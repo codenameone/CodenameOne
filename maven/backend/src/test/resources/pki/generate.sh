@@ -61,4 +61,6 @@ cat leaf.pem inter.pem > chain.pem
 $O pkcs12 -export -inkey leaf.key -in leaf.pem -certfile inter.pem -name api -passout pass:changeit -out leaf.p12
 $O pkcs12 -export -legacy -inkey leaf.key -in leaf.pem -name api -passout pass:changeit -out legacy.p12
 $O req -new -key leaf.key -subj "/CN=api.example.com" -addext "subjectAltName=DNS:api.example.com,DNS:www.example.com" -config ext.cnf -out openssl.csr
-rm -f inter.csr leaf.csr sub.csr ext.cnf sub.key
+printf 'signed content\n' > content.txt
+$O cms -sign -nodetach -binary -in content.txt -signer leaf.pem -inkey leaf.key -certfile inter.pem -outform DER -out signed.p7
+rm -f content.txt inter.csr leaf.csr sub.csr ext.cnf sub.key

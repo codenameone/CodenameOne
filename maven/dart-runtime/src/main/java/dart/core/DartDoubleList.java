@@ -23,6 +23,8 @@
  */
 package dart.core;
 
+import dart.runtime.DartRuntime;
+
 import java.util.Arrays;
 
 import dart.runtime.Funcs;
@@ -33,7 +35,7 @@ import dart.runtime.Funcs;
  * {@link #addDouble(double)}) never box; the inherited list surface still works (boxing only at that
  * generic boundary) because {@link DartList} routes through the overridden {@code get/set/size/add}.
  */
-public final class DartDoubleList extends DartList<Double> {
+public class DartDoubleList extends DartList<Double> {
 
     private double[] a;
     private int len;
@@ -41,6 +43,12 @@ public final class DartDoubleList extends DartList<Double> {
     public DartDoubleList() {
         super(true);
         a = new double[8];
+    }
+
+    /// For a typed-data view (dart.typed_data) that keeps its own storage: fixed
+    /// length, and every storage accessor overridden by the subclass.
+    protected DartDoubleList(boolean fixedLength) {
+        super(!fixedLength, false);
     }
 
     private DartDoubleList(double[] a, int len, boolean growable) {
@@ -112,6 +120,81 @@ public final class DartDoubleList extends DartList<Double> {
         return new DartDoubleList(grown.a, grown.len, growable);
     }
 
+    /// `value is List<double>`. The primitive-backed list always is one; a boxed DartList is
+    /// one when every element is a double. Generic code (`List<E>.of(..)` with E bound to
+    /// double at the use site) builds the boxed form, and type arguments are erased here, so
+    /// the elements are the only witness the runtime has of the argument. An empty boxed list
+    /// answers true, as an erased `is List<String>` does.
+    public static boolean isDoubles(Object value) {
+        if (value instanceof DartDoubleList) {
+            return true;
+        }
+        if (!(value instanceof DartList)) {
+            return false;
+        }
+        DartList<?> l = (DartList<?>) value;
+        if (l.elementWitness() != null) {
+            // A boxed list that recorded its type argument answers by it, not its elements.
+            return dart.runtime.TypeWitness.isSubtype(l.elementWitness(), ELEMENT);
+        }
+        int n = l.size();
+        for (int i = 0; i < n; i++) {
+            Object e = l.get(i);
+            if (!(e instanceof Double || e instanceof Float)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// A List<double> value held as the primitive-backed list its static type promises:
+    /// the value itself when it already is one, otherwise a copy. A generic runtime
+    /// method (`Stream<int>.toList()`) builds a boxed DartList, which a local typed
+    /// List<double> cannot hold.
+    @SuppressWarnings("unchecked")
+    /// A value a List<double> is statically typed as, as the DartDoubleList that type is held in:
+    /// itself when it already is one, else a live DoubleListView over the boxed DartList that
+    /// generic code built (`List<E>.of(..)` with E bound to double at the use site). Unlike
+    /// asDoubles this never copies, so writes through either side reach the same list.
+    public static DartDoubleList viewDoubles(Object value) {
+        if (value == null || value instanceof DartDoubleList) {
+            return (DartDoubleList) value;
+        }
+        if (value instanceof DartList) {
+            return new DoubleListView((DartList<Double>) value);
+        }
+        throw new TypeError("type '" + value.getClass().getSimpleName()
+                + "' is not a subtype of type 'List<double>'");
+    }
+
+    @SuppressWarnings("unchecked")
+    public static DartDoubleList asDoubles(Object value) {
+        if (value == null || value instanceof DartDoubleList) {
+            return (DartDoubleList) value;
+        }
+        return fromDoubles((Iterable<? extends Number>) value);
+    }
+
+    /// `List<double>.from(source)` whatever the source's static type (`List<dynamic>`,
+    /// `dynamic`, an `Iterable<num>`): every element is tested as an Object before it is
+    /// read as a number, so a String in a dynamic list is Dart's TypeError rather than a
+    /// cast that ParparVM would not check.
+    public static DartDoubleList fromDoublesChecked(Object source, boolean growable) {
+        if (!(source instanceof Iterable)) {
+            throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(source))
+                    + "' is not a subtype of type 'Iterable<dynamic>'");
+        }
+        DartDoubleList l = new DartDoubleList();
+        for (Object e : (Iterable<?>) source) {
+            if (!(e instanceof Double || e instanceof Float)) {
+                throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                        + "' is not a subtype of type 'double'");
+            }
+            l.addDouble(((Number) e).doubleValue());
+        }
+        return growable ? l : new DartDoubleList(l.a, l.len, false);
+    }
+
     public static DartDoubleList fromDoubles(Iterable<? extends Number> elements) {
         DartDoubleList l = new DartDoubleList();
         for (Number e : elements) {
@@ -165,6 +248,25 @@ public final class DartDoubleList extends DartList<Double> {
         return true;
     }
 
+    private static final dart.runtime.TypeWitness ELEMENT = dart.runtime.TypeWitness.of(Double.class, false);
+
+    @Override
+    public dart.runtime.TypeWitness elementWitness() {
+        dart.runtime.TypeWitness w = super.elementWitness();
+        return w != null ? w : ELEMENT;
+    }
+
+    /// The boxed boundary of a covariant write: a List<double> held as a List<num> or
+    /// List<Object> refuses anything that is no double with Dart's TypeError rather than a
+    /// ClassCastException.
+    protected static Double checkedDouble(Object e) {
+        if (e instanceof Double) {
+            return (Double) e;
+        }
+        throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                + "' is not a subtype of type 'double' of 'value'");
+    }
+
     // --- storage accessors (boxed boundary for the inherited surface) ---
 
     @Override
@@ -174,7 +276,8 @@ public final class DartDoubleList extends DartList<Double> {
     }
 
     @Override
-    public Double set(int index, Double element) {
+    protected Object setElement(int index, Object element$in) {
+        Double element = checkedDouble(element$in);
         checkWritable();
         RangeError.checkValidIndex(index, len);
         double old = a[index];
@@ -187,13 +290,26 @@ public final class DartDoubleList extends DartList<Double> {
         return len;
     }
 
+    /// Growing a List<double> would fill it with null, which Dart rejects as a TypeError;
+    /// shrinking truncates.
     @Override
-    public boolean add(Double e) {
+    void setLengthUnchecked(int n) {
+        if (n > len) {
+            throw new TypeError("type 'Null' is not a subtype of type 'double'");
+        }
+        len = n;
+        modCount++;
+    }
+
+    @Override
+    protected boolean addElement(Object e$in) {
+        Double e = checkedDouble(e$in);
         return addDouble(e);
     }
 
     @Override
-    public void add(int index, Double element) {
+    protected void insertElement(int index, Object element$in) {
+        Double element = checkedDouble(element$in);
         checkGrowable("insert");
         ensure(len + 1);
         System.arraycopy(a, index, a, index + 1, len - index);
@@ -211,5 +327,41 @@ public final class DartDoubleList extends DartList<Double> {
         len--;
         modCount++;
         return old;
+    }
+
+    /**
+     * Dart's {@code sublist(start, end)}, typed as this class: a {@code List<double>}
+     * is emitted as a {@code DartDoubleList}, so the inherited {@code DartList} result was
+     * not assignable back to the variable that holds it.
+     */
+    @Override
+    public DartDoubleList sublist(long start, long end) {
+        RangeError.checkValueInInterval(start, 0, len, "start");
+        RangeError.checkValueInInterval(end, start, len, "end");
+        int n = (int) (end - start);
+        double[] backing = new double[Math.max(8, n)];
+        System.arraycopy(a, (int) start, backing, 0, n);
+        return new DartDoubleList(backing, n, true);
+    }
+
+    /** {@link DartList#sublist(long, Long)}, keeping the primitive-backed list type. */
+    @Override
+    public DartDoubleList sublist(long start, Long end) {
+        return end == null ? sublist(start) : sublist(start, end.longValue());
+    }
+
+    /** Dart's {@code sublist(start)}; see {@link #sublist(long, long)}. */
+    @Override
+    public DartDoubleList sublist(long start) {
+        return sublist(start, len);
+    }
+
+    /**
+     * {@code list[i] = 5} on a {@code List<double>}: Dart converts the int literal to
+     * a double in that context, but the emitted Java hands over a {@code long}, which
+     * {@code idxSet(long, Double)} does not accept.
+     */
+    public Double idxSet(long index, long value) {
+        return idxSet(index, Double.valueOf((double) value));
     }
 }

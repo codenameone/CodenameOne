@@ -48,6 +48,7 @@ public class CameraFrameHarness {
     private volatile FrameFormat frameFormat = FrameFormat.JPEG;
     private volatile long frameIntervalNanos;
     private long lastFrameNanos;
+    private byte[] nv21Buffer;
     public interface FrameListener { void onFrame(CameraFrame frame); }
     public void deliver(Object proxy) { onImageProxy(proxy); }
 ''' + methods + '\n}\n')

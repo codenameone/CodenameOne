@@ -36,7 +36,49 @@ import java.util.LinkedHashSet;
  * view so a {@code Set} used as an iterable emits the same call shapes as a
  * {@code List}).
  */
-public class DartSet<E> extends LinkedHashSet<E> {
+public class DartSet<E> extends LinkedHashSet<E> implements dart.runtime.Reified {
+
+    /// The runtimeType class of a set literal: Dart's VM names it `_Set<E>`, which is
+    /// not `Set<E>` (`<int>{}.runtimeType == Set<int>` is false there too).
+    public static final class _Set {
+        private _Set() {
+        }
+    }
+
+    /// The reified element type, null when nothing recorded it.
+    private dart.runtime.TypeWitness elem;
+
+    /// Records the element witness on {@code set} (null leaves it unknown) and answers it.
+    public static <S> S typed(S set, dart.runtime.TypeWitness elem) {
+        if (elem != null && set instanceof DartSet) {
+            ((DartSet<?>) set).elem = elem;
+        }
+        return set;
+    }
+
+    public dart.runtime.TypeWitness elementWitness() {
+        return elem;
+    }
+
+    @Override
+    public Object $runtimeType() {
+        if (getClass() != DartSet.class) {
+            // A subclass (a LinkedHashSet, an unmodifiable view) is its own Dart type.
+            return getClass();
+        }
+        return dart.runtime.TypeWitness.of(_Set.class, false, elementWitness());
+    }
+
+    /// `value is Set<X>`/`Iterable<X>`: the covariant test on the reified argument; one
+    /// nothing recorded is unknown and passes, as an erased test would.
+    public static boolean isSetOf(Object value, dart.runtime.TypeWitness target) {
+        if (!(value instanceof DartSet)) {
+            return false;
+        }
+        dart.runtime.TypeWitness w = ((DartSet<?>) value).elementWitness();
+        return w == null || dart.runtime.TypeWitness.isSubtype(w, target);
+    }
+
 
     /// Identity, as Dart's own {@code Set} has: {@code [1] == [1]} is false in Dart
     /// unless a type overrides {@code operator ==}. The inherited Java equality is
@@ -71,7 +113,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
      * on every numeric set paid for sets of NaN, which no Flutter application relies on.</p>
      */
     private Object storedElement(Object e) {
-        if (!(e instanceof Number) || super.contains(e)) {
+        if ((!(e instanceof Number) && !dart.runtime.DartRuntime.isCanonView(e)) || super.contains(e)) {
             return e;
         }
         for (Object twin : DartMap.numericTwins(e)) {
@@ -162,6 +204,26 @@ public class DartSet<E> extends LinkedHashSet<E> {
     @Override
     public boolean add(E e) {
         checkWritable();
+        if (elem != null && !elem.test(e)) {
+            throw new TypeError("type '" + DartRuntime.str(dart.runtime.TypeWitness.runtimeType(e))
+                    + "' is not a subtype of type '" + elem + "' of 'value'");
+        }
+        return addStored(e);
+    }
+
+    /// The transpiler calls this instead when the receiver's static element type is exact
+    /// (a type with no proper subtype a collection could be reified with), so the reified
+    /// witness can only be that type and the write cannot fail its check. Any subclass keeps
+    /// its own write path, checks included.
+    public final boolean addUnchecked(E e) {
+        if (getClass() != DartSet.class) {
+            return add(e);
+        }
+        checkWritable();
+        return addStored(e);
+    }
+
+    private boolean addStored(E e) {
         boolean added = storedElement(e) == e && super.add(e);
         if (added) {
             structure++;
@@ -193,6 +255,26 @@ public class DartSet<E> extends LinkedHashSet<E> {
         DartSet<E> s = new DartSet<>();
         for (E e : elements) {
             s.add(e);
+        }
+        return s;
+    }
+
+    /// Dart's {@code Set<E>.from(iterable)} with a concrete E: each element is checked
+    /// against E, and a source that is no Iterable (a dynamic one) is a TypeError.
+    @SuppressWarnings("unchecked")
+    public static <E> DartSet<E> fromChecked(Object source, Class<?> type, boolean nullable) {
+        if (!(source instanceof Iterable)) {
+            throw new TypeError("type '" + (source == null ? "Null" : source.getClass().getName())
+                    + "' is not a subtype of type 'Iterable'");
+        }
+        DartSet<E> s = new DartSet<>();
+        for (Object e : (Iterable<?>) source) {
+            if (e == null ? !nullable : !type.isInstance(e)) {
+                String n = type.getName();
+                throw new TypeError("type '" + (e == null ? "Null" : e.getClass().getName())
+                        + "' is not a subtype of type '" + n.substring(n.lastIndexOf('.') + 1) + "'");
+            }
+            s.add((E) e);
         }
         return s;
     }
@@ -266,7 +348,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
 
     /** Dart's {@code Set.union(other)} -- elements in either set, same kind as this. */
     public DartSet<E> union(java.util.Set<? extends E> other) {
-        DartSet<E> s = newEmpty();
+        DartSet<E> s = typed(newEmpty(), elementWitness());
         s.addAll(this);
         if (other != null) {
             s.addAll(other);
@@ -302,7 +384,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
     public void addAllIterable(Iterable<? extends E> elements) {
         checkWritable();
         if (elements != null) {
-            for (E e : elements) {
+            for (E e : DartList.checkedSource(elementWitness(), elements)) {
                 add(e);
             }
         }
@@ -475,7 +557,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
 
     /** Dart's {@code Set.toSet()} -- a copy of the same kind as this set, per the real SDK. */
     public DartSet<E> toSet() {
-        DartSet<E> s = newEmpty();
+        DartSet<E> s = typed(newEmpty(), elementWitness());
         s.addAll(this);
         return s;
     }
@@ -534,7 +616,7 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return asIterable().reduce(combine);
     }
 
-    public <R> DartIterable<R> expand(Funcs.Func1<E, Iterable<R>> f) {
+    public <R> DartIterable<R> expand(Funcs.Func1<E, ? extends Iterable<R>> f) {
         return asIterable().expand(f);
     }
 
@@ -589,5 +671,20 @@ public class DartSet<E> extends LinkedHashSet<E> {
         } finally {
             DartRuntime.endFormat(this);
         }
+    }
+
+    /// Dart's {@code lookup(object)}: the element equal to {@code object}, or null.
+    public E lookup(Object object) {
+        // Through contains(), so a number looked up matches the way it is stored.
+        if (!contains(object)) {
+            return null;
+        }
+        Object key = storedElement(object);
+        for (E e : this) {
+            if (e == null ? key == null : e.equals(key)) {
+                return e;
+            }
+        }
+        return null;
     }
 }

@@ -150,6 +150,10 @@ public class TextField extends Widget {
         this.autofillHints = v;
     }
 
+    public Object getKeyboardType() {
+        return keyboardType;
+    }
+
     public void keyboardType(Object v) {
         this.keyboardType = v;
     }

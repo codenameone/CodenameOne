@@ -1,0 +1,25 @@
+[false, true, false, true]
+[true, false]
+4
+true
+1
+2
+false,true,false,true
+[6, 7]
+[7, 8]
+true
+true
+false
+false
+true
+false
+true
+false
+true
+a%20b%26c%2Fd
+a b&c/d
+7.5
+[104, 105]
+hi
+[111, 107]
+ok

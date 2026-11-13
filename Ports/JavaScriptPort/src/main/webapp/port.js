@@ -369,7 +369,12 @@ function emitCiFallbackMarker(symbol, markerType) {
 }
 function bindCiFallback(symbol, names, fn) {
   emitCiFallbackMarker(symbol, "ENABLED");
-  const wrappedFallback = function*() {
+  // Disabled diagnostics must not allocate a delegating generator per call.
+  // The implementation retains its native binding and suspension contract.
+  // The symbol is stamped on the function itself in that case, so a function
+  // already bound under another symbol still gets a wrapper of its own.
+  const direct = !__cn1PortDiagEnabled() && fn.__cn1CiFallbackSymbol === undefined;
+  const wrappedFallback = direct ? fn : function*() {
     emitCiFallbackMarker(symbol, "HIT");
     return yield* fn.apply(this, arguments);
   };
@@ -2937,6 +2942,10 @@ bindNative(cn1RtcNames("nativeRtcIce", "int_java_lang_String_int_java_lang_Strin
   yield* cn1RtcHost({ op: "ice", peer: peer | 0, mid: cn1RtcStr(mid), index: index | 0, cand: cn1RtcStr(cand) });
 });
 
+bindNative(cn1RtcNames("nativeRtcRestart", "int", null), function*(peer) {
+  yield* cn1RtcHost({ op: "restart", peer: peer | 0 });
+});
+
 bindNative(cn1RtcNames("nativeRtcClose", "int", null), function*(peer) {
   yield* cn1RtcHost({ op: "close", peer: peer | 0 });
 });
@@ -3931,6 +3940,9 @@ bindCiFallback("Style.setMarginUnitArrayCoerce", [
 bindCiFallback("Style.convertUnitArrayCoerce", [
   styleConvertUnitMethodId
 ], function*(__cn1ThisObject, arr, value, side) {
+  // Null denotes pixel units in Style.convertUnit. Preserve its Java float-to-int
+  // conversion without allocating a synthetic byte[4] on every padding lookup.
+  if (arr == null) return _d2i(value);
   const original = resolveTranslatedMethod("com_codename1_ui_plaf_Style", styleConvertUnitMethodId);
   if (typeof original !== "function") {
     // Null unit means PIXELS in CN1; for any other byte value the translator

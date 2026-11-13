@@ -28,7 +28,7 @@ import com.codenameone.examples.skirmish.api.GameProtocol;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Api;
 import com.codenameone.examples.skirmish.net.GameLink;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.battle.OnlineDriver;
 import java.util.Map;
 

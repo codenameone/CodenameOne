@@ -23,7 +23,7 @@ import com.codename1.backend.Tasks;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.parley.Ids;
-import com.codenameone.examples.parley.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.parley.api.BridgeLinkDto;
 import com.codenameone.examples.parley.api.BridgeRequestDto;
 import com.codenameone.examples.parley.api.BridgeStatusDto;

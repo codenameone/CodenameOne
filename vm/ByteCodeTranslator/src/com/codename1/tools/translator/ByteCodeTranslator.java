@@ -189,7 +189,11 @@ public class ByteCodeTranslator {
         }
         if(directoryList != null) {
             for(File f : directoryList) {
-                if(f.getName().endsWith(".bundle") || f.getName().endsWith(".xcdatamodeld")) {
+                // An xcframework is one unit to Xcode (it picks the device or
+                // simulator slice); flattening it like an ordinary directory
+                // would leave two libraries of one name in the project.
+                if(f.getName().endsWith(".bundle") || f.getName().endsWith(".xcdatamodeld")
+                        || f.getName().endsWith(".xcframework")) {
                     copyDir(f, outputDir);
                     continue;
                 }
@@ -569,6 +573,15 @@ public class ByteCodeTranslator {
         File srcRoot = new File(root, appName + "-src");
         srcRoot.mkdirs();
 
+        // A dependency jar may carry a main of its own -- bcprov's
+        // org.bouncycastle.LICENSE is enough -- and without a name the scan
+        // refuses the second main it meets. The backend packager names its entry
+        // point here (a binary class name), and every other main is then ignored.
+        String preferredMain = System.getProperty("cn1.mainClass");
+        if (preferredMain != null && preferredMain.length() > 0) {
+            ByteCodeClass.setPreferredMainClass(preferredMain.replace('.', '_').replace('/', '_')
+                    .replace('$', '_').replace('-', '_'));
+        }
         b.execute(sources, srcRoot);
 
         File cn1Globals = copyRuntimeResource(srcRoot, "cn1_globals.h");
@@ -1048,6 +1061,7 @@ public class ByteCodeTranslator {
         // share. An app that wants CgBI can put its images in an asset catalog.
         File projectPbx = new File(xcproj, "project.pbxproj");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));
+        writeLldbSharedScheme(root, xcproj, appName);
 
         // File.list(FilenameFilter) is not in JavaAPI; filter the plain listing.
         String[] allNames = srcRoot.list();
@@ -1173,7 +1187,8 @@ public class ByteCodeTranslator {
             fileListEntry.append(file);
             fileListEntry.append(" */ = {isa = PBXFileReference; lastKnownFileType = ");
             fileListEntry.append(getFileType(file));
-            if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || file.endsWith(".a")) {
+            if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || file.endsWith(".a")
+                    || file.endsWith(".xcframework")) {
                 fileListEntry.append("; name = \"");
                 fileListEntry.append(file);
                 if(file.endsWith(".dylib") || file.endsWith(".tbd")) {
@@ -1181,7 +1196,7 @@ public class ByteCodeTranslator {
                     fileListEntry.append(file);
                     fileListEntry.append("\"; sourceTree = SDKROOT; };\n");
                 } else {
-                    if(file.endsWith(".a")) {
+                    if(file.endsWith(".a") || file.endsWith(".xcframework")) {
                         fileListEntry.append("\"; path = \"");
                         fileListEntry.append(appName);
                         fileListEntry.append("-src/");
@@ -1258,7 +1273,7 @@ public class ByteCodeTranslator {
                     fileThreeEntry.append(" */,\n");
                 }
             } else {
-                if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".tbd") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
+                if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".xcframework") || file.endsWith(".dylib") || file.endsWith(".tbd") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
                     frameworks.append("				0");
                     frameworks.append(referenceValue);
                     frameworks.append("18E9ABBC002F3D1D /* ");
@@ -1476,7 +1491,19 @@ public class ByteCodeTranslator {
                 writer.append("            string(REPLACE \"/MDd\" \"/MTd\" ${CN1_FLAG_VAR} \"${${CN1_FLAG_VAR}}\")\n");
                 writer.append("        endforeach()\n");
                 writer.append("    else()\n");
-                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 bcrypt ncrypt winmm runtimeobject dbghelp advapi32 dwmapi)\n");
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 bcrypt ncrypt winmm runtimeobject dbghelp advapi32 dwmapi dxva2)\n");
+                writer.append("    endif()\n");
+                // CN1_WINDOWS_EMBEDDED (WindowsNativeBuilder passes it for
+                // windows.embedded=true) is the kiosk target: a borderless window
+                // over a whole monitor, the shell shortcuts filtered, the shared
+                // on-screen keyboard (cn1_windows_embedded.cpp). The board profile's
+                // defaults ride in CN1_WINDOWS_EMBEDDED_DEFINES as CN1_DEFAULT_*.
+                // dxva2, above, is the DDC/CI backlight of cn1_windows_hardware.cpp,
+                // which a desktop build answers through as well.
+                writer.append("    option(CN1_WINDOWS_EMBEDDED \"Build the embedded (kiosk) target\" OFF)\n");
+                writer.append("    set(CN1_WINDOWS_EMBEDDED_DEFINES \"\" CACHE STRING \"CN1_DEFAULT_* defaults of the kiosk target, semicolon separated\")\n");
+                writer.append("    if(CN1_WINDOWS_EMBEDDED AND NOT CN1_WINDOWS_UWP)\n");
+                writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_WINDOWS_EMBEDDED=1 ${CN1_WINDOWS_EMBEDDED_DEFINES})\n");
                 writer.append("    endif()\n");
                 // BrowserComponent is backed by WebView2 (cn1_windows_browser.cpp),
                 // gated on the SDK being present: when WEBVIEW2_SDK_DIR points at a
@@ -1772,7 +1799,14 @@ public class ByteCodeTranslator {
         // build distro's CURL_OPENSSL_4 tags, absent on Alma/RHEL's libcurl.
         // Keep its headers/compiler flags, but do not link CN1CURL_LIBRARIES.
         writer.append("pkg_check_modules(CN1CURL REQUIRED libcurl)\n");
-        writer.append("pkg_check_modules(CN1GL REQUIRED epoxy egl glesv2)\n");
+        // GL goes through libepoxy, which dlopen()s libEGL and libGLESv2 itself at
+        // first use, so only epoxy is linked; egl/glesv2 are probed for their
+        // headers alone. Linking them made each a DT_NEEDED, and the Steam Linux
+        // Runtime (sniper) ships libEGL but no libGLESv2 -- the binary would not
+        // start there at all. On a system without GLES the GL surface reports
+        // unsupported instead and Cairo draws everything.
+        writer.append("pkg_check_modules(CN1GL REQUIRED epoxy)\n");
+        writer.append("pkg_check_modules(CN1GLHDR REQUIRED egl glesv2)\n");
         // Optional feature libs (browser/media/secure-storage/notifications/
         // location). The port dlopen()s these lazily at first use (see
         // cn1_linux_browser.c / cn1_linux_media.c / cn1_linux_services.c), so we
@@ -1783,7 +1817,7 @@ public class ByteCodeTranslator {
         writer.append("pkg_check_modules(CN1OPT REQUIRED\n");
         writer.append("    gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0\n");
         writer.append("    webkit2gtk-4.1 libsecret-1 libnotify libgeoclue-2.0)\n");
-        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1CRYPTO_INCLUDE_DIRS} ${CN1CURL_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1OPT_INCLUDE_DIRS})\n");
+        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1CRYPTO_INCLUDE_DIRS} ${CN1CURL_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1GLHDR_INCLUDE_DIRS} ${CN1OPT_INCLUDE_DIRS})\n");
         writer.append("target_compile_options(${PROJECT_NAME} PRIVATE ${CN1DEPS_CFLAGS_OTHER} ${CN1CURL_CFLAGS_OTHER} ${CN1GL_CFLAGS_OTHER} ${CN1OPT_CFLAGS_OTHER})\n");
         // libm/pthread back the translated runtime + GC; dl is required for the
         // dlopen() of the optional libs above. Note: CN1OPT_LIBRARIES is
@@ -1852,6 +1886,9 @@ public class ByteCodeTranslator {
     }
     
     private static String getFileType(String s) {
+        if(s.endsWith(".xcframework")) {
+            return "wrapper.xcframework";
+        }
         if(s.endsWith(".framework")) {
             return "wrapper.framework";
         }
@@ -2056,6 +2093,73 @@ public class ByteCodeTranslator {
             }
             copy(in, new FileOutputStream(new File(srcRoot, name)));
             sourceManifest.recordRuntime(name, "/" + name);
+        }
+    }
+
+    /// The collector stops a thread it cannot park with SIGUSR2, and lldb stops on every
+    /// signal by default, so a debug session halts on each such GC stop. Every project
+    /// therefore carries `cn1.lldbinit` beside the `.xcodeproj` and a shared scheme whose
+    /// Run and Test actions load it. This used to be written only by the builder's
+    /// xcodeproj-gem hook, which runs only when a project needs pods or an extension, so a
+    /// plain application never got it (issue #5362). The target identifier is the app
+    /// target of both Apple templates; the builder's hook, when it runs, sets the same
+    /// attribute on this scheme again.
+    private static void writeLldbSharedScheme(File root, File xcproj, String appName) throws IOException {
+        writeUtf8(new File(root, "cn1.lldbinit"),
+                "# Codename One LLDB settings: let the GC's stop signal through without stopping\n"
+                + "process handle -s false -n false -p true SIGUSR2\n");
+        File schemes = new File(xcproj, "xcshareddata/xcschemes");
+        schemes.mkdirs();
+        String ref = buildableReference("         ", appName);
+        String lldb = "      customLLDBInitFile = \"$(SRCROOT)/cn1.lldbinit\"\n";
+        writeUtf8(new File(schemes, appName + ".xcscheme"),
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<Scheme\n   LastUpgradeVersion = \"1500\"\n   version = \"1.7\">\n"
+                + "   <BuildAction\n      parallelizeBuildables = \"YES\"\n      buildImplicitDependencies = \"YES\">\n"
+                + "      <BuildActionEntries>\n"
+                + "         <BuildActionEntry\n            buildForTesting = \"YES\"\n            buildForRunning = \"YES\"\n"
+                + "            buildForProfiling = \"YES\"\n            buildForArchiving = \"YES\"\n            buildForAnalyzing = \"YES\">\n"
+                + buildableReference("            ", appName)
+                + "         </BuildActionEntry>\n      </BuildActionEntries>\n   </BuildAction>\n"
+                + "   <TestAction\n      buildConfiguration = \"Debug\"\n"
+                + "      selectedDebuggerIdentifier = \"Xcode.DebuggerFoundation.Debugger.LLDB\"\n"
+                + "      selectedLauncherIdentifier = \"Xcode.DebuggerFoundation.Launcher.LLDB\"\n"
+                + lldb
+                + "      shouldUseLaunchSchemeArgsEnv = \"YES\">\n   </TestAction>\n"
+                + "   <LaunchAction\n      buildConfiguration = \"Debug\"\n"
+                + "      selectedDebuggerIdentifier = \"Xcode.DebuggerFoundation.Debugger.LLDB\"\n"
+                + "      selectedLauncherIdentifier = \"Xcode.DebuggerFoundation.Launcher.LLDB\"\n"
+                + lldb
+                + "      launchStyle = \"0\"\n      useCustomWorkingDirectory = \"NO\"\n"
+                + "      ignoresPersistentStateOnLaunch = \"NO\"\n      debugDocumentVersioning = \"YES\"\n"
+                + "      allowLocationSimulation = \"YES\">\n"
+                + "      <BuildableProductRunnable\n         runnableDebuggingMode = \"0\">\n"
+                + ref + "      </BuildableProductRunnable>\n   </LaunchAction>\n"
+                + "   <ProfileAction\n      buildConfiguration = \"Release\"\n      shouldUseLaunchSchemeArgsEnv = \"YES\"\n"
+                + "      savedToolIdentifier = \"\"\n      useCustomWorkingDirectory = \"NO\"\n      debugDocumentVersioning = \"YES\">\n"
+                + "      <BuildableProductRunnable\n         runnableDebuggingMode = \"0\">\n"
+                + ref + "      </BuildableProductRunnable>\n   </ProfileAction>\n"
+                + "   <AnalyzeAction\n      buildConfiguration = \"Debug\">\n   </AnalyzeAction>\n"
+                + "   <ArchiveAction\n      buildConfiguration = \"Release\"\n      revealArchiveInOrganizer = \"YES\">\n   </ArchiveAction>\n"
+                + "</Scheme>\n");
+    }
+
+    private static String buildableReference(String indent, String appName) {
+        return indent + "<BuildableReference\n"
+                + indent + "   BuildableIdentifier = \"primary\"\n"
+                + indent + "   BlueprintIdentifier = \"0F634E7418E9ABBC002F3D1D\"\n"
+                + indent + "   BuildableName = \"" + appName + ".app\"\n"
+                + indent + "   BlueprintName = \"" + appName + "\"\n"
+                + indent + "   ReferencedContainer = \"container:" + appName + ".xcodeproj\">\n"
+                + indent + "</BuildableReference>\n";
+    }
+
+    private static void writeUtf8(File f, String s) throws IOException {
+        OutputStream o = new FileOutputStream(f);
+        try {
+            o.write(s.getBytes(StandardCharsets.UTF_8));
+        } finally {
+            o.close();
         }
     }
 

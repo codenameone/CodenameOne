@@ -1,0 +1,47 @@
+true false false
+false true false
+false true false false false
+true false false false false
+false false false true true
+false false true true true
+ran
+void callback int: false
+void callback void: true
+true
+false
+true
+false
+true
+true
+true
+false
+25
+true false false
+false true false
+false false false
+true
+false
+true false false
+false false false false false
+true
+false
+true false false
+true
+false
+false
+true
+false
+true
+false
+true
+42
+false
+false
+false
+false
+true
+false
+false
+false
+true
+4

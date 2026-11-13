@@ -52,6 +52,7 @@ import org.objectweb.asm.Type;
 /// generate the registry, and a class some other use gave a codec works there.
 final class JsonCallSites {
     private static final String JSON = "com/codename1/backend/Json";
+    private static final String TEMPLATE = "com/codename1/backend/messaging/MessageTemplate";
 
     private JsonCallSites() {
     }
@@ -143,6 +144,17 @@ final class JsonCallSites {
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc,
                                     boolean itf) {
+            if (opcode == Opcodes.INVOKEVIRTUAL && TEMPLATE.equals(owner) && "send".equals(name)
+                    && ("(Ljava/lang/String;Ljava/lang/Object;)V".equals(desc)
+                    || "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;)V".equals(desc))) {
+                // A payload is written by Json.write inside the template, so the
+                // type sent needs a codec exactly as a Json.write of it does.
+                if (lastLocal >= 0) {
+                    writtenLocals.add(Integer.valueOf(lastLocal));
+                } else if (last != null) {
+                    use(last, false, "write");
+                }
+            }
             if (opcode == Opcodes.INVOKESTATIC && JSON.equals(owner)) {
                 if (("read".equals(name) || "readList".equals(name))
                         && "(Ljava/lang/String;Ljava/lang/Class;)".equals(params(desc))

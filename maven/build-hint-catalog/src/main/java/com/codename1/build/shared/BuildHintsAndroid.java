@@ -260,6 +260,25 @@ final class BuildHintsAndroid {
                 .def("false")
                 .platform("android"));
 
+        h.add(new Hint("android.billing.store")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("play")
+                .platform("android")
+                .doc("The store an in-app-purchase app is built for: `play` (the default) or "
+                        + "`amazon`. An app is built for one store. `amazon` builds against the "
+                        + "Amazon Appstore SDK instead of the Play Billing Library, declares the "
+                        + "receiver Amazon's client answers through, and leaves out the "
+                        + "`com.android.vending.BILLING` permission, which the Amazon Appstore "
+                        + "doesn't accept. `android.licenseKey` and "
+                        + "`android.billingclient.version` are Google Play settings and aren't "
+                        + "used. Receipts carry the store code `amazon`, the Amazon receipt id "
+                        + "as the transaction id, and the receipt id, user id and SKU as order "
+                        + "data for server-side verification. The Appstore SDK also requires "
+                        + "the app's public key from the Amazon developer console, "
+                        + "`AppstoreAuthenticationKey.pem`, among the app's Android assets. Any "
+                        + "other value fails the build."));
+
         h.add(new Hint("android.billingclient.version")
                 .group(HintGroup.ANDROID)
                 .type(HintType.VERSION)
@@ -1243,6 +1262,13 @@ final class BuildHintsAndroid {
                 .doc("Version of `androidx.wear.watchface:watchface-complications-data-source` added to the "
                         + "wear module. Kept out of `android.gradleDependencies` because that hint feeds the "
                         + "phone module too, and these libraries declare minSdk 26."));
+
+        h.add(new Hint("android.cn1NativesRepository")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("https://repo.codenameone.com/maven2")
+                .platform("android")
+                .doc("Maven repository the builder fetches the on-device AI natives (`com.codenameone.natives`, whisper.cpp and llama.cpp) from, when the app uses them. Defaults to the Codename One repository; a `file:` URL tests a local `scripts/ai-natives/build.sh` output."));
 
         h.add(new Hint("android.wear.guavaVersion")
                 .group(HintGroup.ANDROID)

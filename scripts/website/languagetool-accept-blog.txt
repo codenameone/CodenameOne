@@ -137,3 +137,19 @@ retrolambda
 \bWayline\b
 # Rust GUI toolkit named in the Java vs Rust comparison.
 \begui\b
+minimap
+killfeed
+paintballs
+Paintballs
+
+# Release week of 2026-11-13: library and asset names
+^cpp$
+^ggml$
+^xcframeworks?$
+^javadoc$
+^overallocations?$
+^embeddables?$
+^Quaternius$
+^Rajdhani$
+InfoQ
+zags

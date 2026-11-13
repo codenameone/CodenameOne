@@ -240,6 +240,13 @@ class ZoozPurchase extends Purchase implements Runnable {
 
     @Override
     public void manageSubscriptions(String sku) {
+        if ("mac".equals(Display.getInstance().getPlatformName())) {
+            // The native macOS port. StoreKit has no manage-subscriptions sheet
+            // there and itms-apps is an iOS scheme; the web address is the one
+            // macOS routes to the App Store's subscriptions page.
+            CN.execute("https://apps.apple.com/account/subscriptions");
+            return;
+        }
         CN.execute("itms-apps://apps.apple.com/account/subscriptions");
     }
 

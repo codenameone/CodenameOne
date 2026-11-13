@@ -29,7 +29,7 @@ import com.codenameone.examples.dash.api.InviteDto;
 import com.codenameone.examples.dash.engage.Friends;
 import com.codenameone.examples.dash.engage.Telemetry;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import java.util.List;
 
 /// Invite a friend: the player's link, what an invite pays, and everyone who

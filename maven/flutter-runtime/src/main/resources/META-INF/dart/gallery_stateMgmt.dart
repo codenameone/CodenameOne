@@ -69,13 +69,13 @@ class MultiProvider extends Widget {
 
 @JavaName('com.codename1.flutter.provider.Consumer')
 class Consumer<T> extends StatelessWidget {
-  external Consumer({Key? key, dynamic builder, Widget? child});
+  external Consumer({Key? key, Widget Function(BuildContext, T, Widget)? builder, Widget? child});
 }
 
 // --- scoped_model package ---------------------------------------------
 
 @JavaName('com.codename1.flutter.scopedmodel.Model')
-class Model {
+class Model extends ChangeNotifier {
   external Model();
   external void addListener(VoidCallback listener);
   external void removeListener(VoidCallback listener);
@@ -90,7 +90,7 @@ class ScopedModel extends Widget {
 
 @JavaName('com.codename1.flutter.scopedmodel.ScopedModelDescendant')
 class ScopedModelDescendant<T> extends StatelessWidget {
-  external ScopedModelDescendant({Key? key, dynamic builder, bool? rebuildOnChange, Widget? child});
+  external ScopedModelDescendant({Key? key, Widget Function(BuildContext, Widget, T)? builder, bool? rebuildOnChange, Widget? child});
 }
 
 // --- Locale -----------------------------------------------------------
@@ -100,6 +100,7 @@ class Locale {
   external Locale(String languageCode, [String? countryCode]);
   external String get languageCode;
   external String? get countryCode;
+  external String? get scriptCode;
 }
 
 // --- theming value classes --------------------------------------------
@@ -112,6 +113,12 @@ class IconThemeData {
   external Color? get color;
   external double? get size;
   external double? get opacity;
+  external double? get fill;
+  external double? get weight;
+  external double? get grade;
+  external double? get opticalSize;
+  external List<Shadow>? get shadows;
+  external bool? get applyTextScaling;
   external IconThemeData copyWith({Color? color, double? size, double? opacity, double? fill,
       double? weight, double? grade, double? opticalSize, dynamic shadows,
       bool? applyTextScaling});
@@ -128,6 +135,12 @@ class AppBarTheme {
   external Color? get backgroundColor;
   external double? get elevation;
   external IconThemeData? get iconTheme;
+  external IconThemeData? get actionsIconTheme;
+  external Color? get foregroundColor;
+  external TextStyle? get titleTextStyle;
+  external TextStyle? get toolbarTextStyle;
+  external dynamic get shape;
+  external bool? get centerTitle;
 }
 
 @JavaName('com.codename1.flutter.material.ChipThemeData')

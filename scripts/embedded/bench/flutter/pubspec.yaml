@@ -1,0 +1,9 @@
+name: gauge
+description: The embedded benchmark gauge in Flutter, run by flutter-pi.
+publish_to: 'none'
+version: 1.0.0
+environment:
+  sdk: ^3.9.2
+dependencies:
+  flutter:
+    sdk: flutter

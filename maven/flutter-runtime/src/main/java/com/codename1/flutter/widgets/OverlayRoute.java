@@ -41,6 +41,6 @@ public class OverlayRoute<T> extends Route<T> {
 
     /** The overlay entries this route paints. Subclasses override. */
     public DartIterable<OverlayEntry> createOverlayEntries() {
-        return DartIterable.wrap(new DartList<OverlayEntry>());
+        return DartIterable.wrap(new DartList<OverlayEntry>(dart.runtime.TypeWitness.of(OverlayEntry.class, false)));
     }
 }

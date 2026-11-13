@@ -25,7 +25,7 @@ import com.codename1.orm.session.Identifier;
 import com.codenameone.examples.savor.Days;
 import com.codenameone.examples.savor.Ids;
 import com.codenameone.examples.savor.Rows;
-import com.codenameone.examples.savor.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.savor.api.DayAmountDto;
 import com.codenameone.examples.savor.api.EarningsSummaryDto;
 import com.codenameone.examples.savor.api.PayoutAccountDto;

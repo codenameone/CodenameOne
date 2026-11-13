@@ -94,4 +94,114 @@ public final class Funcs {
     public interface VoidFunc5<A, B, C, D, E> {
         void call(A a, B b, C c, D d, E e);
     }
+
+    @FunctionalInterface
+    public interface Func6<T0, T1, T2, T3, T4, T5, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5);
+    }
+
+    @FunctionalInterface
+    public interface Func7<T0, T1, T2, T3, T4, T5, T6, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6);
+    }
+
+    @FunctionalInterface
+    public interface Func8<T0, T1, T2, T3, T4, T5, T6, T7, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7);
+    }
+
+    @FunctionalInterface
+    public interface Func9<T0, T1, T2, T3, T4, T5, T6, T7, T8, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8);
+    }
+
+    @FunctionalInterface
+    public interface Func10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9);
+    }
+
+    @FunctionalInterface
+    public interface Func11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10);
+    }
+
+    @FunctionalInterface
+    public interface Func12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11);
+    }
+
+    @FunctionalInterface
+    public interface Func13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12);
+    }
+
+    @FunctionalInterface
+    public interface Func14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13);
+    }
+
+    @FunctionalInterface
+    public interface Func15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14);
+    }
+
+    @FunctionalInterface
+    public interface Func16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, R> {
+        R call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14, T15 a15);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc6<T0, T1, T2, T3, T4, T5> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc7<T0, T1, T2, T3, T4, T5, T6> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc8<T0, T1, T2, T3, T4, T5, T6, T7> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc9<T0, T1, T2, T3, T4, T5, T6, T7, T8> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc10<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc11<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc12<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc13<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc14<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc15<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14);
+    }
+
+    @FunctionalInterface
+    public interface VoidFunc16<T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> {
+        void call(T0 a0, T1 a1, T2 a2, T3 a3, T4 a4, T5 a5, T6 a6, T7 a7, T8 a8, T9 a9, T10 a10, T11 a11, T12 a12, T13 a13, T14 a14, T15 a15);
+    }
 }

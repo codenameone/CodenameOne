@@ -25,6 +25,7 @@ package com.codename1.backend.security;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.HttpSession;
 import com.codename1.backend.security.core.userdetails.User;
+import com.codename1.backend.security.mfa.EmailCodeService;
 import com.codename1.backend.security.mfa.RecoveryCodeService;
 import com.codename1.backend.security.mfa.TotpService;
 import com.codename1.backend.security.ratelimit.RateLimitKeyResolver;
@@ -46,7 +47,10 @@ import java.util.Map;
 ///
 /// It is also the filter that takes the code, at `POST /login/mfa` unless
 /// changed, in the field `code`: a one-time code from the user's authenticator
-/// app, or one of their recovery codes. A right one completes the sign-in
+/// app, the code that was mailed to them, or one of their recovery codes. A
+/// user whose only second factor is the mailed code is sent one as they reach
+/// the page; one who has an authenticator app too asks for it there, by
+/// posting the field `send`. A right code completes the sign-in
 /// through the chain's [SessionSignIn] -- the session id changes, the context
 /// is stored, remember-me is issued if it was asked for at the first step, and
 /// the user goes where they were going.
@@ -60,6 +64,7 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
     public static final String PENDING = "CN1_SECURITY_SECOND_FACTOR_PENDING";
 
     private final TotpService totp;
+    private final EmailCodeService emailCodes;
     private final RecoveryCodeService recoveryCodes;
     private final String page;
     private final boolean servePage;
@@ -78,12 +83,14 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
     private SessionSignIn signIn;
     private HttpSessionSecurityContextRepository kinds;
 
-    SecondFactorAuthenticationFilter(TotpService totp, RecoveryCodeService recoveryCodes,
+    SecondFactorAuthenticationFilter(TotpService totp, EmailCodeService emailCodes,
+            RecoveryCodeService recoveryCodes,
             String page, boolean servePage, String processingUrl, String codeParameter,
             long pendingMillis, RateLimiter attempts, RateLimiter addressAttempts,
             AuthenticationSuccessHandler successHandler,
             AuthenticationFailureHandler expiredHandler, Clock clock) {
         this.totp = totp;
+        this.emailCodes = emailCodes;
         this.recoveryCodes = recoveryCodes;
         this.page = page;
         this.servePage = servePage;
@@ -110,12 +117,25 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         this.kinds = repository;
     }
 
+    private boolean app(String name) {
+        return totp != null && totp.isEnabled(name);
+    }
+
+    private boolean mailed(String name) {
+        return emailCodes != null && emailCodes.isEnabled(name);
+    }
+
     // ------------------------------------------------------------ the policy
 
     @Override
     public HttpServer.Response intercept(HttpServer.Request request,
             Authentication authentication, boolean rememberMe) {
-        if (authentication == null || !totp.isEnabled(authentication.getName())) {
+        if (authentication == null) {
+            return null;
+        }
+        boolean app = app(authentication.getName());
+        boolean mailed = mailed(authentication.getName());
+        if (!app && !mailed) {
             return null;
         }
         Map<String, Object> pending = new LinkedHashMap<String, Object>();
@@ -138,12 +158,18 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         session.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
         session.changeSessionId();
         session.setAttribute(PENDING, pending);
+        if (mailed && !app) {
+            // The only way in, so it is not waited to be asked for. A user who
+            // has an app as well is not mailed at every sign-in: they ask.
+            emailCodes.send(authentication.getName());
+        }
         return Responses.redirect(page);
     }
 
     @Override
     public boolean requires(Authentication authentication) {
-        return authentication != null && totp.isEnabled(authentication.getName());
+        return authentication != null && (app(authentication.getName())
+                || mailed(authentication.getName()));
     }
 
     /// A passkey that verified the user signed them in. Whoever ran the count
@@ -151,7 +177,7 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
     /// so their next one-time code is not refused for somebody else's guesses.
     @Override
     public void satisfied(HttpServer.Request request, Authentication authentication) {
-        if (authentication != null && totp.isEnabled(authentication.getName())) {
+        if (requires(authentication)) {
             forget(asciiLower(authentication.getName()), from(request));
         }
     }
@@ -203,6 +229,14 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         String code = Responses.param(request, codeParameter);
         String who = asciiLower(user);
         String from = from(request);
+        if (Responses.param(request, "send") != null) {
+            // Not counted here: the service mails no more than one code in its
+            // own interval, whoever asks and however often.
+            if (mailed(user)) {
+                emailCodes.send(user);
+            }
+            return Responses.redirect(page + "?sent");
+        }
         // What is written as a recovery code is counted apart from the one-time
         // codes, and only at this network: it is the way in for a user whose
         // one-time codes somebody else has used up the attempts at, so those
@@ -225,7 +259,10 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         if (!recovery && attempts != null && !attempts.tryAcquire(counted)) {
             return tooMany(attempts.retryAfterSeconds(counted));
         }
-        boolean accepted = code != null && (totp.verify(user, code)
+        // The app first: six digits it takes never reach the mailed code,
+        // which counts every try made against it.
+        boolean accepted = code != null && ((app(user) && totp.verify(user, code))
+                || (mailed(user) && emailCodes.verify(user, code))
                 || (recoveryCodes != null && recoveryCodes.consume(user, code)));
         if (!accepted) {
             return Responses.redirect(page + "?error");
@@ -299,6 +336,14 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
     private HttpServer.Response page(HttpServer.Request request) {
         boolean error = request.queryParam("error") != null;
         CsrfToken token = CsrfFilter.getToken(request);
+        HttpSession session = request.getSession(false);
+        Object stored = session == null ? null : session.getAttribute(PENDING);
+        Object name = stored instanceof Map ? ((Map) stored).get("name") : null;
+        boolean mailed = name instanceof String && mailed((String) name);
+        boolean app = name instanceof String && app((String) name);
+        String asked = !mailed ? "The code from your authenticator app"
+                : app ? "The code from your authenticator app, or the code we mailed you"
+                : "The code we mailed you";
         StringBuilder html = new StringBuilder(1024);
         html.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n");
         html.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
@@ -308,9 +353,12 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
         html.append("\">\n<h2>Enter your code</h2>\n");
         if (error) {
             html.append("<p role=\"alert\">That code was not accepted</p>\n");
+        } else if (request.queryParam("sent") != null) {
+            html.append("<p role=\"status\">If a code could be sent, it is on its way</p>\n");
         }
-        html.append("<p><label for=\"code\">The code from your authenticator app, or a "
-                + "recovery code</label>\n<input type=\"text\" id=\"code\" name=\"");
+        html.append("<p><label for=\"code\">").append(asked);
+        html.append(recoveryCodes != null ? ", or a recovery code" : "");
+        html.append("</label>\n<input type=\"text\" id=\"code\" name=\"");
         html.append(Responses.escape(codeParameter));
         html.append("\" required autofocus autocomplete=\"one-time-code\" "
                 + "inputmode=\"numeric\"></p>\n");
@@ -319,7 +367,19 @@ public final class SecondFactorAuthenticationFilter implements SecurityFilter, S
                 .append(Responses.escape(token.getParameterName())).append("\" value=\"")
                 .append(Responses.escape(token.getToken())).append("\">\n");
         }
-        html.append("<button type=\"submit\">Continue</button>\n</form>\n</body>\n</html>\n");
+        html.append("<button type=\"submit\">Continue</button>\n</form>\n");
+        if (mailed) {
+            html.append("<form method=\"post\" action=\"").append(Responses.escape(processingUrl));
+            html.append("\">\n<input type=\"hidden\" name=\"send\" value=\"1\">\n");
+            if (token != null) {
+                html.append("<input type=\"hidden\" name=\"")
+                    .append(Responses.escape(token.getParameterName())).append("\" value=\"")
+                    .append(Responses.escape(token.getToken())).append("\">\n");
+            }
+            html.append("<button type=\"submit\">").append(app ? "Mail me a code"
+                    : "Mail me another code").append("</button>\n</form>\n");
+        }
+        html.append("</body>\n</html>\n");
         return Responses.html(200, html.toString());
     }
 }

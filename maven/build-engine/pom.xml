@@ -31,8 +31,16 @@
     </properties>
 
     <dependencies>
+        <!-- The record tests compile entities the way an application does, with
+             the processor writing each record's builder. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-annotation-processor</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <!-- PWA metadata uses the same JSON API bundled in the cloud daemon. -->
-        <dependency><groupId>org.json</groupId><artifactId>json</artifactId><version>20231013</version></dependency>
+        <dependency><groupId>org.json</groupId><artifactId>json</artifactId><version>20260719</version></dependency>
         <!-- Build-only HTML parsing; never linked into backend applications. -->
         <dependency><groupId>org.jsoup</groupId><artifactId>jsoup</artifactId><version>1.23.2</version></dependency>
         <!-- FIRST, before any port. Maven orders the test classpath by declaration,
@@ -239,22 +247,36 @@
             <artifactId>cn1-builder-resources-android</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- The ports a local build reads.
+             Provided and optional, like the compatibility runtimes above: the
+             build needs this module built first, and its tests read the port
+             from the class path, but nothing that RUNS the build tool may
+             inherit it. A plugin's whole class path is downloaded before its
+             first goal, so as a runtime dependency every port was part of the
+             first build of every project, simulator runs included. The host
+             resolves a port when a target that reads it is built
+             (AppBuilder.portArtifacts, ProjectHost.getPortJar);
+             scripts/check-first-build-footprint.py fails the build if one
+             comes back. -->
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-android</artifactId>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-ios</artifactId>
             <classifier>bundle</classifier>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-parparvm</artifactId>
             <classifier>bundle</classifier>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
         <!-- WindowsPort, MacPort and LinuxPort bundles: the native platform classes
              and C / Objective-C sources the native desktop builders stage. -->
@@ -263,21 +285,24 @@
             <artifactId>codenameone-windows</artifactId>
             <classifier>bundle</classifier>
             <version>${project.version}</version>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-mac</artifactId>
             <classifier>bundle</classifier>
             <version>${project.version}</version>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-linux</artifactId>
             <classifier>bundle</classifier>
             <version>${project.version}</version>
-            <scope>runtime</scope>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
         <!-- Forces the reactor to build cn1-hardening first so its shaded jar can be
              embedded below; never on the classpath (see the plugin pom's history for

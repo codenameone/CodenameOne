@@ -230,6 +230,82 @@ class PkiTest {
     }
 
     @Test
+    void selfSignedCertificatesAreWhatTheJdkReads() throws Exception {
+        for (String curve : new String[] {Crypto.P256, Crypto.P384, null}) {
+            byte[] key = curve == null ? Crypto.generateRsaKey(2048) : Crypto.generateEcKey(curve);
+            DistinguishedName name = DistinguishedName.parse("CN=dev.example.com,O=Example");
+            Certificate ours = Certificate.selfSigned(name, key, 30);
+            assertEquals(name.toString(), ours.getSubject().toString());
+            assertEquals(name.toString(), ours.getIssuer().toString());
+            assertTrue(ours.isSelfIssued());
+            assertTrue(ours.isSignedBy(Der.publicKeyOf(key)), String.valueOf(curve));
+            assertArrayEquals(Der.publicKeyOf(key), ours.getPublicKey());
+            assertEquals(30L * 86400000L, ours.getNotAfter() - ours.getNotBefore());
+            assertTrue(ours.isValidAt(System.currentTimeMillis()));
+            X509Certificate jdk = (X509Certificate) CertificateFactory.getInstance("X.509")
+                    .generateCertificate(new ByteArrayInputStream(ours.getEncoded()));
+            jdk.verify(jdk.getPublicKey());
+            assertEquals(3, jdk.getVersion());
+            assertEquals(ours.getNotAfter(), jdk.getNotAfter().getTime());
+        }
+        assertThrows(CertificateException.class, () -> Certificate.selfSigned(
+                DistinguishedName.parse("CN=x"), Crypto.generateEcKey(Crypto.P256), 0));
+    }
+
+    @Test
+    void readsThePeerChainOfATlsConnection() throws Exception {
+        KeyStore store = KeyStore.getInstance("PKCS12");
+        store.load(new ByteArrayInputStream(bytes("leaf.p12")), "changeit".toCharArray());
+        javax.net.ssl.KeyManagerFactory keys = javax.net.ssl.KeyManagerFactory.getInstance(
+                javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
+        keys.init(store, "changeit".toCharArray());
+        javax.net.ssl.SSLContext context = javax.net.ssl.SSLContext.getInstance("TLS");
+        context.init(keys.getKeyManagers(), null, null);
+        try (javax.net.ssl.SSLServerSocket server = (javax.net.ssl.SSLServerSocket)
+                context.getServerSocketFactory().createServerSocket(0)) {
+            Thread accept = new Thread(() -> {
+                try (java.net.Socket peer = server.accept()) {
+                    ((javax.net.ssl.SSLSocket) peer).startHandshake();
+                    peer.getInputStream().read();
+                } catch (IOException ignored) {
+                    // The client hangs up once it has the chain.
+                }
+            });
+            accept.start();
+            java.io.File roots = java.io.File.createTempFile("roots", ".pem");
+            roots.deleteOnExit();
+            java.nio.file.Files.write(roots.toPath(), bytes("root.pem"));
+            com.codename1.backend.Tcp tcp = com.codename1.backend.Tcp.connect("127.0.0.1",
+                    server.getLocalPort(), 5000);
+            try {
+                assertEquals(0, tcp.getPeerCertificates().length);
+                tcp.startTls("127.0.0.1", roots.getAbsolutePath(), false);
+                byte[][] chain = tcp.getPeerCertificates();
+                assertEquals(2, chain.length);
+                assertEquals(cert("leaf.pem"), Certificate.decode(chain[0]));
+                assertEquals(cert("inter.pem"), Certificate.decode(chain[1]));
+            } finally {
+                tcp.close();
+            }
+            accept.join(5000);
+        }
+    }
+
+    @Test
+    void readsOpensslSignedData() throws Exception {
+        SignedData signed = SignedData.decode(bytes("signed.p7"));
+        assertEquals(SignedData.DATA, signed.getContentType());
+        assertArrayEquals("signed content\n".getBytes(StandardCharsets.US_ASCII),
+                signed.getContent());
+        assertEquals(1, signed.getSignerCount());
+        assertTrue(signed.getCertificates().contains(cert("leaf.pem")));
+        assertTrue(signed.getCertificates().contains(cert("inter.pem")));
+        assertThrows(CertificateException.class, () -> SignedData.decode(bytes("leaf.p12")));
+        assertThrows(CertificateException.class,
+                () -> SignedData.decode(cert("leaf.pem").getEncoded()));
+    }
+
+    @Test
     void readsOpensslKeyStores() throws Exception {
         Pkcs12 store = Pkcs12.decode(bytes("leaf.p12"), "changeit");
         assertEquals("api", store.getAlias());
@@ -238,9 +314,58 @@ class PkiTest {
         CertificateException wrong = assertThrows(CertificateException.class,
                 () -> Pkcs12.decode(bytes("leaf.p12"), "nope"));
         assertTrue(wrong.getMessage().contains("password is wrong"));
-        CertificateException legacy = assertThrows(CertificateException.class,
-                () -> Pkcs12.decode(bytes("legacy.p12"), "changeit"));
-        assertTrue(legacy.getMessage().contains("legacy"), legacy.getMessage());
+        // openssl -legacy: RC2-40 certificates, a 3DES key, an HMAC-SHA-1 MAC.
+        Pkcs12 legacy = Pkcs12.decode(bytes("legacy.p12"), "changeit");
+        assertArrayEquals(KeyFiles.privateKey(text("leaf.key")), legacy.getPrivateKey());
+        assertEquals(Arrays.asList(cert("leaf.pem")), legacy.getCertificates());
+        assertThrows(CertificateException.class,
+                () -> Pkcs12.decode(bytes("legacy.p12"), "nope"));
+    }
+
+    @Test
+    void legacyCiphersAreTheJdks() throws Exception {
+        byte[] data = new byte[64];
+        for (int iter = 0 ; iter < data.length ; iter++) {
+            data[iter] = (byte) (iter * 37 + 11);
+        }
+        byte[] iv = {1, 2, 3, 4, 5, 6, 7, 8};
+        for (int length : new int[] {24, 16}) {
+            byte[] key = Arrays.copyOf(data, length);
+            byte[] full = length == 24 ? key : Arrays.copyOf(key, 24);
+            if (length == 16) {
+                System.arraycopy(key, 0, full, 16, 8);
+            }
+            Cipher jdk = Cipher.getInstance("DESede/CBC/NoPadding");
+            jdk.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(full, "DESede"), new IvParameterSpec(iv));
+            byte[] expected = jdk.doFinal(data);
+            assertArrayEquals(expected, LegacyCiphers.tripleDes(true, key, iv, data));
+            assertArrayEquals(data, LegacyCiphers.tripleDes(false, key, iv, expected));
+        }
+        for (int length : new int[] {5, 16}) {
+            byte[] key = Arrays.copyOf(data, length);
+            Cipher jdk = Cipher.getInstance("RC2/CBC/NoPadding");
+            jdk.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "RC2"),
+                    new javax.crypto.spec.RC2ParameterSpec(length * 8, iv));
+            byte[] expected = jdk.doFinal(data);
+            assertArrayEquals(expected, LegacyCiphers.rc2(true, key, length * 8, iv, data));
+            assertArrayEquals(data, LegacyCiphers.rc2(false, key, length * 8, iv, expected));
+        }
+    }
+
+    @Test
+    void legacyKeyStoresRoundTripWithTheJdk() throws Exception {
+        byte[] key = KeyFiles.privateKey(text("leaf.key"));
+        List<Certificate> chain = Arrays.asList(cert("leaf.pem"), cert("inter.pem"));
+        byte[] ours = Pkcs12.encodeLegacy(key, chain, "api", "s3cret");
+        KeyStore jdk = KeyStore.getInstance("PKCS12");
+        jdk.load(new ByteArrayInputStream(ours), "s3cret".toCharArray());
+        assertArrayEquals(KeyFactory.getInstance("EC").generatePrivate(
+                new PKCS8EncodedKeySpec(key)).getEncoded(),
+                jdk.getKey("api", "s3cret".toCharArray()).getEncoded());
+        assertEquals(2, jdk.getCertificateChain("api").length);
+        Pkcs12 back = Pkcs12.decode(ours, "s3cret");
+        assertArrayEquals(key, back.getPrivateKey());
+        assertEquals(chain, back.getCertificates());
     }
 
     @Test

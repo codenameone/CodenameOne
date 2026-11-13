@@ -1,0 +1,31 @@
+true
+false
+false
+true
+true
+true
+true
+false
+true
+true
+true
+false
+cast fail
+8
+true
+10
+true
+false
+() => Null
+() => Null
+() => void
+() => void
+ran
+(int) => Null
+(int) => int
+(int, {String? sep}) => String
+(int, [int]) => int
+true
+true
+(int, {String? sep}) => String
+(int, [int]) => int

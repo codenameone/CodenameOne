@@ -184,7 +184,7 @@ public class TabBar extends StatelessWidget {
      * are white.</p>
      */
     private DartList<Widget> styledTabs(BuildContext context) {
-        DartList<Widget> out = new DartList<Widget>();
+        DartList<Widget> out = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (tabs == null) {
             return out;
         }
@@ -269,10 +269,27 @@ public class TabBar extends StatelessWidget {
             cb.color(indicatorColor);
             bar.child(cb);
         }
-        DartList<Widget> kids = new DartList<Widget>();
+        DartList<Widget> kids = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         kids.add(content);
         kids.add(bar);
         col.children(kids);
         return col;
+    }
+
+    /// Flutter's {@code TabBar.preferredSize}: as wide as it is given, and as high
+    /// as its tallest tab (46, or 72 when a tab shows both an icon and text) plus
+    /// the indicator weight.
+    public com.codename1.flutter.rendering.Size preferredSize() {
+        double h = 46.0;
+        if (tabs != null) {
+            for (int i = 0; i < tabs.size(); i++) {
+                Widget t = tabs.get(i);
+                if (t instanceof Tab && ((Tab) t).hasIconAndText()) {
+                    h = 72.0;
+                }
+            }
+        }
+        h += indicatorWeight != null ? indicatorWeight.doubleValue() : 2.0;
+        return new com.codename1.flutter.rendering.Size(Double.POSITIVE_INFINITY, h);
     }
 }

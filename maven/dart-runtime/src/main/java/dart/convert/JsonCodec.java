@@ -38,7 +38,7 @@ import java.util.Map;
  * iterables, strings, numbers, booleans and null, and calls {@code toJson()} on anything
  * else (see {@link JsonEncodable}).
  */
-public final class JsonCodec {
+public final class JsonCodec implements Codec<Object, String> {
 
     private final Object reviver;
     private final Object toEncodable;
@@ -64,6 +64,13 @@ public final class JsonCodec {
         return v;
     }
 
+    /** {@link Codec}'s {@code decode}, for a JsonCodec held as a Codec. */
+    @Override
+    public Object decode(Object encoded) {
+        return decode((String) encoded, reviver);
+    }
+
+    @Override
     public String encode(Object value) {
         return encode(value, toEncodable);
     }
@@ -74,10 +81,12 @@ public final class JsonCodec {
         return sb.toString();
     }
 
+    @Override
     public JsonEncoder encoder() {
         return new JsonEncoder(toEncodable);
     }
 
+    @Override
     public JsonDecoder decoder() {
         return new JsonDecoder(reviver);
     }
@@ -252,7 +261,10 @@ public final class JsonCodec {
         }
 
         private void fail(String msg) {
-            throw new FormatException(msg + " (at character " + (i + 1) + ")");
+            // Dart's parser: the message alone, the input as its source and the offset
+            // apart, so FormatException.toString adds the position and a caret; running
+            // out of input is "Unexpected end of input" whatever was expected.
+            throw new FormatException(i >= s.length() ? "Unexpected end of input" : msg, s, Long.valueOf(i));
         }
 
         private void skipWs() {
@@ -304,7 +316,8 @@ public final class JsonCodec {
         }
 
         private DartMap<String, Object> object() {
-            DartMap<String, Object> m = new DartMap<String, Object>();
+            DartMap<String, Object> m = DartMap.typed(new DartMap<String, Object>(),
+                    dart.runtime.TypeWitness.of(String.class, false), dart.runtime.TypeWitness.DYNAMIC);
             i++;
             skipWs();
             if (i < s.length() && s.charAt(i) == '}') {
@@ -314,12 +327,12 @@ public final class JsonCodec {
             while (true) {
                 skipWs();
                 if (i >= s.length() || s.charAt(i) != '"') {
-                    fail("Expected a string key");
+                    fail("Unexpected character");
                 }
                 String k = string();
                 skipWs();
                 if (i >= s.length() || s.charAt(i) != ':') {
-                    fail("Expected ':'");
+                    fail("Unexpected character");
                 }
                 i++;
                 skipWs();
@@ -334,13 +347,13 @@ public final class JsonCodec {
                 }
                 if (c != ',') {
                     i--;
-                    fail("Expected ',' or '}'");
+                    fail("Unexpected character");
                 }
             }
         }
 
         private DartList<Object> array() {
-            DartList<Object> l = new DartList<Object>();
+            DartList<Object> l = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
             i++;
             skipWs();
             if (i < s.length() && s.charAt(i) == ']') {
@@ -360,7 +373,7 @@ public final class JsonCodec {
                 }
                 if (c != ',') {
                     i--;
-                    fail("Expected ',' or ']'");
+                    fail("Unexpected character");
                 }
             }
         }

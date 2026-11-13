@@ -84,11 +84,23 @@ class TabBarTheme {
       dynamic indicatorSize, dynamic labelPadding, dynamic overlayColor, dynamic dividerColor});
 }
 
+@JavaName('com.codename1.flutter.material.TabBarIndicatorSize')
+enum TabBarIndicatorSize { tab, label }
+
 @JavaName('com.codename1.flutter.material.TabBarThemeData')
 class TabBarThemeData {
   external TabBarThemeData({Color? indicatorColor, Color? labelColor, Color? unselectedLabelColor,
       TextStyle? labelStyle, TextStyle? unselectedLabelStyle, dynamic indicator,
       dynamic indicatorSize, dynamic labelPadding, dynamic overlayColor, dynamic dividerColor});
+  external Color? get indicatorColor;
+  external Color? get labelColor;
+  external Color? get unselectedLabelColor;
+  external TextStyle? get labelStyle;
+  external TextStyle? get unselectedLabelStyle;
+  external dynamic get indicator;
+  external dynamic get indicatorSize;
+  external dynamic get labelPadding;
+  external dynamic get dividerColor;
 }
 
 @JavaName('com.codename1.flutter.material.DialogTheme')
@@ -128,7 +140,9 @@ class FloatingActionButtonThemeData {
 // `style:` parameter, so it needs no members here.
 
 @JavaName('com.codename1.flutter.material.ButtonStyle')
-class ButtonStyle {}
+class ButtonStyle {
+  external ButtonStyle merge(ButtonStyle? style);
+}
 
 // Note: FilterChip / ChoiceChip / InputChip are owned by the widgetsMore
 // category (gallery_p2_widgetsMore.dart), not this file, to avoid a duplicate

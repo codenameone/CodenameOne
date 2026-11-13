@@ -1,0 +1,9 @@
+3 6 Uint32List
+false true
+{0: x, 1: y, 2: z}
+{1: y}
+one,two
+null
+b
+8
+10

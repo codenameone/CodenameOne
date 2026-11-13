@@ -25,7 +25,7 @@ import com.codenameone.examples.savor.api.CourierStatusDto;
 import com.codenameone.examples.savor.map.Locator;
 import com.codenameone.examples.savor.map.Maps;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 

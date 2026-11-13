@@ -90,6 +90,34 @@ public class IconThemeData {
         return opacity;
     }
 
+    public Double fill() {
+        return fill;
+    }
+
+    public Double weight() {
+        return weight;
+    }
+
+    public Double grade() {
+        return grade;
+    }
+
+    public Double opticalSize() {
+        return opticalSize;
+    }
+
+    /// Typed as Flutter declares it (List<Shadow>?): an untyped getter left
+    /// `theme.shadows?.length` with nothing to call `length` on.
+    @SuppressWarnings("unchecked")
+    public dart.core.DartList<com.codename1.flutter.painting.Shadow> shadows() {
+        return shadows instanceof dart.core.DartList
+                ? (dart.core.DartList<com.codename1.flutter.painting.Shadow>) shadows : null;
+    }
+
+    public Boolean applyTextScaling() {
+        return applyTextScaling;
+    }
+
     public IconThemeData copyWith(Color color, Double size, Double opacity, Double fill,
                                   Double weight, Double grade, Double opticalSize, Object shadows,
                                   Boolean applyTextScaling) {

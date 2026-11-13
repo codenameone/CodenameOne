@@ -28,7 +28,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.reel.Telemetry;
 import com.codenameone.examples.reel.api.SignupDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.net.Session;
 
 /// Creates an account and signs in with it.

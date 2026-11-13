@@ -35,7 +35,7 @@ import dart.runtime.Funcs;
 /** firebase_ai's {@code ChatSession}: the history grows by each message and the reply that answered it. */
 public class ChatSession {
     private final GenerativeModel model;
-    private final DartList<Content> history = new DartList<Content>();
+    private final DartList<Content> history = new DartList<Content>(dart.runtime.TypeWitness.of(Content.class, false));
     private final Iterable<?> safetySettings;
     private final GenerationConfig generationConfig;
 

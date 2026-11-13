@@ -1,0 +1,15 @@
+streamIsEventStream true
+streamIsLoginStream false
+streamIsObjectStream true
+controllerIsLoginController false
+controllerIsEventSink true
+broadcastIsEventStream true
+broadcastIsLogoutStream false
+passedThroughGeneric false
+futureIntIsFutureString false
+futureIntIsFutureNum true
+futureIntIsFutureInt true
+futureStringIsFutureInt false
+futureStringIsFutureString true
+castFutureTypeError true
+await 1 x

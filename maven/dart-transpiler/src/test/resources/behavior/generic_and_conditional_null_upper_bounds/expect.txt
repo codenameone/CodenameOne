@@ -1,0 +1,12 @@
+[true, false, List<Null>]
+threw
+[1, null, null]
+TypeError true
+[_Map<String, int?>, false, true, true]
+[_Set<int?>, _Map<int?, int?>, true, 1]
+[List<List<int?>>, List<Null>]
+[int, List<int?>, List<Object>, Null, int?, int]
+[List<int?>, [null, 3]]
+[List<int?>, List<int>, List<int?>, [null, 2]]
+[_Map<String, Object?>, null, Box<Null>, Box<Object?>, Box<Null>]
+[true, false, true, true, false, Null, true]

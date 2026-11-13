@@ -19,7 +19,7 @@
 package com.codenameone.examples.wayline.account;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.wayline.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.wayline.api.AccountApiServer;
 import com.codenameone.examples.wayline.api.AccountClosureDto;
 import com.codenameone.examples.wayline.api.PasswordChangeDto;

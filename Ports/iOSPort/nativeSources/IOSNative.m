@@ -12341,6 +12341,8 @@ void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_M
 #endif // CN1_USE_APPREVIEW
 }
 
+extern BOOL cn1KeyboardTrackingSuspended;
+
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
 // Not implemented on the native macOS port: the body below is UIKit -- a
@@ -12376,6 +12378,14 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             
             [picker setBody:smsBody];
             
+            // The composer brings its own keyboard; keep our keyboard handlers out
+            // of it until the delegate dismisses the sheet (issue #6211). Not when
+            // something is already presented: UIKit then refuses this presentation,
+            // the delegate that clears the flag never runs, and the keyboard of
+            // whatever is up would go unhandled until that is dismissed.
+            if (cn1PresentingController().presentedViewController == nil) {
+                cn1KeyboardTrackingSuspended = YES;
+            }
             [cn1PresentingController() presentModalViewController:picker animated:YES];
             
 #ifndef CN1_USE_ARC
@@ -13921,8 +13931,9 @@ SKPayment *paymentInstance = nil;
 NSObject *paymentDiscountInstance = nil;
 #endif
 
-#if defined(CN1_USE_STOREKIT) && TARGET_OS_TV
+#if defined(CN1_USE_STOREKIT) && (TARGET_OS_TV || TARGET_OS_OSX)
 /*
+ * Shared by the native macOS port, where the SDK marks the same selector unavailable.
  * tvOS has no +[SKPayment paymentWithProductIdentifier:]: a payment can only be built from an
  * SKProduct, so the product is looked up first. A product the store does not return is reported
  * through the same itemPurchaseError callback a failed transaction uses. The request keeps this
@@ -13977,7 +13988,7 @@ NSObject *paymentDiscountInstance = nil;
     }
     SKMutablePayment *payment = [SKMutablePayment paymentWithProduct:product];
     if (discount != nil) {
-        if (@available(tvOS 12.2, *)) {
+        if (@available(tvOS 12.2, macOS 10.14.4, *)) {
             payment.paymentDiscount = (SKPaymentDiscount *)discount;
         }
     }
@@ -14017,7 +14028,7 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
         }
         nsSku = [dict valueForKey:@"sku"];
         NSDictionary *promoDict = [dict valueForKey: @"promotionalOffer"];
-        if (@available(iOS 12.2, *)) {
+        if (@available(iOS 12.2, macOS 10.14.4, *)) {
             for (NSString* stringKey in @[@"offerIdentifier", @"keyIdentifier", @"signature", @"nonce"]) {
                 if (!promoDict[stringKey] || ! [promoDict[stringKey] isKindOfClass:[NSString class]] ) {
                     JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
@@ -14046,7 +14057,7 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
         }
         
     }
-#if TARGET_OS_TV
+#if TARGET_OS_TV || TARGET_OS_OSX
     NSString *tvSku = nsSku;
     NSObject *tvDiscount = paymentDiscountInstance;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -14058,7 +14069,7 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
     dispatch_async(dispatch_get_main_queue(), ^{
         if (paymentDiscountInstance != nil) {
             paymentInstance = [SKMutablePayment paymentWithProductIdentifier:nsSku];
-            if (@available(iOS 12.2, *)) {
+            if (@available(iOS 12.2, macOS 10.14.4, *)) {
                 ((SKMutablePayment*)paymentInstance).paymentDiscount = (SKPaymentDiscount*) paymentDiscountInstance;
             } else {
                 // Fallback on earlier versions
@@ -23127,6 +23138,31 @@ static BOOL cn1_secureStorageHasLegacyService(NSString *current, NSString *legac
     return legacy != nil && current != nil && ![legacy isEqualToString:current];
 }
 
+// Not an OSStatus: Security.framework codes are all in -25xxx/-34xxx/-67xxx and -128, so this
+// cannot collide. Must match IOSSecureStorage.KEY_REVOKED_CODE.
+#define CN1_SECURE_STORAGE_KEY_REVOKED -990001
+
+// Whether the biometric item is in the keychain at all. Asks for attributes only, which an
+// access-control list does not guard, so it never prompts and still sees an item whose
+// biometric binding was invalidated.
+static BOOL cn1_secureStorageBiometricItemExists(NSString *account, NSString *appName, NSString *accessGroup) {
+    NSMutableDictionary *q = [NSMutableDictionary dictionary];
+    [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+    [q setObject:account forKey:(__bridge id)kSecAttrAccount];
+    [q setObject:appName forKey:(__bridge id)kSecAttrService];
+    [q setObject:@YES forKey:(__bridge id)kSecReturnAttributes];
+    [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+    if (accessGroup != nil) {
+        [q setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+    }
+    CFTypeRef attrs = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, &attrs);
+    if (attrs != NULL) {
+        CFRelease(attrs);
+    }
+    return status == errSecSuccess;
+}
+
 void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
     POOL_BEGIN();
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
@@ -23157,6 +23193,25 @@ void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_ja
             NSString *value = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
             JAVA_OBJECT jv = fromNSString(getThreadLocalData(), value);
             com_codename1_impl_ios_IOSSecureStorage_nativeStorageStringResult___int_java_lang_String(getThreadLocalData(), requestId, jv);
+        } else if (status == errSecItemNotFound && cn1_secureStorageBiometricItemExists(nsAccount, appName, accessGroup)) {
+            // The item is stored under kSecAccessControlTouchIDCurrentSet, so enrolling a
+            // different Face ID / Touch ID set invalidates it: its attributes are still
+            // there, but the data read answers errSecItemNotFound. That is a revoked key,
+            // the same case Android reports as KEY_REVOKED, and it used to surface as a
+            // generic failure -- iOS apps could never tell re-enrolment from an error.
+            // The item can never be read again, and leaving it makes a later set() fall
+            // into SecItemUpdate on an invalidated item, so delete it, as Android deletes
+            // its invalidated key.
+            NSMutableDictionary *del = [NSMutableDictionary dictionary];
+            [del setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+            [del setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
+            [del setObject:appName forKey:(__bridge id)kSecAttrService];
+            if (accessGroup != nil) {
+                [del setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+            }
+            SecItemDelete((__bridge CFDictionaryRef)del);
+            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), @"Key has been invalidated");
+            com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, CN1_SECURE_STORAGE_KEY_REVOKED, jmsg);
         } else {
             JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
             com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);

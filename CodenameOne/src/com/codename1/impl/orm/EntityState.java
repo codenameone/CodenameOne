@@ -31,7 +31,9 @@ import com.codename1.orm.session.LazyInitializationException;
 @com.codename1.impl.SharedWithBackend
 public final class EntityState {
     SessionImpl session;
-    final Object entity;
+    // Not final: a record is replaced by a copy each time the session changes
+    // it, and its state follows the copy.
+    Object entity;
     final boolean[] loaded;
     final boolean[] fetching;
     final Object[] keys;

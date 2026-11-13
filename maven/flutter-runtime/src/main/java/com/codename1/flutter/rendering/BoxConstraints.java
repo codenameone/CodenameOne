@@ -81,6 +81,16 @@ public final class BoxConstraints {
     /**
      * Constraints that force exactly the given size.
      */
+    /**
+     * Flutter's {@code BoxConstraints.tightFor}: tight in each dimension that is given,
+     * unconstrained in the other.
+     */
+    public static BoxConstraints tightFor(Double width, Double height) {
+        double inf = Double.POSITIVE_INFINITY;
+        return new BoxConstraints(width != null ? width.doubleValue() : 0, width != null ? width.doubleValue() : inf,
+                height != null ? height.doubleValue() : 0, height != null ? height.doubleValue() : inf);
+    }
+
     public static BoxConstraints tight(double width, double height) {
         return new BoxConstraints(width, width, height, height);
     }

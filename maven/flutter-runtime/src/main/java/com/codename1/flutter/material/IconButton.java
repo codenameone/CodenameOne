@@ -107,4 +107,41 @@ public class IconButton extends Widget {
     public Element createElement() {
         return new ButtonRenderElement(this);
     }
+
+    /** Flutter's {@code IconButton.filled}: the icon on a primary-coloured circle. */
+    public static IconButton filled(com.codename1.flutter.Key key, Funcs.VoidFunc0 onPressed, Widget icon,
+            Double iconSize, Color color) {
+        return variant("filled", key, onPressed, icon, iconSize, color);
+    }
+
+    /** Flutter's {@code IconButton.filledTonal}: on a secondary-container circle. */
+    public static IconButton filledTonal(com.codename1.flutter.Key key, Funcs.VoidFunc0 onPressed, Widget icon,
+            Double iconSize, Color color) {
+        return variant("tonal", key, onPressed, icon, iconSize, color);
+    }
+
+    /** Flutter's {@code IconButton.outlined}: inside an outline-coloured ring. */
+    public static IconButton outlined(com.codename1.flutter.Key key, Funcs.VoidFunc0 onPressed, Widget icon,
+            Double iconSize, Color color) {
+        return variant("outlined", key, onPressed, icon, iconSize, color);
+    }
+
+    private String variant;
+
+    /** "filled", "tonal", "outlined", or null for the standard icon button. */
+    public String getVariant() {
+        return variant;
+    }
+
+    private static IconButton variant(String kind, com.codename1.flutter.Key key, Funcs.VoidFunc0 onPressed,
+            Widget icon, Double iconSize, Color color) {
+        IconButton b = new IconButton();
+        b.key(key);
+        b.onPressed(onPressed);
+        b.icon(icon);
+        if (iconSize != null) b.iconSize(iconSize.doubleValue());
+        if (color != null) b.color(color);
+        b.variant = kind;
+        return b;
+    }
 }

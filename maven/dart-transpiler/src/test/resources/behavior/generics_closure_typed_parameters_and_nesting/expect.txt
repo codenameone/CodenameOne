@@ -1,0 +1,10 @@
+List<int>
+_Map<int, List<int>>
+true
+false
+TE true
+n4
+9
+int String
+double bool
+<Y0>(Object) => bool

@@ -1,0 +1,17 @@
+3
+(int) => int
+List<int>
+List<String>
+(String) => List<String>
+String
+(int) => int
+true
+false
+false
+<Y0>(Y0) => List<Y0>
+List<double>
+List<int>
+List<num>
+true
+List<String>
+List<dynamic>

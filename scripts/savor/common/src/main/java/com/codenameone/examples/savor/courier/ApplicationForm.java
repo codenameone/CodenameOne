@@ -43,9 +43,9 @@ import com.codenameone.examples.savor.api.DocumentUploadDto;
 import com.codenameone.examples.savor.api.CourierApplicationDto;
 import com.codenameone.examples.savor.api.UserDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.net.Session;
-import com.codenameone.examples.savor.ui.Chart;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Photos;
 import com.codenameone.examples.savor.ui.Ui;
@@ -131,7 +131,7 @@ public final class ApplicationForm {
                 String.valueOf(STEPS.length)));
         stepTitle.setText(STEPS[step]);
         progress.removeAll();
-        progress.add(BorderLayout.CENTER, new Chart.Meter((step + 1) / (double) STEPS.length));
+        progress.add(BorderLayout.CENTER, new Chart.Meter("Sv", (step + 1) / (double) STEPS.length));
         body.removeAll();
         // A new step starts at its top, wherever the last one was left.
         body.scrollRectToVisible(0, 0, 1, 1, body);

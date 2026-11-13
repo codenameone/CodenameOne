@@ -1,0 +1,15 @@
+3
+[13, 10]
+true
+gamma,beta,alpha
+14
+6
+2
+4
+cfg
+4
+[0, 7, 0, 0]
+main done
+microtask
+delayed future
+late timer

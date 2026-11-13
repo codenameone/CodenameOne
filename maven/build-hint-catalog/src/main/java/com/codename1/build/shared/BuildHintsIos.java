@@ -44,6 +44,13 @@ final class BuildHintsIos {
     }
 
     static void register(List<Hint> h) {
+        h.add(new Hint("ios.cn1NativesRepository")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .def("https://repo.codenameone.com/maven2")
+                .platform("ios")
+                .doc("Maven repository the builder fetches the on-device AI natives (`com.codenameone.natives`, whisper.cpp and llama.cpp) from, when the app uses them. Defaults to the Codename One repository; a `file:` URL tests a local `scripts/ai-natives/build.sh` output."));
+
         h.add(new Hint("ios.NFCReaderUsageDescription")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)

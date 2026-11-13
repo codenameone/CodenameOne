@@ -41,6 +41,36 @@ public class TextSpan extends InlineSpan {
     private TextStyle style;
     private DartList<TextSpan> children;
     private Object recognizer;
+    private String semanticsLabel;
+
+    public void semanticsLabel(String v) {
+        this.semanticsLabel = v;
+    }
+
+    /** Flutter's {@code TextSpan.semanticsLabel}. */
+    public String semanticsLabel() {
+        return semanticsLabel;
+    }
+
+    /** Flutter's {@code TextSpan.text}. */
+    public String text() {
+        return text;
+    }
+
+    /** Flutter's {@code InlineSpan.style}. */
+    public TextStyle style() {
+        return style;
+    }
+
+    /** Flutter's {@code TextSpan.children}. */
+    public DartList<TextSpan> children() {
+        return children;
+    }
+
+    /** Flutter's {@code TextSpan.recognizer}. */
+    public Object recognizer() {
+        return recognizer;
+    }
 
     public void text(String v) {
         this.text = v;

@@ -126,6 +126,21 @@ public class TextEditingController {
         notifyListeners();
     }
 
+    /// Flutter's {@code value}: the text with the selection collapsed at its end. This
+    /// controller does not track a selection, so that is what a read reports.
+    public com.codename1.flutter.TextEditingValue value() {
+        String t = text();
+        com.codename1.flutter.TextEditingValue v = new com.codename1.flutter.TextEditingValue();
+        v.text(t);
+        v.selection(com.codename1.flutter.TextSelection.collapsed(t == null ? 0 : t.length()));
+        return v;
+    }
+
+    /// {@code controller.value = v}: takes the value's text (and notifies, as setText does).
+    public void value(com.codename1.flutter.TextEditingValue v) {
+        setText(v == null ? "" : v.text());
+    }
+
     public void clear() {
         setText("");
     }
@@ -138,7 +153,7 @@ public class TextEditingController {
 
     public void removeListener(Funcs.VoidFunc0 listener) {
         if (listener != null) {
-            listeners.remove(listener);
+            dart.runtime.DartRuntime.removeEq(listeners, listener);
         }
     }
 

@@ -1,0 +1,24 @@
+() => int
+1
+() => Never
+() => Future<Null>
+c
+() => Future<int>
+3
+() => Future<Null>
+() => int
+fin
+1
+(bool) => num
+2.5
+() => String
+(int) => int?
+() => Iterable<int>
+[1]
+() => Stream<String>
+[a]
+() => Null
+() => Null
+() => Never
+caught x
+() => Future<Never>

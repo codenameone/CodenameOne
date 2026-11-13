@@ -35,6 +35,13 @@ import java.util.jar.JarFile;
  * Class loader for the given classpath
  */
 class ClassPathLoader extends ClassLoader {
+    // One domain for every loader, naming none. With null, each loader made
+    // its own default domain that references the loader, and every thread a
+    // test started (a JDK timer, the process reaper) captured it in its
+    // inherited access control context: each finished test's loader and
+    // application stayed in memory for as long as such a thread lived.
+    private static final java.security.ProtectionDomain DOMAIN = new java.security.ProtectionDomain(
+            new java.security.CodeSource(null, (java.security.cert.Certificate[]) null), null);
 
     private File[] classpath;
     private Map classes = new HashMap();
@@ -53,6 +60,14 @@ class ClassPathLoader extends ClassLoader {
         excludes.add("org.cef.");
         excludes.add("me.friwi.jcefmaven.");
         excludes.add("org.w3c");
+        // Libraries that start threads which never end (JOGL's shared
+        // resource runner, JavaCPP's deallocator) are loaded once, by the
+        // parent. Loaded per test, each of those threads kept its test's
+        // loader and everything the application had loaded with it, and a
+        // suite of 3D tests ran out of heap by the last test.
+        excludes.add("com.jogamp.");
+        excludes.add("jogamp.");
+        excludes.add("org.bytedeco.");
     }
     private List<String> includes = new ArrayList<String>();
     {
@@ -257,7 +272,7 @@ class ClassPathLoader extends ClassLoader {
                 }
                 is.close();
                 classByte = byteStream.toByteArray();
-                result = defineClass(className, classByte, 0, classByte.length, null);
+                result = defineClass(className, classByte, 0, classByte.length, DOMAIN);
                 classes.put(className, result);
                 return result;
             }

@@ -19,7 +19,7 @@
 package com.codenameone.examples.pulse.engagement;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.pulse.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.pulse.api.AwayDto;
 import com.codenameone.examples.pulse.api.EngagementApiServer;
 import com.codenameone.examples.pulse.api.HeartRateDto;

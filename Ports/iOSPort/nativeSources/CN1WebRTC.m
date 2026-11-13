@@ -548,6 +548,18 @@ void com_codename1_impl_ios_IOSNative_webRtcAddIceCandidate___int_java_lang_Stri
     });
 }
 
+void com_codename1_impl_ios_IOSNative_webRtcRestartIce___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT peer) {
+    int p = peer;
+    cn1wOnMain(^{
+        RTCPeerConnection *pc = cn1wPeer(p);
+        if (pc != nil) {
+            // Takes effect in the next offer, which the app creates and sends.
+            [pc restartIce];
+        }
+    });
+}
+
 void com_codename1_impl_ios_IOSNative_webRtcClosePeerConnection___int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT peer) {
     int p = peer;
@@ -737,6 +749,10 @@ void com_codename1_impl_ios_IOSNative_webRtcSetDescription___int_int_boolean_jav
 void com_codename1_impl_ios_IOSNative_webRtcAddIceCandidate___int_java_lang_String_int_java_lang_String(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT peer, JAVA_OBJECT sdpMid,
         JAVA_INT sdpMLineIndex, JAVA_OBJECT candidate) {
+}
+
+void com_codename1_impl_ios_IOSNative_webRtcRestartIce___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT peer) {
 }
 
 void com_codename1_impl_ios_IOSNative_webRtcClosePeerConnection___int(

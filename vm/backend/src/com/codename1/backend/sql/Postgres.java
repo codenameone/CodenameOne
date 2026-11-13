@@ -30,6 +30,7 @@ import java.util.Map;
 
 import com.codename1.backend.Base64;
 import com.codename1.backend.ConcurrencyFailureException;
+import com.codename1.backend.DataIntegrityViolationException;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Tcp;
 
@@ -963,6 +964,7 @@ public final class Postgres {
                 + (detail == null ? "unknown" : detail)
                 + (sql == null ? "" : " [" + sql + "]");
         return isConcurrencyFailure(state) ? new ConcurrencyFailureException(text)
+                : state != null && state.startsWith("23") ? new DataIntegrityViolationException(text)
                 : new IOException(text);
     }
 

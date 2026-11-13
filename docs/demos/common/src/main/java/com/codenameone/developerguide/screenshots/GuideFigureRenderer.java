@@ -127,6 +127,9 @@ public final class GuideFigureRenderer {
                         .append(err.getClass().getName()).append(": ").append(err.getMessage());
             } finally {
                 Dialog.setDefaultBlurBackgroundRadius(blurRadius);
+                if (variant.figure().changesTheme()) {
+                    installTheme(device.themeResource());
+                }
             }
         }
         System.out.println("Rendered " + rendered + " figure(s) for " + device.key());

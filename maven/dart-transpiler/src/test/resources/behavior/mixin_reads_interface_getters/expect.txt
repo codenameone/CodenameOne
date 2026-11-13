@@ -1,0 +1,2 @@
+nums has 3
+twice has 6

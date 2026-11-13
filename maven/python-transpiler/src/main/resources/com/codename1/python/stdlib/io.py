@@ -37,7 +37,14 @@ def _setcwd(path):
 
 
 def _abspath(path):
-    """`path` made absolute against the working directory and normalised."""
+    """`path` made absolute against the working directory and normalised.
+
+    A Windows drive path (`C:\\data\\f.txt`, `C:/data`) is absolute too, and
+    becomes `/C:/data/f.txt`: one rooted form for every host, which the
+    backend's file system turns back into the drive path."""
+    if len(path) >= 2 and path[1] == ":" and path[0].isalpha() \
+            and (len(path) == 2 or path[2] in "/\\"):
+        path = "/" + path.replace("\\", "/")
     if not path.startswith("/"):
         base = _getcwd()
         path = base + "/" + path if base != "/" else "/" + path

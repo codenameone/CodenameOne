@@ -106,4 +106,129 @@ public class InputDecorationThemeData {
     public void gapPadding(double v) { this.gapPadding = v; }
     public void alignLabelWithHint(boolean v) { this.alignLabelWithHint = v; }
     public void constraints(Object v) { this.constraints = v; }
+
+    /// Flutter's {@code labelStyle}.
+    public TextStyle labelStyle() {
+        return labelStyle;
+    }
+
+    /// Flutter's {@code floatingLabelStyle}.
+    public TextStyle floatingLabelStyle() {
+        return floatingLabelStyle;
+    }
+
+    /// Flutter's {@code helperStyle}.
+    public TextStyle helperStyle() {
+        return helperStyle;
+    }
+
+    /// Flutter's {@code hintStyle}.
+    public TextStyle hintStyle() {
+        return hintStyle;
+    }
+
+    /// Flutter's {@code errorStyle}.
+    public TextStyle errorStyle() {
+        return errorStyle;
+    }
+
+    /// Flutter's {@code prefixStyle}.
+    public TextStyle prefixStyle() {
+        return prefixStyle;
+    }
+
+    /// Flutter's {@code suffixStyle}.
+    public TextStyle suffixStyle() {
+        return suffixStyle;
+    }
+
+    /// Flutter's {@code counterStyle}.
+    public TextStyle counterStyle() {
+        return counterStyle;
+    }
+
+    /// Flutter's {@code filled}.
+    public boolean filled() {
+        return filled;
+    }
+
+    /// Flutter's {@code fillColor}.
+    public Color fillColor() {
+        return fillColor;
+    }
+
+    /// Flutter's {@code focusColor}.
+    public Color focusColor() {
+        return focusColor;
+    }
+
+    /// Flutter's {@code hoverColor}.
+    public Color hoverColor() {
+        return hoverColor;
+    }
+
+    /// Flutter's {@code contentPadding}.
+    public EdgeInsetsGeometry contentPadding() {
+        return contentPadding;
+    }
+
+    /// Flutter's {@code isDense}.
+    public boolean isDense() {
+        return isDense;
+    }
+
+    /// Flutter's {@code isCollapsed}.
+    public boolean isCollapsed() {
+        return isCollapsed;
+    }
+
+    /// Flutter's {@code border}.
+    public Object border() {
+        return border;
+    }
+
+    /// Flutter's {@code enabledBorder}.
+    public Object enabledBorder() {
+        return enabledBorder;
+    }
+
+    /// Flutter's {@code focusedBorder}.
+    public Object focusedBorder() {
+        return focusedBorder;
+    }
+
+    /// Flutter's {@code errorBorder}.
+    public Object errorBorder() {
+        return errorBorder;
+    }
+
+    /// Flutter's {@code focusedErrorBorder}.
+    public Object focusedErrorBorder() {
+        return focusedErrorBorder;
+    }
+
+    /// Flutter's {@code disabledBorder}.
+    public Object disabledBorder() {
+        return disabledBorder;
+    }
+
+    /// Flutter's {@code floatingLabelBehavior}.
+    public Object floatingLabelBehavior() {
+        return floatingLabelBehavior;
+    }
+
+    /// Flutter's {@code gapPadding}.
+    public double gapPadding() {
+        return gapPadding;
+    }
+
+    /// Flutter's {@code alignLabelWithHint}.
+    public boolean alignLabelWithHint() {
+        return alignLabelWithHint;
+    }
+
+    /// Flutter's {@code constraints}.
+    public Object constraints() {
+        return constraints;
+    }
 }

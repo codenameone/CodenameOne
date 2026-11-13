@@ -43,3 +43,35 @@ class EmojiPicker extends Widget {
       dynamic scrollController, Config config});
   external static List<CategoryEmoji> get defaultEmojiSet;
 }
+
+// emoji_picker_flutter 4.x view configs. Config accepts them and does not apply them yet,
+// so each is a plain value holder: the app compiles, the picker keeps its own look.
+@JavaName('com.codename1.flutter.plugins.emojipicker.EmojiViewConfig')
+class EmojiViewConfig {
+  external const EmojiViewConfig({Object? columns, Object? emojiSizeMax, Object? backgroundColor, Object? verticalSpacing, Object? horizontalSpacing, Object? gridPadding, Object? recentsLimit, Object? noRecents, Object? buttonMode, Object? loadingIndicator, Object? replaceEmojiOnLimitExceed});
+}
+
+@JavaName('com.codename1.flutter.plugins.emojipicker.SearchViewConfig')
+class SearchViewConfig {
+  external const SearchViewConfig({Object? backgroundColor, Object? buttonIconColor, Object? hintText, Object? customSearchView});
+}
+
+@JavaName('com.codename1.flutter.plugins.emojipicker.CategoryViewConfig')
+class CategoryViewConfig {
+  external const CategoryViewConfig({Object? initCategory, Object? backgroundColor, Object? indicatorColor, Object? iconColor, Object? iconColorSelected, Object? backspaceColor, Object? tabBarHeight, Object? tabIndicatorAnimDuration, Object? showBackspaceButton, Object? recentTabBehavior, Object? categoryIcons, Object? dividerColor, Object? extraTab, Object? customCategoryView});
+}
+
+@JavaName('com.codename1.flutter.plugins.emojipicker.BottomActionBarConfig')
+class BottomActionBarConfig {
+  external const BottomActionBarConfig({Object? enabled, Object? showBackspaceButton, Object? showSearchViewButton, Object? backgroundColor, Object? buttonColor, Object? buttonIconColor, Object? customBottomActionBar});
+}
+
+@JavaName('com.codename1.flutter.plugins.emojipicker.ViewOrderConfig')
+class ViewOrderConfig {
+  external const ViewOrderConfig({Object? top, Object? middle, Object? bottom});
+}
+
+@JavaName('com.codename1.flutter.plugins.emojipicker.SkinToneConfig')
+class SkinToneConfig {
+  external const SkinToneConfig({Object? enabled, Object? dialogBackgroundColor, Object? indicatorColor});
+}

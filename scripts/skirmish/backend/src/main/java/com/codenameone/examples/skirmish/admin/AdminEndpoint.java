@@ -22,7 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.orm.repository.PageRequest;
-import com.codenameone.examples.skirmish.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.skirmish.Clock;
 import com.codenameone.examples.skirmish.account.Accounts;
 import com.codenameone.examples.skirmish.api.AdminActionDto;

@@ -1,0 +1,18 @@
+20
+34.0
+1234
+[1, 4, 9, 16]
+n=8
+bag single: Too many elements
+42
+6
+6
+6
+-1
+-2
+-3
+plain singleWhere: Too many elements
+plain single: No element
+-18
+[7, 6, 5]
+>567

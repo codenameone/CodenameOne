@@ -29,7 +29,7 @@ import com.codenameone.examples.reel.api.GenreDto;
 import com.codenameone.examples.reel.api.TitleCardDto;
 import com.codenameone.examples.reel.net.Account;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.ui.Layouts;
 import com.codenameone.examples.reel.ui.Ui;
 import java.util.List;

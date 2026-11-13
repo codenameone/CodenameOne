@@ -36,7 +36,7 @@ public class OverlayInitialEntriesTest {
     @Test
     public void anInitialEntryCanBeRemoved() {
         OverlayEntry entry = new OverlayEntry();
-        DartList<OverlayEntry> initial = new DartList<OverlayEntry>();
+        DartList<OverlayEntry> initial = new DartList<OverlayEntry>(dart.runtime.TypeWitness.of(OverlayEntry.class, false));
         initial.add(entry);
         Overlay overlay = new Overlay();
         overlay.initialEntries(initial);
@@ -54,7 +54,7 @@ public class OverlayInitialEntriesTest {
     @Test
     public void aRepeatedInitialEntryIsAddedOnce() {
         OverlayEntry entry = new OverlayEntry();
-        DartList<OverlayEntry> initial = new DartList<OverlayEntry>();
+        DartList<OverlayEntry> initial = new DartList<OverlayEntry>(dart.runtime.TypeWitness.of(OverlayEntry.class, false));
         initial.add(entry);
         initial.add(entry);
         Overlay overlay = new Overlay();

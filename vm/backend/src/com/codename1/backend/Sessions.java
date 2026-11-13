@@ -144,9 +144,13 @@ final class Sessions {
                         + "server has none");
             }
             out.setStore(new Db(pool, config.get("cn1.session.namespace", "")));
+        } else if ("kv".equalsIgnoreCase(kind) || "redis".equalsIgnoreCase(kind)) {
+            // The server's key/value store, opened on first use: cn1.kv.url,
+            // or Spring Boot's spring.data.redis.* settings.
+            out.setStore(new KeyValue(null, config.get("cn1.session.namespace", "")));
         } else if (!"memory".equalsIgnoreCase(kind)) {
             throw new IOException("cn1.session.store is \"" + kind
-                    + "\"; it must be memory or db");
+                    + "\"; it must be memory, db or kv");
         }
         return out;
     }
@@ -281,7 +285,8 @@ final class Sessions {
                 // timeout, because the last use it has stored lags; the beans get
                 // the same grace, or a request in that window would find the row
                 // still valid after its beans were destroyed, and build a second set.
-                long grace = s instanceof Db ? Db.touchInterval(h.maxInactiveSeconds) : 0;
+                long grace = s instanceof Db || s instanceof KeyValue
+                        ? Db.touchInterval(h.maxInactiveSeconds) : 0;
                 if (h.maxInactiveSeconds > 0
                         && now - h.lastAccessed > h.maxInactiveSeconds * 1000L + grace
                         && !busy.contains(e.getKey())) {
@@ -418,6 +423,8 @@ final class Sessions {
                 session.clean();
             } else if (s instanceof Db) {
                 ((Db) s).touchIfStale(session);
+            } else if (s instanceof KeyValue) {
+                ((KeyValue) s).touchIfStale(session);
             }
             keep(session, previous);
         }
@@ -895,6 +902,207 @@ final class Sessions {
         @Override
         public synchronized int size() {
             return sessions.size();
+        }
+    }
+
+    /// Keeps sessions in the server's key/value store -- Redis once `cn1.kv.url`
+    /// names one -- chosen by `cn1.session.store=kv`, so any instance behind a
+    /// load balancer can serve any client, as Spring Session's Redis store does.
+    ///
+    /// Each session is one entry holding its times and attributes as JSON, with
+    /// an expiry of the timeout plus the touch interval, so the store expires
+    /// sessions by itself and nothing purges them. Saves merge this request's
+    /// changes onto what is stored, written back with compare-and-set, as [Db]
+    /// merges with its version column.
+    public static final class KeyValue implements SessionStore {
+        /// Attempts at an optimistic save before two requests' races are reported.
+        private static final int SAVE_ATTEMPTS = 8;
+        private final com.codename1.backend.kv.KeyValueStore fixed;
+        private final String prefix;
+
+        /// A store over `store`, or over the calling thread's server's
+        /// [com.codename1.backend.kv.KeyValueStores#current()] when it is null,
+        /// keeping its sessions apart from other namespaces' as [Db] does.
+        public KeyValue(com.codename1.backend.kv.KeyValueStore store, String namespace) {
+            this.fixed = store;
+            this.prefix = "cn1:session:" + (namespace == null ? "" : namespace) + ":";
+        }
+
+        private com.codename1.backend.kv.KeyValueStore store() throws IOException {
+            return fixed != null ? fixed : com.codename1.backend.kv.KeyValueStores.current();
+        }
+
+        /// How long an entry lives: the timeout plus the touch interval, the
+        /// grace [Db] allows for a stored last use that lags the real one.
+        private static long ttl(int maxInactiveSeconds) {
+            return maxInactiveSeconds > 0
+                    ? maxInactiveSeconds * 1000L + Db.touchInterval(maxInactiveSeconds) : 0;
+        }
+
+        private static byte[] encode(long created, long accessed, int maxInactive, Map values) {
+            Map doc = new LinkedHashMap();
+            doc.put("c", Long.valueOf(created));
+            doc.put("a", Long.valueOf(accessed));
+            doc.put("m", Integer.valueOf(maxInactive));
+            doc.put("at", values);
+            return com.codename1.impl.backend.WireBuffer.utf8(Json.write(doc));
+        }
+
+        private static Map decode(byte[] raw) throws IOException {
+            return raw == null ? null
+                    : Json.parseObject(com.codename1.impl.backend.WireBuffer.fromUtf8(raw));
+        }
+
+        private static long number(Map doc, String name) {
+            Object v = doc.get(name);
+            return v instanceof Number ? ((Number) v).longValue() : 0L;
+        }
+
+        private static Map attributes(Map doc) {
+            Object v = doc.get("at");
+            return v instanceof Map ? new LinkedHashMap((Map) v) : new LinkedHashMap();
+        }
+
+        @Override
+        public HttpSession load(String id) throws IOException {
+            Map doc = decode(store().get(prefix + id));
+            if (doc == null) {
+                return null;
+            }
+            int maxInactive = (int) number(doc, "m");
+            HttpSession s = new HttpSession(id, number(doc, "c"), number(doc, "a"), maxInactive);
+            s.setExpiryGrace(Db.touchInterval(maxInactive));
+            s.loadAttributes(attributes(doc));
+            return s;
+        }
+
+        @Override
+        public Object consumeAttribute(String id, String name) throws IOException {
+            com.codename1.backend.kv.KeyValueStore kv = store(); // NOPMD CloseResource - the server's store, closed when it stops
+            String key = prefix + id;
+            for (int attempt = 0; attempt < SAVE_ATTEMPTS; attempt++) {
+                byte[] raw = kv.get(key);
+                Map doc = decode(raw);
+                if (doc == null) {
+                    return null;
+                }
+                Map values = attributes(doc);
+                Object taken = values.remove(name);
+                if (taken == null) {
+                    return null;
+                }
+                int maxInactive = (int) number(doc, "m");
+                long left = kv.ttl(key);
+                if (kv.compareAndSet(key, raw, encode(number(doc, "c"), number(doc, "a"),
+                        maxInactive, values), left > 0 ? left : ttl(maxInactive))) {
+                    return taken;
+                }
+            }
+            throw new IOException("Session attribute could not be consumed: concurrent updates");
+        }
+
+        /// The same merge [Db] does: this request's changed attributes applied to
+        /// what is stored now, written back only if nobody wrote in between.
+        @Override
+        public void save(HttpSession session, String previousId) throws IOException {
+            com.codename1.backend.kv.KeyValueStore kv = store(); // NOPMD CloseResource - the server's store, closed when it stops
+            java.util.Set changed = session.changedNames();
+            Map mine = session.attributesCopy();
+            if (session.isNew()) {
+                kv.set(prefix + session.getId(), encode(session.getCreationTime(),
+                        session.getLastAccessedTime(), session.getMaxInactiveInterval(), mine),
+                        ttl(session.getMaxInactiveInterval()));
+                session.storedAccessed = session.getLastAccessedTime();
+                if (previousId != null) {
+                    kv.delete(prefix + previousId);
+                }
+                return;
+            }
+            String from = prefix + (previousId != null ? previousId : session.getId());
+            for (int attempt = 0; attempt < SAVE_ATTEMPTS; attempt++) {
+                byte[] raw = kv.get(from);
+                Map doc = decode(raw);
+                if (doc == null) {
+                    // Invalidated or expired meanwhile by another request: writing
+                    // it back would undo a logout with a stale cookie.
+                    if (previousId != null) {
+                        session.markRotationLost();
+                    }
+                    return;
+                }
+                Map merged = attributes(doc);
+                Iterator names = changed.iterator();
+                while (names.hasNext()) {
+                    Object name = names.next();
+                    if (mine.containsKey(name)) {
+                        merged.put(name, mine.get(name));
+                    } else {
+                        merged.remove(name);
+                    }
+                }
+                int maxInactive = session.isMaxInactiveChanged()
+                        ? session.getMaxInactiveInterval() : (int) number(doc, "m");
+                long accessed = Math.max(number(doc, "a"), session.getLastAccessedTime());
+                byte[] next = encode(number(doc, "c"), accessed, maxInactive, merged);
+                if (previousId != null) {
+                    // A rotation: claim the old entry by deleting it, and only the
+                    // request that deleted it writes the new one.
+                    if (!kv.compareAndSet(from, raw, null, 0)) {
+                        continue;
+                    }
+                    kv.set(prefix + session.getId(), next, ttl(maxInactive));
+                    session.storedAccessed = session.getLastAccessedTime();
+                    return;
+                }
+                if (kv.compareAndSet(from, raw, next, ttl(maxInactive))) {
+                    session.storedAccessed = session.getLastAccessedTime();
+                    return;
+                }
+            }
+            throw new IOException("Session changes could not be saved: other requests "
+                    + "kept changing it (" + SAVE_ATTEMPTS + " attempts)");
+        }
+
+        /// Moves the stored last use forward and renews the expiry, at most once
+        /// per touch interval -- reads keep a session alive without making every
+        /// request a write.
+        void touchIfStale(HttpSession session) throws IOException {
+            long now = System.currentTimeMillis();
+            if (now - session.storedAccessed < Db.touchInterval(session.getMaxInactiveInterval())) {
+                return;
+            }
+            com.codename1.backend.kv.KeyValueStore kv = store(); // NOPMD CloseResource - the server's store, closed when it stops
+            String key = prefix + session.getId();
+            for (int attempt = 0; attempt < SAVE_ATTEMPTS; attempt++) {
+                byte[] raw = kv.get(key);
+                Map doc = decode(raw);
+                if (doc == null) {
+                    return;
+                }
+                int maxInactive = (int) number(doc, "m");
+                byte[] next = encode(number(doc, "c"), Math.max(now, number(doc, "a")),
+                        maxInactive, attributes(doc));
+                if (kv.compareAndSet(key, raw, next, ttl(maxInactive))) {
+                    session.storedAccessed = now;
+                    return;
+                }
+            }
+        }
+
+        @Override
+        public void delete(String id) throws IOException {
+            store().delete(prefix + id);
+        }
+
+        /// Nothing to do: every entry carries its own expiry.
+        @Override
+        public int purgeExpired(long now) {
+            return 0;
+        }
+
+        @Override
+        public int size() {
+            return -1;
         }
     }
 

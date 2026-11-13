@@ -266,6 +266,63 @@ final class BuildHintsDesktop {
                         + "bar above the app, the way the native desktop ports use the window title and "
                         + "the system menu bar."));
 
+        h.add(new Hint("steam.appId")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .valuePattern("[0-9]+")
+                .platform("linux")
+                .doc("The Steamworks app id. Required by the `steam` build target: it goes into the "
+                        + "generated SteamPipe build scripts and into `launch.sh`, which hands it to the "
+                        + "application so Steamworks connects even when the game is started outside Steam."));
+
+        h.add(new Hint("steam.depotId")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .valuePattern("[0-9]+")
+                .platform("linux")
+                .doc("The Linux depot to upload the build into. Defaults to `steam.appId` + 1, which is "
+                        + "the depot Steamworks creates with a new app."));
+
+        h.add(new Hint("steam.branch")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .platform("linux")
+                .doc("A beta branch to set the uploaded build live on, such as `beta`. Empty (default) "
+                        + "uploads without setting it live. Valve doesn't allow setting the default branch "
+                        + "live from an upload: do that in the Steamworks partner site."));
+
+        h.add(new Hint("steam.buildDescription")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .platform("linux")
+                .doc("The description shown for the build in the Steamworks build list. Defaults to the "
+                        + "application version."));
+
+        h.add(new Hint("steam.sdkPath")
+                .group(HintGroup.STEAM)
+                .type(HintType.STRING)
+                .platform("linux")
+                .doc("Local builds only: the unzipped Steamworks SDK, whose redistributable "
+                        + "`libsteam_api.so` is packaged with the game. Also read from the `STEAMWORKS_SDK` "
+                        + "environment variable; the cloud build supplies it itself. Without it the game is "
+                        + "packaged without Steamworks, and `GameServices` reports unavailable."));
+
+        h.add(new Hint("steam.package")
+                .group(HintGroup.STEAM)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("linux")
+                .doc("true/false (defaults to `false`). Lays a native Linux build out as a Steam depot "
+                        + "with its SteamPipe scripts. `cn1:buildSteam` and `cn1:buildSteamLocal` set it."));
+
+        h.add(new Hint("steam.fullscreen")
+                .group(HintGroup.STEAM)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("linux")
+                .doc("true/false (defaults to `true`). Starts the game fullscreen, as Steam Deck and "
+                        + "Steam Machine players expect."));
+
         h.add(new Hint("linux.arch")
                 .group(HintGroup.LINUX)
                 .type(HintType.STRING)
@@ -436,6 +493,60 @@ final class BuildHintsDesktop {
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
                 .platform("windows"));
+
+        h.add(new Hint("windows.embedded")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("windows")
+                .doc("Native Windows port only. Builds the kiosk target for a Windows IoT Enterprise "
+                        + "device: one borderless, topmost window covering a whole monitor, the Windows key "
+                        + "and the shell's task switching shortcuts filtered, and text edited through an "
+                        + "on-screen keyboard. `cn1:deploy-device` installs it as the device's shell through "
+                        + "Shell Launcher. Can't be combined with `windows.xbox`."));
+
+        h.add(new Hint("windows.embedded.board")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.STRING)
+                .def("generic-x64")
+                .platform("windows")
+                .doc("Board profile for `windows.embedded`, which sets the architecture and the "
+                        + "cursor and density defaults: `generic-x64`, `generic-x64-mouse`, "
+                        + "`generic-arm64`, `imx8` or `qualcomm-iot`."));
+
+        h.add(new Hint("windows.embedded.rotation")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.INT)
+                .def("0")
+                .platform("windows")
+                .doc("Clockwise rotation `windows.embedded` applies to its monitor while it runs: "
+                        + "0, 90, 180 or 270. Windows restores the panel's own orientation when the "
+                        + "application exits. `CN1_ROTATION` on the device overrides it."));
+
+        h.add(new Hint("windows.embedded.dpi")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.INT)
+                .def("0")
+                .platform("windows")
+                .doc("Panel density for `windows.embedded` when the panel misreports its size; 0 "
+                        + "uses what Windows reports. `CN1_DPI` on the device overrides it."));
+
+        h.add(new Hint("windows.embedded.monitor")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.INT)
+                .def("0")
+                .platform("windows")
+                .doc("Which monitor `windows.embedded` covers, in Windows' enumeration order; 0, or a "
+                        + "monitor that doesn't exist, is the primary. `CN1_MONITOR` on the device "
+                        + "overrides it."));
+
+        h.add(new Hint("windows.embedded.cursor")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.BOOLEAN)
+                .platform("windows")
+                .doc("Whether `windows.embedded` shows the mouse cursor. Defaults to the board "
+                        + "profile's choice: hidden on touch panels. `CN1_CURSOR` on the device "
+                        + "overrides it."));
 
         h.add(new Hint("windows.xbox")
                 .group(HintGroup.WINDOWS)

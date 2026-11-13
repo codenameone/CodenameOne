@@ -1,0 +1,3 @@
+report 3 small
+report 7 big
+doubled [2, 4, 6]

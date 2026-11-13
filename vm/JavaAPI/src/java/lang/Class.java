@@ -238,7 +238,23 @@ public final class Class<T> implements java.lang.reflect.Type {
         // Letting applications read their own embedded resources is a good feature
         // and wants its own change, where the screenshot baselines it moves can be
         // reviewed as the point of the change rather than as fallout from one.
-        return cn1FileResource(absolute);
+        //
+        // The one exception is opt-in in the same way: a packaged server's
+        // class library host answers with the resources the backend packager
+        // compiled into it (JdkHost.resource). An application's host never
+        // overrides that method, so it still sees exactly what master showed.
+        java.io.InputStream file = cn1FileResource(absolute);
+        return file != null ? file : cn1HostResource(absolute);
+    }
+
+    /// The resource the installed JdkHost compiled in, or null; `absolute`
+    /// starts with '/'. Shared with ClassLoader.getResourceAsStream.
+    static java.io.InputStream cn1HostResource(String absolute) {
+        String relative = absolute.substring(1);
+        if (relative.length() == 0 || cn1EscapesRoot(relative)) {
+            return null;
+        }
+        return com.codename1.impl.JdkHost.get().resource(relative);
     }
 
 

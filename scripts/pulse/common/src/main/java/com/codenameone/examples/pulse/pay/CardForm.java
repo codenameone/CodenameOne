@@ -33,7 +33,7 @@ import com.codenameone.examples.pulse.Telemetry;
 import com.codenameone.examples.pulse.api.CardDto;
 import com.codenameone.examples.pulse.api.PaymentSetupDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Ui;
 

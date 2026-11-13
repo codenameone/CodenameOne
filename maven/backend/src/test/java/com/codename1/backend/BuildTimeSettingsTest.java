@@ -192,11 +192,12 @@ class BuildTimeSettingsTest {
     }
 
     @Test
-    @DisplayName("each key is its owner's, and the list is the four the build reads")
+    @DisplayName("each key is its owner's, and the list is the five the build reads")
     void theKeysAreTheirOwners() {
         assertEquals(java.util.Arrays.asList(SecuritySchema.ENABLED,
                 com.codename1.impl.backend.Management.ENABLED,
-                com.codename1.impl.backend.mcp.McpServer.ENABLED, "cn1.otel.enabled"),
+                com.codename1.impl.backend.mcp.McpServer.ENABLED,
+                com.codename1.impl.backend.OpenApiDocs.ENABLED, "cn1.otel.enabled"),
                 java.util.Arrays.asList(BuildTimeSettings.keys()));
     }
 
@@ -210,12 +211,14 @@ class BuildTimeSettingsTest {
     }
 
     @Test
-    @DisplayName("management, MCP and OpenTelemetry asked for at run time in a build without them stop the start")
+    @DisplayName("management, MCP, OpenAPI and OpenTelemetry asked for at run time in a build without them stop the start")
     void everyOtherKeyIsRefusedTheSameWay() {
         String[][] cases = {
             {"cn1.management.enabled", refusal("cn1.management.enabled",
                     "the management endpoints were", "nothing would serve them", "")},
             {"cn1.mcp.enabled", refusal("cn1.mcp.enabled", "the MCP endpoint was",
+                    "nothing would serve it", "")},
+            {"cn1.openapi.enabled", refusal("cn1.openapi.enabled", "the OpenAPI document was",
                     "nothing would serve it", "")},
             {"cn1.otel.enabled", refusal("cn1.otel.enabled", "the OpenTelemetry exporters were",
                     "nothing would be exported", " A server assembled by hand passes an "

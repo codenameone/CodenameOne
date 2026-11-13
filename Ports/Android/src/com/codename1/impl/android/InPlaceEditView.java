@@ -1004,7 +1004,17 @@ public class InPlaceEditView extends FrameLayout{
                     if(textArea.getClientProperty("goButton") != null) {
                         mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_GO);
                     } else {
-                        if(textArea.getDoneListener() != null){
+                        // "doneButton" and "nextButton" choose the action explicitly, ahead
+                        // of the defaults below. Without them a Done listener forces Done even
+                        // when a next field exists, because the listener only fires for Done:
+                        // that default must not change, or every listener on a field that is
+                        // not the last one stops firing. Done wins if both are set, and a Next
+                        // with nowhere to go falls back to the defaults.
+                        if (textArea.getClientProperty("doneButton") != null) {
+                            mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_DONE);
+                        } else if (textArea.getClientProperty("nextButton") != null && nextDown != null) {
+                            mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_NEXT);
+                        } else if(textArea.getDoneListener() != null){
                             mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_DONE);
                         } else if (nextDown != null) {
                             mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_NEXT);
@@ -1219,7 +1229,6 @@ public class InPlaceEditView extends FrameLayout{
         //if (cursorTimer != null) {
         //    cursorTimer.cancel();
         //}
-        System.out.println("-------In endEditing");
         if (!mIsEditing || mEditText == null) {
             return;
         }
@@ -1235,9 +1244,6 @@ public class InPlaceEditView extends FrameLayout{
 
 
         boolean leaveKeyboardShowing = impl.isAsyncEditMode();
-        System.out.println("Next flag: "+isNextActionFlagSet);
-        System.out.println("Next cmp: "+getNextComponent(mEditText.mTextArea));
-        System.out.println("Reason : "+reason+" IME Action: "+REASON_IME_ACTION);
         if (reason == REASON_IME_ACTION && isNextActionFlagSet) {
             if (getNextComponent(mEditText.mTextArea) instanceof TextArea) {
                 leaveKeyboardShowing = true;
@@ -1252,15 +1258,15 @@ public class InPlaceEditView extends FrameLayout{
         if (forceVKBClose) {
             leaveKeyboardShowing = false;
         }
-        System.out.println("-----LEAVE KEYBOARD SHOWING: "+leaveKeyboardShowing);
         if (!leaveKeyboardShowing || actionCode == EditorInfo.IME_ACTION_DONE || actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
-            System.out.println("Hiding virtual keyboard");
             showVirtualKeyboard(false);
         }
         int imo = mEditText.getImeOptions() & 0xf; // Get rid of flags
+        // Next is deliberately absent: it moves on, it does not finish, so a field
+        // whose action is Next never fires its Done listener from the keyboard.
         if (reason == REASON_IME_ACTION
                 && ((TextArea) mEditText.mTextArea).getDoneListener() != null
-                && (actionCode == EditorInfo.IME_ACTION_DONE)|| actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
+                && (actionCode == EditorInfo.IME_ACTION_DONE || actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO)) {
             ((TextArea) mEditText.mTextArea).fireDoneEvent(keyEvent);
         }
         

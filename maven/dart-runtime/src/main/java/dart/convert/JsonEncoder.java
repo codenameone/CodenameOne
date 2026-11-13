@@ -24,7 +24,7 @@
 package dart.convert;
 
 /** {@code JsonEncoder} and {@code JsonEncoder.withIndent}. */
-public final class JsonEncoder {
+public final class JsonEncoder extends Converter<Object, String> {
     private final Object toEncodable;
     private final String indent;
 
@@ -49,6 +49,7 @@ public final class JsonEncoder {
         return new JsonEncoder(indent, toEncodable);
     }
 
+    @Override
     public String convert(Object value) {
         StringBuilder sb = new StringBuilder();
         JsonCodec.write(sb, value, toEncodable, indent, "", 0);

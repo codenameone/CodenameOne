@@ -1,0 +1,22 @@
+List<int>,List<num>,List<Object>,List<int?>,List<int?>,List<Null>,List<List<num>>,List<List<Object>>
+_Map<String, num>,_Map<String, int?>,_Map<Object, String>
+int,double,Null,List<int>
+List<int>,List<double>,List<Null>,List<List<int>>
+[true, false, true, true, true, true, false]
+2
+1
+int
+1
+String
+3.5
+int
+null
+[List<num>, List<num>]
+List<num>
+List<Object>
+cast fail
+Null
+Null
+List<Object?>
+List<Object?>
+[true, false, true]

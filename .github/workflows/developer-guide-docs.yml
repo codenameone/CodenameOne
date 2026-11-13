@@ -20,11 +20,15 @@ on:
       # The Bastion chapters, the same way; bastion.yml compiles and tests it.
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
+      - 'scripts/slate/**'
+      - 'scripts/splat/**'
       - 'scripts/skirmish/**'
       - 'scripts/dash/**'
       - 'scripts/parley/**'
       - 'scripts/hellocodenameone/common/src/main/kmp/**'
       - 'scripts/reel/**'
+      # The Wayline chapter includes the app kit's push senders.
+      - 'maven/cn1-app-kit/**'
       # The API-name check derives the published pages from the javadoc's own
       # sources, and the guide links into the java.* compatibility classes --
       # java/util/List.html among them. A change that renames or deletes one
@@ -146,7 +150,10 @@ jobs:
               - 'scripts/reel/**'
               - 'scripts/bastion/**'
               - 'scripts/pulse/**'
+              - 'scripts/slate/**'
+              - 'scripts/splat/**'
               - 'scripts/hellocodenameone/common/src/main/kmp/**'
+              - 'maven/cn1-app-kit/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
 
@@ -188,7 +195,7 @@ jobs:
           # here pulls in; they are
           # in the reactor because this job runs on JDK 17 (the flutter-modules profile).
           RETRY_ONLY_MATCHING=transient xvfb-run -a bash scripts/ci/retry.sh mvn -B -ntp -f maven/pom.xml \
-            -pl core,javase,android,css-compiler,codenameone-maven-plugin,backend,backend-test,dart-runtime,flutter-runtime,python-runtime \
+            -pl core,javase,android,css-compiler,codenameone-maven-plugin,annotation-processor,backend,backend-test,dart-runtime,flutter-runtime,python-runtime \
             -am install \
             -Plocal-dev-javase \
             -DskipTests \

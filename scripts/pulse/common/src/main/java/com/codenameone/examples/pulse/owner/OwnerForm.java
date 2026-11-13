@@ -38,7 +38,7 @@ import com.codenameone.examples.pulse.api.NameCountDto;
 import com.codenameone.examples.pulse.api.OwnerDashboardDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Layouts;
 import com.codenameone.examples.pulse.ui.Menu;

@@ -1,0 +1,24 @@
+Symbol("_v")
+Symbol("_v")
+true
+false
+false
+false
+Symbol("_v")
+Symbol("_v")
+22
+11
+10
+11
+20
+1200
+77
+2400
+8400
+nsm Symbol("_v") true false
+nsm Symbol("_v") false true
+nsm Symbol("_tick") false false
+nsm Symbol("_v") true false
+nsm Symbol("_v") false true
+nsm Symbol("_tick") false false
+no _v

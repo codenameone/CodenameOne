@@ -1,0 +1,15 @@
+List<num>,List<Object>,List<int?>,_Map<String, num>,_Map<String, int?>,List<List<Object>>
+List<num>
+[1, 2.5, 0, 1, 0.5]
+List<int?>
+_Map<String, int?>
+null
+2
+null
+[true, false, true, false, true]
+1
+s
+1
+List<int>
+List<num>
+_Map<int, double>

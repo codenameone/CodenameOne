@@ -251,6 +251,10 @@ public final class Crypto {
     public static final String RS256 = "RS256";
     public static final String RS384 = "RS384";
     public static final String RS512 = "RS512";
+    /// RSASSA-PKCS1-v1_5 over SHA-1, for [#verify] only: what older webhook
+    /// senders (Paddle Classic among them) still sign with. Nothing new should
+    /// sign with SHA-1, so [#sign] refuses it.
+    public static final String RS1 = "RS1";
     /// RSASSA-PSS over SHA-256 with MGF1-SHA-256 and a 32 byte salt.
     public static final String PS256 = "PS256";
     /// ECDSA over P-256 with SHA-256, and over P-384 with SHA-384.
@@ -324,11 +328,14 @@ public final class Crypto {
     /// algorithm, or signing fails
     public static byte[] sign(String algorithm, byte[] privateKey, byte[] data) throws IOException {
         int code = signatureCode(algorithm);
+        if (code == 7) {
+            throw new IOException(RS1 + " is accepted for verifying old signatures, not for making new ones");
+        }
         if (privateKey == null || data == null) {
             throw new IOException("A key and data are required");
         }
         try {
-            PrivateKey key = KeyFactory.getInstance(code >= 5 ? "EC" : "RSA")
+            PrivateKey key = KeyFactory.getInstance(code == 5 || code == 6 ? "EC" : "RSA")
                     .generatePrivate(new PKCS8EncodedKeySpec(privateKey));
             requireCurve(key, code);
             Signature signer = signature(code);
@@ -361,7 +368,7 @@ public final class Crypto {
         }
         Signature verifier;
         try {
-            PublicKey key = KeyFactory.getInstance(code >= 5 ? "EC" : "RSA")
+            PublicKey key = KeyFactory.getInstance(code == 5 || code == 6 ? "EC" : "RSA")
                     .generatePublic(new X509EncodedKeySpec(publicKey));
             requireCurve(key, code);
             verifier = signature(code);
@@ -395,6 +402,7 @@ public final class Crypto {
                         MGF1ParameterSpec.SHA256, 32, 1));
                 return pss;
             case 5: return Signature.getInstance("SHA256withECDSA");
+            case 7: return Signature.getInstance("SHA1withRSA");
             default: return Signature.getInstance("SHA384withECDSA");
         }
     }
@@ -402,7 +410,7 @@ public final class Crypto {
     /// The JDK signs with whatever curve an EC key is on; ES256 is P-256 and
     /// ES384 is P-384 and nothing else.
     private static void requireCurve(Key key, int code) throws GeneralSecurityException {
-        if (code < 5) {
+        if (code != 5 && code != 6) {
             return;
         }
         if (!(key instanceof ECKey)) {
@@ -721,6 +729,9 @@ public final class Crypto {
         }
         if (ES384.equals(algorithm)) {
             return 6;
+        }
+        if (RS1.equals(algorithm)) {
+            return 7;
         }
         throw new IOException("Not a supported signature algorithm: " + algorithm);
     }

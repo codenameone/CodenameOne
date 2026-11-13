@@ -69,7 +69,7 @@ public class LicensePage extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        dart.core.DartList<Widget> rows = new dart.core.DartList<Widget>();
+        dart.core.DartList<Widget> rows = new dart.core.DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
         if (applicationIcon != null) {
             rows.add(applicationIcon);
         }

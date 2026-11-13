@@ -145,6 +145,32 @@ public abstract class E2e extends AbstractTest {
         return findByName(name) != null;
     }
 
+    protected interface Counter {
+        int value();
+    }
+
+    /// Waits for `check` while `progress` keeps moving: `stallMillis` is how
+    /// long it may stand still, not a budget for the whole wait. A server that
+    /// stops ticking still fails fast; a runner sharing its CPUs with a dozen
+    /// other jobs only gets there later, where a wall-clock total failed it.
+    protected void untilAdvancing(Check check, Counter progress, int stallMillis, String what) {
+        int last = progress.value();
+        long deadline = System.currentTimeMillis() + stallMillis;
+        while (!check.ok()) {
+            int now = progress.value();
+            if (now != last) {
+                last = now;
+                deadline = System.currentTimeMillis() + stallMillis;
+            } else if (System.currentTimeMillis() > deadline) {
+                Form current = Display.getInstance().getCurrent();
+                shot("stalled-" + (current == null ? "no-form" : current.getName()));
+                throw new RuntimeException("Stalled waiting for " + what + " at " + now + " (nothing moved for "
+                        + stallMillis + " ms, on " + (current == null ? "no form" : current.getName()) + ")");
+            }
+            waitFor(100);
+        }
+    }
+
     protected void until(Check check, int timeoutMillis, String what) {
         long deadline = System.currentTimeMillis() + timeoutMillis;
         while (!check.ok()) {

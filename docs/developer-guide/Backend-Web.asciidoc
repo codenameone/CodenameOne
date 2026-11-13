@@ -37,6 +37,16 @@ same is true across controllers: a variable route in one controller that would
 answer a literal route of another is reported, since the routers are tried in
 turn and the literal one would never run.
 
+A path variable written `{name:.+}`, `{name:.*}` or `{*name}` is a catch-all: it
+takes the rest of the path, slashes included, so `@GetMapping("/files/{*path}")`
+answers `/files/a/b/c.txt` with `path` set to `a/b/c.txt`. It must be the last
+segment. Any other pattern after the colon is refused at build time, since the
+router matches segments and runs no regular expressions.
+
+Mappings are inherited. A controller extending a base class, or implementing an
+interface, picks up the `@RequestMapping` prefix and the mapped methods those
+declare.
+
 ==== Binding the parts of a request
 
 Every parameter of a mapped method says where its value comes from, with exactly
@@ -95,6 +105,11 @@ controller. <<Your own classes as JSON>> describes the form.
 A request target with a malformed escape sequence, or one that isn't valid UTF-8,
 is answered 400 before any route is tried, rather than as a 404 the client
 couldn't explain.
+
+A request parameter that repeats, `?tag=a&tag=b`, binds to a `List<String>` or a
+`String[]`; form fields of a multipart request bind the same way. A boxed type,
+`Integer` or `Long` for example, is `null` when the parameter is absent instead
+of needing a `defaultValue`.
 
 ==== What a method returns
 
@@ -422,6 +437,34 @@ something open until it runs, such as a connection or a file, should also
 implement `java.io.Closeable`. In those cases the server calls `close()`
 instead.
 
+==== Server-Sent Events
+
+For a feed the server pushes and the client only reads -- tokens relayed from a
+language model as they arrive, prices, progress -- an event stream is
+simpler than a WebSocket: it's one ordinary `GET`, the browser's `EventSource`
+reconnects by itself, and it passes through any proxy that passes HTTP.
+`Sse.stream` answers with `text/event-stream` and hands the handler an
+`Sse.Events`. Each `data` or `json` call sends one event and flushes it, so the
+client has it before the next one is produced.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-sse,indent=0]
+----
+
+`event`, `id` and `retry` set fields of the next event. A client that
+reconnects sends the last id it saw, which `lastEventId()` returns, so the
+stream can resume after it. The producer runs on the worker that served the
+request and the stream ends when it returns. A client that goes away makes the
+next send throw. Proxies and load balancers close a connection that has been
+idle for about a minute, so a producer that waits for news calls `ping()`
+from time to time; the client never sees it. Wait with `Thread.sleep`, not
+`Object.wait`.
+
+To relay an event stream from another server unchanged, `HttpProxy` already
+streams it event by event, as it does any upstream body of undeclared
+length. Compression never applies to a streamed response.
+
 ==== Compression
 
 `cn1.server.compression.enabled=true` turns on gzip for responses, with the two
@@ -502,6 +545,9 @@ an encoded escape sequence and a symbolic link out of the tree are all refused.
 Conditional requests and ranges are honoured, and where the platform supports it
 the file is sent from the page cache to the socket without passing through the
 process.
+
+`StaticFiles.firstOf(a, b, ...)` serves from the first of several roots that has
+the file, so an application can overlay its own assets on a library's.
 
 [[backend-web-errors]]
 ==== When a method throws
@@ -624,6 +670,14 @@ A request passes through these stages in order:
 
 Because interceptors run inside the security chain and never see the failures
 security owns, an interceptor can't let through a request security refused.
+
+`MappedInterceptor` limits an interceptor to some paths, as Spring's
+`addPathPatterns` and `excludePathPatterns` do: `*` matches within one segment
+and `/**` matches any number of them.
+
+`ViewControllers` declares answers that need no controller: a redirect from one
+path to another, or a bare status for a path. A backend renders no server-side
+views, so there is no view-name form.
 
 [[backend-web-servlet-equivalents]]
 ==== Coming from Servlets and Spring MVC
@@ -1144,6 +1198,12 @@ proxy a `WebClient` for its timeouts and client certificate.
 A static binary in a `scratch` image has no certificate store. Copy a
 `ca-certificates.crt` into the image and name it in `CURL_CA_BUNDLE` or
 `SSL_CERT_FILE`.
+
+The proxy can also rename a request header on the way out
+(`renameRequestHeader`), rename a response header on the way back
+(`renameResponseHeader`) and replace the status the other service answered with
+(`rewriteStatus`), for a service whose conventions differ from the one the app
+expects.
 
 [[backend-push]]
 === Sending push notifications

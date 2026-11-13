@@ -43,7 +43,7 @@ import com.codenameone.examples.wayline.map.MapStage;
 import com.codenameone.examples.wayline.map.Maps;
 import com.codenameone.examples.wayline.map.Routes;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.ui.BottomSheet;
 import com.codenameone.examples.wayline.ui.Lang;
 import com.codenameone.examples.wayline.ui.Menu;

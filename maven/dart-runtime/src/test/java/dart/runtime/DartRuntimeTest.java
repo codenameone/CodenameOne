@@ -110,7 +110,7 @@ public class DartRuntimeTest {
         assertTrue(DartRuntime.eq(Long.valueOf(Long.MAX_VALUE), Double.valueOf(9.223372036854775807E18)),
                 "the largest int == 2^63 on the VM");
         assertFalse(DartRuntime.eq(Long.valueOf(1), Double.valueOf(1.5)));
-        dart.core.DartList<Object> nums = new dart.core.DartList<Object>();
+        dart.core.DartList<Object> nums = new dart.core.DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         nums.add(Long.valueOf(1));
         assertTrue(nums.contains(Double.valueOf(1.0)), "List<num>.contains(1.0) finds the int 1");
     }
@@ -181,5 +181,66 @@ public class DartRuntimeTest {
         assertEquals("-0", DartRuntime.toStringAsFixed(-0.0, 0));
         assertEquals("0.00", DartRuntime.toStringAsFixed(0.0, 2));
         assertEquals("-0.00", DartRuntime.toStringAsFixed(-0.001, 2));
+    }
+
+    // --- toStringAsPrecision / toStringAsExponential / truncateToDouble -------
+
+    @Test
+    public void toStringAsPrecisionMatchesDart() {
+        assertEquals("1.2e+2", DartRuntime.toStringAsPrecision(123.456, 2));
+        assertEquals("123.5", DartRuntime.toStringAsPrecision(123.456, 4));
+        assertEquals("0.000123", DartRuntime.toStringAsPrecision(0.000123456, 3));
+        assertEquals("1.00e-7", DartRuntime.toStringAsPrecision(1e-7, 3));
+        assertEquals("1e+1", DartRuntime.toStringAsPrecision(9.995, 1), "rounding carries into a new digit");
+        assertEquals("9.99", DartRuntime.toStringAsPrecision(9.995, 3), "9.995 is really 9.99499...");
+        assertEquals("3", DartRuntime.toStringAsPrecision(2.5, 1), "an exact tie rounds up");
+        assertEquals("0.00", DartRuntime.toStringAsPrecision(0.0, 3));
+        assertEquals("-0.00", DartRuntime.toStringAsPrecision(-0.0, 3));
+        assertEquals("-1.23e+3", DartRuntime.toStringAsPrecision(-1234.0, 3));
+        assertEquals("4.94065645841246544177e-324", DartRuntime.toStringAsPrecision(Double.MIN_VALUE, 21));
+        assertEquals("NaN", DartRuntime.toStringAsPrecision(Double.NaN, 3));
+        assertEquals("-Infinity", DartRuntime.toStringAsPrecision(Double.NEGATIVE_INFINITY, 3));
+        assertThrows(RuntimeException.class, () -> DartRuntime.toStringAsPrecision(1.0, 0));
+        assertThrows(RuntimeException.class, () -> DartRuntime.toStringAsPrecision(1.0, 22));
+    }
+
+    @Test
+    public void toStringAsExponentialMatchesDart() {
+        assertEquals("1.23456e+2", DartRuntime.toStringAsExponential(123.456));
+        assertEquals("1.23e+2", DartRuntime.toStringAsExponential(123.456, 2));
+        assertEquals("1e+21", DartRuntime.toStringAsExponential(1e21));
+        assertEquals("1.5e-7", DartRuntime.toStringAsExponential(1.5e-7));
+        assertEquals("5e-324", DartRuntime.toStringAsExponential(Double.MIN_VALUE), "the shortest digits");
+        assertEquals("1.7976931348623157e+308", DartRuntime.toStringAsExponential(Double.MAX_VALUE));
+        assertEquals("1e+3", DartRuntime.toStringAsExponential(999.9, 0));
+        assertEquals("0e+0", DartRuntime.toStringAsExponential(0.0));
+        assertEquals("-0.00e+0", DartRuntime.toStringAsExponential(-0.0, 2));
+        assertEquals("-7e+0", DartRuntime.toStringAsExponential(-7.0));
+        assertEquals("1.2e+2", DartRuntime.toStringAsExponentialOrShortest(123.0, Long.valueOf(1)));
+        assertEquals("1.23e+2", DartRuntime.toStringAsExponentialOrShortest(123.0, null));
+        assertEquals("Infinity", DartRuntime.toStringAsExponential(Double.POSITIVE_INFINITY, 2));
+        assertThrows(RuntimeException.class, () -> DartRuntime.toStringAsExponential(1.0, 21));
+        assertThrows(RuntimeException.class, () -> DartRuntime.toStringAsExponential(1.0, -1));
+    }
+
+    @Test
+    public void truncateToDoubleKeepsTheSign() {
+        assertEquals(-2.0, DartRuntime.truncateToDouble(-2.7), 0.0);
+        assertEquals(2.0, DartRuntime.truncateToDouble(2.7), 0.0);
+        assertTrue(Double.doubleToLongBits(DartRuntime.truncateToDouble(-0.5)) < 0, "-0.5 truncates to -0.0");
+        assertEquals(1e300, DartRuntime.truncateToDouble(1e300), 0.0);
+        assertTrue(Double.isNaN(DartRuntime.truncateToDouble(Double.NaN)));
+        assertEquals("5e-324", DartRuntime.doubleStr(Double.MIN_VALUE), "toString is the shortest round trip too");
+    }
+
+    @Test
+    public void dynamicNumMembers() {
+        assertEquals(Boolean.TRUE, Dyn.get(Double.valueOf(-0.0), "isNegative"), "-0.0 is negative");
+        assertEquals(Boolean.FALSE, Dyn.get(Double.valueOf(Double.NaN), "isNegative"));
+        assertEquals("12", Dyn.call(Long.valueOf(12), "toStringAsPrecision", new Object[] {Long.valueOf(2)}));
+        assertEquals("1.2e+1", Dyn.call(Long.valueOf(12), "toStringAsExponential", new Object[] {}));
+        assertEquals("1.20e+1", Dyn.call(Double.valueOf(12), "toStringAsExponential", new Object[] {Long.valueOf(2)}));
+        assertEquals(Double.valueOf(-3.0), Dyn.call(Double.valueOf(-3.9), "truncateToDouble", new Object[] {}));
+        assertEquals(Double.valueOf(7.0), Dyn.call(Long.valueOf(7), "truncateToDouble", new Object[] {}));
     }
 }

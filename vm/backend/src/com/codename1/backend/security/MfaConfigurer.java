@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.security;
 
+import com.codename1.backend.security.mfa.EmailCodeService;
 import com.codename1.backend.security.mfa.RecoveryCodeService;
 import com.codename1.backend.security.mfa.TotpService;
 import com.codename1.backend.security.ratelimit.InMemoryRateLimiter;
@@ -49,6 +50,11 @@ import com.codename1.backend.security.ratelimit.RateLimiter;
 /// The codes come from the [TotpService] given here or the application's bean
 /// of that type, and recovery codes are accepted when there is a
 /// [RecoveryCodeService] the same way.
+///
+/// An [EmailCodeService], given here or declared as a bean, adds a code sent
+/// by mail: to a user it is enabled for and who has no authenticator app, as
+/// their password is accepted; to one who has both, when they ask for it on
+/// the page. Either service is enough for `mfa()`; with neither it is refused.
 ///
 /// #### How many guesses, and who can be kept out
 ///
@@ -168,6 +174,7 @@ public final class MfaConfigurer extends SecurityConfigurer {
     public static final String ATTEMPTS_WINDOW = "cn1.security.mfa.attemptsWindowSeconds";
 
     private TotpService totp;
+    private EmailCodeService emailCodes;
     private RecoveryCodeService recoveryCodes;
     private String page = "/login/mfa";
     private boolean customPage;
@@ -188,6 +195,13 @@ public final class MfaConfigurer extends SecurityConfigurer {
     /// What checks one-time codes, in place of the application's bean.
     public MfaConfigurer totpService(TotpService totpService) {
         this.totp = totpService;
+        return this;
+    }
+
+    /// What mails and checks sign-in codes, in place of the application's
+    /// bean.
+    public MfaConfigurer emailCodeService(EmailCodeService emailCodeService) {
+        this.emailCodes = emailCodeService;
         return this;
     }
 
@@ -337,10 +351,13 @@ public final class MfaConfigurer extends SecurityConfigurer {
     @Override
     public void init(HttpSecurity http) {
         TotpService codes = totp != null ? totp : http.getSharedObject(TotpService.class);
-        if (codes == null) {
+        EmailCodeService mailed = emailCodes != null ? emailCodes
+                : http.getSharedObject(EmailCodeService.class);
+        if (codes == null && mailed == null) {
             throw new IllegalStateException("mfa() needs something to check codes with, and "
-                    + "this application has none. Declare a TotpService bean, or call "
-                    + "totpService(...) on the mfa() configurer.");
+                    + "this application has none. Declare a TotpService or an "
+                    + "EmailCodeService bean, or call totpService(...) or "
+                    + "emailCodeService(...) on the mfa() configurer.");
         }
         RecoveryCodeService recovery = recoveryCodes != null ? recoveryCodes
                 : http.getSharedObject(RecoveryCodeService.class);
@@ -353,7 +370,7 @@ public final class MfaConfigurer extends SecurityConfigurer {
             success = saved;
         }
         RateLimiter[] counting = attempts(http);
-        filter = new SecondFactorAuthenticationFilter(codes, recovery, page, !customPage,
+        filter = new SecondFactorAuthenticationFilter(codes, mailed, recovery, page, !customPage,
                 processing(), codeParameter, pendingSeconds * 1000L, counting[0], counting[1],
                 success,
                 new SimpleUrlAuthenticationFailureHandler(http.loginPage() + "?error"), clock);

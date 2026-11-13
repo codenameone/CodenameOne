@@ -86,4 +86,36 @@ public class TabBarThemeData {
     public Color labelColor() {
         return labelColor;
     }
+
+    public Color indicatorColor() {
+        return indicatorColor;
+    }
+
+    public Color unselectedLabelColor() {
+        return unselectedLabelColor;
+    }
+
+    public TextStyle labelStyle() {
+        return labelStyle;
+    }
+
+    public TextStyle unselectedLabelStyle() {
+        return unselectedLabelStyle;
+    }
+
+    public Object indicator() {
+        return indicator;
+    }
+
+    public Object indicatorSize() {
+        return indicatorSize;
+    }
+
+    public Object labelPadding() {
+        return labelPadding;
+    }
+
+    public Object dividerColor() {
+        return dividerColor;
+    }
 }

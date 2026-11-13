@@ -23,7 +23,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.push.PushTarget;
 import com.codenameone.examples.wayline.Ids;
-import com.codenameone.examples.wayline.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.wayline.api.PushDeviceDto;
 import com.codenameone.examples.wayline.domain.PushDevice;
 import com.codenameone.examples.wayline.repository.ProfileRepository;

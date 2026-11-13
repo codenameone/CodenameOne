@@ -47,6 +47,48 @@ final class ClassLibraryHost extends JdkHost {
     }
 
     @Override
+    public java.io.InputStream resource(String absolute) {
+        String[] chunks = EmbeddedResources.chunks(absolute);
+        if (chunks == null) {
+            return null;
+        }
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        for (String chunk : chunks) {
+            decodeBase64(chunk, out);
+        }
+        return new java.io.ByteArrayInputStream(out.toByteArray());
+    }
+
+    /// Standard padded Base64, as the packager writes it; nothing else reaches it.
+    private static void decodeBase64(String text, java.io.ByteArrayOutputStream out) {
+        int bits = 0;
+        int count = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            int v;
+            if (c >= 'A' && c <= 'Z') {
+                v = c - 'A';
+            } else if (c >= 'a' && c <= 'z') {
+                v = c - 'a' + 26;
+            } else if (c >= '0' && c <= '9') {
+                v = c - '0' + 52;
+            } else if (c == '+') {
+                v = 62;
+            } else if (c == '/') {
+                v = 63;
+            } else {
+                break;
+            }
+            bits = (bits << 6) | v;
+            count += 6;
+            if (count >= 8) {
+                count -= 8;
+                out.write((bits >> count) & 0xff);
+            }
+        }
+    }
+
+    @Override
     public void randomBytes(byte[] out) {
         byte[] bytes;
         try {

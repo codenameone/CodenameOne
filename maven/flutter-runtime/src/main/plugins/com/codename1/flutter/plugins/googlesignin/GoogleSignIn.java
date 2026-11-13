@@ -92,7 +92,7 @@ public class GoogleSignIn {
 
     /** The scopes a sign-in asks for, {@code openid email profile} first. */
     public DartList<String> scopes() {
-        DartList<String> l = new DartList<String>();
+        DartList<String> l = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         for (String s : scopes) {
             l.add(s);
         }

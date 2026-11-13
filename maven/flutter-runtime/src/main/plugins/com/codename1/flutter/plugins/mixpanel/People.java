@@ -77,7 +77,7 @@ public class People {
     }
 
     public void unset(String name) {
-        DartList<String> names = new DartList<String>();
+        DartList<String> names = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         names.add(name);
         op("$unset", names);
     }
@@ -95,7 +95,7 @@ public class People {
     }
 
     public void clearCharges() {
-        op("$set", one("$transactions", new DartList<Object>()));
+        op("$set", one("$transactions", new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC)));
     }
 
     public void deleteUser() {

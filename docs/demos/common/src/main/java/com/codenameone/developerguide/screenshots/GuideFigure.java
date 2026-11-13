@@ -73,6 +73,16 @@ public interface GuideFigure {
         return false;
     }
 
+    /// Whether building this figure changes the installed theme.
+    ///
+    /// A figure about styling lays rules of its own over the native theme,
+    /// and the theme is global: without this the figures after it in the
+    /// manifest would be drawn in its colours. The renderer installs the
+    /// device's theme again after a figure that answers true.
+    default boolean changesTheme() {
+        return false;
+    }
+
     /// Runs the event thread for a while so animations finish.
     ///
     /// Several things a figure wants to show are only reachable through an

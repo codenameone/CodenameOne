@@ -28,7 +28,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.dash.api.ReplayDto;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.net.Session;
 import com.codenameone.examples.dash.rules.Replay;
 import com.codenameone.examples.dash.rules.Run;

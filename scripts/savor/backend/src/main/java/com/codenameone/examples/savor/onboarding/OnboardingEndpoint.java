@@ -19,7 +19,7 @@
 package com.codenameone.examples.savor.onboarding;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.savor.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.savor.api.DocumentContentDto;
 import com.codenameone.examples.savor.api.DocumentUploadDto;
 import com.codenameone.examples.savor.api.CourierApplicationDto;

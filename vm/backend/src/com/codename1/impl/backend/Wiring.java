@@ -141,6 +141,152 @@ public final class Wiring {
         return havingValue.equalsIgnoreCase(value.trim());
     }
 
+    /// `@ConditionalOnExpression`: the expression's value, in the subset its
+    /// documentation lists. A malformed one stops the start, naming it.
+    public static boolean expressionMatches(Config config, String expression) {
+        Condition c = new Condition(config, expression);
+        Object value = c.or();
+        c.skipSpace();
+        if (c.at != expression.length()) {
+            throw c.fail("unexpected text");
+        }
+        return Condition.truth(value);
+    }
+
+    /// A recursive descent over `@ConditionalOnExpression`'s subset; values are
+    /// Strings and Booleans.
+    private static final class Condition {
+        private final Config config;
+        private final String text;
+        int at;
+
+        Condition(Config config, String text) {
+            this.config = config;
+            this.text = text;
+        }
+
+        static boolean truth(Object value) {
+            return value instanceof Boolean ? ((Boolean) value).booleanValue()
+                    : "true".equalsIgnoreCase(String.valueOf(value).trim());
+        }
+
+        IllegalStateException fail(String why) {
+            return new IllegalStateException("@ConditionalOnExpression(\"" + text + "\"): " + why
+                    + " at position " + at);
+        }
+
+        void skipSpace() {
+            while (at < text.length() && text.charAt(at) <= ' ') {
+                at++;
+            }
+        }
+
+        private boolean take(String token) {
+            skipSpace();
+            if (!text.startsWith(token, at)) {
+                return false;
+            }
+            boolean word = Character.isLetter(token.charAt(0));
+            int end = at + token.length();
+            if (word && end < text.length() && Character.isLetterOrDigit(text.charAt(end))) {
+                return false;
+            }
+            at = end;
+            return true;
+        }
+
+        Object or() {
+            Object left = and();
+            while (take("||") || take("or")) {
+                boolean l = truth(left);
+                Object right = and();
+                left = Boolean.valueOf(l || truth(right));
+            }
+            return left;
+        }
+
+        private Object and() {
+            Object left = not();
+            while (take("&&") || take("and")) {
+                boolean l = truth(left);
+                Object right = not();
+                left = Boolean.valueOf(l && truth(right));
+            }
+            return left;
+        }
+
+        private Object not() {
+            if (take("!") || take("not")) {
+                return Boolean.valueOf(!truth(not()));
+            }
+            return comparison();
+        }
+
+        private Object comparison() {
+            Object left = primary();
+            if (take("==")) {
+                return Boolean.valueOf(String.valueOf(left).equals(String.valueOf(primary())));
+            }
+            if (take("!=")) {
+                return Boolean.valueOf(!String.valueOf(left).equals(String.valueOf(primary())));
+            }
+            return left;
+        }
+
+        private Object primary() {
+            skipSpace();
+            if (at >= text.length()) {
+                throw fail("expected a value");
+            }
+            char c = text.charAt(at);
+            if (c == '(') {
+                at++;
+                Object inner = or();
+                if (!take(")")) {
+                    throw fail("expected )");
+                }
+                return inner;
+            }
+            if (c == '\'') {
+                int end = text.indexOf('\'', at + 1);
+                if (end < 0) {
+                    throw fail("unclosed quote");
+                }
+                String literal = text.substring(at + 1, end);
+                at = end + 1;
+                return literal;
+            }
+            if (text.startsWith("${", at)) {
+                int end = text.indexOf('}', at);
+                if (end < 0) {
+                    throw fail("unclosed ${");
+                }
+                String reference = text.substring(at + 2, end);
+                at = end + 1;
+                String fallback = "";
+                int colon = reference.indexOf(':');
+                if (colon >= 0) {
+                    fallback = reference.substring(colon + 1);
+                    reference = reference.substring(0, colon);
+                }
+                String value;
+                try {
+                    value = config.get(reference.trim());
+                } catch (IOException err) {
+                    throw new IllegalStateException(reference + ": " + err.getMessage(), err);
+                }
+                return value == null ? fallback : value;
+            }
+            if (take("true")) {
+                return Boolean.TRUE;
+            }
+            if (take("false")) {
+                return Boolean.FALSE;
+            }
+            throw fail("unsupported expression");
+        }
+    }
+
     /// What a `@Bean` method returned, refused when it is null: a factory that
     /// produces nothing is a bug in the factory, and handing the null to what
     /// injects it would only move the failure to its first use.

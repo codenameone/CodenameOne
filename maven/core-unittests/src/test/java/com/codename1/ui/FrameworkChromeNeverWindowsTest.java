@@ -84,9 +84,11 @@ public class FrameworkChromeNeverWindowsTest extends UITestBase {
         "com/codename1/ui/TooltipManager.java",
         "com/codename1/ui/Toolbar.java",
         "com/codename1/ui/spinner/Picker.java",
+        "com/codename1/ui/scheduler/Scheduler.java",
         "com/codename1/ui/validation/Validator.java",
         "com/codename1/components/FloatingActionButton.java",
         "com/codename1/components/InfiniteProgress.java",
+        "com/codename1/impl/EmbeddedTextEditor.java",
     };
 
     /** Every construction of a dialog that would take the default if left alone. */

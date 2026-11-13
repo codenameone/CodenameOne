@@ -30,7 +30,7 @@ import com.codenameone.examples.savor.Prefs;
 import com.codenameone.examples.savor.api.PlaceDto;
 import com.codenameone.examples.savor.api.SavedAddressDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Ui;
 
 import java.util.ArrayList;

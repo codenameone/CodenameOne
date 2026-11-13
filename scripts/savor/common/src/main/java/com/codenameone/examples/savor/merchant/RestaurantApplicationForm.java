@@ -36,7 +36,7 @@ import com.codenameone.examples.savor.customer.CustomerForm;
 import com.codenameone.examples.savor.customer.Food;
 import com.codenameone.examples.savor.customer.PlaceSearchForm;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.net.Session;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Nav;

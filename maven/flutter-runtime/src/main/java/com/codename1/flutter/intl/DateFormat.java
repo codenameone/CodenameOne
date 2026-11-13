@@ -75,6 +75,96 @@ public final class DateFormat {
         return of("MMM d, yyyy");
     }
 
+    /** intl's {@code DateFormat.yMMMEd} skeleton, as en_US spells it. */
+    public static DateFormat yMMMEd(String locale) {
+        return of("EEE, MMM d, yyyy");
+    }
+
+    /** intl's {@code DateFormat.yMMMMEEEEd} skeleton, as en_US spells it. */
+    public static DateFormat yMMMMEEEEd(String locale) {
+        return of("EEEE, MMMM d, yyyy");
+    }
+
+    /** intl's {@code DateFormat.MMMEd} skeleton, as en_US spells it. */
+    public static DateFormat MMMEd(String locale) {
+        return of("EEE, MMM d");
+    }
+
+    /** intl's {@code DateFormat.MEd} skeleton, as en_US spells it. */
+    public static DateFormat MEd(String locale) {
+        return of("EEE, M/d");
+    }
+
+    /** intl's {@code DateFormat.EEEE} skeleton, as en_US spells it. */
+    public static DateFormat EEEE(String locale) {
+        return of("EEEE");
+    }
+
+    /** intl's {@code DateFormat.E} skeleton, as en_US spells it. */
+    public static DateFormat E(String locale) {
+        return of("EEE");
+    }
+
+    /** intl's {@code DateFormat.MMMM} skeleton, as en_US spells it. */
+    public static DateFormat MMMM(String locale) {
+        return of("MMMM");
+    }
+
+    /** intl's {@code DateFormat.d} skeleton, as en_US spells it. */
+    public static DateFormat d(String locale) {
+        return of("d");
+    }
+
+    /** intl's {@code DateFormat.y} skeleton, as en_US spells it. */
+    public static DateFormat y(String locale) {
+        return of("yyyy");
+    }
+
+    /** intl's {@code DateFormat.yMMMM} skeleton, as en_US spells it. */
+    public static DateFormat yMMMM(String locale) {
+        return of("MMMM yyyy");
+    }
+
+    /** intl's {@code DateFormat.Md} skeleton, as en_US spells it. */
+    public static DateFormat Md(String locale) {
+        return of("M/d");
+    }
+
+    /** intl's {@code DateFormat.MMMMd} skeleton, as en_US spells it. */
+    public static DateFormat MMMMd(String locale) {
+        return of("MMMM d");
+    }
+
+    /** intl's {@code DateFormat.jms} skeleton, as en_US spells it. */
+    public static DateFormat jms(String locale) {
+        return of("h:mm:ss a");
+    }
+
+    /** intl's {@code DateFormat.Hms} skeleton, as en_US spells it. */
+    public static DateFormat Hms(String locale) {
+        return of("HH:mm:ss");
+    }
+
+    /** intl's {@code DateFormat.j} skeleton, as en_US spells it. */
+    public static DateFormat j(String locale) {
+        return of("h a");
+    }
+
+    /** intl's {@code DateFormat.ms} skeleton, as en_US spells it. */
+    public static DateFormat ms(String locale) {
+        return of("mm:ss");
+    }
+
+    /** intl's {@code DateFormat.MMMMEEEEd} skeleton, as en_US spells it. */
+    public static DateFormat MMMMEEEEd(String locale) {
+        return of("EEEE, MMMM d");
+    }
+
+    /** intl's {@code DateFormat.yM} skeleton, as en_US spells it. */
+    public static DateFormat yM(String locale) {
+        return of("M/yyyy");
+    }
+
     public static DateFormat yMd(String locale) {
         return of("M/d/yyyy");
     }

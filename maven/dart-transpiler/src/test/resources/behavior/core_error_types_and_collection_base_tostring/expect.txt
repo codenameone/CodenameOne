@@ -1,0 +1,51 @@
+{x: 1, y: 2}
+map {x: 1, y: 2}
+[3, 4]
+list [3, 4]
+{a, b}
+set {a, b}
+(2, 4, 6)
+iter (2, 4, 6)
+UnsupportedError true false | Unsupported operation: u
+UnimplementedError true false | UnimplementedError: x
+UnimplementedError true false | UnimplementedError
+NotHere true false | Unsupported operation: n
+Todo true false | UnimplementedError: later
+Todo true false | UnimplementedError
+true
+caught Error Unsupported operation: q
+caught Unsupported UnimplementedError
+fixed true
+unmod true false
+3 5 slot null
+RangeError (slot): no such slot: index should be less than 3: 5
+4 RangeError: Index out of range: index must not be negative: -1
+FormatException: bad (at character 4)
+abcdef
+   ^
+
+FormatException: bad (at character 1)
+abc
+^
+
+FormatException: bad (at line 2, character 3)
+two
+  ^
+
+FormatException: bad (at line 2, character 2)
+two
+ ^
+
+FormatException: bad
+abc
+FormatException: bad (at offset 1)
+FormatException: bad (at offset 4)
+FormatException
+FormatException (at character 2)
+xy
+ ^
+
+made
+init word
+w
+w

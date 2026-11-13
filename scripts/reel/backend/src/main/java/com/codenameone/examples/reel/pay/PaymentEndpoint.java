@@ -19,7 +19,7 @@
 package com.codenameone.examples.reel.pay;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.reel.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.reel.account.Accounts;
 import com.codenameone.examples.reel.api.CardDto;
 import com.codenameone.examples.reel.api.PaymentApiServer;

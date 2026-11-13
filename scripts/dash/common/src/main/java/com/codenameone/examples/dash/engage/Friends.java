@@ -28,7 +28,7 @@ import com.codename1.io.Preferences;
 import com.codenameone.examples.dash.api.InviteClaimDto;
 import com.codenameone.examples.dash.api.InviteDto;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.net.Session;
 import com.codenameone.examples.dash.ui.Rewards;
 import com.codenameone.examples.dash.ui.Ui;

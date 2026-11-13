@@ -51,7 +51,7 @@ import com.codenameone.examples.skirmish.battle.ModelPreview;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.forge.PackScreen;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.rules.forge.AssetRef;
 import com.codenameone.examples.skirmish.ui.MatchmakingForm;
 import com.codenameone.examples.skirmish.ui.Nav;

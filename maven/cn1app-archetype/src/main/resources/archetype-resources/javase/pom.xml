@@ -98,8 +98,9 @@
         JCEF Maven transitively from codenameone-javase; JCEF Maven downloads and
         installs the matching native runtime on first use.
 
-        Runtime scope, never compile: this is ~300 MB of ffmpeg natives for
-        every OS and CPU. The simulator and desktop run classpaths are runtime
+        Runtime scope, never compile: these are ffmpeg natives, for the machine
+        that builds or (with -Dcn1.ffmpeg.allPlatforms, which the desktop jar
+        commands pass) for every desktop platform. The simulator and desktop run classpaths are runtime
         classpaths, so they still get it; the jar that cn1:build uploads is
         assembled from the compile classpath, so it does not. At compile scope
         it went into every desktop upload and the build client refused the jar.

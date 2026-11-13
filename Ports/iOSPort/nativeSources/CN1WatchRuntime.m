@@ -465,5 +465,9 @@ void com_codename1_impl_ios_IOSNative_gl3dClear___long_int_boolean_boolean(CN1_T
 void com_codename1_impl_ios_IOSNative_gl3dSetViewport___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {}
 void com_codename1_impl_ios_IOSNative_gl3dDrawIndexed___long_long_long_int_long_int_int_float_1ARRAY_int_long_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_LONG iboPeer, JAVA_INT indexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {}
 void com_codename1_impl_ios_IOSNative_gl3dDrawArrays___long_long_long_int_int_int_float_1ARRAY_int_long_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_LONG pipelinePeer, JAVA_LONG vboPeer, JAVA_INT strideBytes, JAVA_INT vertexCount, JAVA_INT primitive, JAVA_OBJECT uniforms, JAVA_INT uniformFloats, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginShadowPass___long_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT size) { return 0; }
+void com_codename1_impl_ios_IOSNative_gl3dEndShadowPass___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer) {}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginPostProcess___long_java_lang_String_boolean_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_OBJECT mslSource, JAVA_BOOLEAN bloom) { return 0; }
+void com_codename1_impl_ios_IOSNative_gl3dEndPostProcess___long_float_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_OBJECT params) {}
 
 #endif // TARGET_OS_WATCH

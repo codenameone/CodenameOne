@@ -9,8 +9,8 @@ import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.material.ThemeData;
 import com.codename1.flutter.Widget;
 
-// Generated from main.dart — do not edit.
-public class DemoApp extends StatelessWidget {
+// Generated from main.dart -- do not edit.
+public class DemoApp extends StatelessWidget implements dart.runtime.ConstCanon.Keyed {
 
     public DemoApp(Key key) {
         this.key(key);
@@ -25,8 +25,12 @@ public class DemoApp extends StatelessWidget {
         $t1.colorScheme(ColorScheme.fromSeed(Colors.blue, null));
         $t1.useMaterial3(true);
         $t0.theme($t1);
-        $t0.home(new DemoPage(null));
+        $t0.home(dart.runtime.ConstCanon.object(new DemoPage(null)));
         return $t0;
+    }
+
+    public Object[] $constKey() {
+        return dart.runtime.ConstCanon.join(super.$constKey(), new Object[] {});
     }
 
     static final String $cn1DartLines = "main.dart\n22:12";

@@ -40,14 +40,14 @@ import com.codenameone.examples.savor.live.LiveChannel;
 import com.codenameone.examples.savor.map.Locator;
 import com.codenameone.examples.savor.merchant.RestaurantApplicationForm;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.net.Session;
 import com.codenameone.examples.savor.pay.ReceiptForm;
 import com.codenameone.examples.savor.pay.WalletForm;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Menu;
 import com.codenameone.examples.savor.ui.Nav;
-import com.codenameone.examples.savor.ui.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.savor.ui.ProfileForm;
 import com.codenameone.examples.savor.ui.Ui;
 
@@ -292,7 +292,7 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             loadRestaurants();
         }));
         restaurants = new Container(BoxLayout.y());
-        restaurants.add(new Skeleton(3));
+        restaurants.add(new Skeleton(3, "SvSkeleton"));
         page.add(restaurants);
         Ui.pull(page, () -> {
             loadActive();
@@ -394,7 +394,7 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             }
             LatLng to = destination();
             results.removeAll();
-            results.add(new Skeleton(3));
+            results.add(new Skeleton(3, "SvSkeleton"));
             results.revalidate();
             // An answer for an earlier term that arrives late is dropped: the
             // results are always for what is in the field.

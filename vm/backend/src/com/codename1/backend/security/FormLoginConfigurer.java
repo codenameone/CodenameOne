@@ -170,7 +170,7 @@ public final class FormLoginConfigurer extends SecurityConfigurer {
         if (!customLoginPage) {
             http.addFilter(new DefaultLoginPageGeneratingFilter(loginPage, processingUrl(),
                     usernameParameter, passwordParameter, http.rememberMeParameter(),
-                    http.loginLinks()),
+                    http.loginLinks(), http.passwordResetPages()),
                     HttpSecurity.ORDER_LOGIN_PAGE);
         }
     }

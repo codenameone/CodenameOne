@@ -54,8 +54,13 @@ public final class JavaScriptProxyPackager {
     private JavaScriptProxyPackager() {
     }
 
+    /// Reads the compiled proxy servlet through `resources`, the builder the host
+    /// attached the ParparVM bundle to. That bundle is not on the build tool's own
+    /// class path, so asking this class for it finds nothing in a real build -- and
+    /// finds it in this module's tests, where the bundle is on the test class path.
+    /// There is no overload without the builder for that reason.
     public static File packageProxy(File appDir, File buildDir, String appName,
-                                    BuildRequest request, Logger logger) throws IOException {
+                                    BuildRequest request, Logger logger, Executor resources) throws IOException {
         boolean inject = !"false".equalsIgnoreCase(request.getArg("javascript.inject_proxy", "true"));
         String explicitTarget = trimToNull(request.getArg("javascript.proxy.target", null));
         String externalUrl = trimToNull(request.getArg("javascript.proxy.url", null));
@@ -101,7 +106,7 @@ public final class JavaScriptProxyPackager {
         File output;
         if (target.endsWith("servlet")) {
             copyTree(appDir, stage);
-            packageServlet(stage, target, allowedTargets);
+            packageServlet(stage, target, allowedTargets, resources);
             output = new File(buildDir, safeName(appName) + "-" + target + ".war");
         } else {
             File publicDir = "php".equals(target) ? stage : new File(stage, "public");
@@ -114,12 +119,13 @@ public final class JavaScriptProxyPackager {
         return output;
     }
 
-    private static void packageServlet(File root, String target, String allowedTargets) throws IOException {
+    private static void packageServlet(File root, String target, String allowedTargets, Executor resources)
+            throws IOException {
         String api = target.startsWith("jakarta") ? "jakarta" : "javax";
         File classes = new File(root, "WEB-INF/classes");
         classes.mkdirs();
-        InputStream compiled = JavaScriptProxyPackager.class.getResourceAsStream(
-                "/javascript-proxy-" + api + ".jar");
+        String jar = "/javascript-proxy-" + api + ".jar";
+        InputStream compiled = resources.getResourceAsStream(jar);
         if (compiled == null) {
             throw new IOException("Missing javascript-proxy-" + api + ".jar from the ParparVM bundle");
         }

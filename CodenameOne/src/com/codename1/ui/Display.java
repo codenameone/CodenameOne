@@ -863,6 +863,24 @@ public final class Display extends CN1Constants {
         impl.vibrate(duration);
     }
 
+    /// Rumbles a game controller, when the port and the controller can.
+    ///
+    /// Applications call `com.codename1.gaming.Gamepad#rumble(float, float, int)`
+    /// rather than this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the controller, as `com.codename1.gaming.Gamepad#getIndex()`
+    ///
+    /// - `strong`: the low frequency motor, 0 to 1
+    ///
+    /// - `weak`: the high frequency motor, 0 to 1
+    ///
+    /// - `durationMillis`: how long to rumble
+    public void rumbleGamepad(int index, float strong, float weak, int durationMillis) {
+        impl.rumbleGamepad(index, strong, weak, durationMillis);
+    }
+
     /// Flash the backlight of the device for the given length of time
     ///
     /// #### Parameters
@@ -2200,7 +2218,12 @@ public final class Display extends CN1Constants {
                     }
 
                     while (!runningSerialCallsQueue.isEmpty()) {
-                        pendingSerialCalls.add(0, runningSerialCallsQueue.removeLast());
+                        // Held as an Object and tested: the catch below takes RuntimeException,
+                        // and ParparVM's unchecked cast would never reach it.
+                        Object call = runningSerialCallsQueue.removeLast();
+                        if (call instanceof Runnable) {
+                            pendingSerialCalls.add(0, (Runnable) call);
+                        }
                     }
                 }
 
@@ -8670,6 +8693,14 @@ public final class Display extends CN1Constants {
     /// @hidden
     public com.codename1.impl.VisionImpl getVisionBackend() {
         return impl.createVisionImpl();
+    }
+
+    /// Returns the llama.cpp backend behind `com.codename1.ai.LocalLlmClient`,
+    /// or `null` where none is linked.
+    ///
+    /// @hidden
+    public com.codename1.impl.LocalLlmImpl getLocalLlmBackend() {
+        return impl.createLocalLlmImpl();
     }
 
     /// Creates a fresh backend for `com.codename1.ai.inference`.

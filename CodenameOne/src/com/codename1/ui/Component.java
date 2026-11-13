@@ -7859,7 +7859,7 @@ public class Component implements Animation, StyleListener, Editable {
                     return getPressedStyle();
                 }
 
-                if (keepTextInputFocusStyle(lead)) {
+                if (lead.hasFocus() && keepTextInputFocusStyle(lead)) {
                     return getSelectedStyle();
                 }
 
@@ -7893,7 +7893,7 @@ public class Component implements Animation, StyleListener, Editable {
         // style (including its border padding and background) while the pointer remains;
         // copying only its border onto hover would mix incompatible geometry. Buttons
         // retain hover feedback while focused, since their selected state is not editing.
-        if (keepTextInputFocusStyle(this)) {
+        if (hasFocus() && keepTextInputFocusStyle(this)) {
             return getSelectedStyle();
         }
         // An undeclared hover state still falls through for legacy themes.

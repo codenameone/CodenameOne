@@ -52,6 +52,33 @@ final class BuildHintsGeneral {
                 .doc("Whether video calls are offered, on both platforms. `ios.call.video` and "
                         + "`android.call.video` override it per platform."));
 
+        h.add(new Hint("commerce.cloud.enabled")
+                .group(HintGroup.GENERAL)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("general")
+                .doc("Whether `CommerceManager` asks the Codename One Commerce service for "
+                        + "entitlements. Set it to `false` to keep every decision on the device, "
+                        + "from the store's own receipts."));
+
+        h.add(new Hint("commerce.cloud.endpoint")
+                .group(HintGroup.GENERAL)
+                .type(HintType.STRING)
+                .platform("general")
+                .doc("The base url of the Commerce service `CommerceManager` talks to, for a "
+                        + "self-hosted or staging service, for example "
+                        + "`+https://commerce.example.com/api/v2/commerce+`. Must be an `http` "
+                        + "or `https` url; a build with any other value fails."));
+
+        h.add(new Hint("commerce.cloud.publicKey")
+                .group(HintGroup.GENERAL)
+                .type(HintType.STRING)
+                .platform("general")
+                .doc("The base64 encoded Ed25519 public key that Commerce responses are "
+                        + "verified against. Set it together with `commerce.cloud.endpoint` when "
+                        + "the service signs with its own key; a response that fails the check "
+                        + "is ignored and the app falls back to the store's receipts."));
+
         h.add(new Hint("invite.domain")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)

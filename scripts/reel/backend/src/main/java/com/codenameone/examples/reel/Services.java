@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.reel;
 
+import com.codename1.appkit.server.security.AccountSecurity;
+
 import com.codename1.backend.Config;
 import com.codename1.backend.annotations.Bean;
 import com.codename1.backend.annotations.Configuration;
@@ -33,11 +35,11 @@ import com.codenameone.examples.reel.settings.Settings;
 import com.codenameone.examples.reel.pay.PaymentProvider;
 import com.codenameone.examples.reel.pay.SimulatedPayments;
 import com.codenameone.examples.reel.pay.StripePayments;
-import com.codenameone.examples.reel.push.CloudPushSender;
-import com.codenameone.examples.reel.push.ConsolePushSender;
-import com.codenameone.examples.reel.push.MisconfiguredPushSender;
-import com.codenameone.examples.reel.push.PushSender;
-import com.codenameone.examples.reel.push.RecordingPushSender;
+import com.codename1.appkit.server.push.CloudPushSender;
+import com.codename1.appkit.server.push.ConsolePushSender;
+import com.codename1.appkit.server.push.MisconfiguredPushSender;
+import com.codename1.appkit.server.push.PushSender;
+import com.codename1.appkit.server.push.RecordingPushSender;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,7 +79,7 @@ public class Services {
             @Value("${reel.payments.provider:}") String chosen,
             @Value("${reel.payments.stripe.secret:}") String secret,
             @Value("${reel.public.url:}") String publicUrl,
-            @Value("${" + SecurityConfig.ISSUER_KEY + ":}") String issuer) {
+            @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer) {
         String kind = chosen.trim().length() > 0 ? chosen.trim()
                 : config.isDevelopmentProfile() ? "simulated" : "stripe";
         if ("simulated".equalsIgnoreCase(kind)) {
@@ -89,7 +91,7 @@ public class Services {
         }
         String address = publicUrl.length() > 0 ? publicUrl : issuer;
         String missing = missing("", new String[] {"reel.payments.stripe.secret", secret,
-            "reel.public.url (or " + SecurityConfig.ISSUER_KEY + ")", address});
+            "reel.public.url (or " + AccountSecurity.ISSUER_KEY + ")", address});
         if (missing.length() > 0) {
             return new MisconfiguredPayments("stripe", unset("payments", "stripe", missing));
         }

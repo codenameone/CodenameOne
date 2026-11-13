@@ -94,9 +94,16 @@ public final class Support {
                 done.countDown();
             }
         });
-        boolean arrived;
+        // The Dart handler runs on the isolate's thread -- this one, as Dart main called
+        // in -- through a timer, so the wait runs the event loop as native code waiting
+        // on a nested loop would; only blocking would starve the handler it waits for.
+        boolean arrived = false;
+        long deadline = System.currentTimeMillis() + 5000;
         try {
-            arrived = done.await(5, TimeUnit.SECONDS);
+            while (!arrived && System.currentTimeMillis() < deadline) {
+                dart.async.Async.runMicrotasks();
+                arrived = done.await(5, TimeUnit.MILLISECONDS);
+            }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

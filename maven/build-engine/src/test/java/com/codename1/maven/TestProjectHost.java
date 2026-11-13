@@ -139,6 +139,11 @@ public class TestProjectHost implements ProjectHost {
     }
 
     @Override
+    public File getPortJar(String artifactId, String classifier) {
+        return getJar("com.codenameone", artifactId, classifier);
+    }
+
+    @Override
     public File getJar(String groupId, String artifactId, String classifier) {
         for (BuildArtifact a : artifacts) {
             if (a.getGroupId().equals(groupId) && a.getArtifactId().equals(artifactId)) {

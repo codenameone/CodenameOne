@@ -95,6 +95,8 @@ public final class Tasks {
         /// a bean an authorization expression names -- or null. Kept here because
         /// this is what a thread carries of the server it works for.
         private Map namedBeans;
+        /// Resources opened on first use by [Tasks#resource], closed at shutdown.
+        private final Map resources = new LinkedHashMap();
 
         synchronized void namedBeans(Map beans) {
             this.namedBeans = beans;
@@ -151,6 +153,22 @@ public final class Tasks {
         return previous;
     }
 
+    /// `work`, run under the calling thread's registry whatever thread runs it.
+    static Runnable inServer(final Runnable work) {
+        final Registry registry = current();
+        return new Runnable() {
+            @Override
+            public void run() {
+                Object previous = enter(registry);
+                try {
+                    work.run();
+                } finally {
+                    leave(previous);
+                }
+            }
+        };
+    }
+
     /// The calling thread's registry as it is, for restoring later; may be null.
     static Object peek() {
         return CURRENT.get();
@@ -178,6 +196,57 @@ public final class Tasks {
 
     /// The bean the wiring of the calling thread's server registered under
     /// `name`, or null.
+    /// The calling thread's server's configuration, or null.
+    static Config currentConfig() {
+        return current().config;
+    }
+
+    /// The calling thread's server's resource under `key`, opened on first use.
+    /// Opened outside the registry's lock, since opening one may take a network
+    /// round trip; two callers racing to open it keep the first and close the
+    /// other.
+    static Object resource(String key, com.codename1.impl.backend.BackendAccess.ResourceFactory
+            factory) throws java.io.IOException {
+        Registry r = current();
+        synchronized (r) {
+            if (r.shutdown) {
+                throw new java.io.IOException("The server is stopping");
+            }
+            Object existing = r.resources.get(key);
+            if (existing != null) {
+                return existing;
+            }
+        }
+        Object opened = factory.open(r.config == null
+                ? Config.of(new java.util.Properties(), null) : r.config);
+        synchronized (r) {
+            Object existing = r.resources.get(key);
+            if (existing == null && !r.shutdown) {
+                r.resources.put(key, opened);
+                return opened;
+            }
+        }
+        closeQuietly(opened);
+        Object existing;
+        synchronized (r) {
+            existing = r.resources.get(key);
+        }
+        if (existing == null) {
+            throw new java.io.IOException("The server is stopping");
+        }
+        return existing;
+    }
+
+    private static void closeQuietly(Object resource) {
+        if (resource instanceof java.io.Closeable) {
+            try {
+                ((java.io.Closeable) resource).close();
+            } catch (java.io.IOException | RuntimeException err) {
+                System.err.println("Closing " + resource + " failed: " + err);
+            }
+        }
+    }
+
     static Object namedBean(String name) {
         return current().namedBean(name);
     }
@@ -192,6 +261,15 @@ public final class Tasks {
     /// overrides
     static TaskExecutor executor(String name, int kind) {
         return executor(current(), name, kind);
+    }
+
+    /// The executor called `name` of the calling thread's server, created on
+    /// first use as `@Async("name")` would create it -- the way to give it a
+    /// [TaskDecorator] from a `@PostConstruct`, before any task is submitted.
+    /// @param name the executor's name, as `@Async` and the settings spell it
+    /// @return the executor
+    public static TaskExecutor executor(String name) {
+        return executor(current(), name, AUTO);
     }
 
     static TaskExecutor executor(Registry registry, String name, int kind) {
@@ -226,10 +304,14 @@ public final class Tasks {
             String prefix = "cn1.task.executor." + key + ".";
             int threads = SCHEDULING.equals(key) ? 2 : 8;
             String configured = null;
+            int capacity = 0;
+            String namePrefix = null;
             if (registry.config != null) {
                 try {
                     threads = registry.config.getInt(prefix + "threads", threads);
                     configured = registry.config.get(prefix + "kind");
+                    capacity = registry.config.getInt(prefix + "queue-capacity", 0);
+                    namePrefix = registry.config.get(prefix + "thread-name-prefix", null);
                 } catch (java.io.IOException err) {
                     throw new IllegalStateException("Executor " + key
                             + " cannot be configured: " + err.getMessage(), err);
@@ -245,6 +327,7 @@ public final class Tasks {
                 // Decided per task by the executor, not here: this may run during
                 // start-up, before the server's hosts exist.
                 TaskExecutor created = new TaskExecutor(key, false, true, threads, registry);
+                created.configure(capacity, namePrefix);
                 if (configured == null) {
                     registry.requestedKinds.put(key, Integer.valueOf(kind));
                 }
@@ -262,6 +345,7 @@ public final class Tasks {
                 registry.requestedKinds.put(key, Integer.valueOf(kind));
             }
             TaskExecutor created = new TaskExecutor(key, virtual, threads, registry);
+            created.configure(capacity, namePrefix);
             registry.executors.put(key, created);
             return created;
         }
@@ -382,6 +466,17 @@ public final class Tasks {
         for (Object element : all) {
             long left = deadline - System.currentTimeMillis();
             ((TaskExecutor) element).shutdown(left > 0 ? left : 0);
+        }
+        // After the executors: work still finishing used these. Newest first,
+        // so a resource built over another (a listener container over its
+        // connection) goes before what it uses.
+        List resources;
+        synchronized (registry) {
+            resources = new ArrayList(registry.resources.values());
+            registry.resources.clear();
+        }
+        for (int i = resources.size() - 1; i >= 0; i--) {
+            closeQuietly(resources.get(i));
         }
     }
 }

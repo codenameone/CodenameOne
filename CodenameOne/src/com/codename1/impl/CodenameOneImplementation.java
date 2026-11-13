@@ -479,6 +479,11 @@ public abstract class CodenameOneImplementation {
     public void vibrate(int duration) {
     }
 
+    /// Rumbles game controller `index`; motors are 0 to 1. A port with
+    /// controller force feedback overrides this, the rest ignore it.
+    public void rumbleGamepad(int index, float strong, float weak, int durationMillis) {
+    }
+
     /// Flash the backlight of the device for the given length of time
     ///
     /// #### Parameters
@@ -8816,6 +8821,12 @@ public abstract class CodenameOneImplementation {
 
     /// Factory for the built-in LiteRT inference API.
     public InferenceImpl createInferenceImpl() {
+        return null;
+    }
+
+    /// Factory for the llama.cpp backend of `com.codename1.ai.LocalLlmClient`.
+    /// Returns `null` unless the port has the library linked in.
+    public LocalLlmImpl createLocalLlmImpl() {
         return null;
     }
 

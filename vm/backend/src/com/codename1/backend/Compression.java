@@ -85,6 +85,10 @@ final class Compression {
         // representation: compressing it would leave the offsets describing bytes
         // the client never receives, and a resumed download assembled corrupt.
         if (response == null || response.fileFd >= 0
+                // A streamed body is written after this runs; marking it gzip would
+                // label identity bytes as compressed. Event streams also need every
+                // write to reach the client at once, which gzip would hold back.
+                || response.bodyWriter != null
                 || response.status == 204 || response.status == 304 || response.status == 206
                 || response.hasHeader("Content-Range")
                 || response.hasHeader("Content-Encoding") || !compressible(response.contentType)) {

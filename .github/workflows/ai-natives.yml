@@ -1,0 +1,85 @@
+# Builds the whisper.cpp and llama.cpp natives at the versions pinned in
+# scripts/ai-natives/versions.properties and publishes them to the Codename One
+# repository (https://repo.codenameone.com/maven2, group com.codenameone.natives).
+#
+# Manual by design. Builders fetch exactly the versions PlatformFeatureCatalog
+# names, so run this BEFORE merging a version bump; publish-staging-to-r2.sh
+# refuses to replace an existing object whose bytes differ, so a published
+# version can never change under an application that already uses it.
+name: AI natives
+
+on:
+  workflow_dispatch:
+
+# Its own group: sharing "release" would let a dispatch here replace a pending
+# release run, which GitHub drops without a trace.
+concurrency:
+  group: ai-natives
+  cancel-in-progress: false
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build xcframeworks
+        run: |
+          scripts/ai-natives/build.sh whisper ios "$RUNNER_TEMP/repo"
+          scripts/ai-natives/build.sh llama ios "$RUNNER_TEMP/repo"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-natives-ios
+          path: ${{ runner.temp }}/repo
+
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install NDK
+        run: yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" > /dev/null
+      - name: Build AARs
+        run: |
+          scripts/ai-natives/build.sh whisper android "$RUNNER_TEMP/repo"
+          scripts/ai-natives/build.sh llama android "$RUNNER_TEMP/repo"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-natives-android
+          path: ${{ runner.temp }}/repo
+
+  publish:
+    needs: [ios, android]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ai-natives-*
+          merge-multiple: true
+          path: repo
+      - name: Upload to R2
+        run: bash maven/scripts/r2/publish-staging-to-r2.sh repo
+      - name: Verify
+        run: |
+          set -euo pipefail
+          . <(grep -E '^[a-z]+\.(tag|revision)=' scripts/ai-natives/versions.properties | sed 's/\./_/; s/^/export /')
+          base=https://repo.codenameone.com/maven2/com/codenameone/natives
+          for lib in whisper llama; do
+            tag_var=${lib}_tag; rev_var=${lib}_revision
+            v="${!tag_var#v}-${!rev_var}"
+            curl -fsSI "$base/cn1-$lib-android/$v/cn1-$lib-android-$v.aar" > /dev/null
+            curl -fsSI "$base/cn1-$lib-ios/$v/cn1-$lib-ios-$v.zip" > /dev/null
+            echo "cn1-$lib $v published"
+          done

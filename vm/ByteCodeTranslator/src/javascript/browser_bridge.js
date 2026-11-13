@@ -5538,6 +5538,10 @@
       var c = { sdpMid: r.mid, sdpMLineIndex: r.index, candidate: r.cand };
       if (p.remoteSet) { p.pc.addIceCandidate(c).catch(function() {}); } else { p.early.push(c); }
       return 1; },
+    // Every browser this port runs in has restartIce(); the next offer
+    // carries the new credentials.
+    restart: function(r) { var p = rtc.peers[r.peer];
+      if (p && p.pc.restartIce) { p.pc.restartIce(); } return 1; },
     close: function(r) { var p = rtc.peers[r.peer]; if (p) { delete rtc.peers[r.peer]; p.pc.close();
         // Remote tracks belong to their peer (release() leaves them alone),
         // so they and the elements showing them go with it.

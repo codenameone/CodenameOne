@@ -1,0 +1,33 @@
+Record(r1)
+Record
+2
+[hi]
+elf 3 Character
+true
+42
+true
+1
+42
+6
+true
+1x
+2
+[Exception.none, Exception.minor, Exception.major]
+Short.b
+two
+Class.second
+System.off
+4
+A
+true
+1.5
+12.5
+[2, 4, 6]
+{k: true}
+StateError
+e1
+3
+Void.only
+true
+10
+true

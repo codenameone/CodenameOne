@@ -117,6 +117,10 @@ public abstract class BackendAccess {
     /// Serves the management endpoints when the configuration turns them on.
     public abstract void management(Backend.Builder builder);
 
+    /// Serves `document`, the OpenAPI document the build wrote, and a Swagger UI
+    /// page for it; see [OpenApiDocs]. The only call that names them.
+    public abstract void openApi(Backend.Builder builder, String document);
+
     /// Puts the security layer in front of the application's routes, for a build
     /// that found a `SecurityFilterChain` bean. The only call that names the
     /// layer, so a server whose entry point does not make it has none of its code.
@@ -271,4 +275,28 @@ public abstract class BackendAccess {
 
     /// Every executor of the given servers.
     public abstract List executorsOf(Collection servers);
+
+    // ------------------------------------------------------- server resources
+
+    /// Opens a resource that belongs to one server -- a key/value store, a
+    /// messaging connection -- the first time its key is asked for.
+    public interface ResourceFactory {
+        /// Opens the resource from the server's configuration. What it answers is
+        /// closed, when it is [java.io.Closeable], as the server stops.
+        Object open(Config config) throws IOException;
+    }
+
+    /// The calling thread's server's resource under `key`, opened by `factory`
+    /// on first use and closed when that server stops. Never cached in a
+    /// static: two servers in one process each have their own.
+    public abstract Object serverResource(String key, ResourceFactory factory)
+            throws IOException;
+
+    /// The calling thread's server's configuration, or null outside any server.
+    public abstract Config currentConfig();
+
+    /// `work`, made to run as part of the calling thread's server on whatever
+    /// thread later runs it -- a messaging consumer's own thread -- so its
+    /// resources, beans and configuration are that server's.
+    public abstract Runnable inServer(Runnable work);
 }

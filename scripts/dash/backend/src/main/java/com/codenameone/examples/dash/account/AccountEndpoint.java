@@ -19,7 +19,7 @@
 package com.codenameone.examples.dash.account;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.dash.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.dash.api.AccountApiServer;
 import com.codenameone.examples.dash.api.PlayerDto;
 import com.codenameone.examples.dash.api.ProfileDto;

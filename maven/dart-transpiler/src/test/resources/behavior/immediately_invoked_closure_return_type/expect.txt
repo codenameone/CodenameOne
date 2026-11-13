@@ -1,0 +1,5 @@
+warm
+null
+cool
+WARM
+<none>

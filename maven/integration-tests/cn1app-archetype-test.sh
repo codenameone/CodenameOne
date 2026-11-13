@@ -127,6 +127,53 @@ if ! command -v clang >/dev/null 2>&1; then
   fi
   echo "NOTE skipping cn1:backend-package: no clang on PATH"
 else
+  # Two things a real server has that the archetype does not (#6184): a class
+  # path resource under a nested path, which the packaged binary must answer
+  # through both Class and ClassLoader, and a second class with a main(), which
+  # bcprov's org.bouncycastle.LICENSE is in practice and which used to stop the
+  # translation with "Multiple main classes".
+  API_SOURCE="$(grep -rl "@RestController" backend/src/main/java | head -1)"
+  API_PACKAGE="$(sed -n 's/^package \(.*\);/\1/p' "$API_SOURCE")"
+  API_DIR="$(dirname "$API_SOURCE")"
+  mkdir -p backend/src/main/resources/cn1smoke/nested
+  printf 'embedded' > backend/src/main/resources/cn1smoke/nested/value.txt
+  cat > "$API_DIR/SmokeResources.java" <<JAVA
+package $API_PACKAGE;
+
+import com.codename1.backend.annotations.GetMapping;
+import com.codename1.backend.annotations.RestController;
+
+@RestController
+public class SmokeResources {
+    @GetMapping("/smoke/resource")
+    public String resource() throws java.io.IOException {
+        return read(SmokeResources.class.getResourceAsStream("/cn1smoke/nested/value.txt")) + ":"
+                + read(SmokeResources.class.getClassLoader().getResourceAsStream("cn1smoke/nested/value.txt"));
+    }
+
+    private static String read(java.io.InputStream in) throws java.io.IOException {
+        if (in == null) {
+            return "null";
+        }
+        StringBuilder sb = new StringBuilder();
+        int c;
+        while ((c = in.read()) >= 0) {
+            sb.append((char) c);
+        }
+        in.close();
+        return sb.toString();
+    }
+}
+JAVA
+  cat > "$API_DIR/SmokeOtherMain.java" <<JAVA
+package $API_PACKAGE;
+
+public final class SmokeOtherMain {
+    public static void main(String[] args) {
+        System.out.println("not the server");
+    }
+}
+JAVA
   echo "packaging the backend natively with $BACKEND_PACKAGE_JDK"
   env -u JDK_8_HOME JAVA_HOME="$BACKEND_PACKAGE_JDK" \
     mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
@@ -161,10 +208,16 @@ else
   done
   # The route that goes through an injected @Component, while the binary still runs.
   GREETING="$(curl -s --max-time 5 "http://127.0.0.1:$BACKEND_PORT/greet/archetype" || true)"
+  RESOURCE="$(curl -s --max-time 5 "http://127.0.0.1:$BACKEND_PORT/smoke/resource" || true)"
   kill -9 $BACKEND_PID 2>/dev/null || true
   trap 'set_auto_bundle_pref false' EXIT
   if [ "$HEALTH" = "ok" ] && [ "$GREETING" != "Hello, archetype" ]; then
     echo "the packaged backend did not answer /greet through its injected service (got '$GREETING'):" >&2
+    cat backend/target/backend-run.log >&2
+    exit 1
+  fi
+  if [ "$HEALTH" = "ok" ] && [ "$RESOURCE" != "embedded:embedded" ]; then
+    echo "the packaged backend did not read its class path resource (got '$RESOURCE'):" >&2
     cat backend/target/backend-run.log >&2
     exit 1
   fi

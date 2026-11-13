@@ -22,7 +22,7 @@ import com.codename1.components.MultiButton;
 import com.codename1.ui.Form;
 import com.codenameone.examples.dash.api.RaceSummaryDto;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 
 /// The player's recent races, each one a replay away.
 public final class HistoryForm {

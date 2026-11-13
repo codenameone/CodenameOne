@@ -45,6 +45,11 @@ public class Locale {
         return languageCode;
     }
 
+    /** Dart's {@code scriptCode}: this runtime's locales carry no script subtag. */
+    public String scriptCode() {
+        return null;
+    }
+
     public String countryCode() {
         return countryCode;
     }

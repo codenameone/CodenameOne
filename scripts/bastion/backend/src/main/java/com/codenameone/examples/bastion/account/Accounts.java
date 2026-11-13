@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.bastion.account;
 
+import com.codename1.appkit.server.Grants;
+
 import java.time.Instant;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;

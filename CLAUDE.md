@@ -305,6 +305,63 @@ scripts/check-build-hint-catalog.sh            # every hint the code reads is de
 means a hint went in undeclared. Do not re-run `tools/build-hint-bootstrap/`; it
 seeded the catalog once and would overwrite hand edits.
 
+### A new project's first build is a download, and it is gated
+
+The first thing a developer does is run a project from the initializr on a
+machine that has never built one. Maven resolves a plugin's **whole** class path
+before its first goal, so every runtime dependency of `codenameone-maven-plugin`
+and `codenameone-build-engine` is downloaded by a Hello World in the simulator.
+That was 346 MB: 55 MB of ports nothing in a simulator run opens, and 157 MB of
+ffmpeg for seven platforms. No test fails when it grows.
+
+- **The ports are not dependencies of the build tools.** `codenameone-ios`,
+  `-android`, `-mac`, `-windows`, `-linux` and `-parparvm` are `provided` and
+  `optional` in both poms (reactor order and the test class path keep them).
+  `AppBuilder.LocalBuild` names the ports each local target reads,
+  `ProjectHost.getPortJar` resolves one at the build tool's own version when
+  that target is built, and `Executor.getResourceAsStream` reads the class path
+  first and those jars second. A builder must read a port **through the
+  Executor**, never `SomeClass.class.getResourceAsStream`: that sees the class
+  path alone and finds nothing in a customer build while passing every test
+  here, where the ports are on the test class path.
+- **A new local target, or a new port, is a row in `LocalBuild`** and in
+  `LocalBuildPortsTest`, and a new port also in `PORT_ARTIFACTS` in the script
+  below.
+- **Ports are resolved at the plugin's own version**, by both build tools, and a
+  port the *project* depends on is never used: a builder paired with an older
+  port writes a project that builds and does not start. A port under the plugin
+  declaration's own `<dependencies>` still wins, which is how one is pinned.
+- **ffmpeg is the host's alone.** `maven/cn1-binaries/pom.xml` selects the
+  natives with OS-activated profiles, which Maven evaluates on the machine that
+  resolves the pom -- so that pom must never be flattened. Gradle does not
+  evaluate them; `PluginInfo.hostFfmpegPlatforms` is the same table there.
+- **The desktop jar is the exception, because it runs somewhere else.**
+  `javase-executable-jar` resolves the other desktop platforms' natives itself
+  (`missingDesktopNatives`). A project with a `javase` module packages straight
+  from its class path, so its generated launch commands pass
+  `-Dcn1.ffmpeg.allPlatforms=true` (Maven only), and
+  `generate-desktop-app-wrapper` warns when an older project's do not. Those
+  commands exist in several copies nothing regenerates: the archetype's
+  scripts and IDE launchers, the Initializr's `common.zip` and per-IDE zips,
+  the plugin's IntelliJ `workspace.xml`, and `cn1:buildExecutableJar`, which
+  sends the property to its child build. `scripts/sync-initializr-launchers.py`
+  (`starter-launchers.yml`) fails on a copy that builds the jar without it.
+- **`codename1.stageOnly` resolves the target's ports** although it never runs
+  the builder, so the staging tests cover resolution for every target they stage.
+
+`scripts/check-first-build-footprint.py` (`archetype-smoke.yml`) generates a
+project, builds what `run.sh` builds into an **empty** local repository with the
+workspace's repository as a `file://` remote, and fails on a port, on an
+`org.bytedeco` native for another platform, on a host with no ffmpeg at all, or
+on the total passing `BUDGET_MB`. CI runs it on Linux only, so it first holds
+the profile of *every* host in that pom to a table (`HOST_PROFILES`). It
+measures a floor: the Maven wrapper's distribution and what the simulator
+fetches once running are not in a local repository.
+
+```bash
+scripts/check-first-build-footprint.py --repo "$PWD/.m2-repo"
+```
+
 ### The CSS compiler is headless, and has to stay that way
 
 Compiling `css/theme.css` to `theme.res` opens no window, boots no JavaSE port
@@ -513,7 +570,7 @@ guessed at versions, which is worse than none -- `scripts/check-since-tags.sh`.
 the next tag or the end of the comment: text written after one was swallowed into
 it, and since the doclet drops `@author`, 90 published comments had silently lost
 a "See also" or "Deprecated" section. `scripts/check-author-tags.py` rejects them
-in every tracked `.java` file (its own workflow, `check-author-tags.yml`), in `///`
+in every tracked `.java` file (`source-gates.yml`), in `///`
 and `/** */` comments. A plain `/* */` comment is left alone: vendored license
 headers (MiG Layout's BSD notice) carry an `@author` that is part of the notice.
 
@@ -566,7 +623,7 @@ escape (`'\0'`, `"\u001f"`, `\x1f`). TAB, LF and CR are the only control
 characters allowed. It covers every tracked text file -- source, scripts,
 config and docs -- because this tree had corrupted files in several of them.
 
-It runs as its own workflow (`.github/workflows/check-control-characters.yml`)
+It runs in its own workflow (`.github/workflows/source-gates.yml`, one job with the other cheap tree-wide script gates)
 rather than inside `pr.yml`, whose `paths` filter excludes `scripts/**` and
 `docs/**` and would let a PR touching only those skip the check.
 
@@ -614,8 +671,8 @@ not honour -- check `.note.android.ident`, which records the API level the
 slice was really compiled against.
 
 `scripts/check-16k-page-alignment.py` gates this over every tracked archive and
-loose `.so` in the tree, in its own workflow
-(`.github/workflows/check-16k-page-alignment.yml`) rather than inside `pr.yml`,
+loose `.so` in the tree, as a step of
+`.github/workflows/source-gates.yml` rather than inside `pr.yml`,
 whose `paths` filter would let a PR that only adds a native artifact skip it.
 Containers and libraries are found by magic bytes, not by extension, so a
 `.cn1lib` or any future container is covered.
@@ -1398,12 +1455,22 @@ never failed there. They now run:
 - **Nightly on master**, each with exactly `cron: '11 0 * * *'` -- off the top
   of the hour, where GitHub delays and may drop scheduled runs. No `push`
   trigger: a red master push went unread.
-- **`nightly-watchdog.yml`** (07:30 UTC) finds every workflow carrying exactly
+- **`nightly-watchdog.yml`** (07:30, 13:30 and 19:30 UTC -- GitHub starts the
+  crons hours late) finds every workflow carrying exactly
   that uncommented cron, judges its newest scheduled run (the previous
   completed one while a run is still going), and keeps one issue, "Nightly
   CI failures", open and assigned to `vars.NIGHTLY_ALERT_ASSIGNEE` (default
   `shai-almog`) until a night where every suite finished green. A suite with
   no scheduled run in 30 hours is reported too.
+
+- **The samples' nightly iOS builds are one workflow**,
+  `samples-ios-nightly.yml`: the port built once, then two macOS shards build
+  every sample, one step each (`scripts/ci/build-sample-ios-simulator.sh`).
+  Each sample's own iOS jobs carry `if: github.event_name != 'schedule'` and
+  still run on its pull requests. Two macOS jobs per sample, all at 00:11, hit
+  the macOS concurrency cap and jobs timed out without ever getting a runner.
+  A new sample with an iOS build goes into that workflow too; the watchdog
+  names the failing step, so the alert still says which sample broke.
 
 Moving a suite to the nightly is therefore one cron line and a narrowed
 `paths`; there is no list to update. Keep on pull requests whatever has

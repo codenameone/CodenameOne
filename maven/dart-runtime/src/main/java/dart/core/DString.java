@@ -109,7 +109,7 @@ public final class DString {
     }
 
     public static DartList<String> split(String s, String pattern) {
-        DartList<String> out = new DartList<>();
+        DartList<String> out = new DartList<>(dart.runtime.TypeWitness.of(String.class, false));
         if (pattern.isEmpty()) {
             for (int i = 0; i < s.length(); i++) {
                 out.add(String.valueOf(s.charAt(i)));
@@ -137,7 +137,7 @@ public final class DString {
      * rejected.
      */
     public static DartList<String> split(String s, RegExp pattern) {
-        DartList<String> out = new DartList<>();
+        DartList<String> out = new DartList<>(dart.runtime.TypeWitness.of(String.class, false));
         int length = s.length();
         java.util.Iterator<RegExpMatch> matches = pattern.allMatches(s).iterator();
         if (length == 0 && matches.hasNext()) {
@@ -318,7 +318,87 @@ public final class DString {
             java.util.Iterator<RegExpMatch> it = ((RegExp) pattern).allMatches(s, (int) index).iterator();
             return it.hasNext() && it.next().start() == index;
         }
-        throw new ArgumentError("startsWith: unsupported pattern " + pattern);
+        throw notAPattern(pattern);
+    }
+
+    /**
+     * Dart's checked implicit downcast of a dynamic argument to {@code Pattern}: the
+     * runtime's patterns are a String and a {@link RegExp}, so anything else (null
+     * included -- the parameters are non-nullable) is a TypeError at the call, as Dart
+     * raises it.
+     */
+    private static Object pattern(Object p) {
+        if (p instanceof String || p instanceof RegExp) {
+            return p;
+        }
+        throw notAPattern(p);
+    }
+
+    private static TypeError notAPattern(Object p) {
+        return new TypeError("type '" + dart.runtime.DartRuntime.typeName(p)
+                + "' is not a subtype of type 'Pattern'");
+    }
+
+    /** {@code contains} with a dynamic {@code Pattern} argument. */
+    public static boolean contains(String s, Object other) {
+        Object p = pattern(other);
+        return p instanceof String ? contains(s, (String) p) : contains(s, (RegExp) p);
+    }
+
+    /** {@code indexOf} with a dynamic {@code Pattern} argument. */
+    public static long indexOf(String s, Object other) {
+        Object p = pattern(other);
+        return p instanceof String ? indexOf(s, (String) p) : indexOf(s, (RegExp) p);
+    }
+
+    /** {@code contains(other, startIndex)} with a dynamic {@code Pattern} argument. */
+    public static boolean contains(String s, Object other, long startIndex) {
+        Object p = pattern(other);
+        return p instanceof String ? contains(s, (String) p, startIndex) : contains(s, (RegExp) p, startIndex);
+    }
+
+    /** {@code indexOf(pattern, start)} with a dynamic {@code Pattern} argument. */
+    public static long indexOf(String s, Object other, long start) {
+        Object p = pattern(other);
+        return p instanceof String ? indexOf(s, (String) p, start) : indexOf(s, (RegExp) p, start);
+    }
+
+    /** {@code lastIndexOf} with a dynamic {@code Pattern} argument. */
+    public static long lastIndexOf(String s, Object other) {
+        Object p = pattern(other);
+        return p instanceof String ? lastIndexOf(s, (String) p) : lastIndexOf(s, (RegExp) p);
+    }
+
+    /** {@code lastIndexOf(pattern, start)} with a dynamic {@code Pattern} argument. */
+    public static long lastIndexOf(String s, Object other, long start) {
+        Object p = pattern(other);
+        return p instanceof String ? lastIndexOf(s, (String) p, start) : lastIndexOf(s, (RegExp) p, start);
+    }
+
+    /** {@code split} with a dynamic {@code Pattern} argument. */
+    public static DartList<String> split(String s, Object pattern) {
+        Object p = pattern(pattern);
+        return p instanceof String ? split(s, (String) p) : split(s, (RegExp) p);
+    }
+
+    /** {@code replaceFirst} with a dynamic {@code Pattern} argument. */
+    public static String replaceFirst(String s, Object from, String to) {
+        return replaceFirst(s, from, to, 0);
+    }
+
+    /** {@code replaceFirst(from, to, startIndex)} with a dynamic {@code Pattern} argument. */
+    public static String replaceFirst(String s, Object from, String to, long startIndex) {
+        Object p = pattern(from);
+        if (p instanceof String) {
+            return replaceFirst(s, (String) p, to, startIndex);
+        }
+        return replaceFirst(s, (RegExp) p, to, startIndex);
+    }
+
+    /** {@code replaceAll} with a dynamic {@code Pattern} argument. */
+    public static String replaceAll(String s, Object from, String to) {
+        Object p = pattern(from);
+        return p instanceof String ? replaceAll(s, (String) p, to) : replaceAll(s, (RegExp) p, to);
     }
 
     public static boolean contains(String s, String other) {
@@ -358,7 +438,7 @@ public final class DString {
     public static long parseInt(String s) {
         Long v = tryParseInt(s);
         if (v == null) {
-            throw new dart.core.FormatException("Invalid radix-10 number: " + s);
+            throw intFormatError(s, 10);
         }
         return v.longValue();
     }
@@ -367,9 +447,43 @@ public final class DString {
     public static long parseInt(String s, long radix) {
         Long v = tryParseInt(s, radix);
         if (v == null) {
-            throw new dart.core.FormatException("Invalid radix-" + radix + " number: " + s);
+            throw intFormatError(s, radix);
         }
         return v.longValue();
+    }
+
+    /**
+     * The FormatException Dart's int.parse throws: the message names the radix and
+     * nothing else, the input is its source, and the offset is where the number was
+     * expected to start (past any leading whitespace). Blank input is "Invalid number".
+     */
+    private static dart.core.FormatException intFormatError(String s, long radix) {
+        int start = 0;
+        while (s != null && start < s.length() && Character.isWhitespace(s.charAt(start))) {
+            start++;
+        }
+        if (s == null || start == s.length()) {
+            return new dart.core.FormatException("Invalid number", s, Long.valueOf(0));
+        }
+        return new dart.core.FormatException("Invalid radix-" + radix + " number", s, Long.valueOf(start));
+    }
+
+    /** Dart's num.parse: an int when the text is one, else a double; the source is the message. */
+    public static Number parseNum(String s) {
+        Number v = tryParseNum(s);
+        if (v == null) {
+            throw new dart.core.FormatException(s);
+        }
+        return v;
+    }
+
+    /** Dart's num.tryParse: int.tryParse, then double.tryParse. */
+    public static Number tryParseNum(String s) {
+        Long i = tryParseInt(s);
+        if (i != null) {
+            return i;
+        }
+        return tryParseDouble(s);
     }
 
     /** Dart's int.tryParse: decimal, or hexadecimal with a 0x prefix. */
@@ -729,7 +843,7 @@ public final class DString {
     public static double parseDouble(String s) {
         Double d = tryParseDouble(s);
         if (d == null) {
-            throw new dart.core.FormatException("Invalid double: " + s);
+            throw new dart.core.FormatException("Invalid double", s, null);
         }
         return d.doubleValue();
     }

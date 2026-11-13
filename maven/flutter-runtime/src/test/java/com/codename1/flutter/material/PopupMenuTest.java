@@ -70,7 +70,7 @@ class PopupMenuTest {
         b.itemBuilder(new Funcs.Func1<BuildContext, Object>() {
             @Override
             public Object call(BuildContext context) {
-                DartList<PopupMenuEntry<String>> list = new DartList<PopupMenuEntry<String>>();
+                DartList<PopupMenuEntry<String>> list = new DartList<PopupMenuEntry<String>>(dart.runtime.TypeWitness.of(PopupMenuEntry.class, false, dart.runtime.TypeWitness.of(String.class, false)));
                 for (String v : values) {
                     list.add(item(v, new ProbeBox(60, 20)));
                 }
@@ -87,7 +87,7 @@ class PopupMenuTest {
 
         assertNotNull(trigger, "a menu button with no icon must still show something");
         assertTrue(trigger instanceof Icon, "Flutter falls back to an Icon");
-        assertEquals(Icons.more_vert().codePoint(), ((Icon) trigger).getIcon().codePoint());
+        assertEquals(Icons.more_vert().codePointChar(), ((Icon) trigger).getIcon().codePointChar());
     }
 
     @Test
@@ -96,8 +96,8 @@ class PopupMenuTest {
         PopupMenuButton<String> b = new PopupMenuButton<String>();
         b.icon(new Icon(Icons.search()));
 
-        assertEquals(Icons.search().codePoint(),
-                ((Icon) b.effectiveTrigger()).getIcon().codePoint());
+        assertEquals(Icons.search().codePointChar(),
+                ((Icon) b.effectiveTrigger()).getIcon().codePointChar());
     }
 
     @Test
@@ -107,7 +107,7 @@ class PopupMenuTest {
         PopupMenuButtonRenderElement e = (PopupMenuButtonRenderElement)
                 FlutterUI.mount(b, new RenderHost(), new BuildOwner());
 
-        assertEquals(Icons.more_vert().codePoint(), e.consumedIconChar(),
+        assertEquals(Icons.more_vert().codePointChar(), e.consumedIconChar(),
                 "the overflow glyph must be what the button draws");
         assertNotNull(e.pressHandler(), "and pressing it must do something");
     }
@@ -132,7 +132,7 @@ class PopupMenuTest {
             @Override
             public Object call(BuildContext context) {
                 builds[0]++;
-                DartList<PopupMenuEntry<String>> l = new DartList<PopupMenuEntry<String>>();
+                DartList<PopupMenuEntry<String>> l = new DartList<PopupMenuEntry<String>>(dart.runtime.TypeWitness.of(PopupMenuEntry.class, false, dart.runtime.TypeWitness.of(String.class, false)));
                 l.add(item("one", new ProbeBox(60, 20)));
                 return l;
             }

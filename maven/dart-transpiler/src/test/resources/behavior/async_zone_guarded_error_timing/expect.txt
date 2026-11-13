@@ -1,0 +1,7 @@
+4498500
+fin
+caught Bad state: x
+zone got zoned
+zv 7
+arrow
+end

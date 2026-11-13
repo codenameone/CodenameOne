@@ -23,7 +23,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.reel.Kinds;
 import com.codenameone.examples.reel.account.Devices;
-import com.codenameone.examples.reel.account.Grants;
+import com.codename1.appkit.server.Grants;
 import com.codenameone.examples.reel.api.SharingAlertDto;
 import com.codenameone.examples.reel.api.SharingDecisionDto;
 import com.codenameone.examples.reel.domain.SharingAlert;

@@ -256,9 +256,19 @@ final class Table {
         return out;
     }
 
-    /// Writes a generated key back into the entity.
-    void setId(Object entity, long key) throws IOException {
-        definition.set(entity, idIndex, Long.valueOf(key));
+    /// Writes a generated key back into the entity, and answers the entity
+    /// that carries it: `entity` itself, or a copy of an immutable one.
+    Object setId(Object entity, long key) throws IOException {
+        return definition.with(entity, idIndex, Long.valueOf(key));
+    }
+
+    /// True when `entity`'s key is the database's to assign and it has none yet.
+    boolean unassigned(Object entity) {
+        if (!columns[idIndex].isGenerated()) {
+            return false;
+        }
+        Object id = definition.get(entity, idIndex);
+        return id == null || id instanceof Number && ((Number) id).longValue() == 0;
     }
 
     /// The longest an ASSIGNED text key may be, on every engine.
@@ -326,11 +336,11 @@ final class Table {
 
     /// One row as an entity.
     Object read(Map row) throws IOException {
-        Object entity = definition.newInstance();
+        Object[] values = new Object[columns.length];
         for (int iter = 0 ; iter < columns.length ; iter++) {
-            definition.set(entity, iter, lookup(row, columns[iter].getColumn()));
+            values[iter] = lookup(row, columns[iter].getColumn());
         }
-        return entity;
+        return definition.construct(values);
     }
 
     /// Every row as an entity, in order.

@@ -30,7 +30,7 @@ import com.codenameone.examples.savor.map.Locator;
 import com.codenameone.examples.savor.map.MapStage;
 import com.codenameone.examples.savor.map.Maps;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Ui;
 import com.codename1.ui.util.UITimer;

@@ -1,0 +1,10 @@
+3 of clubs
+red
+1
+9
+1 1
+BETA
+[3, 4, 5]
+#
+30
+true

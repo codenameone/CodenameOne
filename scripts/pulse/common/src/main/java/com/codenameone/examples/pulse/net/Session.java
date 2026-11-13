@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.pulse.net;
 
+import com.codename1.appkit.Net;
+
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParser;
 import com.codename1.io.NetworkManager;

@@ -69,6 +69,8 @@ include::component-selector.asciidoc[]
 
 include::Rich-Text-And-Code-Editing.asciidoc[]
 
+include::Scheduling-And-Gantt.asciidoc[]
+
 include::Accessibility-Semantics.asciidoc[]
 
 include::Animations.asciidoc[]
@@ -141,11 +143,17 @@ include::Backend-Security.asciidoc[]
 
 include::Backend-Scheduling.asciidoc[]
 
+include::Backend-Messaging.asciidoc[]
+
+include::Backend-Mail.asciidoc[]
+
 include::Backend-Observability.asciidoc[]
 
 include::Backend-MCP.asciidoc[]
 
 include::Backend-Operations.asciidoc[]
+
+include::Command-Line-Applications.asciidoc[]
 
 include::Wayline-Users-Guide.asciidoc[]
 
@@ -159,6 +167,8 @@ include::Savor-Implementors-Guide.asciidoc[]
 include::Skirmish-Implementors-Guide.asciidoc[]
 
 include::Dash-Implementors-Guide.asciidoc[]
+
+include::Splat-Implementors-Guide.asciidoc[]
 
 include::Parley-Users-Guide.asciidoc[]
 
@@ -175,6 +185,10 @@ include::Bastion-Implementors-Guide.asciidoc[]
 include::Pulse-Users-Guide.asciidoc[]
 
 include::Pulse-Implementors-Guide.asciidoc[]
+
+include::Slate-Users-Guide.asciidoc[]
+
+include::Slate-Implementors-Guide.asciidoc[]
 
 = Device and platform services
 
@@ -307,6 +321,10 @@ include::Working-With-Windows.asciidoc[]
 include::Working-With-Linux.asciidoc[]
 
 include::Embedded-Linux.asciidoc[]
+
+include::Embedded-Windows.asciidoc[]
+
+include::Steam.asciidoc[]
 
 include::Realtime.asciidoc[]
 

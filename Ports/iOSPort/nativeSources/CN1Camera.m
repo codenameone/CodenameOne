@@ -67,6 +67,9 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 @property (nonatomic, copy) NSString *pendingPhotoFilePath;
 @property (nonatomic, assign) int pendingPhotoCallbackId;
 @property (nonatomic, assign) int pendingPhotoQuality;
+// videoZoomFactor that the application's zoom ratio 1.0 maps to. 1.0 for a
+// physical camera; the wide lens' switch-over factor for a virtual one.
+@property (nonatomic, assign) CGFloat zoomBase;
 // What configureForCloseRangeAnalysis: changed, so turning it off puts back
 // the application's own zoom and focus mode -- the zoom only when nothing has
 // zoomed since, so a setZoom made during analysis is kept.
@@ -173,7 +176,12 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
         dev = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
     }
     if (!dev) return NO;
+    AVCaptureDevice *requested = dev;
+#if !TARGET_OS_OSX && !TARGET_OS_TV
+    dev = [CN1Camera closeFocusingDeviceFor:dev];
+#endif
     self.device = dev;
+    self.zoomBase = 1.0;
 
     NSError *err = nil;
     AVCaptureDeviceInput *vin = [AVCaptureDeviceInput deviceInputWithDevice:dev error:&err];
@@ -201,6 +209,19 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
         self.session.sessionPreset = AVCaptureSessionPresetMedium;
     }
 
+    if (![self.session canAddInput:vin] && dev != requested) {
+        // A virtual device offers fewer formats than its physical lenses; if
+        // it cannot run this preset, open the lens that was asked for, as
+        // before the substitution.
+        dev = requested;
+        self.device = dev;
+        vin = [AVCaptureDeviceInput deviceInputWithDevice:dev error:&err];
+        if (!vin) {
+            [self.session commitConfiguration];
+            return NO;
+        }
+        self.input = vin;
+    }
     if ([self.session canAddInput:vin]) {
         [self.session addInput:vin];
     } else {
@@ -241,8 +262,68 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 
     [self.session commitConfiguration];
     [self.session startRunning];
+#if !TARGET_OS_OSX && !TARGET_OS_TV
+    // After startRunning: the session may settle activeFormat as it starts,
+    // and a format change resets videoZoomFactor to 1.0 (the ultra-wide lens).
+    [self applyVirtualDeviceDefaults];
+#endif
     return YES;
 }
+
+#if !TARGET_OS_OSX && !TARGET_OS_TV
+// The back wide-angle lens of the Pro iPhones cannot focus closer than about
+// 20 cm, so a barcode held at a natural 10 cm stays blurred and scanning only
+// works from 30 cm. The virtual multi-lens device that contains that lens
+// switches to the ultra-wide (macro) lens on its own when the subject is too
+// close, as the system Camera app does. Camera.getCameras() lists the
+// physical wide lens, so a request for it is answered with the virtual device
+// that contains it; applyVirtualDeviceDefaults keeps the framing at "1x".
++ (AVCaptureDevice *)closeFocusingDeviceFor:(AVCaptureDevice *)dev {
+    if (@available(iOS 13.0, *)) {
+        if (dev.position != AVCaptureDevicePositionBack
+                || ![dev.deviceType isEqualToString:AVCaptureDeviceTypeBuiltInWideAngleCamera]) {
+            return dev;
+        }
+        AVCaptureDeviceDiscoverySession *sess =
+            [AVCaptureDeviceDiscoverySession discoverySessionWithDeviceTypes:
+                @[ AVCaptureDeviceTypeBuiltInTripleCamera,
+                   AVCaptureDeviceTypeBuiltInDualWideCamera ]
+                                                                 mediaType:AVMediaTypeVideo
+                                                                  position:AVCaptureDevicePositionBack];
+        // The discovery session returns the requested types in order, so the
+        // triple camera wins where both exist.
+        for (AVCaptureDevice *v in sess.devices) {
+            for (AVCaptureDevice *c in v.constituentDevices) {
+                if ([c.uniqueID isEqualToString:dev.uniqueID]) {
+                    return v;
+                }
+            }
+        }
+    }
+    return dev;
+}
+
+- (void)applyVirtualDeviceDefaults {
+    if (@available(iOS 13.0, *)) {
+        AVCaptureDevice *d = self.device;
+        if (!d.isVirtualDevice || d.virtualDeviceSwitchOverVideoZoomFactors.count == 0) {
+            return;
+        }
+        // Zoom 1.0 on these devices is the ultra-wide lens; the first
+        // switch-over factor is where the wide lens takes over, which is the
+        // field of view the physical camera that was asked for has.
+        CGFloat base = d.virtualDeviceSwitchOverVideoZoomFactors.firstObject.doubleValue;
+        if (![d lockForConfiguration:nil]) return;
+        base = MIN(base, d.activeFormat.videoMaxZoomFactor);
+        d.videoZoomFactor = base;
+        if ([d isFocusModeSupported:AVCaptureFocusModeContinuousAutoFocus]) {
+            d.focusMode = AVCaptureFocusModeContinuousAutoFocus;
+        }
+        [d unlockForConfiguration];
+        self.zoomBase = base;
+    }
+}
+#endif
 
 - (CN1View *)createPreviewView {
     if (self.previewView) return self.previewView;
@@ -428,7 +509,12 @@ didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL
             self.zoomBeforeAnalysis = zoom;
             NSInteger minFocusMm = d.minimumFocusDistance;
             float fov = d.activeFormat.videoFieldOfView;
-            if (minFocusMm > 0 && fov > 0) {
+            // A virtual multi-lens device (closeFocusingDeviceFor:) reaches a
+            // close code by switching to its macro lens, so it is not zoomed:
+            // zooming in is what made users hold the phone 30cm away, and the
+            // formula takes zoom 1.0 to be the active lens' field of view,
+            // which on a virtual device is the ultra-wide's.
+            if (minFocusMm > 0 && fov > 0 && !d.isVirtualDevice) {
                 double halfFov = (fov / 2.0) * M_PI / 180.0;
                 double minSubjectMm = (20.0 / 0.8) / tan(halfFov);
                 if ((double)minFocusMm > minSubjectMm) {
@@ -556,7 +642,8 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 #else
     if (!self.device) return;
     if (![self.device lockForConfiguration:nil]) return;
-    CGFloat r = MAX(1.0, MIN((CGFloat)ratio, self.device.activeFormat.videoMaxZoomFactor));
+    CGFloat base = self.zoomBase > 0 ? self.zoomBase : 1.0;
+    CGFloat r = MAX(base, MIN(base * (CGFloat)ratio, self.device.activeFormat.videoMaxZoomFactor));
     self.device.videoZoomFactor = r;
     [self.device unlockForConfiguration];
 #endif

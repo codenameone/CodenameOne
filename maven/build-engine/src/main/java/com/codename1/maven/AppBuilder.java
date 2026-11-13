@@ -1221,8 +1221,8 @@ public class AppBuilder {
 
     /**
      * The aggregator that puts the desktop media runtime -- org.bytedeco's ffmpeg,
-     * with natives for Android, iOS, Linux, macOS and Windows -- on the simulator
-     * and desktop run classpaths.
+     * with the natives of the machine that resolves it, or of every platform as
+     * older versions of it did -- on the simulator and desktop run classpaths.
      */
     public static final String DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID = "cn1-binaries-javase";
 
@@ -1647,6 +1647,113 @@ public class AppBuilder {
         }
     }
 
+    /// The builder a local build target runs, and the port artifacts that builder reads.
+    ///
+    /// One table for both, on purpose. The ports are not dependencies of the build tool
+    /// any more -- see `Executor.addPortJar` for what that cost every first build -- so
+    /// the host resolves them per target, and a host that decided for itself which
+    /// target needs which port would be a second copy of the dispatch below that the
+    /// first can drift from. Gradle reads [#portArtifacts(String)] while it configures
+    /// the build task; the dispatch in [#execute()] switches on the same value.
+    ///
+    /// The order of the tests is the order the dispatch always had, and it matters:
+    /// `local-mac-device` has to be recognised before anything asks whether a target
+    /// "contains ios".
+    enum LocalBuild {
+        // Native ParparVM Windows cross-compile (clang-cl) and the windows-source
+        // project generation. The cloud win32 build (windows-device) is NOT local.
+        // Distinct from the JVM-bundled "windows-desktop" (javase) target.
+        WINDOWS("codenameone-windows:bundle", "codenameone-parparvm:bundle"),
+        // Native ParparVM Linux build (GTK3/Cairo, CMake/Ninja). Distinct from the
+        // JVM-bundled "linux-desktop" (javase) target.
+        LINUX("codenameone-linux:bundle", "codenameone-parparvm:bundle"),
+        // The native Linux build laid out as a Steam depot (SteamDepotPackager).
+        STEAM("codenameone-linux:bundle", "codenameone-parparvm:bundle"),
+        ANDROID("codenameone-android"),
+        // The native AppKit build. mac-os-x-native is the cloud target and is not
+        // handled here.
+        MAC("codenameone-mac:bundle", "codenameone-parparvm:bundle"),
+        IOS("codenameone-ios:bundle", "codenameone-parparvm:bundle"),
+        JAVASCRIPT("codenameone-parparvm:bundle");
+
+        private final List<String> ports;
+
+        LocalBuild(String... ports) {
+            this.ports = Collections.unmodifiableList(Arrays.asList(ports));
+        }
+
+        /// The builder `buildTarget` runs, or null when it is not a local target
+        /// this build knows.
+        static LocalBuild of(String buildTarget) {
+            if (!isLocalBuildTarget(buildTarget)) {
+                return null;
+            }
+            if (BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
+                    || "local-windows-device".equals(buildTarget)) {
+                return WINDOWS;
+            }
+            if ("local-linux-device".equals(buildTarget)) {
+                return LINUX;
+            }
+            if ("local-steam".equals(buildTarget)) {
+                return STEAM;
+            }
+            if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+                return ANDROID;
+            }
+            if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                    || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget)) {
+                return MAC;
+            }
+            if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
+                return IOS;
+            }
+            if (buildTarget.contains("javascript")) {
+                return JAVASCRIPT;
+            }
+            return null;
+        }
+    }
+
+    /// The port artifacts a build of `buildTarget` reads, each as
+    /// `artifactId[:classifier]` in group `com.codenameone` at the build tool's own
+    /// version. Empty for a cloud build, which reads none: the server has its own.
+    public static List<String> portArtifacts(String buildTarget) {
+        LocalBuild local = LocalBuild.of(buildTarget);
+        return local == null ? Collections.<String>emptyList() : local.ports;
+    }
+
+    /// Hands `builder` the ports its target reads, resolving each through the host.
+    ///
+    /// A port the host cannot produce stops the build here, by name. Left alone it
+    /// would surface as "Resource not found: /parparvm-compiler.jar" from the middle
+    /// of a builder, which says nothing about a repository or a version.
+    private void attachPorts(Executor builder) throws BuildExecutionException {
+        for (File jar : resolvePorts()) {
+            builder.addPortJar(jar);
+        }
+    }
+
+    /// The jars of [#portArtifacts(String)] for this build's target, in that order.
+    private List<File> resolvePorts() throws BuildExecutionException {
+        List<File> jars = new ArrayList<File>();
+        for (String port : portArtifacts(buildTarget)) {
+            int colon = port.indexOf(':');
+            String artifactId = colon < 0 ? port : port.substring(0, colon);
+            String classifier = colon < 0 ? null : port.substring(colon + 1);
+            File jar = host.getPortJar(artifactId, classifier);
+            if (jar == null || !jar.isFile()) {
+                throw new BuildExecutionException("A " + buildTarget + " build needs " + GROUP_ID + ":"
+                        + artifactId + ":" + host.pluginVersion() + (classifier == null ? "" : ":" + classifier)
+                        + ", and it could not be resolved. It is fetched the first time a target is"
+                        + " built, so check that the Codename One repository is reachable and that"
+                        + " this version was published there.");
+            }
+            jars.add(jar);
+        }
+        return jars;
+    }
+
     /**
      * Copies the secondary entry points into the {@code codename1.arg.} namespace
      * of the settings file that is uploaded to the build server.
@@ -1914,6 +2021,14 @@ public class AppBuilder {
             }
             overlayCommandLineBuildHints(settings);
             MainClassPreflight.validate(jarWithDependencies, settings, jarsToMerge, mainClassSources());
+            // The ports are the one input of a local build that staging does not
+            // otherwise touch: they are resolved by the builder, which never starts
+            // here. Resolving them anyway is what lets the staging tests, which run
+            // every target of a generated project on every pull request, notice a
+            // target whose port can no longer be found. A cloud target has none.
+            for (File port : resolvePorts()) {
+                getLog().info("codename1.stageOnly is set: " + buildTarget + " reads " + port.getName());
+            }
             getLog().info("codename1.stageOnly is set: staged " + jarWithDependencies + " ("
                     + jarWithDependencies.length() + " bytes) for " + buildTarget + " and stopped before building");
             return;
@@ -2158,38 +2273,39 @@ public class AppBuilder {
 
             if (isLocalBuildTarget(buildTarget)) {
                 automated = false;
-                if (BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
-                        || "local-windows-device".equals(buildTarget)) {
-                    // Local native ParparVM Windows cross-compile (clang-cl) and the
-                    // windows-source project generation. The cloud win32 build
-                    // (windows-device) is NOT local -- it falls through to the
-                    // server submission below. Distinct from the JVM-bundled
-                    // "windows-desktop" (javase) target.
-                    doWindowsNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
-                } else if ("local-linux-device".equals(buildTarget)) {
-                    // Native ParparVM Linux build (GTK3/Cairo, CMake/Ninja). Distinct
-                    // from the JVM-bundled "linux-desktop" (javase) target.
-                    doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
-                } else if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
-                    doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
-                } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
-                        || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget)) {
-                    // The native AppKit build. mac-source stops once the Xcode
-                    // project exists; local-mac-device goes on to build it, and
-                    // both run the same builder, so what a developer opens in
-                    // Xcode is what the device target compiles. mac-os-x-native
-                    // is the cloud target and is not handled here -- it has its
-                    // own queue rather than riding the iOS one.
-                    if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
-                        cn1SettingsProps.setProperty("codename1.arg.macos.sourceOnly", "true");
-                    }
-                    doMacOSNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
-                } else if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
-                    doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
-                } else if (buildTarget.contains("javascript")) {
-                    doJavaScriptLocalBuild(antProject, cn1SettingsProps, antDistJar);
-                } else {
+                LocalBuild local = LocalBuild.of(buildTarget);
+                if (local == null) {
                     throw new BuildExecutionException("Build target not supported "+buildTarget);
+                }
+                switch (local) {
+                    case WINDOWS:
+                        doWindowsNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                        break;
+                    case LINUX:
+                        doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar, false);
+                        break;
+                    case STEAM:
+                        doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar, true);
+                        break;
+                    case ANDROID:
+                        doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                        break;
+                    case MAC:
+                        // mac-source stops once the Xcode project exists;
+                        // local-mac-device goes on to build it, and both run the
+                        // same builder, so what a developer opens in Xcode is what
+                        // the device target compiles.
+                        if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                            cn1SettingsProps.setProperty("codename1.arg.macos.sourceOnly", "true");
+                        }
+                        doMacOSNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                        break;
+                    case IOS:
+                        doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                        break;
+                    default:
+                        doJavaScriptLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                        break;
                 }
             } else {
                 // Cloud builds route through a remote build server. Nothing is
@@ -2404,6 +2520,7 @@ public class AppBuilder {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
 
         AndroidGradleBuilder e = new AndroidGradleBuilder();
+        attachPorts(e);
         e.setBuildTarget(buildTarget);
         e.setLogger(getLog());
         File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "android-build");
@@ -2644,6 +2761,7 @@ public class AppBuilder {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
 
         IPhoneBuilder e = new IPhoneBuilder();
+        attachPorts(e);
         e.setLogger(getLog());
         File buildDirectory = new File(tmpProjectDir,
                 "dist" + File.separator + (macNativeBuild ? "mac-build" : "ios-build"));
@@ -2771,6 +2889,7 @@ public class AppBuilder {
     private void doMacOSNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
         MacOSNativeBuilder e = new MacOSNativeBuilder();
+        attachPorts(e);
         e.setLogger(getLog());
         File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "macos-build");
         e.setBuildDirectory(buildDirectory);
@@ -2890,6 +3009,7 @@ public class AppBuilder {
     private void doWindowsNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
         WindowsNativeBuilder e = new WindowsNativeBuilder();
+        attachPorts(e);
         e.setLogger(getLog());
         File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "windows-build");
         e.setBuildDirectory(buildDirectory);
@@ -2949,6 +3069,17 @@ public class AppBuilder {
             }
             if (e.getWindowsExecutable() != null) {
                 getLog().info("Built native Windows executable: " + e.getWindowsExecutable().getAbsolutePath());
+                // Also kept where deploy-device looks for it, as the Linux build is:
+                // a windows.embedded build goes to a kiosk the same way.
+                File out = new File(host.buildDirectory(), "windows-native");
+                out.mkdirs();
+                try {
+                    java.nio.file.Files.copy(e.getWindowsExecutable().toPath(),
+                            new File(out, e.getWindowsExecutable().getName()).toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.io.IOException ioe) {
+                    throw new BuildExecutionException("Could not copy the Windows executable to " + out, ioe);
+                }
             }
         } catch (com.codename1.builders.BuildException hardeningEx) {
             throw new BuildExecutionException(hardeningEx.getMessage(), hardeningEx);
@@ -2971,9 +3102,12 @@ public class AppBuilder {
      * pkg-config present (and, for musl targets, a {@code zig}/musl toolchain);
      * elsewhere the builder fails fast with a clear message.
      */
-    private void doLinuxNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
+    private void doLinuxNativeLocalBuild(File tmpProjectDir, Properties props, File distJar, boolean steam)
+            throws BuildExecutionException {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
         LinuxNativeBuilder e = new LinuxNativeBuilder();
+        attachPorts(e);
+        e.setSteamPackaging(steam);
         e.setLogger(getLog());
         File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "linux-build");
         e.setBuildDirectory(buildDirectory);
@@ -3025,6 +3159,19 @@ public class AppBuilder {
                 kept.setExecutable(true);
                 getLog().info("Built native Linux executable: " + kept.getAbsolutePath());
             }
+            if (e.getSteamDepot() != null) {
+                // Kept with the depot tree, so cn1:steamUpload can run the scripts.
+                File out = new File(host.buildDirectory(), "steam");
+                try {
+                    copyTree(new File(e.getResultDir(), "steam"), out);
+                    java.nio.file.Files.copy(e.getSteamDepot().toPath(),
+                            new File(host.buildDirectory(), e.getSteamDepot().getName()).toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.io.IOException ioe) {
+                    throw new BuildExecutionException("Could not copy the Steam depot to " + out, ioe);
+                }
+                getLog().info("Steam depot: " + out.getAbsolutePath());
+            }
         } catch (com.codename1.builders.BuildException hardeningEx) {
             throw new BuildExecutionException(hardeningEx.getMessage(), hardeningEx);
         } catch (org.apache.tools.ant.BuildException ex) {
@@ -3035,6 +3182,26 @@ public class AppBuilder {
             throw new BuildExecutionException("Failed to build Linux app", ex);
         } finally {
             e.cleanup();
+        }
+    }
+
+    /// Copies a tree, keeping the executable bit (the depot's binary and launch.sh).
+    private static void copyTree(File from, File to) throws java.io.IOException {
+        to.mkdirs();
+        File[] files = from.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File f : files) {
+            File t = new File(to, f.getName());
+            if (f.isDirectory()) {
+                copyTree(f, t);
+            } else {
+                java.nio.file.Files.copy(f.toPath(), t.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                if (f.canExecute()) {
+                    t.setExecutable(true, false);
+                }
+            }
         }
     }
 
@@ -3062,6 +3229,7 @@ public class AppBuilder {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
 
         JavaScriptBuilder e = new JavaScriptBuilder();
+        attachPorts(e);
         e.setLogger(getLog());
         e.setBuildTarget(buildTarget);
         File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "javascript-build");
@@ -3148,6 +3316,17 @@ public class AppBuilder {
             // the finally below deletes that directory outright -- without this the developer
             // never sees either artifact at all. They are copied, not attached: host
             // configuration is not something to publish to a Maven repository.
+            // A symbol map left in the build directory by an earlier, minified build would be
+            // read against this bundle's different names; this build's own map, if it wrote one,
+            // is copied below.
+            File[] staleMaps = new File(buildDirectory()).listFiles();
+            if (staleMaps != null) {
+                for (File stale : staleMaps) {
+                    if (stale.isFile() && stale.getName().endsWith("-js-symbols.txt") && !stale.delete()) {
+                        getLog().warn("Could not delete stale JavaScript symbol map " + stale);
+                    }
+                }
+            }
             for (File artifact : e.getJavaScriptBuildArtifacts()) {
                 File copyTo = new File(buildDirectory(), artifact.getName());
                 try {

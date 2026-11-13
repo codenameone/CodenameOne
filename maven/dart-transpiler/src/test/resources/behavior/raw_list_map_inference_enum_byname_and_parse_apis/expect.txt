@@ -1,0 +1,45 @@
+true
+false
+0
+admin
+Role.admin
+3
+1
+user,admin
+1
+name is an extension
+Role.user
+Role.user
+5
+L5
+10
+4
+1
+plain enums are not Comparable
+Role.user
+arg ArgumentError
+42
+2.5
+true
+null
+1000.0
+q
+true
+true
+false
+{a: 1, b: 2, c: 3}
+a
+[y, z]
+{1: v1, 2: v2, 3: v3}
+{1, 3, 5}
+7
+ranA
+ranA2
+7
+8
+Invalid radix-10 number
+zz
+Invalid double
+abc
+Missing end `]` to match `[` in host
+Unexpected character

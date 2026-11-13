@@ -36,7 +36,7 @@ import dart.typed_data.Uint8List;
 /** firebase_ai's {@code Content}: a role and its parts. */
 public class Content {
     private final String role;
-    private final DartList<Part> parts = new DartList<Part>();
+    private final DartList<Part> parts = new DartList<Part>(dart.runtime.TypeWitness.of(Part.class, false));
 
     public Content(String role, Iterable<?> parts) {
         this.role = role;
@@ -78,7 +78,7 @@ public class Content {
         if (role != null) {
             m.put("role", role);
         }
-        DartList<Object> ps = new DartList<Object>();
+        DartList<Object> ps = new DartList<Object>(dart.runtime.TypeWitness.DYNAMIC);
         for (Part p : parts) {
             ps.add(p.toJson());
         }

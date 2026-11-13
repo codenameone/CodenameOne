@@ -1,0 +1,26 @@
+List<(int) => int>
+List<(String) => String>
+true
+false
+true
+false
+false
+true
+_Set<Map<int, int>>
+false
+List<(double) => double>
+true
+false
+List<(bool?) => void>
+List<Type>
+_Set<Type>
+true
+true
+false
+true
+List<Type?>
+List<Pattern>
+true
+false
+List<Object>
+List<Uri>

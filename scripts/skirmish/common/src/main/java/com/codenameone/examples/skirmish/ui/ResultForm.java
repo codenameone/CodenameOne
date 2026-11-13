@@ -31,7 +31,7 @@ import com.codenameone.examples.skirmish.engage.Ads;
 import com.codenameone.examples.skirmish.engage.Friends;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.rules.Replay;
 

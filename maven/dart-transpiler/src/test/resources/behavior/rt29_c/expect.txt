@@ -1,0 +1,19 @@
+4
+(int) => int
+true
+true
+false
+true
+r
+() => void
+false
+2
+got 1
+(int) => void
+([int?]) => int?
+null
+2
+({required int k}) => int
+5
+() => Null
+() => void

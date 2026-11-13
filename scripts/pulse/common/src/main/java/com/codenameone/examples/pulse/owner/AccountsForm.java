@@ -36,11 +36,11 @@ import com.codenameone.examples.pulse.api.SuspendDto;
 import com.codenameone.examples.pulse.api.UserDetailDto;
 import com.codenameone.examples.pulse.api.UserDto;
 import com.codenameone.examples.pulse.net.Api;
-import com.codenameone.examples.pulse.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.net.Session;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Layouts;
-import com.codenameone.examples.pulse.ui.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.pulse.ui.Split;
 import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Ui;
@@ -97,7 +97,7 @@ public final class AccountsForm {
             form.add(BorderLayout.NORTH, top);
             form.add(BorderLayout.CENTER, list);
         }
-        list.add(new Skeleton(6));
+        list.add(new Skeleton(6, "SvSkeleton"));
         Ui.pull(list, this::load);
         // Back from an account, whatever was done to it shows in the list.
         form.addShowListener(e -> load());
@@ -221,7 +221,7 @@ public final class AccountsForm {
     private static void into(final Form form, final Container page, final String username) {
         page.setName("account");
         page.removeAll();
-        page.add(new Skeleton(6));
+        page.add(new Skeleton(6, "SvSkeleton"));
         page.revalidate();
         page.putClientProperty("showing", username);
         final Runnable[] load = new Runnable[1];

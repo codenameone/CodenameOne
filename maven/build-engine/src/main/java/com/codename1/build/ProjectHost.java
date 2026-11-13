@@ -97,6 +97,18 @@ public interface ProjectHost {
     /// dependencies or the build tool's own, or null.
     File getJar(String groupId, String artifactId, String classifier);
 
+    /// The jar of a port a local build reads its platform from --
+    /// `com.codenameone:artifactId[:classifier]` at the build tool's own version --
+    /// downloading it when the local repository does not have it yet, or null
+    /// when it cannot be produced.
+    ///
+    /// Not [#getJar(String, String, String)]: that answers from what is already
+    /// resolved, and a port is deliberately not. The build tool used to depend on
+    /// every port, so a first build of any project downloaded all of them before
+    /// it ran a goal; now each is fetched by the first build of a target that
+    /// reads it. `AppBuilder.portArtifacts` says which those are.
+    File getPortJar(String artifactId, String classifier);
+
     /// When the current build invocation started, in epoch milliseconds, or
     /// `Long.MAX_VALUE` when unknown.
     long sessionStartTime();

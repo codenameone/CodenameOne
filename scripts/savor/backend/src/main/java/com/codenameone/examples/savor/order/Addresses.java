@@ -22,7 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.savor.Ids;
-import com.codenameone.examples.savor.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.savor.api.SavedAddressDto;
 import com.codenameone.examples.savor.domain.SavedAddress;
 import com.codenameone.examples.savor.geo.Geo;

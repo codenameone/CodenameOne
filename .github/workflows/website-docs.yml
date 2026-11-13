@@ -66,6 +66,8 @@ on:
       - 'scripts/savor/**'
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
+      - 'scripts/slate/**'
+      - 'scripts/splat/**'
       - 'scripts/skirmish/**'
       - 'scripts/dash/**'
       - 'scripts/parley/**'
@@ -426,7 +428,22 @@ jobs:
             --base-url "${PAGES_DEV_URL}" \
             --redirects-file docs/website/public/_redirects \
             --skip-auto-cases
-          node scripts/website/test_search.mjs "${PAGES_DEV_URL}"
+          # Search is static files only (prebuilt lunr indexes), so it runs
+          # against a plain file server: workerd exits when Chromium resets a
+          # connection mid-write on navigation ("::write ... Connection reset
+          # by peer"), which no settling before navigate prevented (#6092).
+          # The redirects above are what needs the Pages runtime.
+          SEARCH_PORT="$(pages_dev_free_port)"
+          python3 -m http.server "${SEARCH_PORT}" --bind 127.0.0.1 \
+            --directory docs/website/public >/tmp/search-static.log 2>&1 &
+          SEARCH_PID=$!
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:${SEARCH_PORT}/" && break
+            sleep 1
+          done
+          node scripts/website/test_search.mjs "http://127.0.0.1:${SEARCH_PORT}" \
+            || { kill "${SEARCH_PID}"; exit 1; }
+          kill "${SEARCH_PID}"
 
       - name: Validate internal links and images
         uses: lycheeverse/lychee-action@v2

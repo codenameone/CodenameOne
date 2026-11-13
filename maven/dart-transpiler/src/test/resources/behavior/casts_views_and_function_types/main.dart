@@ -1,0 +1,83 @@
+String show(int x) => 'v$x';
+int twice(int x, {required int k}) => x * k;
+
+class Holder {
+  String name(int n) => 'h$n';
+}
+
+T pickFirst<T>(T a, T b) => a;
+
+class Keeper {
+  K pair<K>(int n, K k) => k;
+}
+
+void main() {
+  List<Object> ls = <Object>[1, 2];
+  final ci = ls.cast<int>();
+  print(ci is List<int>);
+  print(ci is List<String>);
+  print(ci[0] + 1);
+  final cs = ls.cast<String>();
+  print(cs is List<String>);
+  try {
+    print(cs[0].length);
+  } on TypeError {
+    print('read checked');
+  }
+  final names = <Object>['a', 'b'].cast<String>();
+  print(names is List<String>);
+  print(names.map((s) => s.length).toList());
+  final st = <Object>{'x'}.cast<String>();
+  print(st is Set<String>);
+  print(st is Set<int>);
+  final Map<Object, Object> m = <Object, Object>{'a': 1};
+  final cm = m.cast<String, int>();
+  print(cm is Map<String, int>);
+  print(cm is Map<int, int>);
+  print(cm['a']);
+  final it = ls.map((e) => '$e');
+  print(it.toList() is List<String>);
+  print(ls.toList() is List<Object>);
+  print(ls.toList() is List<int>);
+  print(ls.where((e) => true).toList() is List<int>);
+
+  String Function(int) f = (int x) => 'f$x';
+  print(f.runtimeType);
+  print(show.runtimeType);
+  print(Holder().name.runtimeType);
+  print(f.runtimeType == show.runtimeType);
+  print(twice.runtimeType);
+  int Function(int, [String]) g = (int a, [String b = '']) => a;
+  print(g.runtimeType);
+
+  print(twice is int Function(int, {required int k}));
+  print(twice is int Function(int, {int k}));
+  Object h = (int x, {int k = 1}) => x;
+  print(h is int Function(int, {required int k}));
+  print(h is int Function(int, {int k}));
+
+  // A generic function keeps its own type parameters: runtimeType renames them Y0, Y1..
+  T same<T>(T v) => v;
+  print(same.runtimeType);
+  print(same<int>(4));
+  S? maybe<S, U>(U u, S? s) => s;
+  print(maybe.runtimeType);
+  Object first = pickFirst;
+  print(first.runtimeType);
+  Object paired = Keeper().pair;
+  print(paired.runtimeType);
+
+  // Type parameters nested in the signature print renamed too.
+  List<K> wrapped<K>(K k) => [k];
+  print(wrapped.runtimeType);
+  int sizeOf<K, V>(Map<K, V> m) => m.length;
+  print(sizeOf.runtimeType);
+  K applyTo<K, V>(K Function(V) f, V v) => f(v);
+  print(applyTo.runtimeType);
+  print(applyTo<String, int>((n) => 'n$n', 7));
+  final ident = <T>(T x) => x;
+  print(ident.runtimeType);
+  print(ident(5));
+  final listed = <E>(List<E> xs, E Function(E)? g) => xs.length;
+  print(listed.runtimeType);
+}

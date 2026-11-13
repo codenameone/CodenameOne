@@ -4591,6 +4591,10 @@ public final class Icons {
     public static IconData public_() {
         return new IconData(FontImage.MATERIAL_PUBLIC);
     }
+    // Dart public_ (the Java name public_ is the escaped Dart public).
+    public static IconData public__() {
+        return new IconData(FontImage.MATERIAL_PUBLIC);
+    }
     public static IconData public_off() {
         return new IconData(FontImage.MATERIAL_PUBLIC_OFF);
     }

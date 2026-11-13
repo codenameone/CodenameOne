@@ -86,6 +86,31 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "Maven backend-only: " + mavenBackend);
     }
 
+    /// A command-line project is the backend module with a command in place of the
+    /// routes, on both build tools.
+    private void validateCommandLineProject() throws Exception {
+        ProjectOptions.BuildTool[] tools = {ProjectOptions.BuildTool.GRADLE, ProjectOptions.BuildTool.MAVEN};
+        for (ProjectOptions.BuildTool tool : tools) {
+            String label = "[cli " + tool + "] ";
+            ProjectOptions options = ProjectOptions.defaults().withBuild(tool, ProjectOptions.ProjectType.COMMAND_LINE);
+            Map<String, byte[]> entries = tool == ProjectOptions.BuildTool.GRADLE
+                    ? readZipEntries(createProjectZip(IDE.INTELLIJ, Template.BAREBONES, "Hello", "com.acme.hello", options))
+                    : mavenEntries(GeneratorModel.cn1PluginVersion(), Template.BAREBONES, IDE.INTELLIJ, "Hello",
+                            "com.acme.hello", options);
+            String hello = null;
+            for (String path : entries.keySet()) {
+                assertFalse(path.endsWith("/Api.java") || path.endsWith("/ApiTest.java"),
+                        label + "server source in a command-line project: " + path);
+                if (path.endsWith("com/acme/hello/Hello.java")) {
+                    hello = path;
+                }
+            }
+            assertNotNull(hello, label + "missing Hello.java");
+            assertContains(getText(entries, hello), "@Command", label + "Hello.java is not a command");
+            assertFalse(getText(entries, hello).indexOf("__") >= 0, label + "unreplaced placeholder in Hello.java");
+        }
+    }
+
     @Override
     public boolean runTest() throws Exception {
         // Run the targeted regression checks first so they don't get masked when an
@@ -105,6 +130,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateMavenRefusals();
         validateFullStackTemplate();
         validateReelGate();
+        validateSplatGate();
+        validateSlateGate();
+        validateCommandLineProject();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
                 if (template.isFullStack() && type == ProjectOptions.ProjectType.APP) {
@@ -117,7 +145,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 }
                 for (IDE ide : IDE.values()) {
                     validateMavenLayoutCombination(template, type, false, ide);
-                    if (type != ProjectOptions.ProjectType.BACKEND_ONLY) {
+                    if (!type.hasNoClient()) {
                         validateMavenLayoutCombination(template, type, true, ide);
                     }
                 }
@@ -184,7 +212,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             // they do in every other backend layout. A backend-only project is
             // the server, so there they sit at the root.
             if (path.startsWith("src/")) {
-                boolean serverTest = type == ProjectOptions.ProjectType.BACKEND_ONLY
+                boolean serverTest = type.hasNoClient()
                         && path.startsWith("src/test/java/");
                 assertTrue(path.startsWith("src/main/") || serverTest, label + "unexpected source set: " + path);
             } else if (path.startsWith("backend/src/")) {
@@ -211,7 +239,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // Gradle builds -- from the IDE or ./gradlew -- report through the plugin's
         // settings half; a backend-only project has no client build to report.
         String gradleProperties = getText(entries, "gradle.properties");
-        if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+        if (type.hasNoClient()) {
             assertFalse(gradleProperties.indexOf("cn1.telemetry.") >= 0,
                     label + "a backend-only project does not report builds");
         } else {
@@ -240,16 +268,24 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertFalse(readme.indexOf("build.sh") >= 0, label + "Gradle README must not mention the Maven launchers");
 
         String apiPath;
-        if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+        if (type.hasNoClient()) {
             assertNull(entries.get("codenameone_settings.properties"),
                     label + "a backend has no Codename One app settings");
             assertNull(entries.get("icon.png"), label + "a backend has no icon");
             assertNull(entries.get("src/main/css/theme.css"), label + "a backend has no theme");
             assertNull(entries.get("AGENTS.md"), label + "the UI authoring skill is not shipped with a backend");
             assertNotNull(entries.get("application.properties"), label + "backend settings belong at the root");
-            assertNotNull(entries.get("application-dev.properties"), label + "backend dev profile belongs at the root");
             assertContains(getText(entries, "build.gradle.kts"), "runBackend",
                     label + "a backend-only root build script is the backend template");
+        }
+        if (type == ProjectOptions.ProjectType.COMMAND_LINE) {
+            // The backend's module and build script, holding a tool instead of a server.
+            apiPath = null;
+            assertContains(getText(entries, "src/main/java/" + packagePath + "/Hello.java"),
+                    "package " + packageName + ";", label + "Hello.java in the chosen package");
+            assertNull(entries.get("application-dev.properties"), label + "a tool has no dev profile");
+        } else if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            assertNotNull(entries.get("application-dev.properties"), label + "backend dev profile belongs at the root");
             apiPath = "src/main/java/" + packagePath + "/Api.java";
             String api = getText(entries, apiPath);
             assertContains(api, "./gradlew runBackend", label + "backend-only tasks are addressed from the root");
@@ -307,7 +343,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(getText(entries, ".idea/gradle.xml"), "GradleProjectSettings",
                     label + "IntelliJ should link the Gradle build");
             assertNull(entries.get(".idea/workspace.xml"), label + "Maven run configurations must not ship with Gradle");
-            if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            if (type.hasNoClient()) {
                 assertContains(getText(entries, ".idea/runConfigurations/Run_Backend.xml"),
                         "<option value=\"runBackend\" />", label + "IntelliJ backend run configuration");
             } else {
@@ -324,7 +360,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         } else if (ide == IDE.VS_CODE) {
             String tasks = getText(entries, ".vscode/tasks.json");
             assertContains(tasks, "\"command\": \"./gradlew\"", label + "VS Code tasks run the wrapper");
-            assertContains(tasks, type == ProjectOptions.ProjectType.BACKEND_ONLY ? "[\"runBackend\"]" : "[\"run\"]",
+            assertContains(tasks, type.hasNoClient() ? "[\"runBackend\"]" : "[\"run\"]",
                     label + "VS Code should have a run task");
             assertContains(getText(entries, ".vscode/extensions.json"), "vscjava.vscode-gradle",
                     label + "VS Code should recommend the Gradle extension");
@@ -376,10 +412,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                                         String packageName, String mainClassName, String label) throws IOException {
         boolean rides = template == Template.WAYLINE;
         boolean bank = template == Template.BASTION;
-        boolean game = template == Template.SKIRMISH || template == Template.DASH;
+        boolean game = template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT;
         boolean runner = template == Template.DASH;
+        boolean paintball = template == Template.SPLAT;
         boolean video = template == Template.REEL;
         boolean studio = template == Template.PULSE;
+        boolean booking = template == Template.SLATE;
         String name = template.SOURCE_MAIN_CLASS;
         String upper = template.name();
         String lower = GeneratorModel.toLowerCaseInvariant(name);
@@ -394,12 +432,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? (runner ? "endless runner" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : video ? "video streaming service" : "food-delivery app",
+        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
-            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
+            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : booking ? "`client@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
                     label + "README lists the template's own demo accounts");
-            assertFalse(readme.indexOf(rides || chat || bank || video || studio ? "courier@" : "rider@") >= 0,
+            assertFalse(readme.indexOf(rides || chat || bank || video || studio || booking ? "courier@" : "rider@") >= 0,
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
@@ -420,15 +458,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
-        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : video ? "/api/CatalogApi.java" : studio ? "/api/BookingApi.java" : "/api/OrderApi.java")),
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : video ? "/api/CatalogApi.java" : studio ? "/api/BookingApi.java" : booking ? "/api/AppointmentApi.java" : "/api/OrderApi.java")),
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
-        assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : studio ? "V2__accounts.sql" : "V1__accounts.sql")),
+        assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : studio || booking ? "V2__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : booking ? "/booking/BookingFlowTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : studio ? "/member/MemberForm.java" : "/customer/CustomerForm.java")),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : studio ? "/member/MemberForm.java" : booking ? "/client/ClientForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
         if (!game) {
             assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
@@ -458,6 +496,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 // and scans the door pass with the camera.
                 assertContains(settings, "codename1.arg.ios.NSHealthShareUsageDescription=",
                         label + "the template's iOS Health prompt");
+            } else if (booking) {
+                // Booking asks for no location; it reads the phone's calendars
+                // for busy time and writes appointments into them.
+                assertContains(settings, "codename1.arg.ios.NSCalendarsFullAccessUsageDescription=",
+                        label + "the template's iOS calendar prompt");
             } else if (!game) {
                 assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
                         label + "the template's iOS location prompt");
@@ -599,6 +642,30 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 GeneratorModel.REEL_SINCE, "Reel is not generated before its gate");
         assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
                 GeneratorModel.REEL_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.REEL)), "The page offers Reel from its gate on");
+    }
+
+    /// The shooter template needs the 3D engine of a newer core: below its own
+    /// gate it is refused, and the page does not list it.
+    private void validateSplatGate() throws Exception {
+        assertFalse(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.SPLAT_SINCE),
+                "Splat's gate is past the other complete apps'");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.SPLAT, "OldSplat",
+                "com.acme.oldsplat", ProjectOptions.defaults().forFullStack(), FULL_STACK_VERSION),
+                GeneratorModel.SPLAT_SINCE, "Splat is not generated before its gate");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
+                GeneratorModel.SPLAT_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.SPLAT)), "The page offers Splat from its gate on");
+    }
+
+    /// The booking template needs the scheduling views of a newer core: below
+    /// its own gate it is refused, and the page does not list it.
+    private void validateSlateGate() throws Exception {
+        assertFalse(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.SLATE_SINCE),
+                "Slate's gate is past the other complete apps'");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.SLATE, "OldSlate",
+                "com.acme.oldslate", ProjectOptions.defaults().forFullStack(), FULL_STACK_VERSION),
+                GeneratorModel.SLATE_SINCE, "Slate is not generated before its gate");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
+                GeneratorModel.SLATE_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.SLATE)), "The page offers Slate from its gate on");
     }
 
     private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {
@@ -757,8 +824,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertFalse(path.startsWith("gradle") || path.endsWith(".kts"), label + "Gradle file leaked: " + path);
         }
 
-        if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
-            validateMavenBackendOnly(entries, ide, packageName, label);
+        if (type.hasNoClient()) {
+            validateMavenBackendOnly(entries, type, ide, packageName, label);
             return;
         }
 
@@ -815,7 +882,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertNotNull(entries.get("common/codenameone_settings.properties"), label + "missing app settings");
     }
 
-    private void validateMavenBackendOnly(Map<String, byte[]> entries, IDE ide, String packageName, String label) {
+    private void validateMavenBackendOnly(Map<String, byte[]> entries, ProjectOptions.ProjectType type, IDE ide, String packageName, String label) {
         String packagePath = packageName.replace('.', '/');
         for (String path : entries.keySet()) {
             assertFalse(path.startsWith("common/") || path.startsWith("backend/"),
@@ -839,13 +906,20 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(pom, "<goal>process-annotations</goal>", label + "the generated entry point");
         assertContains(pom, "<groupId>" + packageName + "</groupId>", label + "the chosen groupId");
         assertNotNull(entries.get("application.properties"), label + "settings at the root");
+        assertNotNull(entries.get(".gitignore"), label + "missing .gitignore");
+        if (type == ProjectOptions.ProjectType.COMMAND_LINE) {
+            // A command-line tool shares the server's single-module layout but
+            // has no server: no dev profile, no API, no cn1:backend run actions.
+            String hello = getText(entries, "src/main/java/" + packagePath + "/Hello.java");
+            assertContains(hello, "package " + packageName + ";", label + "Hello.java in the chosen package");
+            return;
+        }
         assertNotNull(entries.get("application-dev.properties"), label + "dev profile at the root");
         String api = getText(entries, "src/main/java/" + packagePath + "/Api.java");
         assertContains(api, "package " + packageName + ";", label + "Api.java in the chosen package");
         assertContains(api, "./mvnw cn1:backend", label + "Api.java should give the Maven command");
         assertNotNull(entries.get("src/main/java/" + packagePath + "/Greeter.java"), label + "missing Greeter.java");
         assertContains(getText(entries, "README.md"), "./mvnw cn1:backend-package", label + "README should give the goals");
-        assertNotNull(entries.get(".gitignore"), label + "missing .gitignore");
         if (ide == IDE.INTELLIJ) {
             assertContains(getText(entries, ".idea/runConfigurations/Run_Backend.xml"), "<option value=\"cn1:backend\" />",
                     label + "IntelliJ should run the backend");
@@ -1607,9 +1681,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
         assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Root pom should include app artifact/name");
-        assertContains(pom, "<cn1.plugin.version>7.0.280</cn1.plugin.version>",
+        assertContains(pom, "<cn1.plugin.version>7.0.281</cn1.plugin.version>",
                 "Root pom should use current CN1 plugin version");
-        assertContains(pom, "<cn1.version>7.0.280</cn1.version>",
+        assertContains(pom, "<cn1.version>7.0.281</cn1.version>",
                 "Root pom should align CN1 runtime version with plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");

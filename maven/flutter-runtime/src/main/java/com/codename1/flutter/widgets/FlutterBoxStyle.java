@@ -92,7 +92,7 @@ final class FlutterBoxStyle {
                                 .useCache(shadowed)
                                 .cornerRadius(com.codename1.flutter.rendering.Dp.mm(radiusLp));
                 if (shadowed) {
-                    border = border.shadowOpacity(40).shadowSpread(0.5f).shadowY(1);
+                    border = shadowFrom(border, ((BoxDecoration) decoration).getBoxShadow());
                 }
                 border = withOutline(border, decoration);
                 face.getAllStyles().setBorder(border);
@@ -256,5 +256,26 @@ final class FlutterBoxStyle {
                 .strokeColor(side.color().rgb())
                 .strokeOpacity(side.color().alpha())
                 .stroke((float) com.codename1.flutter.rendering.Dp.px(w), false);
+    }
+
+    /**
+     * The Codename One shadow for a Flutter {@code boxShadow} list: opacity from the
+     * first shadow's colour, spread from its blur and spread radii, the vertical offset
+     * from its offset. A list of something other than BoxShadow keeps the M3 default.
+     */
+    static com.codename1.ui.plaf.RoundRectBorder shadowFrom(com.codename1.ui.plaf.RoundRectBorder border, Object shadows) {
+        Object first = shadows;
+        if (shadows instanceof java.util.List) {
+            java.util.List<?> l = (java.util.List<?>) shadows;
+            first = l.isEmpty() ? null : l.get(0);
+        }
+        if (!(first instanceof com.codename1.flutter.painting.BoxShadow)) {
+            return border.shadowOpacity(40).shadowSpread(0.5f).shadowY(1);
+        }
+        com.codename1.flutter.painting.BoxShadow bs = (com.codename1.flutter.painting.BoxShadow) first;
+        int opacity = bs.color() == null ? 0 : (int) Math.round(bs.color().alpha() * 100 / 255.0);
+        float spreadMm = (float) com.codename1.flutter.rendering.Dp.mm(bs.blurRadius() / 2 + bs.spreadRadius());
+        float y = bs.offset() == null ? 0 : (float) com.codename1.flutter.rendering.Dp.mm(bs.offset().dy());
+        return border.shadowOpacity(opacity).shadowSpread(spreadMm).shadowY(y);
     }
 }

@@ -342,6 +342,30 @@ final class Multipart {
         return null;
     }
 
+    /// Every value of `name` in a urlencoded form, in order.
+    static List<String> formValues(String form, String name) {
+        List<String> out = new ArrayList<String>();
+        if (form == null || name == null) {
+            return out;
+        }
+        int pos = 0;
+        while (pos <= form.length()) {
+            int end = form.indexOf('&', pos);
+            if (end < 0) {
+                end = form.length();
+            }
+            int eq = form.indexOf('=', pos);
+            if (eq < 0 || eq > end) {
+                eq = end;
+            }
+            if (name.equals(decode(form.substring(pos, eq)))) {
+                out.add(decode(eq < end ? form.substring(eq + 1, end) : ""));
+            }
+            pos = end + 1;
+        }
+        return out;
+    }
+
     private static String decode(String value) {
         if (value.indexOf('%') < 0 && value.indexOf('+') < 0) {
             return value;

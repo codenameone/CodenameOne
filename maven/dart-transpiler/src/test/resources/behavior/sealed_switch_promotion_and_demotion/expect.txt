@@ -1,0 +1,17 @@
+big5
+small3
+AB
+other
+x3
+notx
+ello
+empty
+ns
+even4
+none
+Z
+13
+3
+4
+5.5
+2

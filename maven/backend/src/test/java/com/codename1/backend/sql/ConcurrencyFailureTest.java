@@ -116,4 +116,16 @@ class ConcurrencyFailureTest {
         first.initCause(second);
         assertFalse(ConcurrencyFailureException.isCauseOf(first));
     }
+
+    @Test
+    @DisplayName("MySQL and MariaDB: duplicates, foreign keys and NOT NULL are integrity violations")
+    void recognizesMySqlIntegrityViolations() {
+        assertTrue(MySql.isIntegrityViolation(1062, "23000"));
+        assertTrue(MySql.isIntegrityViolation(1451, "23000"));
+        assertTrue(MySql.isIntegrityViolation(1452, ""));
+        assertTrue(MySql.isIntegrityViolation(1048, null));
+        assertTrue(MySql.isIntegrityViolation(4025, "23000"));
+        assertFalse(MySql.isIntegrityViolation(1213, "40001"));
+        assertFalse(MySql.isIntegrityViolation(1064, "42000"));
+    }
 }

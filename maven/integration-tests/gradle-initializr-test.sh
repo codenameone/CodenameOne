@@ -8,7 +8,11 @@
 #  3. its runBackend serves the template's /healthz on the JVM;
 #  4. backendPackage translates it to a native binary (skipped without clang,
 #     unless CN1_BACKEND_PACKAGE_REQUIRED=1), and the binary serves /healthz.
-#  5. its migration tasks say so when there is nothing to migrate, and apply,
+#  5. "Command-line tool" runs its command with arguments, on the JVM and as a
+#     native binary, with picocli's exit codes and generated help;
+#  6. the same download with its command written in Python (argparse) instead
+#     runs, packages and exits the way CPython would;
+#  7. its migration tasks say so when there is nothing to migrate, and apply,
 #     list and validate a script once there is one.
 #
 # Needs the reactor installed (mvn install) and a JDK 17+; see inc/gradle.sh.
@@ -110,6 +114,120 @@ elif [ "${CN1_BACKEND_PACKAGE_REQUIRED:-}" = "1" ]; then
   fail "backendPackage needs clang, and CN1_BACKEND_PACKAGE_REQUIRED=1 forbids skipping it"
 else
   echo "   skipped: no clang on PATH"
+fi
+
+echo "== Command-line tool"
+CLI="$WORKDIR/cli/launcherprobe"
+mkdir -p "$CLI"
+unzip -q "$WORKDIR/fixtures/GRADLE-COMMAND_LINE-INTELLIJ.zip" -d "$CLI"
+use_local_plugin "$CLI"
+[ -n "$(find "$CLI/src/main/java" -name Hello.java)" ] || fail "no Hello.java command"
+[ -z "$(find "$CLI/src" -name Api.java)" ] || fail "a command-line tool should not have a controller"
+run_gradle "$CLI" runBackend "-Pcn1.backend.args=--count 2 --loud Ada" > "$WORKDIR/cli-run.log" 2>&1 \
+  || { cat "$WORKDIR/cli-run.log"; fail "runBackend with arguments"; }
+[ "$(grep -c '^HELLO, ADA!$' "$WORKDIR/cli-run.log")" = "2" ] \
+  || { cat "$WORKDIR/cli-run.log"; fail "the command did not run with its arguments on the JVM"; }
+run_gradle "$CLI" test > "$WORKDIR/cli-test.log" 2>&1 || { cat "$WORKDIR/cli-test.log"; fail "the tool's tests"; }
+# binary -- runs the packaged tool through every outcome a caller sees
+check_cli_binary() {
+  local bin="$1" out code
+  out="$("$bin" -c 3 Ada)" || fail "the binary failed on valid arguments"
+  [ "$(printf '%s\n' "$out" | grep -c '^Hello, Ada$')" = "3" ] || fail "the binary printed: $out"
+  out="$("$bin" --help)" || fail "--help did not exit 0"
+  printf '%s\n' "$out" | grep -q 'Usage: ' || fail "--help printed no usage: $out"
+  printf '%s\n' "$out" | grep -q -- '--count=<count>' || fail "--help did not list --count: $out"
+  out="$("$bin" --version)" || fail "--version did not exit 0"
+  printf '%s\n' "$out" | grep -q ' 1.0$' || fail "--version printed: $out"
+  set +e
+  "$bin" --no-such-option Ada > "$WORKDIR/cli-bad.log" 2>&1; code=$?
+  "$bin" > "$WORKDIR/cli-missing.log" 2>&1; local missing=$?
+  set -e
+  [ "$code" = "2" ] || { cat "$WORKDIR/cli-bad.log"; fail "an unknown option exited $code, not 2"; }
+  grep -q "Unknown option: '--no-such-option'" "$WORKDIR/cli-bad.log" || { cat "$WORKDIR/cli-bad.log"; fail "unknown option message"; }
+  [ "$missing" = "2" ] || { cat "$WORKDIR/cli-missing.log"; fail "a missing parameter exited $missing, not 2"; }
+}
+if command -v clang > /dev/null 2>&1; then
+  run_gradle "$CLI" backendPackage > "$WORKDIR/cli-package.log" 2>&1 || { cat "$WORKDIR/cli-package.log"; fail "backendPackage for the tool"; }
+  [ -x "$CLI/build/launcherprobe" ] || { cat "$WORKDIR/cli-package.log"; fail "no executable at $CLI/build/launcherprobe"; }
+  echo "   $(du -h "$CLI/build/launcherprobe" | cut -f1) binary"
+  check_cli_binary "$CLI/build/launcherprobe"
+elif [ "${CN1_BACKEND_PACKAGE_REQUIRED:-}" = "1" ]; then
+  fail "backendPackage needs clang, and CN1_BACKEND_PACKAGE_REQUIRED=1 forbids skipping it"
+else
+  echo "   native binary skipped: no clang on PATH"
+fi
+
+echo "== Command-line tool in Python"
+# The Java command replaced by a Python program: src/main/python transpiles,
+# its main module becomes the entry point, and argparse, sys.exit and an
+# uncaught exception give the exit statuses CPython gives.
+PYCLI="$WORKDIR/pycli/launcherprobe"
+mkdir -p "$PYCLI"
+unzip -q "$WORKDIR/fixtures/GRADLE-COMMAND_LINE-INTELLIJ.zip" -d "$PYCLI"
+use_local_plugin "$PYCLI"
+find "$PYCLI/src" -name 'Hello*.java' -exec rm {} +
+mkdir -p "$PYCLI/src/main/python"
+cat > "$PYCLI/src/main/python/main.py" <<'PY'
+import argparse
+import sys
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Prints a greeting.")
+    parser.add_argument("name", help="who to greet")
+    parser.add_argument("-c", "--count", type=int, default=1, help="how many times")
+    parser.add_argument("-l", "--loud", action="store_true", help="shout it")
+    parser.add_argument("--status", type=int, default=0, help="exit with this status")
+    parser.add_argument("--version", action="version", version="%(prog)s 1.0")
+    args = parser.parse_args(argv)
+    if args.name == "crash":
+        raise RuntimeError("boom")
+    greeting = "Hello, %s" % args.name
+    for _ in range(args.count):
+        print(greeting.upper() + "!" if args.loud else greeting)
+    return args.status
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+PY
+run_gradle "$PYCLI" runBackend "-Pcn1.backend.args=--count 2 --loud Ada" > "$WORKDIR/pycli-run.log" 2>&1 \
+  || { cat "$WORKDIR/pycli-run.log"; fail "runBackend for the Python tool"; }
+[ "$(grep -c '^HELLO, ADA!$' "$WORKDIR/pycli-run.log")" = "2" ] \
+  || { cat "$WORKDIR/pycli-run.log"; fail "the Python tool did not run with its arguments on the JVM"; }
+# binary -- the outcomes a caller of a Python tool sees, in CPython's words
+check_python_binary() {
+  local bin="$1" out code
+  out="$("$bin" -c 3 Ada)" || fail "the Python binary failed on valid arguments"
+  [ "$(printf '%s\n' "$out" | grep -c '^Hello, Ada$')" = "3" ] || fail "the Python binary printed: $out"
+  out="$("$bin" --help)" || fail "--help did not exit 0"
+  printf '%s\n' "$out" | grep -q '^usage: launcherprobe \[-h\]' || fail "--help printed: $out"
+  printf '%s\n' "$out" | grep -q -- '-c, --count COUNT' || fail "--help did not list --count: $out"
+  out="$("$bin" --version)" || fail "--version did not exit 0"
+  [ "$out" = "launcherprobe 1.0" ] || fail "--version printed: $out"
+  set +e
+  "$bin" --status 7 Ada > /dev/null 2>&1; code=$?
+  "$bin" --no-such-option Ada > "$WORKDIR/pycli-bad.log" 2>&1; local bad=$?
+  "$bin" crash > "$WORKDIR/pycli-crash.log" 2>&1; local crash=$?
+  set -e
+  [ "$code" = "7" ] || fail "sys.exit(7) exited $code"
+  [ "$bad" = "2" ] || { cat "$WORKDIR/pycli-bad.log"; fail "an unknown option exited $bad, not 2"; }
+  grep -q "launcherprobe: error: unrecognized arguments: --no-such-option" "$WORKDIR/pycli-bad.log" \
+    || { cat "$WORKDIR/pycli-bad.log"; fail "unknown option message"; }
+  [ "$crash" = "1" ] || { cat "$WORKDIR/pycli-crash.log"; fail "an uncaught exception exited $crash, not 1"; }
+  grep -q "RuntimeError: boom" "$WORKDIR/pycli-crash.log" || { cat "$WORKDIR/pycli-crash.log"; fail "no traceback"; }
+}
+if [ "${CN1_PYTHON_NATIVE:-1}" = "0" ]; then
+  # The translation is the slowest step of this script; CI runs it on one leg.
+  echo "   native binary skipped (CN1_PYTHON_NATIVE=0)"
+elif command -v clang > /dev/null 2>&1; then
+  run_gradle "$PYCLI" backendPackage > "$WORKDIR/pycli-package.log" 2>&1 \
+    || { cat "$WORKDIR/pycli-package.log"; fail "backendPackage for the Python tool"; }
+  [ -x "$PYCLI/build/launcherprobe" ] || { cat "$WORKDIR/pycli-package.log"; fail "no executable at $PYCLI/build/launcherprobe"; }
+  echo "   $(du -h "$PYCLI/build/launcherprobe" | cut -f1) binary"
+  check_python_binary "$PYCLI/build/launcherprobe"
+elif [ "${CN1_BACKEND_PACKAGE_REQUIRED:-}" = "1" ]; then
+  fail "backendPackage needs clang, and CN1_BACKEND_PACKAGE_REQUIRED=1 forbids skipping it"
 fi
 
 echo "== migrations"

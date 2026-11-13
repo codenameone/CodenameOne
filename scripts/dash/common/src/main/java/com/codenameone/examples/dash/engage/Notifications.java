@@ -29,7 +29,7 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.dash.AppConfig;
 import com.codenameone.examples.dash.api.PushDeviceDto;
 import com.codenameone.examples.dash.net.Api;
-import com.codenameone.examples.dash.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.dash.net.Session;
 import com.codenameone.examples.dash.ui.Nav;
 

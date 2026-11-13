@@ -7,6 +7,17 @@ on:
     paths:
       - 'scripts/test-starter-launchers.py'
       - 'scripts/sync-initializr-launchers.py'
+      # The launchers this workflow compares, and their copies: a change to one
+      # without the other is the drift it exists to report.
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/build.*'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/run.*'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/mvnw*'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/mvnconfig.toml'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/.vscode/**'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/tools/**'
+      - 'maven/cli/src/main/batsh/build.batsh'
+      - 'scripts/initializr/common/src/main/resources/*.zip'
+      - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/maven/intellij/workspace.xml'
       - '.github/workflows/starter-launchers.yml'
   workflow_dispatch:
   schedule:
@@ -28,8 +39,10 @@ jobs:
         os: [ubuntu-24.04, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     # macOS runners take ~37 s per generated download, and there are past
-    # thirty of them now: twenty minutes cancelled a run that was passing.
-    timeout-minutes: 40
+    # thirty of them now: twenty minutes cancelled a run that was passing, and
+    # then forty did -- passing runs finish in 35 to 39 on macOS, and the nightly
+    # was cancelled at the limit with nothing wrong.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

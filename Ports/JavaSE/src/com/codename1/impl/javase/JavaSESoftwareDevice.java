@@ -23,6 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.gpu.Camera;
+import com.codename1.gpu.Environment;
 import com.codename1.gpu.GpuCapabilities;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.IndexBuffer;
@@ -289,9 +290,26 @@ class JavaSESoftwareDevice extends GraphicsDevice {
         }
 
         float invArea = 1.0f / area;
-        boolean lit = material.getType() == Material.Type.LAMBERT
-                || material.getType() == Material.Type.PHONG;
-        boolean phong = material.getType() == Material.Type.PHONG;
+        boolean lit = material.isLit();
+        boolean phong = material.getType() == Material.Type.PHONG
+                || material.getType() == Material.Type.PBR;
+        // The environment, approximated on the CPU: fog, the sky/ground
+        // ambient, exposure and the ACES curve, emissive, and the open sky
+        // as a gradient with the sun's glow. Shadows, clouds and the post
+        // chain are GPU only (GpuCapabilities says so).
+        Environment env = getEnvironment();
+        boolean fog = env.isFog() && material.getType() != Material.Type.SKYBOX;
+        float fogR = ((env.getFogColor() >> 16) & 0xff) / 255.0f;
+        float fogG = ((env.getFogColor() >> 8) & 0xff) / 255.0f;
+        float fogB = (env.getFogColor() & 0xff) / 255.0f;
+        boolean hemi = lit && env.isHemisphere();
+        boolean tone = lit && env.isToneMapping();
+        float exposure = env.getExposure();
+        boolean sky = env.isSky() && material.getType() == Material.Type.SKYBOX;
+        int em = material.getEmissive();
+        float emR = ((em >> 16) & 0xff) / 255.0f;
+        float emG = ((em >> 8) & 0xff) / 255.0f;
+        float emB = (em & 0xff) / 255.0f;
         boolean blend = rs.getBlendMode() == RenderState.BlendMode.ALPHA
                 || rs.getBlendMode() == RenderState.BlendMode.ADDITIVE;
         boolean additive = rs.getBlendMode() == RenderState.BlendMode.ADDITIVE;
@@ -383,9 +401,18 @@ class JavaSESoftwareDevice extends GraphicsDevice {
                     if (ndotl < 0) {
                         ndotl = 0;
                     }
-                    float litR = ar + lr * ndotl;
-                    float litG = ag + lg * ndotl;
-                    float litB = ab + lb * ndotl;
+                    float ambR = ar;
+                    float ambG = ag;
+                    float ambB = ab;
+                    if (hemi) {
+                        float up = ny * 0.5f + 0.5f;
+                        ambR = channel(env.getGroundColor(), 16) * (1 - up) + channel(env.getSkyColor(), 16) * up;
+                        ambG = channel(env.getGroundColor(), 8) * (1 - up) + channel(env.getSkyColor(), 8) * up;
+                        ambB = channel(env.getGroundColor(), 0) * (1 - up) + channel(env.getSkyColor(), 0) * up;
+                    }
+                    float litR = ambR + lr * ndotl;
+                    float litG = ambG + lg * ndotl;
+                    float litB = ambB + lb * ndotl;
                     r *= litR;
                     g *= litG;
                     b *= litB;
@@ -422,6 +449,48 @@ class JavaSESoftwareDevice extends GraphicsDevice {
                     }
                 }
 
+                if (lit) {
+                    r += emR;
+                    g += emG;
+                    b += emB;
+                }
+                if (tone) {
+                    r = aces(r * exposure);
+                    g = aces(g * exposure);
+                    b = aces(b * exposure);
+                }
+                if (fog || sky) {
+                    float wx = b0 * world[0][0] + b1 * world[1][0] + b2 * world[2][0];
+                    float wy = b0 * world[0][1] + b1 * world[1][1] + b2 * world[2][1];
+                    float wz = b0 * world[0][2] + b1 * world[1][2] + b2 * world[2][2];
+                    float dx = wx - eyeX;
+                    float dy = wy - eyeY;
+                    float dz = wz - eyeZ;
+                    float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    if (sky && dist > 0) {
+                        float up = dy / dist;
+                        float t = (float) Math.pow(up < 0 ? 0 : up, 0.55);
+                        r = channel(env.getHorizonColor(), 16) * (1 - t) + channel(env.getZenithColor(), 16) * t;
+                        g = channel(env.getHorizonColor(), 8) * (1 - t) + channel(env.getZenithColor(), 8) * t;
+                        b = channel(env.getHorizonColor(), 0) * (1 - t) + channel(env.getZenithColor(), 0) * t;
+                        // (lx, ly, lz) points back toward the sun
+                        float sd = (dx * lx + dy * ly + dz * lz) / dist;
+                        float glow = sd > 0 ? (float) Math.pow(sd, 64) : 0f;
+                        r += channel(env.getSunColor(), 16) * glow;
+                        g += channel(env.getSunColor(), 8) * glow;
+                        b += channel(env.getSunColor(), 0) * glow;
+                    }
+                    if (fog) {
+                        float d = env.getFogDensity() * dist;
+                        float h = wy - env.getFogBaseHeight();
+                        float thin = h > 0 ? (float) Math.exp(-env.getFogHeightFalloff() * h) : 1f;
+                        float f = 1f - (float) Math.exp(-d * d);
+                        f *= thin;
+                        r = r * (1 - f) + fogR * f;
+                        g = g * (1 - f) + fogG * f;
+                        b = b * (1 - f) + fogB * f;
+                    }
+                }
                 int out = packColor(r, g, b, a);
                 if (blend) {
                     out = blendPixel(color[di], out, additive, a);
@@ -556,6 +625,16 @@ class JavaSESoftwareDevice extends GraphicsDevice {
         int rg = clamp255((int) (sg * sa + dg * ia + 0.5f));
         int rb = clamp255((int) (sb * sa + db * ia + 0.5f));
         return (0xff << 24) | (rr << 16) | (rg << 8) | rb;
+    }
+
+    private static float channel(int argb, int shift) {
+        return ((argb >> shift) & 0xff) / 255.0f;
+    }
+
+    // the same ACES fit the GLSL generator uses
+    private static float aces(float x) {
+        float v = (x * (2.51f * x + 0.03f)) / (x * (2.43f * x + 0.59f) + 0.14f);
+        return v < 0 ? 0 : v > 1 ? 1 : v;
     }
 
     private static int clamp255(int v) {

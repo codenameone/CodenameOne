@@ -701,6 +701,9 @@ public class FlutterProjectImporterTest {
                 java.util.Arrays.asList("flutter", "dio"));
         assertFalse(plain.contains("implements"));
         assertFalse(plain.contains("AppLinks"));
+        // every app feeds WidgetsBindingObserver: resumed after start, paused before stop
+        assertTrue(plain.contains("super.start();\n        com.codename1.flutter.widgets.WidgetsBinding.instance.appStarted();"));
+        assertTrue(plain.contains("WidgetsBinding.instance.appStopped();\n        super.stop();"));
         assertTrue(plain.contains("com.example.flutter.FlutterRegistry.invokeMain();"));
         // naming com.codename1.push makes the Android build require google-services.json
         assertFalse(plain.contains("com.codename1.push"));

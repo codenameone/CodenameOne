@@ -52,7 +52,7 @@ public class RichTextSpanTest {
             s.style(style);
         }
         if (children.length > 0) {
-            DartList<TextSpan> kids = new DartList<TextSpan>();
+            DartList<TextSpan> kids = new DartList<TextSpan>(dart.runtime.TypeWitness.of(TextSpan.class, false));
             for (TextSpan c : children) {
                 kids.add(c);
             }

@@ -118,4 +118,44 @@ public class DefaultTextStyle extends InheritedWidget {
         }
         return ((DefaultTextStyle) oldWidget).style != style;
     }
+
+    /// Flutter's {@code style}: never null -- an empty style when none is set.
+    public TextStyle style() {
+        return style != null ? style : new TextStyle();
+    }
+
+    /// {@code DefaultTextStyle.merge}: a widget that, when built, merges these values
+    /// over the ambient DefaultTextStyle, as Flutter's does.
+    public static Widget merge(final com.codename1.flutter.Key key, final TextStyle style, final TextAlign textAlign,
+            final Boolean softWrap, final Object overflow, final Long maxLines, final Widget child) {
+        com.codename1.flutter.StatelessWidget w = new com.codename1.flutter.StatelessWidget() {
+            @Override
+            public Widget build(BuildContext context) {
+                DefaultTextStyle parent = of(context);
+                DefaultTextStyle d = new DefaultTextStyle();
+                TextStyle base = parent.getStyle();
+                d.style(base == null ? style : (style == null ? base : base.merge(style)));
+                TextAlign ta = textAlign != null ? textAlign : parent.getTextAlign();
+                if (ta != null) {
+                    d.textAlign(ta);
+                }
+                Boolean sw = softWrap != null ? softWrap : parent.getSoftWrap();
+                if (sw != null) {
+                    d.softWrap(sw.booleanValue());
+                }
+                Object ov = overflow != null ? overflow : parent.getOverflow();
+                if (ov != null) {
+                    d.overflow(ov);
+                }
+                Integer ml = maxLines != null ? Integer.valueOf(maxLines.intValue()) : parent.getMaxLines();
+                if (ml != null) {
+                    d.maxLines(ml.intValue());
+                }
+                d.child(child);
+                return d;
+            }
+        };
+        w.key(key);
+        return w;
+    }
 }

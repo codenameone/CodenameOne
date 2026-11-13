@@ -35,8 +35,8 @@ import com.codenameone.examples.reel.api.SharingAlertDto;
 import com.codenameone.examples.reel.api.SharingDecisionDto;
 import com.codenameone.examples.reel.api.UserDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
-import com.codenameone.examples.reel.ui.Chart;
+import com.codename1.appkit.Net;
+import com.codename1.appkit.Chart;
 import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Nav;
 import com.codenameone.examples.reel.ui.SettingsForm;
@@ -128,7 +128,7 @@ public final class AdminForm implements Nav.Home {
             v[iter] = points.get(iter).value();
         }
         Ui.section(page, title);
-        page.add(Chart.of(name, v, points.get(0).day(), points.get(v.length - 1).day()));
+        page.add(Chart.of("Sv", name, v, points.get(0).day(), points.get(v.length - 1).day()));
     }
 
     private void users() {

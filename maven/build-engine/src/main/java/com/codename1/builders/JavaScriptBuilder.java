@@ -95,7 +95,8 @@ public class JavaScriptBuilder extends Executor {
 
     /**
      * The artifacts the translator writes BESIDE the bundle: the deployment configuration the
-     * developer activates by hand, and the suspension report.
+     * developer activates by hand, the suspension report, and the symbol map that turns the
+     * minified function names in a browser profile or stack trace back into the translator's.
      *
      * <p>They are deliberately not in the bundle -- it is a web root, and the zip above unpacks
      * straight into one -- but that leaves them inside the build directory, which
@@ -127,7 +128,7 @@ public class JavaScriptBuilder extends Executor {
         }
         String prefix = distDir.getAbsoluteFile().getName() + "-";
         List<File> found = new ArrayList<File>();
-        String[] names = new String[] {"cn1-security", "suspension-report.txt"};
+        String[] names = new String[] {"cn1-security", "suspension-report.txt", "symbols.txt"};
         for (String name : names) {
             File f = new File(parent, prefix + name);
             if (f.exists()) {
@@ -248,7 +249,7 @@ public class JavaScriptBuilder extends Executor {
                         public void log(String message) {
                             JavaScriptBuilder.this.log(message);
                         }
-                    });
+                    }, this);
             jsOutputZip = new File(buildDir, request.getMainClass() + "-js.zip");
             // Zip the dist FLAT. The bundle is meant to be unpacked directly
             // into a web root, so a "<MainClass>-js/" wrapper only forces every
@@ -268,7 +269,7 @@ public class JavaScriptBuilder extends Executor {
     private void stageJavaApi(File stageClasses) throws IOException {
         InputStream is = getResourceAsStream("/parparvm-java-api.jar");
         if (is == null) {
-            throw new IOException("parparvm-java-api.jar resource is missing from the plugin classpath");
+            throw new IOException("parparvm-java-api.jar is missing from the codenameone-parparvm bundle this build resolved");
         }
         try {
             unzip(is, stageClasses, stageClasses, stageClasses);
@@ -634,6 +635,9 @@ public class JavaScriptBuilder extends Executor {
             pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "(), new Runnable() {");
             pw.println("            public void run() {");
             pw.print(hardeningRuntimeProperties(request));
+            // The commerce switch, endpoint and signing key, which CommerceManager reads
+            // through Display.getProperty and nothing else puts there.
+            pw.print(CommerceBuildHints.stubProperties(request));
             // The theme, title-bar and text-selection hints, read by the port through
             // Display.getProperty. The native theme is installed from the lifecycle's init,
             // which runs after this.

@@ -92,6 +92,18 @@ public class LinuxNativeBuilder extends Executor {
 
     private File resultDir;
     private File linuxExecutable;
+    private boolean steamPackaging;
+    private File steamDepot;
+
+    /// Lays the result out as a Steam depot as well (the `steam` targets).
+    public void setSteamPackaging(boolean steamPackaging) {
+        this.steamPackaging = steamPackaging;
+    }
+
+    /// The zipped Steam depot, or null when Steam packaging was off.
+    public File getSteamDepot() {
+        return steamDepot;
+    }
 
     /** The produced native executable, or {@code null} if the build failed. */
     public File getLinuxExecutable() {
@@ -332,9 +344,9 @@ public class LinuxNativeBuilder extends Executor {
                 log("Native theme not used by this build, not shipped: linuxNativeTheme.res");
             }
         } catch (Exception ex) {
-            throw new BuildException("Failed to stage the LinuxPort native layer. The codenameone "
-                    + "maven plugin must provide the codenameone-linux 'bundle' artifact "
-                    + "(LinuxPort.jar + nativelinux.jar) on its classpath.", ex);
+            throw new BuildException("Failed to stage the LinuxPort native layer. The codenameone-linux "
+                    + "'bundle' artifact this build resolved must carry LinuxPort.jar and "
+                    + "nativelinux.jar; a truncated download or a bundle of another version does not.", ex);
         }
 
         // The bundled SQLite engine is emitted only for applications that use com.codename1.db,
@@ -571,6 +583,23 @@ public class LinuxNativeBuilder extends Executor {
             }
         }
         log("Native Linux executable: " + linuxExecutable.getAbsolutePath() + " (" + arch + ")");
+        if (steamPackaging || "true".equalsIgnoreCase(request.getArg("steam.package", "false"))) {
+            SteamDepotPackager.Input in = new SteamDepotPackager.Input(resultDir, linuxExecutable,
+                    SteamDepotPackager.appIdOf(request.getArg("steam.appId", null)));
+            in.depotId = request.getArg("steam.depotId", null);
+            in.branch = request.getArg("steam.branch", "");
+            in.description = request.getArg("steam.buildDescription",
+                    request.getDisplayName() + " " + request.getVersion());
+            in.fullscreen = !"false".equalsIgnoreCase(request.getArg("steam.fullscreen", "true"));
+            in.arch = arch;
+            String sdk = request.getArg("steam.sdkPath", System.getenv("STEAMWORKS_SDK"));
+            in.sdkDir = sdk == null || sdk.trim().isEmpty() ? null : new File(sdk.trim());
+            try {
+                steamDepot = SteamDepotPackager.packageDepot(in, this::log);
+            } catch (com.codename1.builders.BuildException ex) {
+                throw new BuildException(ex.getMessage(), ex);
+            }
+        }
         return true;
     }
 
@@ -839,6 +868,9 @@ public class LinuxNativeBuilder extends Executor {
         // Stamp the hardening metadata so Hardening.isHardened() and crash reports carry the
         // mapping id / level on this port too (parity with iOS and Android).
         src.append(hardeningRuntimeProperties(request));
+        // The commerce switch, endpoint and signing key, which CommerceManager reads through
+        // Display.getProperty and nothing else puts there.
+        src.append(CommerceBuildHints.stubProperties(request));
         // And the database compatibility switch, before the lifecycle below starts, so it is in
         // force by the time anything opens a database.
         src.append(databaseLegacyStubProperty(request, usesDatabase));

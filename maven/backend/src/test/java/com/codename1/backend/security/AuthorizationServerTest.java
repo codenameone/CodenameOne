@@ -256,7 +256,11 @@ class AuthorizationServerTest {
                 RegisteredClient.withId("3").clientId("service")
                         .clientSecret(OAuth2Testing.PLAIN.encode("service-secret"))
                         .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                        .scope("api").build());
+                        .scope("api").build(),
+                RegisteredClient.withId("5").clientId("legacy-service")
+                        .clientSecret(OAuth2Testing.PLAIN.encode("legacy-secret"))
+                        .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                        .scope("api").audience("legacy-service").build());
     }
 
     private static Object[] users() {
@@ -422,6 +426,17 @@ class AuthorizationServerTest {
             Reply again = token(server, "grant_type", "refresh_token", "client_id",
                     "orders-app", "client_secret", "orders-secret", "refresh_token", next);
             assertEquals(Arrays.asList(ORDERS, BILLING), access(server, again).getAudience());
+        }
+    }
+
+    @Test
+    @DisplayName("a client registered with an audience gets tokens for it")
+    void audienceRegisteredWithTheClient() throws Exception {
+        try (SecuredServer server = start()) {
+            Reply issued = server.call("POST", "/oauth2/token",
+                    form("grant_type", "client_credentials", "scope", "api"), FORM,
+                    "Authorization", OAuth2Testing.basic("legacy-service", "legacy-secret"));
+            assertEquals(Arrays.asList("legacy-service"), access(server, issued).getAudience());
         }
     }
 

@@ -1,0 +1,17 @@
+Both(both-label, base:both) label=both-label
+22
+true
+true
+Fixed(fixed) label=fixed
+ignored x
+Named(named) label=named
+10
+named
+both-label
+fixed
+square 9.0
+true
+6
+2 2 store
+a 1
+true

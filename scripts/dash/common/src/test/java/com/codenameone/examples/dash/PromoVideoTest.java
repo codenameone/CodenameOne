@@ -259,11 +259,7 @@ public class PromoVideoTest extends E2e {
 
     /// Lets the bot run until the runner is `metres` down the track.
     private void driveTo(RunView view, int metres) {
-        long give = System.currentTimeMillis() + 90000;
-        while (view.driver().run().runner(view.driver().me()).z / 1000 < metres
-                && System.currentTimeMillis() < give && !driveFor(view, 100)) {
-            // the bot steers
-        }
+        driveUntil(view, () -> view.driver().run().runner(view.driver().me()).z / 1000 >= metres, 90000);
     }
 
     /// Back to the home screen, the way the tab bar takes a player there.

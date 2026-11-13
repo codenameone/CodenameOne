@@ -33,45 +33,55 @@ import java.io.UnsupportedEncodingException;
 /// BER's indefinite lengths are refused. X.509, PKCS#10 and the PKCS#12 files
 /// OpenSSL and the JDK write are DER; a file that is not is reported as such
 /// rather than half read.
-final class Asn1 {
-    static final int BOOLEAN = 0x01;
-    static final int INTEGER = 0x02;
-    static final int BIT_STRING = 0x03;
-    static final int OCTET_STRING = 0x04;
-    static final int NULL = 0x05;
-    static final int OID = 0x06;
-    static final int UTF8_STRING = 0x0c;
-    static final int PRINTABLE_STRING = 0x13;
-    static final int T61_STRING = 0x14;
-    static final int IA5_STRING = 0x16;
-    static final int UTC_TIME = 0x17;
-    static final int GENERALIZED_TIME = 0x18;
-    static final int UNIVERSAL_STRING = 0x1c;
-    static final int BMP_STRING = 0x1e;
-    static final int SEQUENCE = 0x30;
-    static final int SET = 0x31;
+///
+/// It is public for formats this package does not cover -- a CMS SignedData
+/// structure, an Apple receipt, an attestation extension -- so they are read
+/// with the same bounds checks rather than by hand.
+///
+/// ```java
+/// Asn1.Reader outer = new Asn1.Reader(der).open(Asn1.SEQUENCE);
+/// String type = outer.oid();
+/// byte[] content = outer.open(Asn1.explicit(0)).raw(Asn1.SEQUENCE);
+/// ```
+public final class Asn1 {
+    public static final int BOOLEAN = 0x01;
+    public static final int INTEGER = 0x02;
+    public static final int BIT_STRING = 0x03;
+    public static final int OCTET_STRING = 0x04;
+    public static final int NULL = 0x05;
+    public static final int OID = 0x06;
+    public static final int UTF8_STRING = 0x0c;
+    public static final int PRINTABLE_STRING = 0x13;
+    public static final int T61_STRING = 0x14;
+    public static final int IA5_STRING = 0x16;
+    public static final int UTC_TIME = 0x17;
+    public static final int GENERALIZED_TIME = 0x18;
+    public static final int UNIVERSAL_STRING = 0x1c;
+    public static final int BMP_STRING = 0x1e;
+    public static final int SEQUENCE = 0x30;
+    public static final int SET = 0x31;
 
     private Asn1() {
     }
 
     /// The context-specific constructed tag `[n]`.
-    static int explicit(int n) {
+    public static int explicit(int n) {
         return 0xa0 | n;
     }
 
     /// The context-specific primitive tag `[n]`.
-    static int implicit(int n) {
+    public static int implicit(int n) {
         return 0x80 | n;
     }
 
     /// Reads one level of a DER structure. Every read checks the tag and that
     /// the element ends inside its parent.
-    static final class Reader {
+    public static final class Reader {
         private final byte[] data;
         private int pos;
         private final int end;
 
-        Reader(byte[] data) throws IOException {
+        public Reader(byte[] data) throws IOException {
             this(data, 0, data == null ? 0 : data.length);
             if (data == null || data.length == 0) {
                 throw new IOException("No DER data was given");
@@ -84,17 +94,17 @@ final class Asn1 {
             this.end = end;
         }
 
-        boolean hasMore() {
+        public boolean hasMore() {
             return pos < end;
         }
 
         /// The tag of the next element, or -1 at the end.
-        int peek() {
+        public int peek() {
             return pos < end ? data[pos] & 0xff : -1;
         }
 
         /// Fails unless every byte has been read.
-        void finish() throws IOException {
+        public void finish() throws IOException {
             if (pos != end) {
                 throw new IOException("Unexpected data after the end of a DER structure");
             }
@@ -145,47 +155,47 @@ final class Asn1 {
         }
 
         /// The next element's content, which must carry `tag`.
-        byte[] read(int tag) throws IOException {
+        public byte[] read(int tag) throws IOException {
             int[] h = header(tag);
             pos = h[2];
             return copy(h[1], h[2]);
         }
 
         /// The next element whole, header included, which must carry `tag`.
-        byte[] raw(int tag) throws IOException {
+        public byte[] raw(int tag) throws IOException {
             int[] h = header(tag);
             pos = h[2];
             return copy(h[0], h[2]);
         }
 
         /// A reader over the content of the next element, which must carry `tag`.
-        Reader open(int tag) throws IOException {
+        public Reader open(int tag) throws IOException {
             int[] h = header(tag);
             pos = h[2];
             return new Reader(data, h[1], h[2]);
         }
 
         /// Like [#open], or null and nothing read when the next tag is another.
-        Reader openOptional(int tag) throws IOException {
+        public Reader openOptional(int tag) throws IOException {
             return peek() == tag ? open(tag) : null;
         }
 
         /// Skips the next element, whatever it is.
-        void skip() throws IOException {
+        public void skip() throws IOException {
             pos = header(peek())[2];
         }
 
         /// The next element whole, whatever its tag.
-        byte[] rawAny() throws IOException {
+        public byte[] rawAny() throws IOException {
             return raw(peek());
         }
 
-        String oid() throws IOException {
+        public String oid() throws IOException {
             return oidString(read(OID));
         }
 
         /// An INTEGER as its unsigned magnitude, leading zeros removed.
-        byte[] unsignedInteger() throws IOException {
+        public byte[] unsignedInteger() throws IOException {
             byte[] value = read(INTEGER);
             if (value.length == 0) {
                 throw new IOException("An empty DER INTEGER");
@@ -200,7 +210,7 @@ final class Asn1 {
         }
 
         /// A small non-negative INTEGER.
-        int smallInteger() throws IOException {
+        public int smallInteger() throws IOException {
             byte[] value = read(INTEGER);
             if (value.length == 0 || value.length > 4 || (value[0] & 0x80) != 0) {
                 throw new IOException("Expected a small non-negative DER INTEGER");
@@ -212,7 +222,7 @@ final class Asn1 {
             return out;
         }
 
-        boolean bool() throws IOException {
+        public boolean bool() throws IOException {
             byte[] value = read(BOOLEAN);
             if (value.length != 1) {
                 throw new IOException("A DER BOOLEAN is one byte");
@@ -221,7 +231,7 @@ final class Asn1 {
         }
 
         /// A BIT STRING's bytes; it must have no unused bits.
-        byte[] bits() throws IOException {
+        public byte[] bits() throws IOException {
             byte[] value = read(BIT_STRING);
             if (value.length == 0 || value[0] != 0) {
                 throw new IOException("Expected a BIT STRING of whole bytes");
@@ -232,7 +242,7 @@ final class Asn1 {
         }
 
         /// A time, UTCTime or GeneralizedTime, as milliseconds since the epoch.
-        long time() throws IOException {
+        public long time() throws IOException {
             int tag = peek();
             if (tag != UTC_TIME && tag != GENERALIZED_TIME) {
                 throw new IOException("Expected a UTCTime or a GeneralizedTime");
@@ -241,7 +251,7 @@ final class Asn1 {
         }
 
         /// Any of the string types a certificate name uses, decoded.
-        String string() throws IOException {
+        public String string() throws IOException {
             int tag = peek();
             byte[] value = read(tag);
             switch (tag) {
@@ -269,7 +279,7 @@ final class Asn1 {
 
     // ---------------------------------------------------------------- writing
 
-    static byte[] tlv(int tag, byte[]... parts) {
+    public static byte[] tlv(int tag, byte[]... parts) {
         int length = 0;
         for (byte[] part : parts) {
             length += part.length;
@@ -294,25 +304,25 @@ final class Asn1 {
         return out;
     }
 
-    static byte[] sequence(byte[]... parts) {
+    public static byte[] sequence(byte[]... parts) {
         return tlv(SEQUENCE, parts);
     }
 
-    static byte[] set(byte[]... parts) {
+    public static byte[] set(byte[]... parts) {
         return tlv(SET, parts);
     }
 
-    static byte[] octets(byte[] value) {
+    public static byte[] octets(byte[] value) {
         return tlv(OCTET_STRING, value);
     }
 
-    static byte[] bitString(byte[] value) {
+    public static byte[] bitString(byte[] value) {
         byte[] content = new byte[value.length + 1];
         System.arraycopy(value, 0, content, 1, value.length);
         return tlv(BIT_STRING, content);
     }
 
-    static byte[] nullValue() {
+    public static byte[] nullValue() {
         // Through tlv() like every other encoder, never as a literal or a
         // new byte[2] filled with constants: CodeQL takes such an array for a
         // constant IV, follows its two bytes through an encoded PFX into the
@@ -323,7 +333,7 @@ final class Asn1 {
     }
 
     /// A non-negative INTEGER.
-    static byte[] integer(long value) {
+    public static byte[] integer(long value) {
         if (value < 0) {
             throw new IllegalArgumentException("negative");
         }
@@ -339,7 +349,7 @@ final class Asn1 {
     }
 
     /// An INTEGER from an unsigned magnitude.
-    static byte[] unsignedInteger(byte[] magnitude) {
+    public static byte[] unsignedInteger(byte[] magnitude) {
         int skip = 0;
         while (skip < magnitude.length - 1 && magnitude[skip] == 0) {
             skip++;
@@ -350,19 +360,19 @@ final class Asn1 {
         return tlv(INTEGER, content);
     }
 
-    static byte[] oid(String dotted) {
+    public static byte[] oid(String dotted) {
         return tlv(OID, oidBytes(dotted));
     }
 
-    static byte[] utf8String(String value) {
+    public static byte[] utf8String(String value) {
         return tlv(UTF8_STRING, utf8Bytes(value));
     }
 
-    static byte[] ia5String(String value) {
+    public static byte[] ia5String(String value) {
         return tlv(IA5_STRING, asciiBytes(value));
     }
 
-    static byte[] printableString(String value) {
+    public static byte[] printableString(String value) {
         return tlv(PRINTABLE_STRING, asciiBytes(value));
     }
 
@@ -386,7 +396,7 @@ final class Asn1 {
 
     // --------------------------------------------------------------- encoding
 
-    static String oidString(byte[] value) throws IOException {
+    public static String oidString(byte[] value) throws IOException {
         if (value.length == 0) {
             throw new IOException("An empty OBJECT IDENTIFIER");
         }

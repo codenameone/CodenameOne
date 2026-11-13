@@ -196,7 +196,7 @@ public class SignInScreen extends StatefulWidget {
         @Override
         public Widget build(BuildContext context) {
             final SignInScreen w = widget();
-            DartList<Widget> children = new DartList<Widget>();
+            DartList<Widget> children = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             if (w.headerBuilder != null) {
                 Widget h = w.headerBuilder.call(context,
                         com.codename1.flutter.rendering.BoxConstraints.loose(Double.POSITIVE_INFINITY, 200),

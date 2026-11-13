@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Whole-program model: every parsed user library plus lookup tables.
@@ -165,12 +166,113 @@ public final class Program {
             libraries.add(part);
             register(part, part);
         }
+        lowerExtensionStatics();
+        separateLibraryPrivateMembers();
+        separateLibraryPrivateTypedefs();
+        restoreShadowedAliases();
+        markShadowedCoreTypes();
+        eraseExtensionTypes();
+        expandRecordTypedefs();
+        separateAmbiguousTypedefNames();
+        // `extends Iterable<E>` is `extends IterableBase<E>`: dart:core's Iterable is an
+        // abstract base whose only abstract member is `iterator`, exactly IterableBase. The
+        // Java dart.core.DartIterable is a concrete wrapper over a java.lang.Iterable, not a
+        // base to extend (its iterator() is java.util's, it has no no-arg constructor), so
+        // the class takes the dart.collection.IterableMixin protocol IterableBase maps to.
+        for (Ast.Library lib : libraries) {
+            for (Ast.ClassDecl c : lib.classes) {
+                if (c.superclass != null && "Iterable".equals(c.superclass.name)
+                        && c.superclass.resolved == null
+                        && resolveClass("Iterable", c.ownerLibrary) == null) {
+                    c.superclass.name = "IterableBase";
+                }
+                // `implements Iterable<E>` likewise: the class supplies every member itself,
+                // and the IterableMixin interface is what a Java class can implement. A class
+                // that already takes that interface (`with IterableMixin`, `extends
+                // IterableBase`) would then repeat it, so the clause is dropped there.
+                boolean applied = c.superclass != null && ("IterableBase".equals(c.superclass.name)
+                        || "IterableMixin".equals(c.superclass.name));
+                for (Ast.TypeRef m : c.mixins) {
+                    applied |= "IterableMixin".equals(m.name) || "IterableBase".equals(m.name);
+                }
+                for (java.util.Iterator<Ast.TypeRef> it = c.interfaces.iterator(); it.hasNext();) {
+                    Ast.TypeRef i = it.next();
+                    if ("Iterable".equals(i.name) && i.resolved == null
+                            && resolveClass("Iterable", c.ownerLibrary) == null) {
+                        if (applied) {
+                            it.remove();
+                        } else {
+                            i.name = "IterableBase";
+                            applied = true;
+                        }
+                    }
+                }
+                addSetProtocol(c);
+            }
+        }
         Set<Ast.ClassDecl> done = new HashSet<Ast.ClassDecl>();
         for (Ast.Library lib : libraries) {
             for (Ast.ClassDecl c : lib.classes) {
                 forwardSuperCtors(c, done);
             }
         }
+        // Dart 2 let any class with no superclass, no mixins and no constructors be mixed
+        // in (`class C with ListMixin<E>, DelegatingView<E>` where DelegatingView is an
+        // `abstract class`). Such a class is used as a mixin, so it is emitted as one; it
+        // must also be abstract, so nothing constructs it.
+        for (Ast.Library lib : libraries) {
+            for (Ast.ClassDecl c : lib.classes) {
+                for (Ast.TypeRef m : c.mixins) {
+                    Ast.ClassDecl mx = resolveClass(m.name, c.ownerLibrary);
+                    if (mx != null && !mx.isMixin && mx.isAbstract && mx.superclass == null
+                            && mx.mixins.isEmpty() && mx.ctors.isEmpty() && mx.extensionOn == null
+                            && mx != c && (c.superclass != null || m != c.mixins.get(0))) {
+                        // (In first place with no superclass the emitter already extends it.)
+                        mx.isMixin = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * `class Wrapper<E> extends Base<E> implements Set<E>` (or a mixin declared
+     * `implements Set<E>`): dart:core's Set is a runtime class here, which a Java class that
+     * already extends something cannot extend, so the class was neither a DartSet nor a
+     * SetMixin and could be handed to no Set-typed slot. SetBase is added beside Set -- Set
+     * stays, so the analyzer still reads the class as a Set -- and the emitter implements
+     * its runtime interface, dart.collection.SetMixin, and bridges it through SetMixinView.
+     * A class with no superclass and no mixin keeps extending the runtime class instead.
+     */
+    private void addSetProtocol(Ast.ClassDecl c) {
+        if (c.superclass == null && c.mixins.isEmpty() && !c.isMixin) {
+            return;
+        }
+        Ast.TypeRef set = null;
+        for (Ast.TypeRef i : c.interfaces) {
+            if ("SetBase".equals(i.name) || "SetMixin".equals(i.name)) {
+                return;
+            }
+            if ("Set".equals(i.name) && i.resolved == null && i.args.size() == 1
+                    && resolveClass("Set", c.ownerLibrary) == null) {
+                set = i;
+            }
+        }
+        if (set == null || set.arg(0).is("int") || set.arg(0).is("double")) {
+            return;
+        }
+        for (Ast.TypeRef m : c.mixins) {
+            if ("SetBase".equals(m.name) || "SetMixin".equals(m.name)) {
+                return;
+            }
+        }
+        if (c.superclass != null && ("SetBase".equals(c.superclass.name)
+                || "SetMixin".equals(c.superclass.name))) {
+            return;
+        }
+        Ast.TypeRef base = new Ast.TypeRef("SetBase");
+        base.args.add(set.arg(0));
+        c.interfaces.add(base);
     }
 
     /**
@@ -227,12 +329,505 @@ public final class Program {
         return part.partOfName != null && part.partOfName.equals(owner.libraryName);
     }
 
+    /**
+     * The parser reads an unprefixed {@code Queue} (or another dart:collection name) as the
+     * built-in collection it aliases. A program class of that name declared in the library,
+     * or imported into it without a prefix, is what Dart resolves the name to instead, so
+     * {@code o is Queue} must test that class, never any List.
+     */
+    private void restoreShadowedAliases() {
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.aliasedTypes) {
+                if (t.aliasedFrom != null && !t.runtimeOnly && visibleUnprefixed(t.aliasedFrom, lib)) {
+                    t.name = t.aliasedFrom;
+                }
+            }
+        }
+    }
+
+    /**
+     * A type written with a dart:core name ({@code String}, {@code int}, {@code List}, ...)
+     * that a program class of that name declared in, or imported unprefixed into, the
+     * library takes instead (dart:core hidden or prefixed, or the class declared locally).
+     * It is marked {@code shadowsCore}, so {@code TypeRef.is("String")} -- which the
+     * emitter asks everywhere to mean dart:core's String -- answers false for it.
+     */
+    private void markShadowedCoreTypes() {
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.namedTypes) {
+                if (t.name != null && !t.runtimeOnly && Ast.TypeRef.CORE_NAMES.contains(t.name)
+                        && visibleUnprefixed(t.name, lib)) {
+                    // Only the flag: {@code resolved} reaches a whole class declaration, which
+                    // the reflective AST walks would then follow from every type reference.
+                    t.shadowsCore = true;
+                }
+            }
+        }
+    }
+
+    /**
+     * Every type that names a Dart 3 extension type is its representation type at run time:
+     * `List<Id>` is a `List<int>`, `x is Id` is `x is int`. Rewritten in place, through
+     * chains (`extension type Admin(Id id)` is an int) and with the type arguments of a
+     * generic one substituted (`Box<String>` over `List<T>` is `List<String>`). A class of the
+     * same name wins, as in {@link #expandRecordTypedefs}.
+     */
+    private void eraseExtensionTypes() {
+        boolean any = false;
+        for (Ast.ClassDecl c : extensions) {
+            any |= c.isExtensionType;
+        }
+        if (!any) {
+            return;
+        }
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.namedTypes) {
+                Ast.Library scope = lib;
+                Ast.ClassDecl et;
+                for (int depth = 0; depth < 16 && t.name != null
+                        && (et = extensionTypeIn(t.name, scope)) != null; depth++) {
+                    // the representation is written in the extension type's own library
+                    scope = et.ownerLibrary;
+                    if (t.extensionType == null) {
+                        t.extensionType = et;
+                        if (!et.typeParams.isEmpty()) {
+                            t.extensionTypeArgs = new ArrayList<Ast.TypeRef>(t.args);
+                        }
+                    }
+                    Ast.TypeRef rep = et.extensionOn;
+                    Map<String, Ast.TypeRef> subst = new java.util.HashMap<String, Ast.TypeRef>();
+                    for (int i = 0; i < et.typeParams.size(); i++) {
+                        subst.put(et.typeParams.get(i), i < t.args.size() ? t.args.get(i) : Ast.TypeRef.DYNAMIC);
+                    }
+                    if (rep.args.isEmpty() && subst.containsKey(rep.name)) {
+                        // `extension type Wrap<T>(T value)`: the representation is the argument.
+                        Ast.TypeRef r = subst.get(rep.name);
+                        t.name = r.name;
+                        t.args = r.args;
+                        t.funcParams = r.funcParams;
+                        t.nullable = t.nullable || r.nullable;
+                        continue;
+                    }
+                    List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
+                    for (Ast.TypeRef a : rep.args) {
+                        Ast.TypeRef sa = substRecordArg(a, subst);
+                        // `List<s.Shape>`: an argument written in the extension type's
+                        // library is resolved there, never by the reader's imports
+                        args.add(sa == a ? pinnedCopy(a, et.ownerLibrary, lib) : sa);
+                    }
+                    t.name = rep.name;
+                    t.args = args;
+                    if (rep.resolved != null || rep.runtimeOnly) {
+                        // the representation was already erased (and pinned) in its own
+                        // library: `extension type Wrap(Area a)` over `Area(s.Shape s)`
+                        t.resolved = rep.resolved;
+                        t.runtimeOnly = rep.runtimeOnly;
+                    }
+                    // `extension type Fn(int Function(int) f)`: the function shape is the
+                    // type, so a closure passed where an Fn is expected gets its context
+                    t.funcParams = rep.funcParams;
+                    t.funcReturn = rep.funcReturn;
+                    t.funcRequired = rep.funcRequired;
+                    t.funcNamed = rep.funcNamed;
+                    t.funcNamedRequired = rep.funcNamedRequired;
+                    t.funcTypeParams = rep.funcTypeParams;
+                    t.nullable = t.nullable || rep.nullable;
+                }
+                pinPrefixedRepresentation(t, scope, lib);
+            }
+        }
+    }
+
+    /**
+     * An erasure that ended on a name written with an import prefix (`s.Shape`) in another
+     * library than {@code lib}: the prefix is that library's, so the class is resolved there
+     * and pinned, and the name loses the prefix {@code lib} may not have (or may bind to
+     * another library).
+     */
+    private void pinPrefixedRepresentation(Ast.TypeRef t, Ast.Library scope, Ast.Library lib) {
+        int dot = t.name == null ? -1 : t.name.indexOf('.');
+        if (scope == lib || t.resolved != null || t.name == null) {
+            return;
+        }
+        if (dot < 0) {
+            // a bare name of the representation's library (`Shape` imported there without a
+            // prefix) may not be visible, or may be another class, where it is read
+            if (scope != null && classesByName.containsKey(t.name)) {
+                Ast.ClassDecl c = resolveClass(t.name, scope);
+                if (c != null && c.ownerLibrary != null) {
+                    t.resolved = c;
+                }
+            }
+            return;
+        }
+        if (dot == 0) {
+            return;
+        }
+        String prefix = t.name.substring(0, dot);
+        String bare = t.name.substring(dot + 1);
+        if (scope == null || !scope.prefixImports.containsKey(prefix) || bare.indexOf('.') >= 0) {
+            return;
+        }
+        Ast.ClassDecl c = resolveClass(bare, scope, prefix);
+        if (c != null) {
+            t.name = bare;
+            t.resolved = c;
+        }
+    }
+
+    /**
+     * A copy of {@code a}, written in {@code scope}, with every program class it names
+     * (its type arguments included) pinned in {@code scope}: the copy is read in {@code lib}.
+     */
+    private Ast.TypeRef pinnedCopy(Ast.TypeRef a, Ast.Library scope, Ast.Library lib) {
+        if (a == null || scope == lib || a.funcParams != null) {
+            return a;
+        }
+        Ast.TypeRef c = new Ast.TypeRef(a.name);
+        c.nullable = a.nullable;
+        c.resolved = a.resolved;
+        c.runtimeOnly = a.runtimeOnly;
+        c.extensionType = a.extensionType;
+        c.extensionTypeArgs = a.extensionTypeArgs;
+        c.aliasedFrom = a.aliasedFrom;
+        for (Ast.TypeRef x : a.args) {
+            c.args.add(pinnedCopy(x, scope, lib));
+        }
+        pinPrefixedRepresentation(c, scope, lib);
+        return c;
+    }
+
+    /**
+     * The extension type {@code written} (`Id` or `p.Id`) names in {@code lib}, or null when
+     * it names none or a class of that name is what the library sees. Decided per library:
+     * `a.Id` is a's extension type even when b.dart declares a class Id.
+     */
+    public Ast.ClassDecl extensionTypeIn(String written, Ast.Library lib) {
+        int dot = written.indexOf('.');
+        String prefix = dot > 0 ? written.substring(0, dot) : null;
+        String name = dot > 0 ? written.substring(dot + 1) : written;
+        if (name.indexOf('.') >= 0) {
+            return null;
+        }
+        List<Ast.ClassDecl> candidates = new ArrayList<Ast.ClassDecl>();
+        for (Ast.ClassDecl c : extensions) {
+            if (c.isExtensionType && c.name.equals(name)) {
+                candidates.add(c);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        List<Ast.ClassDecl> classesNamed = classesByName.get(name);
+        if (prefix != null) {
+            String uri = lib == null ? null : lib.prefixImports.get(prefix);
+            if (uri == null) {
+                return null;
+            }
+            Ast.Library target = resolveImportedLibrary(lib, uri);
+            if (classesNamed != null) {
+                for (Ast.ClassDecl c : classesNamed) {
+                    if (provides(target, name, c.ownerLibrary)) {
+                        return null;
+                    }
+                }
+            }
+            for (Ast.ClassDecl c : candidates) {
+                if (provides(target, name, c.ownerLibrary)) {
+                    return c;
+                }
+            }
+            return null;
+        }
+        for (Ast.ClassDecl c : candidates) {
+            if (c.ownerLibrary == lib) {
+                return c;
+            }
+        }
+        if (classesNamed != null && (lib == null || visibleUnprefixed(name, lib))) {
+            return null;
+        }
+        if (lib != null) {
+            for (Ast.Directive d : lib.importDirectives) {
+                Ast.Library target = d.admits(name) && d.prefix == null
+                        ? resolveImportedLibrary(lib, d.uri) : null;
+                for (Ast.ClassDecl c : candidates) {
+                    if (target != null && provides(target, name, c.ownerLibrary)) {
+                        return c;
+                    }
+                }
+            }
+        }
+        // Not visible by the imports (an import graph the program does not model, such as
+        // a part or an orphan library): the only extension type of the name, when no class
+        // of that name exists anywhere, as before.
+        return classesNamed == null && candidates.size() == 1 ? candidates.get(0) : null;
+    }
+
+    /**
+     * A record typedef (`typedef Pair = ({Op f, (int, Op) g})`) is replaced, wherever it is
+     * named, by the record shape it aliases, so {@code p.f(1)} resolves the record's
+     * fields like a record type written out would. A class of that name wins, as it
+     * would in Dart's scope.
+     */
+    private void expandRecordTypedefs() {
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.namedTypes) {
+                // through chains (`typedef Id = Key; typedef Key = String`); each level is
+                // written in the library that declares the alias, and resolved there
+                Ast.Library scope = lib;
+                for (int depth = 0; depth < 8 && scope != null; depth++) {
+                    Ast.TypedefDecl td = typedefIn(t.name, scope);
+                    if (td == null || !expandAliasTypedef(t, td)) {
+                        break;
+                    }
+                    scope = typedefOwner(td);
+                }
+            }
+        }
+    }
+
+    /**
+     * Rewrites {@code t} to what the typedef it names aliases: a record shape, or a plain
+     * class type (`typedef Key = String`, `typedef Row = List<int>`) -- the program's own
+     * typedef, which shadows a Flutter or runtime type of that name exactly as a class would,
+     * so `Key k; k.toUpperCase()` is a String's member. A function type is left to the
+     * emitter's typedef signatures. False when {@code t} names no such typedef.
+     */
+    private boolean expandAliasTypedef(Ast.TypeRef t, Ast.TypedefDecl td) {
+        if (td == null || td.aliased == null || td.aliased.name == null || td.aliased == Ast.TypeRef.DYNAMIC
+                || td.aliased.funcParams != null || td.aliased.funcReturn != null
+                || "Function".equals(td.aliased.name) || td.aliased.name.equals(t.name)
+                || t.funcParams != null) {
+            return false;
+        }
+        if (td.typeParams.size() != t.args.size() && !(t.args.isEmpty())) {
+            return false;
+        }
+        Map<String, Ast.TypeRef> subst = new java.util.HashMap<String, Ast.TypeRef>();
+        for (int i = 0; i < td.typeParams.size(); i++) {
+            subst.put(td.typeParams.get(i), i < t.args.size() ? t.args.get(i) : Ast.TypeRef.DYNAMIC);
+        }
+        boolean record = td.aliased.name.startsWith("Rec$");
+        if (!record && td.aliased.args.isEmpty() && subst.containsKey(td.aliased.name)) {
+            // `typedef Same<T> = T`
+            Ast.TypeRef r = subst.get(td.aliased.name);
+            t.name = r.name;
+            t.args = r.args;
+            t.funcParams = r.funcParams;
+            t.funcReturn = r.funcReturn;
+            t.nullable = t.nullable || r.nullable;
+            return true;
+        }
+        List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
+        Ast.Library owner = null;
+        for (Ast.TypeRef a : td.aliased.args) {
+            Ast.TypeRef b = substRecordArg(a, subst);
+            if (b != a && !b.args.isEmpty()) {
+                // a substituted copy is in no library's named types: expand it here, in the
+                // alias's own library, as the original would have been
+                if (owner == null) {
+                    owner = typedefOwner(td);
+                }
+                expandCopy(b, owner);
+            }
+            args.add(b);
+        }
+        t.name = td.aliased.name;
+        t.args = args;
+        if (!record) {
+            t.nullable = t.nullable || td.aliased.nullable;
+            t.resolved = td.aliased.resolved;
+            t.runtimeOnly = td.aliased.runtimeOnly;
+            t.shadowsCore = td.aliased.shadowsCore;
+            if (t.extensionType == null) {
+                t.extensionType = td.aliased.extensionType;
+                t.extensionTypeArgs = td.aliased.extensionTypeArgs;
+            }
+        }
+        return true;
+    }
+
+    private void expandCopy(Ast.TypeRef t, Ast.Library scope) {
+        for (int depth = 0; depth < 8 && scope != null; depth++) {
+            Ast.TypedefDecl td = typedefIn(t.name, scope);
+            if (td == null || !expandAliasTypedef(t, td)) {
+                break;
+            }
+            scope = typedefOwner(td);
+        }
+        for (Ast.TypeRef a : t.args) {
+            if (a != null && a.name != null && a.funcParams == null) {
+                expandCopy(a, scope);
+            }
+        }
+    }
+
+    /** The library whose declarations include {@code td} (parts are merged into their owner). */
+    private Ast.Library typedefOwner(Ast.TypedefDecl td) {
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypedefDecl x : lib.typedefs) {
+                if (x == td) {
+                    return lib;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The typedef {@code written} (`Id` or `p.Id`) names in {@code lib}'s own scope, or null
+     * when it names none there -- a class, enum or extension type of that name, a dart:core
+     * type (`Duration` while another library aliases `Duration`), or a typedef of another
+     * library that {@code lib} does not import. Dart resolves a type name through the
+     * library's declarations, then its unprefixed imports; a prefixed name through the
+     * prefix's import alone.
+     */
+    public Ast.TypedefDecl typedefIn(String written, Ast.Library lib) {
+        if (written == null || lib == null) {
+            return null;
+        }
+        int dot = written.indexOf('.');
+        String name = dot > 0 ? written.substring(dot + 1) : written;
+        if (name.indexOf('.') >= 0 || dot == 0) {
+            return null;
+        }
+        if (dot > 0) {
+            String uri = lib.prefixImports.get(written.substring(0, dot));
+            Ast.Library target = uri == null ? null : resolveImportedLibrary(lib, uri);
+            return target == null ? null : providedTypedef(target, name);
+        }
+        for (Ast.ClassDecl c : lib.classes) {
+            if (name.equals(c.name)) {
+                return null;
+            }
+        }
+        for (Ast.TypedefDecl x : lib.typedefs) {
+            if (name.equals(x.name) || name.equals(x.declaredName)) {
+                return x;
+            }
+        }
+        if (declaresNonTypedef(lib, name)) {
+            return null;
+        }
+        List<Ast.ClassDecl> classesNamed = classesByName.get(name);
+        // An import the program does not model (a stub package such as Flutter) provides no
+        // program typedef, so a name it alone could supply resolves to no typedef: the stub
+        // class it names (Flutter's `Key`) is what the library sees, never the typedef of a
+        // library it does not import.
+        for (Ast.Directive d : lib.importDirectives) {
+            if (d.prefix != null || !d.admits(name)) {
+                continue;
+            }
+            Ast.Library target = resolveImportedLibrary(lib, d.uri);
+            if (target == null) {
+                continue;
+            }
+            if (classesNamed != null) {
+                for (Ast.ClassDecl c : classesNamed) {
+                    if (provides(target, name, c.ownerLibrary)) {
+                        return null;
+                    }
+                }
+            }
+            Ast.TypedefDecl x = providedTypedef(target, name);
+            if (x != null) {
+                return x;
+            }
+        }
+        return null;
+    }
+
+    private boolean declaresNonTypedef(Ast.Library lib, String name) {
+        for (Ast.EnumDecl e : lib.enums) {
+            if (name.equals(e.name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The typedef of {@code name} that {@code target} declares or re-exports. */
+    private Ast.TypedefDecl providedTypedef(Ast.Library target, String name) {
+        for (Ast.Library l : libraries) {
+            for (Ast.TypedefDecl x : l.typedefs) {
+                if ((name.equals(x.name) || name.equals(x.declaredName)) && provides(target, name, l)) {
+                    return x;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Ast.TypeRef substRecordArg(Ast.TypeRef a, Map<String, Ast.TypeRef> subst) {
+        if (a != null && a.name != null && a.args.isEmpty() && a.funcParams == null && subst.containsKey(a.name)) {
+            Ast.TypeRef r = subst.get(a.name);
+            if (a.nullable && !r.nullable) {
+                Ast.TypeRef c = new Ast.TypeRef(r.name);
+                c.args.addAll(r.args);
+                c.nullable = true;
+                return c;
+            }
+            return r;
+        }
+        if (a != null && a.name != null && !a.args.isEmpty() && a.funcParams == null && a.funcReturn == null) {
+            // `typedef Grid<T> = List<Row<T>>`: the inner type's own arguments are the outer
+            // alias's parameters too, so `Grid<int>` is `List<Row<int>>`
+            List<Ast.TypeRef> args = new ArrayList<Ast.TypeRef>();
+            boolean changed = false;
+            for (Ast.TypeRef x : a.args) {
+                Ast.TypeRef y = substRecordArg(x, subst);
+                changed |= y != x;
+                args.add(y);
+            }
+            if (changed) {
+                Ast.TypeRef c = new Ast.TypeRef(a.name);
+                c.args.addAll(args);
+                c.nullable = a.nullable;
+                c.resolved = a.resolved;
+                c.runtimeOnly = a.runtimeOnly;
+                c.shadowsCore = a.shadowsCore;
+                c.extensionType = a.extensionType;
+                c.extensionTypeArgs = a.extensionTypeArgs;
+                c.aliasedFrom = a.aliasedFrom;
+                return c;
+            }
+        }
+        return a;
+    }
+
+    private boolean visibleUnprefixed(String name, Ast.Library lib) {
+        List<Ast.ClassDecl> byName = classesByName.get(name);
+        if (byName == null) {
+            return false;
+        }
+        for (Ast.ClassDecl c : byName) {
+            if (c.ownerLibrary == lib) {
+                return true;
+            }
+        }
+        for (Ast.Directive d : lib.importDirectives) {
+            Ast.Library target = d.admits(name) && d.prefix == null
+                    ? resolveImportedLibrary(lib, d.uri) : null;
+            if (target != null) {
+                for (Ast.ClassDecl c : byName) {
+                    if (provides(target, name, c.ownerLibrary)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     private void mergePart(Ast.Library owner, Ast.Library part) {
         owner.classes.addAll(part.classes);
         owner.enums.addAll(part.enums);
         owner.functions.addAll(part.functions);
         owner.topLevelVars.addAll(part.topLevelVars);
         owner.typedefs.addAll(part.typedefs);
+        owner.aliasedTypes.addAll(part.aliasedTypes);
+        owner.namedTypes.addAll(part.namedTypes);
         register(owner, part);
     }
 
@@ -303,6 +898,24 @@ public final class Program {
      * missed a re-exported declaration, and resolution fell back to whichever same-named
      * declaration was registered last.
      */
+    /**
+     * The extension {@code prefix.name} names in {@code lib}: the one the prefix's import
+     * provides, or null when it provides none (or a class of that name).
+     */
+    public Ast.ClassDecl extensionThroughPrefix(String prefix, String name, Ast.Library lib) {
+        String uri = lib == null ? null : lib.prefixImports.get(prefix);
+        Ast.Library target = uri == null ? null : resolveImportedLibrary(lib, uri);
+        if (target == null) {
+            return null;
+        }
+        for (Ast.ClassDecl c : extensions) {
+            if (c.name.equals(name) && provides(target, name, c.ownerLibrary)) {
+                return c;
+            }
+        }
+        return null;
+    }
+
     public boolean provides(Ast.Library lib, String name, Ast.Library owner) {
         return provides(lib, name, owner, new HashSet<Ast.Library>());
     }
@@ -330,7 +943,13 @@ public final class Program {
      */
     public Ast.ClassDecl resolveClass(String name, Ast.Library fromLibrary, String prefix) {
         if (prefix != null && fromLibrary != null) {
-            Ast.Library target = resolveImportedLibrary(fromLibrary, fromLibrary.prefixImports.get(prefix));
+            String uri = fromLibrary.prefixImports.get(prefix);
+            if (uri != null && uri.startsWith("dart:")) {
+                // `io.WebSocket`: a dart: library declares no program class, so the name is
+                // the runtime type even beside a program class of the same simple name.
+                return null;
+            }
+            Ast.Library target = resolveImportedLibrary(fromLibrary, uri);
             List<Ast.ClassDecl> byName = classesByName.get(name);
             if (target != null && byName != null) {
                 for (Ast.ClassDecl c : byName) {
@@ -362,7 +981,10 @@ public final class Program {
             for (Ast.Directive d : fromLibrary.importDirectives) {
                 // Honour show/hide: `import 'a.dart' hide Foo; import 'b.dart' show Foo;`
                 // is b's Foo even though a.dart comes first.
-                Ast.Library target = d.admits(name) ? resolveImportedLibrary(fromLibrary, d.uri) : null;
+                // A prefixed import provides only `prefix.Name`, never the bare name: a
+                // library wrapping `io.WebSocket` in its own WebSocket means its own.
+                Ast.Library target = d.admits(name) && d.prefix == null
+                        ? resolveImportedLibrary(fromLibrary, d.uri) : null;
                 if (target != null) {
                     for (Ast.ClassDecl c : byName) {
                         if (provides(target, name, c.ownerLibrary)) {
@@ -394,6 +1016,37 @@ public final class Program {
      */
     public Ast.Library resolveTopLevelVarOwner(String name, Ast.Library from, String prefix) {
         return resolveOwner(name, topLevelVarOwnersByName.get(name), topLevelVarOwners.get(name), from, prefix);
+    }
+
+    /**
+     * Whether a bare {@code name} in {@code from} can mean a top-level variable or function of
+     * the program: one declared in {@code from} itself or provided by an unprefixed import.
+     * The owner tables are whole-program, so without this a library that never imports
+     * {@code package:path} would see its {@code context} getter.
+     */
+    public boolean topLevelMemberVisibleUnprefixed(String name, Ast.Library from) {
+        List<Ast.Library> owners = new ArrayList<Ast.Library>();
+        if (topLevelVarOwnersByName.get(name) != null) {
+            owners.addAll(topLevelVarOwnersByName.get(name));
+        }
+        if (functionOwnersByName.get(name) != null) {
+            owners.addAll(functionOwnersByName.get(name));
+        }
+        if (from == null || owners.isEmpty() || owners.contains(from)) {
+            return true;
+        }
+        for (Ast.Directive d : from.importDirectives) {
+            if (d.prefix != null || !d.admits(name)) {
+                continue;
+            }
+            Ast.Library target = resolveImportedLibrary(from, d.uri);
+            for (Ast.Library o : owners) {
+                if (target != null && provides(target, name, o)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Same as {@link #resolveTopLevelVarOwner} for top-level functions / getters. */
@@ -541,6 +1194,11 @@ public final class Program {
         if (ext.ownerLibrary == from) {
             return true;
         }
+        if (!ext.unnamedExtension && ext.name != null && ext.name.startsWith("_")) {
+            // A private extension is visible only in its own library (parts included): no
+            // import or export reaches it.
+            return false;
+        }
         for (Ast.Directive d : from.importDirectives) {
             if (exportsExtension(resolveImportedLibrary(from, d.uri), d, ext, new HashSet<Ast.Library>())) {
                 return true;
@@ -604,4 +1262,947 @@ public final class Program {
         }
         return sb.append("Lib").toString();
     }
+    /**
+     * Dart library privacy: a member named {@code _x} declared in one library is a different
+     * member from an {@code _x} declared in another, even on a subclass, so neither overrides
+     * nor answers for the other. Java has no such scoping, so every library but the first to
+     * declare a colliding private member name has that name renamed throughout its own
+     * declarations ({@code _x$p1}); the name is private, so nothing outside the library can
+     * spell it. Type, top-level and constructor names are left alone, as are stub libraries,
+     * whose members map onto Java names.
+     *
+     * <p>A library that also declares the name at top level (or as a type) has only its
+     * MEMBER references renamed, by resolution rather than spelling
+     * ({@link #renamePrivateMembers}): member declarations, {@code o._x}, {@code #_x}, field
+     * initializers and a bare {@code _x} that Dart resolves to a member of the enclosing
+     * class. Its top-level {@code _x} keeps its name; top-level declarations are told apart
+     * by library already.
+     */
+    /// For each library (by file name) whose private names were renamed: renamed name to the
+    /// name as written. The generated classes of that library register it with the runtime
+    /// ({@code Symbol.spell}), so an Invocation's memberName prints the Dart spelling; a
+    /// `#_x` literal carries its own.
+    public final Map<String, Map<String, String>> privateSpellings = new java.util.HashMap<String, Map<String, String>>();
+
+    /// {@code candidate}, or it with {@code $} appended until no library spells it: a user
+    /// identifier may itself be written {@code _x$p2}.
+    private static String freshPrivateName(String candidate, Set<String> spelled) {
+        String n = candidate;
+        while (spelled.contains(n)) {
+            n = n + "$";
+        }
+        return n;
+    }
+
+    private void separateLibraryPrivateMembers() {
+        Map<String, List<Ast.Library>> declaring = new LinkedHashMap<String, List<Ast.Library>>();
+        // Top-level names are excluded per library: renaming a member whose name a top-level
+        // declaration of the SAME library also has would rename that declaration's references
+        // too. Another library declaring only the member is still separated.
+        Map<Ast.Library, Set<String>> excludedBy = new java.util.IdentityHashMap<Ast.Library, Set<String>>();
+        Map<Ast.Library, Set<String>> enumEntriesBy = new java.util.IdentityHashMap<Ast.Library, Set<String>>();
+        for (Ast.Library lib : libraries) {
+            Set<String> excluded = new HashSet<String>();
+            excludedBy.put(lib, excluded);
+            for (Ast.ClassDecl c : lib.classes) {
+                excluded.add(c.name);
+            }
+            Set<String> entries = new HashSet<String>();
+            enumEntriesBy.put(lib, entries);
+            for (Ast.EnumDecl e : lib.enums) {
+                excluded.add(e.name);
+                // Enum values keep their names (renamePrivate does not reach them); they are
+                // reached through their enum, so another library's `_x` cannot meet them.
+                excluded.addAll(e.entries);
+                entries.addAll(e.entries);
+            }
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                excluded.add(t.name);
+            }
+            for (Ast.FunctionDecl f : lib.functions) {
+                excluded.add(f.name);
+            }
+            for (Ast.FieldDecl f : lib.topLevelVars) {
+                excluded.add(f.name);
+            }
+        }
+        for (Ast.Library lib : libraries) {
+            Set<String> own = new HashSet<String>();
+            boolean stub = false;
+            for (Ast.ClassDecl c : lib.classes) {
+                stub |= c.javaName != null;
+                for (Ast.FieldDecl f : c.fields) {
+                    own.add(f.name);
+                }
+                for (Ast.MethodDecl m : c.methods) {
+                    own.add(m.name);
+                }
+            }
+            for (Ast.EnumDecl e : lib.enums) {
+                stub |= e.javaName != null;
+                for (Ast.FieldDecl f : e.fields) {
+                    own.add(f.name);
+                }
+                for (Ast.MethodDecl m : e.methods) {
+                    own.add(m.name);
+                }
+            }
+            if (stub) {
+                continue;
+            }
+            // Every private name the library spells as a member, a local or a `#_x` literal
+            // takes part too, though it declares no member of that name: a dynamic `d._x` or
+            // a `#_x` from this library must not reach (or equal) another library's `_x`, and
+            // renaming the library's own spelling is what keeps it apart.
+            collectPrivateNames(lib, own, java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()));
+            for (String n : own) {
+                if (n != null && n.startsWith("_") && n.length() > 1) {
+                    List<Ast.Library> l = declaring.get(n);
+                    if (l == null) {
+                        l = new ArrayList<Ast.Library>();
+                        declaring.put(n, l);
+                    }
+                    l.add(lib);
+                }
+            }
+        }
+        Map<Ast.Library, Map<String, String>> renames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
+        Map<Ast.Library, Map<String, String>> memberRenames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
+        for (Map.Entry<String, List<Ast.Library>> en : declaring.entrySet()) {
+            List<Ast.Library> l = en.getValue();
+            if (l.size() < 2) {
+                continue;
+            }
+            // A library that cannot rename the name at all (an enum value) keeps it; failing
+            // that the first library does. Every other one is renamed: wholly when it has no
+            // top-level of that name, otherwise its member references only.
+            Ast.Library keeper = l.get(0);
+            for (Ast.Library lib : l) {
+                if (enumEntriesBy.get(lib).contains(en.getKey())) {
+                    keeper = lib;
+                    break;
+                }
+            }
+            for (int i = 0; i < l.size(); i++) {
+                Ast.Library lib = l.get(i);
+                if (lib == keeper || enumEntriesBy.get(lib).contains(en.getKey())) {
+                    continue;
+                }
+                if (excludedBy.get(lib).contains(en.getKey())) {
+                    Map<String, String> m = memberRenames.get(lib);
+                    if (m == null) {
+                        m = new java.util.HashMap<String, String>();
+                        memberRenames.put(lib, m);
+                    }
+                    m.put(en.getKey(), freshPrivateName(en.getKey() + "$p" + libraries.indexOf(lib), declaring.keySet()));
+                    continue;
+                }
+                Map<String, String> m = renames.get(l.get(i));
+                if (m == null) {
+                    m = new java.util.HashMap<String, String>();
+                    renames.put(l.get(i), m);
+                }
+                m.put(en.getKey(), freshPrivateName(en.getKey() + "$p" + libraries.indexOf(l.get(i)), declaring.keySet()));
+            }
+        }
+        for (Map<Ast.Library, Map<String, String>> all : java.util.Arrays.asList(memberRenames, renames)) {
+            for (Map.Entry<Ast.Library, Map<String, String>> en : all.entrySet()) {
+                Map<String, String> sp = privateSpellings.get(en.getKey().fileName);
+                if (sp == null) {
+                    sp = new TreeMap<String, String>();
+                    privateSpellings.put(en.getKey().fileName, sp);
+                }
+                for (Map.Entry<String, String> r : en.getValue().entrySet()) {
+                    sp.put(r.getValue(), r.getKey());
+                }
+            }
+        }
+        for (Map.Entry<Ast.Library, Map<String, String>> en : memberRenames.entrySet()) {
+            renamePrivateMembers(en.getKey(), en.getValue());
+        }
+        for (Map.Entry<Ast.Library, Map<String, String>> en : renames.entrySet()) {
+            renamePrivate(en.getKey(), en.getValue(), java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+    }
+
+    /**
+     * Renames the member references to {@code names} in {@code lib}, leaving its top-level
+     * declarations of those names and their references alone. A bare identifier is resolved
+     * as Dart resolves it lexically: a local of that name wins, then a member the enclosing
+     * class (or extension) itself declares, then the top-level; an inherited member is never
+     * in lexical scope, so with a top-level of the name present it is reached only through
+     * {@code this}. Locals are scoped lexically, as Dart scopes them: a local shadows the
+     * member only inside the block (loop, catch clause, closure, case) that declares it and
+     * from its declaration on, so the member is still the one reached before it, in sibling
+     * blocks and in closures declared earlier.
+     */
+    private static void renamePrivateMembers(Ast.Library lib, Map<String, String> names) {
+        Set<Object> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
+        for (Ast.ClassDecl c : lib.classes) {
+            Set<String> declared = new HashSet<String>();
+            for (Ast.FieldDecl f : c.fields) {
+                declared.add(f.name);
+            }
+            for (Ast.MethodDecl m : c.methods) {
+                declared.add(m.name);
+            }
+            renameMembersIn(c, names, declared, new LocalScopes(), seen);
+        }
+        for (Ast.EnumDecl e : lib.enums) {
+            Set<String> declared = new HashSet<String>();
+            for (Ast.FieldDecl f : e.fields) {
+                declared.add(f.name);
+            }
+            for (Ast.MethodDecl m : e.methods) {
+                declared.add(m.name);
+            }
+            renameMembersIn(e, names, declared, new LocalScopes(), seen);
+        }
+        // Everything else (top-level functions and variables, typedefs) has no enclosing
+        // class: a bare name there is never a member.
+        renameMembersIn(lib, names, java.util.Collections.<String>emptySet(), new LocalScopes(), seen);
+    }
+
+    /**
+     * Points every reference to an extension's static field at the top-level variable
+     * AstBuilder.hoistStaticFields made of it: `E.f` (and `E.f = v`, `E.f += v`, `E.f++`,
+     * which hold the same PropertyGet) becomes that variable, and so does a bare `f` that no
+     * local shadows inside E's members and its statics' initializers, where a bare call of a
+     * static method of E also gets E as its explicit target (the initializer now sits
+     * outside E). A local named E hides the extension, as in Dart.
+     */
+    private void lowerExtensionStatics() {
+        Map<String, Ast.ClassDecl> byName = new java.util.HashMap<String, Ast.ClassDecl>();
+        Map<Object, Ast.ClassDecl> owners = new java.util.IdentityHashMap<Object, Ast.ClassDecl>();
+        for (Ast.ClassDecl c : extensions) {
+            if (!c.hoistedStatics.isEmpty()) {
+                byName.put(c.name, c);
+                owners.put(c, c);
+                for (Ast.FieldDecl f : c.hoistedFields) {
+                    owners.put(f, c);
+                }
+            }
+        }
+        if (byName.isEmpty()) {
+            return;
+        }
+        Set<Object> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
+        for (Ast.Library lib : libraries) {
+            lowerStaticsIn(lib, null, extensionsSeenBy(lib, byName), owners, new LocalScopes(), seen);
+        }
+    }
+
+    /**
+     * The extensions with hoisted statics {@code lib} can name, keyed as it writes them:
+     * `E` for one it declares or imports unprefixed, `p.E` for one an `import .. as p`
+     * provides. Resolved per library, so two libraries' same-named extensions do not meet.
+     */
+    private Map<String, Ast.ClassDecl> extensionsSeenBy(Ast.Library lib, Map<String, Ast.ClassDecl> all) {
+        Map<String, Ast.ClassDecl> seen = new java.util.HashMap<String, Ast.ClassDecl>();
+        Map<String, Integer> counts = new java.util.HashMap<String, Integer>();
+        for (Ast.ClassDecl c : extensions) {
+            if (!c.hoistedStatics.isEmpty()) {
+                Integer n = counts.get(c.name);
+                counts.put(c.name, n == null ? 1 : n + 1);
+            }
+        }
+        for (Ast.ClassDecl c : extensions) {
+            if (c.hoistedStatics.isEmpty()) {
+                continue;
+            }
+            if (c.ownerLibrary == lib) {
+                seen.put(c.name, c);
+                continue;
+            }
+            for (Ast.Directive d : lib.importDirectives) {
+                if (!d.admits(c.name)) {
+                    continue;
+                }
+                Ast.Library target = resolveImportedLibrary(lib, d.uri);
+                if (target != null && provides(target, c.name, c.ownerLibrary)) {
+                    String key = d.prefix == null ? c.name : d.prefix + "." + c.name;
+                    if (d.prefix != null || !seen.containsKey(key)) {
+                        seen.put(key, c);
+                    }
+                }
+            }
+        }
+        for (Map.Entry<String, Ast.ClassDecl> e : all.entrySet()) {
+            // an import graph the program does not model (parts, orphans): a name only one
+            // extension has, as before
+            if (!seen.containsKey(e.getKey()) && counts.get(e.getKey()) == 1) {
+                seen.put(e.getKey(), e.getValue());
+            }
+        }
+        return seen;
+    }
+
+    private static final Map<Class<?>, List<java.lang.reflect.Field>> CHILD_FIELDS =
+            new java.util.HashMap<Class<?>, List<java.lang.reflect.Field>>();
+
+    /// The fields of a node class that hold child nodes; back-references (a ClassDecl,
+    /// a type) are not children.
+    private static synchronized List<java.lang.reflect.Field> childFields(Class<?> c) {
+        List<java.lang.reflect.Field> fs = CHILD_FIELDS.get(c);
+        if (fs == null) {
+            fs = new ArrayList<java.lang.reflect.Field>();
+            for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
+                for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                    Class<?> t = f.getType();
+                    if (!java.lang.reflect.Modifier.isStatic(f.getModifiers()) && !"inferFrom".equals(f.getName())
+                            && !Ast.ClassDecl.class.isAssignableFrom(t) && !Ast.TypeRef.class.isAssignableFrom(t)
+                            && !Ast.Library.class.isAssignableFrom(t)
+                            && (Ast.Node.class.isAssignableFrom(t) || List.class.isAssignableFrom(t)
+                            || t == Ast.Args.class || t == Ast.NamedArg.class)) {
+                        f.setAccessible(true);
+                        fs.add(f);
+                    }
+                }
+            }
+            CHILD_FIELDS.put(c, fs);
+        }
+        return fs;
+    }
+
+    /// {@code o} as it reads after the rewrite: an `E.f` is replaced, a bare `f` renamed.
+    private static Object lowerStaticRef(Object o, Ast.ClassDecl ext, Map<String, Ast.ClassDecl> byName,
+            LocalScopes locals) {
+        if (o instanceof Ast.PropertyGet && !((Ast.PropertyGet) o).nullAware
+                && ((Ast.PropertyGet) o).target instanceof Ast.Ident) {
+            Ast.PropertyGet pg = (Ast.PropertyGet) o;
+            Ast.Ident t = (Ast.Ident) pg.target;
+            Ast.ClassDecl e = byName.get(t.name);
+            if (e != null && t.typeArgs == null && e.hoistedStatics.containsKey(pg.name) && !locals.declares(t.name)) {
+                Ast.Ident id = new Ast.Ident();
+                id.file = pg.file;
+                id.line = pg.line;
+                id.col = pg.col;
+                id.name = e.hoistedStatics.get(pg.name);
+                return id;
+            }
+        }
+        if (o instanceof Ast.PropertyGet && !((Ast.PropertyGet) o).nullAware
+                && ((Ast.PropertyGet) o).target instanceof Ast.PropertyGet
+                && ((Ast.PropertyGet) ((Ast.PropertyGet) o).target).target instanceof Ast.Ident) {
+            // `p.E.f` through an import prefix
+            Ast.PropertyGet pg = (Ast.PropertyGet) o;
+            Ast.PropertyGet mid = (Ast.PropertyGet) pg.target;
+            Ast.Ident p = (Ast.Ident) mid.target;
+            Ast.ClassDecl e = byName.get(p.name + "." + mid.name);
+            if (e != null && !mid.nullAware && p.typeArgs == null && e.hoistedStatics.containsKey(pg.name)
+                    && !locals.declares(p.name)) {
+                Ast.Ident id = new Ast.Ident();
+                id.file = pg.file;
+                id.line = pg.line;
+                id.col = pg.col;
+                id.name = e.hoistedStatics.get(pg.name);
+                return id;
+            }
+        }
+        if (ext != null && o instanceof Ast.Ident) {
+            Ast.Ident id = (Ast.Ident) o;
+            if (ext.hoistedStatics.containsKey(id.name) && !locals.declares(id.name)) {
+                id.name = ext.hoistedStatics.get(id.name);
+            }
+        }
+        return o;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void lowerStaticsIn(Object o, Ast.ClassDecl ext, Map<String, Ast.ClassDecl> byName,
+            Map<Object, Ast.ClassDecl> owners, LocalScopes locals, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof List) {
+            List<Object> l = (List<Object>) o;
+            for (int i = 0; i < l.size(); i++) {
+                Object e = l.get(i);
+                Object r = lowerStaticRef(e, ext, byName, locals);
+                if (r != e) {
+                    l.set(i, r);
+                }
+                lowerStaticsIn(r, ext, byName, owners, locals, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        Ast.ClassDecl own = owners.get(o);
+        if (own != null) {
+            ext = own;
+        }
+        if (o instanceof Ast.FieldDecl && own != null && ((Ast.FieldDecl) o).initializer != null) {
+            // The initializer of a hoisted static now sits outside E: E's statics get E.
+            qualifyStaticCalls(((Ast.FieldDecl) o).initializer, own,
+                    java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+        if (o instanceof Ast.LocalFunc) {
+            locals.declare(((Ast.LocalFunc) o).name);
+        }
+        boolean scoped = opensScope(o) || o instanceof Ast.LocalFunc;
+        if (scoped) {
+            locals.push();
+        }
+        try {
+            if (o instanceof Ast.Param && !((Ast.Param) o).isThis && !((Ast.Param) o).isSuper) {
+                locals.declare(((Ast.Param) o).name);
+            } else if (o instanceof Ast.VariablePattern) {
+                locals.declare(((Ast.VariablePattern) o).name);
+            } else if (o instanceof Ast.ForInStmt) {
+                locals.declare(((Ast.ForInStmt) o).varName);
+            } else if (o instanceof Ast.CatchClause) {
+                locals.declare(((Ast.CatchClause) o).exceptionVar);
+                locals.declare(((Ast.CatchClause) o).stackVar);
+            }
+            for (java.lang.reflect.Field f : childFields(o.getClass())) {
+                Object v;
+                try {
+                    v = f.get(o);
+                    Object r = lowerStaticRef(v, ext, byName, locals);
+                    if (r != v) {
+                        f.set(o, r);
+                        v = r;
+                    }
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                } catch (IllegalArgumentException ex) {
+                    // An Ident does not fit a field typed narrower than Expr: left as written.
+                    continue;
+                }
+                lowerStaticsIn(v, ext, byName, owners, locals, seen);
+            }
+        } finally {
+            if (scoped) {
+                locals.pop();
+            }
+        }
+        if (o instanceof Ast.VarDeclStmt) {
+            locals.declare(((Ast.VarDeclStmt) o).name);
+        }
+    }
+
+    /// Gives every bare call of one of {@code ext}'s static methods under {@code o} the
+    /// explicit target `E`.
+    private static void qualifyStaticCalls(Object o, Ast.ClassDecl ext, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof List) {
+            for (Object e : (List<?>) o) {
+                qualifyStaticCalls(e, ext, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        if (o instanceof Ast.Call && ((Ast.Call) o).target == null && ((Ast.Call) o).name != null) {
+            Ast.Call c = (Ast.Call) o;
+            Ast.MethodDecl m = ext.method(c.name);
+            if (m != null && m.isStatic) {
+                Ast.Ident t = new Ast.Ident();
+                t.file = c.file;
+                t.line = c.line;
+                t.col = c.col;
+                t.name = ext.name;
+                c.target = t;
+            }
+        }
+        for (java.lang.reflect.Field f : childFields(o.getClass())) {
+            try {
+                qualifyStaticCalls(f.get(o), ext, seen);
+            } catch (IllegalAccessException ex) {
+                throw new IllegalStateException(ex);
+            }
+        }
+    }
+
+    /// The local scopes open at a point of the walk, innermost last.
+    private static final class LocalScopes {
+        private final java.util.ArrayList<Set<String>> stack = new java.util.ArrayList<Set<String>>();
+
+        void push() {
+            stack.add(new HashSet<String>());
+        }
+
+        void pop() {
+            stack.remove(stack.size() - 1);
+        }
+
+        void declare(String name) {
+            if (name != null && !stack.isEmpty()) {
+                stack.get(stack.size() - 1).add(name);
+            }
+        }
+
+        boolean declares(String name) {
+            for (Set<String> s : stack) {
+                if (s.contains(name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /// Whether {@code o} opens a scope of its own for the locals it (or its body) declares.
+    private static boolean opensScope(Object o) {
+        return o instanceof Ast.Block || o instanceof Ast.MethodDecl || o instanceof Ast.CtorDecl
+                || o instanceof Ast.FunctionDecl || o instanceof Ast.Lambda || o instanceof Ast.ForStmt
+                || o instanceof Ast.ForInStmt || o instanceof Ast.CatchClause || o instanceof Ast.SwitchCase
+                || o instanceof Ast.SwitchExprCase || o instanceof Ast.ForElement;
+    }
+
+    private static void renameMembersIn(Object o, Map<String, String> names, Set<String> inScope,
+            LocalScopes locals, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof Iterable) {
+            for (Object e : (Iterable<?>) o) {
+                renameMembersIn(e, names, inScope, locals, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        if (o instanceof Ast.IfStmt && ((Ast.IfStmt) o).casePattern != null) {
+            // An if-case's pattern variables are in scope in its guard and then branch only.
+            Ast.IfStmt is = (Ast.IfStmt) o;
+            renameMembersIn(is.condition, names, inScope, locals, seen);
+            locals.push();
+            renameMembersIn(is.casePattern, names, inScope, locals, seen);
+            renameMembersIn(is.caseGuard, names, inScope, locals, seen);
+            renameMembersIn(is.thenStmt, names, inScope, locals, seen);
+            locals.pop();
+            renameMembersIn(is.elseStmt, names, inScope, locals, seen);
+            return;
+        }
+        if (o instanceof Ast.LocalFunc) {
+            // Its name is in scope in the enclosing block (and so in its own body).
+            locals.declare(((Ast.LocalFunc) o).name);
+        }
+        boolean scoped = opensScope(o) || o instanceof Ast.LocalFunc;
+        if (scoped) {
+            locals.push();
+        }
+        try {
+            renameMembersInNode(o, names, inScope, locals, seen);
+        } finally {
+            if (scoped) {
+                locals.pop();
+            }
+        }
+        // A variable is in scope from its declaration on (Dart rejects a use before it in the
+        // same block, so its own initializer never meets it).
+        if (o instanceof Ast.VarDeclStmt) {
+            locals.declare(((Ast.VarDeclStmt) o).name);
+        }
+    }
+
+    private static void renameMembersInNode(Object o, Map<String, String> names, Set<String> inScope,
+            LocalScopes locals, Set<Object> seen) {
+        if (o instanceof Ast.Param && !((Ast.Param) o).isThis && !((Ast.Param) o).isSuper) {
+            locals.declare(((Ast.Param) o).name);
+        } else if (o instanceof Ast.VariablePattern) {
+            locals.declare(((Ast.VariablePattern) o).name);
+        } else if (o instanceof Ast.ForInStmt) {
+            locals.declare(((Ast.ForInStmt) o).varName);
+        } else if (o instanceof Ast.CatchClause) {
+            locals.declare(((Ast.CatchClause) o).exceptionVar);
+            locals.declare(((Ast.CatchClause) o).stackVar);
+        }
+        String sym = privateSymbol(o);
+        if (sym != null && names.containsKey(sym)) {
+            renameSymbol((Ast.Call) o, names.get(sym));
+        }
+        String rename = null;
+        if (o instanceof Ast.MethodDecl) {
+            rename = ((Ast.MethodDecl) o).name;
+        } else if (o instanceof Ast.FieldDecl) {
+            // Only class and enum fields are reached with a class in scope; a top-level
+            // variable is reached from the library walk, where inScope is empty.
+            rename = inScope.isEmpty() ? null : ((Ast.FieldDecl) o).name;
+        } else if (o instanceof Ast.PropertyGet) {
+            rename = ((Ast.PropertyGet) o).target != null || memberInScope(((Ast.PropertyGet) o).name, inScope, locals)
+                    ? ((Ast.PropertyGet) o).name : null;
+        } else if (o instanceof Ast.Call) {
+            Ast.Call c = (Ast.Call) o;
+            rename = c.target != null || memberInScope(c.name, inScope, locals) ? c.name : null;
+        } else if (o instanceof Ast.Ident) {
+            rename = memberInScope(((Ast.Ident) o).name, inScope, locals) ? ((Ast.Ident) o).name : null;
+        } else if (o instanceof Ast.FieldInit) {
+            rename = ((Ast.FieldInit) o).field;
+        } else if (o instanceof Ast.Param && (((Ast.Param) o).isThis || ((Ast.Param) o).isSuper)) {
+            rename = ((Ast.Param) o).name;
+        } else if (o instanceof Ast.PatternField) {
+            rename = ((Ast.PatternField) o).name;
+        }
+        if (rename != null && names.containsKey(rename)) {
+            String to = names.get(rename);
+            if (o instanceof Ast.MethodDecl) {
+                ((Ast.MethodDecl) o).name = to;
+            } else if (o instanceof Ast.FieldDecl) {
+                ((Ast.FieldDecl) o).name = to;
+            } else if (o instanceof Ast.PropertyGet) {
+                ((Ast.PropertyGet) o).name = to;
+            } else if (o instanceof Ast.Call) {
+                ((Ast.Call) o).name = to;
+            } else if (o instanceof Ast.Ident) {
+                ((Ast.Ident) o).name = to;
+            } else if (o instanceof Ast.FieldInit) {
+                ((Ast.FieldInit) o).field = to;
+            } else if (o instanceof Ast.Param) {
+                ((Ast.Param) o).name = to;
+            } else {
+                ((Ast.PatternField) o).name = to;
+            }
+        }
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                int mod = f.getModifiers();
+                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive() || f.getType() == String.class
+                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
+                        || f.getType() == Ast.EnumDecl.class || f.getType() == Ast.TypeRef.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    renameMembersIn(f.get(o), names, inScope, locals, seen);
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
+        }
+    }
+
+    private static boolean memberInScope(String name, Set<String> inScope, LocalScopes locals) {
+        return inScope.contains(name) && !locals.declares(name);
+    }
+
+    /// Renames a `#_x` literal to {@code to}, keeping the name as written for its spelling:
+    /// the literal becomes {@code Symbol("_x$p2", "_x")}, so it equals only this library's
+    /// `#_x` but prints as Dart prints it.
+    private static void renameSymbol(Ast.Call c, String to) {
+        Ast.StringLit lit = (Ast.StringLit) c.args.positional.get(0);
+        String was = (String) lit.parts.get(0);
+        lit.parts.set(0, to);
+        if (c.args.positional.size() == 1) {
+            Ast.StringLit spelled = new Ast.StringLit();
+            spelled.parts.add(was);
+            c.args.positional.add(spelled);
+        }
+    }
+
+    /**
+     * A private typedef ({@code typedef _Fn = ...}) or extension declared in two libraries
+     * names two different things, but the {@link #typedefs} table is keyed by name alone and
+     * an extension is emitted as a Java class of its own name, so the last one answered for
+     * both. Classes, enums and mixins keep their names and are
+     * told apart by library (see {@code JavaEmitter.javaClassName}); an alias leaves no
+     * runtime trace, so every library but the first to declare the name simply has it
+     * renamed ({@code _Fn$t2}) throughout its own declarations, as
+     * {@link #separateLibraryPrivateMembers} does for members.
+     */
+    private void separateLibraryPrivateTypedefs() {
+        // Extensions are reached as list elements; ClassDecl-typed fields are skipped below.
+        Map<String, Ast.Library> first = new java.util.HashMap<String, Ast.Library>();
+        Map<Ast.Library, Map<String, String>> renames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
+        for (Ast.Library lib : libraries) {
+            List<String> declared = new ArrayList<String>();
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                declared.add(t.name);
+            }
+            for (Ast.ClassDecl c : lib.classes) {
+                if (c.extensionOn != null && !c.unnamedExtension) {
+                    declared.add(c.name);
+                }
+            }
+            for (String name : declared) {
+                if (name == null || !name.startsWith("_")) {
+                    continue;
+                }
+                Ast.Library owner = first.get(name);
+                if (owner == null) {
+                    first.put(name, lib);
+                } else if (owner != lib) {
+                    Map<String, String> m = renames.get(lib);
+                    if (m == null) {
+                        m = new java.util.HashMap<String, String>();
+                        renames.put(lib, m);
+                    }
+                    m.put(name, name + "$t" + libraries.indexOf(lib));
+                }
+            }
+        }
+        if (renames.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<Ast.Library, Map<String, String>> en : renames.entrySet()) {
+            renameTypeNames(en.getKey(), en.getValue(), java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+        typedefs.clear();
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                if (!typedefs.containsKey(t.name) || !t.name.startsWith("_")) {
+                    typedefs.put(t.name, t);
+                }
+            }
+        }
+    }
+
+    /**
+     * Gives every typedef whose bare name is ambiguous across the program a name of its own,
+     * so the {@link #typedefs} table, keyed by name, answers with exactly the declaration a
+     * reference denotes. A name is ambiguous when two libraries declare it (`typedef Op =
+     * int Function(int)` beside another library's `typedef Op = String`), or when a library
+     * writes it without seeing any typedef of that name (Flutter's `Key` while a library it
+     * does not import declares `typedef Key = String`). Each library's references are
+     * renamed to what they resolve to in that library's own scope ({@link #typedefIn}), so a
+     * member type written in one library and read while emitting another keeps the meaning
+     * it had where it was written. An alias leaves no runtime trace, so the new name is never
+     * observable.
+     */
+    private void separateAmbiguousTypedefNames() {
+        Map<String, List<Ast.TypedefDecl>> byName = new java.util.HashMap<String, List<Ast.TypedefDecl>>();
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                if (t.name == null) {
+                    continue;
+                }
+                List<Ast.TypedefDecl> l = byName.get(t.name);
+                if (l == null) {
+                    l = new ArrayList<Ast.TypedefDecl>();
+                    byName.put(t.name, l);
+                }
+                l.add(t);
+            }
+        }
+        Set<String> ambiguous = new java.util.HashSet<String>();
+        for (Map.Entry<String, List<Ast.TypedefDecl>> en : byName.entrySet()) {
+            if (en.getValue().size() > 1) {
+                ambiguous.add(en.getKey());
+            }
+        }
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.namedTypes) {
+                if (t.name != null && byName.containsKey(t.name) && typedefIn(t.name, lib) == null) {
+                    ambiguous.add(t.name);
+                }
+            }
+        }
+        if (ambiguous.isEmpty()) {
+            return;
+        }
+        Map<Ast.TypedefDecl, String> canonical = new java.util.IdentityHashMap<Ast.TypedefDecl, String>();
+        for (String n : ambiguous) {
+            for (Ast.TypedefDecl t : byName.get(n)) {
+                canonical.put(t, n + "$a" + libraries.indexOf(typedefOwner(t)));
+                t.declaredName = n;
+            }
+        }
+        // Each library's renames, decided before any is applied: typedefIn reads names.
+        Map<Ast.Library, Map<String, String>> renames = new java.util.IdentityHashMap<Ast.Library, Map<String, String>>();
+        for (Ast.Library lib : libraries) {
+            Map<String, String> m = new java.util.HashMap<String, String>();
+            Set<String> written = new java.util.HashSet<String>();
+            for (Ast.TypeRef t : lib.namedTypes) {
+                if (t.name != null) {
+                    written.add(t.name);
+                }
+            }
+            for (String n : ambiguous) {
+                written.add(n);
+            }
+            for (String w : written) {
+                int dot = w.indexOf('.');
+                if (!ambiguous.contains(dot > 0 ? w.substring(dot + 1) : w)) {
+                    continue;
+                }
+                Ast.TypedefDecl td = typedefIn(w, lib);
+                if (td != null && canonical.containsKey(td)) {
+                    // a prefixed reference becomes the bare unique name, which the table answers
+                    m.put(w, canonical.get(td));
+                }
+            }
+            if (!m.isEmpty()) {
+                renames.put(lib, m);
+            }
+        }
+        for (Map.Entry<Ast.Library, Map<String, String>> en : renames.entrySet()) {
+            renameTypeNames(en.getKey(), en.getValue(), java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>()));
+        }
+        for (Map.Entry<Ast.TypedefDecl, String> en : canonical.entrySet()) {
+            // a declaration whose own library never names it is renamed here; the name as
+            // declared still resolves a reference written later (`p.Op` as a value)
+            en.getKey().name = en.getValue();
+        }
+        typedefs.clear();
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypedefDecl t : lib.typedefs) {
+                if (!typedefs.containsKey(t.name) || !t.name.startsWith("_")) {
+                    typedefs.put(t.name, t);
+                }
+            }
+        }
+    }
+
+    /** Renames type names (type references, typedef declarations, identifiers) under {@code o}. */
+    private static void renameTypeNames(Object o, Map<String, String> names, Set<Object> seen) {
+        if (o == null || o instanceof String || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof Iterable) {
+            for (Object e : (Iterable<?>) o) {
+                renameTypeNames(e, names, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)
+                && !(o instanceof Ast.TypeRef)) {
+            return;
+        }
+        boolean named = o instanceof Ast.TypeRef || o instanceof Ast.TypedefDecl || o instanceof Ast.Ident
+                || o instanceof Ast.Call
+                || o instanceof Ast.ClassDecl && ((Ast.ClassDecl) o).extensionOn != null;
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                int mod = f.getModifiers();
+                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive()
+                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
+                        || f.getType() == Ast.EnumDecl.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    Object v = f.get(o);
+                    if (f.getType() == String.class) {
+                        if (named && "name".equals(f.getName()) && names.containsKey(v)) {
+                            f.set(o, names.get(v));
+                        }
+                    } else {
+                        renameTypeNames(v, names, seen);
+                    }
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
+        }
+    }
+
+    /// The private names {@link #renamePrivate} would rename in {@code o}, into {@code out}.
+    private static void collectPrivateNames(Object o, Set<String> out, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof Iterable) {
+            for (Object e : (Iterable<?>) o) {
+                collectPrivateNames(e, out, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        String sym = privateSymbol(o);
+        if (sym != null) {
+            out.add(sym);
+        }
+        boolean typeName = o instanceof Ast.ClassDecl || o instanceof Ast.EnumDecl || o instanceof Ast.TypedefDecl
+                || o instanceof Ast.Library;
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                int mod = f.getModifiers();
+                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive()
+                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
+                        || f.getType() == Ast.EnumDecl.class || f.getType() == Ast.TypeRef.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    Object v = f.get(o);
+                    if (f.getType() == String.class) {
+                        String nm = f.getName();
+                        if (!typeName && ("name".equals(nm) || "field".equals(nm)) && v != null
+                                && ((String) v).startsWith("_")) {
+                            out.add((String) v);
+                        }
+                    } else {
+                        collectPrivateNames(v, out, seen);
+                    }
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
+        }
+    }
+
+    /// The name of a `#_x` literal, or null.
+    private static String privateSymbol(Object o) {
+        if (!(o instanceof Ast.Call) || !((Ast.Call) o).symbolLiteral) {
+            return null;
+        }
+        Ast.Call c = (Ast.Call) o;
+        if (c.args.positional.size() != 1 || !(c.args.positional.get(0) instanceof Ast.StringLit)) {
+            return null;
+        }
+        List<Object> parts = ((Ast.StringLit) c.args.positional.get(0)).parts;
+        if (parts.size() != 1 || !(parts.get(0) instanceof String) || !((String) parts.get(0)).startsWith("_")) {
+            return null;
+        }
+        return (String) parts.get(0);
+    }
+
+    private static void renamePrivate(Object o, Map<String, String> names, Set<Object> seen) {
+        if (o == null || o instanceof String || o instanceof Ast.TypeRef || !seen.add(o)) {
+            return;
+        }
+        String sym = privateSymbol(o);
+        if (sym != null && names.containsKey(sym)) {
+            renameSymbol((Ast.Call) o, names.get(sym));
+        }
+        if (o instanceof Iterable) {
+            for (Object e : (Iterable<?>) o) {
+                renamePrivate(e, names, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Ast.Node) && !(o instanceof Ast.Args) && !(o instanceof Ast.NamedArg)) {
+            return;
+        }
+        boolean typeName = o instanceof Ast.ClassDecl || o instanceof Ast.EnumDecl || o instanceof Ast.TypedefDecl
+                || o instanceof Ast.Library;
+        for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
+            for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                int mod = f.getModifiers();
+                if (java.lang.reflect.Modifier.isStatic(mod) || f.getType().isPrimitive()
+                        || f.getType() == Ast.Library.class || f.getType() == Ast.ClassDecl.class
+                        || f.getType() == Ast.EnumDecl.class || f.getType() == Ast.TypeRef.class) {
+                    continue;
+                }
+                try {
+                    f.setAccessible(true);
+                    Object v = f.get(o);
+                    if (f.getType() == String.class) {
+                        String nm = f.getName();
+                        if (!typeName && ("name".equals(nm) || "field".equals(nm)) && names.containsKey(v)) {
+                            f.set(o, names.get(v));
+                        }
+                    } else {
+                        renamePrivate(v, names, seen);
+                    }
+                } catch (IllegalAccessException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
+        }
+    }
+
 }

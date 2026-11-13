@@ -1,0 +1,9 @@
+6
+TE true
+TE2 true
+E 1
+TE3 true
+(Object?) => void
+TE4 true
+TE5 true
+true

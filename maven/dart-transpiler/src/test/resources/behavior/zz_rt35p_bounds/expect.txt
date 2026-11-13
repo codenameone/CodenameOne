@@ -1,0 +1,6 @@
+true
+d TypeError
+f TypeError
+o TypeError
+apply TypeError
+F<String>(t)

@@ -36,7 +36,7 @@ import com.codenameone.examples.wayline.api.DocumentDto;
 import com.codenameone.examples.wayline.api.DriverApplicationDto;
 import com.codenameone.examples.wayline.api.ReasonDto;
 import com.codenameone.examples.wayline.net.Api;
-import com.codenameone.examples.wayline.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.wayline.ui.Lang;
 import com.codenameone.examples.wayline.ui.Ui;
 import java.util.List;

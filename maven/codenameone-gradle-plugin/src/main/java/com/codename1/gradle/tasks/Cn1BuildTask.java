@@ -88,6 +88,15 @@ public abstract class Cn1BuildTask extends Cn1Task {
     @PathSensitive(PathSensitivity.NAME_ONLY)
     public abstract ConfigurableFileCollection getFrameworkJars();
 
+    /// The ports a local build of this task's target reads -- the iOS port and the
+    /// translator for an Xcode project, the Android port for a Gradle one -- and
+    /// nothing for a cloud build. Their configuration holds only what
+    /// `AppBuilder.portArtifacts` names for the target, so a build never downloads a
+    /// port it does not open.
+    @InputFiles
+    @PathSensitive(PathSensitivity.NAME_ONLY)
+    public abstract ConfigurableFileCollection getPortJars();
+
     /// The source roots the project compiles.
     @Input
     public abstract ListProperty<String> getSourceRoots();
@@ -112,7 +121,8 @@ public abstract class Cn1BuildTask extends Cn1Task {
         AppBuilder builder = new TaskAppBuilder(GradleHostFactory.create(this, log(), layout(),
                 getFinalName().get(), getGroupId().getOrElse(""), getProjectProperties().get(),
                 getUserProperties().get(), getUploadClasspath(), getSourceRoots().get(), getArtifacts().get(),
-                getFrameworkJars(), getCodenameOneVersion().get()), work);
+                getFrameworkJars(), getCodenameOneVersion().get(),
+                AppBuilder.portArtifacts(getBuildTarget().get()), getPortJars()), work);
         builder.platform(getPlatform().get())
                 .buildTarget(getBuildTarget().get())
                 .automated(getAutomated().get())

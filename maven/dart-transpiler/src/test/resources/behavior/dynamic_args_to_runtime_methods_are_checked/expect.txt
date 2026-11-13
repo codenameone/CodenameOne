@@ -1,0 +1,48 @@
+Set.addAll mismatch: TypeError
+Set.addAll match: ok
+Set.addAll list match: ok
+{1, 7, 8}
+Map.addAll mismatch: TypeError
+Map.addAll match: ok
+{a: 1, b: 2}
+String.endsWith mismatch: TypeError
+true
+String.endsWith match: ok
+String.compareTo mismatch: TypeError
+hellolololo
+String.padRight match: ok
+String.padLeft mismatch: TypeError
+String.substring mismatch: TypeError
+true
+String.contains match: ok
+true
+String.contains regexp: ok
+String.contains mismatch: TypeError
+false
+String.startsWith match: ok
+String.startsWith mismatch: TypeError
+3
+String.indexOf match: ok
+2
+String.indexOf regexp: ok
+String.indexOf mismatch: TypeError
+[hel, ]
+String.split match: ok
+[he, o]
+String.split regexp: ok
+String.split mismatch: TypeError
+hel_
+String.replaceAll match: ok
+he_o
+String.replaceAll regexp: ok
+String.replaceAll mismatch: TypeError
+List.insert mismatch: TypeError
+List.insert match: ok
+List.insert bad element: TypeError
+List.addAll match: ok
+List.addAll mismatch: TypeError
+[7, 1, 2, 7, 8]
+StringBuffer.writeAll match: ok
+StringBuffer.writeAll list match: ok
+StringBuffer.writeAll mismatch: TypeError
+7-87+8

@@ -1,0 +1,8 @@
+[2, 4, 7]
+true
+false
+[1, 2]
+Lazy<int>
+Plain<String>
+[rec one]
+{a: 11, b: [12]}

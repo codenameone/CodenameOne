@@ -66,7 +66,9 @@ public final class DartIdentityMap<K, V> extends DartMap<K, V> {
             if (key instanceof Long || key instanceof Double || key instanceof Boolean) {
                 return key.hashCode();
             }
-            return System.identityHashCode(key);
+            // The views of one canonical tear-off are identical() (one Dart function held
+            // as two SAMs), so they hash by that function, not by Java identity.
+            return dart.runtime.DartRuntime.identityHash(key);
         }
     }
 

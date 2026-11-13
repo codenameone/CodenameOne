@@ -1,0 +1,18 @@
+field write of double into Box<int>: TypeError true
+method arg double into Box<int>: TypeError true
+field write of int into Box<int>: no throw
+7
+add double to MyList<int>: TypeError true
+add int to MyList<int>: no throw
+addAll List<double> to MyList<int>: TypeError true
+1
+7
+int into Box<String>: TypeError true
+String into Box<String>: no throw
+t
+swapIn wrong order: TypeError true
+swapIn right order: no throw
+y 3
+double into IntBox: TypeError true
+dynamic set double: TypeError true
+dynamic field double: TypeError true

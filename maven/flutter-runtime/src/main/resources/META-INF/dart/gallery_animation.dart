@@ -12,10 +12,10 @@
 abstract class TickerProvider {}
 
 @JavaName('com.codename1.flutter.animation.SingleTickerProviderStateMixin')
-mixin SingleTickerProviderStateMixin {}
+mixin SingleTickerProviderStateMixin implements TickerProvider {}
 
 @JavaName('com.codename1.flutter.animation.TickerProviderStateMixin')
-mixin TickerProviderStateMixin {}
+mixin TickerProviderStateMixin implements TickerProvider {}
 
 // --- status -----------------------------------------------------------
 
@@ -43,7 +43,7 @@ enum AnimationBehavior { normal, preserve }
 // --- animation / animatable core --------------------------------------
 
 @JavaName('com.codename1.flutter.animation.Animation')
-abstract class Animation<T> {
+abstract class Animation<T> extends Listenable {
   external double get value;
   external AnimationStatus get status;
   external bool get isCompleted;
@@ -215,7 +215,7 @@ class FadeTransition extends Widget {
 
 @JavaName('com.codename1.flutter.animation.ScaleTransition')
 class ScaleTransition extends Widget {
-  external ScaleTransition({Key? key, Animation<double> scale, Alignment? alignment, Widget? child});
+  external ScaleTransition({Key? key, Animation<double> scale, AlignmentGeometry? alignment, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.animation.SlideTransition')
@@ -225,7 +225,7 @@ class SlideTransition extends Widget {
 
 @JavaName('com.codename1.flutter.animation.RotationTransition')
 class RotationTransition extends Widget {
-  external RotationTransition({Key? key, Animation<double> turns, Alignment? alignment, Widget? child});
+  external RotationTransition({Key? key, Animation<double> turns, AlignmentGeometry? alignment, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.animation.PositionedTransition')
@@ -242,25 +242,25 @@ class AnimatedBuilder extends Widget {
 
 @JavaName('com.codename1.flutter.animation.AnimatedContainer')
 class AnimatedContainer extends Widget {
-  external AnimatedContainer({Key? key, Duration duration, Curve? curve, double? width, double? height, Color? color, EdgeInsets? padding, EdgeInsets? margin, Alignment? alignment, Object? decoration, Widget? child});
+  external AnimatedContainer({Key? key, required Duration duration, Curve? curve, double? width, double? height, Color? color, EdgeInsetsGeometry? padding, EdgeInsetsGeometry? margin, Object? alignment, Decoration? decoration, Decoration? foregroundDecoration, BoxConstraints? constraints, Matrix4? transform, Object? transformAlignment, Clip? clipBehavior, VoidCallback? onEnd, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.animation.AnimatedPadding')
 class AnimatedPadding extends Widget {
-  external AnimatedPadding({Key? key, EdgeInsets padding, Duration duration, Curve? curve, Widget? child});
+  external AnimatedPadding({Key? key, required EdgeInsetsGeometry padding, required Duration duration, Curve? curve, VoidCallback? onEnd, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.animation.AnimatedSize')
 class AnimatedSize extends Widget {
-  external AnimatedSize({Key? key, Duration duration, Curve? curve, Alignment? alignment, Widget? child});
+  external AnimatedSize({Key? key, required Duration duration, Duration? reverseDuration, Curve? curve, Object? alignment, Clip? clipBehavior, VoidCallback? onEnd, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.animation.AnimatedSwitcher')
 class AnimatedSwitcher extends Widget {
-  external AnimatedSwitcher({Key? key, Duration duration, Duration? reverseDuration, Curve? switchInCurve, Curve? switchOutCurve, Widget? child});
+  external AnimatedSwitcher({Key? key, required Duration duration, Duration? reverseDuration, Curve? switchInCurve, Curve? switchOutCurve, Widget Function(Widget child, Animation<double> animation)? transitionBuilder, Widget Function(Widget? currentChild, List<Widget> previousChildren)? layoutBuilder, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.animation.AnimatedOpacity')
 class AnimatedOpacity extends Widget {
-  external AnimatedOpacity({Key? key, double opacity, Duration duration, Curve? curve, Widget? child});
+  external AnimatedOpacity({Key? key, required double opacity, required Duration duration, Curve? curve, VoidCallback? onEnd, bool? alwaysIncludeSemantics, Widget? child});
 }

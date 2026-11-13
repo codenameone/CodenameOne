@@ -1,0 +1,14 @@
+bag 2 9 [9, 4]
+names x,y,z base 3
+sink [1, 2] true
+caught Bad state: boom, trace is StackTrace: true
+true
+current true
+fromString frame one
+completer ArgumentError true
+v 1
+stream err oops true
+two-arg f1 true
+r 7
+r2 8
+tear-off handler f3 true

@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.codename1.backend.ConcurrencyFailureException;
+import com.codename1.backend.DataIntegrityViolationException;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Tcp;
 
@@ -1107,6 +1108,14 @@ public final class MySql {
                 || (state != null && state.startsWith("40"));
     }
 
+    /// Whether an error is a broken schema constraint: SQLSTATE class 23, or a
+    /// code that carries it -- duplicate entry (1062), a foreign key (1451,
+    /// 1452) or a NULL in a NOT NULL column (1048).
+    static boolean isIntegrityViolation(int code, String state) {
+        return code == 1062 || code == 1451 || code == 1452 || code == 1048
+                || (state != null && state.startsWith("23"));
+    }
+
     /// ER_UNSUPPORTED_PS: "This command is not supported in the prepared
     /// statement protocol yet".
     private static final int UNSUPPORTED_IN_PREPARED_STATEMENT = 1295;
@@ -1136,6 +1145,7 @@ public final class MySql {
                     + (state.length() == 0 ? "" : " " + state) + ": " + message
                     + (sql == null ? "" : " [" + sql + "]");
             return isConcurrencyFailure(code, state) ? new ConcurrencyFailureException(text)
+                    : isIntegrityViolation(code, state) ? new DataIntegrityViolationException(text)
                     : new IOException(text);
         } catch (IOException malformed) {
             // This method BUILDS the exception rather than throwing one, so a

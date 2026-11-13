@@ -135,6 +135,21 @@ Skirmish sample 3D models (scripts/skirmish/common/src/main/resources/model_*.gl
   Hexagon Pack and Halloween Bits by Kay Lousberg (www.kaylousberg.com),
   released under CC0 1.0. Repacked by scripts/skirmish/tools/pack-models.py.
 
+Splat sample 3D models (scripts/splat/common/src/main/resources/model_*.glb)
+  Toon Shooter Game Kit, Ultimate Nature and Universal Animation Library 1
+  and 2 by Quaternius (quaternius.com), Blaster Kit and Survival Kit by
+  Kenney (kenney.nl), and MakeHuman system and community assets (bodies,
+  skins, hair and clothes marked CC0, makehumancommunity.org), all released
+  under CC0 1.0. Built by scripts/splat/tools/make-operators.py and
+  scripts/splat/tools/pack-art.py.
+  Photo-scanned props and ground textures (model_car, model_barrier*,
+  model_sofa, model_barrel, model_streetlight, model_boxes, tex_*.jpg) by
+  Poly Haven (polyhaven.com), released under CC0 1.0.
+
+Splat sample fonts (scripts/splat/common/src/main/css/fonts/Rajdhani-*.ttf)
+  Rajdhani, Copyright (c) 2014, Indian Type Foundry, licensed under the SIL
+  Open Font License 1.1; the licence text is in the same directory (OFL.txt).
+
 ================================================================================
 .NET Standard reference assembly
 ================================================================================

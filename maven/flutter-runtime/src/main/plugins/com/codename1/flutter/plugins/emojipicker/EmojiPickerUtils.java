@@ -36,7 +36,7 @@ public class EmojiPickerUtils {
     }
 
     public Future<DartList<Emoji>> searchEmoji(String keyword, DartList<CategoryEmoji> data) {
-        DartList<Emoji> out = new DartList<Emoji>();
+        DartList<Emoji> out = new DartList<Emoji>(dart.runtime.TypeWitness.of(Emoji.class, false));
         String k = keyword == null ? "" : keyword;
         for (CategoryEmoji c : data == null ? EmojiData.all() : data) {
             for (Emoji e : c.emoji()) {

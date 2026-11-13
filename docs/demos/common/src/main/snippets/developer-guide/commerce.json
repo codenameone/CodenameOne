@@ -1,0 +1,61 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::commerce-json-001[]
+{
+  "version": 1,
+  "id": "spring_sale",
+  "defaultLocale": "en",
+  "strings": {
+    "en": {
+      "title": "Go Pro",
+      "cta": "Continue for {{price}} per {{period}}"
+    },
+    "de": {
+      "title": "Pro freischalten",
+      "cta": "Weiter mit {{price}} pro {{period}}"
+    }
+  },
+  "colors": {
+    "light": {
+      "background": "#ffffff",
+      "text": "#111111",
+      "muted": "#666666",
+      "accent": "#0a84ff",
+      "accentText": "#ffffff"
+    },
+    "dark": {
+      "background": "#101014",
+      "text": "#f5f5f7",
+      "muted": "#9a9aa0",
+      "accent": "#0a84ff",
+      "accentText": "#ffffff"
+    }
+  },
+  "root": {
+    "type": "stack",
+    "axis": "y",
+    "gap": 3,
+    "padding": 4,
+    "children": [
+      { "type": "closeButton" },
+      { "type": "image", "url": "https://example.com/hero.png", "height": 40 },
+      { "type": "text", "text": "title", "style": "title", "align": "center" },
+      {
+        "type": "features",
+        "items": [
+          { "icon": "cloud_sync", "text": "Sync across all your devices" },
+          { "icon": "block", "text": "No ads" }
+        ]
+      },
+      { "type": "packages", "style": "list", "selected": "annual" },
+      { "type": "purchaseButton", "text": "cta" },
+      { "type": "restoreButton", "text": "Restore purchases" },
+      {
+        "type": "footer",
+        "termsUrl": "https://example.com/terms",
+        "privacyUrl": "https://example.com/privacy"
+      }
+    ]
+  }
+}
+// end::commerce-json-001[]

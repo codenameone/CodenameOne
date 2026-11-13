@@ -1,0 +1,12 @@
+bytes 3
+strings a+b
+[104, 105]
+text 3
+flags on
+flags off
+neither
+false
+true
+true
+false
+true

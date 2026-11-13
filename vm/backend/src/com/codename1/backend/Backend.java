@@ -83,6 +83,32 @@ public final class Backend {
         // digests and random bytes on a ParparVM server (a no-op on the JDK).
         ClassLibraryHost.install();
         Crypto.installCryptoEngine();
+        // Every method of a generated repository bound to the injected session
+        // runs REQUIRED, as in Spring Data: it joins the caller's transaction or
+        // runs in one of its own, read-only for a finder.
+        com.codename1.impl.orm.RepositoryTransactions.install(new RepositoryScope());
+    }
+
+    private static final class RepositoryScope implements com.codename1.impl.orm.RepositoryTransactions.Scope {
+        @Override
+        public Object begin(com.codename1.orm.session.Session session, int propagation, boolean readOnly,
+                            int timeoutSeconds, String isolation) {
+            if (!(session instanceof com.codename1.impl.backend.TransactionSession)) {
+                return null;
+            }
+            return Transactions.begin(propagation, readOnly, timeoutSeconds,
+                    com.codename1.backend.annotations.Isolation.valueOf(isolation));
+        }
+
+        @Override
+        public void end(Object token, boolean succeeded) {
+            Transactions.Transaction tx = (Transactions.Transaction) token;
+            if (succeeded) {
+                Transactions.commit(tx);
+            } else {
+                Transactions.afterThrow(tx, true);
+            }
+        }
     }
 
     private final HttpServer server;
@@ -130,6 +156,8 @@ public final class Backend {
     /// included. The listener accepts before that hook runs, so health must not
     /// report the server ready to a load balancer until it has returned.
     private boolean ready;
+    /// Set once by the builder, before the started() hook reads it.
+    private ApplicationArguments arguments = new ApplicationArguments();
 
     private Backend(HttpServer server, DataSource dataSource, EntityManager entities,
                     Config config, int shutdownMillis, Tracer ownTracer,
@@ -200,6 +228,12 @@ public final class Backend {
     /// The entity manager, or null when this build generated no entities.
     public EntityManager getEntityManager() {
         return entities;
+    }
+
+    /// The arguments the program was started with, as the builder was given
+    /// them; empty when it was given none.
+    public ApplicationArguments getArguments() {
+        return arguments;
     }
 
     /// The configuration this server resolved its settings from.
@@ -1492,6 +1526,8 @@ public final class Backend {
         private MetricReader metricReader;
         private OwnRoute managementRoute;
         private OwnRoute mcpRoute;
+        /// The build's OpenAPI document, when it linked the docs; see [#openApi].
+        private String openApiDocument;
         private boolean testApplication;
         private SecurityRoute securityRoute;
         private String[] compiledSettings;
@@ -1767,6 +1803,15 @@ public final class Backend {
             return this;
         }
 
+        /// Serves `document`, the OpenAPI document the build wrote from the route
+        /// table, and a Swagger UI page for it, unless the configuration turns them
+        /// off; see [com.codename1.impl.backend.OpenApiDocs]. Like [#management],
+        /// the generated entry point calls this only for a build that asked.
+        Builder openApi(String document) {
+            this.openApiDocument = document;
+            return this;
+        }
+
         /// Puts the security layer in front of the application's routes; see
         /// [com.codename1.backend.security.SecurityFilterChain]. Like [#mcp] and
         /// [#management], this is the only code that names the layer, and the
@@ -1811,6 +1856,16 @@ public final class Backend {
         /// The name this server reports itself as, to MCP clients.
         Builder serviceName(String name) {
             this.serviceName = name;
+            return this;
+        }
+
+        private String[] programArguments = new String[0];
+
+        /// The program's command-line arguments, which the
+        /// [CommandLineRunner] and [ApplicationRunner] beans are given. The
+        /// generated main passes its own.
+        public Builder arguments(String... args) {
+            this.programArguments = args == null ? new String[0] : args.clone();
             return this;
         }
 
@@ -1859,6 +1914,7 @@ public final class Backend {
             // acted on is refused here rather than silently doing nothing.
             BuildTimeSettings.require(config, managementRoute != null || testApplication,
                     mcpRoute != null || testApplication,
+                    openApiDocument != null || testApplication,
                     tracer != null || metricReader != null || testApplication);
             // And the other way: a server built to export that is told not to.
             boolean telemetryOff = BuildTimeSettings.leftOut(config,
@@ -1993,6 +2049,15 @@ public final class Backend {
                 // FIRST: it answers one exact path, and a catch-all handler
                 // added before it would otherwise take the app's exports.
                 routers.add(relay);
+            }
+            // The OpenAPI document and Swagger UI ahead of the application's own
+            // routers, so a catch-all route cannot answer them; but among the
+            // application's routers, so the security layer stands in front of them.
+            com.codename1.impl.backend.OpenApiDocs openApiDocs = openApiDocument == null
+                    || BuildTimeSettings.leftOut(config, BuildTimeSettings.OPENAPI) ? null
+                    : com.codename1.impl.backend.OpenApiDocs.fromConfig(config, openApiDocument);
+            if (openApiDocs != null) {
+                routers.add(openApiDocs);
             }
             routers.addAll(handlers);
             // FIRST among the routers, after the relay: its paths are its own, and
@@ -2330,6 +2395,7 @@ public final class Backend {
                         readerOpen ? metricReader : null,
                         managedBeans, sessions, tasks, requestLog,
                         environment == null ? new ArrayList() : environment.gauges());
+                backend.arguments = new ApplicationArguments(programArguments);
                 backend.serving = serving;
                 owned = true;
             } finally {
@@ -2444,6 +2510,10 @@ public final class Backend {
             }
         }
 
+        private static String blankToNull(String value) {
+            return value == null || value.trim().length() == 0 ? null : value;
+        }
+
         private Tls resolveTls() throws IOException {
             if (tls != null) {
                 return tls;
@@ -2451,6 +2521,10 @@ public final class Backend {
             String certificate = tlsCertificate != null ? tlsCertificate
                     : config.get(Config.TLS_CERTIFICATE);
             String key = tlsKey != null ? tlsKey : config.get(Config.TLS_KEY);
+            // An empty setting is no setting: `cn1.server.tls.certificate=` in a
+            // properties file, or the variable exported empty, serves plaintext.
+            certificate = blankToNull(certificate);
+            key = blankToNull(key);
             if (certificate == null || key == null) {
                 if (certificate != null || key != null) {
                     // One without the other is a deployment that believes it is

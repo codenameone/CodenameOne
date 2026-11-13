@@ -44,7 +44,7 @@ import com.codenameone.examples.savor.map.MapStage;
 import com.codenameone.examples.savor.map.Maps;
 import com.codenameone.examples.savor.map.Routes;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.pay.ReceiptForm;
 import com.codenameone.examples.savor.ui.BottomSheet;
 import com.codenameone.examples.savor.ui.Lang;

@@ -33,6 +33,13 @@ public class UnimplementedError extends UnsupportedError {
     }
 
     public UnimplementedError() {
-        super("Unimplemented");
+        super(null);
+    }
+
+    /** Dart's text: the class name, then the message when there is one. */
+    @Override
+    public String toString() {
+        String m = getMessage();
+        return m == null ? "UnimplementedError" : "UnimplementedError: " + m;
     }
 }

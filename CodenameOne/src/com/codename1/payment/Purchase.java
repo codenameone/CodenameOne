@@ -118,6 +118,9 @@ public abstract class Purchase {
         // provider is registered, and it never throws into the caller.
         java.util.Map<String, Object> params = new java.util.HashMap<String, Object>();
         params.put("sku", sku);
+        // The offering, package and experiment of a purchase that
+        // CommerceManager.purchase(CommercePackage) started; used up here.
+        CommerceManager.addPurchaseContext(sku, params, true);
         Analytics.autoEvent("purchase", "commerce", params);
 
     }
@@ -417,6 +420,7 @@ public abstract class Purchase {
     private static void fireAnalyticsPurchaseInitiated(String sku) {
         java.util.Map<String, Object> params = new java.util.HashMap<String, Object>();
         params.put("sku", sku);
+        CommerceManager.addPurchaseContext(sku, params, false);
         Analytics.autoEvent("purchase_initiated", "commerce", params);
     }
 
@@ -816,6 +820,12 @@ public abstract class Purchase {
                 && !getPendingPurchases().isEmpty()) {
             synchronizeReceipts(0, null);
             return;
+        }
+        if (Boolean.TRUE.equals(fetchSucceeded)) {
+            // The receipts are settled: every pending one was submitted and
+            // the list was fetched. Cloud commerce asks its service again, on
+            // a background thread of its own; a build without it does nothing.
+            CommerceManager.receiptsSynchronized();
         }
         fireSynchronizeReceiptsCallbacks(Boolean.TRUE.equals(fetchSucceeded));
     }

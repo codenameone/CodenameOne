@@ -1633,11 +1633,18 @@ public class IOSImplementation extends CodenameOneImplementation {
             // field, or in a window-only application left a stale destination in place.
             // getNextComponent is Form-only but is defined as exactly this call, and
             // getTabIterator is on TopLevelContainer.
+            // "doneButton" and "nextButton" choose the keyboard action explicitly. Done
+            // is expressed as "there is no next field": the native side derives the Return
+            // key, the toolbar button and whether Return advances from that one answer, so
+            // no second path can disagree with it. Next is what a field with a successor
+            // gets anyway; setting it only changes whether advancing fires the Done
+            // listener (see editingUpdate) and whether an iPad gets the toolbar.
             if (parentTop != null) {
-                TextEditUtil.setNextEditComponent(parentTop.getTabIterator(cmp).getNext());
+                TextEditUtil.setNextEditComponent(TextEditUtil.nextFor(cmp, parentTop.getTabIterator(cmp).getNext()));
             } else if (current != null) {
-                TextEditUtil.setNextEditComponent(current.getNextComponent(cmp));
+                TextEditUtil.setNextEditComponent(TextEditUtil.nextFor(cmp, current.getNextComponent(cmp)));
             }
+            TextEditUtil.setExplicitKeyboardAction(TextEditUtil.choosesKeyboardAction(cmp));
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
@@ -1763,11 +1770,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             public void run() {
                 if(instance.currentEditing != null) {
                     if(finished) {
-                        editNext = cursorPositon == -2;
+                        // -2 is Return or the toolbar's Next, -3 the toolbar's Done. They
+                        // were one code, and still behave as one, except for a field that
+                        // asked for Next explicitly: there Next moves on without finishing,
+                        // so only Done fires the listener -- which is what Android does.
+                        editNext = TextEditUtil.endedOnKeyboardAction(cursorPositon);
+                        boolean firesDone = TextEditUtil.firesDoneEvent(cursorPositon, instance.currentEditing);
                         synchronized(EDITING_LOCK) {
                             instance.currentEditing.setText(s);
                             Display.getInstance().onEditingComplete(instance.currentEditing, s);
-                            if(editNext && instance.currentEditing != null && instance.currentEditing instanceof TextArea) {
+                            if(firesDone && instance.currentEditing instanceof TextArea) {
                                 ((TextArea)instance.currentEditing).fireDoneEvent();
                             }
                             Component cmp = instance.currentEditing;
@@ -6355,6 +6367,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                 || nativeInstance.cn1LanguageIsSupported(1, false)
                 || nativeInstance.cn1LanguageIsSupported(2, false)
                 ? new IOSLanguageImpl() : null;
+    }
+
+    private com.codename1.impl.LocalLlmImpl localLlm;
+
+    @Override
+    public com.codename1.impl.LocalLlmImpl createLocalLlmImpl() {
+        if (localLlm == null && nativeInstance.cn1LlamaIsSupported()) {
+            localLlm = new IOSLocalLlmImpl();
+        }
+        return localLlm;
     }
 
     @Override

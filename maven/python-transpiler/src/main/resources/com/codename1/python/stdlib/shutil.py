@@ -148,16 +148,26 @@ def which(cmd, mode=None, path=None):
 
 
 def get_terminal_size(fallback=(80, 24)):
+    """COLUMNS and LINES when set, else the terminal on standard output,
+    else `fallback` -- in that order, as CPython does."""
     try:
-        cols = int(_os.environ["COLUMNS"])
-        lines = int(_os.environ["LINES"])
-        return _os.terminal_size((cols, lines))
-    except (KeyError, ValueError, AttributeError):
-        pass
+        columns = int(_os.getenv("COLUMNS", ""))
+    except ValueError:
+        columns = 0
     try:
-        return _os.get_terminal_size()
-    except OSError:
-        return _os.terminal_size(fallback)
+        lines = int(_os.getenv("LINES", ""))
+    except ValueError:
+        lines = 0
+    if columns <= 0 or lines <= 0:
+        try:
+            size = _os.get_terminal_size(1)
+        except OSError:
+            size = _os.terminal_size(fallback)
+        if columns <= 0:
+            columns = size.columns or fallback[0]
+        if lines <= 0:
+            lines = size.lines or fallback[1]
+    return _os.terminal_size((columns, lines))
 
 
 def chown(path, user=None, group=None):

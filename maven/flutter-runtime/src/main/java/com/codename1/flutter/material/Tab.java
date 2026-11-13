@@ -72,7 +72,7 @@ public class Tab extends StatelessWidget {
         }
         Widget label = text != null ? new Text(text) : null;
         if (icon != null && label != null) {
-            DartList<Widget> kids = new DartList<Widget>();
+            DartList<Widget> kids = new DartList<Widget>(dart.runtime.TypeWitness.of(Widget.class, false));
             kids.add(icon);
             kids.add(label);
             Column col = new Column();
@@ -86,5 +86,10 @@ public class Tab extends StatelessWidget {
             return label;
         }
         return new SizedBox();
+    }
+
+    /// True when the tab shows an icon and a label, which makes a TabBar taller.
+    boolean hasIconAndText() {
+        return icon != null && (text != null || child != null);
     }
 }

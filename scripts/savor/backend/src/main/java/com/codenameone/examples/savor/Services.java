@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.savor;
 
+import com.codename1.appkit.server.security.AccountSecurity;
+
 import com.codename1.backend.Config;
 import com.codename1.backend.annotations.Bean;
 import com.codename1.backend.annotations.Configuration;
@@ -30,11 +32,11 @@ import com.codenameone.examples.savor.pay.MisconfiguredPayments;
 import com.codenameone.examples.savor.pay.PaymentProvider;
 import com.codenameone.examples.savor.pay.SimulatedPayments;
 import com.codenameone.examples.savor.pay.StripePayments;
-import com.codenameone.examples.savor.push.CloudPushSender;
-import com.codenameone.examples.savor.push.ConsolePushSender;
-import com.codenameone.examples.savor.push.MisconfiguredPushSender;
-import com.codenameone.examples.savor.push.PushSender;
-import com.codenameone.examples.savor.push.RecordingPushSender;
+import com.codename1.appkit.server.push.CloudPushSender;
+import com.codename1.appkit.server.push.ConsolePushSender;
+import com.codename1.appkit.server.push.MisconfiguredPushSender;
+import com.codename1.appkit.server.push.PushSender;
+import com.codename1.appkit.server.push.RecordingPushSender;
 import com.codenameone.examples.savor.sms.ConsoleSmsSender;
 import com.codenameone.examples.savor.sms.MessageBirdSmsSender;
 import com.codenameone.examples.savor.sms.MisconfiguredSmsSender;
@@ -147,7 +149,7 @@ public class Services {
             @Value("${savor.payments.provider:}") String chosen,
             @Value("${savor.payments.stripe.secret:}") String secret,
             @Value("${savor.public.url:}") String publicUrl,
-            @Value("${" + SecurityConfig.ISSUER_KEY + ":}") String issuer) {
+            @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer) {
         String kind = chosen.trim().length() > 0 ? chosen.trim()
                 : config.isDevelopmentProfile() ? "simulated" : "stripe";
         if ("simulated".equalsIgnoreCase(kind)) {
@@ -159,7 +161,7 @@ public class Services {
         }
         String address = publicUrl.length() > 0 ? publicUrl : issuer;
         String missing = missing("", new String[] {"savor.payments.stripe.secret", secret,
-            "savor.public.url (or " + SecurityConfig.ISSUER_KEY + ")", address});
+            "savor.public.url (or " + AccountSecurity.ISSUER_KEY + ")", address});
         if (missing.length() > 0) {
             return new MisconfiguredPayments("stripe", unset("payments", "stripe", missing));
         }

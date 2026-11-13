@@ -23,7 +23,12 @@
 package com.codename1.impl.javase;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
@@ -125,7 +130,7 @@ public class CN1Bootstrap {
      * @throws Exception 
      */
     public static boolean run(Class mainClass, String[] argv) throws Exception {
-        return run(mainClass.getName(), argv);
+        return run(mainClass.getName(), mainClass.getClassLoader(), argv);
     }
     
     /**
@@ -137,6 +142,10 @@ public class CN1Bootstrap {
      * @throws Exception 
      */
     public static boolean run(String mainClass, String[] argv) throws Exception {
+        return run(mainClass, Thread.currentThread().getContextClassLoader(), argv);
+    }
+
+    private static boolean run(String mainClass, ClassLoader origin, String[] argv) throws Exception {
         if (isBootstrapped()) {
             return false;
         }
@@ -149,13 +158,16 @@ public class CN1Bootstrap {
         }
         System.setProperty("NSHighResolutionCapable", "true");
         
-        StringTokenizer t = new StringTokenizer(System.getProperty("java.class.path"), File.pathSeparator);
-        
-        List<File> files = new ArrayList<File>();
-        int len = t.countTokens();
-        for (int iter = 0; iter < len; iter++) {
-            files.add(new File(t.nextToken()));
+        List<File> files = bootstrapClasspath(System.getProperty("java.class.path"), origin);
+        // The simulator reads java.class.path itself later on, so it has to name what we load from
+        StringBuilder cp = new StringBuilder();
+        for (File f : files) {
+            if (cp.length() > 0) {
+                cp.append(File.pathSeparator);
+            }
+            cp.append(f.getPath());
         }
+        System.setProperty("java.class.path", cp.toString());
         for (File dir : SimulatorProject.legacyNativeJarDirs()) {
             if (dir.exists()) {
                 
@@ -230,8 +242,16 @@ public class CN1Bootstrap {
         ((ClassPathLoader)ldr).addExclude("org.cef.");
         ((ClassPathLoader)ldr).addExclude("me.friwi.jcefmaven.");
         
-        final ClassLoader fLdr = ldr;
-        Class c = Class.forName(mainClass, true, ldr);
+        Class c;
+        try {
+            c = Class.forName(mainClass, true, ldr);
+        } catch (ClassNotFoundException ex) {
+            ClassNotFoundException cnf = new ClassNotFoundException("Codename One could not reload the main class "
+                    + mainClass + " in its simulator class loader. It searched: " + files
+                    + ". The class must be on java.class.path or reachable through a URLClassLoader that loaded it.");
+            cnf.initCause(ex);
+            throw cnf;
+        }
         Method m = c.getDeclaredMethod("main", String[].class);
         
         m.invoke(null, new Object[]{argv});
@@ -239,6 +259,68 @@ public class CN1Bootstrap {
         
     }
     
+    /// The class path the reloadable class loader is built from: `java.class.path`, followed by
+    /// the URLs of every `URLClassLoader` from `origin` up to the system loader.
+    ///
+    /// `java.class.path` alone is not enough. `mvn -Prun-desktop` runs the stub with `exec:java`,
+    /// inside Maven's own JVM: there `java.class.path` is Maven's launcher, and the application,
+    /// the port and core are reachable only through the loader the plugin built (issue #6203).
+    static List<File> bootstrapClasspath(String javaClassPath, ClassLoader origin) {
+        List<File> files = new ArrayList<File>();
+        if (javaClassPath != null) {
+            StringTokenizer t = new StringTokenizer(javaClassPath, File.pathSeparator);
+            while (t.hasMoreTokens()) {
+                files.add(new File(t.nextToken()));
+            }
+        }
+        List<URLClassLoader> chain = new ArrayList<URLClassLoader>();
+        for (ClassLoader l = origin; l != null && l != ClassLoader.getSystemClassLoader(); l = l.getParent()) {
+            if (l instanceof URLClassLoader) {
+                chain.add(0, (URLClassLoader) l);
+            }
+        }
+        // Parents first, so a class both loaders see resolves as it did before the reload
+        for (URLClassLoader l : chain) {
+            for (URL u : l.getURLs()) {
+                if (!"file".equals(u.getProtocol())) {
+                    continue;
+                }
+                File f = urlToFile(u);
+                if (!files.contains(f)) {
+                    files.add(f);
+                }
+            }
+        }
+        return files;
+    }
+
+    /// A `file:` URL as a file. `toURI()` rejects the unescaped spaces of the deprecated
+    /// `File.toURL()`, and `File(URI)` rejects a UNC authority, so both fall back to the decoded
+    /// path, without the leading slash `getPath()` puts before a Windows drive letter.
+    static File urlToFile(URL u) {
+        try {
+            return new File(u.toURI());
+        } catch (URISyntaxException ex) {
+            // fall through to the decoded path
+        } catch (IllegalArgumentException ex) {
+            // fall through to the decoded path
+        }
+        String path;
+        try {
+            path = URLDecoder.decode(u.getPath().replace("+", "%2B"), "UTF-8");
+        } catch (UnsupportedEncodingException ex) {
+            path = u.getPath();
+        }
+        String host = u.getHost();
+        if (host != null && host.length() > 0) {
+            return new File("\\\\" + host + path.replace('/', '\\'));
+        }
+        if (path.length() > 2 && path.charAt(0) == '/' && path.charAt(2) == ':') {
+            path = path.substring(1);
+        }
+        return new File(path);
+    }
+
      private static String OS = System.getProperty("os.name").toLowerCase();
     private static boolean isWindows = (OS.indexOf("win") >= 0);
     

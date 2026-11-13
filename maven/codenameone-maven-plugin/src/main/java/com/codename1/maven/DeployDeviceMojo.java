@@ -78,15 +78,30 @@ public class DeployDeviceMojo extends AbstractMojo {
     @Parameter(property = "cn1.device.logs", defaultValue = "false")
     private boolean logs;
 
+    /** Windows devices: {@code shell} (Shell Launcher, the default) or {@code autostart}. */
+    @Parameter(property = "cn1.device.kioskMode", defaultValue = "shell")
+    private String kioskMode;
+
+    /** Windows devices: the one account whose shell becomes the application; every non-administrator by default. */
+    @Parameter(property = "cn1.device.kioskUser")
+    private String kioskUser;
+
+    /** Windows devices: turns on Keyboard Filter and blocks Ctrl+Alt+Del and the other shell shortcuts. */
+    @Parameter(property = "cn1.device.keyboardFilter", defaultValue = "false")
+    private boolean keyboardFilter;
+
     @Parameter(defaultValue = "${project.build.directory}", readonly = true)
     private File buildDirectory;
 
-    /// The newest executable a local Linux build left: `target/linux-native` of this
-    /// module, or of the `linux` module beside it when the goal runs at the root.
+    /// The newest executable a local native build left: `target/linux-native` or
+    /// `target/windows-native` of this module, or of the `linux` or `win` module
+    /// beside it when the goal runs at the root.
     static File findBuiltBinary(File buildDirectory) {
         File root = buildDirectory.getParentFile();
         return DeviceDeployer.findBinary(buildDirectory, new File(buildDirectory, "linux-native"),
-                root == null ? null : new File(root, "linux" + File.separator + "target" + File.separator + "linux-native"));
+                new File(buildDirectory, "windows-native"),
+                root == null ? null : new File(root, "linux" + File.separator + "target" + File.separator + "linux-native"),
+                root == null ? null : new File(root, "win" + File.separator + "target" + File.separator + "windows-native"));
     }
 
     @Override
@@ -97,7 +112,8 @@ public class DeployDeviceMojo extends AbstractMojo {
         }
         try {
             new DeviceDeployer(MavenLog.of(getLog())).host(host).user(user).port(port).binary(bin)
-                    .remoteDir(remoteDir).service(service).environment(environment).profile(profile).followLogs(logs).deploy();
+                    .remoteDir(remoteDir).service(service).environment(environment).profile(profile).followLogs(logs)
+                    .kioskMode(kioskMode).kioskUser(kioskUser).keyboardFilter(keyboardFilter).deploy();
         } catch (BuildException ex) {
             throw new MojoExecutionException(ex.getMessage(), ex);
         }

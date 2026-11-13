@@ -1,0 +1,18 @@
+Map<String, int>
+(String) => int
+Holder<int>
+Holder<String>
+Holder<dynamic>
+Holder<int>
+Plain
+Holder<int>
+Holder<num>
+true
+true
+true
+true
+hi
+(int, String) => void
+(int) => int
+Holder<dynamic>
+[Map<String, int>, Plain]

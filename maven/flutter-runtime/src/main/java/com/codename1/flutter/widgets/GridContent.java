@@ -39,6 +39,17 @@ class GridContent extends Widget {
     private final Double mainAxisSpacing;
     private final Double crossAxisSpacing;
     private final DartList<Widget> children;
+    /// Whether the main axis is horizontal: cells then fill columns top to bottom.
+    private boolean horizontal;
+
+    GridContent horizontal(boolean v) {
+        this.horizontal = v;
+        return this;
+    }
+
+    boolean isHorizontal() {
+        return horizontal;
+    }
 
     GridContent(long crossAxisCount, Double childAspectRatio, Double mainAxisSpacing,
                 Double crossAxisSpacing, DartList<Widget> children) {

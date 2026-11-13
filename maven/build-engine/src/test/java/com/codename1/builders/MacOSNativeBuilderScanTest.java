@@ -422,6 +422,20 @@ public class MacOSNativeBuilderScanTest {
     }
 
     /**
+     * Any class of the purchase API switches the StoreKit natives on, the
+     * commerce facade included; a package that merely starts with the same
+     * letters does not.
+     */
+    @Test
+    public void thePaymentPackageEnablesPurchase() {
+        assertTrue(MacOSNativeBuilder.usesPurchaseApi("com/codename1/payment/Purchase"));
+        assertTrue(MacOSNativeBuilder.usesPurchaseApi("com/codename1/payment/CommerceManager"));
+        assertFalse(MacOSNativeBuilder.usesPurchaseApi("com/codename1/paymentsx/Thing"));
+        assertFalse(MacOSNativeBuilder.usesPurchaseApi("com/example/payment/Purchase"));
+        assertFalse(MacOSNativeBuilder.usesPurchaseApi(null));
+    }
+
+    /**
      * An application is free to call the review API without the
      * com.codename1.appreview facade, and both spellings are public API. The
      * package scan cannot see either, so missing them compiles the native

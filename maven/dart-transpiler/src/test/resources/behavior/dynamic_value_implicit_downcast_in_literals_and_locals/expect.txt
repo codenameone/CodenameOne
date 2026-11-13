@@ -1,0 +1,34 @@
+map TypeError
+{a: 1}
+mapOk ok
+listspread TypeError
+[1]
+listspreadOk ok
+listif TypeError
+listifelse TypeError
+listfor TypeError
+[1, 1]
+listforOk ok
+setif TypeError
+setfor TypeError
+mapfor TypeError
+{k1: 1}
+mapforOk ok
+list1 TypeError
+[1, 2]
+list1Ok ok
+listStr TypeError
+[null]
+nullable ok
+nullableStr TypeError
+int TypeError
+7
+intOk ok
+double TypeError
+2.5
+doubleOk ok
+string TypeError
+bool TypeError
+true
+boolOk ok
+typedMap TypeError

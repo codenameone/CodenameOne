@@ -38,7 +38,8 @@ import dart.runtime.Funcs;
  * and nothing more is delivered.</p>
  *
  * <p>Pause is not modelled: a paused subscription still receives events, which its
- * subscription buffers.</p>
+ * subscription buffers. Stream transformations do not use this class; they listen
+ * to their source through {@link Forward}.</p>
  */
 public final class AsyncStar {
 
@@ -57,7 +58,7 @@ public final class AsyncStar {
     /** The yield target an async* body writes to. */
     public static final class Sink<T> {
         final StreamController<T> controller = new StreamController<T>();
-        volatile boolean cancelled;
+        boolean cancelled;
         private final java.util.List<Funcs.VoidFunc0> cancelHooks = new java.util.ArrayList<Funcs.VoidFunc0>();
 
         /// Runs {@code hook} when the listener cancels: a body blocked on an upstream
@@ -65,12 +66,9 @@ public final class AsyncStar {
         public void onCancel(Funcs.VoidFunc0 hook) {
             // One lock with the cancel handler: a cancel between the check and the add
             // left the hook unrun, and the body blocked on a quiet source forever.
-            boolean now;
-            synchronized (cancelHooks) {
-                now = cancelled;
-                if (!now) {
-                    cancelHooks.add(hook);
-                }
+            boolean now = cancelled;
+            if (!now) {
+                cancelHooks.add(hook);
             }
             if (now) {
                 hook.call();
@@ -129,68 +127,23 @@ public final class AsyncStar {
         }
     }
 
+    /// The generator's stream. The transpiler lowers almost every {@code async*} body
+    /// to an {@link AsyncStarFrame}; this runs the few shapes it does not, and the
+    /// runtime's own non-suspending generators ({@code Stream.fromIterable}).
     public static <T> Stream<T> asyncStar(final Funcs.VoidFunc1<Sink<T>> body) {
-        return asyncStar(body, null);
-    }
-
-    /// A stream transformation: {@code body} reads {@code source} through an iterator
-    /// and yields. The iterator subscribes inside the downstream listen(), so an event
-    /// the source emits right after it is buffered rather than lost to a broadcast
-    /// stream, and source errors are re-emitted in order while the body keeps reading,
-    /// as Dart's transformers (take, LineSplitter, utf8.decoder...) do.
-    public static <T, R> Stream<R> over(final Stream<T> source,
-            final Funcs.VoidFunc2<StreamIterator<T>, Sink<R>> body) {
-        final Object[] sinkRef = new Object[1];
-        final StreamIterator<T> it = new StreamIterator<T>(source, new Funcs.VoidFunc1<Object>() {
-            @Override
-            @SuppressWarnings("unchecked")
-            public void call(Object e) {
-                Object sk = sinkRef[0];
-                if (sk instanceof Sink) {
-                    ((Sink<R>) sk).addError(e);
-                }
-            }
-        });
-        return asyncStar(new Funcs.VoidFunc1<Sink<R>>() {
-            @Override
-            public void call(final Sink<R> s) {
-                sinkRef[0] = s;
-                s.onCancel(new Funcs.VoidFunc0() {
-                    @Override
-                    public void call() {
-                        it.cancel();
-                    }
-                });
-                try {
-                    body.call(it, s);
-                } finally {
-                    it.cancel();
-                }
-            }
-        }, new Funcs.VoidFunc0() {
-            @Override
-            public void call() {
-                it.start();
-            }
-        });
-    }
-
-    /// {@code onListen} runs synchronously inside listen(), before the body's timer: a
-    /// derived stream subscribes to its source there, so an event the source emits right
-    /// after the downstream listen() is buffered rather than lost to a broadcast stream.
-    static <T> Stream<T> asyncStar(final Funcs.VoidFunc1<Sink<T>> body, final Funcs.VoidFunc0 onListen) {
         final Sink<T> sink = new Sink<T>();
         sink.controller.onListen(new Funcs.VoidFunc0() {
             @Override
             public void call() {
-                if (onListen != null) {
-                    onListen.call();
-                }
-                // Started from a timer, never inside listen() itself, as Dart does.
-                new Timer(dart.core.Duration.zero, new Funcs.VoidFunc0() {
+                // Started in a microtask, never inside listen() itself, as Dart does,
+                // in order with the deliveries already queued.
+                // The body runs on the event loop, in the isolate's own thread like
+                // every other Dart callback. A body this runtime could not lower to an
+                // AsyncStarFrame parks at its awaits the way any blocking await does.
+                Microtasks.schedule(new Runnable() {
                     @Override
-                    public void call() {
-                        run(body, sink);
+                    public void run() {
+                        AsyncStar.run(body, sink);
                     }
                 });
             }
@@ -199,11 +152,9 @@ public final class AsyncStar {
             @Override
             public void call() {
                 Funcs.VoidFunc0[] hooks;
-                synchronized (sink.cancelHooks) {
-                    sink.cancelled = true;
-                    hooks = sink.cancelHooks.toArray(new Funcs.VoidFunc0[sink.cancelHooks.size()]);
-                    sink.cancelHooks.clear();
-                }
+                sink.cancelled = true;
+                hooks = sink.cancelHooks.toArray(new Funcs.VoidFunc0[sink.cancelHooks.size()]);
+                sink.cancelHooks.clear();
                 for (Funcs.VoidFunc0 h : hooks) {
                     h.call();
                 }

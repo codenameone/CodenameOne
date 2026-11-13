@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.reel.net;
 
+import com.codename1.appkit.Net;
+
 import com.codenameone.examples.reel.Prefs;
 import com.codenameone.examples.reel.api.AppConfigDto;
 import com.codenameone.examples.reel.api.FeatureFlagDto;

@@ -1,0 +1,15 @@
+[1, 2, 3, 4]
+10
+true
+2
+List<dynamic> is not List<int>
+List<Object> is not List<String>
+xy 2
+2.5
+1
+Map<String, dynamic> is not Map<String, int>
+7
+int is not Future<int>
+[1, 2]
+List<int> is not Stream<int>
+String is not List<int>

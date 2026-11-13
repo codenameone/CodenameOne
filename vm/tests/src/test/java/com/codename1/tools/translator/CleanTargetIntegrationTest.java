@@ -769,6 +769,29 @@ class CleanTargetIntegrationTest {
         Path uwpExe = crossBuildDist(cmakeRoot, sys, clangCl, "WinFormApp", true);
         System.out.println("CN1_XWIN_UWP_EXE=" + uwpExe.toAbsolutePath() + " (" + (Files.size(uwpExe) / 1024) + "KB)");
 
+        // --- the kiosk build (windows.embedded=true) for an x64 panel PC and an
+        // arm64 IoT board: the embedded window code and the WinRT bus natives
+        // compile only in this variant. The x64 one is what the Windows CI job
+        // launches to check the kiosk window (CN1_KIOSK_EXE_OUT). ---
+        Path kioskExe = crossBuildDist(cmakeRoot, sys, clangCl, "WinFormApp", false, true, false);
+        System.out.println("CN1_XWIN_KIOSK_EXE=" + kioskExe.toAbsolutePath());
+        String kioskOut = System.getenv("CN1_KIOSK_EXE_OUT");
+        boolean ci = kioskOut != null && !kioskOut.trim().isEmpty();
+        // CI splats aarch64 too, so a missing arm64 build there is a failure.
+        if (ci || Files.isDirectory(sys.resolve("crt/lib/aarch64"))) {
+            Path armExe = crossBuildDist(cmakeRoot, sys, clangCl, "WinFormApp", false, true, true);
+            System.out.println("CN1_XWIN_KIOSK_ARM64_EXE=" + armExe.toAbsolutePath());
+        } else {
+            System.out.println("No aarch64 libraries in the sysroot; the arm64 kiosk build was skipped");
+        }
+        if (ci) {
+            Path dest = Paths.get(kioskOut.trim());
+            if (dest.getParent() != null) {
+                Files.createDirectories(dest.getParent());
+            }
+            Files.copy(kioskExe, dest, StandardCopyOption.REPLACE_EXISTING);
+        }
+
         // --- the UWP smoke app the Windows CI job installs and launches as a real
         // UWP activation (windows-cross-compile.yml). It writes a marker into its
         // package LocalState once its first form has painted, which is the only
@@ -880,8 +903,16 @@ class CleanTargetIntegrationTest {
     /// which compiles the app API partition and links WindowsApp.lib alone.
     static Path crossBuildDist(Path cmakeRoot, Path sys, String clangCl, String exeName, boolean uwp)
             throws Exception {
-        String target = "x86_64-pc-windows-msvc";
-        String libArch = "x86_64";
+        return crossBuildDist(cmakeRoot, sys, clangCl, exeName, uwp, false, false);
+    }
+
+    /// `embedded` builds the kiosk variant `windows.embedded=true` produces
+    /// (`-DCN1_WINDOWS_EMBEDDED=ON`); `arm64` targets Windows on Arm, which the
+    /// arm64 IoT boards run. The sysroot must have been splatted for aarch64 too.
+    static Path crossBuildDist(Path cmakeRoot, Path sys, String clangCl, String exeName, boolean uwp,
+            boolean embedded, boolean arm64) throws Exception {
+        String target = arm64 ? "aarch64-pc-windows-msvc" : "x86_64-pc-windows-msvc";
+        String libArch = arm64 ? "aarch64" : "x86_64";
         String inc = String.join(" ",
                 "--target=" + target,
                 imsvc(sys.resolve("crt/include")),
@@ -903,13 +934,15 @@ class CleanTargetIntegrationTest {
                 "-I", sys.resolve("crt/include").toString(),
                 "-I", sys.resolve("sdk/include/ucrt").toString());
         String llvmRc = System.getenv().getOrDefault("CN1_LLVM_RC", "llvm-rc");
-        Path buildDir = cmakeRoot.resolve(uwp ? "xbuild-uwp" : "xbuild");
+        Path buildDir = cmakeRoot.resolve((uwp ? "xbuild-uwp" : embedded ? "xbuild-embedded" : "xbuild")
+                + (arm64 ? "-arm64" : ""));
         Files.createDirectories(buildDir);
         runCommand(Arrays.asList("cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
                 "-DCN1_WINDOWS_UWP=" + (uwp ? "ON" : "OFF"),
+                "-DCN1_WINDOWS_EMBEDDED=" + (embedded ? "ON" : "OFF"),
                 "-G", "Ninja",
                 "-DCMAKE_SYSTEM_NAME=Windows",
-                "-DCMAKE_SYSTEM_PROCESSOR=AMD64",
+                "-DCMAKE_SYSTEM_PROCESSOR=" + (arm64 ? "ARM64" : "AMD64"),
                 // STATIC_LIBRARY so CMake's compiler-detection try_compile does not
                 // need a full link before the toolchain flags are fully applied.
                 "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",

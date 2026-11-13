@@ -34,8 +34,22 @@ public abstract class SystemChrome {
     private SystemChrome() {
     }
 
+    private static SystemUiOverlayStyle current;
+
+    /// Records the style; it is answered by currentStyle(). The platform's own
+    /// status bar is left as the port draws it.
     public static void setSystemUIOverlayStyle(SystemUiOverlayStyle style) {
-        // no-op
+        // Codename One has no status bar styling API: no Display property or
+        // method that the iOS or Android port reads sets the bar's colour or
+        // icon brightness (the Android port only makes the bar transparent for
+        // edge-to-edge layouts, internally). The style is therefore only
+        // stored, so currentStyle() can answer what the application asked for.
+        current = style;
+    }
+
+    /// The style most recently set, or null.
+    public static SystemUiOverlayStyle currentStyle() {
+        return current;
     }
 
     public static void setPreferredOrientations(List<?> orientations) {

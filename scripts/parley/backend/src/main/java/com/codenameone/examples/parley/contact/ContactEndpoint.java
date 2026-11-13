@@ -19,7 +19,7 @@
 package com.codenameone.examples.parley.contact;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.parley.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.parley.api.ContactApiServer;
 import com.codenameone.examples.parley.api.ContactDto;
 import com.codenameone.examples.parley.api.ReportDto;

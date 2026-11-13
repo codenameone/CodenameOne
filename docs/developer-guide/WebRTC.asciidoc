@@ -66,6 +66,32 @@ over, close the connection and release the media so the camera light goes off:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/WebRtcSnippets.java[tag=webrtc-hangup,indent=0]
 ----
 
+=== When the network changes
+
+A phone that moves from Wi-Fi to mobile data loses the path its call was using:
+the addresses the two sides agreed on no longer reach it. The connection reports
+`DISCONNECTED`, and the remote video stops on its last frame. Show that state, for
+example as "Reconnecting...", rather than a frozen picture of a call that still says
+it's connected. A `DISCONNECTED` connection can recover by itself after a brief
+loss. If it doesn't recover within a second or two, or it reports `FAILED`, restart
+ICE:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/WebRtcSnippets.java[tag=webrtc-restart,indent=0]
+----
+
+`restartIce()` changes nothing by itself. The next offer carries new credentials,
+the other side answers it as it answered the first, and new candidates flow both
+ways. Tracks and views stay in place, and the connection reports `CONNECTED` once
+it finds a new path. Restart from one side only, by convention the caller. If both
+sides offer at once, neither offer can be answered.
+
+To test it, start a call on Wi-Fi and switch one phone to mobile data, with a
+running stopwatch in front of the camera so a frozen frame is obvious. In the
+simulator, `CN.setProperty("platformHint.webrtc.dropNetwork",
+"true")` drops the path of every connected call until it restarts.
+
 === Tracks and views
 
 A `MediaTrack` is one stream of audio or video, local, or remote. `setEnabled(false)`

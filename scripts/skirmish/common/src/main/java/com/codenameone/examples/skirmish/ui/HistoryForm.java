@@ -22,7 +22,7 @@ import com.codename1.components.MultiButton;
 import com.codename1.ui.Form;
 import com.codenameone.examples.skirmish.api.MatchSummaryDto;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 
 /// The player's recent battles, each one a replay away.
 public final class HistoryForm {

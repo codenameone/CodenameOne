@@ -27,7 +27,7 @@ import com.codenameone.examples.parley.Telemetry;
 import com.codenameone.examples.parley.api.ReasonDto;
 import com.codenameone.examples.parley.api.ReportViewDto;
 import com.codenameone.examples.parley.net.Api;
-import com.codenameone.examples.parley.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.parley.ui.Lang;
 import com.codenameone.examples.parley.ui.Ui;
 import java.util.List;

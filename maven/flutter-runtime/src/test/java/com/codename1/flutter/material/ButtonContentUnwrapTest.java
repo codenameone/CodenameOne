@@ -86,7 +86,7 @@ class ButtonContentUnwrapTest {
     @Test
     @DisplayName("a plain Icon still yields its glyph")
     void aPlainIconIsFound() {
-        assertEquals(Icons.arrow_back().codePoint(),
+        assertEquals(Icons.arrow_back().codePointChar(),
                 mount(new Icon(Icons.arrow_back())).consumedIconChar());
     }
 
@@ -95,7 +95,7 @@ class ButtonContentUnwrapTest {
     void aComposedIconIsResolved() {
         ButtonRenderElement e = mount(new ComposedIcon());
 
-        assertEquals(Icons.arrow_back().codePoint(), e.consumedIconChar(),
+        assertEquals(Icons.arrow_back().codePointChar(), e.consumedIconChar(),
                 "BackButtonIcon-shaped content must resolve to its glyph");
         assertEquals(null, e.consumedLabel(),
                 "and must NOT fall back to a toString() label");
@@ -106,7 +106,7 @@ class ButtonContentUnwrapTest {
     void aWrappedIconIsResolved() {
         ButtonRenderElement e = mount(new Wrapper(new Icon(Icons.search())));
 
-        assertEquals(Icons.search().codePoint(), e.consumedIconChar());
+        assertEquals(Icons.search().codePointChar(), e.consumedIconChar());
         assertEquals(null, e.consumedLabel());
     }
 
@@ -115,7 +115,7 @@ class ButtonContentUnwrapTest {
     void nestingIsWalked() {
         ButtonRenderElement e = mount(new Wrapper(new ComposedIcon()));
 
-        assertEquals(Icons.arrow_back().codePoint(), e.consumedIconChar());
+        assertEquals(Icons.arrow_back().codePointChar(), e.consumedIconChar());
     }
 
     @Test
@@ -144,7 +144,7 @@ class ButtonContentUnwrapTest {
     void aStatefulIconIsResolved() {
         ButtonRenderElement e = mount(new StatefulIcon());
 
-        assertEquals(Icons.tune().codePoint(), e.consumedIconChar(),
+        assertEquals(Icons.tune().codePointChar(), e.consumedIconChar(),
                 "FeatureDiscovery-shaped content must resolve to its glyph");
         assertEquals(null, e.consumedLabel());
     }

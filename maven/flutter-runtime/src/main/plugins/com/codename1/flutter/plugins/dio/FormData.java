@@ -73,7 +73,7 @@ public class FormData {
     /// `formData.fields.add(MapEntry(k, v))` is read back by encode and length.
     public dart.core.DartList<MapEntry<String, String>> fields() {
         if (liveFields == null) {
-            liveFields = new dart.core.DartList<MapEntry<String, String>>();
+            liveFields = new dart.core.DartList<MapEntry<String, String>>(dart.runtime.TypeWitness.of(MapEntry.class, false, dart.runtime.TypeWitness.of(String.class, false), dart.runtime.TypeWitness.of(String.class, false)));
             for (String[] f : fields) {
                 liveFields.add(new MapEntry<String, String>(f[0], f[1]));
             }
@@ -108,7 +108,7 @@ public class FormData {
     /// `formData.files`: the file parts, as a live list (see {@link #fields}).
     public dart.core.DartList<MapEntry<String, MultipartFile>> files() {
         if (liveFiles == null) {
-            liveFiles = new dart.core.DartList<MapEntry<String, MultipartFile>>();
+            liveFiles = new dart.core.DartList<MapEntry<String, MultipartFile>>(dart.runtime.TypeWitness.of(MapEntry.class, false, dart.runtime.TypeWitness.of(String.class, false), dart.runtime.TypeWitness.of(MultipartFile.class, false)));
             for (Object[] f : files) {
                 if (f[1] instanceof MultipartFile && f[0] instanceof String) {
                     liveFiles.add(new MapEntry<String, MultipartFile>((String) f[0], (MultipartFile) f[1]));

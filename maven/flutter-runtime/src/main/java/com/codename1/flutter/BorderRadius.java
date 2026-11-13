@@ -65,6 +65,12 @@ public final class BorderRadius extends BorderRadiusGeometry {
         return null;
     }
 
+    /** Flutter's {@code BorderRadius.copyWith}: this radius with the given corners replaced. */
+    public BorderRadius copyWith(Radius topLeft, Radius topRight, Radius bottomLeft, Radius bottomRight) {
+        return new BorderRadius(topLeft != null ? topLeft : this.topLeft, topRight != null ? topRight : this.topRight,
+                bottomLeft != null ? bottomLeft : this.bottomLeft, bottomRight != null ? bottomRight : this.bottomRight);
+    }
+
     public static BorderRadius only(Radius topLeft, Radius topRight,
                                     Radius bottomLeft, Radius bottomRight) {
         return new BorderRadius(topLeft, topRight, bottomLeft, bottomRight);
@@ -113,5 +119,11 @@ public final class BorderRadius extends BorderRadiusGeometry {
                 Radius.lerp(a.topRight, b.topRight, t),
                 Radius.lerp(a.bottomLeft, b.bottomLeft, t),
                 Radius.lerp(a.bottomRight, b.bottomRight, t));
+    }
+
+    /// Already absolute: every text direction resolves to this radius.
+    @Override
+    public BorderRadius resolve(TextDirection direction) {
+        return this;
     }
 }

@@ -1,0 +1,12 @@
+# Settings the tool reads at start-up through com.codename1.backend.Config, the
+# same layered configuration a server has: a system property of the same name
+# wins, then the environment variable the key maps to (my.setting is read from
+# MY_SETTING), then application-<profile>.properties, then this file.
+#
+# It sits in the module root on purpose: the native runtime has no classpath to
+# load a resource from, so Config opens it as a FILE relative to the working
+# directory.
+
+# The name --help prints when the module declares several top-level commands,
+# which become the subcommands of one; it defaults to the project's directory.
+# cn1.cli.name=__PROJECT_NAME__

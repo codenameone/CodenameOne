@@ -19,7 +19,7 @@
 package com.codenameone.examples.reel.catalog;
 
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.reel.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.reel.api.CatalogApiServer;
 import com.codenameone.examples.reel.api.GenreDto;
 import com.codenameone.examples.reel.api.HomeDto;

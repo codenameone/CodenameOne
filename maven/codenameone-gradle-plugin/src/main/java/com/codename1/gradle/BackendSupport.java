@@ -101,10 +101,14 @@ final class BackendSupport {
     static void apply(final Project project, final ProjectLayout layout, final CodenameOneExtension ext,
                       final Provider<Map<String, String>> userProperties) {
         AppSupport.addFramework(project, "implementation", ext.getVersion(), "codenameone-backend");
+        AppSupport.addProcessor(project);
         project.getDependencies().add("runtimeOnly", SQLITE_JDBC);
 
         final SourceSet main = project.getExtensions().getByType(JavaPluginExtension.class).getSourceSets()
                 .getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+        // A tool or a server written in Python: its main module becomes the entry
+        // point (CommandAnnotationProcessor), so it must compile before the pass below.
+        AppSupport.registerPython(project, layout, ext, userProperties, main);
         // The @RestController router and the entry point are generated here, from
         // the compiled classes, exactly as the Maven module's process-annotations
         // execution does.

@@ -56,7 +56,7 @@ class NavigationRailLayoutTest {
 
     private static NavigationRail railOfThree(NavigationRailLabelType type, long selected) {
         NavigationRail rail = new NavigationRail();
-        DartList<NavigationRailDestination> ds = new DartList<NavigationRailDestination>();
+        DartList<NavigationRailDestination> ds = new DartList<NavigationRailDestination>(dart.runtime.TypeWitness.of(NavigationRailDestination.class, false));
         ds.add(destination("First"));
         ds.add(destination("Second"));
         ds.add(destination("Third"));
@@ -88,7 +88,7 @@ class NavigationRailLayoutTest {
     }
 
     private static DartList<String> textOf(NavigationRail rail) {
-        DartList<String> out = new DartList<String>();
+        DartList<String> out = new DartList<String>(dart.runtime.TypeWitness.of(String.class, false));
         collectText(rail.build(null), out);
         return out;
     }

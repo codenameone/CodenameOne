@@ -38,4 +38,12 @@ public interface DynamicObject {
     boolean $dset(String name, Object value);
 
     Object $dcall(String name, Object[] positional, DartMap<String, Object> named);
+
+    /// Dart's noSuchMethod, called by dart.runtime.Dyn when a dynamic access found no
+    /// member. A program class that declares noSuchMethod overrides this (its parameter
+    /// type, Invocation, maps to dart.core.Invocation); every other class answers
+    /// Dyn.NO_MEMBER, and Dyn then throws the NoSuchMethodError Object's member would.
+    default Object noSuchMethod(dart.core.Invocation invocation) {
+        return Dyn.NO_MEMBER;
+    }
 }

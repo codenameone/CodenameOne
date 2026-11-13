@@ -1,0 +1,17 @@
+3
+x
+[1, 2, 3]
+[1, 2, 3]
+v=5
+Cell(7)
+Cell(8)
+9
+log2 null null
+log2 a null
+log2 a b
+log2 1 null
+ababab
+z
+()
+true
+done

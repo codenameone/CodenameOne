@@ -331,7 +331,7 @@ final class JavascriptBundleWriter {
             chunkStrings.add(chunks.get(i).toString());
             chunks.set(i, null);
         }
-        minifyGeneratedIdentifiers(chunkStrings);
+        writeSymbolMap(outputDirectory, minifyGeneratedIdentifiers(chunkStrings));
         aliasHotCn1Identifiers(chunkStrings);
         mangleDispatchIds(chunkStrings, classes);
         mangleInstanceFieldProps(chunkStrings, classes);
@@ -376,9 +376,9 @@ final class JavascriptBundleWriter {
      * definitions; and {@code $M} is a fresh prefix the mangler never emits.
      * Kill switch: {@code -Dparparvm.js.minify.idents.off}.
      */
-    private static void minifyGeneratedIdentifiers(java.util.List<String> chunkStrings) {
+    private static java.util.Map<String, String> minifyGeneratedIdentifiers(java.util.List<String> chunkStrings) {
         if (System.getProperty("parparvm.js.minify.idents.off") != null) {
-            return;
+            return java.util.Collections.emptyMap();
         }
         com.codename1.tools.translator.regex.Pattern defPattern = com.codename1.tools.translator.regex.Pattern.compile(
                 "function\\*?\\s+(cn1_[A-Za-z0-9_]+)\\s*\\(");
@@ -398,7 +398,7 @@ final class JavascriptBundleWriter {
             }
         }
         if (defs.isEmpty()) {
-            return;
+            return java.util.Collections.emptyMap();
         }
         // Any cn1_ token referenced as a string literal must NOT be renamed:
         //  - in the app bundle: jvm.setMain's main method, field-list manifests;
@@ -493,7 +493,7 @@ final class JavascriptBundleWriter {
             }
         }
         if (defs.isEmpty()) {
-            return;
+            return java.util.Collections.emptyMap();
         }
         java.util.Map<String, String> map = new java.util.HashMap<String, String>(defs.size() * 2);
         int idx = 0;
@@ -503,8 +503,46 @@ final class JavascriptBundleWriter {
         for (int i = 0; i < chunkStrings.size(); i++) {
             chunkStrings.set(i, renameTokens(chunkStrings.get(i), map));
         }
+        return map;
     }
 
+
+    /**
+     * Writes the short names {@link #minifyGeneratedIdentifiers} gave the
+     * bundle's functions, beside the bundle as {@code <bundle>-symbols.txt}.
+     *
+     * <p>A browser profiler and a stack trace name a function by its
+     * definition, so after minification they read {@code $Mabc} instead of
+     * {@code cn1_com_foo_Bar_baz_int}. One line per function -- the short
+     * name, a tab, the translator's name -- lets the developer translate a
+     * profile or a trace back. The other renaming passes never reach a
+     * function's own name: the hot-call aliases are {@code var}s holding the
+     * function object, whose name stays the {@code $M} one, and the
+     * dispatch-id and field manglers rewrite strings and properties.</p>
+     *
+     * <p>It goes beside the bundle, never in it: the bundle is the public web
+     * root, and the map is megabytes nobody but the developer reads. A build
+     * that did not minify deletes the file instead, so a map left by an
+     * earlier build is never read against a bundle it does not describe.</p>
+     */
+    private static void writeSymbolMap(File outputDirectory, java.util.Map<String, String> map) throws IOException {
+        File out = sidecar(outputDirectory, "symbols.txt");
+        if (map.isEmpty()) {
+            if (out.exists() && !out.delete()) {
+                throw new IOException("Could not delete stale symbol map " + out);
+            }
+            return;
+        }
+        java.util.TreeMap<String, String> byShort = new java.util.TreeMap<String, String>();
+        for (java.util.Map.Entry<String, String> e : map.entrySet()) {
+            byShort.put(e.getValue(), e.getKey());
+        }
+        StringBuilder sb = new StringBuilder(map.size() * 64);
+        for (java.util.Map.Entry<String, String> e : byShort.entrySet()) {
+            sb.append(e.getKey()).append('\t').append(e.getValue()).append('\n');
+        }
+        Util.writeUtf8(out, sb.toString());
+    }
 
     /**
      * Mangles signature-based dispatch-id STRING VALUES

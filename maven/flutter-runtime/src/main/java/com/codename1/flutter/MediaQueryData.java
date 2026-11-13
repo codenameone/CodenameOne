@@ -80,6 +80,11 @@ public class MediaQueryData {
      * The number of font pixels per logical pixel (legacy Flutter accessor;
      * defaults to 1.0 — this pass does not read the platform text-scale).
      */
+    /** Flutter's {@code MediaQueryData.textScaler}. */
+    public TextScaler textScaler() {
+        return TextScaler.linear(textScaleFactor);
+    }
+
     public double textScaleFactor() {
         return textScaleFactor;
     }

@@ -27,7 +27,7 @@ package com.codename1.flutter;
  * A point within a rectangle expressed in Flutter's -1..1 coordinate system:
  * (-1,-1) is the top left, (0,0) the center, (1,1) the bottom right.
  */
-public class Alignment {
+public class Alignment extends AlignmentGeometry {
 
     public static final Alignment topLeft = new Alignment(-1, -1);
     public static final Alignment topCenter = new Alignment(0, -1);

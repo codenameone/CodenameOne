@@ -58,6 +58,7 @@ public enum HintGroup {
     MAC_NATIVE(null, "macNative."),
     WINDOWS(null, "windows."),
     LINUX(null, "linux."),
+    STEAM(null, "steam."),
     JAVASCRIPT(null, "javascript."),
     TV_NATIVE(null, "tvNative."),
     WATCH_NATIVE(null, "watchNative."),

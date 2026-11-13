@@ -2,9 +2,8 @@
 // const context, where Dart makes them const implicitly: a const variable's
 // initializer, a const literal's elements, a const constructor's arguments.
 // (-0.0).toStringAsFixed keeps the sign. A RegExp group index past 32 bits is a
-// RangeError, not group 0. Future callbacks run synchronously in this runtime's
-// blocking-await model (see Future.onComplete): the order below is the CURRENT
-// behaviour, pinned on purpose, and differs from Dart, which prints sync first.
+// RangeError, not group 0. A then() callback on a completed future runs from the
+// microtask queue, as in Dart: the list is printed before 'future' is added.
 
 const topList = <int>[1, 2];
 const topMap = <String, int>{'a': 1};

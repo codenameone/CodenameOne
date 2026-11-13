@@ -26,7 +26,7 @@ import com.codename1.ui.TextField;
 import com.codenameone.examples.skirmish.api.PackSaveDto;
 import com.codenameone.examples.skirmish.battle.ForgeFiles;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.rules.Arena;
 import com.codenameone.examples.skirmish.rules.CardDef;

@@ -179,7 +179,9 @@ class FocusNode {
 // declared here.
 @JavaName('com.codename1.flutter.navigation.NavigatorState')
 abstract class NavigatorState {
-  external String restorablePush(Object routeBuilder, {Object? arguments});
+  // The builder's real type, which NavigatorState.restorablePush takes as a Func2: a
+  // tear-off into an Object slot is cast to its own exact SAM, which javac then refuses.
+  external String restorablePush(Object? Function(BuildContext, Object?) routeBuilder, {Object? arguments});
   external String restorablePushNamed(String routeName, {Object? arguments});
   external void pop([Object? result]);
   // Imperative navigation used across new_gallery — Flutter's `NavigatorState`
@@ -187,8 +189,9 @@ abstract class NavigatorState {
   external Future<T> push<T>(Route<T> route);
   external Future<T> pushNamed<T>(String routeName, {Object? arguments});
   external Future<T> pushReplacement<T>(Route<T> newRoute, {Object? result});
+  external Future<T> pushAndRemoveUntil<T>(Route<T> newRoute, bool Function(Route<dynamic>) predicate);
   external Future<T> pushReplacementNamed<T>(String routeName, {Object? arguments, Object? result});
-  external void popUntil(Object predicate);
+  external void popUntil(bool Function(Route<dynamic>) predicate);
   external bool canPop();
   external Future<bool> maybePop([Object? result]);
 }

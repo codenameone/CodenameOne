@@ -20,8 +20,8 @@ package com.codenameone.examples.wayline.admin;
 
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PreAuthorize;
-import com.codenameone.examples.wayline.Caller;
-import com.codenameone.examples.wayline.Text;
+import com.codename1.appkit.server.Caller;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.wayline.account.Accounts;
 import com.codenameone.examples.wayline.api.AdminApiServer;
 import com.codenameone.examples.wayline.api.AdminStatsDto;

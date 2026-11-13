@@ -63,12 +63,12 @@ public class FabRenderElement extends RenderElement {
         for (int depth = 0; w != null && depth < 6; depth++) {
             if (w instanceof Icon) {
                 Icon ic = (Icon) w;
-                return ic.getIcon() == null ? 0 : ic.getIcon().codePoint();
+                return ic.getIcon() == null ? 0 : ic.getIcon().codePointChar();
             }
             if (w instanceof com.codename1.flutter.widgets.HasIcon) {
                 com.codename1.flutter.IconData d =
                         ((com.codename1.flutter.widgets.HasIcon) w).iconData();
-                return d == null ? 0 : d.codePoint();
+                return d == null ? 0 : d.codePointChar();
             }
             if (!(w instanceof com.codename1.flutter.widgets.HasChild)) {
                 return 0;
@@ -443,7 +443,7 @@ public class FabRenderElement extends RenderElement {
             return constraints.smallest();
         }
         return constraints.constrain(
-                materialSize(fab().isExtended(), c.getPreferredSize().getWidth()));
+                materialSize(fab().isExtended(), c.getPreferredSize().getWidth(), fab().getSizeLp()));
     }
 
     /**
@@ -456,8 +456,12 @@ public class FabRenderElement extends RenderElement {
      * only the width follows the label, and never below the minimum.</p>
      */
     static Size materialSize(boolean extended, double preferredWidth) {
+        return materialSize(extended, preferredWidth, FAB_SIZE_LP);
+    }
+
+    static Size materialSize(boolean extended, double preferredWidth, double sideLp) {
         if (!extended) {
-            double side = com.codename1.flutter.rendering.Dp.px(FAB_SIZE_LP);
+            double side = com.codename1.flutter.rendering.Dp.px(sideLp);
             return new Size(side, side);
         }
         return new Size(

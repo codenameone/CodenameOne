@@ -1,0 +1,41 @@
+created
+make 0
+got 0
+make 1
+got 1
+make 2
+got 2
+counted done
+[0, 1, 2, 3, 4]
+3
+[10, 30, 50]
+true
+a
+true
+b
+threw Bad state: boom
+false
+descend 2
+descend 1
+[2, 1, 0, 100, 101, 102]
+enter try
+guarded 1
+guarded 2
+after break
+enter try
+finally ran
+[1, 2, 3]
+caught oops
+[1, 2, 3, 4]
+make 0
+make 0
+make 1
+a 1 b 0
+X,Y
+[1, 4, 9, 16]
+[(1, 2), (3, 4)]
+[]
+[7, 1, 2, 3, 4]
+[0, 3, 6]
+[2, 0, 2]
+4

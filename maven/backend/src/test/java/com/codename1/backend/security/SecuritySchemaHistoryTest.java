@@ -95,7 +95,7 @@ class SecuritySchemaHistoryTest {
             Migrations.of(pool, SecuritySchema.migrations()).target("10").migrate();
             pool.execute("INSERT INTO cn1_persistent_logins (series, username_key, username, token_hash, last_used) "
                     + "VALUES ('browser', 'ada', 'Ada', 'old-hash', 1000)", null);
-            assertEquals(2, Migrations.of(pool, SecuritySchema.migrations()).migrate().getMigrationsExecuted());
+            assertEquals(3, Migrations.of(pool, SecuritySchema.migrations()).migrate().getMigrationsExecuted());
             com.codename1.backend.security.rememberme.JdbcTokenRepository repository =
                     new com.codename1.backend.security.rememberme.JdbcTokenRepository(pool);
             assertEquals("old-hash", repository.getTokenForSeries("browser").getTokenHash());
@@ -113,9 +113,9 @@ class SecuritySchemaHistoryTest {
         DataSource pool = DataSource.open(new File(dir, "named.db").getPath(), 2, 5000, 10000);
         try {
             MigrateResult result = Migrations.of(pool, SecuritySchema.migrations()).migrate();
-            assertEquals(12, result.getMigrationsExecuted());
-            assertEquals(12, new TreeSet<String>(result.getApplied()).size(),
-                    "twelve versions reported under fewer names: " + result.getApplied());
+            assertEquals(13, result.getMigrationsExecuted());
+            assertEquals(13, new TreeSet<String>(result.getApplied()).size(),
+                    "thirteen versions reported under fewer names: " + result.getApplied());
             assertEquals("com.codename1.backend.security.SecuritySchema.V1__users_and_authorities",
                     result.getApplied().get(0));
             assertEquals("com.codename1.backend.security.SecuritySchema.V9__passkeys",
@@ -140,9 +140,9 @@ class SecuritySchemaHistoryTest {
             Migrations.of(pool, SecuritySchema.migrations()).validate();
             MigrateResult again = Migrations.of(pool, SecuritySchema.migrations()).migrate();
             assertEquals(0, again.getMigrationsExecuted());
-            assertEquals("12", again.getTargetVersion());
+            assertEquals("13", again.getTargetVersion());
             MigrationInfo[] info = Migrations.of(pool, SecuritySchema.migrations()).info();
-            assertEquals(12, info.length);
+            assertEquals(13, info.length);
             for (MigrationInfo row : info) {
                 assertEquals(MigrationState.SUCCESS, row.getState(), "version " + row.getVersion());
             }
@@ -161,7 +161,7 @@ class SecuritySchemaHistoryTest {
             Migrations.of(pool, SecuritySchema.migrations()).target("11").migrate();
             pool.execute("INSERT INTO cn1_persistent_logins (series, username_key, username, "
                     + "token_hash, last_used) VALUES ('old', 'ada', 'Ada', 'h0', 1000)", null);
-            assertEquals(1, Migrations.of(pool, SecuritySchema.migrations()).migrate()
+            assertEquals(2, Migrations.of(pool, SecuritySchema.migrations()).migrate()
                     .getMigrationsExecuted());
             com.codename1.backend.security.rememberme.JdbcTokenRepository repository =
                     new com.codename1.backend.security.rememberme.JdbcTokenRepository(pool);

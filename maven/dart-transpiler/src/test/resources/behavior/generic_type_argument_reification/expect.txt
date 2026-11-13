@@ -1,0 +1,32 @@
+int:true num:true String:false Object:true ObjectQ:true dynamic:true intQ:true notString:true
+int:false num:false String:true Object:true ObjectQ:true dynamic:true intQ:false notString:false
+int:false num:false String:false Object:false ObjectQ:true dynamic:true intQ:true notString:true
+int:false num:false String:false Object:false ObjectQ:true dynamic:true intQ:false notString:true
+int:true num:true String:false Object:true ObjectQ:true dynamic:true intQ:true notString:true
+int:false num:false String:true Object:true ObjectQ:true dynamic:true intQ:false notString:false
+int:false num:true String:false Object:true ObjectQ:true dynamic:true intQ:false notString:true
+int:true num:true String:false Object:true ObjectQ:true dynamic:true intQ:true notString:true
+[1, 7, 8]
+[1, 2.5, 7, 8]
+[a]
+5
+[true/true/false, false/false/true, false/false/false]
+true true false false
+5
+TypeError for Box<String>
+null
+true false
+true false
+int:true num:true String:false Object:true ObjectQ:true dynamic:true intQ:true notString:true
+int:false num:false String:true Object:true ObjectQ:true dynamic:true intQ:false notString:false
+int:false num:true String:false Object:true ObjectQ:true dynamic:true intQ:false notString:true
+true false
+true false true false
+true false true false
+int:false num:false String:false Object:false ObjectQ:false dynamic:false intQ:false notString:true
+int:false num:true String:false Object:true ObjectQ:true dynamic:true intQ:false notString:true
+true true false
+true false
+caught Box<int> 1
+caught Box<String> s
+caught Box<int> 2

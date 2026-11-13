@@ -1,0 +1,14 @@
+addAllDoubleLiteral TypeError
+addAllNumTypedIntLiteral TypeError
+addAllIntList ok
+[1, 2, 4]
+insertAllMixed TypeError
+setAllDouble TypeError
+setRangeDouble TypeError
+setRangeInts ok
+[9, 2, 4]
+addAllUntypedIterableMixed TypeError
+[a]
+setAddAllDouble TypeError
+setAddAllInts ok
+{1, 3}

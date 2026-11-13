@@ -1,0 +1,13 @@
+keeper feeds dog 1.5 3 0.5 1
+dogkeeper feeds dog woof 42 6 0.25 7
+40
+2
+true
+true
+true
+quiet
+both!
+43
+12
+4
+31

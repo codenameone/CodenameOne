@@ -69,6 +69,10 @@
         <jcefmaven.version>146.0.10</jcefmaven.version>
         <jcef.version>jcef-d3de827+cef-146.0.10+g8219561+chromium-146.0.7680.179</jcef.version>
         <ffmpeg.version>7.1-1.5.11</ffmpeg.version>
+        <!-- The JavaCPP release ffmpeg.version was built against: its second
+             half. Bump the two together. cn1-binaries-javase and the Gradle
+             plugin both name the host's native jars at these versions. -->
+        <cn1.javacpp.version>1.5.11</cn1.javacpp.version>
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
         <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
@@ -82,6 +86,7 @@
         <module>cn1-binaries</module>
         <module>platform-feature-catalog</module>
         <module>project-model</module>
+        <module>annotation-processor</module>
         <module>build-hint-catalog</module>
         <module>build-hint-tools</module>
         <module>java-runtime</module>
@@ -185,11 +190,6 @@
                 <groupId>me.friwi</groupId>
                 <artifactId>jcefmaven</artifactId>
                 <version>${jcefmaven.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.bytedeco</groupId>
-                <artifactId>ffmpeg-platform</artifactId>
-                <version>${ffmpeg.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
@@ -762,10 +762,12 @@
                                              skipexisting="true"
                                              ignoreerrors="true"/>
 
+                                        <!-- Best effort, like the <java> below (no failonerror): a GitHub
+                                             outage must not fail the framework build. -->
                                         <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
                                              dest="${user.home}/UpdateCodenameOne.jar"
                                              skipexisting="true"
-                                             ignoreerrors="false"/>
+                                             ignoreerrors="true"/>
                                         <java fork="true" jar="${user.home}/.codenameone/UpdateCodenameOne.jar">
                                             <arg value="${project.build.directory}/generated-sources/project"/>
                                             <arg value="force" />

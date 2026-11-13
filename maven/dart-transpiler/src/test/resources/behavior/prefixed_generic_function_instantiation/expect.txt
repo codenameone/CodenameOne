@@ -1,0 +1,13 @@
+int:1:null
+int:1:2
+true
+true
+true
+false
+String:a
+true
+Box<int>
+Box<Box<String>>
+Inner<int, List<Box<int>>>
+Inner<int, List<int>>
+Box<int>?

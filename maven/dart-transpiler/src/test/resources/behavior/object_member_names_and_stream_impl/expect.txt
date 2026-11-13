@@ -1,0 +1,14 @@
+gauge 20
+Instance of 'Plain'
+Instance of 'Builder'
+a+b+all
+Builder
+42
+a+b+all
+interp a+b+all
+trigger=go
+trigger=none
+[2, 4, 6]
+[11]
+read-only base
+local 7 8

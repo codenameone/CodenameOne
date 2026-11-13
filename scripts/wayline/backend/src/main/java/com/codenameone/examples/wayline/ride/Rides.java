@@ -28,7 +28,7 @@ import com.codename1.orm.repository.PageRequest;
 import com.codename1.orm.session.Identifier;
 import com.codename1.orm.session.PersistenceException;
 import com.codenameone.examples.wayline.Ids;
-import com.codenameone.examples.wayline.Text;
+import com.codename1.appkit.server.Text;
 import com.codenameone.examples.wayline.account.Moderation;
 import com.codenameone.examples.wayline.api.FareOptionDto;
 import com.codenameone.examples.wayline.api.FareQuoteDto;

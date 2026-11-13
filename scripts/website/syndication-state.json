@@ -3193,6 +3193,158 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-05T01:01:12+00:00"
+      },
+      "devto": {
+        "id": 4984372,
+        "url": "https://dev.to/codenameone/webrtc-calls-key-agreement-and-orm-checks-at-build-time-2cgb",
+        "syndicated_at": "2026-11-05T21:17:48+00:00"
+      }
+    },
+    "flutter-better-in-java": {
+      "foojay": {
+        "id": 192,
+        "url": "https://github.com/foojayio/website/pull/192",
+        "pull_request_url": "https://github.com/foojayio/website/pull/192",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-11-06T04:24:28+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/flutter-better-in-java",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aedf98e9e48a18824c9a440",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-06T16:01:12+00:00"
+      },
+      "devto": {
+        "id": 4989336,
+        "url": "https://dev.to/codenameone/flutter-better-in-java-1e48",
+        "syndicated_at": "2026-11-06T16:03:34+00:00"
+      }
+    },
+    "compose-on-more-screens": {
+      "hashnode": {
+        "url": "https://debugagent.com/your-compose-code-on-more-screens-and-less-cpu",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aee781d93c75ceeabce1579",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-07T01:01:08+00:00"
+      },
+      "devto": {
+        "id": 4993883,
+        "url": "https://dev.to/codenameone/your-compose-code-on-more-screens-and-less-cpu-2o3e",
+        "syndicated_at": "2026-11-07T14:03:54+00:00"
+      }
+    },
+    "swing-and-javafx-on-phones": {
+      "hashnode": {
+        "url": "https://debugagent.com/your-swing-and-javafx-code-on-iphone-android-and-the-web",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aefc9a1ea38004bf957fe54",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-08T01:01:12+00:00"
+      },
+      "devto": {
+        "id": 4998870,
+        "url": "https://dev.to/codenameone/your-swing-and-javafx-code-on-iphone-android-and-the-web-24c8",
+        "syndicated_at": "2026-11-08T14:01:01+00:00"
+      }
+    },
+    "bastion-hardened-bank-template": {
+      "hashnode": {
+        "url": "https://debugagent.com/bastion-a-hardened-bank-template-and-crypto-wallets-in-core",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6af11b1c548f787d91e0ab3a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-09T01:01:07+00:00"
+      },
+      "devto": {
+        "id": 5004794,
+        "url": "https://dev.to/codenameone/bastion-a-hardened-bank-template-and-crypto-wallets-in-core-3i06",
+        "syndicated_at": "2026-11-09T14:01:15+00:00"
+      }
+    },
+    "reel-streaming-and-courses-template": {
+      "hashnode": {
+        "url": "https://debugagent.com/reel-your-own-streaming-service-or-course-platform",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6af26c9f1491a789dd3dace5",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-10T01:01:10+00:00"
+      },
+      "devto": {
+        "id": 5011482,
+        "url": "https://dev.to/codenameone/reel-your-own-streaming-service-or-course-platform-4i2d",
+        "syndicated_at": "2026-11-10T14:36:01+00:00"
+      }
+    },
+    "android-apps-everywhere-even-without-google": {
+      "hashnode": {
+        "url": "https://debugagent.com/grapheneos-lineageos-e-os-and-others-are-now-officially-supported",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6af3be1e0ced3775a9d60076",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-11T01:01:08+00:00"
+      },
+      "devto": {
+        "id": 5017701,
+        "url": "https://dev.to/codenameone/grapheneos-lineageos-eos-and-others-are-now-officially-supported-3102",
+        "syndicated_at": "2026-11-11T15:03:44+00:00"
+      }
+    },
+    "backend-caches-certificates-and-a-simulator-that-types": {
+      "hashnode": {
+        "url": "https://debugagent.com/caches-certificates-streaming-uploads-and-a-simulator-that-types",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6af50f9e04079e73d0dc1543",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-12T01:01:09+00:00"
+      },
+      "devto": {
+        "id": 5023840,
+        "url": "https://dev.to/codenameone/caches-certificates-streaming-uploads-and-a-simulator-that-types-3d1j",
+        "syndicated_at": "2026-11-12T14:01:23+00:00"
+      }
+    },
+    "embedded-linux-ui-in-18-mb": {
+      "hashnode": {
+        "url": "https://debugagent.com/embedded-java-20x-smaller-than-chrome-faster-than-rust-royalty-free",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6af6611fcc8dba85ffa05c68",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-13T01:01:10+00:00"
+      },
+      "foojay": {
+        "id": 438,
+        "url": "https://github.com/foojayio/website/pull/438",
+        "pull_request_url": "https://github.com/foojayio/website/pull/438",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-11-13T01:01:30+00:00"
       }
     }
   }

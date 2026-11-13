@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.reel;
 
+import com.codename1.appkit.server.security.AccountSecurity;
+
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.GetMapping;
@@ -41,7 +43,7 @@ import java.util.Map;
 /// sign-in holds. That is why this needs no sign-in of its own.
 @RestController
 public class SignInCodePage {
-    @GetMapping(SecurityConfig.WEB_REDIRECT_PATH)
+    @GetMapping(AccountSecurity.WEB_REDIRECT_PATH)
     public HttpServer.Response code(
             @RequestParam(value = "code", required = false) String code,
             @RequestParam(value = "state", required = false) String state,

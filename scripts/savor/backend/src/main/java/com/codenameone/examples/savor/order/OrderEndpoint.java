@@ -20,7 +20,7 @@ package com.codenameone.examples.savor.order;
 
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
-import com.codenameone.examples.savor.Caller;
+import com.codename1.appkit.server.Caller;
 import com.codenameone.examples.savor.Roles;
 import com.codenameone.examples.savor.api.CartDto;
 import com.codenameone.examples.savor.api.DeliveryActivityDto;

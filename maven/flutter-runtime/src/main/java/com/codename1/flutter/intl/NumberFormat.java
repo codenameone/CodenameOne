@@ -33,8 +33,13 @@ public final class NumberFormat {
 
     private final String prefix;
     private final String suffix;
-    private final int digits;
+    private int digits;
+    /// intl's minimumFractionDigits once set; -1 keeps the pattern's own (0 for a
+    /// decimal pattern, which drops trailing zeros, otherwise every digit).
+    private int minDigits = -1;
     private final boolean percent;
+    /** 0: fixed; 1: compact ("1.2K"); 2: compact long ("1.2 thousand"); 3: grouped decimal. */
+    private int mode;
 
     private NumberFormat(String prefix, String suffix, int digits, boolean percent) {
         this.prefix = prefix;
@@ -60,12 +65,146 @@ public final class NumberFormat {
         return new NumberFormat("", "%", decimalDigits >= 0 ? (int) decimalDigits : 0, true);
     }
 
+    private static NumberFormat withMode(NumberFormat f, int mode) {
+        f.mode = mode;
+        return f;
+    }
+
+    /** {@code NumberFormat.compact()}: three significant digits and a K/M/B/T suffix. */
+    public static NumberFormat compact(String locale, Boolean explicitSign) {
+        return withMode(new NumberFormat("", "", -1, false), 1);
+    }
+
+    /** {@code NumberFormat.compactLong()}: "1.23 thousand". */
+    public static NumberFormat compactLong(String locale, Boolean explicitSign) {
+        return withMode(new NumberFormat("", "", -1, false), 2);
+    }
+
+    /** {@code NumberFormat.compactCurrency(symbol:)}: the symbol before a compact amount. */
+    public static NumberFormat compactCurrency(String locale, String name, String symbol, Long decimalDigits) {
+        return withMode(new NumberFormat(symbol != null ? symbol : (name != null ? name : "USD"), "",
+                decimalDigits != null ? (int) decimalDigits.longValue() : 2, false), 1);
+    }
+
+    /** {@code NumberFormat.compactSimpleCurrency()}: as compactCurrency, with "$". */
+    public static NumberFormat compactSimpleCurrency(String locale, String name, Long decimalDigits) {
+        return withMode(new NumberFormat("$", "", decimalDigits != null ? (int) decimalDigits.longValue() : 2,
+                false), 1);
+    }
+
+    /** {@code NumberFormat.decimalPattern()}: grouped thousands, up to three decimals. */
+    public static NumberFormat decimalPattern(String locale) {
+        return withMode(new NumberFormat("", "", 3, false), 3);
+    }
+
+    /** {@code NumberFormat.percentPattern()}: a whole percentage. */
+    public static NumberFormat percentPattern(String locale) {
+        return new NumberFormat("", "%", 0, true);
+    }
+
+    private static final String[] SHORT = {"", "K", "M", "B", "T"};
+    private static final String[] LONG = {"", " thousand", " million", " billion", " trillion"};
+
+    /// intl's en_US compact rule: the value scaled to its thousands bucket and shown to
+    /// three significant digits with trailing zeros dropped (1234 -> 1.23K, 999999 ->
+    /// 1M). Below a thousand a currency keeps up to its decimal digits as three
+    /// significant ones (7 -> $7.00, 999 -> $999); a plain number drops the zeros.
+    private String compactFormat(double value) {
+        boolean neg = value < 0;
+        double v = Math.abs(value);
+        String sign = neg ? "-" : "";
+        if (v < 1000) {
+            int intDigits = v < 1 ? 1 : Long.toString((long) Math.floor(v)).length();
+            boolean currency = prefix.length() > 0;
+            int dec = Math.max(0, Math.min(currency ? digits : 2, 3 - intDigits));
+            String s = fixed(v, dec);
+            if (!currency) {
+                s = trim(s);
+            }
+            return sign + prefix + s;
+        }
+        int k = 0;
+        double scaled = v;
+        while (scaled >= 1000 && k < SHORT.length - 1) {
+            scaled /= 1000;
+            k++;
+        }
+        int intDigits = Long.toString((long) Math.floor(scaled)).length();
+        String s = trim(fixed(scaled, Math.max(0, 3 - intDigits)));
+        if (s.startsWith("1000") && k < SHORT.length - 1) {
+            k++;
+            s = "1";
+        }
+        return sign + prefix + s + (mode == 2 ? LONG[k] : SHORT[k]);
+    }
+
+    private static String trim(String s) {
+        if (s.indexOf('.') < 0) {
+            return s;
+        }
+        int end = s.length();
+        while (s.charAt(end - 1) == '0') {
+            end--;
+        }
+        if (s.charAt(end - 1) == '.') {
+            end--;
+        }
+        return s.substring(0, end);
+    }
+
+    private static String grouped(String s) {
+        int dot = s.indexOf('.');
+        String ip = dot < 0 ? s : s.substring(0, dot);
+        boolean neg = ip.startsWith("-");
+        if (neg) {
+            ip = ip.substring(1);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < ip.length(); i++) {
+            if (i > 0 && (ip.length() - i) % 3 == 0) {
+                sb.append(',');
+            }
+            sb.append(ip.charAt(i));
+        }
+        return (neg ? "-" : "") + sb + (dot < 0 ? "" : s.substring(dot));
+    }
+
     public String format(Object number) {
         double v = number instanceof Number ? ((Number) number).doubleValue() : 0;
+        if (mode == 1 || mode == 2) {
+            return compactFormat(v);
+        }
+        if (mode == 3) {
+            return grouped(trimTo(fixed(v, digits), minimumFractionDigitsInt()));
+        }
         if (percent) {
             v = v * 100;
         }
-        return prefix + fixed(v, digits) + suffix;
+        String body = fixed(v, digits);
+        return prefix + (minDigits >= 0 ? trimTo(body, minDigits) : body) + suffix;
+    }
+
+    /** Drops trailing fraction zeros down to {@code min} digits, and a bare point. */
+    private static String trimTo(String s, int min) {
+        int dot = s.indexOf('.');
+        if (dot < 0) {
+            return s;
+        }
+        int end = s.length();
+        while (end - dot - 1 > min && s.charAt(end - 1) == '0') {
+            end--;
+        }
+        if (end == dot + 1) {
+            end = dot;
+        }
+        return s.substring(0, end);
+    }
+
+    private int minimumFractionDigitsInt() {
+        if (minDigits >= 0) {
+            return minDigits;
+        }
+        return mode == 3 ? 0 : digits;
     }
 
     private static String fixed(double value, int digits) {
@@ -93,4 +232,31 @@ public final class NumberFormat {
         }
         return sb.toString();
     }
+
+    /** intl's {@code minimumFractionDigits}. */
+    public long minimumFractionDigits() {
+        return minimumFractionDigitsInt();
+    }
+
+    /** intl's {@code minimumFractionDigits = v}; raises the maximum to match if needed. */
+    public void minimumFractionDigits(long v) {
+        minDigits = (int) Math.max(0, v);
+        if (digits < minDigits) {
+            digits = minDigits;
+        }
+    }
+
+    /** intl's {@code maximumFractionDigits}. */
+    public long maximumFractionDigits() {
+        return digits;
+    }
+
+    /** intl's {@code maximumFractionDigits = v}; lowers the minimum to match if needed. */
+    public void maximumFractionDigits(long v) {
+        digits = (int) Math.max(0, v);
+        if (minDigits > digits) {
+            minDigits = digits;
+        }
+    }
+
 }

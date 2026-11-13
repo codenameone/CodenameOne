@@ -55,6 +55,11 @@ final class Access extends BackendAccess {
     }
 
     @Override
+    public void openApi(Backend.Builder builder, String document) {
+        builder.openApi(document);
+    }
+
+    @Override
     public void security(Backend.Builder builder) {
         builder.security();
     }
@@ -354,5 +359,21 @@ final class Access extends BackendAccess {
     @Override
     public List executorsOf(Collection servers) {
         return Tasks.executorsOf(servers);
+    }
+
+    @Override
+    public Object serverResource(String key, BackendAccess.ResourceFactory factory)
+            throws IOException {
+        return Tasks.resource(key, factory);
+    }
+
+    @Override
+    public Config currentConfig() {
+        return Tasks.currentConfig();
+    }
+
+    @Override
+    public Runnable inServer(Runnable work) {
+        return Tasks.inServer(work);
     }
 }

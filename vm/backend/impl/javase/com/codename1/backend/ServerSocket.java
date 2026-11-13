@@ -200,10 +200,14 @@ public final class ServerSocket {
             throw new IOException("Not a socket: " + fd);
         }
         SocketChannel channel = (SocketChannel) entry; //NOPMD CloseResource - owned by the descriptor table
-        boolean wasBlocking = channel.isBlocking();
         Selector selector = null;
         try {
-            channel.configureBlocking(false);
+            // Through Deadlines' per-descriptor count, never a private toggle:
+            // a websocket writer may be inside writeWithDeadline on this same
+            // channel, and a mode saved and restored here independently of it
+            // can leave the channel non-blocking (or flip it back to blocking
+            // under the writer's registered selector).
+            Deadlines.enterNonBlocking(fd, channel);
             selector = Selector.open();
             channel.register(selector, SelectionKey.OP_READ);
             // ZERO IS A PROBE, NOT A WAIT. The translated twin is a poll(), where
@@ -225,9 +229,7 @@ public final class ServerSocket {
             if (selector != null) {
                 selector.close();
             }
-            if (wasBlocking && channel.isOpen()) {
-                channel.configureBlocking(true);
-            }
+            Deadlines.leaveNonBlocking(fd, channel);
         }
     }
 
@@ -238,7 +240,7 @@ public final class ServerSocket {
         }
         SocketChannel channel = (SocketChannel) entry; //NOPMD CloseResource - owned by the descriptor table
         ByteBuffer target = ByteBuffer.wrap(buffer, offset, length);
-        if (channel.isBlocking()) {
+        if (Deadlines.isLogicallyBlocking(fd, channel)) {
             // A blocking channel read cannot be interrupted by a timer, so the
             // deadline is applied with a selector around it.
             return Deadlines.readWithDeadline(fd, channel, target);

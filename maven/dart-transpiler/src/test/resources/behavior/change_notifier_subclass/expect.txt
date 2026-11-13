@@ -1,0 +1,5 @@
+value 2 heard 2 listeners true
+after remove heard 2 listeners false
+disposing at 3
+doubled [2, 4]
+as notifier [2, 4, 4]

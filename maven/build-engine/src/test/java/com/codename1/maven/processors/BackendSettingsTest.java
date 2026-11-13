@@ -76,6 +76,7 @@ public class BackendSettingsTest {
         // something on. Each call has to name a listed key by its constant, so a new
         // one cannot be read without being listed -- and so checked by the server.
         List<String> allowed = Arrays.asList("MANAGEMENT_KEY", "SECURITY_SCHEMA_KEY", "MCP_KEY",
+                "OPENAPI_KEY",
                 "OTEL_ENABLED_PROPERTY");
         Pattern call = Pattern.compile("applicationPropertyTrue\\(\\s*ctx\\s*,\\s*([^)]*?)\\s*\\)");
         List<String> seen = new ArrayList<String>();

@@ -35,6 +35,12 @@ public class AndroidCameraThreadingHarness {
 
     /* PRODUCTION_METHODS */
 
+    // The production method reads the display through Android's resources;
+    // AndroidCameraFrameConverterTest holds the size it picks.
+    private android.util.Size analysisTargetSize(CameraSessionOptions options) {
+        return new android.util.Size(options.getPreviewWidth(), options.getPreviewHeight());
+    }
+
     private static void check(boolean ok, String message) {
         if (!ok) throw new AssertionError(message);
     }

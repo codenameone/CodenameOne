@@ -1,0 +1,6 @@
+err0 true
+2
+err1b true
+err2 true
+2
+5

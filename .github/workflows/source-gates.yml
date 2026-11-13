@@ -1,0 +1,95 @@
+name: Source gates
+
+# The cheap tree-wide script gates, as steps of ONE job. Each used to be its own
+# workflow, and on a busy PR every one of them queued for a runner of its own:
+# a sub-minute grep showed 40+ minutes of wall time, nearly all of it waiting.
+#
+# Deliberately not a step in pr.yml, and deliberately with no paths filter:
+# pr.yml's filter excludes scripts/** and docs/**, so a PR touching only those
+# (or weakening one of these scripts) would skip the gates. Every step runs on
+# every PR; together they cost about a minute.
+#
+# Steps use `if: !cancelled()` so one failing gate does not hide the others.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-gates:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The copyright-header gate diffs against the PR base.
+          fetch-depth: 0
+
+      # A raw control byte makes a file binary to grep, which then reports "no
+      # match" instead of an error. Absolute: no baseline, no exclusions.
+      - name: Scan tracked text files for raw control characters
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: scripts/check-control-characters.py
+
+      # @author and @version swallow the text after them into the tag body,
+      # which the doclet then drops. See scripts/check-author-tags.py.
+      - name: Reject @author and @version in documentation comments
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: scripts/check-author-tags.py
+
+      - name: Reject since markers in API docs
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          scripts/check-since-tags.sh
+          scripts/check-since-tags.sh vm/backend/src
+          scripts/check-since-tags.sh vm/backend/impl
+
+      - name: Google Play types only in guarded proxies
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: scripts/check-android-gms-isolation.py
+
+      # Unit-test the gate's classification boundaries before the scan, so a
+      # broken gate is reported as a broken gate rather than as a clean tree.
+      - name: Unit-test the 16 KB page alignment gate
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 scripts/test_check_16k_page_alignment.py
+
+      - name: Scan tracked native artifacts for 16 KB page alignment
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: scripts/check-16k-page-alignment.py --verbose
+
+      - name: Validate added and modified source headers
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE_SHA"
+          elif [[ -n "$PUSH_BASE_SHA" && "$PUSH_BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            base_sha="$PUSH_BASE_SHA"
+          else
+            base_sha="$(git rev-parse HEAD^)"
+          fi
+          scripts/check-copyright-headers.sh --base "$base_sha" --head "$GITHUB_SHA"

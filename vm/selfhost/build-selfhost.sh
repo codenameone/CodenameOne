@@ -100,7 +100,13 @@ if [ "$needs_build" = 1 ]; then
     # `clean` because the incremental check cannot be trusted here. The clean is what
     # actually evicts a deleted resource from target/classes, so the manifest test above
     # is only useful paired with it.
-    (cd "$REPO/vm" && mvn -q -B -pl ByteCodeTranslator -am clean package -DskipTests)
+    # Through retry.sh with RETRY_ONLY_MATCHING=transient: no step before the perf gate
+    # builds ByteCodeTranslator, so this is the first run in the job to resolve its
+    # plugins (maven-shade-plugin) from Central, and a 429 there failed the gate on a PR
+    # that changed nothing about the translator. Only resolution failures are retried; a
+    # compile error is returned on the first attempt, so a real build failure still fails.
+    (cd "$REPO/vm" && RETRY_ONLY_MATCHING=transient bash "$REPO/scripts/ci/retry.sh" \
+        mvn -q -B -pl ByteCodeTranslator -am clean package -DskipTests)
 fi
 # Record the manifest only after a build that succeeded -- `set -e` aborts above on
 # failure, so reaching here means target/classes matches this file list. Writing it
@@ -119,7 +125,8 @@ ASM_VERSION="$(sed -n 's:.*<asm.version>\(.*\)</asm.version>.*:\1:p' "$REPO/vm/p
 ASM_JARS="$OUT/asm-jars"
 for artifact in asm asm-commons asm-tree asm-analysis; do
     if [ ! -f "$ASM_JARS/$artifact-$ASM_VERSION.jar" ]; then
-        (cd "$REPO/vm" && mvn -q -B -N dependency:copy \
+        (cd "$REPO/vm" && RETRY_ONLY_MATCHING=transient bash "$REPO/scripts/ci/retry.sh" \
+            mvn -q -B -N dependency:copy \
             "-Dartifact=org.ow2.asm:$artifact:$ASM_VERSION" "-DoutputDirectory=$(native_path "$ASM_JARS")")
     fi
 done

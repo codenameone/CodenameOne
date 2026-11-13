@@ -3,7 +3,11 @@
 #
 #   <framework> <cold|warm> first_frame_ms fps cpu_pct pss_kb private_kb rss_kb mapped_kb mapped_files
 #
-#   run.sh <codenameone-binary-dir> [seconds] [runs]
+#   run.sh <codenameone-binary-dir> [seconds] [runs] [frameworks]
+#
+# frameworks is a space separated subset of
+# "codenameone slint qt javafx chromium flutter"; the default is all but flutter,
+# which needs a display device and has its own image (flutter/Containerfile).
 #
 # Needs a privileged container (docker run --privileged): a cold start drops the
 # page cache first, so every executable, library, plugin and font is read from
@@ -23,6 +27,7 @@
 set -uo pipefail
 SECS="${2:-10}"
 RUNS="${3:-3}"
+ONLY="${4:-codenameone slint qt javafx chromium}"
 # Every other workload is built into the image; read Codename One from the
 # container's own disk too, not from a bind mount, whose cold reads go through
 # the host's file sharing and cost seconds a device's storage does not.
@@ -100,13 +105,17 @@ chromium_cmd() {
         "file:///bench/chromium/gauge.html?s=$SECS"
 }
 
+want() { case " $ONLY " in *" $1 "*) return 0 ;; esac; return 1; }
+
 for i in $(seq "$RUNS"); do
     for mode in cold warm; do
-        run_one codenameone $mode /opt/cn1/EmbeddedDemo
-        run_one slint $mode /bench/slint/target/release/slintgauge
-        run_one qt $mode /bench/qt/build/qtgauge
-        run_one javafx $mode /opt/fxrt/bin/java -Dglass.platform=Headless -Dprism.order=sw \
+        want codenameone && run_one codenameone $mode /opt/cn1/EmbeddedDemo
+        want slint && run_one slint $mode /bench/slint/target/release/slintgauge
+        want qt && run_one qt $mode /bench/qt/build/qtgauge
+        want javafx && run_one javafx $mode /opt/fxrt/bin/java -Dglass.platform=Headless -Dprism.order=sw \
             -cp /bench/javafx/classes Gauge
-        run_one chromium $mode chromium_cmd
+        want chromium && run_one chromium $mode chromium_cmd
+        # Release (AOT) build on the KMS display; vsync paces it to 60.
+        want flutter && run_one flutter $mode flutter-pi --release /bench/flutter/bundle
     done
 done

@@ -278,10 +278,17 @@ public final class IOSSecureStorage extends SecureStorage {
         }
     }
 
+    /// Reported by the native get when the item survives but its Face ID / Touch ID binding
+    /// was invalidated by a change to the enrolled set. Not an OSStatus; must match
+    /// CN1_SECURE_STORAGE_KEY_REVOKED in IOSNative.m.
+    static final int KEY_REVOKED_CODE = -990001;
+
     private static BiometricError mapStorageError(int code) {
         // Reuse the LAError mapping (negative values) and the dominant
         // OSStatus values returned by Security.framework.
         switch (code) {
+            case KEY_REVOKED_CODE:
+                return BiometricError.KEY_REVOKED;
             case -128:  // errSecUserCanceled
                 return BiometricError.USER_CANCELED;
             case -25291: // errSecNotAvailable

@@ -52,7 +52,7 @@ class MethodChannel {
   external Future<dynamic> invokeMethod(String method, [Object? arguments]);
   external Future<List<dynamic>> invokeListMethod(String method, [Object? arguments]);
   external Future<Map<dynamic, dynamic>> invokeMapMethod(String method, [Object? arguments]);
-  external void setMethodCallHandler(Object? handler);
+  external void setMethodCallHandler(dynamic Function(MethodCall)? handler);
 }
 
 @JavaName('com.codename1.flutter.services.EventChannel')

@@ -1,0 +1,140 @@
+name: Flutter gallery compiles
+
+# Transpiles the Flutter gallery -- the Flutter benchmark's application, and
+# the largest real Dart program the transpiler sees -- and compiles the result,
+# on every change to the transpiler, the runtimes or the Flutter build steps.
+#
+# The benchmark (flutter-bench.yml) does this too, but runs on a pull request
+# only when its own tree changes. #6154 therefore merged a transpiler that
+# turned the gallery into Java javac rejects (a private class's static
+# tear-off, nested function-type witnesses, named-argument inference, numeric
+# conditionals) with nothing on its pull request having looked, and the
+# nightly and every later benchmark pull request were red. This job is the
+# benchmark's own path up to javac -- prepare.sh, then the generated
+# project's compile -- on one runner, measuring nothing.
+#
+# The unit and behavior tests (dart-flutter-tests.yml) check constructs one at
+# a time and the acceptance apps (flutter-acceptance.yml) are small; neither
+# reaches what this does.
+
+on:
+  pull_request:
+    paths:
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/flutter-runtime/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/FlutterProjectBuilder.java'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/FlutterProjectImporter.java'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/DartLineMapper.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Flutter*.java'
+      - 'scripts/flutter-bench/app/prepare.sh'
+      - 'scripts/flutter-bench/app/cn1/**'
+      - '.github/workflows/flutter-gallery-compile.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/flutter-runtime/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/FlutterProjectBuilder.java'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/FlutterProjectImporter.java'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/DartLineMapper.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Flutter*.java'
+      - 'scripts/flutter-bench/app/prepare.sh'
+      - 'scripts/flutter-bench/app/cn1/**'
+      - '.github/workflows/flutter-gallery-compile.yml'
+  workflow_dispatch:
+
+env:
+  # The benchmark's own pin (flutter-bench.yml): the gallery and the lockfile
+  # that holds its dependencies come from this SDK. Move the two together.
+  FLUTTER_REF: '3.35.4'
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gallery:
+    runs-on: ubuntu-24.04
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Link cn1-binaries
+        run: ln -s /opt/cn1-binaries ../cn1-binaries
+
+      - name: Check the container's JDKs
+        run: |
+          for var in JAVA_HOME_8 JAVA_HOME_17; do
+            eval "path=\${$var:-}"
+            if [ -z "$path" ] || [ ! -x "$path/bin/javac" ]; then
+              echo "$var is unset or has no javac: '${path:-<unset>}'" >&2
+              exit 1
+            fi
+          done
+
+      # The same two passes as flutter-bench.yml's framework job: what prepare.sh
+      # generates is a project from the shipping archetype, so it resolves the
+      # plugin, the archetype and core from this repository, and the runtimes,
+      # which build only on JDK 17.
+      - name: Build the framework on JDK 8
+        env:
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          cd maven
+          JAVA_HOME="$JAVA_HOME_8" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -pl core,dart-transpiler,codenameone-maven-plugin,cn1app-archetype -am
+
+      - name: Build the Flutter runtime on JDK 17
+        env:
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          cd maven
+          JAVA_HOME="$JAVA_HOME_17" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -pl dart-runtime,flutter-runtime
+
+      # A checkout, not a release archive: the gallery is dev/integration_tests,
+      # which the release archives leave out.
+      - name: Check out the Flutter SDK
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_REF" \
+              https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          echo "FLUTTER_ROOT=$RUNNER_TEMP/flutter" >> "$GITHUB_ENV"
+
+      - name: Prepare the gallery
+        run: |
+          flutter --version
+          JAVA_HOME="$JAVA_HOME_17" scripts/flutter-bench/app/prepare.sh \
+              --work "$RUNNER_TEMP/fbench" \
+              --maven-repo "$GITHUB_WORKSPACE/m2"
+
+      # compile, not package: the transpile and javac are what this guards, and
+      # neither needs a platform build or a display.
+      - name: Transpile and compile the gallery
+        env:
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          cd "$RUNNER_TEMP/fbench/cn1"
+          JAVA_HOME="$JAVA_HOME_17" bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B compile \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -DskipTests -DskipComplianceCheck=true -pl common -am

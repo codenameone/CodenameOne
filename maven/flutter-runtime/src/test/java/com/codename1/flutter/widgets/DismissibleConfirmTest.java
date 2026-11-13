@@ -55,6 +55,8 @@ class DismissibleConfirmTest {
                 seen[0] = ok;
             }
         });
+        // A callback on a completed future runs from the microtask queue, as in Dart.
+        dart.async.Async.drainMicrotasks();
         return seen[0];
     }
 

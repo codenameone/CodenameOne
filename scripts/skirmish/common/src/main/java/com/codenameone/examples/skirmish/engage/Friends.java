@@ -28,7 +28,7 @@ import com.codename1.io.Preferences;
 import com.codenameone.examples.skirmish.api.InviteClaimDto;
 import com.codenameone.examples.skirmish.api.InviteDto;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.ui.Rewards;
 import com.codenameone.examples.skirmish.ui.Ui;

@@ -28,7 +28,7 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.skirmish.api.DeckDto;
 import com.codenameone.examples.skirmish.engage.Telemetry;
 import com.codenameone.examples.skirmish.net.Api;
-import com.codenameone.examples.skirmish.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.skirmish.net.Session;
 import com.codenameone.examples.skirmish.rules.CardDef;
 import com.codenameone.examples.skirmish.rules.Cards;

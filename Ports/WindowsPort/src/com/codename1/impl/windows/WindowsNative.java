@@ -1139,6 +1139,21 @@ public final class WindowsNative {
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap);
 
+    /** Starts the shadow pass: binds a size x size R32_FLOAT depth map as the target and clears it; false if it cannot. */
+    public static native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    /** Ends the shadow pass and rebinds the scene target and viewport. */
+    public static native void gl3dEndShadowPass(long contextPeer);
+    /** Binds (or unbinds) the shadow map at t1/s1 for the following draws. */
+    public static native void gl3dSetShadowSampling(long contextPeer, boolean on);
+    /** Redirects drawing into an offscreen scene target (plus bloom targets if bloom); false if it cannot. */
+    public static native boolean gl3dBeginPost(long contextPeer, boolean bloom);
+    /**
+     * Runs bloom (bright, two blur rounds) and the composite into the frame target.
+     * The 16 float parameters are documented in WindowsGraphicsDevice.endPostProcess.
+     */
+    public static native void gl3dEndPost(long contextPeer, long brightPipeline, long blurPipeline,
+            long compositePipeline, float[] params);
+
     // ---- SQLite bindings. Implemented in cn1_windows_db.c from the shared cn1_db_sqlite_impl.h. ----
 
     /** True when a database file exists at this absolute path. */
@@ -1227,4 +1242,34 @@ public final class WindowsNative {
     public static native void sqlResultText(long ctx, byte[] utf8);
     public static native void sqlResultBlob(long ctx, byte[] value);
     public static native void sqlResultError(long ctx, byte[] utf8);
+
+    /// True when the exe was built for the embedded (kiosk) target
+    /// (`windows.embedded=true`, cn1_windows_embedded.cpp): a constant of the
+    /// build, never a runtime switch.
+    public static native boolean isEmbeddedDisplay();
+
+    // ---- com.codename1.hardware (cn1_windows_hardware.cpp). Each returns a value
+    // >= 0 or a negative Linux errno, the contract KernelHardware reads;
+    // -ETIMEDOUT reports a timeout.
+    public static native int hwGpioOpen(String chip, int line, boolean output, boolean high, int bias, int edges);
+    public static native int hwGpioRead(int handle);
+    public static native int hwGpioWrite(int handle, boolean high);
+    public static native int hwGpioWaitEdge(int handle, int timeoutMs, long[] timestampOut);
+    public static native int hwI2cOpen(int bus, int address);
+    public static native int hwI2cTransfer(int handle, byte[] write, int writeLen, byte[] read, int readLen);
+    public static native int hwSpiOpen(int bus, int chipSelect, int mode, int speedHz, int bitsPerWord);
+    public static native int hwSpiTransfer(int handle, byte[] tx, byte[] rx, int len);
+    public static native int hwSerialOpen(String device, int baud, int dataBits, int parity, int stopBits);
+    public static native int hwSerialRead(int handle, byte[] buf, int off, int len, int timeoutMs);
+    public static native int hwSerialWrite(int handle, byte[] buf, int off, int len);
+    public static native int hwPwmOpen(int chip, int channel);
+    public static native int hwPwmConfigure(int handle, long periodNanos, long dutyNanos, boolean enabled);
+    public static native int hwCanOpen(String iface);
+    public static native int hwCanSend(int handle, int id, boolean extended, byte[] data, int len);
+    public static native int hwCanReceive(int handle, int[] idOut, byte[] data, int timeoutMs);
+    public static native int hwWatchdogOpen(int timeoutSeconds);
+    public static native int hwWatchdogKick(int handle);
+    public static native void hwClose(int handle, boolean disarm);
+    public static native String hwList(int kind);
+    public static native int hwBacklight(int op, int value);
 }

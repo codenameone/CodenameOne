@@ -1,0 +1,15 @@
+none
+token=abc
+inner token=abc
+result 7
+none
+1
+2
+3
+null
+3
+true
+[a, b, c]
+set: Cannot modify unmodifiable map
+remove: Cannot modify unmodifiable map
+3

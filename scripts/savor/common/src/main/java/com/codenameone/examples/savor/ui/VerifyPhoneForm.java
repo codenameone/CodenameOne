@@ -29,7 +29,7 @@ import com.codenameone.examples.savor.Telemetry;
 import com.codenameone.examples.savor.api.PhoneCodeDto;
 import com.codenameone.examples.savor.api.UserDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.net.Session;
 
 /// Proves the phone number is the user's, which the server asks for before the

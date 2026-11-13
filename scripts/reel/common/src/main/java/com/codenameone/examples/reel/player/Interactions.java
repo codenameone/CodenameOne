@@ -30,7 +30,7 @@ import com.codenameone.examples.reel.api.AnswerDto;
 import com.codenameone.examples.reel.api.AnswerResultDto;
 import com.codenameone.examples.reel.api.InteractionDto;
 import com.codenameone.examples.reel.net.Api;
-import com.codenameone.examples.reel.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Ui;
 import java.util.ArrayList;

@@ -1203,6 +1203,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (key.equalsIgnoreCase("platformHint.showEDTWarnings")) {
             setShowEDTWarnings("true".equalsIgnoreCase(value));
         }
+        if (key.equalsIgnoreCase("platformHint.webrtc.dropNetwork") && webRtc != null) {
+            // The simulator's stand-in for a phone changing network mid-call:
+            // calls lose their path until the app restarts ICE.
+            webRtc.dropNetwork();
+        }
         super.setPlatformHint(key, value);
 
     }
@@ -5822,6 +5827,28 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void deinitialize() {
+        // What was registered to be torn down with the port and not already run
+        // by deinitializeSync(): sound pools and media players own threads that
+        // never end by themselves, and the test runner retires each test's port
+        // this way. Left running they kept that test's whole application in
+        // memory, and a suite ran out of heap after a dozen tests.
+        for (JavaSEGpuSurface surface : new ArrayList<JavaSEGpuSurface>(glSurfaces.keySet())) {
+            try {
+                surface.disposeSurface();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+        glSurfaces.clear();
+        ArrayList<Runnable> pending = new ArrayList<Runnable>(deinitializeHooks);
+        deinitializeHooks.clear();
+        for (Runnable r : pending) {
+            try {
+                r.run();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
         // The window manager's monitor poller is a daemon timer that outlives the port
         // otherwise. A simulator session that restarts through deinitialize()/init()
         // builds a new manager each time, and every previous poller kept waking every
@@ -16780,6 +16807,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             return defaultValue;
         }
+        if ("commerce.cloud.enabled".equals(key) || "commerce.cloud.endpoint".equals(key)
+                || "commerce.cloud.publicKey".equals(key)) {
+            // A builder stamps these into the device stub; nothing does for the simulator, so
+            // the hints are resolved here and a project pointed at its own service can be run.
+            // Display.setProperty still wins: Display answers its own properties first.
+            String commerce = buildHint(key);
+            if (commerce != null && commerce.trim().length() > 0) {
+                return commerce.trim();
+            }
+            return defaultValue;
+        }
         if(key.equalsIgnoreCase("cn1_push_prefix") 
                 || key.equalsIgnoreCase("cellId") 
                 || key.equalsIgnoreCase("IMEI") 
@@ -17613,7 +17651,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public com.codename1.media.SoundPoolPeer createSoundPool(int maxStreams) {
         try {
-            return new JavaSESoundPool(maxStreams);
+            final JavaSESoundPool pool = new JavaSESoundPool(maxStreams);
+            // Its mixer thread runs until the pool is released.
+            addDeinitializeHook(new Runnable() {
+                public void run() {
+                    pool.release();
+                }
+            });
+            return pool;
         } catch (Throwable t) {
             // audio line unavailable (e.g. headless CI) -- fall back to the
             // MediaManager based pool by reporting no native backend
@@ -21977,8 +22022,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         return new JavaSEPort.Peer((JFrame)cnt, (java.awt.Component) nativeComponent);
     }
 
-    private final java.util.Map<com.codename1.ui.PeerComponent, JavaSEGpuSurface> glSurfaces =
-            new java.util.IdentityHashMap<com.codename1.ui.PeerComponent, JavaSEGpuSurface>();
+    // Every live surface, for deinitialize(). Weak: a surface is found from its
+    // peer (a client property, so it lives exactly as long as the peer) and this
+    // set must not keep it. A map from peer to surface never let go, because the
+    // surface's view holds the peer: every 3D view ever shown stayed in memory
+    // with its frame buffers.
+    private final java.util.Map<JavaSEGpuSurface, Boolean> glSurfaces =
+            new java.util.WeakHashMap<JavaSEGpuSurface, Boolean>();
+    private static final String GPU_SURFACE = "cn1$gpuSurface";
 
     private final com.codename1.impl.gpu.GpuImplementation gpuImpl =
             new com.codename1.impl.gpu.GpuImplementation() {
@@ -22011,14 +22062,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             com.codename1.ui.PeerComponent peer = createNativePeer(surface.getComponent());
             if (peer != null) {
-                glSurfaces.put(peer, surface);
+                peer.putClientProperty(GPU_SURFACE, surface);
+                glSurfaces.put(surface, Boolean.TRUE);
             }
             return peer;
         }
 
         @Override
         public void setContinuous(com.codename1.ui.PeerComponent peer, boolean continuous) {
-            JavaSEGpuSurface surface = glSurfaces.get(peer);
+            JavaSEGpuSurface surface = (JavaSEGpuSurface) peer.getClientProperty(GPU_SURFACE);
             if (surface != null) {
                 surface.setContinuous(continuous);
             }
@@ -22026,7 +22078,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public void requestRender(com.codename1.ui.PeerComponent peer) {
-            JavaSEGpuSurface surface = glSurfaces.get(peer);
+            JavaSEGpuSurface surface = (JavaSEGpuSurface) peer.getClientProperty(GPU_SURFACE);
             if (surface != null) {
                 surface.requestRender();
             }

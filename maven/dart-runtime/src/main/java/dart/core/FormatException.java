@@ -25,14 +25,149 @@ package dart.core;
 
 /**
  * Dart's FormatException (int.parse / double.parse failures etc.).
+ *
+ * <p>Dart code may also declare its own format errors with {@code implements
+ * FormatException}; the transpiler makes such a class extend this one, so it is caught
+ * by {@code on FormatException}. Its {@code message}, {@code source} and {@code offset}
+ * getters override these accessors, and {@link #getMessage()} (what {@code e.message}
+ * reads) follows the override.
  */
 public class FormatException extends RuntimeException {
+    private final String message;
+    private final Object source;
+    private final Long offset;
+
+    public FormatException() {
+        this("", null, null);
+    }
+
     public FormatException(String message) {
+        this(message, null, null);
+    }
+
+    public FormatException(String message, Object source, Long offset) {
         super(message);
+        this.message = message;
+        this.source = source;
+        this.offset = offset;
+    }
+
+    public String get$message() {
+        return message;
+    }
+
+    public Object get$source() {
+        return source;
+    }
+
+    public Long get$offset() {
+        return offset;
+    }
+
+    // A subclass's `final String message` field surfaces as an override of get$message(),
+    // an explicit `get source => ...` as an override of source(): each name delegates to
+    // the other, so whichever one the subclass overrides is what every reader sees.
+    public String message() {
+        return get$message();
+    }
+
+    public Object source() {
+        return get$source();
+    }
+
+    public Long offset() {
+        return get$offset();
     }
 
     @Override
+    public String getMessage() {
+        return message();
+    }
+
+    /**
+     * Dart's FormatException.toString: the message, then for a String source the
+     * position of the offset in it (line and column when it is past the first line),
+     * the line it falls on, and a caret under it; for any other source just the offset.
+     */
+    @Override
     public String toString() {
-        return "FormatException: " + getMessage();
+        String msg = getMessage();
+        StringBuilder report = new StringBuilder("FormatException");
+        if (msg != null && msg.length() > 0) {
+            report.append(": ").append(msg);
+        }
+        Long off = offset();
+        Object src = source();
+        if (!(src instanceof String)) {
+            if (off != null) {
+                report.append(" (at offset ").append(off.longValue()).append(')');
+            }
+            return report.toString();
+        }
+        String source = (String) src;
+        if (off != null && (off.longValue() < 0 || off.longValue() > source.length())) {
+            off = null;
+        }
+        if (off == null) {
+            if (source.length() > 78) {
+                source = source.substring(0, 75) + "...";
+            }
+            return report.append('\n').append(source).toString();
+        }
+        int offset = (int) off.longValue();
+        int lineNum = 1;
+        int lineStart = 0;
+        boolean previousCharWasCR = false;
+        for (int i = 0; i < offset; i++) {
+            char c = source.charAt(i);
+            if (c == '\n') {
+                if (lineStart != i || !previousCharWasCR) {
+                    lineNum++;
+                }
+                lineStart = i + 1;
+                previousCharWasCR = false;
+            } else if (c == '\r') {
+                lineNum++;
+                lineStart = i + 1;
+                previousCharWasCR = true;
+            }
+        }
+        if (lineNum > 1) {
+            report.append(" (at line ").append(lineNum).append(", character ")
+                    .append(offset - lineStart + 1).append(")\n");
+        } else {
+            report.append(" (at character ").append(offset + 1).append(")\n");
+        }
+        int lineEnd = source.length();
+        for (int i = offset; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (c == '\n' || c == '\r') {
+                lineEnd = i;
+                break;
+            }
+        }
+        int start = lineStart;
+        int end = lineEnd;
+        String prefix = "";
+        String postfix = "";
+        if (lineEnd - lineStart > 78) {
+            if (offset - lineStart < 75) {
+                end = start + 75;
+                postfix = "...";
+            } else if (end - offset < 75) {
+                start = end - 75;
+                prefix = "...";
+            } else {
+                start = offset - 36;
+                end = offset + 36;
+                prefix = "...";
+                postfix = "...";
+            }
+        }
+        report.append(prefix).append(source, start, end).append(postfix).append('\n');
+        for (int i = offset - start + prefix.length(); i > 0; i--) {
+            report.append(' ');
+        }
+        return report.append("^\n").toString();
     }
 }

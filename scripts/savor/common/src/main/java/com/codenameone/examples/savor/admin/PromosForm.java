@@ -27,7 +27,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.savor.api.PromoDto;
 import com.codenameone.examples.savor.net.Api;
-import com.codenameone.examples.savor.net.Net;
+import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Ui;
 

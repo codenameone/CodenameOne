@@ -56,6 +56,12 @@ import com.codename1.backend.sql.Dialect;
 /// and is skipped when another instance holds it, so a job runs on one replica
 /// at a time. The claim expires after `lockAtMostFor` milliseconds, so a
 /// replica that dies mid-run does not keep it.
+///
+/// A server with no database takes the lock in its key/value store instead,
+/// when `cn1.kv.url` names a shared one: one `SET NX PX` whose expiry is the
+/// same `lockAtMostFor`, released by a compare-and-delete of this run's lease.
+/// A server with both keeps the database, so replicas of one deployment never
+/// disagree about where its locks are.
 public final class Scheduler {
     public static final int CRON = 0;
     public static final int FIXED_RATE = 1;
@@ -63,6 +69,8 @@ public final class Scheduler {
 
     private static final String LOCK_TABLE = "cn1_scheduler_lock";
     private static final long DEFAULT_LOCK_MILLIS = 10 * 60 * 1000L;
+    /// The key prefix of a lock claimed in the key/value store.
+    private static final String LOCK_PREFIX = "cn1:lock:";
 
     /// One registered job and what has happened to it.
     public static final class Job {
@@ -150,13 +158,37 @@ public final class Scheduler {
         // to whichever tracer another server in the process installed.
         Tracer own = backend.getTracer();
         this.tracer = own != null ? own : BackendAccess.get().untraced();
+        this.config = backend.getConfig();
+    }
+
+    /// The server's configuration, for the key/value store locks fall back to.
+    private com.codename1.backend.Config config;
+    /// The store locks are claimed in when there is no database; opened on the
+    /// first claim and closed when the scheduler stops.
+    private com.codename1.backend.kv.KeyValueStore kvLocks;
+
+    /// Whether locks can be claimed in a shared key/value store.
+    private boolean hasSharedStore() {
+        try {
+            return config != null && com.codename1.backend.kv.KeyValueStores.isConfigured(config);
+        } catch (IOException err) {
+            return false;
+        }
+    }
+
+    private synchronized com.codename1.backend.kv.KeyValueStore kvLocks() throws IOException {
+        if (kvLocks == null) {
+            kvLocks = com.codename1.backend.kv.KeyValueStores.open(config);
+        }
+        return kvLocks;
     }
     private boolean lockTableReady;
 
     /// #### Parameters
     ///
     /// - `locks`: @param locks the pool locked jobs claim their row in, or null when this
-    /// server has no database -- the build refuses a lock without one
+    /// server has no database; locks are then claimed in the shared key/value store
+    ///   `cn1.kv.url` names, and the build refuses a lock with neither
     public Scheduler(DataSource locks) {
         this.locks = locks;
         String id;
@@ -216,9 +248,10 @@ public final class Scheduler {
         if (started) {
             throw new IllegalStateException("Jobs are registered before the scheduler starts");
         }
-        if (job.lock != null && locks == null) {
+        if (job.lock != null && locks == null && !hasSharedStore()) {
             throw new IllegalStateException("Scheduled job " + job.name + " takes lock \""
-                    + job.lock + "\", which needs a database, and this server has none");
+                    + job.lock + "\", which needs a database or a shared key/value store "
+                    + "(cn1.kv.url), and this server has neither");
         }
         for (Object element : jobs) {
             if (((Job) element).name.equals(job.name)) {
@@ -274,6 +307,7 @@ public final class Scheduler {
             notifyAll();
         }
         long deadline = AsyncTask.deadline(System.currentTimeMillis(), Math.max(0, waitMillis));
+        com.codename1.backend.kv.KeyValueStore store; // NOPMD CloseResource - closed below, outside the lock
         synchronized (this) {
             while (anyRunning()) {
                 long left = deadline - System.currentTimeMillis();
@@ -285,6 +319,15 @@ public final class Scheduler {
                 } catch (InterruptedException err) {
                     break;
                 }
+            }
+            store = kvLocks;
+            kvLocks = null;
+        }
+        if (store != null) {
+            try {
+                store.close();
+            } catch (IOException err) {
+                System.err.println("Could not close the scheduler's lock store: " + err);
             }
         }
     }
@@ -457,12 +500,18 @@ public final class Scheduler {
     /// Claims the job's lock row; the lease that now holds it, or null when another
     /// run does.
     String claim(Job job) throws IOException {
-        prepareLockTable();
         String lease;
         synchronized (this) {
             claims++;
             lease = instance + "#" + claims;
         }
+        if (locks == null) {
+            // The store's own clock expires the key, so no replica's clock is
+            // trusted for the lease, as the database's clock is below.
+            return kvLocks().setIfAbsent(LOCK_PREFIX + job.lock, WireBuffer.utf8(lease),
+                    job.lockAtMostFor) ? lease : null;
+        }
+        prepareLockTable();
         // The DATABASE's clock, which every replica shares: with each replica's
         // own, one running ahead by more than the remaining lease would take a
         // lock another still legitimately holds, and run the job beside it.
@@ -519,6 +568,14 @@ public final class Scheduler {
     /// Gives up `lease`'s claim -- and only that one: after an expiry the row
     /// may belong to a later run, of this job or another sharing its lock name.
     void release(Job job, String lease) {
+        if (locks == null) {
+            try {
+                kvLocks().compareAndSet(LOCK_PREFIX + job.lock, WireBuffer.utf8(lease), null, 0);
+            } catch (IOException err) {
+                System.err.println("Could not release scheduler lock " + job.lock + ": " + err);
+            }
+            return;
+        }
         try {
             locks.execute("UPDATE " + LOCK_TABLE + " SET lock_until = ? WHERE name = ? AND "
                     + "locked_by = ?", new Object[] {Long.valueOf(databaseNow()),

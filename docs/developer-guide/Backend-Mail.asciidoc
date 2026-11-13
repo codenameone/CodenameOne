@@ -1,0 +1,294 @@
+[[backend-mail]]
+== Backend email
+
+Most servers send mail before they do much else: a welcome, a receipt, a link to
+set a new password. This chapter covers sending it. One class describes a
+message, one bean sends it, and the transport behind the bean is chosen by a
+property. The transport is SMTP for a provider or a relay, the Amazon SES API,
+or memory for development and tests.
+
+The names follow Spring where a Spring developer would look for them, and
+Spring Boot's `spring.mail.*` properties are read. The surface is smaller.
+`Mail` stands in for `SimpleMailMessage`, `MimeMessage` and
+`MimeMessageHelper`, and `MailSender` for `JavaMailSender`. SMTP is implemented
+on the backend's own network layer with no mail library, and the build links
+only the transport the configuration names. A server that never injects
+`MailSender` contains no mail code at all.
+
+=== Sending a mail
+
+Two settings are enough:
+
+[source,properties]
+----
+include::../demos/backend/src/main/resources/application.properties[tag=backend-mail-config]
+----
+
+`cn1.mail.from` is the sender of every mail that doesn't name its own. Inject
+`MailSender` like any other bean:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/mail/Signup.java[tag=backend-mail-send,indent=0]
+----
+
+`Mail.to(...)` starts a builder, and `build()` checks everything: an address
+that isn't one, a header value with a line break in it, or an attachment with
+no name throws `IllegalArgumentException` there. A `Mail` that exists can be
+sent, so a malformed address fails in the code that produced it and not at the
+mail server an hour later. Text built from user input is safe in any field,
+because a value that would inject a header is refused and never escaped into
+something else.
+
+`send` returns as soon as the mail is queued. Delivery happens on a thread of
+the mail support's own, for two reasons. An SMTP exchange is several round
+trips, and a request shouldn't wait for them. And a mail that fails the first
+time has to be tried again after the request is long over.
+
+=== Sending inside a transaction
+
+When the server has a database, `send` writes the encoded mail to the table
+`cn1_mail_outbox` in the caller's transaction. In the example above, the
+account row and the welcome mail commit together. If `register` throws, the
+transaction rolls back and no mail goes out. If the server stops right after
+the commit, the row is still there, and the next server to start sends it.
+
+That's the transactional outbox <<backend-messaging>> uses for messages, and
+it gives the same guarantee: a committed mail is sent at least once. In the
+rare case where a server dies between sending the mail and removing the row, the mail
+goes out twice. It never goes out zero times.
+
+Without a database the queue is in memory. Mail is retried the same way, and
+whatever is still queued when the process stops is lost.
+
+=== Delivery and retries
+
+A mail the server couldn't take is tried again with a growing delay: 30 seconds,
+then four times longer each time, up to an hour, for six attempts in all. What
+happens next depends on why it failed:
+
+* A temporary failure, such as a `4xx` reply, a timeout or a dropped
+  connection, is retried.
+* A permanent failure, a `5xx` reply, isn't. The server said it will never take
+  this mail, and sending it again only harms the sender's reputation.
+
+A mail that's given up on moves to `cn1_mail_dead` with the reason, and a line
+in the log says so. Nothing sends from that table. It's there for an operator
+to read.
+
+`sendNow` skips the queue. It delivers on the calling thread and throws
+`MailException` when the server refuses, for the few cases where the caller has
+to know before it answers:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/mail/Receipts.java[tag=backend-mail-now,indent=0]
+----
+
+A mail sent with `sendNow` isn't part of the caller's transaction and isn't
+retried.
+
+[cols="2,1,3", options="header"]
+|===
+| Key | Default | What it sets
+
+| `cn1.mail.retry.max-attempts`
+| 6
+| Attempts before a mail is given up on.
+
+| `cn1.mail.retry.backoff`
+| 30000
+| Milliseconds before the second attempt.
+
+| `cn1.mail.retry.multiplier`
+| 4
+| What each later wait is multiplied by.
+
+| `cn1.mail.retry.max-backoff`
+| 3600000
+| The longest wait.
+
+| `cn1.mail.outbox.sweep`
+| 10000
+| Milliseconds between looks for mails a stopped server left behind.
+|===
+
+=== Templates
+
+A mail's HTML can come from the same templates that render pages, described in
+<<backend-views>>. Put the template under `templates/mail`:
+
+[source,html]
+----
+include::../demos/backend/src/main/snippets/mail-shipped.html[tag=backend-mail-template-html,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/mail/Receipts.java[tag=backend-mail-template,indent=0]
+----
+
+The template is compiled by the build like every other, so a property the
+model doesn't have fails the build with the file and position, and nothing is
+parsed when a mail is sent.
+
+Every HTML mail should carry a plain text version too. Mail clients that show
+text need it, and spam filters score a mail without one. The text is derived
+from the rendered HTML, with the tags removed and the address of each link kept
+beside its words. Calling `text(...)` on the builder gives your own instead.
+
+A mail is read outside your site. A template for one can't use a relative link
+or a stylesheet, and has no request to read. Write absolute URLs and inline
+styles.
+
+=== Attachments and inline images
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/mail/Receipts.java[tag=backend-mail-attach,indent=0]
+----
+
+`attach` adds a file the reader can save. `inline` adds an image the HTML
+shows in place, referenced as `cid:` followed by the content id. The builder
+picks the structure a mail client expects from what the mail contains, so
+there's no multipart mode to choose.
+
+Subjects, display names and file names can hold any Unicode text. Bodies are
+always UTF-8. `header` sets a header of your own, such as `List-Unsubscribe`.
+
+=== Providers
+
+[cols="2,3", options="header"]
+|===
+| `cn1.mail.url` | Sends through
+
+| `smtp://user:password@host:587`
+| SMTP with STARTTLS. Every provider with an SMTP endpoint, and any relay.
+
+| `smtps://user:password@host:465`
+| SMTP over TLS from the first byte.
+
+| `ses://eu-west-1`
+| The Amazon SES API in that region.
+
+| `log:`
+| Nothing. Each mail's headers and text are written to the log.
+
+| `memory:`
+| Nothing. Mails are kept for a test to read. The default.
+|===
+
+Without `cn1.mail.url`, Spring Boot's `spring.mail.host`, `spring.mail.port`,
+`spring.mail.username` and `spring.mail.password` select SMTP.
+
+==== SMTP
+
+A username or password containing `@`, `:` or `/` has to be URL-encoded in the
+URL, or set apart from it with `cn1.mail.username` and `cn1.mail.password`.
+
+`smtp://` upgrades the connection with STARTTLS before it says anything else,
+and refuses a server that doesn't offer it. A password is never sent over a
+connection that isn't encrypted, whatever the settings say. For a relay on the
+same machine that has no TLS, `cn1.mail.smtp.starttls=false` sends in the
+clear, without credentials.
+
+Connections are kept open between mails and reused, and several mails handed to
+`send(Mail...)` in one call go over one connection.
+
+[cols="2,1,3", options="header"]
+|===
+| Key | Default | What it sets
+
+| `cn1.mail.smtp.auth`
+|
+| `plain`, `login` or `xoauth2`. Unset takes what the server offers. With
+  `xoauth2` the password is an OAuth 2 access token.
+
+| `cn1.mail.smtp.helo`
+| `localhost`
+| The name the client gives for itself.
+
+| `cn1.mail.smtp.ca`
+|
+| A PEM file of certificates to trust in place of the system's.
+
+| `cn1.mail.timeout.connect`
+| 5000
+| Milliseconds a connection may take to open.
+
+| `cn1.mail.timeout.read`
+| 60000
+| Milliseconds a reply may take.
+
+| `cn1.mail.pool.max`
+| 2
+| Idle connections kept for the next mail.
+
+| `cn1.mail.pool.idle`
+| 30000
+| Milliseconds an idle connection is kept.
+|===
+
+==== Amazon SES
+
+`ses://` followed by a region sends through the SES API: one signed HTTPS
+request for each mail, with no SMTP credentials to issue. The credentials are
+the machine's own, read from the environment, a container role or an instance
+role, as for the other AWS services in <<backend-messaging>>. The sender has to
+be an identity SES has verified. `cn1.mail.ses.configuration-set` names a
+configuration set.
+
+=== Testing
+
+A test that names no `cn1.mail.url` sends nothing. Mails are kept in memory, and
+`MailSender` hands them back:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/mail/SignupTest.java[tag=backend-mail-test,indent=0]
+----
+
+`sent()` returns the mails in the order they were sent, with templates already
+rendered, so `getHtml()` and `getText()` are what a reader would have seen.
+Mail is captured during the call to `send`, so there's nothing to wait for.
+
+During development `cn1.mail.url=log:` prints each mail. To look at mails in a
+real client, run a catch-all SMTP server on your machine and point
+`cn1.mail.url` at `smtp://localhost:1025` with `cn1.mail.smtp.starttls=false`.
+
+=== Observing mail
+
+The counters `cn1.mail.sent`, `cn1.mail.failed`, `cn1.mail.refused` and
+`cn1.mail.retried`, and the gauge `cn1.mail.outbox.pending`, are exported with
+the metrics <<backend-observability>> describes. Every hand-over to the
+mail server is a span named `mail send`, with the transport, the number of
+recipients and the size of the message. No address is ever written to a span, a
+metric or the log.
+
+Once a server has sent a mail, its health endpoint reports the transport under
+`mail`. When the transport is down, that's reported and the server stays in
+service: mail waits in the outbox, and the server's requests are no worse
+served for it.
+
+=== What isn't supported
+
+* Receiving mail. There's no IMAP or POP3 client.
+* Signing with DKIM. The provider or the relay signs.
+* S/MIME and PGP.
+* Character sets other than UTF-8.
+
+=== Pitfalls
+
+* *No `cn1.mail.url` in production.* The default keeps mail in memory and
+  sends nothing. The server says so in its log the first time a mail is sent.
+* *A sender the provider hasn't verified.* Providers refuse mail from a domain
+  that isn't yours to send from. That's a permanent failure, so every mail
+  lands in `cn1_mail_dead`.
+* *Waiting on `sendNow` in a request.* It holds the request for the whole SMTP
+  exchange. Use `send` unless the answer depends on the outcome.
+* *Treating accepted as delivered.* The server accepting a mail says nothing
+  about the inbox. Bounces and complaints come back through the provider's
+  webhooks or its bounce address.
+* *A handler that isn't safe to repeat.* A committed mail can go out twice
+  after a crash. Put what makes a mail unique, such as an order number, where
+  the reader sees it.

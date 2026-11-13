@@ -756,6 +756,17 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     g_signal_connect(cn1Window, "delete-event", G_CALLBACK(cn1OnDelete), 0);
 
     cn1ResizeBackBuffer(cn1DisplayWidth, cn1DisplayHeight);
+    {
+        /* Fullscreen when asked (the steam target's launch.sh exports
+         * CN1_FULLSCREEN=1 per the steam.fullscreen hint) and always under
+         * Steam's Gaming Mode, where SteamGamepadUI is set and a window frame
+         * would only be letterboxed by gamescope. */
+        const char* fs = getenv("CN1_FULLSCREEN");
+        const char* gamepadUi = getenv("SteamGamepadUI");
+        if ((fs != NULL && strcmp(fs, "1") == 0) || (gamepadUi != NULL && strcmp(gamepadUi, "1") == 0)) {
+            gtk_window_fullscreen(GTK_WINDOW(cn1Window));
+        }
+    }
     gtk_widget_show_all(cn1Window);
     gtk_widget_grab_focus(cn1DrawingArea);
     cn1WindowOpen = 1;

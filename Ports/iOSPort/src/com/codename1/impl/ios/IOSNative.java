@@ -757,6 +757,18 @@ public class IOSNative {
     native long cn1InferenceOutputData(int handle, int index);
     native String cn1InferenceResize(int handle, int index, int[] shape);
     native void cn1InferenceClose(int handle);
+    // llama.cpp (CN1Llama.m, behind INCLUDE_CN1_LLAMA).
+    native boolean cn1LlamaIsSupported();
+    native int cn1LlamaOpen(String path, int contextSize, int gpuLayers, int threads);
+    native String cn1LlamaLastError(int handle);
+    native boolean cn1LlamaStart(int handle, String[] roles, String[] contents,
+                                 int maxTokens, float temperature, float topP,
+                                 int seed, String grammar);
+    native String cn1LlamaNext(int handle);
+    native int cn1LlamaPromptTokens(int handle);
+    native int cn1LlamaCompletionTokens(int handle);
+    native float[] cn1LlamaEmbed(int handle, String text);
+    native void cn1LlamaClose(int handle);
 
     // Augmented reality API (com.codename1.ar). Backed by CN1AR.m which wraps
     // an ARKit ARSession composited through an ARSCNView. The IOSARImpl class
@@ -820,6 +832,11 @@ public class IOSNative {
     native void gl3dDrawArrays(long contextPeer, long pipelinePeer, long vboPeer, int strideBytes,
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap);
+
+    native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    native void gl3dEndShadowPass(long contextPeer);
+    native boolean gl3dBeginPostProcess(long contextPeer, String mslSource, boolean bloom);
+    native void gl3dEndPostProcess(long contextPeer, float[] params);
 
     native void destroyAudioUnit(long peer);
 
@@ -2369,6 +2386,9 @@ public class IOSNative {
 
     /** Closes a peer connection and frees its handle. */
     native void webRtcClosePeerConnection(int peer);
+
+    /** Makes the next offer restart ICE. */
+    native void webRtcRestartIce(int peer);
 
     /** Mutes or unmutes a track. */
     native void webRtcSetTrackEnabled(int track, boolean enabled);

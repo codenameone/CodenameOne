@@ -101,6 +101,7 @@ public final class AndroidDependencyCoordinates {
         INJECTED.put("androidx.wear.tiles:tiles", "1.4.1");
         INJECTED.put("androidx.wear.watchface:watchface-complications-data-source", "1.2.1");
         INJECTED.put("androidx.window:window", "1.3.0");
+        INJECTED.put(AmazonBillingFragments.SDK_COORDINATE, AmazonBillingFragments.SDK_VERSION);
         INJECTED.put("com.android.billingclient:billing", PlayBillingVersions.DEFAULT_VERSION);
         INJECTED.put("com.android.support:appcompat-v7", "28.0.0");
         INJECTED.put("com.android.support:multidex", "1.0.3");

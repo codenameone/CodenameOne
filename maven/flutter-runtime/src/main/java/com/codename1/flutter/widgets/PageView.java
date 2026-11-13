@@ -30,7 +30,6 @@ import com.codename1.flutter.Widget;
 
 import dart.core.DartList;
 import dart.runtime.Funcs;
-import dart.runtime.RefLong;
 
 /**
  * A scrollable list showing one page at a time — Flutter's {@code PageView} (and
@@ -51,7 +50,7 @@ public class PageView extends Widget {
     private Boolean reverse;
     private Object physics;
     private Boolean pageSnapping;
-    private Funcs.VoidFunc1<RefLong> onPageChanged;
+    private Funcs.VoidFunc1<Long> onPageChanged;
     private DartList<Widget> children;
     private Boolean allowImplicitScrolling;
     private String restorationId;
@@ -69,7 +68,7 @@ public class PageView extends Widget {
     public void reverse(Boolean v) { this.reverse = v; }
     public void physics(Object v) { this.physics = v; }
     public void pageSnapping(Boolean v) { this.pageSnapping = v; }
-    public void onPageChanged(Funcs.VoidFunc1<RefLong> v) { this.onPageChanged = v; }
+    public void onPageChanged(Funcs.VoidFunc1<Long> v) { this.onPageChanged = v; }
     public void children(DartList<Widget> v) { this.children = v; }
     public void allowImplicitScrolling(Boolean v) { this.allowImplicitScrolling = v; }
     public void restorationId(String v) { this.restorationId = v; }
@@ -79,7 +78,7 @@ public class PageView extends Widget {
     /** Dart's {@code PageView.builder} named constructor in positional form. */
     public static PageView builder(Key key, PageController controller, Object scrollDirection,
                                    Boolean reverse, Object physics, Boolean pageSnapping,
-                                   Funcs.VoidFunc1<RefLong> onPageChanged,
+                                   Funcs.VoidFunc1<Long> onPageChanged,
                                    Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
                                    Long itemCount, Boolean allowImplicitScrolling,
                                    String restorationId, Object clipBehavior) {
@@ -134,7 +133,7 @@ public class PageView extends Widget {
         return padEnds == null || padEnds.booleanValue();
     }
 
-    public Funcs.VoidFunc1<RefLong> getOnPageChanged() {
+    public Funcs.VoidFunc1<Long> getOnPageChanged() {
         return onPageChanged;
     }
 

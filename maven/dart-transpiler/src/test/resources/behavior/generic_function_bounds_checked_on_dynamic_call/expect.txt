@@ -1,0 +1,16 @@
+topLevelTearOffRejectsString TypeError
+4
+topLevelTearOffAcceptsInt ok
+selfBoundTearOff int TypeError
+selfBoundTearOff String TypeError
+selfBoundTearOff Object TypeError
+dynamicMethodRejectsString TypeError
+1.5
+dynamicMethodAcceptsDouble ok
+methodTearOffRejectsString TypeError
+staticTearOffRejectsString TypeError
+selfBoundLambda int TypeError
+selfBoundLambda String TypeError
+selfBoundLambda Object TypeError
+z
+selfBoundExplicitString ok

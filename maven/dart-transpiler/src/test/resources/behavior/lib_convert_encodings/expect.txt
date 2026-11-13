@@ -1,0 +1,3 @@
+byName utf-8 iso-8859-1 null
+escape &lt;a href=&quot;x&quot;&gt;Tom &amp; Jerry&#39;s&lt;&#47;a&gt;
+escape2 plain

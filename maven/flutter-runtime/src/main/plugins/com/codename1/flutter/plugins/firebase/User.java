@@ -106,6 +106,20 @@ public class User {
         return auth.sendOob(this, "VERIFY_EMAIL", null);
     }
 
+    /**
+     * Firebase's {@code providerData}. The REST session this runtime signs in with does
+     * not report the linked providers, so it is derived: none for an anonymous user,
+     * and the email/password provider for one with an email. A federated sign-in is
+     * reported as {@code password} too, which an app reading providerId must allow for.
+     */
+    public dart.core.DartList<UserInfo> providerData() {
+        dart.core.DartList<UserInfo> out = new dart.core.DartList<UserInfo>(dart.runtime.TypeWitness.of(UserInfo.class, false));
+        if (!anonymous && email != null) {
+            out.add(new UserInfo("password", email, email, displayName, photoURL, phoneNumber()));
+        }
+        return out;
+    }
+
     @Override
     public String toString() {
         return "User(uid: " + uid + ", email: " + email + ")";
