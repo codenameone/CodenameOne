@@ -159,6 +159,14 @@ final class GraphLook {
         return d != null && d.booleanValue();
     }
 
+    /// Screen pixels per world unit at zoom 1: the node font's height over
+    /// the 20 pixels world sizes are designed for, never below 1.
+    static float unit() {
+        Font f = style("NodeGraphNode").getFont();
+        int h = f == null ? 0 : f.getHeight();
+        return Math.max(1f, h / 20f);
+    }
+
     static int mm(float mm) {
         return Math.max(1, Display.getInstance().convertToPixels(mm));
     }

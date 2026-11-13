@@ -129,7 +129,7 @@ public class NodeGraph extends Container {
     private GraphEdgeRenderer edgeRenderer = new DefaultGraphEdgeRenderer();
     private final List<GraphListener> listeners = new ArrayList<GraphListener>();
 
-    private float zoom = 1f;
+    private float scale = 1f;
     private float minZoom = 0.08f;
     private float maxZoom = 4f;
     private float detailZoom = 0.3f;
@@ -417,19 +417,21 @@ public class NodeGraph extends Container {
     public void setZoomRange(float min, float max) {
         minZoom = Math.max(0.01f, Math.min(min, max));
         maxZoom = Math.max(minZoom, max);
-        setZoom(zoom);
+        setZoom(getZoom());
     }
 
     // ------------------------------------------------------------------- view
 
-    /// The current zoom: screen pixels per world unit.
+    /// The current zoom. At zoom 1 a node is drawn at its world size scaled
+    /// to the theme font, so labels fit on dense screens as they do on a
+    /// desktop; `fitToView` never goes past it.
     public float getZoom() {
-        return zoom;
+        return scale / unit();
     }
 
     /// Zooms about the centre of the view.
     public void setZoom(float z) {
-        zoomAt(z / zoom, canvas.getWidth() / 2, canvas.getHeight() / 2);
+        zoomAt(z * unit() / scale, canvas.getWidth() / 2, canvas.getHeight() / 2);
     }
 
     /// The world x at the left edge of the view.
@@ -457,7 +459,7 @@ public class NodeGraph extends Container {
         if (r == null) {
             return;
         }
-        setView(r[0] + r[2] / 2 - canvas.getWidth() / 2.0 / zoom, r[1] + r[3] / 2 - canvas.getHeight() / 2.0 / zoom);
+        setView(r[0] + r[2] / 2 - canvas.getWidth() / 2.0 / scale, r[1] + r[3] / 2 - canvas.getHeight() / 2.0 / scale);
     }
 
     /// Zooms and scrolls so the whole graph fits the view, never past zoom 1.
@@ -473,16 +475,25 @@ public class NodeGraph extends Container {
         double bw = Math.max(1, b[2] - b[0]);
         double bh = Math.max(1, b[3] - b[1]);
         float z = (float) Math.min((w - margin * 2) / bw, (h - margin * 2) / bh);
-        zoom = clampZoom(Math.min(1f, z));
-        viewX = (b[0] + b[2]) / 2 - w / 2.0 / zoom;
-        viewY = (b[1] + b[3]) / 2 - h / 2.0 / zoom;
+        scale = clampZoom(Math.min(unit(), z));
+        viewX = (b[0] + b[2]) / 2 - w / 2.0 / scale;
+        viewY = (b[1] + b[3]) / 2 - h / 2.0 / scale;
         viewSet = true;
         syncComponents();
         repaint();
     }
 
     private float clampZoom(float z) {
-        return Math.max(minZoom, Math.min(maxZoom, z));
+        float u = unit();
+        return Math.max(minZoom * u, Math.min(maxZoom * u, z));
+    }
+
+    // Screen pixels per world unit at zoom 1. World units are sized for a
+    // theme font about 20 pixels high; on a dense screen the font is two or
+    // three times that, and a node that stayed 160 pixels wide would cut its
+    // label to a letter or two. Never below 1, so a desktop draws as it did.
+    private static float unit() {
+        return GraphLook.unit();
     }
 
     /// Multiplies the zoom by `factor` keeping the world point under the
@@ -492,15 +503,15 @@ public class NodeGraph extends Container {
     ///
     /// false when the zoom was already at its limit
     public boolean zoomAt(float factor, int screenX, int screenY) {
-        float nz = clampZoom(zoom * factor);
-        if (Math.abs(nz - zoom) < 1e-6f) {
+        float nz = clampZoom(scale * factor);
+        if (Math.abs(nz - scale) < 1e-6f) {
             return false;
         }
         double wx = screenToWorldX(screenX);
         double wy = screenToWorldY(screenY);
-        zoom = nz;
-        viewX = wx - screenX / (double) zoom;
-        viewY = wy - screenY / (double) zoom;
+        scale = nz;
+        viewX = wx - screenX / (double) scale;
+        viewY = wy - screenY / (double) scale;
         syncComponents();
         repaint();
         return true;
@@ -508,27 +519,27 @@ public class NodeGraph extends Container {
 
     /// A world x as a pixel from the left of the view.
     public int worldToScreenX(double wx) {
-        return (int) Math.round((wx - viewX) * zoom);
+        return (int) Math.round((wx - viewX) * scale);
     }
 
     /// A world y as a pixel from the top of the view.
     public int worldToScreenY(double wy) {
-        return (int) Math.round((wy - viewY) * zoom);
+        return (int) Math.round((wy - viewY) * scale);
     }
 
     /// A world length in pixels.
     public int worldToScreenLength(double len) {
-        return (int) Math.round(len * zoom);
+        return (int) Math.round(len * scale);
     }
 
     /// A pixel from the left of the view as a world x.
     public double screenToWorldX(int sx) {
-        return viewX + sx / (double) zoom;
+        return viewX + sx / (double) scale;
     }
 
     /// A pixel from the top of the view as a world y.
     public double screenToWorldY(int sy) {
-        return viewY + sy / (double) zoom;
+        return viewY + sy / (double) scale;
     }
 
     int headerHeightOnScreen() {
@@ -536,7 +547,7 @@ public class NodeGraph extends Container {
     }
 
     int portRadiusOnScreen() {
-        return Math.max(3, Math.round(GraphLook.mm(1.1f) * Math.min(1.4f, Math.max(0.5f, zoom))));
+        return Math.max(3, Math.round(GraphLook.mm(1.1f) * Math.min(1.4f, Math.max(0.5f, getZoom()))));
     }
 
     // -------------------------------------------------------------- selection
@@ -1021,7 +1032,7 @@ public class NodeGraph extends Container {
         }
         // curved: a cubic per span; tangents horizontal at ports, otherwise
         // Catmull-Rom through the bends
-        int steps = Math.max(6, Math.min(24, (int) (zoom * 16)));
+        int steps = Math.max(6, Math.min(24, (int) (scale * 16)));
         ensurePath((cn - 1) * steps + 1);
         int k = 0;
         pathX[k] = cx[0];
@@ -1171,8 +1182,8 @@ public class NodeGraph extends Container {
                 sy = new double[n];
             }
             for (int k = 0; k < n; k++) {
-                sx[k] = (pathX[k] - viewX) * zoom;
-                sy[k] = (pathY[k] - viewY) * zoom;
+                sx[k] = (pathX[k] - viewX) * scale;
+                sy[k] = (pathY[k] - viewY) * scale;
             }
             edgeRenderer.paintEdge(g, this, e, sx, sy, n, e == selectedEdge); // NOPMD CompareObjectsWithEquals - the same object is meant
         }
@@ -1286,7 +1297,7 @@ public class NodeGraph extends Container {
     private void paintGrid(Graphics g, int w, int h, int bg) {
         Style gs = GraphLook.style("NodeGraphGrid");
         double step = 24;
-        while (step * zoom < GraphLook.mm(2.5f)) {
+        while (step * scale < GraphLook.mm(2.5f)) {
             step *= 4;
         }
         g.setColor(GraphLook.mix(bg, gs.getFgColor(), 110));
@@ -1307,7 +1318,7 @@ public class NodeGraph extends Container {
         int y = worldToScreenY(r[1]);
         int w = worldToScreenLength(r[2]);
         int h = worldToScreenLength(r[3]);
-        int arc = Math.max(2, Math.round(GraphLook.mm(2f) * Math.min(zoom, 1.5f)));
+        int arc = Math.max(2, Math.round(GraphLook.mm(2f) * Math.min(getZoom(), 1.5f)));
         int fg = s.getFgColor();
         int a = g.getAlpha();
         g.setColor(GraphLook.bg(s, GraphLook.mix(0xffffff, fg, 20)));
@@ -1316,11 +1327,11 @@ public class NodeGraph extends Container {
         g.setAlpha(a);
         g.setColor(GraphLook.mix(GraphLook.bg(s, 0xffffff), fg, 90));
         g.drawRoundRect(x, y, w - 1, h - 1, arc, arc);
-        if (zoom >= detailZoom) {
-            Font f = GraphLook.font("NodeGraphGroup", zoom);
+        if (getZoom() >= detailZoom) {
+            Font f = GraphLook.font("NodeGraphGroup", getZoom());
             g.setFont(f);
             g.setColor(fg);
-            int pad = GraphLook.mm(1.5f, zoom);
+            int pad = GraphLook.mm(1.5f, getZoom());
             int th = worldToScreenLength(GROUP_TITLE);
             String chevron = "- ";
             g.drawString(GraphLook.fit(chevron + grp.getLabel(), f, w - pad * 2), x + pad, y + (th - f.getHeight()) / 2 + pad / 2);
@@ -1333,7 +1344,7 @@ public class NodeGraph extends Container {
         int y = worldToScreenY(r[1]);
         int w = worldToScreenLength(r[2]);
         int h = worldToScreenLength(r[3]);
-        int arc = Math.max(2, Math.round(GraphLook.mm(1.6f) * Math.min(zoom, 1.5f)));
+        int arc = Math.max(2, Math.round(GraphLook.mm(1.6f) * Math.min(getZoom(), 1.5f)));
         int fg = s.getFgColor();
         int bg = GraphLook.bg(GraphLook.style("NodeGraphNode"), 0xffffff);
         GraphLook.shadow(g, x, y, w, h, arc, 0.6f);
@@ -1345,11 +1356,11 @@ public class NodeGraph extends Container {
         g.fillRoundRect(x, y, w, h, arc, arc);
         g.setColor(GraphLook.mix(bg, fg, 90));
         g.drawRoundRect(x, y, w - 1, h - 1, arc, arc);
-        if (zoom >= detailZoom) {
-            Font f = GraphLook.font("NodeGraphGroup", zoom);
+        if (getZoom() >= detailZoom) {
+            Font f = GraphLook.font("NodeGraphGroup", getZoom());
             g.setFont(f);
             g.setColor(fg);
-            int pad = GraphLook.mm(1.5f, zoom);
+            int pad = GraphLook.mm(1.5f, getZoom());
             g.drawString(GraphLook.fit("+ " + grp.getLabel(), f, w - pad * 2), x + pad, y + (h - f.getHeight()) / 2);
         }
     }
@@ -1410,8 +1421,8 @@ public class NodeGraph extends Container {
         g.setColor(primary);
         int vx = (int) (viewX * t[0] + t[1]);
         int vy = (int) (viewY * t[0] + t[2]);
-        int vw = (int) (canvas.getWidth() / (double) zoom * t[0]);
-        int vh = (int) (canvas.getHeight() / (double) zoom * t[0]);
+        int vw = (int) (canvas.getWidth() / (double) scale * t[0]);
+        int vh = (int) (canvas.getHeight() / (double) scale * t[0]);
         g.drawRect(vx, vy, vw, vh);
         g.drawRect(vx + 1, vy + 1, vw - 2, vh - 2);
         g.setClip(clip);
@@ -1425,7 +1436,7 @@ public class NodeGraph extends Container {
     public Image toImage(int width, int height) {
         Image img = Image.createImage(width, height, 0xffffffff);
         Graphics g = img.getGraphics();
-        float oz = zoom;
+        float oz = scale;
         double ox = viewX;
         double oy = viewY;
         List<GraphNode> sel = new ArrayList<GraphNode>(selection);
@@ -1439,12 +1450,12 @@ public class NodeGraph extends Container {
             int margin = GraphLook.mm(3);
             double bw = Math.max(1, b[2] - b[0]);
             double bh = Math.max(1, b[3] - b[1]);
-            zoom = (float) Math.min(1, Math.min((width - margin * 2) / bw, (height - margin * 2) / bh));
-            viewX = (b[0] + b[2]) / 2 - width / 2.0 / zoom;
-            viewY = (b[1] + b[3]) / 2 - height / 2.0 / zoom;
+            scale = (float) Math.min(unit(), Math.min((width - margin * 2) / bw, (height - margin * 2) / bh));
+            viewX = (b[0] + b[2]) / 2 - width / 2.0 / scale;
+            viewY = (b[1] + b[3]) / 2 - height / 2.0 / scale;
         }
         paintGraph(g, width, height);
-        zoom = oz;
+        scale = oz;
         viewX = ox;
         viewY = oy;
         selection.addAll(sel);
@@ -1473,7 +1484,7 @@ public class NodeGraph extends Container {
     public GraphEdge edgeAt(int sx, int sy) {
         double wx = screenToWorldX(sx);
         double wy = screenToWorldY(sy);
-        double tol = GraphLook.mm(2f) / (double) zoom;
+        double tol = GraphLook.mm(2f) / (double) scale;
         GraphEdge best = null;
         double bestD = tol * tol;
         List<GraphEdge> edges = model.getEdges();
@@ -1529,7 +1540,7 @@ public class NodeGraph extends Container {
     private GraphNode portOwnerAt(int sx, int sy, int reach) {
         double wx = screenToWorldX(sx);
         double wy = screenToWorldY(sy);
-        double wr = reach / (double) zoom;
+        double wr = reach / (double) scale;
         List<GraphNode> nodes = model.getNodes();
         for (int i = nodes.size() - 1; i >= 0; i--) {
             GraphNode n = nodes.get(i);
@@ -1589,7 +1600,7 @@ public class NodeGraph extends Container {
         }
         double wx = (sx - t[1]) / t[0];
         double wy = (sy - t[2]) / t[0];
-        setView(wx - canvas.getWidth() / 2.0 / zoom, wy - canvas.getHeight() / 2.0 / zoom);
+        setView(wx - canvas.getWidth() / 2.0 / scale, wy - canvas.getHeight() / 2.0 / scale);
     }
 
     // ---------------------------------------------------------------- pointer
@@ -2108,7 +2119,7 @@ public class NodeGraph extends Container {
         }
         int w = canvas.getWidth();
         int h = canvas.getHeight();
-        boolean show = zoom >= componentZoom && w > 0 && h > 0;
+        boolean show = getZoom() >= componentZoom && w > 0 && h > 0;
         boolean changed = false;
         if (componentFactory != null) {
             List<GraphNode> nodes = model.getNodes();
@@ -2259,8 +2270,8 @@ public class NodeGraph extends Container {
         protected void scrollChanged() {
             int ox = getOffsetX();
             int oy = getOffsetY();
-            viewX += (ox - seenX) / (double) zoom;
-            viewY += (oy - seenY) / (double) zoom;
+            viewX += (ox - seenX) / (double) scale;
+            viewY += (oy - seenY) / (double) scale;
             seenX = ox;
             seenY = oy;
             viewSet = true;
