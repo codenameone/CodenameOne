@@ -374,6 +374,9 @@ public final class Emitter {
     public void planTyped() {
         typedEmit = new TypedEmit(this, infer, layouts);
         typedEmit.plan();
+        for (Layouts.Cls k : layouts.classes.values()) {
+            k.typed = typedEmit;
+        }
     }
 
     /// Hands every module the plain fields of every class of the program.
@@ -4314,7 +4317,12 @@ public final class Emitter {
             // field is read twice, a load, and an unbound local fails every
             // instanceof and raises from the generic path.
             StringBuilder sb = new StringBuilder("(");
-            if (hk != null) {
+            String tf = hk != null && hk.typed != null ? hk.typed.foreignGet(hk, name, h) : null;
+            if (tf != null) {
+                // A typed field is set on every instance of its class.
+                sb.append(h).append(" != null && ").append(h).append(" == ").append(raw).append(" ? ").append(tf)
+                        .append(" : ");
+            } else if (hk != null) {
                 String f = h + ".f_" + mangle(name);
                 sb.append(h).append(" == ").append(raw).append(" && ").append(f).append(" != null ? ").append(f)
                         .append(" : ");
@@ -4362,15 +4370,19 @@ public final class Emitter {
     /// The class declaring field `name` that the compiled method's receiver
     /// class is or extends, or null when there is none (or no such method).
     private Layouts.Cls selfOwner(String name) {
-        return ownerFor(name, selfCls);
+        return ownerFor(name, selfCls, layouts.fieldOwners);
     }
 
     /// The class declaring field `name` that `cls` is or extends, or null.
     private Layouts.Cls ownerFor(String name, Layouts.Cls cls) {
+        return ownerFor(name, cls, allOwners);
+    }
+
+    private static Layouts.Cls ownerFor(String name, Layouts.Cls cls, Map<String, List<Layouts.Cls>> all) {
         if (cls == null) {
             return null;
         }
-        List<Layouts.Cls> owners = allOwners.get(name);
+        List<Layouts.Cls> owners = all.get(name);
         if (owners == null) {
             return null;
         }
@@ -4400,7 +4412,8 @@ public final class Emitter {
             return;
         }
         String h = shadowVar.get(o);
-        if (h != null && ownerFor(name, shadowCls.get(o)) != null) {
+        Layouts.Cls hs = h != null ? ownerFor(name, shadowCls.get(o)) : null;
+        if (hs != null && (hs.typed == null || hs.typed.typedField(hs, name) == null)) {
             String f = h + ".f_" + mangle(name);
             out.append("if (").append(h).append(" == ").append(o).append(" && (").append(f).append(" != null || !")
                     .append(h).append(".extra)) {\n");

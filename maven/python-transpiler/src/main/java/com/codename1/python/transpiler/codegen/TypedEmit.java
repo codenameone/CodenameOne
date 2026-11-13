@@ -673,6 +673,20 @@ final class TypedEmit {
         return "TF_" + Emitter.mangle(f.def.name);
     }
 
+    /// Field `f` of `k` read on `recv`, an expression of `k`'s Java class,
+    /// as an object, or null when the field is not held typed.
+    String foreignGet(Layouts.Cls k, String f, String recv) {
+        Ty t = typedField(k, f);
+        if (t == null) {
+            return null;
+        }
+        String m = Emitter.mangle(f);
+        if (t.k == Ty.K.INT) {
+            return dual(recv + ".t_" + m, recv + ".b_" + m).c;
+        }
+        return box(new E(recv + ".t_" + m, t));
+    }
+
     Ty typedField(Layouts.Cls owner, String f) {
         Map<String, Ty> m = typedFields.get(owner);
         return m == null ? null : m.get(f);

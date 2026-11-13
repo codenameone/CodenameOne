@@ -56,6 +56,9 @@ final class Layouts {
         /// `javaName` qualified by the module's Java class: how code in any
         /// module of the program names this class.
         String ref;
+        /// The typed code of the module declaring the class, once its typed
+        /// fields are decided: whether a field is held typed, and how.
+        TypedEmit typed;
         final Cls parent;
         final List<String> fields = new ArrayList<String>();
         /// Every field, the inherited ones first: the index order the
@@ -127,21 +130,23 @@ final class Layouts {
     /// The class each compiled method belongs to.
     final Map<FunctionDef, Cls> methodClass = new LinkedHashMap<FunctionDef, Cls>();
 
-    /// Field name -> every class of the whole program declaring it as a
-    /// plain (untyped) field. The program is closed: a class compiled in
+    /// Field name -> every class of the whole program declaring it, typed
+    /// (`Cls.typed`) or not. The program is closed: a class compiled in
     /// one module is a class code in every other module may read the
     /// fields of directly (`ShadowTypes`). Filled once every module's
     /// typed fields are known, before any module is emitted.
     static Map<String, List<Cls>> program(List<Layouts> all) {
         Map<String, List<Cls>> r = new LinkedHashMap<String, List<Cls>>();
         for (Layouts l : all) {
-            for (Map.Entry<String, List<Cls>> e : l.fieldOwners.entrySet()) {
-                List<Cls> o = r.get(e.getKey());
-                if (o == null) {
-                    o = new ArrayList<Cls>();
-                    r.put(e.getKey(), o);
+            for (Cls k : l.classes.values()) {
+                for (String f : k.fields) {
+                    List<Cls> o = r.get(f);
+                    if (o == null) {
+                        o = new ArrayList<Cls>();
+                        r.put(f, o);
+                    }
+                    o.add(k);
                 }
-                o.addAll(e.getValue());
             }
         }
         return r;
