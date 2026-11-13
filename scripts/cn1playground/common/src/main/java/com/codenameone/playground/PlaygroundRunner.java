@@ -364,7 +364,7 @@ final class PlaygroundRunner {
         }
         int at = message.indexOf("symbol:");
         if (at < 0) {
-            return null;
+            return missingOuterClass(message);
         }
         int p = skipSpaces(message, at + "symbol:".length());
         int kindEnd = p;
@@ -400,6 +400,29 @@ final class PlaygroundRunner {
                     && (qEnd == message.length() || message.charAt(qEnd) != '.')) {
                 return message.substring(q, qEnd);
             }
+        }
+        return message.substring(p, end);
+    }
+
+    /// ``TaskDependency.Type.FINISH_TO_START`` with TaskDependency unimported
+    /// carries no symbol at all: two names before the constant read to javac
+    /// as a class in a package, and the message is "package TaskDependency
+    /// does not exist". A package is never capitalised and never a single
+    /// name here, so a capitalised one with no dot in it is the outer class.
+    private static String missingOuterClass(String message) {
+        String lead = "package ";
+        String tail = " does not exist";
+        int p = message.indexOf(lead);
+        if (p < 0) {
+            return null;
+        }
+        p += lead.length();
+        int end = p;
+        while (end < message.length() && Character.isJavaIdentifierPart(message.charAt(end))) {
+            end++;
+        }
+        if (end == p || !Character.isUpperCase(message.charAt(p)) || !message.startsWith(tail, end)) {
+            return null;
         }
         return message.substring(p, end);
     }

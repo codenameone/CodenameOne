@@ -16891,7 +16891,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void run() {
                     int hour = ((Integer)currentValue).intValue() / 60;
                     int minute = ((Integer)currentValue).intValue() % 60;
-                    TimePickerDialog tp = new TimePickerDialog(getActivity(), pickInstance, hour, minute, true){
+                    // The dialog follows the picker: a picker that writes its value
+                    // with AM/PM gets a 12 hour dial. This was always 24 hours, so
+                    // the dialog and the text it filled in could disagree.
+                    boolean hours24 = !(source instanceof com.codename1.ui.spinner.Picker)
+                            || !((com.codename1.ui.spinner.Picker) source).isShowMeridiem();
+                    TimePickerDialog tp = new TimePickerDialog(getActivity(), pickInstance, hour, minute, hours24){
 
                         @Override
                         public void cancel() {

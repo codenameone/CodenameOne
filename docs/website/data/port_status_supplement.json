@@ -57,6 +57,90 @@
       ]
     },
     {
+      "test": "GanttThemeScreenshotTest",
+      "reason": "The Gantt chart baseline is a task table beside a timeline of bars and dependency arrows. A watch face has no room for either, so the capture there would only record how the chart fails to fit.",
+      "platform_support": "The Gantt component compiles and runs on watchOS; it is a planning view for phones, tablets and desktops, and only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the chart in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "gantt-chart-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "MaterialDatePickerThemeScreenshotTest",
+      "reason": "The Material date picker baseline is a phone-sized dialog holding a month grid. The watch form factor has no room for that dialog, so there is no comparable capture to take.",
+      "platform_support": "Date entry works on watchOS through the existing Picker; only this phone-geometry dialog baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg opens the picker in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-picker-dialog-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "MaterialTimePickerThemeScreenshotTest",
+      "reason": "The Material time picker baseline is a phone-sized dialog holding a clock dial. The watch form factor has no room for that dialog, so there is no comparable capture to take.",
+      "platform_support": "Time entry works on watchOS through the existing Picker; only this phone-geometry dialog baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg opens the picker in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-picker-dialog-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "SchedulerMonthThemeScreenshotTest",
+      "reason": "The scheduler month baseline is a six-week grid with events in each day cell. A watch face has no room for it, so the capture there would only record how the grid fails to fit.",
+      "platform_support": "The Scheduler component compiles and runs on watchOS; it is a calendar view for phones, tablets and desktops, and only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the month view in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "calendar-grid-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "SchedulerResourceThemeScreenshotTest",
+      "reason": "The scheduler resource baseline is a day laid out with one column per resource against a time axis. A watch face has no room for it, so the capture there would only record how the grid fails to fit.",
+      "platform_support": "The Scheduler component compiles and runs on watchOS; it is a calendar view for phones, tablets and desktops, and only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the resource view in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "calendar-grid-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "SchedulerThemeScreenshotTest",
+      "reason": "The scheduler week baseline is a grid of day columns against a time axis. A watch face has no room for it, so the capture there would only record how the grid fails to fit.",
+      "platform_support": "The Scheduler component compiles and runs on watchOS; it is a calendar view for phones, tablets and desktops, and only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the week view in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "calendar-grid-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "GoogleWebMapScreenshotTest",
       "reason": "The live Google Maps JavaScript map needs three things at once: a web view that composites into the screenshot, a billed Google Maps API key, and network access to Google's tile servers. Every desktop port (macOS, Mac Catalyst, Linux and Windows) and the browser skip it before reading a key, because their captures do not composite the native web view; only the Android and iOS pipelines are given the key (no-api-key is still accepted from Linux and Windows reports written before they took the desktop path), tvOS ships no WebKit, and the watch form factor has no map surface at all.",
       "platform_support": "Every listed port supports BrowserComponent and the map API where the table says so; this skip is about one live, key-gated and network-dependent third-party map rendering inside a screenshot comparison, not about map support.",

@@ -45,6 +45,10 @@ JavaScript and Linux.
 This API is a clean replacement for the old `CN1Calendar` integration. New
 code shouldn't mix objects or identifiers from the two APIs.
 
+To show what a source holds by the day, the week or the month, and let the
+user drag an event to another time, give a `CalendarScheduleModel` to a
+`Scheduler`. See <<scheduling-and-gantt,Scheduling and Gantt charts>>.
+
 === Creating an event
 
 All-day values use `CalendarDateTime.allDay(LocalDate)`. Timed values use

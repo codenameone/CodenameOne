@@ -862,3 +862,97 @@ Button.hover {
     --radius: 1.5mm;
 }
 /* end::wayline-css-brand[] */
+
+/* tag::scheduling-css-scheduler[] */
+SchedulerItem {
+    background-color: #0f766e;
+    color: #ffffff;
+}
+
+SchedulerBackgroundItem {
+    background-color: #f0fdfa;
+    color: #115e59;
+}
+
+SchedulerHeaderToday {
+    background-color: #0f766e;
+    color: #ffffff;
+}
+
+SchedulerNow {
+    background-color: #e11d48;
+    color: #e11d48;
+}
+
+/* A UIID of the application's own, for the items that ask for it. */
+TentativeBooking {
+    background-color: #fef3c7;
+    color: #92400e;
+    font-family: "native:MainRegular";
+    font-size: 1.4mm;
+}
+/* end::scheduling-css-scheduler[] */
+
+/* tag::scheduling-css-gantt[] */
+GanttBar {
+    background-color: #93c5fd;
+    color: #0f172a;
+}
+
+GanttBarProgress {
+    background-color: #1d4ed8;
+    color: #ffffff;
+}
+
+GanttBarCritical {
+    background-color: #f97316;
+    color: #0f172a;
+}
+
+GanttSummaryBar {
+    background-color: #0f172a;
+    color: #ffffff;
+}
+
+GanttMilestone {
+    background-color: #7c3aed;
+    color: #ffffff;
+}
+
+GanttLinkCritical {
+    color: #f97316;
+}
+/* end::scheduling-css-gantt[] */
+
+/* tag::picker-material-constant[] */
+#Constants {
+    pickerStyle: "material";
+}
+/* end::picker-material-constant[] */
+
+/* tag::picker-material-css[] */
+PickerMaterial {
+    background-color: #f0fdfa;
+}
+
+PickerMaterialButton {
+    color: #0f766e;
+}
+
+/* The chosen day. */
+PickerMaterialDay.selected {
+    background-color: #0f766e;
+    color: #ffffff;
+}
+
+/* The clock face, and the hand with the number under it. */
+PickerMaterialDial {
+    background-color: #ccfbf1;
+    color: #134e4a;
+}
+
+PickerMaterialDial.selected {
+    background-color: #0f766e;
+    color: #ffffff;
+}
+/* end::picker-material-css[] */

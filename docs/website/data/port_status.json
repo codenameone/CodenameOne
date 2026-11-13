@@ -445,6 +445,18 @@
       ]
     },
     {
+      "id": "scheduling-views",
+      "category": "Rich components",
+      "name": "Scheduler and Gantt chart",
+      "description": "Checks the scheduler's week, month and resource timeline views and the Gantt chart with its task table, links, critical path and resource load, in light and dark themes.",
+      "tests": [
+        "GanttThemeScreenshotTest",
+        "SchedulerMonthThemeScreenshotTest",
+        "SchedulerResourceThemeScreenshotTest",
+        "SchedulerThemeScreenshotTest"
+      ]
+    },
+    {
       "id": "native-theme-controls",
       "category": "Themes and styling",
       "name": "Native-theme controls",
@@ -454,6 +466,8 @@
         "CheckBoxRadioThemeScreenshotTest",
         "DesktopWidgetsThemeScreenshotTest",
         "ListThemeScreenshotTest",
+        "MaterialDatePickerThemeScreenshotTest",
+        "MaterialTimePickerThemeScreenshotTest",
         "MultiButtonThemeScreenshotTest",
         "PickerThemeScreenshotTest",
         "SwitchThemeScreenshotTest",
@@ -1407,6 +1421,30 @@
     {
       "pattern": "PickerTheme_*",
       "test": "PickerThemeScreenshotTest"
+    },
+    {
+      "pattern": "MaterialDatePickerTheme*",
+      "test": "MaterialDatePickerThemeScreenshotTest"
+    },
+    {
+      "pattern": "MaterialTimePickerTheme*",
+      "test": "MaterialTimePickerThemeScreenshotTest"
+    },
+    {
+      "pattern": "SchedulerTheme*",
+      "test": "SchedulerThemeScreenshotTest"
+    },
+    {
+      "pattern": "SchedulerMonthTheme*",
+      "test": "SchedulerMonthThemeScreenshotTest"
+    },
+    {
+      "pattern": "SchedulerResourceTheme*",
+      "test": "SchedulerResourceThemeScreenshotTest"
+    },
+    {
+      "pattern": "GanttTheme*",
+      "test": "GanttThemeScreenshotTest"
     },
     {
       "pattern": "ToolbarTheme_*",

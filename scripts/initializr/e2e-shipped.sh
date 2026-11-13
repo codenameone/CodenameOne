@@ -79,15 +79,18 @@ FULL_STACK_SINCE="$(since FULL_STACK_SINCE)"
 BASTION_SINCE="$(since BASTION_SINCE)"
 REEL_SINCE="$(since REEL_SINCE)"
 SPLAT_SINCE="$(since SPLAT_SINCE)"
-[ -n "$FULL_STACK_SINCE" ] && [ -n "$BASTION_SINCE" ] && [ -n "$REEL_SINCE" ] && [ -n "$SPLAT_SINCE" ] || fail "could not read the template floors from $GENERATOR"
+SLATE_SINCE="$(since SLATE_SINCE)"
+[ -n "$FULL_STACK_SINCE" ] && [ -n "$BASTION_SINCE" ] && [ -n "$REEL_SINCE" ] && [ -n "$SPLAT_SINCE" ] && [ -n "$SLATE_SINCE" ] || fail "could not read the template floors from $GENERATOR"
 # The oldest release a template's generated code compiles against: Bastion
 # calls framework API that first shipped in BASTION_SINCE, Reel the protected
-# playback API of REEL_SINCE, Splat the 3D engine of SPLAT_SINCE.
+# playback API of REEL_SINCE, Splat the 3D engine of SPLAT_SINCE,
+# Slate the scheduling views of SLATE_SINCE.
 template_since() {
   case "$1" in
     BASTION) echo "$BASTION_SINCE" ;;
     REEL) echo "$REEL_SINCE" ;;
     SPLAT) echo "$SPLAT_SINCE" ;;
+    SLATE) echo "$SLATE_SINCE" ;;
     *) echo "$FULL_STACK_SINCE" ;;
   esac
 }

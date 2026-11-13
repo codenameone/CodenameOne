@@ -187,9 +187,17 @@ include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate
 
 The provider's day, week and agenda are one schedule read over a range, drawn as
 a timeline: a lane per day, the working hours as a band, bookings as blocks as long
-as they last, calendar busy time shaded and a line at the current time. The owner's
+as they last, calendar busy time hatched and a line at the current time. The owner's
 day board is the same component with a lane per provider, so a gap reads the same
-on both:
+on both.
+
+The grid itself is the framework's <<scheduling-and-gantt,`Scheduler`>>: the day and
+the week are its `DAY` and `WEEK` views, the board its `RESOURCE_DAY` view with a
+resource per provider. `Timeline` is the translation from Slate's data to the
+scheduler's -- a shift becomes a background item, calendar busy time a blocked one,
+an appointment an event styled by its state -- and the scheduler supplies the
+scrolling, the pinned hours and names, the zoom and the layout of bookings that
+overlap:
 
 [source,java,role=cn1-no-try]
 ----

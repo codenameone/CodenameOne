@@ -1390,6 +1390,14 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvTimelineBusy { color: var(--text-muted-dark); background-color: var(--line-dark); }
     SvTimelineNoShow { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
     SvTimelineNow { color: var(--danger-dark); }
+    Scheduler { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SchedulerGrid { color: var(--line-strong-dark); background-color: transparent; }
+    SchedulerOffHours { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SchedulerHeader { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SchedulerHeaderToday { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SchedulerTimeLabel { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SchedulerNow { color: var(--danger-dark); background-color: var(--danger-dark); }
+    SchedulerSelection { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
     SvMeter { color: var(--brand-dark); }
     SvAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
     SvAlert.pressed { background-color: var(--surface-press-dark); }
@@ -1499,5 +1507,16 @@ SvTimelineBooking { color: var(--brand); background-color: var(--brand-tint); fo
 SvTimelineDone { color: var(--text-muted); background-color: var(--surface-press); font-family: "native:MainBold"; font-size: 2.2mm; }
 SvTimelineBusy { color: var(--text-muted); background-color: var(--line); }
 SvTimelineNoShow { color: var(--warning); background-color: var(--warning-tint); font-family: "native:MainBold"; font-size: 2.2mm; }
-SvLegend { padding: 1mm 0 1mm 0; margin: 0; }
+SvLegend { padding: 1mm 3mm 1mm 3mm; margin: 0; }
 SvTimelineNow { color: var(--danger); }
+/* The grid the timeline is drawn in is the framework's Scheduler, which paints
+   from these styles rather than from components: the closed hours are its
+   own background, the lines its grid's color. */
+Scheduler { color: var(--text); background-color: var(--surface-alt); padding: 0; margin: 0; }
+SchedulerGrid { color: var(--line-strong); background-color: transparent; }
+SchedulerOffHours { color: var(--text-muted); background-color: var(--surface-alt); }
+SchedulerHeader { color: var(--text-muted); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.2mm; }
+SchedulerHeaderToday { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainBold"; font-size: 2.2mm; }
+SchedulerTimeLabel { color: var(--text-muted); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.2mm; }
+SchedulerNow { color: var(--danger); background-color: var(--danger); }
+SchedulerSelection { color: var(--brand); background-color: var(--brand-tint); }

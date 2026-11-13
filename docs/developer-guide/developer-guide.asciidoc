@@ -69,6 +69,8 @@ include::component-selector.asciidoc[]
 
 include::Rich-Text-And-Code-Editing.asciidoc[]
 
+include::Scheduling-And-Gantt.asciidoc[]
+
 include::Accessibility-Semantics.asciidoc[]
 
 include::Animations.asciidoc[]
