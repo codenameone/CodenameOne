@@ -3326,6 +3326,26 @@
         "url": "https://dev.to/codenameone/caches-certificates-streaming-uploads-and-a-simulator-that-types-3d1j",
         "syndicated_at": "2026-11-12T14:01:23+00:00"
       }
+    },
+    "embedded-linux-ui-in-18-mb": {
+      "hashnode": {
+        "url": "https://debugagent.com/embedded-java-20x-smaller-than-chrome-faster-than-rust-royalty-free",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6af6611fcc8dba85ffa05c68",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-13T01:01:10+00:00"
+      },
+      "foojay": {
+        "id": 438,
+        "url": "https://github.com/foojayio/website/pull/438",
+        "pull_request_url": "https://github.com/foojayio/website/pull/438",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-11-13T01:01:30+00:00"
+      }
     }
   }
 }
