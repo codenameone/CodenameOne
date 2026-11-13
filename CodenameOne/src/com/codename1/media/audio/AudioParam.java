@@ -35,9 +35,12 @@ import java.util.ArrayList;
 /// parameter so calls can be chained:
 ///
 /// ```java
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// GainNode gain = audio.createGain();
+/// double now = audio.getCurrentTime();
 /// gain.getGain().setValueAtTime(0, now)
 ///         .linearRampToValueAtTime(1, now + 0.05)
-///         .setTargetAtTime(0.2, now + 0.05, 0.1);
+///         .setTargetAtTime(0.2f, now + 0.05, 0.1);
 /// ```
 ///
 /// Times are in the context's time base, [BaseAudioContext#getCurrentTime()].

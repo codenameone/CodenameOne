@@ -38,10 +38,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 /// implementation, so values match browsers in shape, not to the sample.
 ///
 /// ```java
-/// DynamicsCompressorNode comp = ctx.createDynamicsCompressor();
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// GainNode mix = audio.createGain();
+/// DynamicsCompressorNode comp = audio.createDynamicsCompressor();
 /// comp.getThreshold().setValue(-18);
 /// comp.getRatio().setValue(4);
-/// mix.connect(comp).connect(ctx.getDestination());
+/// mix.connect(comp).connect(audio.getDestination());
 /// ```
 public final class DynamicsCompressorNode extends AudioNode {
     private static final double LOOKAHEAD_SECONDS = 0.006;

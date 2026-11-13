@@ -32,9 +32,13 @@ package com.codename1.media.audio;
 /// mono input, otherwise stereo.
 ///
 /// ```java
-/// ConvolverNode hall = ctx.createConvolver();
-/// hall.setBuffer(impulse);          // decoded or synthesised response
-/// dry.connect(hall).connect(wetGain).connect(ctx.getDestination());
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode dry = audio.createOscillator();
+/// GainNode wetGain = audio.createGain();
+/// AudioData impulse = audio.createBuffer(2, 22050, 44100); // decoded or synthesised response
+/// ConvolverNode hall = audio.createConvolver();
+/// hall.setBuffer(impulse);
+/// dry.connect(hall).connect(wetGain).connect(audio.getDestination());
 /// ```
 ///
 /// Convolution is uniformly partitioned in the frequency domain, one 128 frame

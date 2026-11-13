@@ -30,12 +30,13 @@ package com.codename1.media.audio;
 /// passes its input through.
 ///
 /// ```java
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
 /// float[] curve = new float[1024];
 /// for (int i = 0; i < curve.length; i++) {
 ///     double x = i * 2.0 / (curve.length - 1) - 1;
 ///     curve[i] = (float) (x * 3 / (1 + Math.abs(x * 3)));   // soft clip
 /// }
-/// WaveShaperNode drive = ctx.createWaveShaper();
+/// WaveShaperNode drive = audio.createWaveShaper();
 /// drive.setCurve(curve);
 /// drive.setOversample(OverSampleType.FOUR_X);
 /// ```

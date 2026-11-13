@@ -25,12 +25,14 @@ package com.codenameone.developerguide.snippets;
 import com.codename1.media.AudioBuffer;
 import com.codename1.media.MediaManager;
 import com.codename1.media.audio.AnalyserNode;
+import com.codename1.media.audio.AudioBufferSourceNode;
 import com.codename1.media.audio.AudioContext;
 import com.codename1.media.audio.AudioData;
 import com.codename1.media.audio.AudioProcessor;
 import com.codename1.media.audio.AudioProcessorNode;
 import com.codename1.media.audio.BiquadFilterNode;
 import com.codename1.media.audio.BiquadFilterType;
+import com.codename1.media.audio.ConvolverNode;
 import com.codename1.media.audio.GainNode;
 import com.codename1.media.audio.MicrophoneSourceNode;
 import com.codename1.media.audio.OfflineAudioContext;
@@ -39,47 +41,55 @@ import com.codename1.media.audio.PannerNode;
 import com.codename1.media.audio.PanningModel;
 
 /// Snippets for the audio graph, included by the developer guide's media
-/// chapter.
+/// chapter. Each tagged block declares what it uses, so it also runs as it
+/// stands in the Playground, whose script already has a variable named `ctx`.
 public class AudioGraphSnippets {
     void beep() {
         // tag::audio-graph-beep[]
-        AudioContext ctx = AudioContext.create();
-        if (ctx == null) {
-            return; // no real-time output on this platform
+        AudioContext audio = AudioContext.create();
+        if (audio != null) { // null where the platform has no real-time output
+            OscillatorNode osc = audio.createOscillator();
+            osc.getFrequency().setValue(440);
+            GainNode env = audio.createGain();
+            double now = audio.getCurrentTime();
+            env.getGain().setValueAtTime(0, now);
+            env.getGain().linearRampToValueAtTime(0.5f, now + 0.02);
+            env.getGain().exponentialRampToValueAtTime(0.001f, now + 1);
+            BiquadFilterNode filter = audio.createBiquadFilter();
+            filter.setType(BiquadFilterType.LOWPASS);
+            filter.getFrequency().setValue(1200);
+            osc.connect(filter).connect(env).connect(audio.getDestination());
+            osc.start(now);
+            osc.stop(now + 1);
         }
-        OscillatorNode osc = ctx.createOscillator();
-        osc.getFrequency().setValue(440);
-        GainNode env = ctx.createGain();
-        double now = ctx.getCurrentTime();
-        env.getGain().setValueAtTime(0, now);
-        env.getGain().linearRampToValueAtTime(0.5f, now + 0.02);
-        env.getGain().exponentialRampToValueAtTime(0.001f, now + 1);
-        BiquadFilterNode filter = ctx.createBiquadFilter();
-        filter.setType(BiquadFilterType.LOWPASS);
-        filter.getFrequency().setValue(1200);
-        osc.connect(filter).connect(env).connect(ctx.getDestination());
-        osc.start(now);
-        osc.stop(now + 1);
         // end::audio-graph-beep[]
     }
 
-    void spatial(AudioContext ctx, AudioData footsteps) {
+    void spatial() {
         // tag::audio-graph-spatial[]
-        PannerNode panner = ctx.createPanner();
-        panner.setPanningModel(PanningModel.HRTF);
-        panner.getPositionX().setValue(3);
-        panner.getPositionZ().setValue(-1);
-        ctx.getListener().getPositionX().setValue(0);
-        com.codename1.media.audio.AudioBufferSourceNode src = ctx.createBufferSource();
-        src.setBuffer(footsteps);
-        src.setLoop(true);
-        src.connect(panner).connect(ctx.getDestination());
-        src.start();
+        AudioContext audio = AudioContext.create();
+        if (audio != null) {
+            PannerNode panner = audio.createPanner();
+            panner.setPanningModel(PanningModel.HRTF);
+            panner.getPositionX().setValue(3);
+            panner.getPositionZ().setValue(-1);
+            audio.getListener().getPositionX().setValue(0);
+            OscillatorNode tone = audio.createOscillator();
+            tone.connect(panner).connect(audio.getDestination());
+            tone.start();
+            tone.stop(audio.getCurrentTime() + 2);
+        }
         // end::audio-graph-spatial[]
     }
 
-    float level(AnalyserNode analyser) {
+    float level() {
         // tag::audio-graph-analyser[]
+        OfflineAudioContext audio = new OfflineAudioContext(1, 4096, 44100);
+        OscillatorNode osc = audio.createOscillator();
+        AnalyserNode analyser = audio.createAnalyser();
+        osc.connect(analyser).connect(audio.getDestination());
+        osc.start();
+        audio.startRendering();
         float[] spectrum = new float[analyser.getFrequencyBinCount()];
         analyser.getFloatFrequencyData(spectrum);
         float loudest = -1000;
@@ -90,9 +100,10 @@ public class AudioGraphSnippets {
         return loudest;
     }
 
-    AudioProcessorNode bitCrusher(AudioContext ctx) {
+    AudioProcessorNode bitCrusher() {
         // tag::audio-graph-processor[]
-        AudioProcessorNode crusher = ctx.createAudioProcessor(new AudioProcessor() {
+        OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+        AudioProcessorNode crusher = audio.createAudioProcessor(new AudioProcessor() {
             @Override
             public boolean process(float[][][] in, float[][][] out, float[][] params) {
                 for (int c = 0; c < out[0].length && c < in[0].length; c++) {
@@ -107,34 +118,34 @@ public class AudioGraphSnippets {
         return crusher;
     }
 
-    void microphone(AudioContext ctx) {
+    void microphone() {
         // tag::audio-graph-microphone[]
-        if (!ctx.isMicrophoneSourceSupported()) {
-            return;
+        AudioContext audio = AudioContext.create();
+        if (audio != null && audio.isMicrophoneSourceSupported()) {
+            AudioBuffer capture = MediaManager.getAudioBuffer("mic", true, 4096);
+            MicrophoneSourceNode mic = audio.createMicrophoneSource(capture);
+            AnalyserNode meter = audio.createAnalyser();
+            mic.connect(meter);
+            // start a recorder built with redirectToAudioBuffer(true) and path "mic"
         }
-        AudioBuffer capture = MediaManager.getAudioBuffer("mic", true, 4096);
-        MicrophoneSourceNode mic = ctx.createMicrophoneSource(capture);
-        AnalyserNode meter = ctx.createAnalyser();
-        mic.connect(meter);
-        // start a recorder built with redirectToAudioBuffer(true) and path "mic"
         // end::audio-graph-microphone[]
     }
 
-    AudioData offline(byte[] wav) {
+    void offline() {
         // tag::audio-graph-offline[]
+        byte[] wav = new byte[0]; // the bytes of a .wav file, from storage or a resource
+        AudioData rendered = null;
         OfflineAudioContext offline = new OfflineAudioContext(2, 48000 * 5, 48000);
-        AudioData clip = offline.decodeAudioData(wav);
-        if (clip == null) {
-            return null; // not a WAV file
+        AudioData clip = offline.decodeAudioData(wav); // null if not a WAV file
+        if (clip != null) {
+            AudioBufferSourceNode src = offline.createBufferSource();
+            src.setBuffer(clip);
+            ConvolverNode reverb = offline.createConvolver();
+            reverb.setBuffer(clip);
+            src.connect(reverb).connect(offline.getDestination());
+            src.start();
+            rendered = offline.startRendering();
         }
-        com.codename1.media.audio.AudioBufferSourceNode src = offline.createBufferSource();
-        src.setBuffer(clip);
-        com.codename1.media.audio.ConvolverNode reverb = offline.createConvolver();
-        reverb.setBuffer(clip);
-        src.connect(reverb).connect(offline.getDestination());
-        src.start();
-        AudioData rendered = offline.startRendering();
         // end::audio-graph-offline[]
-        return rendered;
     }
 }

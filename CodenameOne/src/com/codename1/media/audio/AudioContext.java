@@ -34,12 +34,12 @@ import java.util.concurrent.atomic.AtomicReference;
 /// [OfflineAudioContext] works everywhere.
 ///
 /// ```java
-/// AudioContext ctx = AudioContext.create();
-/// if (ctx != null) {
-///     OscillatorNode osc = ctx.createOscillator();
-///     GainNode amp = ctx.createGain();
-///     osc.connect(amp).connect(ctx.getDestination());
-///     double now = ctx.getCurrentTime();
+/// AudioContext audio = AudioContext.create();
+/// if (audio != null) {
+///     OscillatorNode osc = audio.createOscillator();
+///     GainNode amp = audio.createGain();
+///     osc.connect(amp).connect(audio.getDestination());
+///     double now = audio.getCurrentTime();
 ///     amp.getGain().setValueAtTime(0, now).linearRampToValueAtTime(0.5f, now + 0.02)
 ///             .setTargetAtTime(0, now + 0.1, 0.2);
 ///     osc.start(now);

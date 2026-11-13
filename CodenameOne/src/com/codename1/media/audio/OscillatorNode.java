@@ -27,12 +27,13 @@ import com.codename1.util.MathUtil;
 /// A band-limited periodic waveform, the Web Audio `OscillatorNode`. Mono.
 ///
 /// ```java
-/// OscillatorNode osc = ctx.createOscillator();
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode osc = audio.createOscillator();
 /// osc.setType(OscillatorType.SAWTOOTH);
 /// osc.getFrequency().setValue(220);
-/// osc.connect(ctx.getDestination());
+/// osc.connect(audio.getDestination());
 /// osc.start();
-/// osc.stop(ctx.getCurrentTime() + 1);
+/// osc.stop(audio.getCurrentTime() + 1);
 /// ```
 public final class OscillatorNode extends AudioScheduledSourceNode {
     private final AudioParam frequency;

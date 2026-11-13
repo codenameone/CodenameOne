@@ -30,9 +30,11 @@ import java.util.concurrent.atomic.AtomicLong;
 /// input through unchanged: the Web Audio `AnalyserNode`.
 ///
 /// ```java
-/// AnalyserNode an = ctx.createAnalyser();
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode player = audio.createOscillator();
+/// AnalyserNode an = audio.createAnalyser();
 /// an.setFftSize(1024);
-/// player.connect(an).connect(ctx.getDestination());
+/// player.connect(an).connect(audio.getDestination());
 /// byte[] bars = new byte[an.getFrequencyBinCount()];
 /// // in an animation callback
 /// an.getByteFrequencyData(bars);

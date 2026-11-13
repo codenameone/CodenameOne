@@ -27,11 +27,11 @@ package com.codename1.media.audio;
 /// platform: use it to bounce a mix, pre-render effects, or test a graph.
 ///
 /// ```java
-/// OfflineAudioContext ctx = new OfflineAudioContext(2, 44100, 44100);
-/// OscillatorNode osc = ctx.createOscillator();
-/// osc.connect(ctx.getDestination());
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode osc = audio.createOscillator();
+/// osc.connect(audio.getDestination());
 /// osc.start();
-/// AudioData oneSecond = ctx.startRendering();
+/// AudioData oneSecond = audio.startRendering();
 /// ```
 public final class OfflineAudioContext extends BaseAudioContext {
     private final int length;

@@ -32,13 +32,15 @@ import com.codename1.util.MathUtil;
 /// pans by azimuth; [PanningModel#HRTF] renders binaurally for headphones.
 ///
 /// ```java
-/// PannerNode p = ctx.createPanner();
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode footsteps = audio.createOscillator();
+/// PannerNode p = audio.createPanner();
 /// p.setPanningModel(PanningModel.HRTF);
 /// p.setDistanceModel(DistanceModelType.INVERSE);
 /// p.setRefDistance(1);
 /// p.setPosition(3, 0, -2);           // ahead and to the right
-/// footsteps.connect(p).connect(ctx.getDestination());
-/// ctx.getListener().setPosition(0, 0, 0);
+/// footsteps.connect(p).connect(audio.getDestination());
+/// audio.getListener().setPosition(0, 0, 0);
 /// ```
 ///
 /// Positions and orientation are audio rate [AudioParam]s and can be

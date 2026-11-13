@@ -29,11 +29,13 @@ import com.codename1.util.MathUtil;
 /// interpolation.
 ///
 /// ```java
-/// AudioBufferSourceNode src = ctx.createBufferSource();
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// AudioData clip = audio.createBuffer(1, 44100, 44100); // or decodeAudioData
+/// AudioBufferSourceNode src = audio.createBufferSource();
 /// src.setBuffer(clip);
 /// src.getPlaybackRate().setValue(1.5f);
-/// src.connect(ctx.getDestination());
-/// src.start(ctx.getCurrentTime() + 0.1);
+/// src.connect(audio.getDestination());
+/// src.start(audio.getCurrentTime() + 0.1);
 /// ```
 public final class AudioBufferSourceNode extends AudioScheduledSourceNode {
     private final AudioParam playbackRate;

@@ -28,12 +28,14 @@ package com.codename1.media.audio;
 /// A delay is the only node that may close a cycle, as in a feedback echo:
 ///
 /// ```java
-/// DelayNode echo = ctx.createDelay(1);
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode source = audio.createOscillator();
+/// DelayNode echo = audio.createDelay(1);
 /// echo.getDelayTime().setValue(0.3f);
-/// GainNode feedback = ctx.createGain();
+/// GainNode feedback = audio.createGain();
 /// feedback.getGain().setValue(0.4f);
 /// source.connect(echo).connect(feedback).connect(echo);
-/// echo.connect(ctx.getDestination());
+/// echo.connect(audio.getDestination());
 /// ```
 ///
 /// Inside a cycle the delay cannot be shorter than one render quantum (128
