@@ -140,8 +140,8 @@ public class DefaultGraphNodeRenderer implements GraphNodeRenderer {
                 if (detail && p.getLabel() != null) {
                     g.setFont(f);
                     g.setColor(GraphLook.mix(bg, fg, 190));
-                    int half = graph.worldToScreenLength(node.getWidth()) / 2 - pad;
-                    String text = GraphLook.fit(p.getLabel(), f, half);
+                    int room = labelRoom(graph, node, p, py, f, pad, pass == 0 ? outs : ins);
+                    String text = GraphLook.fit(p.getLabel(), f, room);
                     int ly = py - f.getHeight() / 2;
                     if (p.isInput()) {
                         g.drawString(text, px + pad, ly);
@@ -151,5 +151,26 @@ public class DefaultGraphNodeRenderer implements GraphNodeRenderer {
                 }
             }
         }
+    }
+
+    // The width a port label may take: the whole card when nothing faces it,
+    // otherwise what the label across the same row leaves, but never less
+    // than half the card, so the two share a crowded row evenly.
+    private static int labelRoom(NodeGraph graph, GraphNode node, GraphPort port, int py,
+            Font f, int pad, List<GraphPort> across) {
+        int full = graph.worldToScreenLength(node.getWidth()) - pad * 2;
+        int half = full / 2 - pad;
+        int taken = 0;
+        for (int i = 0; i < across.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator
+            GraphPort o = across.get(i);
+            int oy = graph.worldToScreenY(graph.portY(node, o));
+            if (o.getLabel() != null && Math.abs(oy - py) < f.getHeight()) {
+                taken = Math.max(taken, f.stringWidth(o.getLabel()));
+            }
+        }
+        if (taken == 0) {
+            return full;
+        }
+        return Math.max(half, full - taken - pad * 2);
     }
 }
