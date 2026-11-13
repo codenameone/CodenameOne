@@ -413,7 +413,9 @@ public class UnityGameView extends GameView {
     /// How many steps asked for have been run and put on the scene.
     private final AtomicInteger stepsRun = new AtomicInteger();
 
-    private UnityGameAudio audio;
+    /// A [UnityGraphAudio] where the device has a real-time audio graph,
+    /// otherwise a [UnityGameAudio].
+    private com.codename1.unitycompat.unityengine.AudioOutput audio;
     private final UnityGamePrefs prefs = new UnityGamePrefs();
 
     /// Whether this view is one of the [#multiKeyHolders]: between its
@@ -453,7 +455,11 @@ public class UnityGameView extends GameView {
             releaseMultiKey();
         }
         if (audio != null) {
-            audio.stopAll();
+            if (audio instanceof UnityGraphAudio) {
+                ((UnityGraphAudio) audio).stopAll();
+            } else if (audio instanceof UnityGameAudio) {
+                ((UnityGameAudio) audio).stopAll();
+            }
             // The output is the process's, not the view's: with two views,
             // the one shown last installed its own, and the other taken away
             // must not silence it. As with the preferences below.
@@ -486,7 +492,8 @@ public class UnityGameView extends GameView {
     /// taken off a form and they were withdrawn.
     public final void installServices() {
         if (audio == null) {
-            audio = new UnityGameAudio();
+            UnityGraphAudio graph = UnityGraphAudio.create();
+            audio = graph != null ? graph : new UnityGameAudio();
         }
         AudioSource.$output(audio);
         PlayerPrefs.$store(prefs);

@@ -22,8 +22,10 @@
  */
 package com.codename1.unitycompat.unityengine;
 
-/// `UnityEngine.AudioListener`: where the scene is heard from. Sound here
-/// is not placed in space, so the listener itself does nothing; its static
+/// `UnityEngine.AudioListener`: where the scene is heard from. A source
+/// with a `spatialBlend` is attenuated by its distance to the live listener
+/// and panned by where it lies to the listener's side (see [AudioSource]);
+/// with more than one live, the last to tick wins. Its static
 /// `volume` scales every sound, those playing as it is set too, and its static
 /// `pause` holds every sound and every source's clock until it is cleared.
 /// There is no `AudioSource.ignoreListenerPause` here, so no sound is
@@ -33,6 +35,16 @@ public final class AudioListener extends Behaviour {
     @Override
     public Component $new() {
         return new AudioListener();
+    }
+
+    @Override
+    public int $roles() {
+        return super.$roles() | TICKS;
+    }
+
+    @Override
+    public void $tick(float dt) {
+        AudioSource.heardFrom(this);
     }
 
     public static float get_volume() {
