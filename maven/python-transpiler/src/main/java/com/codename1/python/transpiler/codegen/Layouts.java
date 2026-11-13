@@ -53,6 +53,9 @@ final class Layouts {
         final ClassDef def;
         final String javaName;
         final String typeVar;
+        /// `javaName` qualified by the module's Java class: how code in any
+        /// module of the program names this class.
+        String ref;
         final Cls parent;
         final List<String> fields = new ArrayList<String>();
         /// Every field, the inherited ones first: the index order the
@@ -81,6 +84,26 @@ final class Layouts {
     final Map<FunctionDef, String> staticNames = new LinkedHashMap<FunctionDef, String>();
     /// The class each compiled method belongs to.
     final Map<FunctionDef, Cls> methodClass = new LinkedHashMap<FunctionDef, Cls>();
+
+    /// Field name -> every class of the whole program declaring it as a
+    /// plain (untyped) field. The program is closed: a class compiled in
+    /// one module is a class code in every other module may read the
+    /// fields of directly (`ShadowTypes`). Filled once every module's
+    /// typed fields are known, before any module is emitted.
+    static Map<String, List<Cls>> program(List<Layouts> all) {
+        Map<String, List<Cls>> r = new LinkedHashMap<String, List<Cls>>();
+        for (Layouts l : all) {
+            for (Map.Entry<String, List<Cls>> e : l.fieldOwners.entrySet()) {
+                List<Cls> o = r.get(e.getKey());
+                if (o == null) {
+                    o = new ArrayList<Cls>();
+                    r.put(e.getKey(), o);
+                }
+                o.addAll(e.getValue());
+            }
+        }
+        return r;
+    }
 
     private static final Set<String> FORBIDDEN = new HashSet<String>();
 

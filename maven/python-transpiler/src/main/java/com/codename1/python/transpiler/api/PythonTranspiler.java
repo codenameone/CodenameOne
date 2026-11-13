@@ -309,6 +309,12 @@ public final class PythonTranspiler {
         if (deferred != null) {
             deferred.addAll(program.notes());
         }
+        // One program: every module's typed fields are decided first, and
+        // then every module may read the plain fields of every class.
+        for (Emitter em : emitters.values()) {
+            em.planTyped();
+        }
+        Emitter.shareLayouts(new ArrayList<Emitter>(emitters.values()));
         List<Emitter.DynamicUse> dynamic = new ArrayList<Emitter.DynamicUse>();
         for (Map.Entry<String, Emitter> e : emitters.entrySet()) {
             String path = e.getKey();

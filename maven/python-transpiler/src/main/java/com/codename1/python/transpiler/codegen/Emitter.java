@@ -361,8 +361,36 @@ public final class Emitter {
         uncell(ms);
         findDirectLong(m.body);
         layouts = Layouts.plan(m.body, "", ms.attrStores);
+        for (Layouts.Cls k : layouts.classes.values()) {
+            k.ref = className + "." + k.javaName;
+        }
+        // Until the program's table is shared, only the module's own.
+        allOwners = layouts.fieldOwners;
         infer = program.types.add(moduleName, isPackage, m.body, layouts, ms, facts);
     }
+
+    /// Decides the module's typed fields, which takes them out of the
+    /// plain fields other modules may read (`Layouts.program`).
+    public void planTyped() {
+        typedEmit = new TypedEmit(this, infer, layouts);
+        typedEmit.plan();
+    }
+
+    /// Hands every module the plain fields of every class of the program.
+    public static void shareLayouts(List<Emitter> all) {
+        List<Layouts> ls = new ArrayList<Layouts>();
+        for (Emitter e : all) {
+            ls.add(e.layouts);
+        }
+        Map<String, List<Layouts.Cls>> owners = Layouts.program(ls);
+        for (Emitter e : all) {
+            e.allOwners = owners;
+        }
+    }
+
+    /// Field name -> the classes of the whole program with that plain
+    /// field (`Layouts.program`).
+    private Map<String, List<Layouts.Cls>> allOwners;
 
     public String emit(Node.Module m) {
         if (infer == null) {
@@ -379,8 +407,9 @@ public final class Emitter {
         if (System.getProperty("cn1.python.dumpTypes") != null) {
             System.err.println(infer.dump());
         }
-        typedEmit = new TypedEmit(this, infer, layouts);
-        typedEmit.plan();
+        if (typedEmit == null) {
+            planTyped();
+        }
         block(stmts, body, 2);
 
         StringBuilder out = new StringBuilder();
@@ -630,7 +659,7 @@ public final class Emitter {
                 out.append(v).append(" = ").append(value).append(";\n");
                 String h = shadowVar.get(v);
                 if (h != null) {
-                    String k = shadowCls.get(v).javaName;
+                    String k = shadowCls.get(v).ref;
                     indent(out, ind);
                     out.append(h).append(" = ").append(v).append(" instanceof ").append(k).append(" ? (").append(k)
                             .append(") ").append(v).append(" : null;\n");
@@ -2331,8 +2360,8 @@ public final class Emitter {
             selfCls = asClass;
             selfTyped = "k" + frame.id;
         }
-        if (body != null && !generator && !layouts.fieldOwners.isEmpty()) {
-            for (Map.Entry<String, Layouts.Cls> e : ShadowTypes.of(body, layouts).entrySet()) {
+        if (body != null && !generator && !allOwners.isEmpty()) {
+            for (Map.Entry<String, Layouts.Cls> e : ShadowTypes.of(body, allOwners).entrySet()) {
                 String n = e.getKey();
                 if (fs.resolve(n) != Scope.Binding.LOCAL || fs.cells.contains(n)) {
                     continue;
@@ -2422,7 +2451,7 @@ public final class Emitter {
                     .append(selfLocal).append(" : null;\n");
         }
         for (Map.Entry<String, String> e : shadowVar.entrySet()) {
-            String k = shadowCls.get(e.getKey()).javaName;
+            String k = shadowCls.get(e.getKey()).ref;
             indent(pro, ind);
             // Every local is declared above (parameters with their value,
             // the rest null), so testing it here is right for both.
@@ -3104,7 +3133,7 @@ public final class Emitter {
             if (FRAME_HOOKS.contains(a.attr) && a.value instanceof Name && "sys".equals(((Name) a.value).id)) {
                 return dynamicCodeAtRuntime(a, "sys." + a.attr);
             }
-            if (layouts.fieldOwners.containsKey(a.attr)) {
+            if (allOwners.containsKey(a.attr)) {
                 return fieldGet(a.attr, expr(a.value), site(a.attr));
             }
             return site(a.attr) + ".get(" + expr(a.value) + ")";
@@ -4290,12 +4319,19 @@ public final class Emitter {
                 sb.append(h).append(" == ").append(raw).append(" && ").append(f).append(" != null ? ").append(f)
                         .append(" : ");
             }
-            for (Layouts.Cls k : layouts.fieldOwners.get(name)) {
+            List<Layouts.Cls> mine = layouts.fieldOwners.get(name);
+            if (hk == null && mine == null) {
+                return site + ".get(" + recv + ")";
+            }
+            for (Layouts.Cls k : mine != null ? mine : java.util.Collections.<Layouts.Cls>emptyList()) {
                 String f = "((" + k.javaName + ") " + raw + ").f_" + mangle(name);
                 sb.append(raw).append(" instanceof ").append(k.javaName).append(" && ").append(f)
                         .append(" != null ? ").append(f).append(" : ");
             }
             return sb.append(site).append(".get(").append(recv).append("))").toString();
+        }
+        if (!layouts.fieldOwners.containsKey(name)) {
+            return site + ".get(" + recv + ")";
         }
         String t = temp();
         String u = temp();
@@ -4334,7 +4370,10 @@ public final class Emitter {
         if (cls == null) {
             return null;
         }
-        List<Layouts.Cls> owners = layouts.fieldOwners.get(name);
+        List<Layouts.Cls> owners = allOwners.get(name);
+        if (owners == null) {
+            return null;
+        }
         for (Layouts.Cls c = cls; c != null; c = c.parent) {
             if (owners.contains(c)) {
                 return c;
