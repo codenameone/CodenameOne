@@ -1048,9 +1048,11 @@ final class XmlScan {
 
         /// Element class -> the shape its instances have after
         /// `slowElement`, learnt from the first one and good while no class
-        /// changed (`PyType.version`).
-        private final java.util.HashMap<PyType, Shape> elementShapes = new java.util.HashMap<PyType, Shape>();
-        private int elementVersion = -1;
+        /// changed (`PyType.version`). Shared by every parse: shapes and
+        /// the version are global, and the program's threads parse one at a
+        /// time under the interpreter lock.
+        private static final java.util.HashMap<PyType, Shape> elementShapes = new java.util.HashMap<PyType, Shape>();
+        private static int elementVersion = -1;
 
         /// Installs all of an element's attributes at once: the same values
         /// `slowElement` stores, as the one shape every element of the class
@@ -1065,17 +1067,13 @@ final class XmlScan {
             if (i.shape().size() != 0 || i.base != null || i.nonStrKeys != null) {
                 return false;
             }
-            if (elementVersion != PyType.version) {
-                elementVersion = PyType.version;
-                elementShapes.clear();
-            }
-            Shape s = elementShapes.get(i.cls);
+            Shape s = elementShape(i.cls);
             if (s == null) {
                 slowElement(el, tag, attrib, ns, kids, hint);
                 X_PARENT.set(el, parent);
                 Shape got = i.shape();
-                if (elementVersion == PyType.version && java.util.Arrays.equals(got.names, ELEMENT_NAMES)) {
-                    elementShapes.put(i.cls, got);
+                if (java.util.Arrays.equals(got.names, ELEMENT_NAMES)) {
+                    learnShape(i.cls, got);
                 }
                 return true;
             }
@@ -1096,6 +1094,20 @@ final class XmlScan {
             i.slots = v;
             i.shape = s;
             return true;
+        }
+
+        private static Shape elementShape(PyType t) {
+            if (elementVersion != PyType.version) {
+                elementVersion = PyType.version;
+                elementShapes.clear();
+            }
+            return elementShapes.get(t);
+        }
+
+        private static void learnShape(PyType t, Shape s) {
+            if (elementVersion == PyType.version) {
+                elementShapes.put(t, s);
+            }
         }
 
         private void slowElement(Object el, String tag, PyDict attrib, PyDict ns, PyList kids, Object hint) {
