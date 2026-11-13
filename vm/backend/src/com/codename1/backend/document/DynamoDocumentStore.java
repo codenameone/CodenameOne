@@ -26,6 +26,7 @@ import com.codename1.backend.Crypto;
 import com.codename1.backend.aws.Aws;
 import com.codename1.backend.dynamo.DynamoDb;
 import com.codename1.backend.dynamo.DynamoDbException;
+import com.codename1.backend.dynamo.Items;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,13 +38,18 @@ import java.util.List;
 import java.util.Map;
 
 /// [DocumentStore] over DynamoDB: one table per collection, named
-/// `tablePrefix + collection`, keyed by the identifier as its partition key.
+/// `tablePrefix + collection`, keyed by the partition key and, for a two-column
+/// key, the sort key.
 ///
-/// A lookup by id is a `GetItem`. Every other query is a `Scan` with the
-/// comparisons as a filter expression; `LIKE`, ordering and paging are applied
-/// in memory afterwards. Dates are stored as epoch milliseconds, the form
-/// DynamoDB's TTL and numeric comparisons expect.
+/// A lookup by the whole key is a `GetItem`. A query with an equality on the
+/// partition key is a `Query` over that partition, with at most one comparison
+/// on the sort key in the key condition and the other comparisons as a filter.
+/// Anything else is a `Scan` with the comparisons as a filter expression.
+/// `LIKE`, ordering and paging are applied in memory afterwards. Dates are
+/// stored as epoch milliseconds, the form DynamoDB's TTL and numeric
+/// comparisons expect.
 public final class DynamoDocumentStore implements DocumentStore {
+    private static final String[] OPS = {"=", "<>", ">", ">=", "<", "<="};
     private final DynamoDb db;
     private final String tablePrefix;
 
@@ -59,8 +65,11 @@ public final class DynamoDocumentStore implements DocumentStore {
     }
 
     @Override
-    public void ensureCollection(String collection, String idField) throws IOException {
-        db.createTable(table(collection), idField, null);
+    public void ensureCollection(String collection, String[] keyFields, boolean[] numericKeys)
+            throws IOException {
+        boolean two = keyFields.length > 1;
+        db.createTable(table(collection), keyFields[0], numericKeys[0],
+                two ? keyFields[1] : null, two && numericKeys[1]);
     }
 
     private static Object plain(Object v) {
@@ -77,17 +86,21 @@ public final class DynamoDocumentStore implements DocumentStore {
         return out;
     }
 
-    private static Map key(String idField, Object id) {
+    private static Map key(String[] keyFields, Object[] key) {
         Map k = new LinkedHashMap();
-        k.put(idField, plain(id));
+        for (int i = 0; i < keyFields.length; i++) {
+            k.put(keyFields[i], plain(key[i]));
+        }
         return k;
     }
 
     @Override
-    public boolean insert(String collection, String idField, Map document) throws IOException {
+    public boolean insert(String collection, String[] keyFields, Map document)
+            throws IOException {
         Map names = new LinkedHashMap();
-        names.put("#id", idField);
+        names.put("#id", keyFields[0]);
         try {
+            // An item exists exactly when its partition key attribute does.
             putWithNames(collection, plain(document), "attribute_not_exists(#id)", names, null);
             return true;
         } catch (DynamoDbException err) {
@@ -102,21 +115,20 @@ public final class DynamoDocumentStore implements DocumentStore {
             Map values) throws IOException {
         Map req = new LinkedHashMap();
         req.put("TableName", table(collection));
-        req.put("Item", com.codename1.backend.dynamo.Items.toAttributes(item));
+        req.put("Item", Items.toAttributes(item));
         req.put("ConditionExpression", condition);
         req.put("ExpressionAttributeNames", names);
         if (values != null) {
-            req.put("ExpressionAttributeValues",
-                    com.codename1.backend.dynamo.Items.toAttributes(values));
+            req.put("ExpressionAttributeValues", Items.toAttributes(values));
         }
         db.call("PutItem", req);
     }
 
     @Override
-    public boolean replace(String collection, String idField, Map document, String versionField,
-            Object expectedVersion) throws IOException {
+    public boolean replace(String collection, String[] keyFields, Map document,
+            String versionField, Object expectedVersion) throws IOException {
         Map names = new LinkedHashMap();
-        names.put("#id", idField);
+        names.put("#id", keyFields[0]);
         String condition = "attribute_exists(#id)";
         Map values = null;
         if (versionField != null) {
@@ -137,25 +149,24 @@ public final class DynamoDocumentStore implements DocumentStore {
     }
 
     @Override
-    public Map get(String collection, String idField, Object id) throws IOException {
-        return db.getItem(table(collection), key(idField, id));
+    public Map get(String collection, String[] keyFields, Object[] key) throws IOException {
+        return db.getItem(table(collection), key(keyFields, key));
     }
 
     @Override
-    public boolean delete(String collection, String idField, Object id, String versionField,
-            Object expectedVersion) throws IOException {
+    public boolean delete(String collection, String[] keyFields, Object[] key,
+            String versionField, Object expectedVersion) throws IOException {
         Map req = new LinkedHashMap();
         req.put("TableName", table(collection));
-        req.put("Key", com.codename1.backend.dynamo.Items.toAttributes(key(idField, id)));
+        req.put("Key", Items.toAttributes(key(keyFields, key)));
         Map names = new LinkedHashMap();
-        names.put("#id", idField);
+        names.put("#id", keyFields[0]);
         String condition = "attribute_exists(#id)";
         if (versionField != null) {
             names.put("#v", versionField);
             Map values = new LinkedHashMap();
             values.put(":v", plain(expectedVersion));
-            req.put("ExpressionAttributeValues",
-                    com.codename1.backend.dynamo.Items.toAttributes(values));
+            req.put("ExpressionAttributeValues", Items.toAttributes(values));
             condition = condition + " AND #v = :v";
         }
         req.put("ConditionExpression", condition);
@@ -171,26 +182,74 @@ public final class DynamoDocumentStore implements DocumentStore {
         }
     }
 
-    private List matching(String collection, String idField, List criteria) throws IOException {
-        // An equality on the key alone is a point read, not a scan.
-        for (Object eachCriteriaItem : criteria) {
-            Criterion c = (Criterion) eachCriteriaItem;
-            if (c.getOp() == Criterion.EQ && idField.equals(c.getField()) && c.getValue() != null) {
-                Map item = get(collection, idField, c.getValue());
-                List out = new ArrayList();
-                if (item != null && all(item, criteria)) {
-                    out.add(item);
-                }
-                return out;
+    /// The first criterion on `field` with operator `op`, or null; a null value
+    /// never qualifies, since a key attribute is never null.
+    private static Criterion find(List criteria, String field, boolean equalityOnly) {
+        for (Object eachCriterion : criteria) {
+            Criterion c = (Criterion) eachCriterion;
+            if (!field.equals(c.getField()) || c.getValue() == null) {
+                continue;
             }
+            int op = c.getOp();
+            if (op == Criterion.EQ || !equalityOnly && op >= Criterion.GT && op <= Criterion.LE) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isKey(String[] keyFields, String field) {
+        for (String eachKeyField : keyFields) {
+            if (eachKeyField.equals(field)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List matching(String collection, String[] keyFields, List criteria)
+            throws IOException {
+        Criterion partition = find(criteria, keyFields[0], true);
+        // A sort key condition exists only within a partition; without an
+        // equality on the partition key the comparison is an ordinary filter.
+        Criterion sort = partition != null && keyFields.length > 1
+                ? find(criteria, keyFields[1], false) : null;
+        if (partition != null && (keyFields.length == 1
+                || sort != null && sort.getOp() == Criterion.EQ)) {
+            // The whole key is known: a point read, not a scan.
+            Object[] k = keyFields.length == 1 ? new Object[] {partition.getValue()}
+                    : new Object[] {partition.getValue(), sort.getValue()};
+            Map item = get(collection, keyFields, k);
+            List out = new ArrayList();
+            if (item != null && all(item, criteria)) {
+                out.add(item);
+            }
+            return out;
         }
         StringBuilder filter = new StringBuilder();
         Map names = new LinkedHashMap();
         Map values = new LinkedHashMap();
         List inMemory = new ArrayList();
+        String keyCondition = null;
+        if (partition != null) {
+            names.put("#k0", keyFields[0]);
+            values.put(":k0", plain(partition.getValue()));
+            keyCondition = "#k0 = :k0";
+            if (sort != null) {
+                names.put("#k1", keyFields[1]);
+                values.put(":k1", plain(sort.getValue()));
+                keyCondition = keyCondition + " AND #k1 " + OPS[sort.getOp()] + " :k1";
+            }
+        }
         for (int i = 0; i < criteria.size(); i++) {
-            Criterion c = (Criterion) criteria.get(i);
-            String clause = clause(c, i, names, values);
+            Criterion c = (Criterion) criteria.get(i); // NOPMD ForLoopCanBeForeach - i names the placeholders
+            if (c == partition || c == sort) { // NOPMD CompareObjectsWithEquals - the very criteria used in the key condition
+                continue;
+            }
+            // A Query refuses a key attribute in its filter expression, so any
+            // further condition on one is answered in memory.
+            String clause = keyCondition != null && isKey(keyFields, c.getField()) ? null
+                    : clause(c, i, names, values);
             if (clause == null) {
                 inMemory.add(c);
                 continue;
@@ -200,8 +259,10 @@ public final class DynamoDocumentStore implements DocumentStore {
             }
             filter.append('(').append(clause).append(')');
         }
-        List items = db.scan(table(collection), filter.length() == 0 ? null : filter.toString(),
-                names, values, 0);
+        String f = filter.length() == 0 ? null : filter.toString();
+        List items = keyCondition != null
+                ? db.query(table(collection), null, keyCondition, f, names, values, 0)
+                : db.scan(table(collection), f, names, values, 0);
         if (inMemory.isEmpty()) {
             return items;
         }
@@ -285,14 +346,13 @@ public final class DynamoDocumentStore implements DocumentStore {
             }
         }
         values.put(val, plain(v));
-        String[] ops = {"=", "<>", ">", ">=", "<", "<="};
-        return name + " " + ops[c.getOp()] + " " + val;
+        return name + " " + OPS[c.getOp()] + " " + val;
     }
 
     @Override
-    public List find(String collection, String idField, List criteria, String sortField,
+    public List find(String collection, String[] keyFields, List criteria, String sortField,
             boolean ascending, int offset, int limit) throws IOException {
-        List items = matching(collection, idField, criteria);
+        List items = matching(collection, keyFields, criteria);
         if (sortField != null) {
             Collections.sort(items, new FieldOrder(sortField, ascending));
         }
@@ -322,8 +382,8 @@ public final class DynamoDocumentStore implements DocumentStore {
     }
 
     @Override
-    public long count(String collection, String idField, List criteria) throws IOException {
-        return matching(collection, idField, criteria).size();
+    public long count(String collection, String[] keyFields, List criteria) throws IOException {
+        return matching(collection, keyFields, criteria).size();
     }
 
     @Override

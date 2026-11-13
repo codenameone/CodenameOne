@@ -224,6 +224,15 @@ public final class DynamoDb {
     /// `limit` stops after that many items; zero reads them all.
     public List query(String table, String index, String keyCondition, Map names,
             Map values, int limit) throws IOException {
+        return query(table, index, keyCondition, null, names, values, limit);
+    }
+
+    /// Like [#query(String, String, String, Map, Map, int)], with a filter
+    /// expression (or null) applied to the items the key condition reads.
+    /// DynamoDB filters after reading, so the filter narrows what is returned,
+    /// not what is read and paid for.
+    public List query(String table, String index, String keyCondition, String filter,
+            Map names, Map values, int limit) throws IOException {
         Map req = new LinkedHashMap();
         req.put("TableName", table);
         if (index != null) {
@@ -233,7 +242,7 @@ public final class DynamoDb {
         if (names != null && !names.isEmpty()) {
             req.put("ExpressionAttributeNames", names);
         }
-        expression(req, null, null, values);
+        expression(req, "FilterExpression", filter, values);
         return pages("Query", req, limit);
     }
 
@@ -320,12 +329,20 @@ public final class DynamoDb {
     /// null, a string sort key, billed on demand. An existing table is left alone.
     public void createTable(String table, String partitionKey, String sortKey)
             throws IOException {
+        createTable(table, partitionKey, false, sortKey, false);
+    }
+
+    /// Like [#createTable(String, String, String)], declaring each key as a
+    /// number (`N`) or a string (`S`). DynamoDB refuses a write whose key value
+    /// is not of the declared type, so a numeric key needs `N`.
+    public void createTable(String table, String partitionKey, boolean numericPartition,
+            String sortKey, boolean numericSort) throws IOException {
         List attrs = new ArrayList();
         List schema = new ArrayList();
-        attrs.add(attr(partitionKey));
+        attrs.add(attr(partitionKey, numericPartition));
         schema.add(key(partitionKey, "HASH"));
         if (sortKey != null) {
-            attrs.add(attr(sortKey));
+            attrs.add(attr(sortKey, numericSort));
             schema.add(key(sortKey, "RANGE"));
         }
         Map req = new LinkedHashMap();
@@ -355,10 +372,10 @@ public final class DynamoDb {
         }
     }
 
-    private static Map attr(String name) {
+    private static Map attr(String name, boolean numeric) {
         Map m = new LinkedHashMap();
         m.put("AttributeName", name);
-        m.put("AttributeType", "S");
+        m.put("AttributeType", numeric ? "N" : "S");
         return m;
     }
 

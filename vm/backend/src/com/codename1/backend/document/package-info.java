@@ -45,16 +45,21 @@
 ///   element collection is rejected when first used; keep the related id as an
 ///   ordinary field and query by it. `join`, `leftJoin`, `fetch` and
 ///   `containsElement` throw.
-/// - **No composite or numeric generated identifiers.** A generated `String`
-///   id gets a new ObjectId (MongoDB) or a random 128-bit hex id (DynamoDB); a
-///   generated number needs a SQL sequence.
+/// - **No numeric generated identifiers.** A generated `String` id gets a new
+///   ObjectId (MongoDB) or a random 128-bit hex id (DynamoDB); a generated
+///   number needs a SQL sequence.
+/// - **A composite identifier has exactly two columns, one marked
+///   [com.codename1.annotations.db.SortKey].** That is DynamoDB's partition and
+///   sort key, and a compound `_id` in MongoDB.
 /// - **No identity map or dirty tracking.** Each call goes to the store:
 ///   `merge` writes the whole entity, and two `find`s return two objects.
 /// - **No transactions** spanning several calls. A `@Version` attribute is
 ///   honoured on every write, which is what keeps concurrent updates safe.
 ///
-/// On DynamoDB every query that is not an equality on the identifier scans the
-/// table, then sorts and pages in memory. That is right for small tables and
-/// administration screens; a hot path on a large table belongs on
-/// [com.codename1.backend.dynamo.DynamoDb#query] with an index.
+/// On DynamoDB a query with an equality on the partition key reads only that
+/// partition, using at most one comparison on the sort key; every other query
+/// scans the table. Either way sorting and paging happen in memory. A scan is
+/// right for small tables and administration screens; a hot path on a large
+/// table belongs on a partition key, or on
+/// [com.codename1.backend.dynamo.DynamoDb#query] with a secondary index.
 package com.codename1.backend.document;

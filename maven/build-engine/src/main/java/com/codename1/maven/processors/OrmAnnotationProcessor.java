@@ -484,6 +484,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             pf.fieldName = fieldPath.path;pf.declaringType=fieldPath.declaringType;
             pf.embeddedParent = fieldPath.prefix;
             pf.version = f.getAnnotation("Lcom/codename1/annotations/db/Version;") != null;
+            pf.sortKey = f.getAnnotation("Lcom/codename1/annotations/db/SortKey;") != null;
             pf.kind = PropertyTypeKind.of(f);
             pf.record = ec.record;
             if(f.isFinal() && !ec.record && pf.kind.kind!=PropertyTypeKind.Kind.PROPERTY) ctx.error(cls,"Persistent fields must be writable: "+pf.fieldName);
@@ -772,6 +773,18 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(ec.idFields.size()>1) for(PersistedField field:ec.idFields) {
             if(field.autoIncrement || ec.generation!=0) ctx.error(cls,"Composite identifiers must be assigned; use @Id(autoIncrement=false)");
             if(field.dialectKind==KIND_BLOB) ctx.error(cls,"Composite identifiers cannot contain binary components: "+field.fieldName);
+        }
+        int sortKeys=0;
+        for(PersistedField field:ec.fields) {
+            if(!field.sortKey) continue;
+            sortKeys++;
+            if(!field.isId) ctx.error(cls,"@SortKey marks an identifier column; "+field.fieldName+" is not one");
+        }
+        if(sortKeys>1) ctx.error(cls,"An entity can have only one @SortKey");
+        if(sortKeys>0 && ec.idFields.size()!=2) {
+            // A document store keys an item by a partition key and at most one
+            // sort key, so the pair is the whole identifier or it cannot be stored.
+            ctx.error(cls,"@SortKey requires an identifier of exactly two columns: "+ec.binaryName);
         }
         // TWO FIELDS, ONE COLUMN. Every statement then names the column twice:
         // the CREATE TABLE is refused for a duplicate column, and against a
@@ -1915,6 +1928,9 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 sb.append("value.").append(accessPath(component,ec.record));
             }
             sb.append("}); } return super.keyValues(key); }\n");
+        }
+        for(int i=0;i<ec.fields.size();i++) {
+            if(ec.fields.get(i).sortKey) sb.append("public int sortKeyIndex() { return ").append(i).append("; }\n");
         }
         if(ec.generation!=0) sb.append("public int generation() { return ").append(ec.generation)
           .append("; }\npublic String generator() { return ").append('"').append(escape(ec.generator)).append("\"; }\n");
@@ -3610,6 +3626,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         boolean isId;
         boolean autoIncrement;
         boolean version;
+        /// @SortKey: the sort key of a two-column identifier in a document store.
+        boolean sortKey;
         boolean unique;
         /// @Column(insertable/updatable); both true unless the developer said otherwise.
         boolean insertable = true, updatable = true;

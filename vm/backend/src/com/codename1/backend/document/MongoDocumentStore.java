@@ -54,24 +54,64 @@ public final class MongoDocumentStore implements DocumentStore {
     }
 
     @Override
-    public void ensureCollection(String collection, String idField) {
+    public void ensureCollection(String collection, String[] keyFields, boolean[] numericKeys) {
         // MongoDB creates a collection on its first write, keyed by _id.
     }
 
-    private static Map toMongo(Map doc, String idField) {
+    private static int keyIndex(String[] keyFields, Object field) {
+        for (int i = 0; i < keyFields.length; i++) {
+            if (keyFields[i].equals(field)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// Where a field lives in the stored document: a single key is `_id` itself,
+    /// a two-column key is a sub-document of `_id`.
+    static String path(String[] keyFields, String field) {
+        int k = keyIndex(keyFields, field);
+        if (k < 0) {
+            return field;
+        }
+        return keyFields.length == 1 ? "_id" : "_id." + field;
+    }
+
+    /// The `_id` of a key. A compound `_id` compares field by field in order, so
+    /// it is always built in the order of `keyFields`.
+    private static Object id(String[] keyFields, Object[] key) {
+        if (keyFields.length == 1) {
+            return key[0];
+        }
+        Map id = new LinkedHashMap();
+        for (int i = 0; i < keyFields.length; i++) {
+            id.put(keyFields[i], key[i]);
+        }
+        return id;
+    }
+
+    private static Object[] keyOf(Map doc, String[] keyFields) {
+        Object[] key = new Object[keyFields.length];
+        for (int i = 0; i < keyFields.length; i++) {
+            key[i] = doc.get(keyFields[i]);
+        }
+        return key;
+    }
+
+    private static Map toMongo(Map doc, String[] keyFields) {
         Map out = new LinkedHashMap();
-        out.put("_id", doc.get(idField));
+        out.put("_id", id(keyFields, keyOf(doc, keyFields)));
         Iterator it = doc.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry e = (Map.Entry) it.next();
-            if (!idField.equals(e.getKey())) {
+            if (keyIndex(keyFields, e.getKey()) < 0) {
                 out.put(e.getKey(), e.getValue());
             }
         }
         return out;
     }
 
-    private static Map fromMongo(Map doc, String idField) {
+    private static Map fromMongo(Map doc, String[] keyFields) {
         if (doc == null) {
             return null;
         }
@@ -79,21 +119,30 @@ public final class MongoDocumentStore implements DocumentStore {
         Iterator it = doc.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry e = (Map.Entry) it.next();
-            out.put("_id".equals(e.getKey()) ? idField : e.getKey(), e.getValue());
+            if (!"_id".equals(e.getKey())) {
+                out.put(e.getKey(), e.getValue());
+            } else if (keyFields.length == 1) {
+                out.put(keyFields[0], e.getValue());
+            } else if (e.getValue() instanceof Map) {
+                Map id = (Map) e.getValue();
+                for (String eachKeyField : keyFields) {
+                    out.put(eachKeyField, id.get(eachKeyField));
+                }
+            }
         }
         return out;
     }
 
-    private static Map idFilter(Object id) {
+    private static Map idFilter(String[] keyFields, Object[] key) {
         Map f = new LinkedHashMap();
-        f.put("_id", id);
+        f.put("_id", id(keyFields, key));
         return f;
     }
 
     @Override
-    public boolean insert(String collection, String idField, Map document) throws IOException {
+    public boolean insert(String collection, String[] keyFields, Map document) throws IOException {
         try {
-            c(collection).insertOne(toMongo(document, idField));
+            c(collection).insertOne(toMongo(document, keyFields));
             return true;
         } catch (MongoException err) {
             if (err.isDuplicateKey()) {
@@ -104,13 +153,13 @@ public final class MongoDocumentStore implements DocumentStore {
     }
 
     @Override
-    public boolean replace(String collection, String idField, Map document, String versionField,
-            Object expectedVersion) throws IOException {
-        Map filter = idFilter(document.get(idField));
+    public boolean replace(String collection, String[] keyFields, Map document,
+            String versionField, Object expectedVersion) throws IOException {
+        Map filter = idFilter(keyFields, keyOf(document, keyFields));
         if (versionField != null) {
             filter.put(versionField, expectedVersion);
         }
-        Map body = toMongo(document, idField);
+        Map body = toMongo(document, keyFields);
         body.remove("_id");
         Map cmd = new LinkedHashMap();
         Map u = new LinkedHashMap();
@@ -125,14 +174,14 @@ public final class MongoDocumentStore implements DocumentStore {
     }
 
     @Override
-    public Map get(String collection, String idField, Object id) throws IOException {
-        return fromMongo(c(collection).findOne(idFilter(id)), idField);
+    public Map get(String collection, String[] keyFields, Object[] key) throws IOException {
+        return fromMongo(c(collection).findOne(idFilter(keyFields, key)), keyFields);
     }
 
     @Override
-    public boolean delete(String collection, String idField, Object id, String versionField,
-            Object expectedVersion) throws IOException {
-        Map filter = idFilter(id);
+    public boolean delete(String collection, String[] keyFields, Object[] key,
+            String versionField, Object expectedVersion) throws IOException {
+        Map filter = idFilter(keyFields, key);
         if (versionField != null) {
             filter.put(versionField, expectedVersion);
         }
@@ -140,11 +189,11 @@ public final class MongoDocumentStore implements DocumentStore {
     }
 
     /// The MongoDB filter for a list of criteria.
-    static Map filter(List criteria, String idField) {
+    static Map filter(List criteria, String[] keyFields) {
         List clauses = new ArrayList();
         for (Object eachCriteriaItem : criteria) {
             Criterion cr = (Criterion) eachCriteriaItem;
-            String field = idField.equals(cr.getField()) ? "_id" : cr.getField();
+            String field = path(keyFields, cr.getField());
             Map inner = new LinkedHashMap();
             switch (cr.getOp()) {
                 case Criterion.EQ:
@@ -211,7 +260,7 @@ public final class MongoDocumentStore implements DocumentStore {
     }
 
     @Override
-    public List find(String collection, String idField, List criteria, String sortField,
+    public List find(String collection, String[] keyFields, List criteria, String sortField,
             boolean ascending, int offset, int limit) throws IOException {
         if (limit == 0) {
             return new ArrayList();
@@ -219,21 +268,20 @@ public final class MongoDocumentStore implements DocumentStore {
         Map sort = null;
         if (sortField != null) {
             sort = new LinkedHashMap();
-            sort.put(idField.equals(sortField) ? "_id" : sortField,
-                    Integer.valueOf(ascending ? 1 : -1));
+            sort.put(path(keyFields, sortField), Integer.valueOf(ascending ? 1 : -1));
         }
-        List docs = c(collection).find(filter(criteria, idField), sort, null, offset,
+        List docs = c(collection).find(filter(criteria, keyFields), sort, null, offset,
                 limit < 0 ? 0 : limit);
         List out = new ArrayList(docs.size());
         for (Object eachDoc : docs) {
-            out.add(fromMongo((Map) eachDoc, idField));
+            out.add(fromMongo((Map) eachDoc, keyFields));
         }
         return out;
     }
 
     @Override
-    public long count(String collection, String idField, List criteria) throws IOException {
-        return c(collection).countDocuments(filter(criteria, idField));
+    public long count(String collection, String[] keyFields, List criteria) throws IOException {
+        return c(collection).countDocuments(filter(criteria, keyFields));
     }
 
     @Override

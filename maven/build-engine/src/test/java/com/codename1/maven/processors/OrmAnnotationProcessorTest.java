@@ -3043,6 +3043,34 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void sortKeyNamesOneColumnOfATwoColumnIdentifier() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("sortkey.Message","package sortkey; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Message { @Id(autoIncrement=false) public String channel; @Id(autoIncrement=false) @SortKey public long sentAt; public String text; }");
+        sources.put("sortkey.Plain","package sortkey; import com.codename1.annotations.*; @Entity public class Plain { @Id public long id; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                com.codename1.impl.orm.EntityModel message=(com.codename1.impl.orm.EntityModel)loader.loadClass("sortkey.Message"+suffix).newInstance();
+                org.junit.Assert.assertEquals("sentAt",message.attributes()[message.sortKeyIndex()].field);
+                com.codename1.impl.orm.EntityModel plain=(com.codename1.impl.orm.EntityModel)loader.loadClass("sortkey.Plain"+suffix).newInstance();
+                org.junit.Assert.assertEquals(-1,plain.sortKeyIndex());
+            }
+        }
+    }
+
+    @Test
+    public void sortKeyIsRejectedOffATwoColumnIdentifier() throws Exception {
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("badsort.Single","package badsort; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Single { @Id(autoIncrement=false) @SortKey public long id; }");
+        rejectsMappingForBothRuntimes(sources,"@SortKey requires an identifier of exactly two columns");
+        sources.clear();
+        sources.put("badsort.NotId","package badsort; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class NotId { @Id(autoIncrement=false) public String a; @Id(autoIncrement=false) public long b; @SortKey public long c; }");
+        rejectsMappingForBothRuntimes(sources,"@SortKey marks an identifier column");
+    }
+
+    @Test
     public void siblingOnlyCollectionsDoNotDirtyUnchangedEntities() throws Exception {
         File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("cleansibling.Base","package cleansibling; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"clean_sibling\") @Inheritance public abstract class Base { @Id public long id; @Version public long version; @DbTransient public int updates; @PostUpdate public void updated() { updates++; } }");

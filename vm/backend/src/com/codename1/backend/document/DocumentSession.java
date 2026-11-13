@@ -50,8 +50,8 @@ import java.util.Map;
 /// ```
 ///
 /// What the SQL session does that this one does not is listed in the package
-/// description: relationships, composite and numeric generated ids, an identity
-/// map and multi-call transactions.
+/// description: relationships, numeric generated ids, identifiers of more than
+/// two columns, an identity map and multi-call transactions.
 public final class DocumentSession implements Closeable {
     private static final String RESOURCE = "cn1.document.session";
     private static final int PRE_PERSIST = 0;
@@ -108,16 +108,24 @@ public final class DocumentSession implements Closeable {
         int q = rest.indexOf('?');
         if (q >= 0) {
             region = rest.substring(0, q);
-            String[] parts = rest.substring(q + 1).split("&");
-            for (String eachPart : parts) {
-                int eq = eachPart.indexOf('=');
-                String k = eq < 0 ? eachPart : eachPart.substring(0, eq);
-                String v = eq < 0 ? "" : eachPart.substring(eq + 1);
+            // String.split is not in the device class library; walk the pairs.
+            String query = rest.substring(q + 1);
+            int start = 0;
+            while (start <= query.length()) {
+                int amp = query.indexOf('&', start);
+                String pair = query.substring(start, amp < 0 ? query.length() : amp);
+                int eq = pair.indexOf('=');
+                String k = eq < 0 ? pair : pair.substring(0, eq);
+                String v = eq < 0 ? "" : pair.substring(eq + 1);
                 if ("endpoint".equals(k)) {
                     endpoint = v;
                 } else if ("prefix".equals(k)) {
                     prefix = v;
                 }
+                if (amp < 0) {
+                    break;
+                }
+                start = amp + 1;
             }
         }
         if (region.endsWith("/")) {
@@ -144,11 +152,49 @@ public final class DocumentSession implements Closeable {
             throw new PersistenceException("Relationships are not supported in a document store: "
                     + type.getName());
         }
-        if (m.idIndexes().length != 1) {
-            throw new PersistenceException("A document entity needs exactly one id: "
-                    + type.getName());
-        }
+        keyIndexes(m);
         return m;
+    }
+
+    /// The attributes of the store key: the id, or for a two-column id the
+    /// partition key and then the `@SortKey` column.
+    static int[] keyIndexes(EntityModel<?> m) {
+        int[] ids = m.idIndexes();
+        if (ids.length == 1) {
+            return ids;
+        }
+        int sort = m.sortKeyIndex();
+        if (ids.length != 2 || sort < 0) {
+            throw new PersistenceException("A document entity has one id, or two with one of them "
+                    + "marked @SortKey: " + m.type().getName());
+        }
+        return new int[] {ids[0] == sort ? ids[1] : ids[0], sort};
+    }
+
+    static String[] keyFields(EntityModel<?> m) {
+        int[] k = keyIndexes(m);
+        String[] out = new String[k.length];
+        for (int i = 0; i < k.length; i++) {
+            out[i] = column(m, k[i]);
+        }
+        return out;
+    }
+
+    /// An identifier, in any form the model accepts (a value, an array, an
+    /// `@EmbeddedId` object), as a store key in partition-then-sort order.
+    static Object[] key(EntityModel<?> m, Object id) {
+        Object[] values = m.keyValues(id);
+        int[] ids = m.idIndexes();
+        int[] k = keyIndexes(m);
+        Object[] out = new Object[k.length];
+        for (int i = 0; i < k.length; i++) {
+            for (int j = 0; j < ids.length; j++) {
+                if (ids[j] == k[i]) {
+                    out[i] = values[j];
+                }
+            }
+        }
+        return out;
     }
 
     static String column(EntityModel<?> m, int i) {
@@ -173,7 +219,9 @@ public final class DocumentSession implements Closeable {
             if (m.mapping(i).length() > 0) {
                 v = m.parameter(i, v);
             }
-            doc.put(attrs[i].column, toDocument(v));
+            // A key is written in its storage form, the form a lookup by id
+            // builds, so a date or boolean key matches itself.
+            doc.put(attrs[i].column, attrs[i].id ? Values.storage(v) : toDocument(v));
         }
         return doc;
     }
@@ -222,7 +270,17 @@ public final class DocumentSession implements Closeable {
     public void createCollections(Class... types) throws IOException {
         for (Class eachType : types) {
             EntityModel m = model(eachType);
-            store.ensureCollection(m.table(), column(m, m.idIndex()));
+            int[] k = keyIndexes(m);
+            boolean[] numeric = new boolean[k.length];
+            for (int i = 0; i < k.length; i++) {
+                int kind = m.attributes()[k[i]].kind;
+                if (kind == Attribute.BLOB) {
+                    throw new PersistenceException("A document key cannot be binary: "
+                            + m.type().getName());
+                }
+                numeric[i] = kind != Attribute.TEXT;
+            }
+            store.ensureCollection(m.table(), keyFields(m), numeric);
         }
     }
 
@@ -231,9 +289,10 @@ public final class DocumentSession implements Closeable {
     public <T> T persist(T entity) throws IOException {
         @SuppressWarnings("unchecked")
         EntityModel<T> m = model((Class<T>) entity.getClass());
-        int id = m.idIndex();
+        int[] ids = m.idIndexes();
+        int id = ids[0];
         Attribute idAttr = m.attributes()[id];
-        if (m.get(entity, id) == null) {
+        if (ids.length == 1 && m.get(entity, id) == null) {
             if (!idAttr.generated) {
                 throw new PersistenceException("Null id: " + m.type().getName());
             }
@@ -248,7 +307,7 @@ public final class DocumentSession implements Closeable {
             entity = assign(m, entity, vi, Long.valueOf(0));
         }
         m.lifecycle(entity, PRE_PERSIST);
-        if (!store.insert(m.table(), idAttr.column, toDocument(m, entity))) {
+        if (!store.insert(m.table(), keyFields(m), toDocument(m, entity))) {
             throw new PersistenceException("Duplicate id: " + m.type().getName());
         }
         m.lifecycle(entity, POST_PERSIST);
@@ -261,7 +320,6 @@ public final class DocumentSession implements Closeable {
     public <T> T merge(T entity) throws IOException {
         @SuppressWarnings("unchecked")
         EntityModel<T> m = model((Class<T>) entity.getClass());
-        Attribute idAttr = m.attributes()[m.idIndex()];
         m.lifecycle(entity, PRE_UPDATE);
         int vi = m.versionIndex();
         String versionColumn = null;
@@ -276,7 +334,7 @@ public final class DocumentSession implements Closeable {
             // entity stays stale after a failed merge.
             doc.put(versionColumn, next);
         }
-        boolean ok = store.replace(m.table(), idAttr.column, doc, versionColumn, expected);
+        boolean ok = store.replace(m.table(), keyFields(m), doc, versionColumn, expected);
         if (!ok) {
             if (vi >= 0) {
                 throw new OptimisticLockException("Stale " + m.type().getName());
@@ -293,7 +351,7 @@ public final class DocumentSession implements Closeable {
     /// The entity with this id, or null.
     public <T> T find(Class<T> type, Object id) throws IOException {
         EntityModel<T> m = model(type);
-        Map doc = store.get(m.table(), column(m, m.idIndex()), toDocument(id));
+        Map doc = store.get(m.table(), keyFields(m), key(m, id));
         return doc == null ? null : fromDocument(m, doc);
     }
 
@@ -302,10 +360,9 @@ public final class DocumentSession implements Closeable {
     public <T> boolean remove(T entity) throws IOException {
         @SuppressWarnings("unchecked")
         EntityModel<T> m = model((Class<T>) entity.getClass());
-        int id = m.idIndex();
         m.lifecycle(entity, PRE_REMOVE);
         int vi = m.versionIndex();
-        boolean ok = store.delete(m.table(), column(m, id), toDocument(m.get(entity, id)),
+        boolean ok = store.delete(m.table(), keyFields(m), key(m, m.identifier(entity)),
                 vi < 0 ? null : column(m, vi), vi < 0 ? null : Values.storage(m.get(entity, vi)));
         if (!ok) {
             if (vi >= 0) {
@@ -324,11 +381,11 @@ public final class DocumentSession implements Closeable {
 
     <T> List run(EntityModel<T> m, List criteria, String sort, boolean asc, int offset,
             int limit) throws IOException {
-        return store.find(m.table(), column(m, m.idIndex()), criteria, sort, asc, offset, limit);
+        return store.find(m.table(), keyFields(m), criteria, sort, asc, offset, limit);
     }
 
     <T> long count(EntityModel<T> m, List criteria) throws IOException {
-        return store.count(m.table(), column(m, m.idIndex()), criteria);
+        return store.count(m.table(), keyFields(m), criteria);
     }
 
     @Override

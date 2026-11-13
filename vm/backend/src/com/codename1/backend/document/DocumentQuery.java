@@ -23,6 +23,7 @@
 package com.codename1.backend.document;
 
 import com.codename1.impl.orm.EntityModel;
+import com.codename1.impl.orm.Values;
 import com.codename1.orm.session.PersistenceException;
 import com.codename1.orm.session.Query;
 import java.io.IOException;
@@ -51,8 +52,15 @@ public final class DocumentQuery<T> implements Query<T> {
         return DocumentSession.column(model, model.index(field));
     }
 
+    /// A value as the store holds it for `field`: a key column is stored in its
+    /// storage form (see [DocumentSession]), every other one in its own type.
+    private Object stored(String field, Object value) {
+        return model.attributes()[model.index(field)].id ? Values.storage(value)
+                : DocumentSession.toDocument(value);
+    }
+
     private DocumentQuery<T> add(String field, int op, Object value) {
-        criteria.add(new Criterion(column(field), op, DocumentSession.toDocument(value)));
+        criteria.add(new Criterion(column(field), op, stored(field, value)));
         return this;
     }
 
@@ -129,7 +137,7 @@ public final class DocumentQuery<T> implements Query<T> {
         }
         Object[] stored = new Object[values.length];
         for (int i = 0; i < values.length; i++) {
-            stored[i] = DocumentSession.toDocument(values[i]);
+            stored[i] = stored(field, values[i]);
         }
         criteria.add(new Criterion(column(field), Criterion.IN, stored));
         return this;

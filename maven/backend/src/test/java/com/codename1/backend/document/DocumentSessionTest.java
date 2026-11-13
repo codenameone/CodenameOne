@@ -91,6 +91,82 @@ public class DocumentSessionTest {
         }
     }
 
+    public static final class Message {
+        String channel;
+        long sentAt;
+        String text;
+    }
+
+    /// Partition key `channel`, sort key `sentAt`, declared in the opposite
+    /// order so the session has to read the @SortKey to tell them apart.
+    static final class MessageModel extends EntityModel<Message> {
+        private final String table;
+        MessageModel(String table) {
+            this.table = table;
+        }
+        private static final Attribute[] ATTRS = {
+            new Attribute("sentAt", "sent_at", Attribute.BIGINT, true, false, false, false),
+            new Attribute("channel", "channel", Attribute.TEXT, true, false, false, false),
+            new Attribute("text", "text", Attribute.TEXT, false, false, true, false)
+        };
+        public Class<Message> type() { return Message.class; }
+        public String table() { return table; }
+        public Attribute[] attributes() { return ATTRS; }
+        public int sortKeyIndex() { return 0; }
+        public Message create() { return new Message(); }
+        public Object get(Message m, int i) {
+            return i == 0 ? Long.valueOf(m.sentAt) : i == 1 ? m.channel : m.text;
+        }
+        public void set(Message m, int i, Object v) {
+            if (i == 0) {
+                m.sentAt = ((Number) v).longValue();
+            } else if (i == 1) {
+                m.channel = (String) v;
+            } else {
+                m.text = (String) v;
+            }
+        }
+    }
+
+    private static void sortKeyScenario(DocumentSession s) throws Exception {
+        Models.register(new MessageModel("cn1_msgs_" + Long.toHexString(System.nanoTime())));
+        s.createCollections(Message.class);
+        for (int i = 0; i < 10; i++) {
+            Message m = new Message();
+            m.channel = i % 2 == 0 ? "general" : "random";
+            m.sentAt = 1000 + i;
+            m.text = "hello " + i;
+            s.persist(m);
+        }
+        Message dup = new Message();
+        dup.channel = "general";
+        dup.sentAt = 1000;
+        assertThrows(com.codename1.orm.session.PersistenceException.class, () -> s.persist(dup));
+        // The partition alone, a range of the sort key, and a non-key filter.
+        assertEquals(5, s.query(Message.class).eq("channel", "general").count());
+        List<Message> range = s.query(Message.class).eq("channel", "general").ge("sentAt", 1004L)
+                .orderBy("sentAt", false).list();
+        assertEquals(3, range.size());
+        assertEquals(1008, range.get(0).sentAt);
+        assertEquals(1, s.query(Message.class).eq("channel", "random")
+                .eq("text", "hello 3").count());
+        // A second condition on the sort key is answered in memory.
+        assertEquals(3, s.query(Message.class).eq("channel", "random").gt("sentAt", 1002L)
+                .lt("sentAt", 1009L).count());
+        // The whole key: a point read, by array and through the session.
+        assertEquals(1, s.query(Message.class).eq("channel", "random").eq("sentAt", 1005L).count());
+        Message one = s.find(Message.class, new Object[] {Long.valueOf(1005), "random"});
+        assertEquals("hello 5", one.text);
+        one.text = "edited";
+        s.merge(one);
+        assertEquals("edited", s.find(Message.class, new Object[] {Long.valueOf(1005), "random"}).text);
+        // No partition key: a scan.
+        assertEquals(4, s.query(Message.class).gt("sentAt", 1005L).count());
+        assertTrue(s.remove(one));
+        assertNull(s.find(Message.class, new Object[] {Long.valueOf(1005), "random"}));
+        assertEquals(4, s.query(Message.class).eq("channel", "random").count());
+    }
+
     private static void scenario(DocumentSession s) throws Exception {
         Models.register(new NoteModel("cn1_notes_" + Long.toHexString(System.nanoTime())));
         s.createCollections(Note.class);
@@ -146,6 +222,7 @@ public class DocumentSessionTest {
         Assumptions.assumeTrue(uri != null && uri.length() > 0, "CN1_TEST_MONGODB_URI unset");
         try (DocumentSession s = DocumentSession.open(uri)) {
             scenario(s);
+            sortKeyScenario(s);
         }
     }
 
@@ -156,6 +233,7 @@ public class DocumentSessionTest {
                 "CN1_TEST_DYNAMODB_ENDPOINT unset");
         try (DocumentSession s = DocumentSession.open("dynamodb://us-east-1?endpoint=" + endpoint)) {
             scenario(s);
+            sortKeyScenario(s);
         }
     }
 
