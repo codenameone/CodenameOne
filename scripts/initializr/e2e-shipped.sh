@@ -244,8 +244,17 @@ for template in "${TEMPLATES[@]}"; do
     # local. This is a workaround for the suite only: the plugin needs a provider
     # for a current Surefire, and until it has one a developer's own `mvn test`
     # fails the same way.
+    # The heap is the one the sample's own run-e2e.sh gives the same suite, so
+    # the two cannot drift: every test runs in one simulator, and Splat's 3D
+    # views need 3072m under xvfb where 1536m ran out after its practice match.
+    # It never goes below the 1536m every download passed with before. A sample
+    # whose script names no heap (Bastion) fails the grep, and under pipefail the
+    # assignment would end the script, hence the `|| heap_mb=`.
+    heap_mb="$(grep -o -- '-Xmx[0-9]*[mM]' "$sample/run-e2e.sh" 2>/dev/null | head -n 1 | tr -dc '0-9')" || heap_mb=
+    [ -n "$heap_mb" ] && [ "$heap_mb" -gt 1536 ] || heap_mb=1536
+    heap="-Xmx${heap_mb}m"
     set +e
-    (cd "$dir" && JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx1536m -D$lower.server.url=http://localhost:$PORT -D$lower.shots.dir=$shots" \
+    (cd "$dir" && JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} $heap -D$lower.server.url=http://localhost:$PORT -D$lower.shots.dir=$shots" \
         ${RUNNER[@]+"${RUNNER[@]}"} ./mvnw -B -Daether.enhancedLocalRepository.trackingFilename=_e2e.repositories -Dcodename1.platform=javase -Ptest verify) > "$WORK/$template-e2e.log" 2>&1
     status=$?
     set -e
