@@ -38,6 +38,7 @@ import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.html5.js.webgl.WebGLBuffer;
 import com.codename1.html5.js.webgl.WebGLFramebuffer;
@@ -553,6 +554,54 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
     }
 
+
+    // custom shading uniform names, so a draw does not build strings
+    private static final String[] CU_NAMES = new String[ShaderMaterial.MAX_UNIFORMS];
+    private static final String[] CT_NAMES = new String[ShaderMaterial.MAX_TEXTURES];
+
+    static {
+        for (int i = 0; i < CU_NAMES.length; i++) {
+            CU_NAMES[i] = "u_cu[" + i + "]";
+        }
+        for (int i = 0; i < CT_NAMES.length; i++) {
+            CT_NAMES[i] = "u_ct" + i;
+        }
+    }
+
+    // Custom shading (Material.getShader()): the clock, the uniform array and
+    // the material's own textures on units 2 and up -- 0 is the base texture,
+    // 1 the shadow map.
+    private void applyShader(ProgramEntry p, Material material) {
+        ShaderMaterial sm = material.getShader();
+        if (sm == null) {
+            return;
+        }
+        uniform1(p, "u_time", getTime());
+        float[] v = sm.getUniformValues();
+        for (int i = 0; i < sm.getUniformCount(); i++) {
+            WebGLUniformLocation l = loc(p, CU_NAMES[i]);
+            if (l != null) {
+                gl.uniform4f(l, v[i * 4], v[i * 4 + 1], v[i * 4 + 2], v[i * 4 + 3]);
+            }
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            WebGLUniformLocation l = loc(p, CT_NAMES[i]);
+            if (l != null && t != null && t.getHandle() instanceof WebGLTexture) {
+                gl.activeTexture(TEXTURE0 + 2 + i);
+                gl.bindTexture(TEXTURE_2D, (WebGLTexture) t.getHandle());
+                int wrap = t.getWrap() == Texture.Wrap.REPEAT ? REPEAT : CLAMP_TO_EDGE;
+                int filter = t.getFilter() == Texture.Filter.NEAREST ? NEAREST : LINEAR;
+                gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_S, wrap);
+                gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_T, wrap);
+                gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, filter);
+                gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, filter);
+                gl.uniform1i(l, 2 + i);
+            }
+        }
+        gl.activeTexture(TEXTURE0);
+    }
+
     private void applyEnvironment(ProgramEntry p, Material material, Environment env, boolean shadowed) {
         uniformColor(p, "u_fogColor", env.getFogColor());
         uniform3(p, "u_fog", env.getFogDensity(), env.getFogHeightFalloff(), env.getFogBaseHeight());
@@ -571,6 +620,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             }
         }
         uniformColor(p, "u_emissive", material.getEmissive());
+        applyShader(p, material);
         if (shadowed) {
             WebGLUniformLocation l = loc(p, "u_shadowMatrix");
             if (l != null) {

@@ -37,6 +37,7 @@ import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
@@ -70,7 +71,9 @@ class WindowsGraphicsDevice extends GraphicsDevice {
     // (24: color, light dir, light colour, ambient, eye, params) + 7 vec4 (28:
     // fog colour, fog, sky, ground, emissive, zenith, horizon) + sun (4).
     // + shadow matrix (16) + shadow params (4, bias / strength / texel size).
-    private static final int UNIFORM_FLOATS = 124;
+    // 0-123 the engine's own; 124-127 the clock, 128-191 the custom
+    // ShaderMaterial slots (CN1Uniforms.timeP and cu[16])
+    private static final int UNIFORM_FLOATS = 192;
     private final float[] uniforms = new float[UNIFORM_FLOATS];
 
     // Shadow state, as in JavaSEGLDevice: the light matrix of the last shadow
@@ -163,6 +166,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
 
         int primitive = primitiveCode(mesh.getPrimitiveType());
         int strideBytes = fmt.getStrideBytes();
+        bindShaderTextures(material);
 
         if (mesh.isIndexed()) {
             IndexBuffer ib = mesh.getIndices();
@@ -309,6 +313,38 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         uniforms[o++] = sl.getShadowStrength();
         uniforms[o++] = 1.0f / Math.max(1, shadowSize);
         uniforms[o++] = 0.0f;
+        uniforms[o++] = getTime();
+        uniforms[o++] = 0.0f;
+        uniforms[o++] = 0.0f;
+        uniforms[o++] = 0.0f;
+        ShaderMaterial sm = material.getShader();
+        int n = sm == null ? 0 : sm.getUniformCount() * 4;
+        if (n > 0) {
+            System.arraycopy(sm.getUniformValues(), 0, uniforms, o, n);
+        }
+        for (int i = o + n; i < UNIFORM_FLOATS; i++) {
+            uniforms[i] = 0.0f;
+        }
+    }
+
+    // binds the material's custom textures at t2/s2 and up for the next draw
+    private void bindShaderTextures(Material material) {
+        ShaderMaterial sm = material.getShader();
+        if (sm == null) {
+            return;
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            long peer = 0;
+            int filter = 1;
+            int wrap = 1;
+            if (t != null && t.getHandle() instanceof Long) {
+                peer = ((Long) t.getHandle()).longValue();
+                filter = t.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+                wrap = t.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+            }
+            WindowsNative.gl3dBindTexture(contextPeer, 2 + i, peer, filter, wrap);
+        }
     }
 
     public boolean beginShadowPass(Light light) {

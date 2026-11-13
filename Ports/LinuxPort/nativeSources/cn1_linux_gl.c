@@ -85,7 +85,8 @@ typedef struct {
 } CN1GlContext;
 
 /* Layout of the packed uniform array a draw passes in; must match
- * LinuxGraphicsDevice.packUniforms (112 floats). A size of 16 is a mat4. */
+ * LinuxGraphicsDevice.packUniforms (177 floats). A size of 16 is a mat4, 64
+ * the ShaderMaterial vec4[16] array u_cu. */
 typedef struct {
     const char* name;
     int size;
@@ -97,10 +98,10 @@ static const CN1GlUniformDef CN1_UNIFORMS[] = {
     {"u_eye", 3}, {"u_shininess", 1}, {"u_fogColor", 3}, {"u_fog", 3},
     {"u_sky", 3}, {"u_ground", 3}, {"u_exposure", 1}, {"u_pbr", 2},
     {"u_emissive", 3}, {"u_zenith", 3}, {"u_horizon", 3}, {"u_sun", 4},
-    {"u_shadow", 3}
+    {"u_shadow", 3}, {"u_time", 1}, {"u_cu", 64}
 };
 #define CN1_UNIFORM_COUNT ((int) (sizeof(CN1_UNIFORMS) / sizeof(CN1_UNIFORMS[0])))
-#define CN1_UNIFORM_FLOATS 112
+#define CN1_UNIFORM_FLOATS 177
 
 typedef struct {
     GLuint program;
@@ -470,6 +471,24 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dGetOrCreatePipeline___long_ja
         p->loc[i] = glGetUniformLocation(prog, CN1_UNIFORMS[i].name);
     }
     p->uTexture = glGetUniformLocation(prog, "u_texture");
+    /* ShaderMaterial textures sample units 2 and up; the sampler uniforms keep
+     * their unit in the program, so they are set once here. */
+    {
+        GLint prev = 0;
+        int t;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &prev);
+        glUseProgram(prog);
+        for (t = 0; t < 4; t++) {
+            char nm[8];
+            GLint l;
+            snprintf(nm, sizeof(nm), "u_ct%d", t);
+            l = glGetUniformLocation(prog, nm);
+            if (l >= 0) {
+                glUniform1i(l, 2 + t);
+            }
+        }
+        glUseProgram((GLuint) prev);
+    }
     p->uShadowMap = glGetUniformLocation(prog, "u_shadowMap");
     /* Record which optional interleaved attributes the shader declared. */
     p->hasNormal = strstr(vsrc, "attribute vec3 a_normal") != 0;
@@ -573,6 +592,7 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
             int n = CN1_UNIFORMS[i].size;
             if (l >= 0) {
                 switch (n) {
+                    case 64: glUniform4fv(l, 16, u); break;
                     case 16: glUniformMatrix4fv(l, 1, GL_FALSE, u); break;
                     case 4: glUniform4fv(l, 1, u); break;
                     case 3: glUniform3fv(l, 1, u); break;
@@ -703,6 +723,21 @@ static int cn1GlEnsureTarget(CN1GlTarget* t, int w, int h, int depth, GLint filt
         return 0;
     }
     return 1;
+}
+
+/* Binds a ShaderMaterial texture on unit index for the next draw. */
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dBindTexture___long_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT index, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
+    GLuint t = (GLuint) texturePeer;
+    if (contextPeer == 0) return;
+    glActiveTexture(GL_TEXTURE0 + index);
+    glBindTexture(GL_TEXTURE_2D, t);
+    if (t) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texFilter ? GL_LINEAR : GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texFilter ? GL_LINEAR : GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texWrap ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texWrap ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+    }
+    glActiveTexture(GL_TEXTURE0);
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT size) {

@@ -101,6 +101,8 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_gl3dUpdateShortBuffer___long_short_1A
 }
 
 /* Shadows and post processing: false makes the device draw directly. */
+void com_codename1_impl_ios_IOSNative_gl3dBindTexture___long_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_LONG __cn1Arg3, JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
+}
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
     return JAVA_FALSE;
 }

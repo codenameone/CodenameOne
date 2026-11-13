@@ -40,6 +40,7 @@ import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
@@ -577,6 +578,54 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         }
     }
 
+
+    // custom shading uniform names, so a draw does not build strings
+    private static final String[] CU_NAMES = new String[ShaderMaterial.MAX_UNIFORMS];
+    private static final String[] CT_NAMES = new String[ShaderMaterial.MAX_TEXTURES];
+
+    static {
+        for (int i = 0; i < CU_NAMES.length; i++) {
+            CU_NAMES[i] = "u_cu[" + i + "]";
+        }
+        for (int i = 0; i < CT_NAMES.length; i++) {
+            CT_NAMES[i] = "u_ct" + i;
+        }
+    }
+
+    // Custom shading (Material.getShader()): the clock, the uniform array and
+    // the material's own textures on units 2 and up -- 0 is the base texture,
+    // 1 the shadow map.
+    private void applyShader(Program p, Material material) {
+        ShaderMaterial sm = material.getShader();
+        if (sm == null) {
+            return;
+        }
+        uniform1(p, "u_time", getTime());
+        float[] v = sm.getUniformValues();
+        for (int i = 0; i < sm.getUniformCount(); i++) {
+            int l = loc(p, CU_NAMES[i]);
+            if (l >= 0) {
+                GLES20.glUniform4f(l, v[i * 4], v[i * 4 + 1], v[i * 4 + 2], v[i * 4 + 3]);
+            }
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            int l = loc(p, CT_NAMES[i]);
+            if (l >= 0 && t != null && t.getHandle() instanceof TexHandle) {
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + 2 + i);
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
+                int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GLES20.GL_REPEAT : GLES20.GL_CLAMP_TO_EDGE;
+                int filter = t.getFilter() == Texture.Filter.NEAREST ? GLES20.GL_NEAREST : GLES20.GL_LINEAR;
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, wrap);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, wrap);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, filter);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter);
+                GLES20.glUniform1i(l, 2 + i);
+            }
+        }
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+    }
+
     private void applyEnvironment(Program p, Material material, Environment env, boolean shadowed) {
         uniformColor(p, "u_fogColor", env.getFogColor());
         uniform3(p, "u_fog", env.getFogDensity(), env.getFogHeightFalloff(), env.getFogBaseHeight());
@@ -595,6 +644,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             }
         }
         uniformColor(p, "u_emissive", material.getEmissive());
+        applyShader(p, material);
         if (shadowed) {
             int l = loc(p, "u_shadowMatrix");
             if (l >= 0) {

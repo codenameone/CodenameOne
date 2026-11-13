@@ -26,6 +26,9 @@ import com.codename1.gpu.Environment;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderEmitter;
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
 
 /// Runtime generator of HLSL (Direct3D 11, Shader Model 4) source for the native
 /// Windows 3D backend. It mirrors the logic of the portable GLSL generator
@@ -113,15 +116,111 @@ public final class HlslShaderGenerator {
         boolean tone = lit && environment != null && environment.isToneMapping();
         boolean emissive = lit && (material.getEmissive() & 0xffffff) != 0;
         boolean shadow = lit && shadowed && material.isReceiveShadows();
+        ShaderMaterial sm = material.getShader();
+        Custom c = null;
+        if (sm != null) {
+            c = new Custom();
+            c.shader = sm;
+            c.hasNormal = hasNormal;
+            c.hasTexcoord = hasTexcoord;
+            c.fragWorld = ShaderEmitter.uses(sm, true, "worldPos") || ShaderEmitter.uses(sm, true, "viewDir");
+            c.fragNormal = hasNormal && ShaderEmitter.uses(sm, true, "worldNormal");
+            c.fragUv = hasTexcoord && ShaderEmitter.uses(sm, true, "uv");
+        }
         this.source = build(lit, phong, pbr, textured, hasNormal, hasTexcoord, fog, skyOn,
-                hemi, tone, emissive, shadow);
+                hemi, tone, emissive, shadow, c);
+    }
+
+    // a material's ShaderMaterial and which inputs its fragment graphs read
+    private static final class Custom {
+        ShaderMaterial shader;
+        boolean hasNormal;
+        boolean hasTexcoord;
+        boolean fragWorld;
+        boolean fragNormal;
+        boolean fragUv;
+        boolean lit;
+        boolean textured;
+    }
+
+    // custom shading inputs; both stages call their argument `input`
+    private static final class Inputs implements ShaderEmitter.Inputs {
+        private final Custom c;
+        private final boolean fragment;
+
+        Inputs(Custom c, boolean fragment) {
+            this.c = c;
+            this.fragment = fragment;
+        }
+
+        public String builtin(String name) {
+            if ("time".equals(name)) {
+                return "timeP.x";
+            }
+            if ("cameraPos".equals(name)) {
+                return "eye.xyz";
+            }
+            if ("sunDir".equals(name)) {
+                return "normalize(-lightDir.xyz)";
+            }
+            if ("sunColor".equals(name)) {
+                return "lightColor.xyz";
+            }
+            if (!fragment) {
+                if ("position".equals(name)) {
+                    return "input.position";
+                }
+                if ("normal".equals(name)) {
+                    return c.hasNormal ? "input.normal" : "float3(0.0, 1.0, 0.0)";
+                }
+                if ("uv".equals(name)) {
+                    return c.hasTexcoord ? "input.texcoord" : "float2(0.0, 0.0)";
+                }
+                if ("worldPos".equals(name)) {
+                    return "mul(model, float4(input.position, 1.0)).xyz";
+                }
+                return null;
+            }
+            if ("worldPos".equals(name)) {
+                return "input.worldPos";
+            }
+            if ("worldNormal".equals(name)) {
+                return c.lit || c.fragNormal ? "normalize(input.worldNormal)" : "float3(0.0, 1.0, 0.0)";
+            }
+            if ("viewDir".equals(name)) {
+                return "normalize(eye.xyz - input.worldPos)";
+            }
+            if ("uv".equals(name)) {
+                return c.textured || c.fragUv ? "input.texcoord" : "float2(0.0, 0.0)";
+            }
+            if ("baseColor".equals(name)) {
+                return "base";
+            }
+            return null;
+        }
+
+        public String uniform(int slot) {
+            return "cu[" + slot + "]";
+        }
+
+        public String sample(int slot, String uv) {
+            return fragment ? "cn1_ct" + slot + ".Sample(cn1_cs" + slot + ", " + uv + ")" : null;
+        }
     }
 
     private static String build(boolean lit, boolean phong, boolean pbr, boolean textured,
                                 boolean hasNormal, boolean hasTexcoord, boolean fog,
                                 boolean sky, boolean hemi, boolean tone, boolean emissive,
-                                boolean shadow) {
-        boolean world = lit || fog || sky;
+                                boolean shadow, Custom c) {
+        if (c != null) {
+            c.lit = lit;
+            c.textured = textured;
+        }
+        boolean world = lit || fog || sky || (c != null && c.fragWorld);
+        boolean normalOut = lit || (c != null && c.fragNormal);
+        boolean uvOut = textured || (c != null && c.fragUv);
+        ShaderNode offset = c == null ? null : c.shader.get(ShaderMaterial.Hook.VERTEX_OFFSET);
+        String pos = offset != null ? "pos" : "input.position";
         StringBuilder sb = new StringBuilder();
 
         // Constant buffer. Layout matches the float[] the Java side packs and the
@@ -147,6 +246,9 @@ public final class HlslShaderGenerator {
         sb.append("  float4 sun;\n");         // sun colour, cloud cover
         sb.append("  float4x4 shadowMatrix;\n");
         sb.append("  float4 shadowParams;\n"); // bias, strength, texel size
+        // custom shading: the clock, then one float4 per declared uniform
+        sb.append("  float4 timeP;\n");
+        sb.append("  float4 cu[").append(ShaderMaterial.MAX_UNIFORMS).append("];\n");
         sb.append("};\n");
 
         if (textured) {
@@ -157,6 +259,11 @@ public final class HlslShaderGenerator {
         if (shadow) {
             sb.append("Texture2D cn1_shadowMap : register(t1);\n");
             sb.append("SamplerState cn1_shadowSampler : register(s1);\n");
+        }
+        int customTextures = c == null ? 0 : c.shader.getTextureCount();
+        for (int i = 0; i < customTextures; i++) {
+            sb.append("Texture2D cn1_ct").append(i).append(" : register(t").append(2 + i).append(");\n");
+            sb.append("SamplerState cn1_cs").append(i).append(" : register(s").append(2 + i).append(");\n");
         }
 
         // Vertex input/output structs.
@@ -172,13 +279,13 @@ public final class HlslShaderGenerator {
 
         sb.append("struct VSOutput {\n");
         sb.append("  float4 position : SV_Position;\n");
-        if (lit) {
+        if (normalOut) {
             sb.append("  float3 worldNormal : TEXCOORD1;\n");
         }
         if (world) {
             sb.append("  float3 worldPos : TEXCOORD2;\n");
         }
-        if (textured) {
+        if (uvOut) {
             sb.append("  float2 texcoord : TEXCOORD0;\n");
         }
         if (shadow) {
@@ -189,7 +296,13 @@ public final class HlslShaderGenerator {
         // Vertex shader.
         sb.append("VSOutput ").append(VERTEX_FUNCTION).append("(VSInput input) {\n");
         sb.append("  VSOutput output;\n");
-        sb.append("  float4 clip = mul(mvp, float4(input.position, 1.0));\n");
+        if (offset != null) {
+            ShaderEmitter e = new ShaderEmitter(ShaderEmitter.Dialect.HLSL, c.shader, new Inputs(c, false), sb,
+                    "  ", "_v");
+            String o = e.emit(offset);
+            sb.append("  float3 pos = input.position + ").append(o).append(";\n");
+        }
+        sb.append("  float4 clip = mul(mvp, float4(").append(pos).append(", 1.0));\n");
         // Adapt the portable GL-convention clip space to Direct3D: only remap Z
         // from GL's [-w, w] to D3D's [0, w] depth range. Y is NOT flipped here --
         // the GL backend (the reference) does not flip either, and D3D's viewport
@@ -198,17 +311,17 @@ public final class HlslShaderGenerator {
         // in cn1_windows_d3d.cpp (front faces are counter-clockwise).
         sb.append("  clip.z = (clip.z + clip.w) * 0.5;\n");
         sb.append("  output.position = clip;\n");
-        if (lit) {
+        if (normalOut) {
             sb.append("  output.worldNormal = mul(normalMatrix, float4(input.normal, 0.0)).xyz;\n");
         }
         if (world) {
-            sb.append("  output.worldPos = mul(model, float4(input.position, 1.0)).xyz;\n");
+            sb.append("  output.worldPos = mul(model, float4(").append(pos).append(", 1.0)).xyz;\n");
         }
-        if (textured) {
+        if (uvOut) {
             sb.append("  output.texcoord = input.texcoord;\n");
         }
         if (shadow) {
-            sb.append("  output.shadowPos = mul(shadowMatrix, mul(model, float4(input.position, 1.0)));\n");
+            sb.append("  output.shadowPos = mul(shadowMatrix, mul(model, float4(").append(pos).append(", 1.0)));\n");
         }
         sb.append("  return output;\n");
         sb.append("}\n");
@@ -233,12 +346,35 @@ public final class HlslShaderGenerator {
         if (textured) {
             sb.append("  base = base * cn1_tex.Sample(cn1_sampler, input.texcoord);\n");
         }
+        String[] hook = new String[ShaderMaterial.Hook.values().length];
+        if (c != null) {
+            ShaderEmitter e = new ShaderEmitter(ShaderEmitter.Dialect.HLSL, c.shader, new Inputs(c, true), sb,
+                    "  ", "_f");
+            ShaderMaterial.Hook[] all = ShaderMaterial.Hook.values();
+            for (int i = 0; i < all.length; i++) {
+                ShaderNode g = c.shader.get(all[i]);
+                if (g != null && all[i].isFragment()) {
+                    hook[i] = e.emit(g);
+                }
+            }
+        }
+        if (hook[ShaderMaterial.Hook.BASE_COLOR.ordinal()] != null) {
+            sb.append("  base = ").append(hook[ShaderMaterial.Hook.BASE_COLOR.ordinal()]).append(";\n");
+        }
+        if (hook[ShaderMaterial.Hook.DISCARD.ordinal()] != null) {
+            sb.append("  if (").append(hook[ShaderMaterial.Hook.DISCARD.ordinal()]).append(" > 0.5) {\n");
+            sb.append("    discard;\n  }\n");
+        }
+        String customEmissive = hook[ShaderMaterial.Hook.EMISSIVE.ordinal()];
         sb.append("  float3 rgb = base.rgb;\n");
         if (sky) {
             appendSky(sb);
         }
         if (lit) {
             sb.append("  float3 n = normalize(input.worldNormal);\n");
+            if (hook[ShaderMaterial.Hook.NORMAL.ordinal()] != null) {
+                sb.append("  n = normalize(").append(hook[ShaderMaterial.Hook.NORMAL.ordinal()]).append(");\n");
+            }
             sb.append("  float3 l = normalize(-lightDir.xyz);\n");
             sb.append("  float ndotl = max(dot(n, l), 0.0);\n");
             if (hemi) {
@@ -248,7 +384,8 @@ public final class HlslShaderGenerator {
             }
             sb.append(shadow ? "  float shade = shadowAt(input.shadowPos, n, l);\n" : "  float shade = 1.0;\n");
             if (pbr) {
-                appendPbr(sb);
+                appendPbr(sb, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
+                        hook[ShaderMaterial.Hook.ROUGHNESS.ordinal()]);
             } else {
                 sb.append("  rgb = base.rgb * (amb + lightColor.xyz * ndotl * shade);\n");
                 if (phong) {
@@ -263,9 +400,14 @@ public final class HlslShaderGenerator {
             if (emissive) {
                 sb.append("  rgb += emissiveColor.xyz;\n");
             }
+            if (customEmissive != null) {
+                sb.append("  rgb += ").append(customEmissive).append(";\n");
+            }
             if (tone) {
                 sb.append("  rgb = aces(rgb * params.w);\n");
             }
+        } else if (customEmissive != null) {
+            sb.append("  rgb += ").append(customEmissive).append(";\n");
         }
         if (fog) {
             sb.append("  float camDist = length(input.worldPos - eye.xyz);\n");
@@ -455,9 +597,12 @@ public final class HlslShaderGenerator {
 
     // Cook-Torrance with a GGX distribution, Smith-Schlick geometry and
     // Schlick's Fresnel, as in the GLSL generator.
-    private static void appendPbr(StringBuilder sb) {
-        sb.append("  float metallic = params.y;\n");
-        sb.append("  float rough = params.z;\n");
+    private static void appendPbr(StringBuilder sb, String metallicHook, String roughHook) {
+        sb.append("  float metallic = ")
+                .append(metallicHook != null ? "saturate(" + metallicHook + ")" : "params.y").append(";\n");
+        // below 0.04 the GGX lobe is a sub-pixel spike that aliases
+        sb.append("  float rough = ")
+                .append(roughHook != null ? "clamp(" + roughHook + ", 0.04, 1.0)" : "params.z").append(";\n");
         sb.append("  float3 v = normalize(eye.xyz - input.worldPos);\n");
         sb.append("  float3 h = normalize(l + v);\n");
         sb.append("  float ndotv = max(dot(n, v), 0.001);\n");

@@ -35,6 +35,7 @@ import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.PrimitiveType;
 import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
 import com.codename1.impl.gpu.GlslShaderGenerator;
@@ -79,7 +80,9 @@ class IOSGraphicsDevice extends GraphicsDevice {
     // environment, PBR and sky values (see packEnvironment), then the shadow
     // matrix (16 floats) and a vec4 of bias, strength and texel size.
     // We pad to a multiple of 16 for the aligned allocator.
-    private static final int UNIFORM_FLOATS = 128;
+    // 0-127 the engine's own; 128-131 the clock, 132-195 the custom
+    // ShaderMaterial slots (CN1Uniforms.timeP and cu[16])
+    private static final int UNIFORM_FLOATS = 196;
 
     // Shadow map state: the light's view-projection (also read by receivers
     // through the uniform block), and whether a map has been rendered yet.
@@ -180,6 +183,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
 
         int primitive = primitiveCode(type);
         int strideBytes = fmt.getStrideBytes();
+        bindShaderTextures(material);
 
         if (mesh.isIndexed()) {
             IndexBuffer ib = mesh.getIndices();
@@ -312,8 +316,46 @@ class IOSGraphicsDevice extends GraphicsDevice {
         o = 72;
         packEnvironment(material, o);
         // a draw that does not receive shadows must not see the previous one's
-        for (int i = 108; i < UNIFORM_FLOATS; i++) {
+        for (int i = 108; i < 128; i++) {
             uniforms[i] = 0.0f;
+        }
+        packShader(material);
+    }
+
+    private void packShader(Material material) {
+        uniforms[128] = getTime();
+        uniforms[129] = 0.0f;
+        uniforms[130] = 0.0f;
+        uniforms[131] = 0.0f;
+        ShaderMaterial sm = material.getShader();
+        int n = sm == null ? 0 : sm.getUniformCount() * 4;
+        if (n > 0) {
+            System.arraycopy(sm.getUniformValues(), 0, uniforms, 132, n);
+        }
+        for (int i = 132 + n; i < UNIFORM_FLOATS; i++) {
+            uniforms[i] = 0.0f;
+        }
+    }
+
+    // binds the material's custom textures on Metal slots 2 and up for the
+    // next draw; an unbound one gets the null peer, which the native side
+    // replaces with a 1x1 white texture
+    private void bindShaderTextures(Material material) {
+        ShaderMaterial sm = material.getShader();
+        if (sm == null) {
+            return;
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            long peer = 0;
+            int filter = 1;
+            int wrap = 1;
+            if (t != null && t.getHandle() instanceof Long) {
+                peer = ((Long) t.getHandle()).longValue();
+                filter = t.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+                wrap = t.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+            }
+            IOSImplementation.nativeInstance.gl3dBindTexture(contextPeer, 2 + i, peer, filter, wrap);
         }
     }
 

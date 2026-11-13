@@ -173,6 +173,29 @@ public abstract class GraphicsDevice {
         return environment;
     }
 
+    private float time;
+
+    /// Sets the clock that custom shaders read with
+    /// `com.codename1.gpu.shader.ShaderNode.time()`, in seconds. Call it once
+    /// per frame before drawing; animated library shaders such as water move
+    /// with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: the time
+    public void setTime(float seconds) {
+        this.time = seconds;
+    }
+
+    /// Returns the clock set with `setTime`.
+    ///
+    /// #### Returns
+    ///
+    /// seconds
+    public float getTime() {
+        return time;
+    }
+
     /// Starts rendering the light's shadow map. Until `endShadowPass`, `draw`
     /// writes only depth as seen from the light, and skips materials that do
     /// not cast shadows. Draws after `endShadowPass` that receive shadows

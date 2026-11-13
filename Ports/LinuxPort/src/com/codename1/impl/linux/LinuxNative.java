@@ -1220,6 +1220,10 @@ public final class LinuxNative {
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap, int shadowMap);
 
+    /** Binds a ShaderMaterial texture on unit `index` for the next draw. */
+    public static native void gl3dBindTexture(long contextPeer, int index, long texturePeer, int texFilter,
+            int texWrap);
+
     /** Binds a size x size packed-depth shadow target and clears it. */
     public static native boolean gl3dBeginShadowPass(long contextPeer, int size);
     /** Restores the target and viewport that were bound at gl3dBeginShadowPass. */

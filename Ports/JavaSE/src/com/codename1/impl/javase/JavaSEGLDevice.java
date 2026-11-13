@@ -38,6 +38,7 @@ import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
@@ -555,6 +556,54 @@ class JavaSEGLDevice extends GraphicsDevice {
         }
     }
 
+
+    // custom shading uniform names, so a draw does not build strings
+    private static final String[] CU_NAMES = new String[ShaderMaterial.MAX_UNIFORMS];
+    private static final String[] CT_NAMES = new String[ShaderMaterial.MAX_TEXTURES];
+
+    static {
+        for (int i = 0; i < CU_NAMES.length; i++) {
+            CU_NAMES[i] = "u_cu[" + i + "]";
+        }
+        for (int i = 0; i < CT_NAMES.length; i++) {
+            CT_NAMES[i] = "u_ct" + i;
+        }
+    }
+
+    // Custom shading (Material.getShader()): the clock, the uniform array and
+    // the material's own textures on units 2 and up -- 0 is the base texture,
+    // 1 the shadow map.
+    private void applyShader(Program p, Material material) {
+        ShaderMaterial sm = material.getShader();
+        if (sm == null) {
+            return;
+        }
+        uniform1(p, "u_time", getTime());
+        float[] v = sm.getUniformValues();
+        for (int i = 0; i < sm.getUniformCount(); i++) {
+            int l = loc(p, CU_NAMES[i]);
+            if (l >= 0) {
+                gl.glUniform4f(l, v[i * 4], v[i * 4 + 1], v[i * 4 + 2], v[i * 4 + 3]);
+            }
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            int l = loc(p, CT_NAMES[i]);
+            if (l >= 0 && t != null && t.getHandle() instanceof TexHandle) {
+                gl.glActiveTexture(GL2ES2.GL_TEXTURE0 + 2 + i);
+                gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
+                int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GL2ES2.GL_REPEAT : GL2ES2.GL_CLAMP_TO_EDGE;
+                int filter = t.getFilter() == Texture.Filter.NEAREST ? GL2ES2.GL_NEAREST : GL2ES2.GL_LINEAR;
+                gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_S, wrap);
+                gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_T, wrap);
+                gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MIN_FILTER, filter);
+                gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, filter);
+                gl.glUniform1i(l, 2 + i);
+            }
+        }
+        gl.glActiveTexture(GL2ES2.GL_TEXTURE0);
+    }
+
     private void applyEnvironment(Program p, Material material, Environment env, boolean shadowed) {
         uniformColor(p, "u_fogColor", env.getFogColor());
         uniform3(p, "u_fog", env.getFogDensity(), env.getFogHeightFalloff(), env.getFogBaseHeight());
@@ -573,6 +622,7 @@ class JavaSEGLDevice extends GraphicsDevice {
             }
         }
         uniformColor(p, "u_emissive", material.getEmissive());
+        applyShader(p, material);
         if (shadowed) {
             int l = loc(p, "u_shadowMatrix");
             if (l >= 0) {

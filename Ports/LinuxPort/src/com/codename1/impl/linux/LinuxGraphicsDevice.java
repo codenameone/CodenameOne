@@ -37,6 +37,7 @@ import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
@@ -76,7 +77,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
     // u_shininess(1), u_fogColor(3), u_fog(3), u_sky(3), u_ground(3),
     // u_exposure(1), u_pbr(2), u_emissive(3), u_zenith(3), u_horizon(3),
     // u_sun(4), u_shadow(3).
-    private static final int UNIFORM_FLOATS = 112;
+    private static final int UNIFORM_FLOATS = 177;
     private final float[] uniforms = new float[UNIFORM_FLOATS];
 
     private long shadowPipeline;
@@ -162,6 +163,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
 
         int primitive = primitiveCode(mesh.getPrimitiveType());
         int strideBytes = fmt.getStrideBytes();
+        bindShaderTextures(material);
 
         if (mesh.isIndexed()) {
             IndexBuffer ib = mesh.getIndices();
@@ -336,6 +338,35 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             uniforms[o++] = 0f;
             uniforms[o++] = 0f;
             uniforms[o++] = 0f;
+        }
+        uniforms[o++] = getTime();
+        ShaderMaterial sm = material.getShader();
+        int n = sm == null ? 0 : sm.getUniformCount() * 4;
+        if (n > 0) {
+            System.arraycopy(sm.getUniformValues(), 0, uniforms, o, n);
+        }
+        for (int i = n; i < ShaderMaterial.MAX_UNIFORMS * 4; i++) {
+            uniforms[o + i] = 0f;
+        }
+    }
+
+    // binds the material's custom textures on units 2 and up for the next draw
+    private void bindShaderTextures(Material material) {
+        ShaderMaterial sm = material.getShader();
+        if (sm == null) {
+            return;
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            long peer = 0;
+            int filter = 1;
+            int wrap = 1;
+            if (t != null && t.getHandle() instanceof Long) {
+                peer = ((Long) t.getHandle()).longValue();
+                filter = t.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+                wrap = t.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+            }
+            LinuxNative.gl3dBindTexture(contextPeer, 2 + i, peer, filter, wrap);
         }
     }
 

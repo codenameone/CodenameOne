@@ -819,6 +819,46 @@ static MTLPrimitiveType CN1GL3DPrimitive(int primitive) {
     }
 }
 
+// One sampler per filter/wrap pair, made once per device: a scene of sprites
+// draws hundreds of textured quads a frame, and a new sampler state for each
+// was an allocation per draw.
+static id<MTLSamplerState> CN1GL3DSampler(CN1GL3DView *view, int texFilter, int texWrap) {
+    static id<MTLSamplerState> cn1Samplers[4];
+    static void *cn1SamplerDevice = NULL;
+    if (cn1SamplerDevice != (__bridge void *) view.device) {
+        for (int i = 0; i < 4; i++) {
+            cn1Samplers[i] = nil;
+        }
+        cn1SamplerDevice = (__bridge void *) view.device;
+    }
+    int key = (texFilter ? 1 : 0) | (texWrap ? 2 : 0);
+    if (cn1Samplers[key] == nil) {
+        MTLSamplerDescriptor *sd = [[MTLSamplerDescriptor alloc] init];
+        sd.minFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
+        sd.magFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
+        sd.sAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
+        sd.tAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
+        cn1Samplers[key] = [view.device newSamplerStateWithDescriptor:sd];
+    }
+    return cn1Samplers[key];
+}
+
+// A 1x1 white texture for a declared custom texture with nothing bound: Metal
+// leaves an unbound slot undefined, GL samples it as black or white by driver.
+static id<MTLTexture> CN1GL3DWhite(CN1GL3DView *view) {
+    static id<MTLTexture> cn1White = nil;
+    static void *cn1WhiteDevice = NULL;
+    if (cn1White == nil || cn1WhiteDevice != (__bridge void *) view.device) {
+        MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                     width:1 height:1 mipmapped:NO];
+        cn1White = [view.device newTextureWithDescriptor:td];
+        uint32_t px = 0xffffffffu;
+        [cn1White replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:&px bytesPerRow:4];
+        cn1WhiteDevice = (__bridge void *) view.device;
+    }
+    return cn1White;
+}
+
 static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
         id<MTLBuffer> vbo, JAVA_OBJECT uniforms, int uniformFloats,
         long texturePeer, int texFilter, int texWrap) {
@@ -847,27 +887,7 @@ static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
     if (texturePeer != 0) {
         id<MTLTexture> tex = (__bridge id<MTLTexture>)(void *) texturePeer;
         [enc setFragmentTexture:tex atIndex:0];
-        // One sampler per filter/wrap pair, made once per device: a scene of
-        // sprites draws hundreds of textured quads a frame, and a new sampler
-        // state for each was an allocation per draw.
-        static id<MTLSamplerState> cn1Samplers[4];
-        static void *cn1SamplerDevice = NULL;
-        if (cn1SamplerDevice != (__bridge void *) view.device) {
-            for (int i = 0; i < 4; i++) {
-                cn1Samplers[i] = nil;
-            }
-            cn1SamplerDevice = (__bridge void *) view.device;
-        }
-        int key = (texFilter ? 1 : 0) | (texWrap ? 2 : 0);
-        if (cn1Samplers[key] == nil) {
-            MTLSamplerDescriptor *sd = [[MTLSamplerDescriptor alloc] init];
-            sd.minFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
-            sd.magFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
-            sd.sAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
-            sd.tAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
-            cn1Samplers[key] = [view.device newSamplerStateWithDescriptor:sd];
-        }
-        [enc setFragmentSamplerState:cn1Samplers[key] atIndex:0];
+        [enc setFragmentSamplerState:CN1GL3DSampler(view, texFilter, texWrap) atIndex:0];
     }
 }
 
@@ -902,6 +922,18 @@ void com_codename1_impl_ios_IOSNative_gl3dDrawArrays___long_long_long_int_int_in
     id<MTLBuffer> vbo = (__bridge id<MTLBuffer>)(void *) vboPeer;
     CN1GL3DBindCommon(view, p, vbo, uniforms, uniformFloats, (long) texturePeer, texFilter, texWrap);
     [[view activeEncoder] drawPrimitives:CN1GL3DPrimitive(primitive) vertexStart:0 vertexCount:vertexCount];
+}
+
+void com_codename1_impl_ios_IOSNative_gl3dBindTexture___long_int_long_int_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT index,
+        JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
+    if (contextPeer == 0) return;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    id<MTLRenderCommandEncoder> enc = [view activeEncoder];
+    if (enc == nil) return;
+    id<MTLTexture> tex = texturePeer != 0 ? (__bridge id<MTLTexture>)(void *) texturePeer : CN1GL3DWhite(view);
+    [enc setFragmentTexture:tex atIndex:index];
+    [enc setFragmentSamplerState:CN1GL3DSampler(view, texFilter, texWrap) atIndex:index];
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginShadowPass___long_int_R_boolean(

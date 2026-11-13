@@ -760,6 +760,20 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dDrawArrays___long_long_lo
     c->ctx->Draw((UINT) vertexCount, 0);
 }
 
+// Binds a ShaderMaterial texture at t<index>/s<index> for the next draw; the
+// draw's own bind leaves slots 2 and up alone. A null peer unbinds the slot.
+JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dBindTexture___long_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT index, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
+    CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
+    if (c == NULL || index < 2 || index >= D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT) {
+        return;
+    }
+    CN1D3DTexture* tex = (CN1D3DTexture*) (intptr_t) texturePeer;
+    ID3D11ShaderResourceView* srv = tex != NULL ? tex->srv : NULL;
+    ID3D11SamplerState* samp = cn1D3DSampler(c, texFilter, texWrap);
+    c->ctx->PSSetShaderResources((UINT) index, 1, &srv);
+    c->ctx->PSSetSamplers((UINT) index, 1, &samp);
+}
+
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT size) {
     CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
     if (!c || !c->ctx || !c->activeRtv) return JAVA_FALSE;

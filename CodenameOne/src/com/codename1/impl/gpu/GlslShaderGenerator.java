@@ -26,6 +26,9 @@ import com.codename1.gpu.Environment;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderEmitter;
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
 
 /// Generates portable GLSL ES 1.00 vertex and fragment shader source for a given
 /// `Material` and `VertexFormat`. This is the "engine-managed shader" code path
@@ -46,6 +49,9 @@ import com.codename1.gpu.VertexFormat;
 /// - physically based: `u_pbr` (vec2: metallic, roughness), `u_emissive` (vec3)
 /// - shadows: `u_shadowMatrix` (mat4), `u_shadowMap` (sampler2D, texture unit 1),
 ///   `u_shadow` (vec3: bias, strength, texel size)
+/// - custom shading (`Material.getShader()`): `u_cu` (vec4 array, one entry
+///   per declared uniform, both stages), `u_ct0` to `u_ct3` (sampler2D,
+///   texture units 2 to 5) and `u_time` (float)
 ///
 /// Shadow maps store depth packed into RGBA8 (`packDepth`), so they need no
 /// depth texture or float render target and work on every GLES2 and WebGL1
@@ -118,6 +124,23 @@ public final class GlslShaderGenerator {
         f.toneMap = f.lit && environment != null && environment.isToneMapping();
         f.shadow = f.lit && shadowed && material.isReceiveShadows();
         f.emissive = f.lit && (material.getEmissive() & 0xffffff) != 0;
+        ShaderMaterial sm = material.getShader();
+        if (sm != null) {
+            f.shader = sm;
+            f.hasNormal = hasNormal;
+            f.hasTexcoord = hasTexcoord;
+            f.fragWorld = ShaderEmitter.uses(sm, true, "worldPos") || ShaderEmitter.uses(sm, true, "viewDir");
+            f.fragEye = f.fragWorld || ShaderEmitter.uses(sm, true, "cameraPos");
+            f.fragNormal = hasNormal && ShaderEmitter.uses(sm, true, "worldNormal");
+            f.fragUv = hasTexcoord && ShaderEmitter.uses(sm, true, "uv");
+            f.fragSun = ShaderEmitter.uses(sm, true, "sunDir") || ShaderEmitter.uses(sm, true, "sunColor");
+            f.vertWorld = ShaderEmitter.uses(sm, false, "worldPos");
+            f.vertUv = hasTexcoord && ShaderEmitter.uses(sm, false, "uv");
+            f.vertNormal = hasNormal && ShaderEmitter.uses(sm, false, "normal");
+            f.vertEye = ShaderEmitter.uses(sm, false, "cameraPos");
+            f.vertSun = ShaderEmitter.uses(sm, false, "sunDir") || ShaderEmitter.uses(sm, false, "sunColor");
+            f.time = ShaderEmitter.uses(sm, "time");
+        }
         this.vertexSource = buildVertex(f);
         this.fragmentSource = buildFragment(f);
     }
@@ -149,24 +172,166 @@ public final class GlslShaderGenerator {
         boolean shadow;
         boolean emissive;
         boolean sky;
+        ShaderMaterial shader;
+        boolean hasNormal;
+        boolean hasTexcoord;
+        boolean fragWorld;
+        boolean fragEye;
+        boolean fragNormal;
+        boolean fragUv;
+        boolean fragSun;
+        boolean vertWorld;
+        boolean vertUv;
+        boolean vertNormal;
+        boolean vertEye;
+        boolean vertSun;
+        boolean time;
+
+        boolean world() {
+            return lit || fog || sky || fragWorld;
+        }
+
+        boolean normalVarying() {
+            return lit || fragNormal;
+        }
+
+        boolean uvVarying() {
+            return textured || fragUv;
+        }
+    }
+
+    // custom shading inputs of the vertex stage
+    private static final class VertexInputs implements ShaderEmitter.Inputs {
+        private final Features f;
+
+        VertexInputs(Features f) {
+            this.f = f;
+        }
+
+        public String builtin(String name) { // NOPMD MissingOverride - Java 5 source forbids @Override on an interface method
+            if ("position".equals(name)) {
+                return A_POSITION;
+            }
+            if ("normal".equals(name)) {
+                return f.hasNormal ? A_NORMAL : "vec3(0.0, 1.0, 0.0)";
+            }
+            if ("uv".equals(name)) {
+                return f.hasTexcoord ? A_TEXCOORD : "vec2(0.0)";
+            }
+            if ("worldPos".equals(name)) {
+                return "(u_model * vec4(" + A_POSITION + ", 1.0)).xyz";
+            }
+            return commonBuiltin(name);
+        }
+
+        public String uniform(int slot) { // NOPMD MissingOverride - Java 5 source forbids @Override on an interface method
+            return "u_cu[" + slot + "]";
+        }
+
+        public String sample(int slot, String uv) { // NOPMD MissingOverride - Java 5 source forbids @Override on an interface method
+            // GLES 2 does not promise vertex texture fetch
+            return null;
+        }
+    }
+
+    // custom shading inputs of the fragment stage
+    private static final class FragmentInputs implements ShaderEmitter.Inputs {
+        private final Features f;
+
+        FragmentInputs(Features f) {
+            this.f = f;
+        }
+
+        public String builtin(String name) { // NOPMD MissingOverride - Java 5 source forbids @Override on an interface method
+            if ("worldPos".equals(name)) {
+                return "v_worldPos";
+            }
+            if ("worldNormal".equals(name)) {
+                return f.normalVarying() ? "normalize(v_normal)" : "vec3(0.0, 1.0, 0.0)";
+            }
+            if ("viewDir".equals(name)) {
+                return "normalize(u_eye - v_worldPos)";
+            }
+            if ("uv".equals(name)) {
+                return f.uvVarying() ? "v_texcoord" : "vec2(0.0)";
+            }
+            if ("baseColor".equals(name)) {
+                return "base";
+            }
+            return commonBuiltin(name);
+        }
+
+        public String uniform(int slot) { // NOPMD MissingOverride - Java 5 source forbids @Override on an interface method
+            return "u_cu[" + slot + "]";
+        }
+
+        public String sample(int slot, String uv) { // NOPMD MissingOverride - Java 5 source forbids @Override on an interface method
+            return "texture2D(u_ct" + slot + ", " + uv + ")";
+        }
+    }
+
+    private static String commonBuiltin(String name) {
+        if ("time".equals(name)) {
+            return "u_time";
+        }
+        if ("cameraPos".equals(name)) {
+            return "u_eye";
+        }
+        if ("sunDir".equals(name)) {
+            return "normalize(-u_lightDir)";
+        }
+        if ("sunColor".equals(name)) {
+            return "u_lightColor";
+        }
+        return null;
+    }
+
+    private static void appendCustomUniforms(StringBuilder sb, Features f, boolean fragment) {
+        ShaderMaterial sm = f.shader;
+        if (sm == null) {
+            return;
+        }
+        if (sm.getUniformCount() > 0) {
+            sb.append("uniform vec4 u_cu[").append(sm.getUniformCount()).append("];\n");
+        }
+        if (f.time) {
+            sb.append("uniform float u_time;\n");
+        }
+        if (fragment) {
+            for (int i = 0; i < sm.getTextureCount(); i++) {
+                sb.append("uniform sampler2D u_ct").append(i).append(";\n");
+            }
+        }
     }
 
     private static String buildVertex(Features f) {
-        boolean world = f.lit || f.fog || f.sky;
+        boolean world = f.world();
+        ShaderNode offset = f.shader == null ? null : f.shader.get(ShaderMaterial.Hook.VERTEX_OFFSET);
+        String pos = offset != null ? "pos" : A_POSITION;
         StringBuilder sb = new StringBuilder();
         sb.append("attribute vec3 ").append(A_POSITION).append(";\n");
-        if (f.lit) {
+        if (f.normalVarying() || f.vertNormal) {
             sb.append("attribute vec3 ").append(A_NORMAL).append(";\n");
         }
-        if (f.textured) {
+        if (f.uvVarying() || f.vertUv) {
             sb.append("attribute vec2 ").append(A_TEXCOORD).append(";\n");
         }
         sb.append("uniform mat4 u_mvp;\n");
-        if (world) {
+        if (world || f.vertWorld) {
             sb.append("uniform mat4 u_model;\n");
+        }
+        if (world) {
             sb.append("varying vec3 v_worldPos;\n");
         }
-        if (f.lit) {
+        if (f.vertEye) {
+            sb.append("uniform vec3 u_eye;\n");
+        }
+        if (f.vertSun) {
+            sb.append("uniform vec3 u_lightDir;\n");
+            sb.append("uniform vec3 u_lightColor;\n");
+        }
+        appendCustomUniforms(sb, f, false);
+        if (f.normalVarying()) {
             sb.append("uniform mat4 u_normalMatrix;\n");
             sb.append("varying vec3 v_normal;\n");
         }
@@ -174,47 +339,66 @@ public final class GlslShaderGenerator {
             sb.append("uniform mat4 u_shadowMatrix;\n");
             sb.append("varying vec4 v_shadowPos;\n");
         }
-        if (f.textured) {
+        if (f.uvVarying()) {
             sb.append("varying vec2 v_texcoord;\n");
         }
         sb.append("void main() {\n");
+        if (offset != null) {
+            ShaderEmitter e = new ShaderEmitter(ShaderEmitter.Dialect.GLSL, f.shader, new VertexInputs(f), sb,
+                    "  ", "_v");
+            String o = e.emit(offset);
+            sb.append("  vec3 pos = ").append(A_POSITION).append(" + ").append(o).append(";\n");
+        }
         if (world) {
-            sb.append("  vec4 world = u_model * vec4(").append(A_POSITION).append(", 1.0);\n");
+            sb.append("  vec4 world = u_model * vec4(").append(pos).append(", 1.0);\n");
             sb.append("  v_worldPos = world.xyz;\n");
         }
-        if (f.lit) {
+        if (f.normalVarying()) {
             sb.append("  v_normal = (u_normalMatrix * vec4(").append(A_NORMAL).append(", 0.0)).xyz;\n");
         }
         if (f.shadow) {
             sb.append("  v_shadowPos = u_shadowMatrix * world;\n");
         }
-        if (f.textured) {
+        if (f.uvVarying()) {
             sb.append("  v_texcoord = ").append(A_TEXCOORD).append(";\n");
         }
-        sb.append("  gl_Position = u_mvp * vec4(").append(A_POSITION).append(", 1.0);\n");
+        sb.append("  gl_Position = u_mvp * vec4(").append(pos).append(", 1.0);\n");
         sb.append("}\n");
         return sb.toString();
     }
 
     private static String buildFragment(Features f) {
-        boolean world = f.lit || f.fog || f.sky;
+        boolean world = f.world();
         StringBuilder sb = new StringBuilder();
-        sb.append(f.shadow ? HIGHP : "precision mediump float;\n");
+        // custom graphs (noise, waves) need the precision world space math does
+        sb.append(f.shadow || f.shader != null ? HIGHP : "precision mediump float;\n");
         sb.append("uniform vec4 u_color;\n");
         if (f.textured) {
             sb.append("uniform sampler2D u_texture;\n");
+        }
+        if (f.uvVarying()) {
             sb.append("varying vec2 v_texcoord;\n");
         }
         if (world) {
             sb.append("varying vec3 v_worldPos;\n");
+        }
+        if (world || f.fragEye) {
             sb.append("uniform vec3 u_eye;\n");
         }
-        if (f.lit) {
+        // the sky declares u_lightDir itself
+        if (f.lit || (f.fragSun && !f.sky)) {
             sb.append("uniform vec3 u_lightDir;\n");
             sb.append("uniform vec3 u_lightColor;\n");
+        } else if (f.fragSun) {
+            sb.append("uniform vec3 u_lightColor;\n");
+        }
+        if (f.lit) {
             sb.append("uniform vec3 u_ambient;\n");
+        }
+        if (f.normalVarying()) {
             sb.append("varying vec3 v_normal;\n");
         }
+        appendCustomUniforms(sb, f, true);
         if (f.phong) {
             sb.append("uniform float u_shininess;\n");
         }
@@ -273,12 +457,24 @@ public final class GlslShaderGenerator {
         if (f.textured) {
             sb.append("  base = base * texture2D(u_texture, v_texcoord);\n");
         }
+        String[] hook = emitFragmentHooks(f, sb);
+        if (hook[ShaderMaterial.Hook.BASE_COLOR.ordinal()] != null) {
+            sb.append("  base = ").append(hook[ShaderMaterial.Hook.BASE_COLOR.ordinal()]).append(";\n");
+        }
+        if (hook[ShaderMaterial.Hook.DISCARD.ordinal()] != null) {
+            sb.append("  if (").append(hook[ShaderMaterial.Hook.DISCARD.ordinal()]).append(" > 0.5) {\n");
+            sb.append("    discard;\n  }\n");
+        }
         sb.append("  vec3 rgb = base.rgb;\n");
         if (f.sky) {
             appendSky(sb);
         }
+        String customEmissive = hook[ShaderMaterial.Hook.EMISSIVE.ordinal()];
         if (f.lit) {
             sb.append("  vec3 n = normalize(v_normal);\n");
+            if (hook[ShaderMaterial.Hook.NORMAL.ordinal()] != null) {
+                sb.append("  n = normalize(").append(hook[ShaderMaterial.Hook.NORMAL.ordinal()]).append(");\n");
+            }
             sb.append("  vec3 l = normalize(-u_lightDir);\n");
             sb.append("  float ndotl = max(dot(n, l), 0.0);\n");
             if (f.hemisphere) {
@@ -288,7 +484,8 @@ public final class GlslShaderGenerator {
             }
             sb.append(f.shadow ? "  float shade = shadowAt(n, l);\n" : "  float shade = 1.0;\n");
             if (f.pbr) {
-                appendPbr(sb);
+                appendPbr(sb, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
+                        hook[ShaderMaterial.Hook.ROUGHNESS.ordinal()]);
             } else {
                 sb.append("  rgb = base.rgb * (ambient + u_lightColor * ndotl * shade);\n");
                 if (f.phong) {
@@ -303,9 +500,14 @@ public final class GlslShaderGenerator {
             if (f.emissive) {
                 sb.append("  rgb += u_emissive;\n");
             }
+            if (customEmissive != null) {
+                sb.append("  rgb += ").append(customEmissive).append(";\n");
+            }
             if (f.toneMap) {
                 sb.append("  rgb = aces(rgb * u_exposure);\n");
             }
+        } else if (customEmissive != null) {
+            sb.append("  rgb += ").append(customEmissive).append(";\n");
         }
         if (f.fog) {
             sb.append("  float dist = length(v_worldPos - u_eye);\n");
@@ -317,6 +519,25 @@ public final class GlslShaderGenerator {
         sb.append("  gl_FragColor = vec4(rgb, base.a);\n");
         sb.append("}\n");
         return sb.toString();
+    }
+
+    // Prints every fragment hook as temporaries at the top of main, after the
+    // base colour, and returns the expression of each, by hook ordinal.
+    private static String[] emitFragmentHooks(Features f, StringBuilder sb) {
+        ShaderMaterial.Hook[] all = ShaderMaterial.Hook.values();
+        String[] out = new String[all.length];
+        if (f.shader == null) {
+            return out;
+        }
+        ShaderEmitter e = new ShaderEmitter(ShaderEmitter.Dialect.GLSL, f.shader, new FragmentInputs(f), sb,
+                "  ", "_f");
+        for (int i = 0; i < all.length; i++) {
+            ShaderNode g = f.shader.get(all[i]);
+            if (g != null && all[i].isFragment()) {
+                out[i] = e.emit(g);
+            }
+        }
+        return out;
     }
 
     // Value noise and four octaves of it, for the clouds.
@@ -369,9 +590,12 @@ public final class GlslShaderGenerator {
     // Schlick's Fresnel: the metallic/roughness model glTF assets are authored
     // for. The light colour is scaled by pi so a white light on a white
     // dielectric gives the same brightness as LAMBERT does.
-    private static void appendPbr(StringBuilder sb) {
-        sb.append("  float metallic = u_pbr.x;\n");
-        sb.append("  float rough = u_pbr.y;\n");
+    private static void appendPbr(StringBuilder sb, String metallicHook, String roughHook) {
+        sb.append("  float metallic = ")
+                .append(metallicHook != null ? "clamp(" + metallicHook + ", 0.0, 1.0)" : "u_pbr.x").append(";\n");
+        // below 0.04 the GGX lobe is a sub-pixel spike that aliases
+        sb.append("  float rough = ")
+                .append(roughHook != null ? "clamp(" + roughHook + ", 0.04, 1.0)" : "u_pbr.y").append(";\n");
         sb.append("  vec3 v = normalize(u_eye - v_worldPos);\n");
         sb.append("  vec3 h = normalize(l + v);\n");
         sb.append("  float ndotv = max(dot(n, v), 0.001);\n");

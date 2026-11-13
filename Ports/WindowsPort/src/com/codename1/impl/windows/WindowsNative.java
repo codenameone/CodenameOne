@@ -1140,6 +1140,9 @@ public final class WindowsNative {
             long texturePeer, int texFilter, int texWrap);
 
     /** Starts the shadow pass: binds a size x size R32_FLOAT depth map as the target and clears it; false if it cannot. */
+    /** Binds a ShaderMaterial texture and sampler at slot `index` for the next draw. */
+    public static native void gl3dBindTexture(long contextPeer, int index, long texturePeer, int texFilter,
+            int texWrap);
     public static native boolean gl3dBeginShadowPass(long contextPeer, int size);
     /** Ends the shadow pass and rebinds the scene target and viewport. */
     public static native void gl3dEndShadowPass(long contextPeer);

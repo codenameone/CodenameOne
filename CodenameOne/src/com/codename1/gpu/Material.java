@@ -22,6 +22,8 @@
  */
 package com.codename1.gpu;
 
+import com.codename1.gpu.shader.ShaderMaterial;
+
 /// A declarative description of how a surface should be shaded. The 3D engine is
 /// responsible for translating a material into a platform shader (GLSL on OpenGL
 /// ES and WebGL, Metal Shading Language on iOS); applications never write shader
@@ -61,6 +63,7 @@ public final class Material {
     private int emissive = 0xff000000;
     private boolean receiveShadows = true;
     private boolean castShadows = true;
+    private ShaderMaterial shader;
 
     /// Creates an unlit white material.
     public Material() {
@@ -288,7 +291,33 @@ public final class Material {
     ///
     /// a shader variant cache key
     public String getShaderKey() {
-        return type.name() + (texture != null ? "|tex" : "|notex")
+        String k = type.name() + (texture != null ? "|tex" : "|notex")
                 + (receiveShadows ? "|rs" : "|nrs") + ((emissive & 0xffffff) != 0 ? "|em" : "");
+        return shader == null ? k : k + "|sh:" + shader.getShaderKey();
+    }
+
+    /// Returns the custom shading attached to this material.
+    ///
+    /// #### Returns
+    ///
+    /// the shader, or null for the engine's own
+    public ShaderMaterial getShader() {
+        return shader;
+    }
+
+    /// Attaches custom shading: graphs that replace inputs of the shader the
+    /// material's type selects. The library in `com.codename1.gpu.shaders`
+    /// builds ready made ones.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shader`: the shader, or null for the engine's own
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setShader(ShaderMaterial shader) {
+        this.shader = shader;
+        return this;
     }
 }
