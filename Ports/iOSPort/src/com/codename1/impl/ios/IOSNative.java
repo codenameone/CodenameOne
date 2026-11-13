@@ -323,6 +323,15 @@ public class IOSNative {
     native void nativeUnloadSound(long pool, long sound);
     native void nativeReleaseSoundPool(long pool);
 
+    // ---- real-time PCM output (com.codename1.media.audio.AudioContext), CN1AudioOutput.m ----
+    native long audioOutOpen(int sampleRate, int channels);
+    native int audioOutRate(long handle);
+    native int audioOutWrite(long handle, float[] pcm, int offsetFrames, int frames);
+    native void audioOutStart(long handle);
+    native void audioOutStop(long handle);
+    native void audioOutClose(long handle);
+    native double audioOutLatency(long handle);
+
     native float getVolume();
 
     native void setVolume(float vol);

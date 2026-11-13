@@ -7704,6 +7704,64 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new IOSSoundPool(maxStreams);
     }
 
+    @Override
+    public boolean isAudioOutputSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.audio.AudioOutputPeer openAudioOutput(int sampleRate, int channels,
+            com.codename1.media.audio.AudioRenderCallback callback) {
+        int ch = channels == 1 ? 1 : 2;
+        long h = nativeInstance.audioOutOpen(sampleRate, ch);
+        if (h == 0) {
+            return null;
+        }
+        IOSAudioOutput out = new IOSAudioOutput(h, nativeInstance.audioOutRate(h), ch, callback);
+        out.begin();
+        return out;
+    }
+
+    /// Real-time output backed by CN1AudioOutput.m: the render thread pushes into
+    /// a native ring that an AVAudioSourceNode drains.
+    static final class IOSAudioOutput extends com.codename1.impl.PushAudioOutput {
+        private final long handle;
+
+        IOSAudioOutput(long handle, int rate, int channels, com.codename1.media.audio.AudioRenderCallback cb) {
+            super(rate, channels, cb);
+            this.handle = handle;
+        }
+
+        void begin() {
+            startThread();
+        }
+
+        @Override
+        protected int offer(float[] pcm, int offset, int frames) {
+            return nativeInstance.audioOutWrite(handle, pcm, offset, frames);
+        }
+
+        @Override
+        protected void nativeStart() {
+            nativeInstance.audioOutStart(handle);
+        }
+
+        @Override
+        protected void nativeStop() {
+            nativeInstance.audioOutStop(handle);
+        }
+
+        @Override
+        protected void nativeClose() {
+            nativeInstance.audioOutClose(handle);
+        }
+
+        @Override
+        public double getOutputLatency() {
+            return nativeInstance.audioOutLatency(handle);
+        }
+    }
+
     /// Native low latency sound pool peer backed by CN1SoundPool.m (an AVAudioPlayer
     /// ring per sound). Handles (pool, sound) are native pointers carried as longs.
     class IOSSoundPool implements com.codename1.media.SoundPoolPeer {

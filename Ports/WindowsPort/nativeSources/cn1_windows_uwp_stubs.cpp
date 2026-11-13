@@ -60,6 +60,32 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_audioRecStart___java_lang_Str
 JAVA_VOID com_codename1_impl_windows_WindowsNative_audioRecStop___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
 }
 
+/* cn1_windows_audioout.c: no waveOut on UWP, so AudioContext reports unsupported */
+JAVA_LONG com_codename1_impl_windows_WindowsNative_audioOutOpen___int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT sampleRate, JAVA_INT channels) {
+    return 0;
+}
+
+JAVA_INT com_codename1_impl_windows_WindowsNative_audioOutRate___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    return 0;
+}
+
+JAVA_INT com_codename1_impl_windows_WindowsNative_audioOutWrite___long_float_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT pcm, JAVA_INT offset, JAVA_INT frames) {
+    return 0;
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_audioOutStart___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_audioOutStop___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_audioOutClose___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+}
+
+JAVA_DOUBLE com_codename1_impl_windows_WindowsNative_audioOutLatency___long_R_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    return 0;
+}
+
 /* cn1_windows_camera.cpp */
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraCaptureFrame___int_1ARRAY_R_int_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT outDims) {
     return 0;
