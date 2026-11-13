@@ -73,14 +73,26 @@ class JavaSEAudioOutput implements AudioOutputPeer {
     private void loop() {
         float[] pcm = new float[FRAMES * channels];
         byte[] bytes = new byte[FRAMES * channels * 2];
+        // The line is started and stopped here rather than by start()/stop():
+        // a write blocked on a stopped line would never return, and close()
+        // could not reach line.close().
+        boolean lineOn = false;
         while (alive.get()) {
             if (!running.get()) {
+                if (lineOn) {
+                    line.stop();
+                    lineOn = false;
+                }
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
                     return;
                 }
                 continue;
+            }
+            if (!lineOn) {
+                line.start();
+                lineOn = true;
             }
             callback.render(pcm, FRAMES, channels);
             for (int i = 0, b = 0; i < pcm.length; i++) {
@@ -100,13 +112,11 @@ class JavaSEAudioOutput implements AudioOutputPeer {
     }
 
     public void start() {
-        line.start();
         running.set(true);
     }
 
     public void stop() {
         running.set(false);
-        line.stop();
     }
 
     public void close() {

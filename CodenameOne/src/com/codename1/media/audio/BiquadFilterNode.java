@@ -175,9 +175,9 @@ public final class BiquadFilterNode extends AudioNode {
         double nyquist = sampleRate / 2;
         double norm = f0 / nyquist;
         double a = MathUtil.pow(10, gainDb / 40);
-        if (norm <= 0 || norm >= 1) {
+        if (!(norm > 0 && norm < 1)) { // NOPMD LogicInversion - a NaN frequency takes this path
             double pass;
-            boolean low = norm <= 0;
+            boolean low = !(norm >= 1); // NOPMD LogicInversion - NaN reads as the low edge
             switch (type) {
                 case LOWPASS:
                     pass = low ? 0 : 1;
@@ -199,6 +199,19 @@ public final class BiquadFilterNode extends AudioNode {
                     break;
             }
             c[0] = pass;
+            c[1] = 0;
+            c[2] = 0;
+            c[3] = 0;
+            c[4] = 0;
+            return;
+        }
+        boolean qType = type == BiquadFilterType.BANDPASS || type == BiquadFilterType.NOTCH
+                || type == BiquadFilterType.ALLPASS || type == BiquadFilterType.PEAKING;
+        if (qType && !(qv > 0)) { // NOPMD LogicInversion - NaN takes this path too
+            // The specification's Q <= 0 cases: alpha would be infinite or
+            // negative, so the filter collapses to a constant gain.
+            double gain = type == BiquadFilterType.BANDPASS ? 0 : type == BiquadFilterType.PEAKING ? a * a : 1;
+            c[0] = gain;
             c[1] = 0;
             c[2] = 0;
             c[3] = 0;
@@ -316,7 +329,7 @@ public final class BiquadFilterNode extends AudioNode {
                 x2[ch] = x1[ch];
                 x1[ch] = x;
                 y2[ch] = y1[ch];
-                if (Math.abs(y) < 1e-30) {
+                if (!(Math.abs(y) >= 1e-30) || Double.isInfinite(y)) { // NOPMD LogicInversion - NaN resets the state
                     y = 0;
                 }
                 y1[ch] = y;

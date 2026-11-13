@@ -456,7 +456,7 @@ public class UnityGameView extends GameView {
         }
         if (audio != null) {
             if (audio instanceof UnityGraphAudio) {
-                ((UnityGraphAudio) audio).stopAll();
+                ((UnityGraphAudio) audio).close();
             } else if (audio instanceof UnityGameAudio) {
                 ((UnityGameAudio) audio).stopAll();
             }

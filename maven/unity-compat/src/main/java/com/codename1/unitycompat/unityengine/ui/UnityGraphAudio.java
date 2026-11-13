@@ -32,6 +32,7 @@ import com.codename1.media.audio.StereoPannerNode;
 import com.codename1.ui.Display;
 import com.codename1.unitycompat.unityengine.AudioClip;
 import com.codename1.unitycompat.unityengine.AudioOutput;
+import com.codename1.unitycompat.unityengine.UnityRuntime;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -180,11 +181,19 @@ public final class UnityGraphAudio implements AudioOutput {
         s.setOnEnded(new Runnable() {
             @Override
             public void run() {
-                // Only the source still current ends the voice: one stopped
-                // for a seek or a pause has been replaced.
-                if (v.source == s) { // NOPMD CompareObjectsWithEquals
-                    release(voice, v);
-                }
+                // The context reports the end on the EDT, and a port may run
+                // the frame elsewhere: the voice table is the frame's, so the
+                // release is handed to it.
+                UnityRuntime.callInFrame(new Runnable() {
+                    @Override
+                    public void run() {
+                        // Only the source still current ends the voice: one
+                        // stopped for a seek or a pause has been replaced.
+                        if (v.source == s) { // NOPMD CompareObjectsWithEquals
+                            release(voice, v);
+                        }
+                    }
+                });
             }
         });
         v.source = s;
@@ -356,5 +365,15 @@ public final class UnityGraphAudio implements AudioOutput {
             stop(((Integer) keys.get(i)).intValue());
         }
         fallback.stopAll();
+    }
+
+    /// Silences everything and closes the context, releasing its device
+    /// stream and render thread, for a view that is taken away.
+    public void close() {
+        stopAll();
+        if (context != null) {
+            context.close();
+            context = null;
+        }
     }
 }

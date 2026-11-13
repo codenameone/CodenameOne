@@ -126,6 +126,10 @@ public final class AudioContext extends BaseAudioContext {
     ///
     /// seconds, or 0 when unknown
     public double getOutputLatency() {
+        // A closed peer may already have freed its native handle.
+        if (getState() == AudioContextState.CLOSED) {
+            return 0;
+        }
         return peer.getOutputLatency();
     }
 

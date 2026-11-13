@@ -852,4 +852,39 @@ class AudioGraphTest extends UITestBase {
         Assertions.assertNull(c.decodeAudioData(wav(2, 1, 8000, 4, new byte[4])));
         Assertions.assertNull(c.decodeAudioData(null));
     }
+
+    @FormTest
+    void eventInsertedBeforeARampMovesTheRampsStart() {
+        OfflineAudioContext c = ctx(1, 2048);
+        ConstantSourceNode s = c.createConstantSource();
+        AudioParam p = s.getOffset();
+        p.setValueAtTime(0, 0).linearRampToValueAtTime(1, 2000 / SR);
+        p.setValueAtTime(0.5f, 1000 / SR);
+        s.connect(c.getDestination());
+        s.start();
+        float[] d = c.startRendering().getChannelData(0);
+        Assertions.assertEquals(0.75f, d[1500], 1e-3f);
+    }
+
+    @FormTest
+    void biquadWithZeroOrNegativeQStaysFinite() {
+        BiquadFilterType[] types = {BiquadFilterType.BANDPASS, BiquadFilterType.NOTCH,
+                BiquadFilterType.ALLPASS, BiquadFilterType.PEAKING};
+        for (BiquadFilterType t : types) {
+            for (float q : new float[] {0f, -1f}) {
+                OfflineAudioContext c = ctx(1, 1024);
+                OscillatorNode o = c.createOscillator();
+                BiquadFilterNode f = c.createBiquadFilter();
+                f.setType(t);
+                f.getQ().setValue(q);
+                o.connect(f);
+                f.connect(c.getDestination());
+                o.start();
+                float[] d = c.startRendering().getChannelData(0);
+                for (int i = 0; i < d.length; i++) {
+                    Assertions.assertFalse(Float.isNaN(d[i]) || Float.isInfinite(d[i]), t + " Q=" + q + " at " + i);
+                }
+            }
+        }
+    }
 }

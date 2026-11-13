@@ -42,7 +42,8 @@ import java.util.concurrent.atomic.AtomicLong;
 /// Blackman windowed FFT of the newest [#getFftSize()] samples, smoothed over
 /// time and converted to decibels, as the specification defines it.
 ///
-/// The getters may be called from any thread. With a real-time
+/// Call the getters from one thread, normally the EDT: the spectrum getters
+/// share their working arrays. With a real-time
 /// [AudioContext] the render thread keeps writing while they copy, so a copy
 /// is the latest audio at the moment it was taken; it is meant for drawing,
 /// not for sample-exact measurement, which belongs to an [OfflineAudioContext].

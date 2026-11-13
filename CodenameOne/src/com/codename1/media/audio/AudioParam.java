@@ -381,7 +381,11 @@ public final class AudioParam {
         }
         for (int k = 0; k < ev.length; k++) {
             Event e = ev[k];
-            if (e.t0Fixed) {
+            // An event's start follows its predecessor, so it is worked out
+            // again whenever one is inserted before it. Only the first
+            // event keeps what it had: its predecessor may have been pruned
+            // as past, and the start it gave is what the ramp still needs.
+            if (k == 0 && e.t0Fixed) {
                 continue;
             }
             if (k == 0) {

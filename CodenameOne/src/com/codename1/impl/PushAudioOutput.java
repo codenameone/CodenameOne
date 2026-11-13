@@ -101,10 +101,10 @@ public abstract class PushAudioOutput implements AudioOutputPeer {
         return 1;
     }
 
-    /// Starts or resumes the device.
+    /// Starts or resumes the device; called on the render thread.
     protected abstract void nativeStart();
 
-    /// Pauses the device, keeping what is queued.
+    /// Pauses the device, keeping what is queued; called on the render thread.
     protected abstract void nativeStop();
 
     /// Releases the device; called once, on the render thread, after it stops.
@@ -112,14 +112,27 @@ public abstract class PushAudioOutput implements AudioOutputPeer {
 
     private void loop() {
         float[] pcm = new float[FRAMES * channels];
+        // The device is started and paused here, between offers, never from
+        // the caller's thread: an offer that blocks on a paused device (an
+        // AudioTrack write) would otherwise wait for a play() that never
+        // comes, and close() could not reach nativeClose().
+        boolean deviceOn = false;
         while (alive.get()) {
             if (!running.get()) {
+                if (deviceOn) {
+                    nativeStop();
+                    deviceOn = false;
+                }
                 sleep(10);
                 continue;
             }
+            if (!deviceOn) {
+                nativeStart();
+                deviceOn = true;
+            }
             callback.render(pcm, FRAMES, channels);
             int done = 0;
-            while (done < FRAMES && alive.get()) {
+            while (done < FRAMES && alive.get() && running.get()) {
                 int n = offer(pcm, done, FRAMES - done);
                 if (n <= 0) {
                     sleep(idleSleepMillis());
@@ -141,14 +154,12 @@ public abstract class PushAudioOutput implements AudioOutputPeer {
 
     @Override
     public void start() {
-        nativeStart();
         running.set(true);
     }
 
     @Override
     public void stop() {
         running.set(false);
-        nativeStop();
     }
 
     @Override

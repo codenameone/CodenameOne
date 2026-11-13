@@ -59,6 +59,11 @@ public final class DelayNode extends AudioNode {
         delayTime = new AudioParam(context, "delayTime", 0f, 0f, (float) maxDelayTime,
                 AutomationRate.A_RATE, false);
         ringSize = (int) Math.ceil(maxDelayTime * context.getSampleRate()) + 2 * BaseAudioContext.RENDER_QUANTUM + 2;
+        // Mono and stereo rings are made here, on the caller's thread, so the
+        // renderer never allocates one for the usual layouts; a delay fed
+        // more than two channels allocates the rest on first use.
+        ring[0] = new float[ringSize];
+        ring[1] = new float[ringSize];
     }
 
     /// The delay in seconds, 0 by default, up to the maximum; an audio rate
