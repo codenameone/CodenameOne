@@ -1455,12 +1455,22 @@ never failed there. They now run:
 - **Nightly on master**, each with exactly `cron: '11 0 * * *'` -- off the top
   of the hour, where GitHub delays and may drop scheduled runs. No `push`
   trigger: a red master push went unread.
-- **`nightly-watchdog.yml`** (07:30 UTC) finds every workflow carrying exactly
+- **`nightly-watchdog.yml`** (07:30, 13:30 and 19:30 UTC -- GitHub starts the
+  crons hours late) finds every workflow carrying exactly
   that uncommented cron, judges its newest scheduled run (the previous
   completed one while a run is still going), and keeps one issue, "Nightly
   CI failures", open and assigned to `vars.NIGHTLY_ALERT_ASSIGNEE` (default
   `shai-almog`) until a night where every suite finished green. A suite with
   no scheduled run in 30 hours is reported too.
+
+- **The samples' nightly iOS builds are one workflow**,
+  `samples-ios-nightly.yml`: the port built once, then two macOS shards build
+  every sample, one step each (`scripts/ci/build-sample-ios-simulator.sh`).
+  Each sample's own iOS jobs carry `if: github.event_name != 'schedule'` and
+  still run on its pull requests. Two macOS jobs per sample, all at 00:11, hit
+  the macOS concurrency cap and jobs timed out without ever getting a runner.
+  A new sample with an iOS build goes into that workflow too; the watchdog
+  names the failing step, so the alert still says which sample broke.
 
 Moving a suite to the nightly is therefore one cron line and a narrowed
 `paths`; there is no list to update. Keep on pull requests whatever has

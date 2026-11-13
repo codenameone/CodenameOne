@@ -22,8 +22,13 @@ name: Nightly watchdog
 
 on:
   schedule:
-    # Late enough for the slowest suite (the iOS sample builds) to finish.
+    # GitHub starts the 00:11 crons late -- 2026-11-12 they started ~07:00 and
+    # their macOS jobs queued until ~19:00 -- so one morning check judged most
+    # suites by the night BEFORE. Three checks a day; only the first comment of
+    # a given failure set pings (see the comment step below).
     - cron: '30 7 * * *'
+    - cron: '30 13 * * *'
+    - cron: '30 19 * * *'
   workflow_dispatch:
 
 permissions:
@@ -72,6 +77,34 @@ jobs:
             // recent enough to prove the schedule still fires.
             const STALE_MS = 30 * 3600 * 1000;
             const GREEN = ['success', 'skipped', 'neutral'];
+
+            // Which jobs, and which steps in them, failed: one workflow can
+            // carry many suites (samples-ios-nightly.yml builds every sample in
+            // its own step), so "failure" alone does not say what broke. A job
+            // that ran no step never got a runner -- it sat in the macOS queue
+            // until its timeout -- which is capacity, not code, and is said so.
+            async function failedParts(run) {
+              let jobs;
+              try {
+                jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                  owner, repo, run_id: run.id, filter: 'latest', per_page: 100,
+                });
+              } catch (e) {
+                return '';
+              }
+              const parts = [];
+              for (const job of jobs) {
+                if (GREEN.includes(job.conclusion)) continue;
+                const ran = (job.steps || []).filter(s => s.conclusion && s.conclusion !== 'skipped');
+                if (ran.length === 0) {
+                  parts.push(`${job.name} (never got a runner; queued until ${job.conclusion})`);
+                  continue;
+                }
+                const bad = ran.filter(s => !GREEN.includes(s.conclusion)).map(s => s.name);
+                parts.push(bad.length ? `${job.name}: ${bad.join(', ')}` : `${job.name} (${job.conclusion})`);
+              }
+              return parts.length ? ` -- ${parts.join('; ')}` : '';
+            }
             const problems = [];
             const running = [];
             const awaiting = [];
@@ -127,7 +160,7 @@ jobs:
                 cancelled.push(`- [\`${file}\`](${done.html_url}): cancelled`);
               } else if (done && !GREEN.includes(done.conclusion)
                   && Date.now() - new Date(done.created_at).getTime() <= 2 * STALE_MS) {
-                problems.push(`- [\`${file}\`](${done.html_url}): ${done.conclusion}`);
+                problems.push(`- [\`${file}\`](${done.html_url}): ${done.conclusion}${await failedParts(done)}`);
               }
             }
 
@@ -176,9 +209,12 @@ jobs:
             if (!issue) {
               await github.rest.issues.create({ owner, repo, title, body, assignees });
             } else {
+              // A comment, not only a body edit, so a failing night notifies --
+              // but only when the failure set changed since the body last said
+              // it: three checks a day must not ping three times for one night.
+              // A manual re-check updates the body without a ping.
+              const changed = problems.some(p => !(issue.body || '').includes(p));
               await github.rest.issues.update({ owner, repo, issue_number: issue.number, body });
-              // A comment, not only a body edit, so every failing night notifies;
-              // a manual re-check the same day updates the body without a ping.
-              if (context.eventName === 'schedule') await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+              if (context.eventName === 'schedule' && changed) await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
                 body: `@${process.env.ALERT_ASSIGNEE} still failing:\n\n${problems.join('\n')}` });
             }

@@ -1,0 +1,170 @@
+name: Sample apps iOS (nightly)
+
+# The nightly iOS simulator build of every full-stack sample, in one workflow.
+#
+# Each sample's own workflow used to build the iOS port and then the app, two
+# macOS jobs per sample, all released at 00:11 UTC with every other nightly. That
+# was ~20 macOS jobs from the samples alone against the account's macOS
+# concurrency cap; the queue took hours to drain and jobs were cancelled at
+# their timeout without ever getting a runner (parley, 2026-11-12). Here the
+# port is built ONCE and two shards build the apps in turn on warm runners:
+# three macOS jobs a night instead of ~20. An app build is ~10 minutes, so a
+# shard of five finishes well inside its timeout.
+#
+# The samples' own workflows still build iOS on a pull request and on a manual
+# dispatch; only their scheduled run leaves it to this one. A sample added to
+# the nightly needs a step here (and in a shard's list) as well as the
+# `if: github.event_name != 'schedule'` on its own iOS jobs.
+#
+# Every sample is its own step, and every step runs even after an earlier one
+# failed, so one broken sample does not hide the others; nightly-watchdog.yml
+# names the failing step, so the alert says which sample broke.
+
+on:
+  schedule:
+    - cron: '11 0 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/samples-ios-nightly.yml'
+      - 'scripts/ci/build-sample-ios-simulator.sh'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-port:
+    uses: ./.github/workflows/_build-ios-port.yml
+
+  ios:
+    name: iOS builds (${{ matrix.shard }})
+    needs: build-ios-port
+    runs-on: macos-15
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Watch-app samples (dash, pulse, splat, slate) are the slow ones;
+          # they are split across the shards.
+          - shard: a
+            samples: ' parley savor dash pulse bastion '
+          - shard: b
+            samples: ' wayline reel splat slate skirmish '
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Download built CN1 + iOS port bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: cn1-built-bundle
+          path: ${{ runner.temp }}
+      - name: Restore built CN1 + iOS port tree
+        run: |
+          set -euo pipefail
+          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # One step per sample. `!cancelled()` keeps building the rest after one
+      # fails; the per-step timeout is the old per-sample budget (25 minutes to
+      # generate, 20 to build).
+      - name: 'iOS: parley'
+        if: ${{ !cancelled() && contains(matrix.samples, ' parley ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/parley
+        timeout-minutes: 45
+      - name: 'iOS: savor'
+        if: ${{ !cancelled() && contains(matrix.samples, ' savor ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/savor
+        timeout-minutes: 45
+      - name: 'iOS: dash'
+        if: ${{ !cancelled() && contains(matrix.samples, ' dash ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/dash
+        timeout-minutes: 45
+      - name: 'iOS: pulse'
+        if: ${{ !cancelled() && contains(matrix.samples, ' pulse ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/pulse
+        timeout-minutes: 45
+      - name: 'iOS: bastion'
+        if: ${{ !cancelled() && contains(matrix.samples, ' bastion ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/bastion
+        timeout-minutes: 45
+      - name: 'iOS: wayline'
+        if: ${{ !cancelled() && contains(matrix.samples, ' wayline ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/wayline
+        timeout-minutes: 45
+      - name: 'iOS: reel'
+        if: ${{ !cancelled() && contains(matrix.samples, ' reel ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/reel
+        timeout-minutes: 45
+      - name: 'iOS: splat'
+        if: ${{ !cancelled() && contains(matrix.samples, ' splat ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/splat
+        timeout-minutes: 45
+      - name: 'iOS: slate'
+        if: ${{ !cancelled() && contains(matrix.samples, ' slate ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/slate
+        timeout-minutes: 45
+      - name: 'iOS: skirmish'
+        if: ${{ !cancelled() && contains(matrix.samples, ' skirmish ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/skirmish
+        timeout-minutes: 45
