@@ -508,35 +508,57 @@ def _test(n, axis, test, env):
         return k == "c"
     if kind == "pi":
         return k == "p" and (test[1] is None or n._xtarget == test[1])
+    # The tag is compared in its Clark form, "{uri}local", in place: splitting
+    # it made two strings and a tuple for every node a step visited.
     if axis == "attribute":
         if k != "a":
             return False
-        uri, local = _split(n.name)
+        tag = n.name
     else:
         if k != "e":
             return False
-        uri, local = _split(n._xtag)
+        tag = n._xtag
     if kind == "uri":
-        return uri == test[1] and (test[2] == "*" or local == test[2])
+        return _named(tag, test[1], test[2])
     prefix, lname, anyns = test[1], test[2], test[3]
     if prefix is not None and prefix != "xml" and prefix not in env.namespaces:
         raise XPathEvalError("Undefined namespace prefix")
-    if lname != "*" and lname != local:
-        return False
     if anyns:
-        return True
+        return lname == "*" or _local_is(tag, lname)
     if prefix is None:
         if lname == "*":
             return True
         want = env.default_ns if axis != "attribute" else None
-        return uri == want
-    if prefix == "xml":
+    elif prefix == "xml":
         want = "http://www.w3.org/XML/1998/namespace"
     else:
         want = env.namespaces.get(prefix)
         if want is None:
             raise XPathEvalError("Undefined namespace prefix")
-    return uri == want
+    return _named(tag, want, lname)
+
+
+def _named(tag, uri, local):
+    """Whether the Clark-form `tag` is in namespace `uri` (None for none)
+    with local name `local` ("*" for any), as _split(tag) == (uri, local)."""
+    if uri is None:
+        if tag[:1] == "{":
+            return False
+        return local == "*" or tag == local
+    lu = len(uri)
+    if len(tag) < lu + 2 or tag[0] != "{" or tag[lu + 1] != "}" or not tag.startswith(uri, 1):
+        return False
+    if local == "*":
+        return True
+    return len(tag) == lu + 2 + len(local) and tag.endswith(local)
+
+
+def _local_is(tag, local):
+    """Whether the local part of the Clark-form `tag` is `local`."""
+    if tag[:1] != "{":
+        return tag == local
+    n = len(tag) - len(local)
+    return n >= 2 and tag[n - 1] == "}" and tag.endswith(local) and tag.index("}") == n - 1
 
 
 class Env:
