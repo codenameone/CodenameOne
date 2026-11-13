@@ -538,6 +538,35 @@ def _test(n, axis, test, env):
     return _named(tag, want, lname)
 
 
+def _exact_name(axis, test, env):
+    """The one Clark-form tag an element must have to pass `test` on a
+    non-attribute axis, resolved once per step instead of per node; None
+    when the test is not a single name or its prefix does not resolve (the
+    general path, which raises where _test raises)."""
+    if axis == "attribute":
+        return None
+    kind = test[0]
+    if kind == "uri":
+        uri, local = test[1], test[2]
+    elif kind == "name":
+        prefix, local, anyns = test[1], test[2], test[3]
+        if anyns:
+            return None
+        if prefix is None:
+            uri = env.default_ns
+        elif prefix == "xml":
+            uri = "http://www.w3.org/XML/1998/namespace"
+        else:
+            uri = env.namespaces.get(prefix)
+            if uri is None:
+                return None
+    else:
+        return None
+    if local == "*":
+        return None
+    return local if uri is None else "{" + uri + "}" + local
+
+
 def _named(tag, uri, local):
     """Whether the Clark-form `tag` is in namespace `uri` (None for none)
     with local name `local` ("*" for any), as _split(tag) == (uri, local)."""
@@ -685,9 +714,13 @@ def _eval_path(e, node, pos, size, env):
         nodes = [node]
     for axis, test, preds in e[3]:
         with_text = test[0] in ("text", "node")
+        exact = _exact_name(axis, test, env)
         out = []
         for n in nodes:
-            cand = [c for c in _axis(n, axis, with_text) if _test(c, axis, test, env)]
+            if exact is not None:
+                cand = [c for c in _axis(n, axis, False) if c._xkind == "e" and c._xtag == exact]
+            else:
+                cand = [c for c in _axis(n, axis, with_text) if _test(c, axis, test, env)]
             for p in preds:
                 cand = _apply_pred(cand, p, env)
             out.extend(cand)
