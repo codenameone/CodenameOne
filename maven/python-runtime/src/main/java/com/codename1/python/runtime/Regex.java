@@ -144,6 +144,19 @@ final class Regex {
         boolean[] firstAscii = NO_ASCII;
         /// Whether [#first] holds an assertion, which the table cannot answer.
         boolean firstAt;
+        /// A program that is one character test, or one greedy repeat of
+        /// one, and then MATCH (`[\t ]+`, `` `+ ``, `[&<]`, `\n{3,}`): a
+        /// search is the skip to its first character and one span, with no
+        /// interpreter, register fill or stack. Null otherwise.
+        Op solo;
+        /// A character test every match passes, whatever path it takes
+        /// (the `-` of `(\s|^)(-+(?:\s|$))`, the `#` of the heading
+        /// escape), or null. A search over a text with none of it at or
+        /// after the start fails at once; markdownify runs four such
+        /// escapes over every text node, and most nodes contain none.
+        Op need;
+        /// [#need] answered per ASCII char.
+        boolean[] needAscii = NO_ASCII;
         /// The text view, registers and backtracking stacks of the last run,
         /// handed back for the next one: a route table or a tokenizer runs
         /// one pattern per request, and these were most of what a run
@@ -170,6 +183,13 @@ final class Regex {
         final Ints stack = new Ints();
         final Ints trail = new Ints();
         int[] regs = NO_INTS;
+        /// [Prog#need]: whether the scan below is for this hold's text (a
+        /// scratch is held over one text, from [#acquire] to [#release]),
+        /// the offset it began at, and the first needed char at or after it,
+        /// -1 for none. A loop over one text scans it once.
+        boolean needValid;
+        int needFrom;
+        int needAt;
     }
 
     static PyModule module() {
@@ -192,6 +212,14 @@ final class Regex {
                     for (int c = 0; c < 128; c++) {
                         p.firstAscii[c] |= one(op, c);
                     }
+                }
+            }
+            p.solo = solo(p);
+            p.need = need(p.ops, p.first);
+            if (p.need != null) {
+                p.needAscii = new boolean[128];
+                for (int c = 0; c < 128; c++) {
+                    p.needAscii[c] = one(p.need, c);
                 }
             }
             return p;
@@ -226,6 +254,134 @@ final class Regex {
                 (int) Py.index(a[2]), (int) Py.index(a[3])))
                 .with4((a0, a1, a2, a3) -> findall(prog(a0), Py.toStr(a1), (int) Py.index(a2), (int) Py.index(a3))));
         return m;
+    }
+
+    /// See `Prog.solo`.
+    private static Op solo(Prog p) {
+        Op[] ops = p.ops;
+        if (ops == null || ops.length != 2 || ops[1].k != MATCH || p.groups != 0 || p.marks != 0 || p.first == null || p.firstAt) {
+            return null;
+        }
+        Op op = ops[0];
+        if (op.k == CHAR || op.k == SET) {
+            return op;
+        }
+        if (op.k == REPEAT_ONE && op.lo >= 1 && op.one != null && (op.one.k == CHAR || op.one.k == SET)) {
+            return op;
+        }
+        return null;
+    }
+
+    /// See `Prog.need`: the first CHAR or SET test (alone, or as a repeat
+    /// of at least one) that MATCH cannot be reached without, and that the
+    /// first-character skip does not already ask for.
+    private static Op need(Op[] ops, Op[] first) {
+        for (int pc = 0; pc < ops.length; pc++) {
+            Op op = ops[pc];
+            Op test = op.k == CHAR || op.k == SET ? op
+                    : (op.k == REPEAT_ONE || op.k == MIN_REPEAT_ONE) && op.lo >= 1 ? op.one : null;
+            if (test == null || test.k != CHAR && test.k != SET || isFirst(first, test)) {
+                continue;
+            }
+            int r = reachesMatch(ops, pc);
+            if (r < 0) {
+                return null;
+            }
+            if (r == 0) {
+                return test;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isFirst(Op[] first, Op test) {
+        if (first != null) {
+            for (Op f : first) {
+                if (f == test) { //NOPMD CompareObjectsWithEquals - the same op of this program
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// Whether MATCH is reachable from the start without passing `avoid`:
+    /// 1 yes, 0 no, -1 when the program has an op whose flow is not
+    /// modelled here.
+    private static int reachesMatch(Op[] ops, int avoid) {
+        boolean[] seen = new boolean[ops.length];
+        int[] work = new int[2 * ops.length + 2];
+        int n = 0;
+        work[n++] = 0;
+        while (n > 0) {
+            int pc = work[--n];
+            if (pc < 0 || pc >= ops.length) {
+                return -1;
+            }
+            if (pc == avoid || seen[pc]) {
+                continue;
+            }
+            seen[pc] = true;
+            Op op = ops[pc];
+            switch (op.k) {
+                case MATCH:
+                    return 1;
+                case SPLIT:
+                    work[n++] = op.a;
+                    work[n++] = op.b;
+                    break;
+                case JMP:
+                    work[n++] = op.a;
+                    break;
+                case PROGRESS:
+                case GROUPREF_EXISTS:
+                    work[n++] = op.b;
+                    work[n++] = pc + 1;
+                    break;
+                case CHAR:
+                case CHARI:
+                case ANY:
+                case ANYALL:
+                case SET:
+                case AT:
+                case SAVE:
+                case MARK:
+                case BACKREF:
+                case LOOK:
+                case ATOMIC:
+                case REPEAT_ONE:
+                case MIN_REPEAT_ONE:
+                    work[n++] = pc + 1;
+                    break;
+                default:
+                    return -1;
+            }
+        }
+        return 0;
+    }
+
+    /// Whether a char of [Prog#need] is at or after `start` and before
+    /// `endpos`; the scan is kept in `sc` for the next run over the text.
+    private static boolean needed(Op op, boolean[] f, Scratch sc, String text, int start, int endpos) {
+        if (!sc.needValid || start < sc.needFrom || sc.needAt >= 0 && start > sc.needAt) {
+            int at = -1;
+            int len = text.length();
+            if (op.k == CHAR && op.c < 0x10000) {
+                at = text.indexOf(op.c, start);
+            } else {
+                for (int i = start; i < len; i++) {
+                    char c = text.charAt(i);
+                    if (c < 128 ? f[c] : one(op, c)) {
+                        at = i;
+                        break;
+                    }
+                }
+            }
+            sc.needValid = true;
+            sc.needFrom = start;
+            sc.needAt = at;
+        }
+        return sc.needAt >= 0 && sc.needAt < endpos;
     }
 
     /// See `Prog.first`.
@@ -1299,6 +1455,7 @@ final class Regex {
     private static void release(Prog p, Scratch sc) {
         sc.text.s = null;
         sc.text.cps = null;
+        sc.needValid = false;
         p.scratch = sc;
     }
 
@@ -1313,7 +1470,7 @@ final class Regex {
             Text tx = sc.text;
             tx.reset(text);
             int n = tx.cps == null ? text.length() : tx.cps.length;
-            int[] regs = count >= 0 ? run(p, sc, text, 0, n, 2, -1) : new int[0];
+            int[] regs = count >= 0 ? run(p, sc, text, 0, n, 2, -1, true) : NO_MATCH;
             if (regs.length == 0) {
                 return Py.tuple(text, Long.valueOf(0));
             }
@@ -1371,7 +1528,7 @@ final class Regex {
             if (e > n || count != 0 && done >= count) {
                 break;
             }
-            regs = run(p, sc, text, e, n, 2, s == e ? e : -1);
+            regs = run(p, sc, text, e, n, 2, s == e ? e : -1, true);
             if (regs.length == 0) {
                 break;
             }
@@ -1474,7 +1631,7 @@ final class Regex {
             int at = pos;
             int forbid = -1;
             while (at <= endpos) {
-                int[] regs = run(p, sc, text, at, endpos, 2, forbid);
+                int[] regs = run(p, sc, text, at, endpos, 2, forbid, true);
                 if (regs.length == 0) {
                     break;
                 }
@@ -1519,7 +1676,7 @@ final class Regex {
             int forbid = -1;
             int n = 0;
             while (at <= endpos && (maxsplit == 0 || n < maxsplit)) {
-                int[] regs = run(p, sc, text, at, endpos, 2, forbid);
+                int[] regs = run(p, sc, text, at, endpos, 2, forbid, true);
                 if (regs.length == 0) {
                     break;
                 }
@@ -1543,6 +1700,48 @@ final class Regex {
         }
     }
 
+    /// A search for a [Prog#solo] program over a text with no surrogate
+    /// pair. Every match is non-empty, so the caller's `forbid` (an empty
+    /// match not to repeat) never rejects one.
+    private static int[] solo(Op op, Op[] first, Prog p, Scratch sc, Text t, int pos, int endpos, boolean keep) {
+        int start = pos;
+        int end = -1;
+        while (start < endpos) {
+            start = skip(first, p, t, start, endpos);
+            if (start < 0 || start >= endpos) {
+                return NO_MATCH;
+            }
+            if (op.k != REPEAT_ONE) {
+                end = start + 1;
+                break;
+            }
+            int limit = op.hi < 0 ? endpos : Math.min(endpos, start + op.hi);
+            int j = span(op.one, t, start, limit);
+            if (j - start >= op.lo) {
+                end = j;
+                break;
+            }
+            // Every later start inside this run has a shorter one.
+            start = j > start ? j : start + 1;
+        }
+        if (end < 0) {
+            return NO_MATCH;
+        }
+        int[] regs;
+        if (keep) {
+            if (sc.regs.length != 3) {
+                sc.regs = new int[3];
+            }
+            regs = sc.regs;
+        } else {
+            regs = new int[3];
+        }
+        regs[0] = start;
+        regs[1] = end;
+        regs[2] = -1;
+        return regs;
+    }
+
     private static String group(Text t, int[] regs, int g) {
         int s = regs[2 * g];
         int e = regs[2 * g + 1];
@@ -1558,8 +1757,26 @@ final class Regex {
     }
 
     private static int[] run(Prog p, Scratch sc, String text, int pos, int endpos, int mode, int forbid) {
+        return run(p, sc, text, pos, endpos, mode, forbid, false);
+    }
+
+    /// The run itself. With `keep` the registers are answered in the
+    /// scratch's own array, valid until the next run: a loop that reads
+    /// them before running again (sub, split, findall) made one array per
+    /// match. Its last slot is then not `lastindex`.
+    private static int[] run(Prog p, Scratch sc, String text, int pos, int endpos, int mode, int forbid,
+            boolean keep) {
         Text t = sc.text;
         t.reset(text);
+        Op needOp = p.need;
+        if (mode == 2 && needOp != null && t.cps == null && !needed(needOp, p.needAscii, sc, text, pos, endpos)) {
+            return NO_MATCH;
+        }
+        Op solo = p.solo;
+        Op[] first = p.first;
+        if (mode == 2 && solo != null && first != null && t.cps == null) {
+            return solo(solo, first, p, sc, t, pos, endpos, keep);
+        }
         int size = 2 * (p.groups + 1);
         boolean full = mode == 1;
         int start = pos;
@@ -1588,6 +1805,9 @@ final class Regex {
             if (end >= 0) {
                 regs[0] = start;
                 regs[1] = end;
+                if (keep) {
+                    return regs;
+                }
                 int[] out = new int[size + 1];
                 System.arraycopy(regs, 0, out, 0, size + 1);
                 return out;
