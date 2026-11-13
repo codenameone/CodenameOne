@@ -252,6 +252,39 @@ class GenerateOpenApiMojoTest {
                 "the tags property should retype to the surviving class; was:\n" + petSrc);
     }
 
+    /// The document a Codename One backend writes for its own routes
+    /// (`OpenApiDocumentTest` in build-engine holds that file to the writer's output)
+    /// generates a client: the server's spec and this generator agree.
+    @Test
+    void generatesAClientFromABackendsOwnDocument(@TempDir Path tmp) throws Exception {
+        java.io.InputStream in = getClass().getResourceAsStream("/openapi/backend-generated.json");
+        assertTrue(in != null, "golden document missing");
+        String json;
+        try {
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[4096];
+            for (int n; (n = in.read(b)) > 0; ) {
+                buf.write(b, 0, n);
+            }
+            json = new String(buf.toByteArray(), StandardCharsets.UTF_8);
+        } finally {
+            in.close();
+        }
+        File out = tmp.toFile();
+        new GenerateOpenApiMojo.Generator(parse(json), "com.example.notes", out, true, true,
+                new SystemStreamLog()).run();
+        File note = new File(out, "com/example/notes/model/NotesNote.java");
+        assertTrue(note.exists(), "expected the Note model at " + note);
+        String noteSrc = readString(note);
+        assertTrue(noteSrc.contains("\"body_text\""), noteSrc);
+        File api = new File(out, "com/example/notes/NotesApi.java");
+        assertTrue(api.exists(), "expected NotesApi.java");
+        String apiSrc = readString(api);
+        assertTrue(apiSrc.contains("@GET(\"/api/notes/{id}\")"), apiSrc);
+        assertTrue(apiSrc.contains("@POST(\"/api/notes\")"), apiSrc);
+        assertTrue(apiSrc.contains("@DELETE(\"/api/notes/{id}\")"), apiSrc);
+    }
+
     @Test
     void parseJavaVersionHandlesShapes() {
         org.junit.jupiter.api.Assertions.assertEquals(8, GenerateOpenApiMojo.parseJavaVersion("1.8"));
