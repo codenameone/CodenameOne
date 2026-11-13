@@ -65,6 +65,28 @@ class ShaderNodeTest {
     }
 
     @Test
+    void scalarsNeverReachASwizzleOrAGeometricFunction() {
+        // GLSL ES 1.00 and Metal reject both on a float
+        ShaderNode t = time();
+        assertSame(t, t.x());
+        assertEquals(ShaderType.VEC3, time().swizzle("xxx").getType());
+        assertThrows(IllegalArgumentException.class, () -> time().swizzle("y"));
+        ShaderNode[] scalar = {time().swizzle("rrr").x(), dot(time(), time()), length(time()),
+                distance(time(), f(1f)), normalize(time()), reflect(time(), f(1f))};
+        for (ShaderNode n : scalar) {
+            ShaderMaterial sm = new ShaderMaterial().set(ShaderMaterial.Hook.ROUGHNESS, n);
+            for (ShaderEmitter.Dialect d : ShaderEmitter.Dialect.values()) {
+                String src = emit(d, sm, ShaderMaterial.Hook.ROUGHNESS);
+                assertFalse(src.matches("(?s).*(dot|length|distance|normalize|reflect)\\(.*"), src);
+                assertFalse(src.contains("time."), src);
+            }
+        }
+        ShaderEvaluator ev = new ShaderEvaluator(null).setInput("time", 0.25f);
+        assertEquals(-0.25f, ev.evaluateFloat(reflect(time(), f(1f))), 1e-6f);
+        assertEquals(0.0625f, ev.evaluateFloat(dot(time(), time())), 1e-6f);
+    }
+
+    @Test
     void scalarOperandsOfMinMaxAreWidened() {
         ShaderMaterial sm = new ShaderMaterial().set(ShaderMaterial.Hook.EMISSIVE, max(sunColor(), f(0.2f)));
         String msl = emit(ShaderEmitter.Dialect.MSL, sm, ShaderMaterial.Hook.EMISSIVE);

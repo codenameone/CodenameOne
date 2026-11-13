@@ -111,20 +111,10 @@ class PortraitStudio {
     }
 
     private static float[] bounds(AnimatedModel m) {
-        float[] b = {1e9f, 1e9f, 1e9f, -1e9f, -1e9f, -1e9f};
-        for (Model p : m.getParts()) {
-            if (!p.isVisible()) {
-                continue;
-            }
-            float[] v = p.getMesh().getVertices().getData();
-            for (int i = 0; i + 2 < v.length; i += 8) {
-                for (int k = 0; k < 3; k++) {
-                    b[k] = Math.min(b[k], v[i + k]);
-                    b[k + 3] = Math.max(b[k + 3], v[i + k]);
-                }
-            }
-        }
-        return b;
+        // getBounds, not the parts' buffers: where the device skins on the
+        // GPU those hold the bind pose, sixteen floats a vertex
+        float[] b = m.getBounds();
+        return b != null ? b : new float[] {-0.5f, 0f, -0.5f, 0.5f, 1f, 0.5f};
     }
 
     private static BufferedImage downsample(BufferedImage src, int ss) {

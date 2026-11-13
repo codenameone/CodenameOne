@@ -44,6 +44,7 @@ public abstract class GraphicsDevice {
     private Mesh passQuad;
     private Material passMaterial;
     private Camera passCamera;
+    private boolean passWarned;
 
     private Camera camera;
     private boolean shadowMapCurrent;
@@ -331,6 +332,9 @@ public abstract class GraphicsDevice {
             passHeight = height;
             return true;
         }
+        if (effects != null && effects.getPassCount() > 0) {
+            passesDropped("this device cannot draw offscreen");
+        }
         return beginPostEffects(effects, width, height);
     }
 
@@ -353,6 +357,7 @@ public abstract class GraphicsDevice {
         for (int i = 0; i < last; i++) {
             int dst = 1 - src;
             if (!passTarget(dst, passWidth, passHeight) || !beginRenderTarget(passTargets[dst], 0xff000000)) {
+                passesDropped("a second render target is not available, so only the last pass runs");
                 break;
             }
             drawPass(effects.getPass(i), passTargets[src]);
@@ -399,6 +404,15 @@ public abstract class GraphicsDevice {
     ///
     /// - `timeSeconds`: a running clock, which animates the film grain
     protected void endPostEffects(float timeSeconds) {
+    }
+
+    // Says once per device that custom passes were left out, so a pass that
+    // never shows is not a silent mystery.
+    private void passesDropped(String why) {
+        if (!passWarned) {
+            passWarned = true;
+            com.codename1.io.Log.p("PostProcess: custom passes skipped: " + why);
+        }
     }
 
     // Makes sure render target `index` exists at the frame size.

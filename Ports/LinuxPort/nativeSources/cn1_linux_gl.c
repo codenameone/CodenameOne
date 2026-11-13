@@ -968,6 +968,10 @@ static void cn1GlQuad(CN1GlContext* c) {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, (void*) 0);
     glDisableVertexAttribArray(1);
     glDisableVertexAttribArray(2);
+    /* a skinned draw left the joint attributes on, still naming its mesh's
+       buffer; with that buffer deleted the quad's draw would fail */
+    glDisableVertexAttribArray(3);
+    glDisableVertexAttribArray(4);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }

@@ -536,6 +536,16 @@ public final class ShaderNode {
         if (n < 1 || n > 4) {
             throw new IllegalArgumentException("A swizzle names 1 to 4 components: " + components);
         }
+        if (type == ShaderType.FLOAT) {
+            // GLSL ES 1.00 and Metal have no swizzle on a scalar: x is the
+            // value itself and xx.. a splat, printed as a constructor
+            for (int i = 0; i < n; i++) {
+                if (componentIndex(components.charAt(i)) != 0) {
+                    throw new IllegalArgumentException("Component " + components.charAt(i) + " is not in a " + type);
+                }
+            }
+            return n == 1 ? this : widen(this, ShaderType.ofComponents(n));
+        }
         StringBuilder canon = new StringBuilder(n);
         for (int i = 0; i < n; i++) {
             int idx = componentIndex(components.charAt(i));
@@ -741,6 +751,10 @@ public final class ShaderNode {
     ///
     /// the normalized vector
     public static ShaderNode normalize(ShaderNode a) {
+        if (a.type == ShaderType.FLOAT) {
+            // Metal's geometric functions take vectors only
+            return a.div(abs(a));
+        }
         return same("normalize", a);
     }
 
@@ -767,6 +781,9 @@ public final class ShaderNode {
     ///
     /// a `FLOAT` node
     public static ShaderNode length(ShaderNode a) {
+        if (a.type == ShaderType.FLOAT) {
+            return abs(a);
+        }
         return call("length", ShaderType.FLOAT, a);
     }
 
@@ -783,6 +800,9 @@ public final class ShaderNode {
     /// a `FLOAT` node
     public static ShaderNode distance(ShaderNode a, ShaderNode b) {
         requireSame(a, b, "distance");
+        if (a.type == ShaderType.FLOAT) {
+            return abs(a.sub(b));
+        }
         return call("distance", ShaderType.FLOAT, a, b);
     }
 
@@ -799,6 +819,9 @@ public final class ShaderNode {
     /// a `FLOAT` node
     public static ShaderNode dot(ShaderNode a, ShaderNode b) {
         requireSame(a, b, "dot");
+        if (a.type == ShaderType.FLOAT) {
+            return a.mul(b);
+        }
         return call("dot", ShaderType.FLOAT, a, b);
     }
 
@@ -832,6 +855,9 @@ public final class ShaderNode {
     /// a node of the type of `i`
     public static ShaderNode reflect(ShaderNode i, ShaderNode n) {
         requireSame(i, n, "reflect");
+        if (i.type == ShaderType.FLOAT) {
+            return i.sub(n.mul(i).mul(n).mul(2f));
+        }
         return call("reflect", i.type, i, n);
     }
 

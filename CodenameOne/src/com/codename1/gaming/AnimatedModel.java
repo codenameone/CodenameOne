@@ -239,8 +239,61 @@ public class AnimatedModel {
     }
 
     /// The models that draw this instance, one per primitive.
+    ///
+    /// Do not measure a pose from their vertex buffers: where the device
+    /// skins on the GPU (`GraphicsDevice.isGpuSkinning`) a skinned part's
+    /// buffer is `VertexFormat.SKINNED` and holds the bind pose, and the pose
+    /// is applied in the vertex stage. `getBounds` measures the pose on every
+    /// device.
     public Model[] getParts() {
         return parts;
+    }
+
+    /// The bounds of the current pose in the model's own space, node
+    /// transforms and skinning applied, over the visible parts:
+    /// `minX, minY, minZ, maxX, maxY, maxZ`. It poses the model first and gives
+    /// the same answer whether the device skins on the GPU or the CPU.
+    ///
+    /// #### Returns
+    ///
+    /// a new array of six floats, or null when no part is visible
+    public float[] getBounds() {
+        pose();
+        float[] b = {Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE,
+            -Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE};
+        VertexBuffer scratch = null;
+        int skinned = -1;
+        for (int i = 0; i < parts.length; i++) {
+            if (hidden[i] || !parts[i].isVisible()) {
+                continue;
+            }
+            GltfScene.Primitive p = scene.getPrimitive(i);
+            VertexBuffer vb = parts[i].getMesh().getVertices();
+            int skin = scene.getNode(p.getNode()).getSkin();
+            if (skinRows != null && p.isSkinned() && skin >= 0) {
+                // the buffer is the bind pose: skin a copy on the CPU to measure it
+                if (skinned != skin) {
+                    computeJoints(scene.getSkin(skin));
+                    skinned = skin;
+                }
+                if (scratch == null || scratch.getVertexCount() < p.getVertexCount()) {
+                    scratch = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, p.getVertexCount());
+                }
+                skin(p, scratch);
+                vb = scratch;
+            }
+            float[] d = vb.getData();
+            int stride = vb.getFormat().getStrideBytes() / 4;
+            int count = p.getVertexCount();
+            for (int v = 0; v < count; v++) {
+                int o = v * stride;
+                for (int k = 0; k < 3; k++) {
+                    b[k] = Math.min(b[k], d[o + k]);
+                    b[k + 3] = Math.max(b[k + 3], d[o + k]);
+                }
+            }
+        }
+        return b[0] > b[3] ? null : b;
     }
 
     /// Adds every part to `view`.

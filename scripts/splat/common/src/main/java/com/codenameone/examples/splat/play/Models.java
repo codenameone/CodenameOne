@@ -19,7 +19,6 @@
 package com.codenameone.examples.splat.play;
 
 import com.codename1.gaming.AnimatedModel;
-import com.codename1.gaming.Model;
 import com.codename1.gpu.GltfLoader;
 import com.codename1.gpu.GltfScene;
 import com.codename1.gpu.GraphicsDevice;
@@ -120,26 +119,10 @@ public final class Models {
     /// The bounds of the current pose, node transforms applied:
     /// `minX, minY, minZ, maxX, maxY, maxZ`.
     static float[] bounds(AnimatedModel m) {
-        m.pose();
-        float[] b = {Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE,
-            -Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE};
-        Model[] parts = m.getParts();
-        for (int p = 0; p < parts.length; p++) {
-            if (!parts[p].isVisible()) {
-                continue;
-            }
-            float[] d = parts[p].getMesh().getVertices().getData();
-            for (int i = 0; i + 2 < d.length; i += 8) {
-                for (int k = 0; k < 3; k++) {
-                    b[k] = Math.min(b[k], d[i + k]);
-                    b[k + 3] = Math.max(b[k + 3], d[i + k]);
-                }
-            }
-        }
-        if (b[0] > b[3]) {
-            return new float[] {-0.5f, 0f, -0.5f, 0.5f, 1f, 0.5f};
-        }
-        return b;
+        // getBounds, not the parts' buffers: where the device skins on the
+        // GPU those hold the bind pose, sixteen floats a vertex
+        float[] b = m.getBounds();
+        return b != null ? b : new float[] {-0.5f, 0f, -0.5f, 0.5f, 1f, 0.5f};
     }
 }
 // end::splat-models[]

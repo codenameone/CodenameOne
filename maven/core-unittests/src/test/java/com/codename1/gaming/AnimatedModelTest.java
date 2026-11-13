@@ -257,6 +257,23 @@ class AnimatedModelTest extends UITestBase {
     }
 
     @Test
+    void boundsAreTheSameOnTheGpuAndCpuPaths() {
+        AnimatedModel cpu = new AnimatedModel(new StubDevice(), GltfLoader.loadScene(armGltf()));
+        AnimatedModel gpu = new AnimatedModel(new GpuSkinDevice(), GltfLoader.loadScene(armGltf()));
+        cpu.play("Bend", false);
+        gpu.play("Bend", false);
+        cpu.update(0.6f);
+        gpu.update(0.6f);
+        float[] c = cpu.getBounds();
+        float[] g = gpu.getBounds();
+        assertNotNull(c);
+        assertNotNull(g);
+        for (int i = 0; i < 6; i++) {
+            assertEquals(c[i], g[i], EPS, "bound " + i);
+        }
+    }
+
+    @Test
     void skinningTakesAtMostMaxJoints() {
         Material m = new Material(Material.Type.LAMBERT);
         assertThrows(IllegalArgumentException.class,
