@@ -296,6 +296,10 @@ public final class Py {
         if (o instanceof String) {
             return o.hashCode();
         }
+        if (o instanceof Double) {
+            // The boxed value is the float object: a NaN hashes by it.
+            return Hashing.ofDouble(((Double) o).doubleValue(), o);
+        }
         return obj(o).hash();
     }
 
@@ -315,6 +319,9 @@ public final class Py {
         }
         if (o instanceof String) {
             return o.hashCode();
+        }
+        if (o instanceof Double) {
+            return Hashing.ofDouble(((Double) o).doubleValue(), o);
         }
         return keyHashSlow(o, role);
     }
