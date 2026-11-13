@@ -90,6 +90,17 @@ public abstract class PushAudioOutput implements AudioOutputPeer {
     /// the frames accepted, 0 when the queue is full
     protected abstract int offer(float[] pcm, int offset, int frames);
 
+    /// Milliseconds the render thread sleeps when [#offer(float[], int, int)]
+    /// took nothing. One by default; a port where an offer is expensive (a call
+    /// to another thread) answers more.
+    ///
+    /// #### Returns
+    ///
+    /// milliseconds
+    protected int idleSleepMillis() {
+        return 1;
+    }
+
     /// Starts or resumes the device.
     protected abstract void nativeStart();
 
@@ -111,7 +122,7 @@ public abstract class PushAudioOutput implements AudioOutputPeer {
             while (done < FRAMES && alive.get()) {
                 int n = offer(pcm, done, FRAMES - done);
                 if (n <= 0) {
-                    sleep(1);
+                    sleep(idleSleepMillis());
                 } else {
                     done += n;
                 }
