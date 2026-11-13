@@ -120,6 +120,42 @@ public abstract class BaseAudioContext {
         return listener;
     }
 
+    /// Creates a curve distortion node with no curve.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public WaveShaperNode createWaveShaper() {
+        return new WaveShaperNode(this);
+    }
+
+    /// Creates a spectrum and waveform analyser.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public AnalyserNode createAnalyser() {
+        return new AnalyserNode(this);
+    }
+
+    /// Creates a compressor with the specification's default settings.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public DynamicsCompressorNode createDynamicsCompressor() {
+        return new DynamicsCompressorNode(this);
+    }
+
+    /// Creates a convolver with no impulse response.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public ConvolverNode createConvolver() {
+        return new ConvolverNode(this);
+    }
+
     /// Creates a 3D panner, equal-power with the inverse distance model until changed.
     ///
     /// #### Returns

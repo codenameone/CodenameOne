@@ -29,6 +29,10 @@
 /// parameters are [AudioParam]s with sample-accurate automation and can be
 /// modulated by other nodes.
 ///
+/// [ConvolverNode] (reverb), [DynamicsCompressorNode], [WaveShaperNode]
+/// (distortion) and [AnalyserNode] (spectrum and waveform for visualisers)
+/// complete the processing set.
+///
 /// [PannerNode] places a source in 3D around the context's [AudioListener],
 /// with the specification's distance models and sound cones. Its
 /// [PanningModel#HRTF] mode renders binaurally for headphones from a

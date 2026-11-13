@@ -562,4 +562,138 @@ class AudioGraphTest extends UITestBase {
         c.startRendering();
         return b.getThreadAllocatedBytes(t) - before;
     }
+
+    @FormTest
+    void convolverMatchesDirectConvolution() {
+        int frames = 1000;
+        OfflineAudioContext c = ctx(1, frames);
+        AudioData x = c.createBuffer(1, frames, SR);
+        AudioData h = c.createBuffer(1, 300, SR);
+        java.util.Random rnd = new java.util.Random(7);
+        for (int i = 0; i < frames; i++) {
+            x.getChannelData(0)[i] = rnd.nextFloat() * 2 - 1;
+        }
+        for (int i = 0; i < 300; i++) {
+            h.getChannelData(0)[i] = (float) (Math.exp(-i / 40.0) * (rnd.nextFloat() - 0.5));
+        }
+        AudioBufferSourceNode s = c.createBufferSource();
+        s.setBuffer(x);
+        ConvolverNode cv = c.createConvolver();
+        cv.setNormalize(false);
+        cv.setBuffer(h);
+        s.connect(cv).connect(c.getDestination());
+        s.start();
+        float[] y = c.startRendering().getChannelData(0);
+        for (int n = 0; n < frames; n++) {
+            double e = 0;
+            for (int k = 0; k <= n && k < 300; k++) {
+                e += x.getChannelData(0)[n - k] * h.getChannelData(0)[k];
+            }
+            Assertions.assertEquals(e, y[n], 1e-4, "frame " + n);
+        }
+    }
+
+    @FormTest
+    void convolverTrueStereoRoutesAndNormalizes() {
+        OfflineAudioContext c = ctx(2, 256);
+        AudioData h = c.createBuffer(4, 4, SR);
+        h.getChannelData(0)[0] = 1;   // L -> L
+        h.getChannelData(1)[1] = 1;   // L -> R, one frame late
+        h.getChannelData(2)[2] = 1;   // R -> L
+        h.getChannelData(3)[3] = 1;   // R -> R
+        AudioData imp = c.createBuffer(2, 1, SR);
+        imp.getChannelData(0)[0] = 1;
+        imp.getChannelData(1)[0] = 2;
+        AudioBufferSourceNode s = c.createBufferSource();
+        s.setBuffer(imp);
+        ConvolverNode cv = c.createConvolver();
+        cv.setNormalize(false);
+        cv.setBuffer(h);
+        s.connect(cv).connect(c.getDestination());
+        s.start();
+        AudioData out = c.startRendering();
+        Assertions.assertEquals(1, out.getChannelData(0)[0], 1e-5);
+        Assertions.assertEquals(2, out.getChannelData(0)[2], 1e-5);
+        Assertions.assertEquals(1, out.getChannelData(1)[1], 1e-5);
+        Assertions.assertEquals(2, out.getChannelData(1)[3], 1e-5);
+        // the spec's scale: rms 0.5 over 4 channels -> 1/0.5 * 0.00125 * 44100/48000 * 0.5
+        Assertions.assertEquals(2 * 0.00125 * 44100 / 48000.0 * 0.5,
+                ConvolverNode.normalizationScale(h), 1e-9);
+    }
+
+    @FormTest
+    void waveShaperInterpolatesTheCurveAndOversamplingStaysClose() {
+        float[] curve = {-1, 0, 1};
+        Assertions.assertEquals(0.5f, WaveShaperNode.shape(curve, 0.5f), 1e-6);
+        Assertions.assertEquals(-1f, WaveShaperNode.shape(curve, -3f), 1e-6);
+        Assertions.assertEquals(1f, WaveShaperNode.shape(curve, 3f), 1e-6);
+        for (OverSampleType t : OverSampleType.values()) {
+            OfflineAudioContext c = ctx(1, 2048);
+            OscillatorNode o = c.createOscillator();
+            o.getFrequency().setValue(200);
+            WaveShaperNode ws = c.createWaveShaper();
+            ws.setCurve(new float[] {-2, 2});   // a gain of 2
+            ws.setOversample(t);
+            o.connect(ws).connect(c.getDestination());
+            o.start();
+            float[] d = c.startRendering().getChannelData(0);
+            float peak = 0;
+            for (int i = 1024; i < 2048; i++) {
+                peak = Math.max(peak, Math.abs(d[i]));
+            }
+            Assertions.assertEquals(2, peak, 0.02, t.toString());
+        }
+    }
+
+    @FormTest
+    void analyserFindsTheToneAndPassesThrough() {
+        float rate = 32768;
+        OfflineAudioContext c = new OfflineAudioContext(1, 4096, rate);
+        OscillatorNode o = c.createOscillator();
+        o.getFrequency().setValue(1024);   // bin 32 of a 1024 point FFT
+        AnalyserNode an = c.createAnalyser();
+        an.setFftSize(1024);
+        an.setSmoothingTimeConstant(0);
+        o.connect(an).connect(c.getDestination());
+        o.start();
+        float[] d = c.startRendering().getChannelData(0);
+        Assertions.assertEquals(Math.sin(2 * Math.PI * 1024 * 100 / rate), d[100], 1e-4);
+        float[] db = new float[an.getFrequencyBinCount()];
+        an.getFloatFrequencyData(db);
+        int best = 0;
+        for (int i = 0; i < db.length; i++) {
+            if (db[i] > db[best]) {
+                best = i;
+            }
+        }
+        Assertions.assertEquals(32, best);
+        // a unit sine through a Blackman window: amplitude 0.42 / 2
+        Assertions.assertEquals(20 * Math.log10(0.21), db[32], 0.1);
+        byte[] bytes = new byte[512];
+        an.getByteFrequencyData(bytes);
+        Assertions.assertEquals(255, bytes[32] & 0xff);
+        float[] td = new float[1024];
+        an.getFloatTimeDomainData(td);
+        Assertions.assertEquals(d[4096 - 1024 + 5], td[5], 1e-6);
+    }
+
+    @FormTest
+    void compressorReducesLoudSignalsAndLeavesQuietOnes() {
+        Assertions.assertEquals(-60, DynamicsCompressorNode.curve(-60, -24, 30, 12), 1e-9);
+        Assertions.assertEquals(-24 + 6 / 12.0, DynamicsCompressorNode.curve(-18 + 0, -24, 0, 12), 1e-9);
+        OfflineAudioContext c = ctx(1, 48000);
+        ConstantSourceNode s = c.createConstantSource();
+        DynamicsCompressorNode comp = c.createDynamicsCompressor();
+        comp.getKnee().setValue(0);
+        comp.getThreshold().setValue(-20);
+        comp.getRatio().setValue(4);
+        s.connect(comp).connect(c.getDestination());
+        s.start();
+        float[] d = c.startRendering().getChannelData(0);
+        // 0 dB in, -20 + 20/4 = -15 dB after the curve, times make-up (15 dB)^0.6
+        double expect = Math.pow(10, (-15 + 15 * 0.6) / 20);
+        Assertions.assertEquals(expect, d[47999], 1e-3);
+        Assertions.assertEquals(-15, comp.getReduction(), 0.01);
+        Assertions.assertEquals(0, d[10], 1e-6);   // still inside the look-ahead
+    }
 }
