@@ -54,7 +54,7 @@ class MongoClientTest {
         doc.put("bin", new byte[] {1, 2, 3});
         doc.put("arr", Arrays.asList(new Object[] {"a", Integer.valueOf(1)}));
         Map sub = new LinkedHashMap();
-        sub.put("k", "é中😀");
+        sub.put("k", "\u00e9\u4e2d\ud83d\ude00");
         doc.put("sub", sub);
         Map back = Bson.decode(Bson.encode(doc));
         assertEquals(new ArrayList(doc.keySet()), new ArrayList(back.keySet()));
