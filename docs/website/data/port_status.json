@@ -1423,27 +1423,27 @@
       "test": "PickerThemeScreenshotTest"
     },
     {
-      "pattern": "MaterialDatePickerTheme_*",
+      "pattern": "MaterialDatePickerTheme*",
       "test": "MaterialDatePickerThemeScreenshotTest"
     },
     {
-      "pattern": "MaterialTimePickerTheme_*",
+      "pattern": "MaterialTimePickerTheme*",
       "test": "MaterialTimePickerThemeScreenshotTest"
     },
     {
-      "pattern": "SchedulerTheme_*",
+      "pattern": "SchedulerTheme*",
       "test": "SchedulerThemeScreenshotTest"
     },
     {
-      "pattern": "SchedulerMonthTheme_*",
+      "pattern": "SchedulerMonthTheme*",
       "test": "SchedulerMonthThemeScreenshotTest"
     },
     {
-      "pattern": "SchedulerResourceTheme_*",
+      "pattern": "SchedulerResourceTheme*",
       "test": "SchedulerResourceThemeScreenshotTest"
     },
     {
-      "pattern": "GanttTheme_*",
+      "pattern": "GanttTheme*",
       "test": "GanttThemeScreenshotTest"
     },
     {
