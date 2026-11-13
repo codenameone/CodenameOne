@@ -160,17 +160,27 @@ final class PyZlib {
         /// Inflates `in`, producing at most `max` bytes; answers
         /// `(output, bytes of in consumed, end of stream reached)`.
         Object inflate(byte[] in, long max, boolean finish) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[CHUNK];
+            // Straight into one array, sized from the input and doubled when
+            // full: no chunk buffer and no stream copying it twice per call.
+            long guess = Math.max(256L, (long) in.length * 4);
+            byte[] out = new byte[(int) Math.min(Math.min(guess, max), Integer.MAX_VALUE - 8)];
+            int size = 0;
             z.setInput(in, 0, in.length, false);
             boolean eof = false;
             while (true) {
-                long room = max - out.size();
+                long room = max - size;
                 if (room <= 0) {
                     break;
                 }
-                int len = (int) Math.min(buf.length, room);
-                z.setOutput(buf, 0, len);
+                if (size == out.length) {
+                    long grown = Math.min(Math.min((long) out.length * 2, max), Integer.MAX_VALUE - 8);
+                    if (grown <= out.length) {
+                        break;
+                    }
+                    out = java.util.Arrays.copyOf(out, (int) grown);
+                }
+                int len = (int) Math.min(out.length - size, room);
+                z.setOutput(out, size, len);
                 int err = z.inflate(finish ? JZlib.Z_FINISH : JZlib.Z_NO_FLUSH);
                 if (err == JZlib.Z_NEED_DICT) {
                     if (dict == null || z.inflateSetDictionary(dict, dict.length) != JZlib.Z_OK) {
@@ -179,7 +189,7 @@ final class PyZlib {
                     continue;
                 }
                 int produced = len - z.availOut;
-                out.write(buf, 0, produced);
+                size += produced;
                 if (err == JZlib.Z_STREAM_END) {
                     eof = true;
                     break;
@@ -188,7 +198,7 @@ final class PyZlib {
                     // With Z_FINISH, zlib answers Z_BUF_ERROR whenever the
                     // output buffer fills before the stream ends, so it only
                     // means "stuck" when this pass produced nothing. Stopping
-                    // on the first one truncated any output above CHUNK bytes.
+                    // on the first one truncated any output above one buffer.
                     if (produced == 0) {
                         break;
                     }
@@ -201,8 +211,11 @@ final class PyZlib {
                     break;
                 }
             }
+            if (size != out.length) {
+                out = java.util.Arrays.copyOf(out, size);
+            }
             int consumed = in.length - z.availIn;
-            return Py.tuple(new PyBytes(out.toByteArray()), PyInt.of(consumed), Py.bool(eof));
+            return Py.tuple(new PyBytes(out), PyInt.of(consumed), Py.bool(eof));
         }
     }
 }
