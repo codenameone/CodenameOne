@@ -6246,6 +6246,16 @@ public final class Display extends CN1Constants {
         return impl.createSoundPool(maxStreams);
     }
 
+    /// Indicates whether a recorder redirected to an `AudioBuffer` captures PCM
+    /// here, which `com.codename1.media.audio.MicrophoneSourceNode` plays.
+    ///
+    /// #### Returns
+    ///
+    /// true where capture to a buffer is implemented
+    public boolean isAudioBufferCaptureSupported() {
+        return impl.isAudioBufferCaptureSupported();
+    }
+
     /// Indicates whether this platform can play a `com.codename1.media.audio.AudioContext`
     /// in real time. Applications call `AudioContext.isSupported()` instead.
     public boolean isAudioOutputSupported() {

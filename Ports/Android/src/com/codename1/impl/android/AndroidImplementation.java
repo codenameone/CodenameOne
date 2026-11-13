@@ -5156,6 +5156,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public boolean isAudioBufferCaptureSupported() {
+        return true;
+    }
+
+    @Override
     public boolean isAudioOutputSupported() {
         return true;
     }

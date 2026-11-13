@@ -17644,6 +17644,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isAudioBufferCaptureSupported() {
+        return true;
+    }
+
+    @Override
     public boolean isAudioOutputSupported() {
         return JavaSEAudioOutput.isAvailable();
     }

@@ -3899,11 +3899,6 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return new WindowsMedia(peer, onCompletion);
     }
 
-    /* ---------------------------------------------------- audio recording
-     * waveIn-backed PCM WAV recorder (cn1_windows_audiorec.c). createMediaRecorder
-     * returns a Media whose play() starts capturing from the default microphone
-     * and pause()/cleanup() finalizes the file. */
-
     @Override
     public boolean isAudioOutputSupported() {
         return true;
@@ -3961,6 +3956,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
             return WindowsNative.audioOutLatency(handle);
         }
     }
+
+    /* ---------------------------------------------------- audio recording
+     * waveIn-backed PCM WAV recorder (cn1_windows_audiorec.c). createMediaRecorder
+     * returns a Media whose play() starts capturing from the default microphone
+     * and pause()/cleanup() finalizes the file. */
 
     @Override
     public Media createMediaRecorder(String path, String mimeType) throws IOException {

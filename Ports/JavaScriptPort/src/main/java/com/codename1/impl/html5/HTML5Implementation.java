@@ -6317,6 +6317,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     @Override
+    public boolean isAudioBufferCaptureSupported() {
+        return true;
+    }
+
+    @Override
     public boolean isAudioOutputSupported() {
         return true;
     }

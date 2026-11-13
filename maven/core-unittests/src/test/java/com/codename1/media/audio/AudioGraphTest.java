@@ -696,4 +696,160 @@ class AudioGraphTest extends UITestBase {
         Assertions.assertEquals(-15, comp.getReduction(), 0.01);
         Assertions.assertEquals(0, d[10], 1e-6);   // still inside the look-ahead
     }
+
+    @FormTest
+    void processorSeesInputsAndAutomatedParameters() {
+        OfflineAudioContext c = ctx(2, 1024);
+        ConstantSourceNode s = c.createConstantSource();
+        s.getOffset().setValue(0.5f);
+        final int[] calls = new int[1];
+        final int[] constantLengths = new int[2];
+        AudioProcessorNode n = c.createAudioProcessor(new AudioProcessor() {
+            @Override
+            public boolean process(float[][][] in, float[][][] out, float[][] p) {
+                calls[0]++;
+                constantLengths[p[0].length == 1 ? 0 : 1]++;
+                for (int i = 0; i < 128; i++) {
+                    float g = p[0].length == 1 ? p[0][0] : p[0][i];
+                    out[0][0][i] = in[0][0][i] * g;
+                    out[0][1][i] = -in[0][0][i] * g;
+                }
+                return true;
+            }
+        }, 1, 1, new int[]{2}, new AudioParamDescriptor[]{new AudioParamDescriptor("gain", 2f)});
+        Assertions.assertTrue(c.isAudioProcessorSupported());
+        Assertions.assertNull(n.getParameter("nope"));
+        n.getParameter("gain").setValueAtTime(2f, 0);
+        n.getParameter("gain").linearRampToValueAtTime(4f, 512 / (double) SR);
+        s.connect(n).connect(c.getDestination());
+        s.start();
+        AudioData out = c.startRendering();
+        Assertions.assertEquals(8, calls[0]);
+        Assertions.assertTrue(constantLengths[0] > 0 && constantLengths[1] > 0);
+        Assertions.assertEquals(1.0, out.getChannelData(0)[0], 1e-6);
+        Assertions.assertEquals(2.0, out.getChannelData(0)[1000], 1e-6);
+        Assertions.assertEquals(-2.0, out.getChannelData(1)[1000], 1e-6);
+        Assertions.assertEquals(1.5, out.getChannelData(0)[256], 1e-3);
+    }
+
+    @FormTest
+    void processorThatThrowsOrStopsGoesSilent() {
+        OfflineAudioContext c = ctx(1, 1024);
+        final int[] calls = new int[2];
+        AudioProcessorNode bad = c.createAudioProcessor(new AudioProcessor() {
+            @Override
+            public boolean process(float[][][] in, float[][][] out, float[][] p) {
+                calls[0]++;
+                out[0][0][0] = 1;
+                throw new IllegalStateException("boom");
+            }
+        }, 1);
+        AudioProcessorNode stop = c.createAudioProcessor(new AudioProcessor() {
+            @Override
+            public boolean process(float[][][] in, float[][][] out, float[][] p) {
+                calls[1]++;
+                java.util.Arrays.fill(out[0][0], 0.25f);
+                return calls[1] < 2;
+            }
+        }, 0, 1, null, null);
+        bad.connect(c.getDestination());
+        stop.connect(c.getDestination());
+        float[] d = c.startRendering().getChannelData(0);
+        Assertions.assertEquals(1, calls[0]);
+        Assertions.assertEquals(2, calls[1]);
+        Assertions.assertTrue(bad.isFailed());
+        Assertions.assertEquals(0.25, d[0], 1e-6);
+        Assertions.assertEquals(0.25, d[255], 1e-6);
+        Assertions.assertEquals(0, d[256], 1e-6);
+    }
+
+    @FormTest
+    void microphoneSourceResamplesCapturedAudio() {
+        OfflineAudioContext c = ctx(1, 4096);
+        com.codename1.media.AudioBuffer capture = new com.codename1.media.AudioBuffer(4800);
+        MicrophoneSourceNode mic = c.createMicrophoneSource(capture);
+        mic.connect(c.getDestination());
+        float[] pcm = new float[1800];
+        for (int f = 0; f < 900; f++) {
+            pcm[2 * f] = f / 1000f;
+            pcm[2 * f + 1] = -f / 1000f;
+        }
+        capture.copyFrom(24000, 2, pcm);
+        float[] d = c.startRendering().getChannelData(0);
+        // stereo captured, mono destination: the average of L and R is 0
+        Assertions.assertEquals(0, d[100], 1e-6);
+        mic.close();
+
+        OfflineAudioContext c2 = ctx(2, 4096);
+        com.codename1.media.AudioBuffer cap2 = new com.codename1.media.AudioBuffer(4800);
+        MicrophoneSourceNode m2 = c2.createMicrophoneSource(cap2);
+        m2.connect(c2.getDestination());
+        cap2.copyFrom(24000, 2, pcm);
+        AudioData out = c2.startRendering();
+        // 24 kHz into 48 kHz: frame i reads capture frame i / 2
+        Assertions.assertEquals(0.1005, out.getChannelData(0)[201], 1e-5);
+        Assertions.assertEquals(-0.1005, out.getChannelData(1)[201], 1e-5);
+        // capture ran out after 900 frames, about 1800 output frames
+        Assertions.assertEquals(0, out.getChannelData(0)[3000], 1e-6);
+    }
+
+    private static byte[] wav(int format, int channels, int rate, int bits, byte[] data) {
+        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+        writeTag(o, "RIFF");
+        le(o, 36 + data.length, 4);
+        writeTag(o, "WAVE");
+        writeTag(o, "LIST");
+        le(o, 3, 4);
+        o.write(1);
+        o.write(2);
+        o.write(3);
+        o.write(0);
+        writeTag(o, "fmt ");
+        le(o, 16, 4);
+        le(o, format, 2);
+        le(o, channels, 2);
+        le(o, rate, 4);
+        le(o, rate * channels * bits / 8, 4);
+        le(o, channels * bits / 8, 2);
+        le(o, bits, 2);
+        writeTag(o, "data");
+        le(o, data.length, 4);
+        o.write(data, 0, data.length);
+        return o.toByteArray();
+    }
+
+    private static void writeTag(java.io.ByteArrayOutputStream o, String t) {
+        for (int i = 0; i < 4; i++) {
+            o.write(t.charAt(i));
+        }
+    }
+
+    private static void le(java.io.ByteArrayOutputStream o, int v, int n) {
+        for (int i = 0; i < n; i++) {
+            o.write((v >> (8 * i)) & 0xff);
+        }
+    }
+
+    @FormTest
+    void decodesWaveFiles() {
+        OfflineAudioContext c = ctx(1, 128);
+        byte[] pcm16 = {0, 0x40, 0, (byte) 0xC0, (byte) 0xFF, 0x7F, 0, (byte) 0x80};
+        AudioData a = c.decodeAudioData(wav(1, 2, 22050, 16, pcm16));
+        Assertions.assertNotNull(a);
+        Assertions.assertEquals(2, a.getNumberOfChannels());
+        Assertions.assertEquals(2, a.getLength());
+        Assertions.assertEquals(22050f, a.getSampleRate(), 0);
+        Assertions.assertEquals(0.5, a.getChannelData(0)[0], 1e-6);
+        Assertions.assertEquals(-0.5, a.getChannelData(1)[0], 1e-6);
+        Assertions.assertEquals(-1.0, a.getChannelData(1)[1], 1e-6);
+        byte[] pcm24 = {0, 0, (byte) 0xC0};
+        Assertions.assertEquals(-0.5, c.decodeAudioData(wav(1, 1, 8000, 24, pcm24)).getChannelData(0)[0], 1e-6);
+        int bits = Float.floatToIntBits(0.75f);
+        byte[] f32 = {(byte) bits, (byte) (bits >> 8), (byte) (bits >> 16), (byte) (bits >> 24)};
+        Assertions.assertEquals(0.75, c.decodeAudioData(wav(3, 1, 8000, 32, f32)).getChannelData(0)[0], 0);
+        Assertions.assertEquals(0.0, c.decodeAudioData(wav(1, 1, 8000, 8, new byte[]{(byte) 128})).getChannelData(0)[0], 0);
+        Assertions.assertNull(c.decodeAudioData(new byte[]{'I', 'D', '3', 4, 0, 0, 0, 0, 0, 0, 0, 0}));
+        Assertions.assertNull(c.decodeAudioData(wav(2, 1, 8000, 4, new byte[4])));
+        Assertions.assertNull(c.decodeAudioData(null));
+    }
 }

@@ -165,6 +165,104 @@ public abstract class BaseAudioContext {
         return new PannerNode(this);
     }
 
+    /// Creates a node running custom Java DSP, the counterpart of
+    /// `new AudioWorkletNode(...)`. There is no module to load: the processor
+    /// is an ordinary object, called on the render thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `processor`: the DSP
+    ///
+    /// - `numberOfInputs`: inputs the node has
+    ///
+    /// - `numberOfOutputs`: outputs the node has
+    ///
+    /// - `outputChannelCount`: channels of each output; null gives every output one
+    ///
+    /// - `parameters`: the parameters to create, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public AudioProcessorNode createAudioProcessor(AudioProcessor processor, int numberOfInputs,
+            int numberOfOutputs, int[] outputChannelCount, AudioParamDescriptor[] parameters) {
+        return new AudioProcessorNode(this, processor, numberOfInputs, numberOfOutputs,
+                outputChannelCount, parameters);
+    }
+
+    /// Creates a one input, one output processor node with one output channel
+    /// per input channel up to two, and no parameters.
+    ///
+    /// #### Parameters
+    ///
+    /// - `processor`: the DSP
+    ///
+    /// - `outputChannels`: the output's channel count
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public AudioProcessorNode createAudioProcessor(AudioProcessor processor, int outputChannels) {
+        return createAudioProcessor(processor, 1, 1, new int[]{outputChannels}, null);
+    }
+
+    /// Whether [#createAudioProcessor] runs custom DSP here. It is always
+    /// true, since the whole graph is rendered by portable code; the method
+    /// exists so code written for the Web Audio worklet's spotty support can ask.
+    ///
+    /// #### Returns
+    ///
+    /// true
+    public boolean isAudioProcessorSupported() {
+        return true;
+    }
+
+    /// Creates a source that plays live capture, the counterpart of
+    /// `createMediaStreamSource` for a microphone. Record with
+    /// `MediaRecorderBuilder.redirectToAudioBuffer(true)` and pass the buffer
+    /// from `MediaManager.getAudioBuffer(path, true, size)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `capture`: the buffer the recorder fills
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public MicrophoneSourceNode createMicrophoneSource(com.codename1.media.AudioBuffer capture) {
+        return new MicrophoneSourceNode(this, capture);
+    }
+
+    /// Whether the platform can capture to an `AudioBuffer`, which
+    /// [#createMicrophoneSource] plays. Recording still needs the user's
+    /// permission, which the recorder asks for.
+    ///
+    /// #### Returns
+    ///
+    /// true where capture to a buffer is implemented
+    public boolean isMicrophoneSourceSupported() {
+        return com.codename1.ui.Display.getInstance().isAudioBufferCaptureSupported();
+    }
+
+    /// Decodes an encoded audio file into an [AudioData] for an
+    /// [AudioBufferSourceNode], the counterpart of `decodeAudioData`.
+    ///
+    /// The decoder is portable code and reads RIFF WAVE (integer PCM of 8 to
+    /// 32 bits, float of 32 or 64 bits). It answers null for anything else;
+    /// convert compressed audio to WAVE ahead of time. The result keeps the
+    /// file's sample rate, and a buffer source resamples it as it plays.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encoded`: the file's bytes
+    ///
+    /// #### Returns
+    ///
+    /// the audio, or null when the format is not one this decoder reads
+    public AudioData decodeAudioData(byte[] encoded) {
+        return WavDecoder.decode(encoded);
+    }
+
     /// Whether [PanningModel#HRTF] renders binaurally on this platform. It is
     /// always true: the head model is portable code. The method exists so code
     /// written for platforms where HRTF might fall back to equal-power can ask.

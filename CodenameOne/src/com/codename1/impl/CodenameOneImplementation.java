@@ -5943,6 +5943,14 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Indicates whether a recorder built with
+    /// `MediaRecorderBuilder.redirectToAudioBuffer(true)` captures PCM on this
+    /// platform. The default returns false; ports that implement the redirect
+    /// override it.
+    public boolean isAudioBufferCaptureSupported() {
+        return false;
+    }
+
     /// Indicates whether this platform can stream rendered PCM to the speaker in
     /// real time, which is what `com.codename1.media.audio.AudioContext` needs.
     /// The default returns false; a port that overrides it must also override
