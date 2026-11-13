@@ -1013,27 +1013,15 @@ final class XmlScan {
             }
             Object cls = lx.classFor(tag);
             Object el = NEW.call1(cls, cls);
-            // The attributes in _Element.__init__'s order, which fixes the
-            // instance dict's order, each stored once with its final value:
-            // the defaults it then overwrote cost a store and, for the
-            // containers, an allocation each per element.
-            X_KIND.set(el, "e");
-            X_TAG.set(el, tag);
-            X_ATTRIB.set(el, attrib);
-            X_NS.set(el, ns);
+            Object parent = open.isEmpty() ? null : open.get(open.size() - 1);
             PyList kids = new PyList();
-            X_KIDS.set(el, kids);
-            X_PARENT.set(el, Py.NONE);
-            X_TEXT.set(el, Py.NONE);
-            X_TAIL.set(el, Py.NONE);
-            X_PFX.set(el, hint);
-            X_LOOKUP.set(el, lx.lookup);
-            X_DOC.set(el, Py.NONE);
-            X_TARGET.set(el, Py.NONE);
-            X_CNT.set(el, lx.cnt);
-            if (!open.isEmpty()) {
-                Object parent = open.get(open.size() - 1);
-                X_PARENT.set(el, parent);
+            if (!fastElement(el, tag, attrib, ns, kids, parent == null ? Py.NONE : parent, hint)) {
+                slowElement(el, tag, attrib, ns, kids, hint);
+                if (parent != null) {
+                    X_PARENT.set(el, parent);
+                }
+            }
+            if (parent != null) {
                 Object pk = KIDS.get(parent);
                 if (!(pk instanceof PyList)) {
                     throw DECLINE;
@@ -1049,6 +1037,82 @@ final class XmlScan {
             if (init != null && init != Py.NONE) { //NOPMD CompareObjectsWithEquals - None is a singleton
                 Py.call(init);
             }
+        }
+
+        /// The names `slowElement` stores, in its order.
+        private static final String[] ELEMENT_NAMES = {"_xkind", "_xtag", "_xattrib", "_xns", "_xkids", "_xparent",
+            "_xtext", "_xtail", "_xpfx", "_xlookup", "_xdoc", "_xtarget", "_xcnt"};
+
+        /// Element class -> the shape its instances have after
+        /// `slowElement`, learnt from the first one and good while no class
+        /// changed (`PyType.version`).
+        private final java.util.HashMap<PyType, Shape> elementShapes = new java.util.HashMap<PyType, Shape>();
+        private int elementVersion = -1;
+
+        /// Installs all of an element's attributes at once: the same values
+        /// `slowElement` stores, as the one shape every element of the class
+        /// ends with. Only for a plain instance with nothing set yet, of a
+        /// class whose first element was built the slow way.
+        private boolean fastElement(Object el, String tag, PyDict attrib, PyDict ns, PyList kids, Object parent,
+                Object hint) {
+            if (el == null || el.getClass() != PyInstance.class) { //NOPMD CompareObjectsWithEquals - exact class is meant
+                return false;
+            }
+            PyInstance i = (PyInstance) el;
+            if (i.shape().size() != 0 || i.base != null || i.nonStrKeys != null) {
+                return false;
+            }
+            if (elementVersion != PyType.version) {
+                elementVersion = PyType.version;
+                elementShapes.clear();
+            }
+            Shape s = elementShapes.get(i.cls);
+            if (s == null) {
+                slowElement(el, tag, attrib, ns, kids, hint);
+                X_PARENT.set(el, parent);
+                Shape got = i.shape();
+                if (elementVersion == PyType.version && java.util.Arrays.equals(got.names, ELEMENT_NAMES)) {
+                    elementShapes.put(i.cls, got);
+                }
+                return true;
+            }
+            Object[] v = new Object[Math.max(ELEMENT_NAMES.length, i.cls.slotHint)];
+            v[0] = "e";
+            v[1] = tag;
+            v[2] = attrib;
+            v[3] = ns;
+            v[4] = kids;
+            v[5] = parent;
+            v[6] = Py.NONE;
+            v[7] = Py.NONE;
+            v[8] = hint;
+            v[9] = lx.lookup;
+            v[10] = Py.NONE;
+            v[11] = Py.NONE;
+            v[12] = lx.cnt;
+            i.slots = v;
+            i.shape = s;
+            return true;
+        }
+
+        private void slowElement(Object el, String tag, PyDict attrib, PyDict ns, PyList kids, Object hint) {
+            // The attributes in _Element.__init__'s order, which fixes the
+            // instance dict's order, each stored once with its final value:
+            // the defaults it then overwrote cost a store and, for the
+            // containers, an allocation each per element.
+            X_KIND.set(el, "e");
+            X_TAG.set(el, tag);
+            X_ATTRIB.set(el, attrib);
+            X_NS.set(el, ns);
+            X_KIDS.set(el, kids);
+            X_PARENT.set(el, Py.NONE);
+            X_TEXT.set(el, Py.NONE);
+            X_TAIL.set(el, Py.NONE);
+            X_PFX.set(el, hint);
+            X_LOOKUP.set(el, lx.lookup);
+            X_DOC.set(el, Py.NONE);
+            X_TARGET.set(el, Py.NONE);
+            X_CNT.set(el, lx.cnt);
         }
 
         private void close() {
