@@ -981,6 +981,17 @@ GanttLink { color: var(--text-secondary-color, #49454f); background-color: trans
 GanttLinkCritical { color: #b3261e; background-color: transparent; }
 GanttLoad { background-color: var(--accent-color, #6750a4); color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
 GanttOverload { background-color: #b3261e; color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
+
+/* The node graph paints every node, edge and group from these. */
+NodeGraph { background-color: #f7f2fa; color: #1d1b20; padding: 0; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
+NodeGraphGrid { background-color: transparent; color: #cac4d0; }
+NodeGraphNode { background-color: #ffffff; color: #1d1b20; font-family: "native:MainRegular"; font-size: 2.5mm; }
+NodeGraphNodeSelected { background-color: #ffffff; color: #6750a4; font-family: "native:MainRegular"; font-size: 2.5mm; }
+NodeGraphGroup { background-color: rgba(232,222,248,0.47); color: #49454f; font-family: "native:MainBold"; font-size: 2.5mm; }
+NodeGraphPort { background-color: #ffffff; color: #6750a4; font-family: "native:MainRegular"; font-size: 2mm; }
+NodeGraphEdge { background-color: transparent; color: #79747e; }
+NodeGraphEdgeLabel { background-color: #ffffff; color: #49454f; font-family: "native:MainRegular"; font-size: 2mm; }
+NodeGraphMinimap { background-color: #f3edf7; color: #49454f; font-family: "native:MainRegular"; font-size: 2mm; }
 PickerMaterial { background-color: #ece6f0; color: var(--text-color, #1d1b20); padding: 0; margin: 0; }
 PickerMaterialDialog { background-color: #ece6f0; color: var(--text-color, #1d1b20); padding: 2mm; margin: 0; border-radius: 4.4mm; }
 PickerMaterialHeader { background-color: transparent; color: var(--text-color, #1d1b20); padding: 2mm 3mm 2mm 3mm; margin: 0; }
@@ -1267,6 +1278,15 @@ PickerMaterialTab.pressed { color: var(--accent-color, #6750a4); background-colo
     GanttLinkCritical { color: #f2b8b5; background-color: transparent; }
     GanttLoad { background-color: var(--accent-color-dark, #d0bcff); color: var(--accent-on-color-dark, #381e72); font-family: "native:MainRegular"; font-size: 2mm; }
     GanttOverload { background-color: #f2b8b5; color: var(--accent-on-color-dark, #381e72); font-family: "native:MainRegular"; font-size: 2mm; }
+    NodeGraph { background-color: #141218; color: #e6e0e9; padding: 0; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    NodeGraphGrid { background-color: transparent; color: #49454f; }
+    NodeGraphNode { background-color: #211f26; color: #e6e0e9; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    NodeGraphNodeSelected { background-color: #211f26; color: #d0bcff; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    NodeGraphGroup { background-color: rgba(43,41,48,0.47); color: #cac4d0; font-family: "native:MainBold"; font-size: 2.5mm; }
+    NodeGraphPort { background-color: #211f26; color: #d0bcff; font-family: "native:MainRegular"; font-size: 2mm; }
+    NodeGraphEdge { background-color: transparent; color: #938f99; }
+    NodeGraphEdgeLabel { background-color: #2b2930; color: #cac4d0; font-family: "native:MainRegular"; font-size: 2mm; }
+    NodeGraphMinimap { background-color: #2b2930; color: #cac4d0; font-family: "native:MainRegular"; font-size: 2mm; }
     PickerMaterial { background-color: #2b2930; color: var(--text-color-dark, #e6e0e9); padding: 0; margin: 0; }
     PickerMaterialDialog { background-color: #2b2930; color: var(--text-color-dark, #e6e0e9); padding: 2mm; margin: 0; border-radius: 4.4mm; }
     PickerMaterialHeader { background-color: transparent; color: var(--text-color-dark, #e6e0e9); padding: 2mm 3mm 2mm 3mm; margin: 0; }

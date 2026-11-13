@@ -368,7 +368,7 @@ public class Gantt extends Container {
         }
         LevelingResult result = ResourceLeveler.level(model);
         if (result.isChanged()) {
-            chart.layoutNow();
+            chart.refreshLayout();
             chart.beginReflow();
             result.apply();
         }
@@ -516,8 +516,8 @@ public class Gantt extends Container {
     /// gantt.setAnimationTime(1100);  // 100 milliseconds into what followed
     /// ```
     public void setAnimationTime(long millis) {
-        chart.setFixedClock(millis);
-        load.setFixedClock(millis);
+        chart.setAnimationTime(millis);
+        load.setAnimationTime(millis);
     }
 
     long now() {

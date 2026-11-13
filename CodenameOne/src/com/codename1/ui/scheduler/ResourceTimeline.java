@@ -26,6 +26,8 @@ import com.codename1.scheduling.ScheduleItem;
 import com.codename1.scheduling.ScheduleResource;
 import com.codename1.scheduling.TimeMath;
 import com.codename1.scheduling.WorkCalendar;
+import com.codename1.ui.ScrollSurface;
+import com.codename1.ui.ScrollSurface.EditTrigger;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.plaf.Style;
@@ -131,7 +133,7 @@ final class ResourceTimeline extends ScrollSurface {
     // ------------------------------------------------------------- layout
 
     @Override
-    void prepare(int width, int height) {
+    protected void layoutSurface(int width, int height) {
         int gen = UIManager.getThemeGeneration();
         if (!dirty && width == laidW && height == laidH && gen == laidGen) {
             return;
@@ -161,13 +163,13 @@ final class ResourceTimeline extends ScrollSurface {
                 widest = Math.max(widest, hf.stringWidth(r.getDetail()));
             }
         }
-        headerW = resources.length == 0 ? 0 : Math.min(width * 2 / 5, Math.min(Look.mm(38), widest + Look.mm(4)));
-        headerH = axis.headerHeight(header);
+        setHeaderSize(resources.length == 0 ? 0 : Math.min(width * 2 / 5, Math.min(Look.mm(38), widest + Look.mm(4))), getHeaderHeight());
+        setHeaderSize(getHeaderWidth(), axis.headerHeight(header));
         laneH = itemFont.getHeight() + Look.mm(2.2f);
         rowPad = Look.mm(1);
         int minRow = hf.getHeight() * (detail ? 2 : 1) + Look.mm(3);
 
-        int bodyW = Math.max(1, width - headerW);
+        int bodyW = Math.max(1, width - getHeaderWidth());
         long span = axis.getEnd() - axis.getStart();
         axis.setScaleLimits(15.0 * TimeMath.MINUTE / Look.mm(9), Math.max(1.0, (double) span / bodyW));
         if (!scaled && width > 0) {
@@ -189,7 +191,7 @@ final class ResourceTimeline extends ScrollSurface {
             long now = owner.now();
             long target = now >= axis.getStart() && now < axis.getEnd() ? now - 2 * TimeMath.HOUR
                     : axis.getStart() + owner.getInitialMinute() * TimeMath.MINUTE;
-            setOffsets(Math.max(0, axis.x(target)), getOffY());
+            setOffsets(Math.max(0, axis.x(target)), getOffsetY());
         }
     }
 
@@ -270,22 +272,26 @@ final class ResourceTimeline extends ScrollSurface {
     }
 
     @Override
-    double[] saveZoom() {
+    protected Object saveZoomState() {
         return new double[]{axis.getMillisPerPixel()};
     }
 
     @Override
-    void restoreZoom(double[] saved) {
+    protected void restoreZoomState(Object state) {
+        if (!(state instanceof double[])) {
+            return;
+        }
+        double[] saved = (double[]) state;
         axis.setMillisPerPixel(saved[0]);
     }
 
     @Override
-    int contentWidth() {
+    protected int getContentWidth() {
         return axis.width();
     }
 
     @Override
-    int contentHeight() {
+    protected int getContentHeight() {
         return rowTop[rowCount];
     }
 
@@ -311,7 +317,7 @@ final class ResourceTimeline extends ScrollSurface {
     // -------------------------------------------------------------- paint
 
     @Override
-    void paintBody(Graphics g, int x, int y) {
+    protected void paintContent(Graphics g, int x, int y) {
         Style grid = Look.style("SchedulerGrid");
         Style off = Look.style("SchedulerOffHours");
         int cx = g.getClipX();
@@ -347,20 +353,20 @@ final class ResourceTimeline extends ScrollSurface {
             int ly = y + rowTop[r];
             g.drawLine(cx, ly, cx + cw, ly);
         }
-        paintRowHover(g, y, cx, cw, hovered(), grid.getFgColor());
-        paintRowHover(g, y, cx, cw, fading(), grid.getFgColor());
+        paintRowHover(g, y, cx, cw, getHoverTarget(), grid.getFgColor());
+        paintRowHover(g, y, cx, cw, getFadingHoverTarget(), grid.getFgColor());
         ScheduleItem selected = owner.getSelectedItem();
-        boolean lit = anyHover();
-        float lift = mode == MOVE || mode == RESIZE_START || mode == RESIZE_END ? liftLevel() : 0;
+        boolean lit = hasHoverFeedback();
+        float lift = mode == MOVE || mode == RESIZE_START || mode == RESIZE_END ? getLiftLevel() : 0;
         int alpha = g.getAlpha();
         for (Bar b : bars) {
             barRect(b, rect);
-            settle(b.item.getId(), rect);
+            applySettle(b.item.getId(), rect);
             if (x + rect[0] > cx + cw || x + rect[0] + rect[2] < cx) {
                 continue;
             }
             int state = ScheduleItemRenderer.HORIZONTAL | ScheduleItemRenderer.COMPACT;
-            float over = lit ? hoverLevel(b.item.getId()) : 0;
+            float over = lit ? getHoverLevel(b.item.getId()) : 0;
             if (over > 0) {
                 state |= ScheduleItemRenderer.HOVERED;
             }
@@ -406,7 +412,7 @@ final class ResourceTimeline extends ScrollSurface {
                 g.setColor(sel.getFgColor());
                 g.drawRect(x0, top, w - 1, h - 1);
             } else {
-                Look.shadow(g, x0, y + rowTop[editRow] + rowPad, w, laneH - 1, liftLevel());
+                Look.shadow(g, x0, y + rowTop[editRow] + rowPad, w, laneH - 1, getLiftLevel());
                 renderer.paintItem(g, owner, editItem, x0, y + rowTop[editRow] + rowPad, w, laneH - 1,
                         ScheduleItemRenderer.DRAGGED | ScheduleItemRenderer.SELECTED | ScheduleItemRenderer.HORIZONTAL
                                 | ScheduleItemRenderer.COMPACT);
@@ -426,16 +432,16 @@ final class ResourceTimeline extends ScrollSurface {
     }
 
     @Override
-    void paintTopHeader(Graphics g, int x, int y) {
+    protected void paintTopHeader(Graphics g, int x, int y) {
         axis.paintHeader(g, Look.style("SchedulerHeader"), x, y, g.getClipX(), g.getClipX() + g.getClipWidth());
     }
 
     @Override
-    void paintLeftHeader(Graphics g, int x, int y) {
+    protected void paintLeftHeader(Graphics g, int x, int y) {
         Style header = Look.style("SchedulerHeader");
         Font f = header.getFont();
         int fh = f.getHeight();
-        Look.fill(g, header, x, g.getClipY(), headerW, g.getClipHeight());
+        Look.fill(g, header, x, g.getClipY(), getHeaderWidth(), g.getClipHeight());
         g.setFont(f);
         int line = Look.mix(header.getBgColor(), header.getFgColor(), 50);
         int pad = Look.mm(1.5f);
@@ -447,36 +453,36 @@ final class ResourceTimeline extends ScrollSurface {
             boolean two = res.getDetail() != null && res.getDetail().length() > 0;
             int ty = top + (h - (two ? 2 * fh : fh)) / 2;
             g.setColor(header.getFgColor());
-            g.drawString(Look.fit(res.getName(), f, headerW - 2 * pad), x + pad, ty);
+            g.drawString(Look.fit(res.getName(), f, getHeaderWidth() - 2 * pad), x + pad, ty);
             if (two) {
                 g.setAlpha(alpha * 160 / 255);
-                g.drawString(Look.fit(res.getDetail(), f, headerW - 2 * pad), x + pad, ty + fh);
+                g.drawString(Look.fit(res.getDetail(), f, getHeaderWidth() - 2 * pad), x + pad, ty + fh);
                 g.setAlpha(alpha);
             }
             g.setColor(line);
-            g.drawLine(x, top + h, x + headerW, top + h);
+            g.drawLine(x, top + h, x + getHeaderWidth(), top + h);
         }
         g.setColor(line);
-        g.drawLine(x + headerW - 1, g.getClipY(), x + headerW - 1, g.getClipY() + g.getClipHeight());
+        g.drawLine(x + getHeaderWidth() - 1, g.getClipY(), x + getHeaderWidth() - 1, g.getClipY() + g.getClipHeight());
     }
 
     @Override
-    void paintCorner(Graphics g, int x, int y) {
+    protected void paintCorner(Graphics g, int x, int y) {
         Style header = Look.style("SchedulerHeader");
-        Look.fill(g, header, x, y, headerW, headerH);
+        Look.fill(g, header, x, y, getHeaderWidth(), getHeaderHeight());
         g.setColor(Look.mix(header.getBgColor(), header.getFgColor(), 50));
-        g.drawLine(x, y + headerH - 1, x + headerW, y + headerH - 1);
-        g.drawLine(x + headerW - 1, y, x + headerW - 1, y + headerH);
+        g.drawLine(x, y + getHeaderHeight() - 1, x + getHeaderWidth(), y + getHeaderHeight() - 1);
+        g.drawLine(x + getHeaderWidth() - 1, y, x + getHeaderWidth() - 1, y + getHeaderHeight());
     }
 
     // ------------------------------------------------------------ pointer
 
     Bar barAt(int px, int py) {
-        if (px < headerW || py < headerH) {
+        if (px < getHeaderWidth() || py < getHeaderHeight()) {
             return null;
         }
-        int cx = px - headerW + getOffX();
-        int cy = py - headerH + getOffY();
+        int cx = px - getHeaderWidth() + getOffsetX();
+        int cy = py - getHeaderHeight() + getOffsetY();
         for (int i = bars.size() - 1; i >= 0; i--) {
             Bar b = bars.get(i);
             barRect(b, rect);
@@ -503,12 +509,13 @@ final class ResourceTimeline extends ScrollSurface {
     }
 
     @Override
-    boolean beginEdit(int x, int y, boolean handlesOnly) {
-        if (!owner.isEditable() || x < headerW || y < headerH) {
+    protected boolean editStarted(int x, int y, EditTrigger trigger) {
+        boolean handlesOnly = trigger == EditTrigger.HANDLE_DRAG;
+        if (!owner.isEditable() || x < getHeaderWidth() || y < getHeaderHeight()) {
             return false;
         }
-        int cx = x - headerW + getOffX();
-        int cy = y - headerH + getOffY();
+        int cx = x - getHeaderWidth() + getOffsetX();
+        int cy = y - getHeaderHeight() + getOffsetY();
         Bar b = barAt(x, y);
         if (b != null) {
             barRect(b, rect);
@@ -556,18 +563,18 @@ final class ResourceTimeline extends ScrollSurface {
         }
         int r = ((Integer) key).intValue();
         if (r >= 0 && r < rowCount) {
-            Look.wash(g, rgb, cx, y + rowTop[r] + 1, cw, rowTop[r + 1] - rowTop[r] - 1, hoverLevel(key));
+            Look.wash(g, rgb, cx, y + rowTop[r] + 1, cw, rowTop[r + 1] - rowTop[r] - 1, getHoverLevel(key));
         }
     }
 
     @Override
-    void hoverAt(int x, int y) {
-        if (x < headerW || y < headerH) {
-            hover(null, DEFAULT_CURSOR);
+    protected void hoverAt(int x, int y) {
+        if (x < getHeaderWidth() || y < getHeaderHeight()) {
+            setHoverTarget(null, DEFAULT_CURSOR);
             return;
         }
-        int cx = x - headerW + getOffX();
-        int cy = y - headerH + getOffY();
+        int cx = x - getHeaderWidth() + getOffsetX();
+        int cy = y - getHeaderHeight() + getOffsetY();
         Bar b = barAt(x, y);
         if (b != null) {
             int cursor = HAND_CURSOR;
@@ -582,16 +589,16 @@ final class ResourceTimeline extends ScrollSurface {
                     cursor = MOVE_CURSOR;
                 }
             }
-            hover(b.item.getId(), cursor);
-            tip(b.item.getTitle() + ", " + owner.formatRange(b.item.getStart(), b.item.getEnd()));
+            setHoverTarget(b.item.getId(), cursor);
+            setHoverTooltip(b.item.getTitle() + ", " + owner.formatRange(b.item.getStart(), b.item.getEnd()));
             return;
         }
-        tip(null);
+        setHoverTooltip(null);
         // The row a drag or a double click would book.
         if (rowCount > 0 && cy < rowTop[rowCount]) {
-            hover(Integer.valueOf(rowAt(cy)), DEFAULT_CURSOR);
+            setHoverTarget(Integer.valueOf(rowAt(cy)), DEFAULT_CURSOR);
         } else {
-            hover(null, DEFAULT_CURSOR);
+            setHoverTarget(null, DEFAULT_CURSOR);
         }
     }
 
@@ -600,12 +607,12 @@ final class ResourceTimeline extends ScrollSurface {
     }
 
     @Override
-    void editDragged(int x, int y) {
+    protected void editMoved(int x, int y) {
         if (mode == 0) {
             return;
         }
-        int cx = Math.max(0, Math.min(contentWidth(), x - headerW + getOffX()));
-        int cy = Math.max(0, y - headerH + getOffY());
+        int cx = Math.max(0, Math.min(getContentWidth(), x - getHeaderWidth() + getOffsetX()));
+        int cy = Math.max(0, y - getHeaderHeight() + getOffsetY());
         long pointer = axis.time(cx);
         long step = step();
         if (mode == MOVE) {
@@ -647,14 +654,14 @@ final class ResourceTimeline extends ScrollSurface {
     }
 
     @Override
-    void endEdit(boolean commit) {
+    protected void editEnded(boolean commit) {
         int m = mode;
         ScheduleItem item = editItem;
         if (item != null && editRow < rowCount) {
             // From where it was let go to where it belongs, which is the
             // place it came from when the move is refused or given up.
             int x0 = axis.x(editStart);
-            settleFrom(item.getId(), x0, rowTop[editRow] + rowPad, Math.max(Look.mm(1.5f), axis.x(editEnd) - x0),
+            startSettle(item.getId(), x0, rowTop[editRow] + rowPad, Math.max(Look.mm(1.5f), axis.x(editEnd) - x0),
                     laneH - 1);
         }
         mode = 0;
@@ -674,8 +681,8 @@ final class ResourceTimeline extends ScrollSurface {
     }
 
     @Override
-    void tapped(int x, int y, boolean doubleTap) {
-        if (x < headerW || y < headerH) {
+    protected void tapped(int x, int y, boolean doubleTap) {
+        if (x < getHeaderWidth() || y < getHeaderHeight()) {
             return;
         }
         Bar b = barAt(x, y);
@@ -689,22 +696,22 @@ final class ResourceTimeline extends ScrollSurface {
         if (owner.getSelectedItem() != null) {
             owner.viewSelected(null);
         } else if (doubleTap && owner.isEditable()) {
-            long start = snap(axis.time(x - headerW + getOffX()) - step() / 2);
-            int row = rowAt(y - headerH + getOffY());
+            long start = snap(axis.time(x - getHeaderWidth() + getOffsetX()) - step() / 2);
+            int row = rowAt(y - getHeaderHeight() + getOffsetY());
             owner.viewRange(start, start + defaultLength(), resources.length > 0 ? resources[row].getId() : null);
         }
     }
 
     @Override
-    boolean zoomBy(float factor, int x, int y) {
+    protected boolean zoomBy(float factor, int x, int y) {
         double before = axis.getMillisPerPixel();
-        long t = axis.time(x - headerW + getOffX());
+        long t = axis.time(x - getHeaderWidth() + getOffsetX());
         axis.setMillisPerPixel(before / factor);
         if (Math.abs(axis.getMillisPerPixel() - before) < before * 0.0001) {
             return false;
         }
         laidW = -1;
-        setOffsets(axis.x(t) - (x - headerW), getOffY());
+        setOffsets(axis.x(t) - (x - getHeaderWidth()), getOffsetY());
         repaint();
         return true;
     }

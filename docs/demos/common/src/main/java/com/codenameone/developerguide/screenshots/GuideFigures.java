@@ -38,9 +38,11 @@ public final class GuideFigures {
         GuideFigure appearance = new AppearanceFigure();
         FigureVariant[] general = general(button, appearance);
         FigureVariant[] scheduling = SchedulingFigures.variants();
-        FigureVariant[] all = new FigureVariant[general.length + scheduling.length];
+        FigureVariant[] graph = GraphFigures.variants();
+        FigureVariant[] all = new FigureVariant[general.length + scheduling.length + graph.length];
         System.arraycopy(general, 0, all, 0, general.length);
         System.arraycopy(scheduling, 0, all, general.length, scheduling.length);
+        System.arraycopy(graph, 0, all, general.length + scheduling.length, graph.length);
         return all;
     }
 
