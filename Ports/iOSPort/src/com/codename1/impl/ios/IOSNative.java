@@ -836,7 +836,7 @@ public class IOSNative {
     // binds a texture and its sampler at a fragment slot for the next draw
     native void gl3dBindTexture(long contextPeer, int index, long texturePeer, int texFilter, int texWrap);
 
-    native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    native boolean gl3dBeginShadowPass(long contextPeer, int width, int size);
     native void gl3dEndShadowPass(long contextPeer);
     native boolean gl3dBeginPostProcess(long contextPeer, String mslSource, boolean bloom);
     native void gl3dEndPostProcess(long contextPeer, float[] params);

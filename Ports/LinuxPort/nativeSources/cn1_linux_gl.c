@@ -85,7 +85,7 @@ typedef struct {
 } CN1GlContext;
 
 /* Layout of the packed uniform array a draw passes in; must match
- * LinuxGraphicsDevice.packUniforms (177 floats). A size of 16 is a mat4, 64
+ * LinuxGraphicsDevice.packUniforms (178 floats). A size of 16 is a mat4, 64
  * the ShaderMaterial vec4[16] array u_cu. */
 typedef struct {
     const char* name;
@@ -98,10 +98,10 @@ static const CN1GlUniformDef CN1_UNIFORMS[] = {
     {"u_eye", 3}, {"u_shininess", 1}, {"u_fogColor", 3}, {"u_fog", 3},
     {"u_sky", 3}, {"u_ground", 3}, {"u_exposure", 1}, {"u_pbr", 2},
     {"u_emissive", 3}, {"u_zenith", 3}, {"u_horizon", 3}, {"u_sun", 4},
-    {"u_shadow", 3}, {"u_time", 1}, {"u_cu", 64}
+    {"u_shadow", 4}, {"u_time", 1}, {"u_cu", 64}
 };
 #define CN1_UNIFORM_COUNT ((int) (sizeof(CN1_UNIFORMS) / sizeof(CN1_UNIFORMS[0])))
-#define CN1_UNIFORM_FLOATS 177
+#define CN1_UNIFORM_FLOATS 178
 
 typedef struct {
     GLuint program;
@@ -740,19 +740,19 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dBindTexture___long_int_long_i
     glActiveTexture(GL_TEXTURE0);
 }
 
-JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT size) {
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT size) {
     CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
-    if (!c || size <= 0) {
+    if (!c || size <= 0 || width <= 0) {
         return JAVA_FALSE;
     }
     cn1GlMakeCurrent(c);
     cn1GlSaveTarget(c);
     /* packed depth must not be interpolated between texels */
-    if (!cn1GlEnsureTarget(&c->shadow, size, size, 1, GL_NEAREST)) {
+    if (!cn1GlEnsureTarget(&c->shadow, width, size, 1, GL_NEAREST)) {
         cn1GlRestoreTarget(c);
         return JAVA_FALSE;
     }
-    glViewport(0, 0, size, size);
+    glViewport(0, 0, width, size);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClearDepthf(1.0f);
     glDepthMask(GL_TRUE);

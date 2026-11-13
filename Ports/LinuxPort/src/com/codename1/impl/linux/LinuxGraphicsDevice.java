@@ -70,14 +70,20 @@ class LinuxGraphicsDevice extends GraphicsDevice {
 
     private final float[] mvp = new float[16];
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, the matrix of the cascade being drawn, and the
+    // cascade count of the shadow pass in progress (the map is that many
+    // squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private final float[] casterMatrix = new float[16];
+    private int shadowCascades = 1;
 
     // The packed uniform array; the order must match CN1_UNIFORMS in
     // cn1_linux_gl.c: u_mvp, u_model, u_normalMatrix, u_shadowMatrix (16 each),
     // u_color(4), u_lightDir(3), u_lightColor(3), u_ambient(3), u_eye(3),
     // u_shininess(1), u_fogColor(3), u_fog(3), u_sky(3), u_ground(3),
     // u_exposure(1), u_pbr(2), u_emissive(3), u_zenith(3), u_horizon(3),
-    // u_sun(4), u_shadow(3).
-    private static final int UNIFORM_FLOATS = 177;
+    // u_sun(4), u_shadow(4), u_time(1), u_cu(64).
+    private static final int UNIFORM_FLOATS = 178;
     private final float[] uniforms = new float[UNIFORM_FLOATS];
 
     private long shadowPipeline;
@@ -346,7 +352,9 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             uniforms[o++] = light.getShadowBias();
             uniforms[o++] = light.getShadowStrength();
             uniforms[o++] = shadowSize > 0 ? light.getShadowSoftness() / shadowSize : 0.0f;
+            uniforms[o++] = light.getShadowCascadeRatio();
         } else {
+            uniforms[o++] = 0f;
             uniforms[o++] = 0f;
             uniforms[o++] = 0f;
             uniforms[o++] = 0f;
@@ -391,11 +399,13 @@ class LinuxGraphicsDevice extends GraphicsDevice {
                     GlslShaderGenerator.shadowFragment());
         }
         int size = light.getShadowMapSize();
-        if (shadowPipeline == 0 || !LinuxNative.gl3dBeginShadowPass(contextPeer, size)) {
+        if (shadowPipeline == 0 || !LinuxNative.gl3dBeginShadowPass(contextPeer, size * light.getShadowCascades(), size)) {
             return false;
         }
         shadowSize = size;
-        light.computeShadowMatrix(shadowMatrix);
+        shadowCascades = light.getShadowCascades();
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -412,7 +422,25 @@ class LinuxGraphicsDevice extends GraphicsDevice {
 
     // Depth only draw of one caster into the shadow map: the shadow program reads
     // u_mvp (light space) and a_position only.
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        int size = shadowSize;
+        if (shadowCascades < 2) {
+            Matrix4.copy(shadowMatrix, casterMatrix);
+            drawShadowCascade(mesh, material, modelMatrix);
+            return;
+        }
+        LinuxNative.gl3dSetViewport(contextPeer, 0, 0, size, size);
+        Matrix4.copy(shadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        LinuxNative.gl3dSetViewport(contextPeer, size, 0, size, size);
+        Matrix4.copy(farShadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        LinuxNative.gl3dSetViewport(contextPeer, 0, 0, size * 2, size);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix) {
         if (!material.isCastShadows()
                 || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
@@ -440,7 +468,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
                 texHandle = ((Long) tex.getHandle()).longValue();
             }
         }
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(casterMatrix, model, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
         }

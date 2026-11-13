@@ -101,4 +101,43 @@ class EnvironmentLightPostTest {
         assertFalse(c.isPostProcessSupported());
         assertTrue(new GpuCapabilities(2048, 8, false, false, false, "x", true, true).isPostProcessSupported());
     }
+
+    @Test
+    void cascadesShareTheNearViewScaledInXY() {
+        Light light = new Light().setDirection(-0.4f, -1f, -0.3f).setShadows(true);
+        light.setShadowMap(1024, 10f).setShadowCenter(3f, 0f, -2f);
+        assertEquals(1, light.getShadowCascades());
+        assertEquals(0f, light.getShadowCascadeRatio(), 0f);
+        light.setShadowCascades(2, 40f);
+        assertEquals(2, light.getShadowCascades());
+        assertEquals(0.25f, light.getShadowCascadeRatio(), 1e-6f);
+        float[] near = new float[16];
+        float[] far = new float[16];
+        light.computeCascadeMatrix(0, near);
+        light.computeCascadeMatrix(1, far);
+        float[] single = new float[16];
+        light.computeShadowMatrix(single);
+        assertArrayEquals(single, near, 0f);
+        for (int c = 0; c < 4; c++) {
+            assertEquals(near[c * 4] * 0.25f, far[c * 4], 1e-6f);
+            assertEquals(near[c * 4 + 1] * 0.25f, far[c * 4 + 1], 1e-6f);
+            assertEquals(near[c * 4 + 2], far[c * 4 + 2], 0f);
+            assertEquals(near[c * 4 + 3], far[c * 4 + 3], 0f);
+        }
+        // a far extent below the near one never shrinks the far cascade
+        light.setShadowCascades(2, 5f);
+        assertEquals(1f, light.getShadowCascadeRatio(), 0f);
+        light.setShadowCascades(1, 40f);
+        assertEquals(0f, light.getShadowCascadeRatio(), 0f);
+    }
+
+    @Test
+    void everyGeneratorPicksTheCascadeFromTheFourthShadowParameter() {
+        Material m = new Material(Material.Type.PBR);
+        String frag = new com.codename1.impl.gpu.GlslShaderGenerator(m, VertexFormat.POSITION_NORMAL_TEXCOORD,
+                new Environment(), true).getFragmentSource();
+        assertTrue(frag.contains("uniform vec4 u_shadow;"), frag);
+        assertTrue(frag.contains("if (u_shadow.w > 0.0)"), frag);
+        assertTrue(frag.contains("p.xy = p.xy * u_shadow.w;"), frag);
+    }
 }

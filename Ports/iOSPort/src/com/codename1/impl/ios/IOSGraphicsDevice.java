@@ -87,6 +87,12 @@ class IOSGraphicsDevice extends GraphicsDevice {
     // Shadow map state: the light's view-projection (also read by receivers
     // through the uniform block), and whether a map has been rendered yet.
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, the matrix of the cascade being drawn, and the
+    // cascade count of the shadow pass in progress (the map is that many
+    // squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private final float[] casterMatrix = new float[16];
+    private int shadowCascades = 1;
     private int shadowSize = 1;
     private boolean inShadowPass;
     private boolean shadowReady;
@@ -366,7 +372,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         uniforms[124] = light.getShadowBias();
         uniforms[125] = light.getShadowStrength();
         uniforms[126] = light.getShadowSoftness() / Math.max(1, shadowSize);
-        uniforms[127] = 0.0f;
+        uniforms[127] = light.getShadowCascadeRatio();
     }
 
     public boolean beginShadowPass(Light light) {
@@ -374,11 +380,13 @@ class IOSGraphicsDevice extends GraphicsDevice {
             return false;
         }
         int size = light.getShadowMapSize();
-        if (!IOSImplementation.nativeInstance.gl3dBeginShadowPass(contextPeer, size)) {
+        if (!IOSImplementation.nativeInstance.gl3dBeginShadowPass(contextPeer, size * light.getShadowCascades(), size)) {
             return false;
         }
         shadowSize = size;
-        light.computeShadowMatrix(shadowMatrix);
+        shadowCascades = light.getShadowCascades();
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -395,7 +403,25 @@ class IOSGraphicsDevice extends GraphicsDevice {
 
     // Depth only draw from the light. The pipeline key's "shadow|" prefix is
     // what tells the native side to build it without a colour attachment.
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        int size = shadowSize;
+        if (shadowCascades < 2) {
+            Matrix4.copy(shadowMatrix, casterMatrix);
+            drawShadowCascade(mesh, material, modelMatrix);
+            return;
+        }
+        IOSImplementation.nativeInstance.gl3dSetViewport(contextPeer, 0, 0, size, size);
+        Matrix4.copy(shadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        IOSImplementation.nativeInstance.gl3dSetViewport(contextPeer, size, 0, size, size);
+        Matrix4.copy(farShadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        IOSImplementation.nativeInstance.gl3dSetViewport(contextPeer, 0, 0, size * 2, size);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix) {
         if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
             return;
@@ -424,7 +450,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
             return;
         }
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(casterMatrix, model, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
         }
@@ -466,7 +492,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
         packUniforms(material, model);
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(casterMatrix, model, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
         }

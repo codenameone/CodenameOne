@@ -131,6 +131,11 @@ class AndroidGraphicsDevice extends GraphicsDevice {
     private boolean inShadowPass;
     private boolean shadowReady;
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, and the cascade count and square size of the
+    // shadow pass in progress (the map is shadowCascades squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private int shadowCascades = 1;
+    private int shadowSize;
     private PostProcess activePost;
     private final int[] savedFbo = new int[1];
     private final int[] savedViewport = new int[4];
@@ -593,6 +598,13 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         }
     }
 
+    private void uniform4(Program p, String name, float a, float b, float c, float d) {
+        int l = loc(p, name);
+        if (l >= 0) {
+            GLES20.glUniform4f(l, a, b, c, d);
+        }
+    }
+
     private void uniform3(Program p, String name, float a, float b, float c) {
         int l = loc(p, name);
         if (l >= 0) {
@@ -683,8 +695,8 @@ class AndroidGraphicsDevice extends GraphicsDevice {
                 GLES20.glUniformMatrix4fv(l, 1, false, shadowMatrix, 0);
             }
             Light light = getLight();
-            uniform3(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
-                    light.getShadowSoftness() / shadowTarget.width);
+            uniform4(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
+                    light.getShadowSoftness() / shadowTarget.height, light.getShadowCascadeRatio());
             sampler(p, "u_shadowMap", 1, shadowTarget.tex);
         }
     }
@@ -765,14 +777,17 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         saveTarget();
         int size = light.getShadowMapSize();
         // packed depth must not be interpolated between texels
-        shadowTarget = target(shadowTarget, size, size, true, GLES20.GL_NEAREST);
+        shadowCascades = light.getShadowCascades();
+        shadowSize = size;
+        shadowTarget = target(shadowTarget, size * shadowCascades, size, true, GLES20.GL_NEAREST);
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, shadowTarget.fbo);
-        GLES20.glViewport(0, 0, size, size);
+        GLES20.glViewport(0, 0, size * shadowCascades, size);
         GLES20.glClearColor(1f, 1f, 1f, 1f);
         GLES20.glClearDepthf(1f);
         GLES20.glDepthMask(true);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-        light.computeShadowMatrix(shadowMatrix);
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -787,7 +802,21 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         restoreTarget();
     }
 
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        if (shadowCascades < 2) {
+            drawShadowCascade(mesh, material, modelMatrix, shadowMatrix);
+            return;
+        }
+        GLES20.glViewport(0, 0, shadowSize, shadowSize);
+        drawShadowCascade(mesh, material, modelMatrix, shadowMatrix);
+        GLES20.glViewport(shadowSize, 0, shadowSize, shadowSize);
+        drawShadowCascade(mesh, material, modelMatrix, farShadowMatrix);
+        GLES20.glViewport(0, 0, shadowSize * 2, shadowSize);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix, float[] lightMatrix) {
         if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
             return;
@@ -795,7 +824,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
         if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
-            drawWith(mesh, material, modelMatrix, getDepthProgram(material, fmt), shadowMatrix, false, true);
+            drawWith(mesh, material, modelMatrix, getDepthProgram(material, fmt), lightMatrix, false, true);
             return;
         }
         GLES20.glUseProgram(shadowProgram.handle);
@@ -804,7 +833,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         } else {
             Matrix4.setIdentity(model);
         }
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(lightMatrix, model, mvp);
         GLES20.glUniformMatrix4fv(shadowProgram.uMvp, 1, false, mvp, 0);
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
         GLES20.glDepthMask(true);

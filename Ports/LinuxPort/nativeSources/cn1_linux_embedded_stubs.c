@@ -487,8 +487,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawArrays___long_long_long_i
 JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dBindTexture___long_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT index, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
     (void) contextPeer; (void) index; (void) texturePeer; (void) texFilter; (void) texWrap;
 }
-JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT size) {
-    (void) contextPeer; (void) size;
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT size) {
+    (void) contextPeer; (void) width; (void) size;
     cn1LinuxStubOnce("gl3dBeginShadowPass");
     return JAVA_FALSE;
 }

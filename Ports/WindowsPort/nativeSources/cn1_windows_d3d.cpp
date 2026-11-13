@@ -774,17 +774,17 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dBindTexture___long_int_lo
     c->ctx->PSSetSamplers((UINT) index, 1, &samp);
 }
 
-JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT size) {
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_gl3dBeginShadowPass___long_int_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT width, JAVA_INT size) {
     CN1D3DContext* c = (CN1D3DContext*) (intptr_t) peer;
     if (!c || !c->ctx || !c->activeRtv) return JAVA_FALSE;
-    if (!cn1D3DEnsureAux(c, &c->shadow, size, size, DXGI_FORMAT_R32_FLOAT, true)) return JAVA_FALSE;
+    if (!cn1D3DEnsureAux(c, &c->shadow, width, size, DXGI_FORMAT_R32_FLOAT, true)) return JAVA_FALSE;
     c->shadowOn = 0;
     ID3D11ShaderResourceView* none = NULL;
     c->ctx->PSSetShaderResources(1, 1, &none);
     UINT n = 1;
     c->ctx->RSGetViewports(&n, &c->savedVp);
     c->ctx->OMSetRenderTargets(1, &c->shadow.rtv, c->shadow.dsv);
-    cn1D3DSetViewport(c, size, size);
+    cn1D3DSetViewport(c, width, size);
     float white[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
     c->ctx->ClearRenderTargetView(c->shadow.rtv, white);
     c->ctx->ClearDepthStencilView(c->shadow.dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);

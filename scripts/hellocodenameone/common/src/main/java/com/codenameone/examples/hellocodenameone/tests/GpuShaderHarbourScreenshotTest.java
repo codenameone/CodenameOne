@@ -74,7 +74,8 @@ public class GpuShaderHarbourScreenshotTest extends BaseTest {
                 }
                 camera.setPerspective(50f, 0.1f, 400f).setPosition(6.5f, 3.4f, 9f).setTarget(-1f, 1.2f, -3f);
                 look.apply(device);
-                look.getLight().setShadowCenter(-1f, 0f, 0f);
+                // crisp shadows on the quay, a coarse far cascade over the water
+                look.getLight().setShadowCenter(-1f, 0f, 0f).setShadowCascades(2, 60f);
             }
 
             public void onResize(GraphicsDevice device, int w, int h) {

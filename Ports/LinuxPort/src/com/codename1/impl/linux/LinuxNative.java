@@ -1224,8 +1224,8 @@ public final class LinuxNative {
     public static native void gl3dBindTexture(long contextPeer, int index, long texturePeer, int texFilter,
             int texWrap);
 
-    /** Binds a size x size packed-depth shadow target and clears it. */
-    public static native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    /** Binds a width x size packed-depth shadow target (one size x size square per cascade) and clears it. */
+    public static native boolean gl3dBeginShadowPass(long contextPeer, int width, int size);
     /** Restores the target and viewport that were bound at gl3dBeginShadowPass. */
     public static native void gl3dEndShadowPass(long contextPeer);
     /** Redirects subsequent draws into an offscreen scene target the size of the viewport. */

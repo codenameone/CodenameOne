@@ -41,6 +41,8 @@ public final class Light {
     private float shadowBias = 0.0015f;
     private float shadowSoftness = 1f;
     private float shadowStrength = 0.8f;
+    private int shadowCascades = 1;
+    private float shadowFarExtent;
 
     /// Sets the world space direction the light travels.
     ///
@@ -247,6 +249,75 @@ public final class Light {
         return shadowSoftness;
     }
 
+    /// Splits the shadow map into cascades. With two, the map set by
+    /// `setShadowMap` keeps its resolution for the area near the shadow
+    /// centre, and a second map of the same size covers `farExtent` units
+    /// either side of it, so a large scene gets crisp shadows up close and
+    /// coarse ones in the distance instead of coarse shadows everywhere. Each
+    /// shaded pixel uses the near map when it falls inside it and the far one
+    /// otherwise. Casters are drawn once per cascade.
+    ///
+    /// #### Parameters
+    ///
+    /// - `count`: 1 for a single map, 2 for a near and a far cascade
+    ///
+    /// - `farExtent`: the half width of the far cascade in world units;
+    ///   ignored with one cascade, and never less than the near extent
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowCascades(int count, float farExtent) {
+        this.shadowCascades = count >= 2 ? 2 : 1;
+        this.shadowFarExtent = farExtent;
+        return this;
+    }
+
+    /// Returns the number of shadow cascades, 1 or 2.
+    public int getShadowCascades() {
+        return shadowCascades;
+    }
+
+    /// Returns the half width of the far cascade, or the shadow extent with a
+    /// single cascade.
+    public float getShadowFarExtent() {
+        return shadowCascades > 1 ? Math.max(shadowExtent, shadowFarExtent) : shadowExtent;
+    }
+
+    /// For a backend: the factor the far cascade scales the near cascade's
+    /// x and y by, the near extent over the far one; 0 with a single cascade.
+    /// It is the fourth component of the shadow parameters every generated
+    /// shader receives.
+    ///
+    /// #### Returns
+    ///
+    /// the ratio in (0, 1], or 0 when the map is not split
+    public float getShadowCascadeRatio() {
+        return shadowCascades > 1 ? shadowExtent / getShadowFarExtent() : 0f;
+    }
+
+    /// For a backend: the matrix of one cascade. Cascade 0 is
+    /// `computeShadowMatrix`; cascade 1 is the same view scaled in x and y by
+    /// `getShadowCascadeRatio`, so both share one depth range. A backend draws
+    /// cascade `i` into the `i`th square of a map `getShadowCascades` squares
+    /// wide.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cascade`: 0 or 1
+    ///
+    /// - `out`: a 16 element array that receives the column-major matrix
+    public void computeCascadeMatrix(int cascade, float[] out) {
+        computeShadowMatrix(out);
+        if (cascade > 0 && shadowCascades > 1) {
+            float r = getShadowCascadeRatio();
+            for (int c = 0; c < 4; c++) {
+                out[c * 4] *= r;
+                out[c * 4 + 1] *= r;
+            }
+        }
+    }
+
     /// Returns the shadow depth bias.
     public float getShadowBias() {
         return shadowBias;
@@ -265,7 +336,8 @@ public final class Light {
         float dx = len > 0 ? dirX / len : 0;
         float dy = len > 0 ? dirY / len : -1;
         float dz = len > 0 ? dirZ / len : 0;
-        float back = shadowExtent * 2f;
+        // the far cascade shares this depth range, so it reaches past both
+        float back = getShadowFarExtent() * 2f;
         float upX = 0;
         float upY = 1;
         float upZ = 0;

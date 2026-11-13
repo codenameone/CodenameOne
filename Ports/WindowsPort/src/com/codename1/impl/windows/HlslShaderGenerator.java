@@ -29,6 +29,7 @@ import com.codename1.gpu.VertexFormat;
 import com.codename1.gpu.shader.ShaderEmitter;
 import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.impl.gpu.GlslShaderGenerator;
 
 /// Runtime generator of HLSL (Direct3D 11, Shader Model 4) source for the native
 /// Windows 3D backend. It mirrors the logic of the portable GLSL generator
@@ -268,7 +269,7 @@ public final class HlslShaderGenerator {
         sb.append("  float4 horizon;\n");
         sb.append("  float4 sun;\n");         // sun colour, cloud cover
         sb.append("  float4x4 shadowMatrix;\n");
-        sb.append("  float4 shadowParams;\n"); // bias, strength, texel size
+        sb.append("  float4 shadowParams;\n"); // bias, strength, texel size, cascade ratio
         // custom shading: the clock, then one float4 per declared uniform
         sb.append("  float4 timeP;\n");
         sb.append("  float4 cu[").append(ShaderMaterial.MAX_UNIFORMS).append("];\n");
@@ -458,14 +459,17 @@ public final class HlslShaderGenerator {
     // GL-convention depth in an R32_FLOAT target, so there is nothing to unpack.
     private static void appendShadowLookup(StringBuilder sb) {
         sb.append("float shadowAt(float4 sp, float3 n, float3 l) {\n");
-        sb.append("  float3 p = sp.xyz / sp.w * 0.5 + 0.5;\n");
+        sb.append("  float3 p = sp.xyz / sp.w;\n");
+        sb.append("  float2 tx = float2(shadowParams.z, shadowParams.z);\n");
+        GlslShaderGenerator.appendCascadePick(sb, "shadowParams.w", "tx");
+        sb.append("  p = p * 0.5 + 0.5;\n");
         sb.append("  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) {\n");
         sb.append("    return 1.0;\n  }\n");
         sb.append("  float bias = shadowParams.x * (1.0 + 2.0 * (1.0 - max(dot(n, l), 0.0)));\n");
         sb.append("  float lit = 0.0;\n");
         sb.append("  [unroll] for (int y = -1; y <= 1; y++) {\n");
         sb.append("    [unroll] for (int x = -1; x <= 1; x++) {\n");
-        sb.append("      float2 uv = float2(p.x + float(x) * shadowParams.z, (1.0 - p.y) + float(y) * shadowParams.z);\n");
+        sb.append("      float2 uv = float2(p.x + float(x) * tx.x, (1.0 - p.y) + float(y) * tx.y);\n");
         sb.append("      float d = cn1_shadowMap.SampleLevel(cn1_shadowSampler, uv, 0).r;\n");
         sb.append("      lit += (p.z - bias > d) ? 0.0 : 1.0;\n");
         sb.append("    }\n  }\n");

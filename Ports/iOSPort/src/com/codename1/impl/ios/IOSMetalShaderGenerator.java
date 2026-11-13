@@ -29,6 +29,7 @@ import com.codename1.gpu.VertexFormat;
 import com.codename1.gpu.shader.ShaderEmitter;
 import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.impl.gpu.GlslShaderGenerator;
 
 /// Runtime generator of Metal Shading Language (MSL) source for the iOS 3D
 /// backend. This mirrors the logic of the portable GLSL generator
@@ -289,7 +290,7 @@ public final class IOSMetalShaderGenerator {
         sb.append("  float4 horizon;\n");
         sb.append("  float4 sun;\n");        // rgb, cloud cover
         sb.append("  float4x4 shadowMatrix;\n");
-        sb.append("  float4 shadowP;\n");   // bias, strength, texel size
+        sb.append("  float4 shadowP;\n");   // bias, strength, texel size, cascade ratio
         // custom shading: the clock, then one float4 per declared uniform
         sb.append("  float4 timeP;\n");
         sb.append("  float4 cu[").append(ShaderMaterial.MAX_UNIFORMS).append("];\n");
@@ -479,14 +480,17 @@ public final class IOSMetalShaderGenerator {
     private static void appendShadowLookup(StringBuilder sb) {
         sb.append("float cn1ShadowAt(float4 sp, float3 n, float3 l, constant CN1Uniforms& u, depth2d<float> map) {\n");
         sb.append("  constexpr sampler ss(coord::normalized, address::clamp_to_edge, filter::nearest);\n");
-        sb.append("  float3 p = sp.xyz / sp.w * 0.5 + 0.5;\n");
+        sb.append("  float3 p = sp.xyz / sp.w;\n");
+        sb.append("  float2 tx = float2(u.shadowP.z);\n");
+        GlslShaderGenerator.appendCascadePick(sb, "u.shadowP.w", "tx");
+        sb.append("  p = p * 0.5 + 0.5;\n");
         sb.append("  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) {\n");
         sb.append("    return 1.0;\n  }\n");
         sb.append("  float bias = u.shadowP.x * (1.0 + 2.0 * (1.0 - max(dot(n, l), 0.0)));\n");
         sb.append("  float lit = 0.0;\n");
         sb.append("  for (int y = -1; y <= 1; y++) {\n");
         sb.append("    for (int x = -1; x <= 1; x++) {\n");
-        sb.append("      float d = map.sample(ss, float2(p.x, 1.0 - p.y) + float2(float(x), float(y)) * u.shadowP.z);\n");
+        sb.append("      float d = map.sample(ss, float2(p.x, 1.0 - p.y) + float2(float(x), float(y)) * tx);\n");
         sb.append("      lit += p.z - bias > d ? 0.0 : 1.0;\n");
         sb.append("    }\n  }\n");
         sb.append("  return 1.0 - u.shadowP.y * (1.0 - lit / 9.0);\n");

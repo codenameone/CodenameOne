@@ -133,6 +133,32 @@ public final class GlslShaderGenerator {
         return new GlslShaderGenerator(material, format, null, false, true);
     }
 
+    /// Prints the cascade choice every generator's shadow lookup shares, on
+    /// `p`, the position in the near cascade's normalized device coordinates.
+    /// With a ratio above 0 the map is two squares wide: a position inside
+    /// the near square (with a margin for the filter) moves to the left half,
+    /// any other is scaled into the far cascade and moves to the right half,
+    /// and the horizontal texel step halves. Public so the Metal and HLSL
+    /// generators print the same lines in their own dialect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sb`: the source being built
+    ///
+    /// - `ratio`: the expression of the cascade ratio
+    ///
+    /// - `texel`: the name of the two component texel step variable
+    public static void appendCascadePick(StringBuilder sb, String ratio, String texel) {
+        sb.append("  if (").append(ratio).append(" > 0.0) {\n");
+        sb.append("    ").append(texel).append(".x *= 0.5;\n");
+        sb.append("    if (max(abs(p.x), abs(p.y)) < 0.97) {\n");
+        sb.append("      p.x = p.x * 0.5 - 0.5;\n");
+        sb.append("    } else {\n");
+        sb.append("      p.xy = p.xy * ").append(ratio).append(";\n");
+        sb.append("      p.x = p.x * 0.5 + 0.5;\n");
+        sb.append("    }\n  }\n");
+    }
+
     /// True if a material moves its vertices or discards fragments, so its
     /// depth only needs a program of its own rather than the shared caster
     /// program that only reads the position.
@@ -480,11 +506,15 @@ public final class GlslShaderGenerator {
         }
         if (f.shadow) {
             sb.append("uniform sampler2D u_shadowMap;\n");
-            sb.append("uniform vec3 u_shadow;\n");
+            // bias, strength, texel size, cascade ratio (0 = one map)
+            sb.append("uniform vec4 u_shadow;\n");
             sb.append("varying vec4 v_shadowPos;\n");
             sb.append(UNPACK);
             sb.append("float shadowAt(vec3 n, vec3 l) {\n");
-            sb.append("  vec3 p = v_shadowPos.xyz / v_shadowPos.w * 0.5 + 0.5;\n");
+            sb.append("  vec3 p = v_shadowPos.xyz / v_shadowPos.w;\n");
+            sb.append("  vec2 tx = vec2(u_shadow.z);\n");
+            appendCascadePick(sb, "u_shadow.w", "tx");
+            sb.append("  p = p * 0.5 + 0.5;\n");
             sb.append("  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) {\n");
             sb.append("    return 1.0;\n  }\n");
             // a steeper surface needs a larger offset to stay off its own map
@@ -492,7 +522,7 @@ public final class GlslShaderGenerator {
             sb.append("  float lit = 0.0;\n");
             sb.append("  for (int y = -1; y <= 1; y++) {\n");
             sb.append("    for (int x = -1; x <= 1; x++) {\n");
-            sb.append("      float d = unpackDepth(texture2D(u_shadowMap, p.xy + vec2(float(x), float(y)) * u_shadow.z));\n");
+            sb.append("      float d = unpackDepth(texture2D(u_shadowMap, p.xy + vec2(float(x), float(y)) * tx));\n");
             sb.append("      lit += p.z - bias > d ? 0.0 : 1.0;\n");
             sb.append("    }\n  }\n");
             sb.append("  return 1.0 - u_shadow.y * (1.0 - lit / 9.0);\n");

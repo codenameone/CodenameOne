@@ -79,6 +79,12 @@ class WindowsGraphicsDevice extends GraphicsDevice {
     // Shadow state, as in JavaSEGLDevice: the light matrix of the last shadow
     // pass, whether a pass is running, and whether its map may be sampled.
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, the matrix of the cascade being drawn, and the
+    // cascade count of the shadow pass in progress (the map is that many
+    // squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private final float[] casterMatrix = new float[16];
+    private int shadowCascades = 1;
     private final float[] model = new float[16];
     private boolean inShadowPass;
     private boolean shadowReady;
@@ -312,7 +318,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         uniforms[o++] = sl.getShadowBias();
         uniforms[o++] = sl.getShadowStrength();
         uniforms[o++] = sl.getShadowSoftness() / Math.max(1, shadowSize);
-        uniforms[o++] = 0.0f;
+        uniforms[o++] = sl.getShadowCascadeRatio();
         uniforms[o++] = getTime();
         uniforms[o++] = 0.0f;
         uniforms[o++] = 0.0f;
@@ -352,12 +358,14 @@ class WindowsGraphicsDevice extends GraphicsDevice {
             return false;
         }
         int size = light.getShadowMapSize();
-        if (!WindowsNative.gl3dBeginShadowPass(contextPeer, size)) {
+        if (!WindowsNative.gl3dBeginShadowPass(contextPeer, size * light.getShadowCascades(), size)) {
             return false;
         }
         shadowSize = size;
         shadowSampling = false;
-        light.computeShadowMatrix(shadowMatrix);
+        shadowCascades = light.getShadowCascades();
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -374,7 +382,25 @@ class WindowsGraphicsDevice extends GraphicsDevice {
 
     // Renders one caster's depth into the shadow map: only positions are read,
     // the first uniform matrix is shadowMatrix * model.
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        int size = shadowSize;
+        if (shadowCascades < 2) {
+            Matrix4.copy(shadowMatrix, casterMatrix);
+            drawShadowCascade(mesh, material, modelMatrix);
+            return;
+        }
+        WindowsNative.gl3dSetViewport(contextPeer, 0, 0, size, size);
+        Matrix4.copy(shadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        WindowsNative.gl3dSetViewport(contextPeer, size, 0, size, size);
+        Matrix4.copy(farShadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        WindowsNative.gl3dSetViewport(contextPeer, 0, 0, size * 2, size);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix) {
         if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
             return;
@@ -394,7 +420,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         } else {
             Matrix4.setIdentity(model);
         }
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(casterMatrix, model, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
         }
@@ -432,7 +458,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         }
         float[] m = modelMatrix != null ? modelMatrix : Matrix4.identity();
         packUniforms(material, m);
-        Matrix4.multiply(shadowMatrix, m, mvp);
+        Matrix4.multiply(casterMatrix, m, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
         }

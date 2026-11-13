@@ -93,7 +93,7 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, CN1GL3DPipeline *> *pipelineCache;
 @property (nonatomic, strong) id<MTLRenderCommandEncoder> currentEncoder;
 - (id<MTLRenderCommandEncoder>)activeEncoder;
-- (BOOL)beginShadowPass:(int)size;
+- (BOOL)beginShadowPass:(int)width height:(int)size;
 - (void)endShadowPass;
 - (BOOL)isInShadowPass;
 - (BOOL)shadowAvailable;
@@ -316,13 +316,14 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     }
 }
 
-- (BOOL)beginShadowPass:(int)size {
-    if (_frameCB == nil || _inShadow || size < 16 || size > 8192) {
+- (BOOL)beginShadowPass:(int)width height:(int)size {
+    if (_frameCB == nil || _inShadow || size < 16 || size > 8192 || width < size || width > 16384) {
         return NO;
     }
-    if (self.shadowTexture == nil || (int) self.shadowTexture.width != size) {
+    if (self.shadowTexture == nil || (int) self.shadowTexture.width != width
+            || (int) self.shadowTexture.height != size) {
         MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:CN1GL3D_DEPTH_FORMAT
-                                                                                      width:size height:size mipmapped:NO];
+                                                                                      width:width height:size mipmapped:NO];
         td.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
         td.storageMode = MTLStorageModePrivate;
         self.shadowTexture = [_device newTextureWithDescriptor:td];
@@ -337,7 +338,7 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     rpd.depthAttachment.loadAction = MTLLoadActionClear;
     rpd.depthAttachment.storeAction = MTLStoreActionStore;
     id<MTLRenderCommandEncoder> enc = [_frameCB renderCommandEncoderWithDescriptor:rpd];
-    [enc setViewport:(MTLViewport){0.0, 0.0, (double) size, (double) size, 0.0, 1.0}];
+    [enc setViewport:(MTLViewport){0.0, 0.0, (double) width, (double) size, 0.0, 1.0}];
     self.currentEncoder = enc;
     _inShadow = YES;
     return YES;
@@ -805,10 +806,19 @@ void com_codename1_impl_ios_IOSNative_gl3dSetViewport___long_int_int_int_int(
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
     if (contextPeer == 0) return;
     CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    // Inside a shadow pass the viewport picks the cascade's square of the
+    // shadow map; it is not the frame's viewport, so it is not recorded.
+    if ([view isInShadowPass]) {
+        if (view.currentEncoder != nil) {
+            [view.currentEncoder setViewport:(MTLViewport){(double) x, (double) y, (double) width,
+                    (double) height, 0.0, 1.0}];
+        }
+        return;
+    }
     [view recordViewport:x y:y width:width height:height];
     // Only an already open main pass is touched; opening one here would run
-    // ahead of a shadow pass or post process target the frame is about to begin.
-    id<MTLRenderCommandEncoder> enc = [view isInShadowPass] ? nil : view.currentEncoder;
+    // ahead of a post process target the frame is about to begin.
+    id<MTLRenderCommandEncoder> enc = view.currentEncoder;
     if (enc != nil) {
         MTLViewport vp = (MTLViewport){(double) x, (double) y, (double) width, (double) height, 0.0, 1.0};
         [enc setViewport:vp];
@@ -943,11 +953,11 @@ void com_codename1_impl_ios_IOSNative_gl3dBindTexture___long_int_long_int_int(
     [enc setFragmentSamplerState:CN1GL3DSampler(view, texFilter, texWrap) atIndex:index];
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginShadowPass___long_int_R_boolean(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT size) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginShadowPass___long_int_int_R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT size) {
     if (contextPeer == 0) return 0;
     CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
-    return [view beginShadowPass:size] ? 1 : 0;
+    return [view beginShadowPass:width height:size] ? 1 : 0;
 }
 
 void com_codename1_impl_ios_IOSNative_gl3dEndShadowPass___long(
