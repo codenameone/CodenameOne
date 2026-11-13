@@ -166,21 +166,38 @@ final class BuiltinSubclass {
             if (args.length == 0 || !(args[0] instanceof PyType)) {
                 throw Py.notATypeObject(t.name, args);
             }
-            PyType cls = (PyType) args[0];
-            if (!cls.isSubtype(t)) {
-                throw Py.typeError(t.name + ".__new__(" + cls.name + "): " + cls.name + " is not a subtype of "
-                        + t.name);
-            }
+            PyType cls = newTarget(t, args[0]);
             Object[] rest = new Object[args.length - 1];
             System.arraycopy(args, 1, rest, 0, rest.length);
-            Object v = t.factory.create(t, rest, kw);
-            if (cls == t) { //NOPMD CompareObjectsWithEquals - identity is meant
-                return v;
+            return wrapNew(t, cls, t.factory.create(t, rest, kw));
+        }).withTwo((c, a) -> {
+            // `str.__new__(cls, value)`, which bs4 runs for every text node: no
+            // argument arrays, and the value is made the way `str(value)` makes it.
+            if (!(c instanceof PyType)) {
+                throw Py.notATypeObject(t.name, new Object[] {c, a});
             }
-            PyInstance o = cls.newInstance();
-            o.base = v;
-            return o;
+            PyType cls = newTarget(t, c);
+            Object v = t.unary != null ? t.unary.create(a) : t.factory.create(t, new Object[] {a}, Py.NO_KW);
+            return wrapNew(t, cls, v);
         })));
+    }
+
+    private static PyType newTarget(PyType t, Object c) {
+        PyType cls = (PyType) c;
+        if (!cls.isSubtype(t)) {
+            throw Py.typeError(t.name + ".__new__(" + cls.name + "): " + cls.name + " is not a subtype of "
+                    + t.name);
+        }
+        return cls;
+    }
+
+    private static Object wrapNew(PyType t, PyType cls, Object v) {
+        if (cls == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return v;
+        }
+        PyInstance o = cls.newInstance();
+        o.base = v;
+        return o;
     }
 
     /// `T.__init__(self, *args)` of a mutable builtin `T`: refills the value.

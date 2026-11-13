@@ -88,6 +88,13 @@ public final class PyBuiltin extends PyObject {
     }
 
     /// A builtin that rejects keyword arguments, as most C functions do.
+    /// Adds a two-argument path to a builtin whose general form takes an array, so
+    /// `f(a, b)` reaches it without packing the arguments.
+    PyBuiltin withTwo(Two f) {
+        two = f;
+        return this;
+    }
+
     public static PyBuiltin positional(final String name, final Positional p) {
         return new PyBuiltin(name, new Impl() {
             @Override
