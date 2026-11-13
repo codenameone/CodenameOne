@@ -552,7 +552,8 @@ public final class IOSMetalShaderGenerator {
     /// from the vertex id) and the bright, blur and composite fragment
     /// functions. Each fragment function reads one `float4` (bright, blur) or a
     /// `CN1PostU` (composite) at fragment buffer 0 and the scene at texture 0,
-    /// the bloom at texture 1. Mirrors the GLSL passes term for term.
+    /// the bloom at texture 1, the scene depth at texture 2 and the colour
+    /// lookup at texture 3. Mirrors the GLSL passes term for term.
     ///
     /// #### Returns
     ///
@@ -569,6 +570,9 @@ public final class IOSMetalShaderGenerator {
         sb.append("  float4 b;\n");     // grain, time, width, height
         sb.append("  float4 fx;\n");    // aberration, fxaa, god rays, unused
         sb.append("  float4 sun;\n");   // sun position in uv
+        sb.append("  float4 dfx;\n");   // ao strength, ao radius, focus, blur
+        sb.append("  float4 dfx2;\n");  // outline, near, far, lut strength
+        sb.append("  float4 ocol;\n");  // outline colour
         sb.append("};\n");
         sb.append("vertex CN1PostV cn1_post_vertex(uint vid [[vertex_id]]) {\n");
         sb.append("  float2 p = float2((vid & 1u) != 0u ? 1.0 : -1.0, (vid & 2u) != 0u ? 1.0 : -1.0);\n");
@@ -602,16 +606,21 @@ public final class IOSMetalShaderGenerator {
         sb.append("  return float4(c, 1.0);\n");
         sb.append("}\n");
         sb.append("float3 cn1Px(texture2d<float> t, float2 p) {\n  return t.sample(cn1PostS, p).rgb;\n}\n");
+        sb.append("float cn1Depth(depth2d<float> t, float2 p) {\n  return t.sample(cn1PostS, p);\n}\n");
+        sb.append("float3 cn1Lut(texture2d<float> t, float2 p) {\n  return t.sample(cn1PostS, p).rgb;\n}\n");
         sb.append("fragment float4 cn1_composite_fragment(CN1PostV in [[stage_in]], constant CN1PostU& u [[buffer(0)]],\n");
-        sb.append("    texture2d<float> scene [[texture(0)]], texture2d<float> bloom [[texture(1)]]) {\n");
+        sb.append("    texture2d<float> scene [[texture(0)]], texture2d<float> bloom [[texture(1)]],\n");
+        sb.append("    depth2d<float> depth [[texture(2)]], texture2d<float> lut [[texture(3)]]) {\n");
         sb.append("  float2 uv0 = in.uv;\n");
         sb.append(com.codename1.impl.gpu.GlslShaderGenerator.postEffects("msl", "u.fx", "u.sun.xy", "u.b.zw"));
+        sb.append(com.codename1.impl.gpu.GlslShaderGenerator.depthEffects("msl", "u.dfx", "u.dfx2", "u.ocol.xyz"));
         sb.append("  c += bloom.sample(cn1PostS, in.uv).rgb * u.a.x;\n");
         sb.append("  c = (c - 0.5) * u.a.y + 0.5;\n");
         sb.append("  float luma = dot(c, float3(0.2126, 0.7152, 0.0722));\n");
         sb.append("  c = mix(float3(luma), c, u.a.z);\n");
         sb.append("  c = clamp(c, 0.0, 1.0);\n");
         sb.append("  c = (u.lift.xyz + c * (1.0 - u.lift.xyz)) * u.gain.xyz;\n");
+        sb.append(com.codename1.impl.gpu.GlslShaderGenerator.lutEffect("msl", "u.dfx2.w"));
         sb.append("  float2 d = in.uv - 0.5;\n");
         sb.append("  c *= 1.0 - u.a.w * smoothstep(0.25, 0.75, dot(d, d) * 2.0);\n");
         sb.append("  float2 px = floor(in.uv * u.b.zw);\n");

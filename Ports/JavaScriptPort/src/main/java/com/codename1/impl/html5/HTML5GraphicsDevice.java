@@ -74,6 +74,8 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     private static final int DEPTH_BUFFER_BIT = 0x0100;
     // chromatic aberration, FXAA, god rays and the sun, for the composite
     private final float[] postFx = new float[6];
+    private final float[] depthFx = new float[12];
+    private boolean depthExtensionAsked;
     private static final int COLOR_BUFFER_BIT = 0x4000;
     private static final int POINTS = 0x0000;
     private static final int LINES = 0x0001;
@@ -115,6 +117,9 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     private static final int COLOR_ATTACHMENT0 = 0x8CE0;
     private static final int DEPTH_ATTACHMENT = 0x8D00;
     private static final int DEPTH_COMPONENT16 = 0x81A5;
+    private static final int DEPTH_COMPONENT = 0x1902;
+    private static final int UNSIGNED_INT = 0x1405;
+    private static final int FRAMEBUFFER_COMPLETE = 0x8CD5;
 
     private final WebGLRenderingContext gl;
     private final Map<String, ProgramEntry> programs = new HashMap<String, ProgramEntry>();
@@ -126,6 +131,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         WebGLFramebuffer fbo;
         WebGLTexture tex;
         WebGLRenderbuffer depth;
+        WebGLTexture depthTex;
         int width;
         int height;
     }
@@ -721,6 +727,32 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         gl.bindFramebuffer(FRAMEBUFFER, n.fbo);
         gl.framebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, n.tex, 0);
         if (depth) {
+            // a depth texture, so the composite can read the scene's depth for
+            // ambient occlusion, depth of field and outlines. WebGL 1 needs
+            // WEBGL_depth_texture; without it the framebuffer is incomplete,
+            // a renderbuffer takes its place and the depth effects turn off
+            if (!depthExtensionAsked) {
+                depthExtensionAsked = true;
+                gl.getExtension("WEBGL_depth_texture");
+            }
+            n.depthTex = gl.createTexture();
+            gl.bindTexture(TEXTURE_2D, n.depthTex);
+            gl.texImage2D(TEXTURE_2D, 0, DEPTH_COMPONENT, w, h, 0, DEPTH_COMPONENT, UNSIGNED_INT, null);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, NEAREST);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, NEAREST);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_S, CLAMP_TO_EDGE);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_T, CLAMP_TO_EDGE);
+            gl.bindTexture(TEXTURE_2D, null);
+            gl.framebufferTexture2D(FRAMEBUFFER, DEPTH_ATTACHMENT, TEXTURE_2D, n.depthTex, 0);
+            if (gl.checkFramebufferStatus(FRAMEBUFFER) == FRAMEBUFFER_COMPLETE) {
+                return n;
+            }
+            for (int i = 0; i < 8 && gl.getError() != 0; i++) {
+                // drain the error the unsupported format raised
+            }
+            gl.framebufferTexture2D(FRAMEBUFFER, DEPTH_ATTACHMENT, TEXTURE_2D, null, 0);
+            gl.deleteTexture(n.depthTex);
+            n.depthTex = null;
             n.depth = gl.createRenderbuffer();
             gl.bindRenderbuffer(RENDERBUFFER, n.depth);
             gl.renderbufferStorage(RENDERBUFFER, DEPTH_COMPONENT16, w, h);
@@ -736,6 +768,9 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
         gl.deleteFramebuffer(t.fbo);
         gl.deleteTexture(t.tex);
+        if (t.depthTex != null) {
+            gl.deleteTexture(t.depthTex);
+        }
         if (t.depth != null) {
             gl.deleteRenderbuffer(t.depth);
         }
@@ -940,6 +975,23 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         packPostEffects(pp, postFx, 0);
         uniform3(c, "u_fx", postFx[0], postFx[1], postFx[2]);
         uniform2(c, "u_sun", postFx[3], postFx[4]);
+        packDepthEffects(pp, depthFx, 0);
+        if (sceneTarget.depthTex == null) {
+            depthFx[0] = 0f;
+            depthFx[3] = 0f;
+            depthFx[4] = 0f;
+        }
+        sampler(c, "u_depth", 2, sceneTarget.depthTex);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof WebGLTexture) {
+            sampler(c, "u_lut", 3, (WebGLTexture) lut.getHandle());
+        } else {
+            depthFx[7] = 0f;
+            sampler(c, "u_lut", 3, null);
+        }
+        uniform4(c, "u_dfx", depthFx[0], depthFx[1], depthFx[2], depthFx[3]);
+        uniform4(c, "u_dfx2", depthFx[4], depthFx[5], depthFx[6], depthFx[7]);
+        uniform3(c, "u_ocol", depthFx[8], depthFx[9], depthFx[10]);
         drawQuad(c);
         gl.depthMask(true);
     }

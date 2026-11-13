@@ -58,6 +58,14 @@ public final class PostProcess {
     private float aberration;
     private boolean fxaa;
     private float godRays;
+    private float aoStrength;
+    private float aoRadius = 12f;
+    private float focusDistance = 10f;
+    private float dofBlur;
+    private float outline;
+    private int outlineColor = 0xff000000;
+    private Texture lut;
+    private float lutStrength;
 
     /// Makes bright parts of the frame glow into their surroundings.
     ///
@@ -238,5 +246,128 @@ public final class PostProcess {
     /// Returns the god ray strength.
     public float getGodRays() {
         return godRays;
+    }
+
+    /// Darkens creases and contact points from the depth of the frame
+    /// (screen space ambient occlusion), so objects sit on the ground instead
+    /// of floating over it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strength`: 0 for none; 0.5 to 1 for visible contact shadows
+    ///
+    /// - `radiusPixels`: how far around each pixel to look, in pixels
+    ///
+    /// #### Returns
+    ///
+    /// this post process for chaining
+    public PostProcess setAmbientOcclusion(float strength, float radiusPixels) {
+        this.aoStrength = Math.max(0f, Math.min(1f, strength));
+        this.aoRadius = Math.max(1f, Math.min(64f, radiusPixels));
+        return this;
+    }
+
+    /// Returns the ambient occlusion strength.
+    public float getAmbientOcclusion() {
+        return aoStrength;
+    }
+
+    /// Returns the ambient occlusion radius in pixels.
+    public float getAmbientOcclusionRadius() {
+        return aoRadius;
+    }
+
+    /// Blurs what is nearer or farther than the focus distance, as a camera
+    /// lens with a wide aperture does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `focusDistance`: the distance from the camera that stays sharp, in
+    ///   world units
+    ///
+    /// - `blurPixels`: the widest blur, in pixels; 0 turns depth of field off
+    ///
+    /// #### Returns
+    ///
+    /// this post process for chaining
+    public PostProcess setDepthOfField(float focusDistance, float blurPixels) {
+        this.focusDistance = Math.max(0.001f, focusDistance);
+        this.dofBlur = Math.max(0f, Math.min(32f, blurPixels));
+        return this;
+    }
+
+    /// Returns the focus distance.
+    public float getFocusDistance() {
+        return focusDistance;
+    }
+
+    /// Returns the widest depth of field blur in pixels.
+    public float getDepthOfFieldBlur() {
+        return dofBlur;
+    }
+
+    /// Draws a line where the depth of the frame jumps, around silhouettes
+    /// and creases, for a toon or ink look.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strength`: 0 for none, 1 for solid lines
+    ///
+    /// - `argb`: the line colour
+    ///
+    /// #### Returns
+    ///
+    /// this post process for chaining
+    public PostProcess setOutline(float strength, int argb) {
+        this.outline = Math.max(0f, Math.min(1f, strength));
+        this.outlineColor = argb;
+        return this;
+    }
+
+    /// Returns the outline strength.
+    public float getOutline() {
+        return outline;
+    }
+
+    /// Returns the outline colour.
+    public int getOutlineColor() {
+        return outlineColor;
+    }
+
+    /// Maps every colour through a lookup table after the grade, the way a
+    /// film look is applied in a colour grading tool. The table is a 256 by
+    /// 16 strip of 16 squares: square `b` holds blue `b / 15`, and inside it
+    /// the column is red and the row (from the top) green, both 0 to 15.
+    /// `ColorLuts` builds such strips.
+    ///
+    /// #### Parameters
+    ///
+    /// - `table`: the lookup strip, or null for none
+    ///
+    /// - `strength`: 0 keeps the graded colour, 1 uses the table's
+    ///
+    /// #### Returns
+    ///
+    /// this post process for chaining
+    public PostProcess setColorLut(Texture table, float strength) {
+        this.lut = table;
+        this.lutStrength = Math.max(0f, Math.min(1f, strength));
+        return this;
+    }
+
+    /// Returns the lookup table, or null.
+    public Texture getColorLut() {
+        return lut;
+    }
+
+    /// Returns the lookup table strength, 0 when there is no table.
+    public float getColorLutStrength() {
+        return lut == null ? 0f : lutStrength;
+    }
+
+    /// True when an effect reads the depth of the frame: ambient occlusion,
+    /// depth of field or outline.
+    public boolean isDepthEffects() {
+        return aoStrength > 0f || dofBlur > 0f || outline > 0f;
     }
 }

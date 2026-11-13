@@ -472,6 +472,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateRenderTarget___long_int_int
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginRenderTarget___long_long_int_int_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_LONG texturePeer, JAVA_INT width, JAVA_INT height, JAVA_INT argb) { return 0; }
 void com_codename1_impl_ios_IOSNative_gl3dEndRenderTarget___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer) {}
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginPostProcess___long_java_lang_String_boolean_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_OBJECT mslSource, JAVA_BOOLEAN bloom) { return 0; }
+void com_codename1_impl_ios_IOSNative_gl3dSetPostLut___long_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_LONG texturePeer) {}
 void com_codename1_impl_ios_IOSNative_gl3dEndPostProcess___long_float_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_OBJECT params) {}
 
 #endif // TARGET_OS_WATCH

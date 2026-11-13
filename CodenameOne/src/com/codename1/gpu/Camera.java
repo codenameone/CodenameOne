@@ -138,6 +138,16 @@ public final class Camera {
         return eyeZ;
     }
 
+    /// Returns the distance to the near clip plane.
+    public float getNear() {
+        return near;
+    }
+
+    /// Returns the distance to the far clip plane.
+    public float getFar() {
+        return far;
+    }
+
     /// Returns the 16 element column-major view matrix.
     public float[] getViewMatrix() {
         recompute();

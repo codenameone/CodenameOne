@@ -436,4 +436,36 @@ public abstract class GraphicsDevice {
         out[offset + 3] = u;
         out[offset + 4] = v;
     }
+
+    /// Writes the parameters of the depth effects and the colour lookup into
+    /// `out` from `offset`, twelve floats: ambient occlusion strength and
+    /// radius in pixels, focus distance, depth of field blur in pixels,
+    /// outline strength, the camera's near and far planes, lookup strength,
+    /// and the outline colour as red, green, blue (0 to 1) and a zero. Every
+    /// device packs them in this order, so the composite passes of every
+    /// shading language agree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the post process being composited
+    ///
+    /// - `out`: the parameter array
+    ///
+    /// - `offset`: where to write the twelve floats
+    protected final void packDepthEffects(PostProcess effects, float[] out, int offset) {
+        Camera cam = getCamera();
+        out[offset] = effects.getAmbientOcclusion();
+        out[offset + 1] = effects.getAmbientOcclusionRadius();
+        out[offset + 2] = effects.getFocusDistance();
+        out[offset + 3] = effects.getDepthOfFieldBlur();
+        out[offset + 4] = effects.getOutline();
+        out[offset + 5] = cam == null ? 0.1f : cam.getNear();
+        out[offset + 6] = cam == null ? 100f : cam.getFar();
+        out[offset + 7] = effects.getColorLutStrength();
+        int c = effects.getOutlineColor();
+        out[offset + 8] = ((c >> 16) & 0xff) / 255f;
+        out[offset + 9] = ((c >> 8) & 0xff) / 255f;
+        out[offset + 10] = (c & 0xff) / 255f;
+        out[offset + 11] = 0f;
+    }
 }

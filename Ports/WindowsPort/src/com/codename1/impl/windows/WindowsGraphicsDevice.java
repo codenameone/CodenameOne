@@ -94,7 +94,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
     private long postBright;
     private long postBlur;
     private long postComposite;
-    private final float[] postParams = new float[24];
+    private final float[] postParams = new float[34];
 
     WindowsGraphicsDevice(long contextPeer) {
         this.contextPeer = contextPeer;
@@ -555,6 +555,14 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         p[14] = 0f;
         p[15] = pp.isBloom() ? 1f : 0f;
         packPostEffects(pp, p, 16);
+        packDepthEffects(pp, p, 22);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof Long) {
+            WindowsNative.gl3dBindTexture(contextPeer, 3, ((Long) lut.getHandle()).longValue(), 1, 0);
+        } else {
+            p[29] = 0f;
+            WindowsNative.gl3dBindTexture(contextPeer, 3, 0L, 1, 0);
+        }
         WindowsNative.gl3dEndPost(contextPeer, postBright, postBlur, postComposite, p);
         shadowSampling = false;
     }

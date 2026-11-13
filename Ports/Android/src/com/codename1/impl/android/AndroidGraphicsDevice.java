@@ -102,6 +102,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
     private final Map<String, Program> programs = new HashMap<String, Program>();
     // chromatic aberration, FXAA, god rays and the sun, for the composite
     private final float[] postFx = new float[6];
+    private final float[] depthFx = new float[12];
 
     private GpuCapabilities caps;
 
@@ -115,6 +116,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         int fbo;
         int tex;
         int depth;
+        boolean depthTex;
         int width;
         int height;
     }
@@ -755,6 +757,32 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0,
                 GLES20.GL_TEXTURE_2D, n.tex, 0);
         if (depth) {
+            // a depth texture, so the composite can read the scene's depth for
+            // ambient occlusion, depth of field and outlines; ES 2 devices
+            // without OES_depth_texture leave the framebuffer incomplete and
+            // fall back to a renderbuffer, and the depth effects turn off
+            GLES20.glGenTextures(1, ids, 0);
+            n.depth = ids[0];
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, n.depth);
+            GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_DEPTH_COMPONENT, w, h, 0,
+                    GLES20.GL_DEPTH_COMPONENT, GLES20.GL_UNSIGNED_INT, null);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+            GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT,
+                    GLES20.GL_TEXTURE_2D, n.depth, 0);
+            if (GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) == GLES20.GL_FRAMEBUFFER_COMPLETE) {
+                n.depthTex = true;
+                return n;
+            }
+            for (int i = 0; i < 8 && GLES20.glGetError() != GLES20.GL_NO_ERROR; i++) {
+                // drain the error the unsupported format raised
+            }
+            GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT,
+                    GLES20.GL_TEXTURE_2D, 0, 0);
+            GLES20.glDeleteTextures(1, new int[]{n.depth}, 0);
             GLES20.glGenRenderbuffers(1, ids, 0);
             n.depth = ids[0];
             GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, n.depth);
@@ -772,7 +800,9 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         }
         GLES20.glDeleteFramebuffers(1, new int[]{t.fbo}, 0);
         GLES20.glDeleteTextures(1, new int[]{t.tex}, 0);
-        if (t.depth != 0) {
+        if (t.depthTex) {
+            GLES20.glDeleteTextures(1, new int[]{t.depth}, 0);
+        } else if (t.depth != 0) {
             GLES20.glDeleteRenderbuffers(1, new int[]{t.depth}, 0);
         }
     }
@@ -957,6 +987,23 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         packPostEffects(pp, postFx, 0);
         uniform3(c, "u_fx", postFx[0], postFx[1], postFx[2]);
         uniform2(c, "u_sun", postFx[3], postFx[4]);
+        packDepthEffects(pp, depthFx, 0);
+        if (!sceneTarget.depthTex) {
+            depthFx[0] = 0f;
+            depthFx[3] = 0f;
+            depthFx[4] = 0f;
+        }
+        sampler(c, "u_depth", 2, sceneTarget.depthTex ? sceneTarget.depth : 0);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof TexHandle) {
+            sampler(c, "u_lut", 3, ((TexHandle) lut.getHandle()).id);
+        } else {
+            depthFx[7] = 0f;
+            sampler(c, "u_lut", 3, 0);
+        }
+        uniform4(c, "u_dfx", depthFx[0], depthFx[1], depthFx[2], depthFx[3]);
+        uniform4(c, "u_dfx2", depthFx[4], depthFx[5], depthFx[6], depthFx[7]);
+        uniform3(c, "u_ocol", depthFx[8], depthFx[9], depthFx[10]);
         drawQuad(c);
         GLES20.glDepthMask(true);
     }

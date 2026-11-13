@@ -114,4 +114,6 @@ public interface WebGLRenderingContext extends JSObject {
     void deleteRenderbuffer(WebGLRenderbuffer renderbuffer);
     void disableVertexAttribArray(int index);
     void uniform2f(WebGLUniformLocation location, float x, float y);
+    int checkFramebufferStatus(int target);
+    JSObject getExtension(String name);
 }

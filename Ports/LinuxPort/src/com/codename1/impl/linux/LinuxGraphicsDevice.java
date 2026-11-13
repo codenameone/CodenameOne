@@ -94,7 +94,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
     private boolean shadowReady;
     private int shadowSize;
     private PostProcess activePost;
-    private final float[] postParams = new float[19];
+    private final float[] postParams = new float[31];
 
     LinuxGraphicsDevice(long contextPeer) {
         this.contextPeer = contextPeer;
@@ -548,6 +548,14 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         p[11] = pp.getGrain();
         p[12] = timeSeconds;
         packPostEffects(pp, p, 13);
+        packDepthEffects(pp, p, 19);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof Long) {
+            LinuxNative.gl3dBindTexture(contextPeer, 3, ((Long) lut.getHandle()).longValue(), 1, 0);
+        } else {
+            p[26] = 0f;
+            LinuxNative.gl3dBindTexture(contextPeer, 3, 0L, 1, 0);
+        }
         LinuxNative.gl3dEndPost(contextPeer, brightPipeline, blurPipeline, compositePipeline,
                 pp.isBloom(), p);
     }

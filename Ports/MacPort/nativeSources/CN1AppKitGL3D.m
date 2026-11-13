@@ -119,6 +119,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginRenderTarget___long_long_
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_gl3dEndRenderTarget___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1) {
 }
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_gl3dSetPostLut___long_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1, JAVA_LONG __cn1Arg2) {
+}
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginPostProcess___long_java_lang_String_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_BOOLEAN __cn1Arg3) {

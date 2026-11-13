@@ -903,12 +903,120 @@ public final class GlslShaderGenerator {
         return t;
     }
 
+    /// The depth effects every composite pass shares: depth of field,
+    /// ambient occlusion and outline, in that order, applied to `c` after
+    /// `postEffects`. The caller declares `cn1Depth(uv)` (window depth, 0 to
+    /// 1; Metal takes the depth texture first) and the block linearizes it
+    /// with the near and far planes. `dfx` and `dfx2` are the first eight
+    /// floats `GraphicsDevice.packDepthEffects` packs, `ocol` the outline
+    /// colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lang`: "glsl", "msl" or "hlsl"
+    ///
+    /// - `dfx`: the expression of (ao strength, ao radius, focus, blur)
+    ///
+    /// - `dfx2`: the expression of (outline, near, far, lut strength)
+    ///
+    /// - `ocol`: the expression of the outline colour
+    ///
+    /// #### Returns
+    ///
+    /// the statements
+    public static String depthEffects(String lang, String dfx, String dfx2, String ocol) {
+        String t = "  if (DFX.x + DFX.w + DFX2.x > 0.0) {\n"
+                + "    float zn = DFX2.y;\n"
+                + "    float zf = DFX2.z;\n"
+                + "    float d0 = DEPTH(uv0);\n"
+                + "    float z0 = 2.0 * zn * zf / (zf + zn - (2.0 * d0 - 1.0) * (zf - zn));\n"
+                + "    if (DFX.w > 0.0) {\n"
+                + "      float coc = clamp(abs(z0 - DFX.z) / max(DFX.z, 0.001), 0.0, 1.0) * DFX.w;\n"
+                + "      if (coc > 0.5) {\n"
+                + "        V3 acc = c;\n"
+                + "        for (int i = 0; i < 12; i++) {\n"
+                + "          float fi = float(i);\n"
+                + "          float a = fi * 2.399963;\n"
+                + "          float r = sqrt((fi + 0.5) / 12.0) * coc;\n"
+                + "          acc += PX(uv0 + V2(cos(a), sin(a)) * r * px1);\n"
+                + "        }\n"
+                + "        c = acc / 13.0;\n"
+                + "      }\n"
+                + "    }\n"
+                + "    if (DFX.x > 0.0 && d0 < 0.99999) {\n"
+                + "      float occ = 0.0;\n"
+                + "      for (int i = 0; i < 8; i++) {\n"
+                + "        float fi = float(i);\n"
+                + "        float a = fi * 2.399963 + 0.7;\n"
+                + "        float r = (fi + 1.0) * 0.125 * DFX.y;\n"
+                + "        float ds = DEPTH(uv0 + V2(cos(a), sin(a)) * r * px1);\n"
+                + "        float zs = 2.0 * zn * zf / (zf + zn - (2.0 * ds - 1.0) * (zf - zn));\n"
+                + "        float dz = (z0 - zs) / z0;\n"
+                + "        occ += smoothstep(0.005, 0.04, dz) * (1.0 - smoothstep(0.15, 0.3, dz));\n"
+                + "      }\n"
+                + "      c *= 1.0 - DFX.x * occ * 0.125;\n"
+                + "    }\n"
+                + "    if (DFX2.x > 0.0) {\n"
+                + "      float e = 0.0;\n"
+                + "      for (int i = 0; i < 4; i++) {\n"
+                + "        float fi = float(i);\n"
+                + "        V2 o = V2(cos(fi * 1.5707963), sin(fi * 1.5707963)) * px1;\n"
+                + "        float ds = DEPTH(uv0 + o);\n"
+                + "        e += 2.0 * zn * zf / (zf + zn - (2.0 * ds - 1.0) * (zf - zn));\n"
+                + "      }\n"
+                + "      float lap = abs(e - 4.0 * z0) / z0;\n"
+                + "      c = mix(c, OCOL, clamp(smoothstep(0.04, 0.16, lap) * DFX2.x, 0.0, 1.0));\n"
+                + "    }\n"
+                + "  }\n";
+        return translate(lang, t.replace("DFX2", dfx2).replace("DFX", dfx).replace("OCOL", ocol));
+    }
+
+    /// The colour lookup every composite pass applies after its grade. The
+    /// caller declares `cn1Lut(uv)` (Metal takes the table first).
+    ///
+    /// #### Parameters
+    ///
+    /// - `lang`: "glsl", "msl" or "hlsl"
+    ///
+    /// - `strength`: the expression of the lookup strength
+    ///
+    /// #### Returns
+    ///
+    /// the statements
+    public static String lutEffect(String lang, String strength) {
+        String t = "  if (STR > 0.0) {\n"
+                + "    V3 q = clamp(c, 0.0, 1.0) * 15.0;\n"
+                + "    float b0 = floor(q.b);\n"
+                + "    float b1 = min(b0 + 1.0, 15.0);\n"
+                + "    V2 t0 = V2((b0 * 16.0 + q.r + 0.5) / 256.0, (q.g + 0.5) / 16.0);\n"
+                + "    V2 t1 = V2((b1 * 16.0 + q.r + 0.5) / 256.0, t0.y);\n"
+                + "    c = mix(c, mix(LUT(t0), LUT(t1), q.b - b0), STR);\n"
+                + "  }\n";
+        return translate(lang, t.replace("STR", strength));
+    }
+
+    private static String translate(String lang, String t) {
+        boolean glsl = "glsl".equals(lang);
+        boolean msl = "msl".equals(lang);
+        t = t.replace("V2", glsl ? "vec2" : "float2").replace("V3", glsl ? "vec3" : "float3")
+                .replace("PX(", msl ? "cn1Px(scene, " : "cn1Px(")
+                .replace("DEPTH(", msl ? "cn1Depth(depth, " : "cn1Depth(")
+                .replace("LUT(", msl ? "cn1Lut(lut, " : "cn1Lut(");
+        if (!glsl && !msl) {
+            t = t.replace("mix(", "lerp(");
+        }
+        return t;
+    }
+
     /// Returns the final pass: the scene plus bloom, colour graded, with
     /// vignette and grain. Uniforms: `u_scene` (unit 0), `u_bloom` (unit 1),
     /// `u_bloomIntensity`, `u_grade` (vec2: contrast, saturation),
     /// `u_lift` and `u_gain` (vec3), `u_vignette`, `u_grain`, `u_time` (float)
     /// and `u_resolution` (vec2, pixels), `u_fx` (vec3: chromatic
-    /// aberration, FXAA, god rays) and `u_sun` (vec2, the sun in uv).
+    /// aberration, FXAA, god rays), `u_sun` (vec2, the sun in uv),
+    /// `u_depth` (unit 2, the scene's depth), `u_lut` (unit 3, the colour
+    /// lookup strip), and `u_dfx`, `u_dfx2` (vec4) and `u_ocol` (vec3) as
+    /// `depthEffects` reads them.
     public static String compositeFragment() {
         return "precision mediump float;\n"
                 + "uniform sampler2D u_scene;\n"
@@ -923,17 +1031,26 @@ public final class GlslShaderGenerator {
                 + "uniform vec2 u_resolution;\n"
                 + "uniform vec3 u_fx;\n"
                 + "uniform vec2 u_sun;\n"
+                + "uniform sampler2D u_depth;\n"
+                + "uniform sampler2D u_lut;\n"
+                + "uniform vec4 u_dfx;\n"
+                + "uniform vec4 u_dfx2;\n"
+                + "uniform vec3 u_ocol;\n"
                 + "varying vec2 v_uv;\n"
                 + "vec3 cn1Px(vec2 p) {\n  return texture2D(u_scene, p).rgb;\n}\n"
+                + "float cn1Depth(vec2 p) {\n  return texture2D(u_depth, p).r;\n}\n"
+                + "vec3 cn1Lut(vec2 p) {\n  return texture2D(u_lut, p).rgb;\n}\n"
                 + "void main() {\n"
                 + "  vec2 uv0 = v_uv;\n"
                 + postEffects("glsl", "u_fx", "u_sun", "u_resolution")
+                + depthEffects("glsl", "u_dfx", "u_dfx2", "u_ocol")
                 + "  c += texture2D(u_bloom, v_uv).rgb * u_bloomIntensity;\n"
                 + "  c = (c - 0.5) * u_grade.x + 0.5;\n"
                 + "  float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));\n"
                 + "  c = mix(vec3(luma), c, u_grade.y);\n"
                 + "  c = clamp(c, 0.0, 1.0);\n"
                 + "  c = (u_lift + c * (1.0 - u_lift)) * u_gain;\n"
+                + lutEffect("glsl", "u_dfx2.w")
                 + "  vec2 d = v_uv - 0.5;\n"
                 + "  c *= 1.0 - u_vignette * smoothstep(0.25, 0.75, dot(d, d) * 2.0);\n"
                 + "  vec2 px = floor(v_uv * u_resolution);\n"

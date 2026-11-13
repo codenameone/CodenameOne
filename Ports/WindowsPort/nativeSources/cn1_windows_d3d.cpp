@@ -68,6 +68,8 @@ struct CN1D3DTarget {
     ID3D11ShaderResourceView* srv;
     ID3D11Texture2D* dsTex;
     ID3D11DepthStencilView* dsv;
+    // the depth as a texture, so the composite can read the scene's depth
+    ID3D11ShaderResourceView* dsSrv;
     int width;
     int height;
 };
@@ -129,6 +131,7 @@ static void cn1D3DReleaseTargets(CN1D3DContext* c) {
 }
 
 static void cn1D3DReleaseTarget(CN1D3DTarget* t) {
+    cn1Release(t->dsSrv);
     cn1Release(t->srv);
     cn1Release(t->rtv);
     cn1Release(t->tex);
@@ -165,11 +168,23 @@ static bool cn1D3DEnsureAux(CN1D3DContext* c, CN1D3DTarget* t, int w, int h, DXG
         return false;
     }
     if (depth) {
+        // typeless, so the same texture is a depth buffer while the scene
+        // draws and a texture the composite samples afterwards
         D3D11_TEXTURE2D_DESC ds = td;
-        ds.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-        ds.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        ds.Format = DXGI_FORMAT_R24G8_TYPELESS;
+        ds.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+        D3D11_DEPTH_STENCIL_VIEW_DESC dvd;
+        ZeroMemory(&dvd, sizeof(dvd));
+        dvd.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        dvd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+        D3D11_SHADER_RESOURCE_VIEW_DESC svd;
+        ZeroMemory(&svd, sizeof(svd));
+        svd.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        svd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        svd.Texture2D.MipLevels = 1;
         if (FAILED(c->device->CreateTexture2D(&ds, NULL, &t->dsTex)) ||
-                FAILED(c->device->CreateDepthStencilView(t->dsTex, NULL, &t->dsv))) {
+                FAILED(c->device->CreateDepthStencilView(t->dsTex, &dvd, &t->dsv)) ||
+                FAILED(c->device->CreateShaderResourceView(t->dsTex, &svd, &t->dsSrv))) {
             cn1D3DReleaseTarget(t);
             return false;
         }
@@ -180,8 +195,10 @@ static bool cn1D3DEnsureAux(CN1D3DContext* c, CN1D3DTarget* t, int w, int h, DXG
 }
 
 static void cn1D3DUnbindPs(CN1D3DContext* c) {
-    ID3D11ShaderResourceView* none[2] = { NULL, NULL };
-    c->ctx->PSSetShaderResources(0, 2, none);
+    // slot 2 is the scene depth in the composite; slot 3, the colour
+    // lookup, stays bound through the post chain
+    ID3D11ShaderResourceView* none[3] = { NULL, NULL, NULL };
+    c->ctx->PSSetShaderResources(0, 3, none);
 }
 
 static void cn1D3DSetViewport(CN1D3DContext* c, int w, int h) {
@@ -927,14 +944,14 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_gl3dBeginPost___long_boole
 }
 
 // One full screen pass of the post chain: samples up to two textures with a
-// linear clamp sampler, writes rtv (no depth), constants are 24 floats.
+// linear clamp sampler, writes rtv (no depth), constants are 44 floats.
 static void cn1D3DPostDraw(CN1D3DContext* c, CN1D3DPipeline* p, ID3D11RenderTargetView* rtv,
         int w, int h, ID3D11ShaderResourceView* src0, ID3D11ShaderResourceView* src1,
-        const float* constants) {
+        ID3D11ShaderResourceView* depth, const float* constants) {
     ID3D11DeviceContext* ctx = c->ctx;
     D3D11_MAPPED_SUBRESOURCE mapped;
     if (SUCCEEDED(ctx->Map(c->postCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
-        memcpy(mapped.pData, constants, 24 * sizeof(float));
+        memcpy(mapped.pData, constants, 44 * sizeof(float));
         ctx->Unmap(c->postCb, 0);
     }
     ctx->OMSetRenderTargets(1, &rtv, NULL);
@@ -952,6 +969,7 @@ static void cn1D3DPostDraw(CN1D3DContext* c, CN1D3DPipeline* p, ID3D11RenderTarg
     ctx->PSSetSamplers(0, 1, &samp);
     ctx->PSSetShaderResources(0, 1, &src0);
     ctx->PSSetShaderResources(1, 1, &src1);
+    ctx->PSSetShaderResources(2, 1, &depth);
     float blendFactor[4] = { 0, 0, 0, 0 };
     ctx->OMSetBlendState(p->blend, blendFactor, 0xffffffff);
     ctx->RSSetState(p->raster);
@@ -970,7 +988,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dEndPost___long_long_long_
     if (c->postCb == NULL) {
         D3D11_BUFFER_DESC cbd;
         ZeroMemory(&cbd, sizeof(cbd));
-        cbd.ByteWidth = 128;
+        cbd.ByteWidth = 176;
         cbd.Usage = D3D11_USAGE_DYNAMIC;
         cbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         cbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -993,12 +1011,18 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dEndPost___long_long_long_
     c->activeDsv = c->dsv;
     if (c->postCb && c->quad) {
         // g0-g3 the composite, g4/g5 the bloom passes, g6/g7 the effects
-        // GraphicsDevice.packPostEffects wrote at 16 to 21
-        float k[32];
+        // GraphicsDevice.packPostEffects wrote at 16 to 21, g8-g10 the
+        // twelve of packDepthEffects at 22 to 33
+        float k[44];
         const JAVA_ARRAY_FLOAT* in = (const JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(params);
         int count = ((JAVA_ARRAY) params)->length;
         for (int i = 0; i < 16; i++) { k[i] = in[i]; }
-        for (int i = 16; i < 32; i++) { k[i] = 0.0f; }
+        for (int i = 16; i < 44; i++) { k[i] = 0.0f; }
+        k[37] = 0.1f;
+        k[38] = 100.0f;
+        if (count >= 34) {
+            for (int i = 0; i < 12; i++) { k[32 + i] = in[22 + i]; }
+        }
         if (count >= 21) {
             k[24] = in[16];
             k[25] = in[17];
@@ -1013,7 +1037,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dEndPost___long_long_long_
             k[16] = 1.0f / (float) c->scene.width;
             k[17] = 1.0f / (float) c->scene.height;
             cn1D3DPostDraw(c, bright, c->bloomA.rtv, c->bloomA.width, c->bloomA.height,
-                    c->scene.srv, NULL, k);
+                    c->scene.srv, NULL, NULL, k);
             k[16] = 0.0f;
             k[17] = 0.0f;
             for (int i = 0; i < 2; i++) {
@@ -1021,17 +1045,17 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dEndPost___long_long_long_
                 k[20] = spread / (float) c->bloomA.width;
                 k[21] = 0.0f;
                 cn1D3DPostDraw(c, blur, c->bloomB.rtv, c->bloomB.width, c->bloomB.height,
-                        c->bloomA.srv, NULL, k);
+                        c->bloomA.srv, NULL, NULL, k);
                 k[20] = 0.0f;
                 k[21] = spread / (float) c->bloomA.height;
                 cn1D3DPostDraw(c, blur, c->bloomA.rtv, c->bloomA.width, c->bloomA.height,
-                        c->bloomB.srv, NULL, k);
+                        c->bloomB.srv, NULL, NULL, k);
             }
             k[20] = 0.0f;
             k[21] = 0.0f;
             bloomSrv = c->bloomA.srv;
         }
-        cn1D3DPostDraw(c, comp, c->rtv, c->width, c->height, c->scene.srv, bloomSrv, k);
+        cn1D3DPostDraw(c, comp, c->rtv, c->width, c->height, c->scene.srv, bloomSrv, c->scene.dsSrv, k);
     }
     c->ctx->OMSetRenderTargets(1, &c->rtv, c->dsv);
     c->ctx->RSSetViewports(1, &c->postVp);

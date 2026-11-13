@@ -532,9 +532,14 @@ public final class HlslShaderGenerator {
                 + "  float4 g5;\n"   // blur pass: direction in uv
                 + "  float4 g6;\n"   // aberration, fxaa, god rays, unused
                 + "  float4 g7;\n"   // sun position in uv
+                + "  float4 g8;\n"   // ao strength, ao radius, focus, blur
+                + "  float4 g9;\n"   // outline, near, far, lut strength
+                + "  float4 g10;\n"  // outline colour
                 + "};\n"
                 + "Texture2D cn1_scene : register(t0);\n"
                 + "Texture2D cn1_bloom : register(t1);\n"
+                + "Texture2D cn1_depth : register(t2);\n"
+                + "Texture2D cn1_lut : register(t3);\n"
                 + "SamplerState cn1_sampler : register(s0);\n"
                 + "struct VSInput {\n  float3 position : POSITION;\n};\n"
                 + "struct VSOutput {\n  float4 position : SV_Position;\n  float2 uv : TEXCOORD0;\n};\n"
@@ -544,6 +549,8 @@ public final class HlslShaderGenerator {
                 + "  output.position = float4(input.position.xy, 0.0, 1.0);\n"
                 + "  return output;\n}\n"
                 + "float3 cn1Px(float2 p) {\n  return cn1_scene.SampleLevel(cn1_sampler, p, 0).rgb;\n}\n"
+                + "float cn1Depth(float2 p) {\n  return cn1_depth.SampleLevel(cn1_sampler, p, 0).r;\n}\n"
+                + "float3 cn1Lut(float2 p) {\n  return cn1_lut.SampleLevel(cn1_sampler, p, 0).rgb;\n}\n"
                 + "float4 " + FRAGMENT_FUNCTION + "(VSOutput input) : SV_Target {\n";
     }
 
@@ -591,12 +598,14 @@ public final class HlslShaderGenerator {
         return postPrologue()
                 + "  float2 uv0 = input.uv;\n"
                 + com.codename1.impl.gpu.GlslShaderGenerator.postEffects("hlsl", "g6", "g7.xy", "g3.yz")
+                + com.codename1.impl.gpu.GlslShaderGenerator.depthEffects("hlsl", "g8", "g9", "g10.xyz")
                 + "  c += cn1_bloom.SampleLevel(cn1_sampler, input.uv, 0).rgb * g0.y;\n"
                 + "  c = (c - 0.5) * g0.z + 0.5;\n"
                 + "  float luma = dot(c, float3(0.2126, 0.7152, 0.0722));\n"
                 + "  c = lerp(float3(luma, luma, luma), c, g0.w);\n"
                 + "  c = saturate(c);\n"
                 + "  c = (g1.xyz + c * (1.0 - g1.xyz)) * g2.xyz;\n"
+                + com.codename1.impl.gpu.GlslShaderGenerator.lutEffect("hlsl", "g9.w")
                 + "  float2 d = input.uv - 0.5;\n"
                 + "  c *= 1.0 - g1.w * smoothstep(0.25, 0.75, dot(d, d) * 2.0);\n"
                 + "  float2 px = floor(input.uv * g3.yz);\n"

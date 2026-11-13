@@ -65,6 +65,7 @@ class JavaSEGLDevice extends GraphicsDevice {
     private GL2ES2 gl;
     // chromatic aberration, FXAA, god rays and the sun, for the composite
     private final float[] postFx = new float[6];
+    private final float[] depthFx = new float[12];
 
     private final Map<String, Program> programs = new HashMap<String, Program>();
     private GpuCapabilities caps;
@@ -103,6 +104,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         int fbo;
         int tex;
         int depth;
+        boolean depthTex;
         int width;
         int height;
     }
@@ -733,6 +735,27 @@ class JavaSEGLDevice extends GraphicsDevice {
         gl.glFramebufferTexture2D(GL2ES2.GL_FRAMEBUFFER, GL2ES2.GL_COLOR_ATTACHMENT0,
                 GL2ES2.GL_TEXTURE_2D, n.tex, 0);
         if (depth) {
+            // a depth texture, so the composite can read the scene's depth
+            // for ambient occlusion, depth of field and outlines
+            gl.glGenTextures(1, ids, 0);
+            n.depth = ids[0];
+            gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, n.depth);
+            gl.glTexImage2D(GL2ES2.GL_TEXTURE_2D, 0, GL2ES2.GL_DEPTH_COMPONENT, w, h, 0,
+                    GL2ES2.GL_DEPTH_COMPONENT, GL2ES2.GL_UNSIGNED_INT, null);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MIN_FILTER, GL2ES2.GL_NEAREST);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, GL2ES2.GL_NEAREST);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_S, GL2ES2.GL_CLAMP_TO_EDGE);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_T, GL2ES2.GL_CLAMP_TO_EDGE);
+            gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, 0);
+            gl.glFramebufferTexture2D(GL2ES2.GL_FRAMEBUFFER, GL2ES2.GL_DEPTH_ATTACHMENT,
+                    GL2ES2.GL_TEXTURE_2D, n.depth, 0);
+            if (gl.glCheckFramebufferStatus(GL2ES2.GL_FRAMEBUFFER) == GL2ES2.GL_FRAMEBUFFER_COMPLETE) {
+                n.depthTex = true;
+                return n;
+            }
+            gl.glFramebufferTexture2D(GL2ES2.GL_FRAMEBUFFER, GL2ES2.GL_DEPTH_ATTACHMENT,
+                    GL2ES2.GL_TEXTURE_2D, 0, 0);
+            gl.glDeleteTextures(1, new int[]{n.depth}, 0);
             gl.glGenRenderbuffers(1, ids, 0);
             n.depth = ids[0];
             gl.glBindRenderbuffer(GL2ES2.GL_RENDERBUFFER, n.depth);
@@ -750,7 +773,9 @@ class JavaSEGLDevice extends GraphicsDevice {
         }
         gl.glDeleteFramebuffers(1, new int[]{t.fbo}, 0);
         gl.glDeleteTextures(1, new int[]{t.tex}, 0);
-        if (t.depth != 0) {
+        if (t.depthTex) {
+            gl.glDeleteTextures(1, new int[]{t.depth}, 0);
+        } else if (t.depth != 0) {
             gl.glDeleteRenderbuffers(1, new int[]{t.depth}, 0);
         }
     }
@@ -938,6 +963,23 @@ class JavaSEGLDevice extends GraphicsDevice {
         packPostEffects(pp, postFx, 0);
         uniform3(c, "u_fx", postFx[0], postFx[1], postFx[2]);
         uniform2(c, "u_sun", postFx[3], postFx[4]);
+        packDepthEffects(pp, depthFx, 0);
+        if (!sceneTarget.depthTex) {
+            depthFx[0] = 0f;
+            depthFx[3] = 0f;
+            depthFx[4] = 0f;
+        }
+        sampler(c, "u_depth", 2, sceneTarget.depthTex ? sceneTarget.depth : 0);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof TexHandle) {
+            sampler(c, "u_lut", 3, ((TexHandle) lut.getHandle()).id);
+        } else {
+            depthFx[7] = 0f;
+            sampler(c, "u_lut", 3, 0);
+        }
+        uniform4(c, "u_dfx", depthFx[0], depthFx[1], depthFx[2], depthFx[3]);
+        uniform4(c, "u_dfx2", depthFx[4], depthFx[5], depthFx[6], depthFx[7]);
+        uniform3(c, "u_ocol", depthFx[8], depthFx[9], depthFx[10]);
         drawQuad(c);
         gl.glDepthMask(true);
     }

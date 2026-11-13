@@ -241,6 +241,23 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 The post chain also offers FXAA, chromatic aberration and god rays from the
 sun's position (`setFxaa`, `setChromaticAberration`, `setGodRays`).
 
+Three more effects read the depth of the frame. `setAmbientOcclusion` darkens
+creases and the places where objects meet the ground, `setDepthOfField` keeps
+one distance sharp and blurs what is nearer or farther, and `setOutline` inks
+every silhouette for a toon look. `setColorLut` then maps the graded colour
+through a lookup strip, the way a film look is applied in a grading tool;
+`ColorLuts` builds strips (`identity`, `filmic`, `posterize`) to upload with
+`GraphicsDevice.createTexture(ColorLuts.WIDTH, ColorLuts.HEIGHT, pixels)`. On
+an OpenGL ES 2 device without depth textures the three depth effects are
+skipped and the rest of the chain still runs.
+
+A scene can also be drawn into a texture and shown on a surface of another
+scene -- a security monitor, a mirror, a minimap. `createRenderTarget(w, h)`
+returns the texture (or null where the device cannot render offscreen), and
+draws between `beginRenderTarget(target, clearColor)` and `endRenderTarget()`
+land in it, with a depth buffer of its own. Use it as any material texture
+afterwards and release it with `dispose`.
+
 Animated shaders read `time()`. A `GameView` advances it every frame; a plain
 `RenderView` calls `GraphicsDevice.setTime` itself, and a test pins it to
 capture the same frame each run.

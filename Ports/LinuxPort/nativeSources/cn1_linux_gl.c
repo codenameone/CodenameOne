@@ -63,7 +63,7 @@ extern int cn1LinuxSurfaceToPng(cairo_surface_t* surface, unsigned char** outDat
 typedef struct {
     GLuint fbo;
     GLuint tex;
-    GLuint depth;
+    GLuint depth; /* a depth texture, so the composite can read the scene's depth */
     int w, h;
 } CN1GlTarget;
 
@@ -138,7 +138,7 @@ static void cn1GlReleaseTarget(CN1GlTarget* t) {
         glDeleteTextures(1, &t->tex);
     }
     if (t->depth) {
-        glDeleteRenderbuffers(1, &t->depth);
+        glDeleteTextures(1, &t->depth);
     }
     memset(t, 0, sizeof(*t));
 }
@@ -736,11 +736,15 @@ static int cn1GlEnsureTarget(CN1GlTarget* t, int w, int h, int depth, GLint filt
     glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t->tex, 0);
     if (depth) {
-        glGenRenderbuffers(1, &t->depth);
-        glBindRenderbuffer(GL_RENDERBUFFER, t->depth);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, w, h);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, t->depth);
-        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        glGenTextures(1, &t->depth);
+        glBindTexture(GL_TEXTURE_2D, t->depth);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, t->depth, 0);
     }
     status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
@@ -918,6 +922,11 @@ static void cn1GlUniform3(GLuint program, const char* name, float a, float b, fl
     if (l >= 0) glUniform3f(l, a, b, d);
 }
 
+static void cn1GlUniform4(GLuint program, const char* name, float a, float b, float d, float e) {
+    GLint l = glGetUniformLocation(program, name);
+    if (l >= 0) glUniform4f(l, a, b, d, e);
+}
+
 static void cn1GlPassInto(const CN1GlTarget* t) {
     glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
     glViewport(0, 0, t->w, t->h);
@@ -943,7 +952,8 @@ static void cn1GlQuad(CN1GlContext* c) {
 
 /* params: threshold, bloomIntensity, contrast, saturation, lift rgb, gain rgb,
  * vignette, grain, time (13 floats), then the six of
- * GraphicsDevice.packPostEffects. */
+ * GraphicsDevice.packPostEffects and the twelve of packDepthEffects. The
+ * colour lookup is bound on unit 3 by the caller (gl3dBindTexture). */
 JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndPost___long_long_long_long_boolean_float_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG brightPeer, JAVA_LONG blurPeer, JAVA_LONG compositePeer, JAVA_BOOLEAN bloom, JAVA_OBJECT params) {
     CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
     CN1GlPipeline* bright = (CN1GlPipeline*) (intptr_t) brightPeer;
@@ -1003,6 +1013,19 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndPost___long_long_long_long
     } else {
         cn1GlUniform3(comp->program, "u_fx", 0.0f, 0.0f, 0.0f);
         cn1GlUniform2(comp->program, "u_sun", 0.5f, 0.5f);
+    }
+    cn1GlSampler(comp->program, "u_depth", 2, c->scene.depth);
+    {
+        GLint l = glGetUniformLocation(comp->program, "u_lut");
+        if (l >= 0) glUniform1i(l, 3);
+    }
+    if (((JAVA_ARRAY) params)->length >= 31) {
+        cn1GlUniform4(comp->program, "u_dfx", pr[19], pr[20], pr[21], pr[22]);
+        cn1GlUniform4(comp->program, "u_dfx2", pr[23], pr[24], pr[25], pr[26]);
+        cn1GlUniform3(comp->program, "u_ocol", pr[27], pr[28], pr[29]);
+    } else {
+        cn1GlUniform4(comp->program, "u_dfx", 0.0f, 0.0f, 0.0f, 0.0f);
+        cn1GlUniform4(comp->program, "u_dfx2", 0.0f, 0.1f, 100.0f, 0.0f);
     }
     cn1GlQuad(c);
     glDepthMask(GL_TRUE);

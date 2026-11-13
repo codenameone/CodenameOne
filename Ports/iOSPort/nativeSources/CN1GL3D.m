@@ -86,6 +86,8 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
 }
 @property (nonatomic, strong) id<MTLTexture> shadowTexture;
 @property (nonatomic, strong) id<MTLTexture> sceneTexture;
+// the colour lookup strip of the next composite, or nil (gl3dSetPostLut)
+@property (nonatomic, strong) id<MTLTexture> postLut;
 @property (nonatomic, strong) id<MTLTexture> bloomA;
 @property (nonatomic, strong) id<MTLTexture> bloomB;
 @property (nonatomic, strong) CN1GL3DPost *post;
@@ -173,7 +175,9 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     }
     MTLTextureDescriptor *dd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:CN1GL3D_DEPTH_FORMAT
                                                                                   width:w height:h mipmapped:NO];
-    dd.usage = MTLTextureUsageRenderTarget;
+    // shader read too: the post composite samples it for ambient occlusion,
+    // depth of field and outlines
+    dd.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     dd.storageMode = MTLStorageModePrivate;
     _depthTexture = [_device newTextureWithDescriptor:dd];
     _depthWidth = w;
@@ -297,7 +301,8 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     rpd.depthAttachment.clearDepth = 1.0;
     rpd.depthAttachment.loadAction = _pendingClearDepth ? MTLLoadActionClear
             : (_encodedThisFrame ? MTLLoadActionLoad : MTLLoadActionDontCare);
-    rpd.depthAttachment.storeAction = MTLStoreActionDontCare;
+    // the scene's depth is kept while post processing, for the composite
+    rpd.depthAttachment.storeAction = _postActive ? MTLStoreActionStore : MTLStoreActionDontCare;
     _pendingClearColor = NO;
     _pendingClearDepth = NO;
     id<MTLRenderCommandEncoder> encoder = [_frameCB renderCommandEncoderWithDescriptor:rpd];
@@ -470,6 +475,8 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     return [_device newTextureWithDescriptor:td];
 }
 
+static id<MTLTexture> CN1GL3DWhite(CN1GL3DView *view);
+
 - (BOOL)beginPostProcess:(NSString *)source bloom:(BOOL)bloom {
     if (_frameCB == nil || _postActive || _inShadow || _frameW < 1 || _frameH < 1) {
         return NO;
@@ -511,12 +518,18 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     if (t1 != nil) {
         [enc setFragmentTexture:t1 atIndex:1];
     }
+    if (pso == self.post.composite) {
+        id<MTLTexture> lut = self.postLut != nil ? self.postLut : CN1GL3DWhite(self);
+        [enc setFragmentTexture:_depthTexture atIndex:2];
+        [enc setFragmentTexture:lut atIndex:3];
+    }
     [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
     [enc endEncoding];
 }
 
 // params: 0 threshold, 1 bloom intensity, 2 contrast, 3 saturation, 4-7 lift,
-// 8-11 gain, 12 vignette, 13 grain, 14 time, 15 bloom on, 16-21 effects.
+// 8-11 gain, 12 vignette, 13 grain, 14 time, 15 bloom on, 16-21 effects,
+// 22-33 the depth effects GraphicsDevice.packDepthEffects writes.
 - (void)endPostProcess:(const float *)p {
     if (!_postActive) {
         return;
@@ -542,15 +555,18 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
         bloomTex = self.bloomA;
     }
     // 16-21 are the effects GraphicsDevice.packPostEffects writes
-    float u[24] = {
+    float u[36] = {
         bloom ? p[1] : 0.0f, p[2], p[3], p[12],
         p[4], p[5], p[6], 0.0f,
         p[8], p[9], p[10], 0.0f,
         p[13], p[14], (float) scene.width, (float) scene.height,
         p[16], p[17], p[18], 0.0f,
-        p[19], p[20], 0.0f, 0.0f
+        p[19], p[20], 0.0f, 0.0f,
+        p[22], p[23], p[24], p[25],
+        p[26], p[27], p[28], self.postLut != nil ? p[29] : 0.0f,
+        p[30], p[31], p[32], 0.0f
     };
-    [self postPass:_frameDrawable.texture pipeline:self.post.composite tex0:scene tex1:bloomTex bytes:u length:96];
+    [self postPass:_frameDrawable.texture pipeline:self.post.composite tex0:scene tex1:bloomTex bytes:u length:144];
     // Drawing continues on the screen, which now holds the composite; its depth
     // was never stored, so it starts clean.
     _pendingClearColor = NO;
@@ -1073,6 +1089,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginPostProcess___long_java_l
     CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
     NSString *src = mslSource == JAVA_NULL ? nil : toNSString(CN1_THREAD_GET_STATE_PASS_ARG mslSource);
     return [view beginPostProcess:src bloom:bloom ? YES : NO] ? 1 : 0;
+}
+
+void com_codename1_impl_ios_IOSNative_gl3dSetPostLut___long_long(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_LONG texturePeer) {
+    if (contextPeer == 0) return;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    view.postLut = texturePeer != 0 ? (__bridge id<MTLTexture>)(void *) texturePeer : nil;
 }
 
 void com_codename1_impl_ios_IOSNative_gl3dEndPostProcess___long_float_1ARRAY(

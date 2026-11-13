@@ -843,6 +843,7 @@ public class IOSNative {
     native boolean gl3dBeginRenderTarget(long contextPeer, long texturePeer, int width, int height, int argb);
     native void gl3dEndRenderTarget(long contextPeer);
     native boolean gl3dBeginPostProcess(long contextPeer, String mslSource, boolean bloom);
+    native void gl3dSetPostLut(long contextPeer, long texturePeer);
     native void gl3dEndPostProcess(long contextPeer, float[] params);
 
     native void destroyAudioUnit(long peer);
