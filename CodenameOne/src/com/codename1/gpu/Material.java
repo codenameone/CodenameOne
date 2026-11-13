@@ -65,6 +65,7 @@ public final class Material {
     private int emissive = 0xff000000;
     private boolean receiveShadows = true;
     private boolean castShadows = true;
+    private boolean fogged = true;
     private ShaderMaterial shader;
     private Texture normalMap;
     private float normalStrength = 1f;
@@ -309,9 +310,34 @@ public final class Material {
     /// a shader variant cache key
     public String getShaderKey() {
         String k = type.name() + (texture != null ? "|tex" : "|notex")
-                + (receiveShadows ? "|rs" : "|nrs") + ((emissive & 0xffffff) != 0 ? "|em" : "");
+                + (receiveShadows ? "|rs" : "|nrs") + (fogged ? "" : "|nofog") + ((emissive & 0xffffff) != 0 ? "|em" : "");
         ShaderMaterial eff = getEffectiveShader();
         return eff == null ? k : k + "|sh:" + eff.getShaderKey();
+    }
+
+    /// Returns false when the environment's fog skips this material.
+    ///
+    /// #### Returns
+    ///
+    /// true when fogged, the default
+    public boolean isFogged() {
+        return fogged;
+    }
+
+    /// Sets whether the environment's fog applies to this material. Turn it
+    /// off for sky domes and distant backdrops that already paint their own
+    /// haze, which fog would wash out to a flat colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fogged`: false to draw without fog
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setFogged(boolean fogged) {
+        this.fogged = fogged;
+        return this;
     }
 
     /// Returns the custom shading attached to this material.

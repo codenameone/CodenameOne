@@ -118,7 +118,7 @@ public final class GlslShaderGenerator {
         f.phong = type == Material.Type.PHONG && hasNormal;
         f.pbr = type == Material.Type.PBR && hasNormal;
         boolean sky = type == Material.Type.SKYBOX;
-        f.fog = environment != null && environment.isFog() && !sky;
+        f.fog = environment != null && environment.isFog() && !sky && material.isFogged();
         f.sky = sky && environment != null && environment.isSky();
         f.hemisphere = f.lit && environment != null && environment.isHemisphere();
         f.toneMap = f.lit && environment != null && environment.isToneMapping();

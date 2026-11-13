@@ -304,7 +304,7 @@ class JavaSESoftwareDevice extends GraphicsDevice {
         // as a gradient with the sun's glow. Shadows, clouds and the post
         // chain are GPU only (GpuCapabilities says so).
         Environment env = getEnvironment();
-        boolean fog = env.isFog() && material.getType() != Material.Type.SKYBOX;
+        boolean fog = env.isFog() && material.getType() != Material.Type.SKYBOX && material.isFogged();
         float fogR = ((env.getFogColor() >> 16) & 0xff) / 255.0f;
         float fogG = ((env.getFogColor() >> 8) & 0xff) / 255.0f;
         float fogB = (env.getFogColor() & 0xff) / 255.0f;

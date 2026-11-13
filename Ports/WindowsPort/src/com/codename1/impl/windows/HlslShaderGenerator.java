@@ -110,7 +110,7 @@ public final class HlslShaderGenerator {
         boolean phong = type == Material.Type.PHONG && hasNormal;
         boolean pbr = type == Material.Type.PBR && hasNormal;
         boolean textured = material.getTexture() != null && hasTexcoord;
-        boolean fog = environment != null && environment.isFog() && !sky;
+        boolean fog = environment != null && environment.isFog() && !sky && material.isFogged();
         boolean skyOn = sky && environment != null && environment.isSky();
         boolean hemi = lit && environment != null && environment.isHemisphere();
         boolean tone = lit && environment != null && environment.isToneMapping();
