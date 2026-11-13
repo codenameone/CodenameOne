@@ -85,6 +85,9 @@ class JavaSEGLDevice extends GraphicsDevice {
         int aPosition;
         int aNormal;
         int aTexcoord;
+        int aJoints = -1;
+        int aWeights = -1;
+        int uJoints = -1;
         int uMvp;
         int uModel;
         int uNormalMatrix;
@@ -328,6 +331,11 @@ class JavaSEGLDevice extends GraphicsDevice {
         bindAttribute(program.aPosition, fmt, VertexAttribute.Usage.POSITION, strideBytes);
         bindAttribute(program.aNormal, fmt, VertexAttribute.Usage.NORMAL, strideBytes);
         bindAttribute(program.aTexcoord, fmt, VertexAttribute.Usage.TEXCOORD, strideBytes);
+        bindAttribute(program.aJoints, fmt, VertexAttribute.Usage.JOINTS, strideBytes);
+        bindAttribute(program.aWeights, fmt, VertexAttribute.Usage.WEIGHTS, strideBytes);
+        if (program.uJoints >= 0 && material.isSkinned()) {
+            gl.glUniform4fv(program.uJoints, material.getJointCount() * 3, material.getJointRows(), 0);
+        }
 
         int glMode = toGlPrimitive(mesh.getPrimitiveType());
         if (mesh.isIndexed()) {
@@ -343,6 +351,8 @@ class JavaSEGLDevice extends GraphicsDevice {
         disableAttribute(program.aPosition);
         disableAttribute(program.aNormal);
         disableAttribute(program.aTexcoord);
+        disableAttribute(program.aJoints);
+        disableAttribute(program.aWeights);
         gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, 0);
     }
 
@@ -532,6 +542,9 @@ class JavaSEGLDevice extends GraphicsDevice {
             p.aPosition = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_POSITION);
             p.aNormal = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_NORMAL);
             p.aTexcoord = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_TEXCOORD);
+            p.aJoints = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_JOINTS);
+            p.aWeights = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_WEIGHTS);
+            p.uJoints = gl.glGetUniformLocation(handle, GlslShaderGenerator.U_JOINTS);
             p.uMvp = gl.glGetUniformLocation(handle, "u_mvp");
             p.uModel = gl.glGetUniformLocation(handle, "u_model");
             p.uNormalMatrix = gl.glGetUniformLocation(handle, "u_normalMatrix");
@@ -1110,6 +1123,11 @@ class JavaSEGLDevice extends GraphicsDevice {
     private final int[] rtSavedFbo = new int[1];
     private final int[] rtSavedViewport = new int[4];
     private final float[] flippedVp = new float[16];
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
 
     public Texture createRenderTarget(int width, int height) {
         if (gl == null || width <= 0 || height <= 0) {

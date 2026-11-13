@@ -96,6 +96,8 @@ struct CN1D3DContext {
     CN1D3DTarget bloomA;
     CN1D3DTarget bloomB;
     ID3D11Buffer* postCb;
+    // The joint rows of a skinned draw, the vertex shader's b1.
+    ID3D11Buffer* jointCb;
     ID3D11Buffer* quad;
     D3D11_VIEWPORT savedVp;
     // the application's viewport when the post pass began, kept for the
@@ -391,6 +393,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_gl3dDestroyContext___long(COD
     }
     cn1Release(c->cbuffer);
     cn1Release(c->postCb);
+    cn1Release(c->jointCb);
     cn1Release(c->quad);
     cn1D3DReleaseTarget(&c->shadow);
     cn1D3DReleaseTarget(&c->scene);
@@ -628,7 +631,13 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_gl3dGetOrCreatePipeline___lon
             e.AlignedByteOffset = offset;
             e.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
             bool isTexcoord = pd.SemanticName != NULL && strcmp(pd.SemanticName, "TEXCOORD") == 0;
-            if (isTexcoord) {
+            // a skinned vertex's four joints and four weights
+            bool isVec4 = pd.SemanticName != NULL && (strcmp(pd.SemanticName, "BLENDINDICES") == 0
+                    || strcmp(pd.SemanticName, "BLENDWEIGHT") == 0);
+            if (isVec4) {
+                e.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                offset += 16;
+            } else if (isTexcoord) {
                 e.Format = DXGI_FORMAT_R32G32_FLOAT;
                 offset += 8;
             } else {
@@ -703,13 +712,23 @@ static D3D11_PRIMITIVE_TOPOLOGY cn1D3DTopology(int primitive) {
     }
 }
 
+// Floats in the uniform block (WindowsGraphicsDevice.UNIFORM_FLOATS), and in
+// the joint block that follows it: 64 joints of three float4.
+#define CN1_D3D_UNIFORM_FLOATS 192
+#define CN1_D3D_JOINT_FLOATS 768
+
 // Binds the shared pipeline + per-draw state ahead of a draw call.
 static void cn1D3DBind(CN1D3DContext* c, CN1D3DPipeline* p, ID3D11Buffer* vbo, int strideBytes,
         int primitive, JAVA_OBJECT uniforms, int uniformFloats,
         JAVA_LONG texturePeer, int texFilter, int texWrap) {
     ID3D11DeviceContext* ctx = c->ctx;
 
-    // Upload uniforms into the constant buffer (recreate if size grows).
+    // A skinned draw appends its joint rows after the uniform block
+    // (WindowsGraphicsDevice.packUniforms); they go to b1, never into b0,
+    // which is sized by the first draw.
+    int jointFloats = uniformFloats > CN1_D3D_UNIFORM_FLOATS ? uniformFloats - CN1_D3D_UNIFORM_FLOATS : 0;
+    uniformFloats -= jointFloats;
+    // Upload uniforms into the constant buffer.
     UINT cbBytes = (UINT) (((uniformFloats * 4) + 15) & ~15);
     if (c->cbuffer == NULL) {
         D3D11_BUFFER_DESC cbd;
@@ -738,6 +757,25 @@ static void cn1D3DBind(CN1D3DContext* c, CN1D3DPipeline* p, ID3D11Buffer* vbo, i
     ctx->PSSetShader(p->ps, NULL, 0);
     ctx->VSSetConstantBuffers(0, 1, &c->cbuffer);
     ctx->PSSetConstantBuffers(0, 1, &c->cbuffer);
+    if (jointFloats > 0 && uniforms != JAVA_NULL) {
+        if (c->jointCb == NULL) {
+            D3D11_BUFFER_DESC jbd;
+            ZeroMemory(&jbd, sizeof(jbd));
+            jbd.ByteWidth = CN1_D3D_JOINT_FLOATS * 4;
+            jbd.Usage = D3D11_USAGE_DYNAMIC;
+            jbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+            jbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            c->device->CreateBuffer(&jbd, NULL, &c->jointCb);
+        }
+        D3D11_MAPPED_SUBRESOURCE jm;
+        if (c->jointCb && SUCCEEDED(ctx->Map(c->jointCb, 0, D3D11_MAP_WRITE_DISCARD, 0, &jm))) {
+            JAVA_ARRAY_FLOAT* u = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA(uniforms);
+            int n = jointFloats < CN1_D3D_JOINT_FLOATS ? jointFloats : CN1_D3D_JOINT_FLOATS;
+            memcpy(jm.pData, u + CN1_D3D_UNIFORM_FLOATS, (size_t) n * 4);
+            ctx->Unmap(c->jointCb, 0);
+        }
+        ctx->VSSetConstantBuffers(1, 1, &c->jointCb);
+    }
 
     CN1D3DTexture* tex = (CN1D3DTexture*) (intptr_t) texturePeer;
     if (tex && tex->srv) {

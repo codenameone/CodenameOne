@@ -84,7 +84,8 @@ class LinuxGraphicsDevice extends GraphicsDevice {
     // u_exposure(1), u_pbr(2), u_emissive(3), u_zenith(3), u_horizon(3),
     // u_sun(4), u_shadow(4), u_time(1), u_cu(64).
     private static final int UNIFORM_FLOATS = 178;
-    private final float[] uniforms = new float[UNIFORM_FLOATS];
+    // a skinned draw appends its joint rows after the named uniforms
+    private final float[] uniforms = new float[UNIFORM_FLOATS + Material.MAX_JOINTS * 12];
 
     private long shadowPipeline;
     private long brightPipeline;
@@ -155,7 +156,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         }
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        packUniforms(material, model, env, shadowed);
+        int uniformFloats = packUniforms(material, model, env, shadowed);
 
         long texHandle = 0;
         int texFilter = 0;
@@ -180,12 +181,12 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             }
             LinuxNative.gl3dDrawIndexed(
                     contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
-                    ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    ib.getIndexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap, shadowed ? 1 : 0);
         } else {
             LinuxNative.gl3dDrawArrays(
                     contextPeer, pipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap, shadowed ? 1 : 0);
         }
     }
@@ -282,7 +283,9 @@ class LinuxGraphicsDevice extends GraphicsDevice {
     }
 
     // Packs the per-draw uniforms in the order of CN1_UNIFORMS in cn1_linux_gl.c.
-    private void packUniforms(Material material, float[] model, Environment env, boolean shadowed) {
+    // Returns the number of floats to pass: the named uniforms, plus the
+    // joint rows of a skinned material.
+    private int packUniforms(Material material, float[] model, Environment env, boolean shadowed) {
         Camera cam = getCamera();
         float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         if (inRenderTarget) {
@@ -378,6 +381,12 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         for (int i = n; i < ShaderMaterial.MAX_UNIFORMS * 4; i++) {
             uniforms[o + i] = 0f;
         }
+        if (!material.isSkinned()) {
+            return UNIFORM_FLOATS;
+        }
+        int joints = material.getJointCount() * 12;
+        System.arraycopy(material.getJointRows(), 0, uniforms, UNIFORM_FLOATS, joints);
+        return UNIFORM_FLOATS + joints;
     }
 
     // binds the material's custom textures on units 2 and up for the next draw
@@ -475,6 +484,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
         long pipeline = shadowPipeline;
         long texHandle = 0;
+        int uniformFloats = UNIFORM_FLOATS;
         if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
             // a material that moves its vertices or discards casts through a
             // depth program of its own, with every uniform a normal draw has
@@ -482,7 +492,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             if (pipeline == 0) {
                 return;
             }
-            packUniforms(material, model, getEnvironment(), false);
+            uniformFloats = packUniforms(material, model, getEnvironment(), false);
             bindShaderTextures(material);
         bindEnvironmentMap();
             Texture tex = material.getTexture();
@@ -503,10 +513,10 @@ class LinuxGraphicsDevice extends GraphicsDevice {
                 return;
             }
             LinuxNative.gl3dDrawIndexed(contextPeer, pipeline, vboHandle, strideBytes,
-                    iboHandle, ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, 1, 1, 0);
+                    iboHandle, ib.getIndexCount(), primitive, uniforms, uniformFloats, texHandle, 1, 1, 0);
         } else {
             LinuxNative.gl3dDrawArrays(contextPeer, pipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, 1, 1, 0);
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats, texHandle, 1, 1, 0);
         }
     }
 
@@ -618,6 +628,11 @@ class LinuxGraphicsDevice extends GraphicsDevice {
 
     private boolean inRenderTarget;
     private final float[] flippedVp = new float[16];
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
 
     public Texture createRenderTarget(int width, int height) {
         if (contextPeer == 0 || width <= 0 || height <= 0) {

@@ -158,6 +158,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     // here because reading it back would need a typed array across the bridge.
     private final int[] viewport = new int[4];
     private final int[] savedViewport = new int[4];
+    private float[] jointScratch = new float[0];
 
     /// Cached compiled program together with the locations the device binds.
     /// Attribute locations are GLint indices (-1 when absent); uniform locations
@@ -167,6 +168,9 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         int aPosition = -1;
         int aNormal = -1;
         int aTexcoord = -1;
+        int aJoints = -1;
+        int aWeights = -1;
+        WebGLUniformLocation uJoints;
         WebGLUniformLocation uMvp;
         WebGLUniformLocation uModel;
         WebGLUniformLocation uNormalMatrix;
@@ -359,6 +363,15 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         WebGLBuffer vbo = uploadVertexBuffer(vertices);
         gl.bindBuffer(ARRAY_BUFFER, vbo);
         bindAttributes(entry, format);
+        if (entry.uJoints != null && material.isSkinned()) {
+            // exactly the joints in use: WebGL sizes the upload by the array
+            int n = material.getJointCount() * 12;
+            if (jointScratch.length != n) {
+                jointScratch = new float[n];
+            }
+            System.arraycopy(material.getJointRows(), 0, jointScratch, 0, n);
+            gl.uniform4fv(entry.uJoints, jointScratch);
+        }
 
         PrimitiveType pt = mesh.getPrimitiveType();
         int mode = toGlPrimitive(pt);
@@ -369,6 +382,14 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             gl.drawElements(mode, indices.getIndexCount(), UNSIGNED_SHORT, 0);
         } else {
             gl.drawArrays(mode, 0, vertices.getVertexCount());
+        }
+        // joint arrays stay enabled otherwise, and a later program that
+        // reads no buffer at that location would fail the draw
+        if (entry.aJoints >= 0) {
+            gl.disableVertexAttribArray(entry.aJoints);
+        }
+        if (entry.aWeights >= 0) {
+            gl.disableVertexAttribArray(entry.aWeights);
         }
     }
 
@@ -388,6 +409,12 @@ class HTML5GraphicsDevice extends GraphicsDevice {
                     break;
                 case TEXCOORD:
                     loc = entry.aTexcoord;
+                    break;
+                case JOINTS:
+                    loc = entry.aJoints;
+                    break;
+                case WEIGHTS:
+                    loc = entry.aWeights;
                     break;
                 default:
                     loc = -1;
@@ -534,6 +561,9 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         entry.aPosition = gl.getAttribLocation(program, GlslShaderGenerator.A_POSITION);
         entry.aNormal = gl.getAttribLocation(program, GlslShaderGenerator.A_NORMAL);
         entry.aTexcoord = gl.getAttribLocation(program, GlslShaderGenerator.A_TEXCOORD);
+        entry.aJoints = gl.getAttribLocation(program, GlslShaderGenerator.A_JOINTS);
+        entry.aWeights = gl.getAttribLocation(program, GlslShaderGenerator.A_WEIGHTS);
+        entry.uJoints = gl.getUniformLocation(program, GlslShaderGenerator.U_JOINTS);
         entry.uMvp = gl.getUniformLocation(program, "u_mvp");
         entry.uModel = gl.getUniformLocation(program, "u_model");
         entry.uNormalMatrix = gl.getUniformLocation(program, "u_normalMatrix");
@@ -1054,6 +1084,11 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     private boolean inRenderTarget;
     private final int[] rtSavedViewport = new int[4];
     private final float[] flippedVp = new float[16];
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
 
     public Texture createRenderTarget(int width, int height) {
         if (gl == null || width <= 0 || height <= 0) {

@@ -663,6 +663,21 @@ static id<MTLTexture> CN1GL3DWhite(CN1GL3DView *view);
         vd.attributes[6].format = MTLVertexFormatFloat2;
         vd.attributes[6].offset = 24;
         vd.attributes[6].bufferIndex = 0;
+    } else if (strideFloats == 16) {
+        // VertexFormat.SKINNED: position, normal, texcoord, then four joint
+        // indices at float 8 and their weights at float 12
+        vd.attributes[3].format = MTLVertexFormatFloat3;
+        vd.attributes[3].offset = 12;
+        vd.attributes[3].bufferIndex = 0;
+        vd.attributes[6].format = MTLVertexFormatFloat2;
+        vd.attributes[6].offset = 24;
+        vd.attributes[6].bufferIndex = 0;
+        vd.attributes[8].format = MTLVertexFormatFloat4;
+        vd.attributes[8].offset = 32;
+        vd.attributes[8].bufferIndex = 0;
+        vd.attributes[12].format = MTLVertexFormatFloat4;
+        vd.attributes[12].offset = 48;
+        vd.attributes[12].bufferIndex = 0;
     }
     vd.layouts[0].stride = strideBytes;
     vd.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
@@ -965,6 +980,9 @@ static id<MTLTexture> CN1GL3DWhite(CN1GL3DView *view) {
     return cn1White;
 }
 
+// Floats in the CN1Uniforms block; IOSGraphicsDevice.UNIFORM_FLOATS.
+#define CN1GL3D_UNIFORM_FLOATS 196
+
 static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
         id<MTLBuffer> vbo, JAVA_OBJECT uniforms, int uniformFloats,
         long texturePeer, int texFilter, int texWrap) {
@@ -981,9 +999,19 @@ static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
     [enc setVertexBuffer:vbo offset:0 atIndex:0];
 
     JAVA_ARRAY_FLOAT *uptr = (JAVA_ARRAY_FLOAT *)CN1_ARRAY_DATA((JAVA_ARRAY)uniforms);
-    int ubytes = (int)(uniformFloats * sizeof(JAVA_ARRAY_FLOAT));
+    // A skinned draw appends its joint rows (three float4 per joint) after
+    // the CN1Uniforms block (IOSGraphicsDevice.packUniforms); the vertex
+    // function reads them from buffer 2. Uniforms and the 64 joints together
+    // stay under setVertexBytes' 4 KB.
+    int baseFloats = uniformFloats > CN1GL3D_UNIFORM_FLOATS ? CN1GL3D_UNIFORM_FLOATS : uniformFloats;
+    int ubytes = (int)(baseFloats * sizeof(JAVA_ARRAY_FLOAT));
     [enc setVertexBytes:uptr length:ubytes atIndex:1];
     [enc setFragmentBytes:uptr length:ubytes atIndex:1];
+    if (uniformFloats > CN1GL3D_UNIFORM_FLOATS) {
+        [enc setVertexBytes:uptr + CN1GL3D_UNIFORM_FLOATS
+                     length:(NSUInteger)(uniformFloats - CN1GL3D_UNIFORM_FLOATS) * sizeof(JAVA_ARRAY_FLOAT)
+                    atIndex:2];
+    }
 
     // The shadow map rides along at fragment texture 1 for every draw once one
     // has been rendered; shaders that do not sample it ignore the binding.

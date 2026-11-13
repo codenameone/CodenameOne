@@ -142,6 +142,7 @@ public final class IOSMetalShaderGenerator {
         f.emissive = f.lit && (material.getEmissive() & 0xffffff) != 0;
         f.hasNormal = hasNormal;
         f.hasTexcoord = hasTexcoord;
+        f.skinned = GlslShaderGenerator.isSkinned(material, format);
         if (depthOnly) {
             f.depthOnly = true;
             f.lit = false;
@@ -184,6 +185,7 @@ public final class IOSMetalShaderGenerator {
         boolean fragNormal;
         boolean fragUv;
         boolean depthOnly;
+        boolean skinned;
     }
 
     // custom shading inputs; the vertex stage reads CN1VertexIn, the fragment
@@ -212,16 +214,16 @@ public final class IOSMetalShaderGenerator {
             }
             if (!fragment) {
                 if ("position".equals(name)) {
-                    return "in.position";
+                    return f.skinned ? "p0" : "in.position";
                 }
                 if ("normal".equals(name)) {
-                    return f.hasNormal ? "in.normal" : "float3(0.0, 1.0, 0.0)";
+                    return f.hasNormal ? (f.skinned ? "n0" : "in.normal") : "float3(0.0, 1.0, 0.0)";
                 }
                 if ("uv".equals(name)) {
                     return f.hasTexcoord ? "in.texcoord" : "float2(0.0)";
                 }
                 if ("worldPos".equals(name)) {
-                    return "(u.model * float4(in.position, 1.0)).xyz";
+                    return "(u.model * float4(" + (f.skinned ? "p0" : "in.position") + ", 1.0)).xyz";
                 }
                 return null;
             }
@@ -261,7 +263,8 @@ public final class IOSMetalShaderGenerator {
         boolean normalOut = lit || f.fragNormal;
         boolean uvOut = textured || f.fragUv;
         ShaderNode offset = f.shader == null ? null : f.shader.get(ShaderMaterial.Hook.VERTEX_OFFSET);
-        String pos = offset != null ? "pos" : "in.position";
+        String p0 = f.skinned ? "p0" : "in.position";
+        String pos = offset != null ? "pos" : p0;
         int posOff = offsetOf(format, VertexAttribute.Usage.POSITION);
         int normOff = offsetOf(format, VertexAttribute.Usage.NORMAL);
         int uvOff = offsetOf(format, VertexAttribute.Usage.TEXCOORD);
@@ -309,6 +312,12 @@ public final class IOSMetalShaderGenerator {
         if (hasTexcoord) {
             sb.append("  float2 texcoord [[attribute(").append(uvOff).append(")]];\n");
         }
+        if (f.skinned) {
+            sb.append("  float4 joints [[attribute(").append(offsetOf(format, VertexAttribute.Usage.JOINTS))
+                    .append(")]];\n");
+            sb.append("  float4 weights [[attribute(").append(offsetOf(format, VertexAttribute.Usage.WEIGHTS))
+                    .append(")]];\n");
+        }
         sb.append("};\n");
 
         sb.append("struct CN1VertexOut {\n");
@@ -330,13 +339,35 @@ public final class IOSMetalShaderGenerator {
         // Vertex function.
         sb.append("vertex CN1VertexOut ").append(VERTEX_FUNCTION).append("(\n");
         sb.append("    CN1VertexIn in [[stage_in]],\n");
-        sb.append("    constant CN1Uniforms& u [[buffer(1)]]) {\n");
+        sb.append("    constant CN1Uniforms& u [[buffer(1)]]");
+        if (f.skinned) {
+            // the joint rows, three per joint, after the uniforms (CN1GL3D.m)
+            sb.append(",\n    constant float4* joints [[buffer(2)]]");
+        }
+        sb.append(") {\n");
         sb.append("  CN1VertexOut out;\n");
+        if (f.skinned) {
+            sb.append("  float4 r0 = float4(0.0);\n  float4 r1 = float4(0.0);\n  float4 r2 = float4(0.0);\n");
+            String[] c = {"x", "y", "z", "w"};
+            for (int k = 0; k < 4; k++) {
+                sb.append("  int j").append(k).append(" = int(in.joints.").append(c[k]).append(" + 0.5) * 3;\n");
+                for (int row = 0; row < 3; row++) {
+                    sb.append("  r").append(row).append(" += in.weights.").append(c[k]).append(" * joints[j")
+                            .append(k).append(" + ").append(row).append("];\n");
+                }
+            }
+            sb.append("  float4 sp = float4(in.position, 1.0);\n");
+            sb.append("  float3 p0 = float3(dot(r0, sp), dot(r1, sp), dot(r2, sp));\n");
+            if (hasNormal) {
+                sb.append("  float3 n0 = float3(dot(r0.xyz, in.normal), dot(r1.xyz, in.normal), "
+                        + "dot(r2.xyz, in.normal));\n");
+            }
+        }
         if (offset != null) {
             ShaderEmitter e = new ShaderEmitter(ShaderEmitter.Dialect.MSL, f.shader, new Inputs(f, false), sb,
                     "  ", "_v");
             String o = e.emit(offset);
-            sb.append("  float3 pos = in.position + ").append(o).append(";\n");
+            sb.append("  float3 pos = ").append(p0).append(" + ").append(o).append(";\n");
         }
         sb.append("  float4 clip = u.mvp * float4(").append(pos).append(", 1.0);\n");
         // Adapt the portable GL-convention clip space to Metal: only remap Z from
@@ -348,7 +379,8 @@ public final class IOSMetalShaderGenerator {
         sb.append("  clip.z = (clip.z + clip.w) * 0.5;\n");
         sb.append("  out.position = clip;\n");
         if (normalOut) {
-            sb.append("  out.worldNormal = (u.normalMatrix * float4(in.normal, 0.0)).xyz;\n");
+            sb.append("  out.worldNormal = (u.normalMatrix * float4(").append(f.skinned ? "n0" : "in.normal")
+                    .append(", 0.0)).xyz;\n");
         }
         if (world) {
             sb.append("  out.worldPos = (u.model * float4(").append(pos).append(", 1.0)).xyz;\n");

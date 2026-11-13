@@ -99,7 +99,8 @@ class IOSGraphicsDevice extends GraphicsDevice {
     private PostProcess activePost;
     private String postSource;
     private final float[] postParams = new float[34];
-    private final float[] uniforms = allocAligned(UNIFORM_FLOATS);
+    // a skinned draw appends its joint rows after the uniform block
+    private final float[] uniforms = allocAligned(UNIFORM_FLOATS + Material.MAX_JOINTS * 12);
 
     IOSGraphicsDevice(long contextPeer) {
         this.contextPeer = contextPeer;
@@ -172,7 +173,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        packUniforms(material, model);
+        int uniformFloats = packUniforms(material, model);
         if (shadowed) {
             packShadow(getLight());
         }
@@ -200,12 +201,12 @@ class IOSGraphicsDevice extends GraphicsDevice {
             }
             IOSImplementation.nativeInstance.gl3dDrawIndexed(
                     contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
-                    ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    ib.getIndexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap);
         } else {
             IOSImplementation.nativeInstance.gl3dDrawArrays(
                     contextPeer, pipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap);
         }
     }
@@ -269,7 +270,10 @@ class IOSGraphicsDevice extends GraphicsDevice {
 
     // Packs the per-draw uniform block into the SIMD aligned float array. The
     // ordering matches the CN1Uniforms struct in the generated MSL.
-    private void packUniforms(Material material, float[] model) {
+    // Returns the number of floats to pass: the uniform block, plus the joint
+    // rows of a skinned material, which CN1GL3D.m hands the vertex stage as
+    // buffer 2.
+    private int packUniforms(Material material, float[] model) {
         Camera cam = getCamera();
         float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         Matrix4.multiply(vp, model, mvp);
@@ -327,6 +331,12 @@ class IOSGraphicsDevice extends GraphicsDevice {
             uniforms[i] = 0.0f;
         }
         packShader(material);
+        if (!material.isSkinned()) {
+            return UNIFORM_FLOATS;
+        }
+        int joints = material.getJointCount() * 12;
+        System.arraycopy(material.getJointRows(), 0, uniforms, UNIFORM_FLOATS, joints);
+        return UNIFORM_FLOATS + joints;
     }
 
     private void packShader(Material material) {
@@ -503,7 +513,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
             return;
         }
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        packUniforms(material, model);
+        int uniformFloats = packUniforms(material, model);
         Matrix4.multiply(casterMatrix, model, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
@@ -529,11 +539,11 @@ class IOSGraphicsDevice extends GraphicsDevice {
             }
             IOSImplementation.nativeInstance.gl3dDrawIndexed(
                     contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
-                    ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, texFilter, texWrap);
+                    ib.getIndexCount(), primitive, uniforms, uniformFloats, texHandle, texFilter, texWrap);
         } else {
             IOSImplementation.nativeInstance.gl3dDrawArrays(
                     contextPeer, pipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, texFilter, texWrap);
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats, texHandle, texFilter, texWrap);
         }
     }
 
@@ -672,6 +682,11 @@ class IOSGraphicsDevice extends GraphicsDevice {
     }
 
     private boolean inRenderTarget;
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
 
     public Texture createRenderTarget(int width, int height) {
         if (contextPeer == 0 || width <= 0 || height <= 0) {

@@ -142,6 +142,15 @@ cube, each drawn into its own viewport in a single frame:
 .Six rotation stages of an animated cube captured in one frame
 image::img/gpu-animation.png[Six rotation stages of an animated cube,scaledwidth=40%]
 
+Skinned characters are deformed on the GPU. A mesh in `VertexFormat.SKINNED`
+carries up to four joint indices and weights per vertex, and
+`Material.setSkinning(rows, count)` hands the shader the first three rows of
+each joint matrix (up to `Material.MAX_JOINTS`). The vertex stage blends the
+joints, and the shadow pass does the same, so shadows bend with the mesh.
+`AnimatedModel` uses this path by itself whenever
+`GraphicsDevice.isGpuSkinning()` is true. On a device without GPU skinning, or
+for a skin with more joints than the limit, it falls back to skinning on the CPU.
+
 === Camera and math
 
 https://www.codenameone.com/javadoc/com/codename1/gpu/Camera.html[Camera] builds

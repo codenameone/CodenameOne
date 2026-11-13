@@ -73,6 +73,9 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         int aPosition;
         int aNormal;
         int aTexcoord;
+        int aJoints = -1;
+        int aWeights = -1;
+        int uJoints = -1;
         int uMvp;
         int uModel;
         int uNormalMatrix;
@@ -347,6 +350,11 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         bindAttribute(program.aPosition, fmt, VertexAttribute.Usage.POSITION, strideBytes);
         bindAttribute(program.aNormal, fmt, VertexAttribute.Usage.NORMAL, strideBytes);
         bindAttribute(program.aTexcoord, fmt, VertexAttribute.Usage.TEXCOORD, strideBytes);
+        bindAttribute(program.aJoints, fmt, VertexAttribute.Usage.JOINTS, strideBytes);
+        bindAttribute(program.aWeights, fmt, VertexAttribute.Usage.WEIGHTS, strideBytes);
+        if (program.uJoints >= 0 && material.isSkinned()) {
+            GLES20.glUniform4fv(program.uJoints, material.getJointCount() * 3, material.getJointRows(), 0);
+        }
 
         int glMode = toGlPrimitive(mesh.getPrimitiveType());
         if (mesh.isIndexed()) {
@@ -362,6 +370,8 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         disableAttribute(program.aPosition);
         disableAttribute(program.aNormal);
         disableAttribute(program.aTexcoord);
+        disableAttribute(program.aJoints);
+        disableAttribute(program.aWeights);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
     }
 
@@ -554,6 +564,9 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             p.aPosition = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_POSITION);
             p.aNormal = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_NORMAL);
             p.aTexcoord = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_TEXCOORD);
+            p.aJoints = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_JOINTS);
+            p.aWeights = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_WEIGHTS);
+            p.uJoints = GLES20.glGetUniformLocation(handle, GlslShaderGenerator.U_JOINTS);
             p.uMvp = GLES20.glGetUniformLocation(handle, "u_mvp");
             p.uModel = GLES20.glGetUniformLocation(handle, "u_model");
             p.uNormalMatrix = GLES20.glGetUniformLocation(handle, "u_normalMatrix");
@@ -1097,6 +1110,12 @@ class AndroidGraphicsDevice extends GraphicsDevice {
     private final int[] rtSavedViewport = new int[4];
     private final float[] flippedVp = new float[16];
 
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
+
+    @Override
     public Texture createRenderTarget(int width, int height) {
         if (width <= 0 || height <= 0) {
             return null;

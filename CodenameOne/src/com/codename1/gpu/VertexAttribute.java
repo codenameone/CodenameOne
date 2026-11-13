@@ -24,7 +24,13 @@ public final class VertexAttribute {
         /// Primary texture coordinate. Typically 2 float components.
         TEXCOORD,
         /// Per vertex color. Typically 4 components.
-        COLOR
+        COLOR,
+        /// The four skeleton joints that move a skinned vertex, as joint
+        /// indices stored in floats. 4 components.
+        JOINTS,
+        /// The weight of each of the four `JOINTS`, summing to 1. 4
+        /// components.
+        WEIGHTS
     }
 
     private final Usage usage;

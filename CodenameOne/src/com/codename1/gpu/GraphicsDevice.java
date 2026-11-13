@@ -250,6 +250,20 @@ public abstract class GraphicsDevice {
         return null;
     }
 
+    /// True if this device skins meshes on the GPU: it draws a mesh in
+    /// `VertexFormat.SKINNED` with a material given `Material.setSkinning`
+    /// by moving each vertex in its vertex stage. Where it answers false,
+    /// as the software simulator device does, skin on the CPU and draw the
+    /// result as an ordinary mesh; `com.codename1.gaming.AnimatedModel`
+    /// picks the path by itself.
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    public boolean isGpuSkinning() {
+        return false;
+    }
+
     /// Sends the draws that follow into `target` until `endRenderTarget`,
     /// clearing its colour to `clearArgb` and its depth first. The viewport
     /// covers the whole target, and the camera, light and environment are the

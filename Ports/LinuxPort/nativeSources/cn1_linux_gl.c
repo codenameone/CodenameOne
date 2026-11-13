@@ -120,6 +120,8 @@ typedef struct {
     GLuint program;
     int hasNormal;
     int hasTexcoord;
+    int hasJoints;
+    GLint uJoints;
     int blend, cull, depthTest, depthWrite;
     GLint loc[CN1_UNIFORM_COUNT];
     GLint uTexture;
@@ -472,6 +474,8 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dGetOrCreatePipeline___long_ja
     glBindAttribLocation(prog, 0, "a_position");
     glBindAttribLocation(prog, 1, "a_normal");
     glBindAttribLocation(prog, 2, "a_texcoord");
+    glBindAttribLocation(prog, 3, "a_joints");
+    glBindAttribLocation(prog, 4, "a_weights");
     glLinkProgram(prog);
     glGetProgramiv(prog, GL_LINK_STATUS, &linkOk);
     glDeleteShader(vs);
@@ -518,6 +522,8 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dGetOrCreatePipeline___long_ja
     /* Record which optional interleaved attributes the shader declared. */
     p->hasNormal = strstr(vsrc, "attribute vec3 a_normal") != 0;
     p->hasTexcoord = strstr(vsrc, "attribute vec2 a_texcoord") != 0;
+    p->hasJoints = strstr(vsrc, "attribute vec4 a_joints") != 0;
+    p->uJoints = glGetUniformLocation(prog, "u_joints");
     p->blend = blendMode;
     p->cull = cullMode;
     p->depthTest = depthTest;
@@ -627,6 +633,11 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
             }
             u += n;
         }
+        /* A skinned draw appends its joint rows, three vec4 per joint, after
+         * the named uniforms (LinuxGraphicsDevice.packUniforms). */
+        if (p->uJoints >= 0 && uniformFloats > CN1_UNIFORM_FLOATS) {
+            glUniform4fv(p->uJoints, (uniformFloats - CN1_UNIFORM_FLOATS) / 4, uniforms + CN1_UNIFORM_FLOATS);
+        }
     }
 
     /* Interleaved vertex attributes (position @0, normal @12, texcoord after). */
@@ -649,11 +660,22 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
              * an unlit textured shader has no a_normal, yet its buffer may still
              * carry normals (POSITION_NORMAL_TEXCOORD), and counting from the
              * shader then sampled the normal as the texcoord. */
-            offset = strideBytes - 8;
+            offset = strideBytes == 64 ? 24 : strideBytes - 8;
             glEnableVertexAttribArray(2);
             glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, strideBytes, (void*) (intptr_t) offset);
         } else {
             glDisableVertexAttribArray(2);
+        }
+        /* VertexFormat.SKINNED: position, normal, texcoord, then the four
+         * joint indices at float 8 and their weights at float 12. */
+        if (p->hasJoints && strideBytes == 64) {
+            glEnableVertexAttribArray(3);
+            glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, strideBytes, (void*) (intptr_t) 32);
+            glEnableVertexAttribArray(4);
+            glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, strideBytes, (void*) (intptr_t) 48);
+        } else {
+            glDisableVertexAttribArray(3);
+            glDisableVertexAttribArray(4);
         }
     }
 

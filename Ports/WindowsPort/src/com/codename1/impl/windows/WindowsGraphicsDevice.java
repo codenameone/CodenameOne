@@ -74,7 +74,8 @@ class WindowsGraphicsDevice extends GraphicsDevice {
     // 0-123 the engine's own; 124-127 the clock, 128-191 the custom
     // ShaderMaterial slots (CN1Uniforms.timeP and cu[16])
     private static final int UNIFORM_FLOATS = 192;
-    private final float[] uniforms = new float[UNIFORM_FLOATS];
+    // a skinned draw appends its joint rows after the uniform block
+    private final float[] uniforms = new float[UNIFORM_FLOATS + Material.MAX_JOINTS * 12];
 
     // Shadow state, as in JavaSEGLDevice: the light matrix of the last shadow
     // pass, whether a pass is running, and whether its map may be sampled.
@@ -158,7 +159,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         }
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        packUniforms(material, model);
+        int uniformFloats = packUniforms(material, model);
 
         long texHandle = 0;
         int texFilter = 0;
@@ -183,12 +184,12 @@ class WindowsGraphicsDevice extends GraphicsDevice {
             }
             WindowsNative.gl3dDrawIndexed(
                     contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
-                    ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    ib.getIndexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap);
         } else {
             WindowsNative.gl3dDrawArrays(
                     contextPeer, pipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap);
         }
     }
@@ -251,7 +252,10 @@ class WindowsGraphicsDevice extends GraphicsDevice {
 
     // Packs the per-draw uniform block. Ordering matches the CN1Uniforms cbuffer
     // in the generated HLSL.
-    private void packUniforms(Material material, float[] model) {
+    // Returns the number of floats to pass: the uniform block, plus the joint
+    // rows of a skinned material, which cn1_windows_d3d.cpp copies into the
+    // vertex shader's constant buffer b1.
+    private int packUniforms(Material material, float[] model) {
         Camera cam = getCamera();
         float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         Matrix4.multiply(vp, model, mvp);
@@ -332,6 +336,12 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         for (int i = o + n; i < UNIFORM_FLOATS; i++) {
             uniforms[i] = 0.0f;
         }
+        if (!material.isSkinned()) {
+            return UNIFORM_FLOATS;
+        }
+        int joints = material.getJointCount() * 12;
+        System.arraycopy(material.getJointRows(), 0, uniforms, UNIFORM_FLOATS, joints);
+        return UNIFORM_FLOATS + joints;
     }
 
     // binds the material's custom textures at t2/s2 and up for the next draw
@@ -469,7 +479,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
             return;
         }
         float[] m = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        packUniforms(material, m);
+        int uniformFloats = packUniforms(material, m);
         Matrix4.multiply(casterMatrix, m, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
@@ -492,11 +502,11 @@ class WindowsGraphicsDevice extends GraphicsDevice {
             long iboHandle = uploadIndexBuffer(ib);
             if (iboHandle != 0) {
                 WindowsNative.gl3dDrawIndexed(contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
-                        ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, texFilter, texWrap);
+                        ib.getIndexCount(), primitive, uniforms, uniformFloats, texHandle, texFilter, texWrap);
             }
         } else {
             WindowsNative.gl3dDrawArrays(contextPeer, pipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, texFilter, texWrap);
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats, texHandle, texFilter, texWrap);
         }
     }
 
@@ -633,6 +643,11 @@ class WindowsGraphicsDevice extends GraphicsDevice {
     }
 
     private boolean inRenderTarget;
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
 
     public Texture createRenderTarget(int width, int height) {
         if (contextPeer == 0 || width <= 0 || height <= 0) {

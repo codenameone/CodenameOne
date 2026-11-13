@@ -2606,6 +2606,8 @@
           args[1] = (args[0] === 0x8893) ? new Uint16Array(args[1]) : new Float32Array(args[1]);
         } else if (member === 'uniformMatrix4fv' && Array.isArray(args[2])) {
           args[2] = new Float32Array(args[2]);
+        } else if (member === 'uniform4fv' && Array.isArray(args[1])) {
+          args[1] = new Float32Array(args[1]);
         } else if (member === 'texImage2D' && Array.isArray(args[args.length - 1])) {
           args[args.length - 1] = new Uint8Array(args[args.length - 1]);
         }

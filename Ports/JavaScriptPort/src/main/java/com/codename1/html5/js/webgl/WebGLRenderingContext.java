@@ -88,6 +88,8 @@ public interface WebGLRenderingContext extends JSObject {
 
     void uniformMatrix4fv(WebGLUniformLocation location, boolean transpose, float[] value);
     void uniform4f(WebGLUniformLocation location, float x, float y, float z, float w);
+    // an array of vec4; the bridge wraps it in a Float32Array
+    void uniform4fv(WebGLUniformLocation location, float[] value);
     void uniform3f(WebGLUniformLocation location, float x, float y, float z);
     void uniform1f(WebGLUniformLocation location, float x);
     void uniform1i(WebGLUniformLocation location, int x);

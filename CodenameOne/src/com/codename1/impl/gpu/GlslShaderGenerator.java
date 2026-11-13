@@ -68,6 +68,13 @@ public final class GlslShaderGenerator {
     public static final String A_NORMAL = "a_normal";
     /// The attribute name bound to vertex texture coordinates.
     public static final String A_TEXCOORD = "a_texcoord";
+    /// The attribute name bound to a skinned vertex's four joint indices.
+    public static final String A_JOINTS = "a_joints";
+    /// The attribute name bound to a skinned vertex's four joint weights.
+    public static final String A_WEIGHTS = "a_weights";
+    /// The vertex uniform holding the joint rows of a skinned material, three
+    /// vec4 per joint.
+    public static final String U_JOINTS = "u_joints";
 
     private static final String HIGHP = "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
             + "precision highp float;\n#else\nprecision mediump float;\n#endif\n";
@@ -188,7 +195,7 @@ public final class GlslShaderGenerator {
     /// true if `depthOnly` must be used for this material
     public static boolean needsOwnDepthProgram(Material material) {
         ShaderMaterial sm = material.getEffectiveShader();
-        return sm != null && (sm.get(ShaderMaterial.Hook.VERTEX_OFFSET) != null
+        return material.isSkinned() || sm != null && (sm.get(ShaderMaterial.Hook.VERTEX_OFFSET) != null
                 || sm.get(ShaderMaterial.Hook.DISCARD) != null);
     }
 
@@ -197,6 +204,8 @@ public final class GlslShaderGenerator {
         boolean hasNormal = format.findByUsage(VertexAttribute.Usage.NORMAL) != null;
         boolean hasTexcoord = format.findByUsage(VertexAttribute.Usage.TEXCOORD) != null;
         Features f = new Features();
+        f.skinned = isSkinned(material, format);
+        f.joints = material.getJointCount();
         f.textured = material.getTexture() != null && hasTexcoord;
         Material.Type type = material.getType();
         f.lit = material.isLit() && hasNormal;
@@ -287,6 +296,8 @@ public final class GlslShaderGenerator {
         boolean vertSun;
         boolean time;
         boolean depthOnly;
+        boolean skinned;
+        int joints;
 
         boolean world() {
             return lit || fog || sky || fragWorld;
@@ -311,16 +322,16 @@ public final class GlslShaderGenerator {
 
         public String builtin(String name) { // NOPMD MissingOverride - Java 5 source forbids @Override on an interface method
             if ("position".equals(name)) {
-                return A_POSITION;
+                return f.skinned ? "p0" : A_POSITION;
             }
             if ("normal".equals(name)) {
-                return f.hasNormal ? A_NORMAL : "vec3(0.0, 1.0, 0.0)";
+                return f.hasNormal ? (f.skinned ? "n0" : A_NORMAL) : "vec3(0.0, 1.0, 0.0)";
             }
             if ("uv".equals(name)) {
                 return f.hasTexcoord ? A_TEXCOORD : "vec2(0.0)";
             }
             if ("worldPos".equals(name)) {
-                return "(u_model * vec4(" + A_POSITION + ", 1.0)).xyz";
+                return "(u_model * vec4(" + (f.skinned ? "p0" : A_POSITION) + ", 1.0)).xyz";
             }
             return commonBuiltin(name);
         }
@@ -408,11 +419,18 @@ public final class GlslShaderGenerator {
     private static String buildVertex(Features f) {
         boolean world = f.world();
         ShaderNode offset = f.shader == null ? null : f.shader.get(ShaderMaterial.Hook.VERTEX_OFFSET);
-        String pos = offset != null ? "pos" : A_POSITION;
+        String p0 = f.skinned ? "p0" : A_POSITION;
+        String pos = offset != null ? "pos" : p0;
+        boolean normalIn = f.normalVarying() || f.vertNormal;
         StringBuilder sb = new StringBuilder();
         sb.append("attribute vec3 ").append(A_POSITION).append(";\n");
-        if (f.normalVarying() || f.vertNormal) {
+        if (normalIn) {
             sb.append("attribute vec3 ").append(A_NORMAL).append(";\n");
+        }
+        if (f.skinned) {
+            sb.append("attribute vec4 ").append(A_JOINTS).append(";\n");
+            sb.append("attribute vec4 ").append(A_WEIGHTS).append(";\n");
+            sb.append("uniform vec4 ").append(U_JOINTS).append("[").append(f.joints * 3).append("];\n");
         }
         if (f.uvVarying() || f.vertUv) {
             sb.append("attribute vec2 ").append(A_TEXCOORD).append(";\n");
@@ -444,18 +462,22 @@ public final class GlslShaderGenerator {
             sb.append("varying vec2 v_texcoord;\n");
         }
         sb.append("void main() {\n");
+        if (f.skinned) {
+            appendSkin(sb, normalIn);
+        }
         if (offset != null) {
             ShaderEmitter e = new ShaderEmitter(ShaderEmitter.Dialect.GLSL, f.shader, new VertexInputs(f), sb,
                     "  ", "_v");
             String o = e.emit(offset);
-            sb.append("  vec3 pos = ").append(A_POSITION).append(" + ").append(o).append(";\n");
+            sb.append("  vec3 pos = ").append(p0).append(" + ").append(o).append(";\n");
         }
         if (world) {
             sb.append("  vec4 world = u_model * vec4(").append(pos).append(", 1.0);\n");
             sb.append("  v_worldPos = world.xyz;\n");
         }
         if (f.normalVarying()) {
-            sb.append("  v_normal = (u_normalMatrix * vec4(").append(A_NORMAL).append(", 0.0)).xyz;\n");
+            sb.append("  v_normal = (u_normalMatrix * vec4(").append(f.skinned ? "n0" : A_NORMAL)
+                    .append(", 0.0)).xyz;\n");
         }
         if (f.shadow) {
             sb.append("  v_shadowPos = u_shadowMatrix * world;\n");
@@ -466,6 +488,50 @@ public final class GlslShaderGenerator {
         sb.append("  gl_Position = u_mvp * vec4(").append(pos).append(", 1.0);\n");
         sb.append("}\n");
         return sb.toString();
+    }
+
+    /// True if a draw of `format` with `material` is skinned in the vertex
+    /// stage: the material has joints and the format carries joints and
+    /// weights. Every generator and every device asks this one question.
+    ///
+    /// #### Parameters
+    ///
+    /// - `material`: the material
+    ///
+    /// - `format`: the mesh's vertex format
+    ///
+    /// #### Returns
+    ///
+    /// true to skin
+    public static boolean isSkinned(Material material, VertexFormat format) {
+        return material.isSkinned() && format.findByUsage(VertexAttribute.Usage.JOINTS) != null
+                && format.findByUsage(VertexAttribute.Usage.WEIGHTS) != null;
+    }
+
+    // Blends the three rows of each of the four joints by weight into
+    // p0 and n0, the skinned position and normal. Three rows rather than a
+    // matrix per joint, and an array only as long as the material's joints
+    // (the count is in Material.getShaderKey), keep the uniform space small:
+    // OpenGL ES 2 promises only 128 vertex vectors, though the devices in use
+    // have 256 or more.
+    private static void appendSkin(StringBuilder sb, boolean normal) {
+        sb.append("  vec4 r0 = vec4(0.0);\n  vec4 r1 = vec4(0.0);\n  vec4 r2 = vec4(0.0);\n");
+        String[] c = {"x", "y", "z", "w"};
+        for (int k = 0; k < 4; k++) {
+            sb.append("  int j").append(k).append(" = int(").append(A_JOINTS).append('.').append(c[k])
+                    .append(" + 0.5) * 3;\n");
+            for (int row = 0; row < 3; row++) {
+                sb.append("  r").append(row).append(" += ").append(A_WEIGHTS).append('.').append(c[k])
+                        .append(" * ").append(U_JOINTS).append("[j").append(k).append(" + ").append(row)
+                        .append("];\n");
+            }
+        }
+        sb.append("  vec4 sp = vec4(").append(A_POSITION).append(", 1.0);\n");
+        sb.append("  vec3 p0 = vec3(dot(r0, sp), dot(r1, sp), dot(r2, sp));\n");
+        if (normal) {
+            sb.append("  vec3 n0 = vec3(dot(r0.xyz, ").append(A_NORMAL).append("), dot(r1.xyz, ")
+                    .append(A_NORMAL).append("), dot(r2.xyz, ").append(A_NORMAL).append("));\n");
+        }
     }
 
     private static String buildFragment(Features f) {

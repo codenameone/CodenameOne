@@ -39,6 +39,18 @@ public final class VertexFormat {
             new VertexAttribute(VertexAttribute.Usage.TEXCOORD, 2)
     });
 
+    /// Position, normal, texture coordinate, four joint indices and four
+    /// joint weights (3 + 3 + 2 + 4 + 4 floats): the layout of a mesh the
+    /// device skins on the GPU, with the joints given by
+    /// `Material.setSkinning`.
+    public static final VertexFormat SKINNED = new VertexFormat(new VertexAttribute[]{
+            new VertexAttribute(VertexAttribute.Usage.POSITION, 3),
+            new VertexAttribute(VertexAttribute.Usage.NORMAL, 3),
+            new VertexAttribute(VertexAttribute.Usage.TEXCOORD, 2),
+            new VertexAttribute(VertexAttribute.Usage.JOINTS, 4),
+            new VertexAttribute(VertexAttribute.Usage.WEIGHTS, 4)
+    });
+
     private final VertexAttribute[] attributes;
     private final int floatsPerVertex;
 

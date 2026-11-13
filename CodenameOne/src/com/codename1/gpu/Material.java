@@ -66,6 +66,8 @@ public final class Material {
     private boolean receiveShadows = true;
     private boolean castShadows = true;
     private boolean fogged = true;
+    private float[] jointRows;
+    private int jointCount;
     private ShaderMaterial shader;
     private Texture normalMap;
     private float normalStrength = 1f;
@@ -311,8 +313,70 @@ public final class Material {
     public String getShaderKey() {
         String k = type.name() + (texture != null ? "|tex" : "|notex")
                 + (receiveShadows ? "|rs" : "|nrs") + (fogged ? "" : "|nofog") + ((emissive & 0xffffff) != 0 ? "|em" : "");
+        if (jointRows != null) {
+            k += "|skin" + jointCount;
+        }
         ShaderMaterial eff = getEffectiveShader();
         return eff == null ? k : k + "|sh:" + eff.getShaderKey();
+    }
+
+    /// The most joints `setSkinning` takes. A rig of more is skinned on the
+    /// CPU by `com.codename1.gaming.AnimatedModel`.
+    public static final int MAX_JOINTS = 64;
+
+    /// Skins the meshes drawn with this material on the GPU. Each joint is
+    /// three rows of its 4x4 matrix (the fourth is always 0, 0, 0, 1), so
+    /// joint `j` is `rows[j * 12 .. j * 12 + 11]`: the first row's four
+    /// values, then the second's, then the third's. A mesh in
+    /// `VertexFormat.SKINNED` moves each vertex by its four joints blended by
+    /// their weights; a mesh without joints draws as it is. The array is read
+    /// at every draw, so an animation updates it in place. Use it only where
+    /// `GraphicsDevice.isGpuSkinning` says the device can.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the joint rows, at least `count * 12` floats, or null to
+    ///   stop skinning
+    ///
+    /// - `count`: the number of joints, at most `MAX_JOINTS`
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setSkinning(float[] rows, int count) {
+        if (rows != null && (count < 1 || count > MAX_JOINTS || rows.length < count * 12)) {
+            throw new IllegalArgumentException("joint count " + count);
+        }
+        this.jointRows = rows;
+        this.jointCount = rows == null ? 0 : count;
+        return this;
+    }
+
+    /// Returns the joint rows `setSkinning` gave, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the rows, shared and not copied
+    public float[] getJointRows() {
+        return jointRows;
+    }
+
+    /// Returns the number of joints `setSkinning` gave, 0 without skinning.
+    ///
+    /// #### Returns
+    ///
+    /// the joint count
+    public int getJointCount() {
+        return jointCount;
+    }
+
+    /// True if the material skins its meshes on the GPU.
+    ///
+    /// #### Returns
+    ///
+    /// true after `setSkinning` with joints
+    public boolean isSkinned() {
+        return jointRows != null;
     }
 
     /// Returns false when the environment's fog skips this material.

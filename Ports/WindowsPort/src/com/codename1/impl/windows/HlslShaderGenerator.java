@@ -142,9 +142,11 @@ public final class HlslShaderGenerator {
         boolean emissive = lit && (material.getEmissive() & 0xffffff) != 0;
         boolean shadow = lit && shadowed && material.isReceiveShadows();
         ShaderMaterial sm = material.getEffectiveShader();
+        boolean skinned = GlslShaderGenerator.isSkinned(material, format);
         Custom c = null;
         if (sm != null) {
             c = new Custom();
+            c.skinned = skinned;
             c.shader = sm;
             c.hasNormal = hasNormal;
             c.hasTexcoord = hasTexcoord;
@@ -153,7 +155,7 @@ public final class HlslShaderGenerator {
             c.fragUv = hasTexcoord && ShaderEmitter.uses(sm, true, "uv");
         }
         this.source = build(lit, phong, pbr, textured, hasNormal, hasTexcoord, fog, skyOn,
-                hemi, tone, emissive, shadow, c, depthOnly, ibl);
+                hemi, tone, emissive, shadow, c, depthOnly, ibl, skinned);
     }
 
     // a material's ShaderMaterial and which inputs its fragment graphs read
@@ -166,6 +168,7 @@ public final class HlslShaderGenerator {
         boolean fragUv;
         boolean lit;
         boolean textured;
+        boolean skinned;
     }
 
     // custom shading inputs; both stages call their argument `input`
@@ -193,16 +196,16 @@ public final class HlslShaderGenerator {
             }
             if (!fragment) {
                 if ("position".equals(name)) {
-                    return "input.position";
+                    return c.skinned ? "p0" : "input.position";
                 }
                 if ("normal".equals(name)) {
-                    return c.hasNormal ? "input.normal" : "float3(0.0, 1.0, 0.0)";
+                    return c.hasNormal ? (c.skinned ? "n0" : "input.normal") : "float3(0.0, 1.0, 0.0)";
                 }
                 if ("uv".equals(name)) {
                     return c.hasTexcoord ? "input.texcoord" : "float2(0.0, 0.0)";
                 }
                 if ("worldPos".equals(name)) {
-                    return "mul(model, float4(input.position, 1.0)).xyz";
+                    return "mul(model, float4(" + (c.skinned ? "p0" : "input.position") + ", 1.0)).xyz";
                 }
                 return null;
             }
@@ -236,7 +239,8 @@ public final class HlslShaderGenerator {
     private static String build(boolean lit, boolean phong, boolean pbr, boolean textured,
                                 boolean hasNormal, boolean hasTexcoord, boolean fog,
                                 boolean sky, boolean hemi, boolean tone, boolean emissive,
-                                boolean shadow, Custom c, boolean depthOnly, boolean ibl) {
+                                boolean shadow, Custom c, boolean depthOnly, boolean ibl,
+                                boolean skinned) {
         if (c != null) {
             c.lit = lit;
             c.textured = textured;
@@ -245,7 +249,8 @@ public final class HlslShaderGenerator {
         boolean normalOut = lit || (c != null && c.fragNormal);
         boolean uvOut = textured || (c != null && c.fragUv);
         ShaderNode offset = c == null ? null : c.shader.get(ShaderMaterial.Hook.VERTEX_OFFSET);
-        String pos = offset != null ? "pos" : "input.position";
+        String p0 = skinned ? "p0" : "input.position";
+        String pos = offset != null ? "pos" : p0;
         StringBuilder sb = new StringBuilder();
 
         // Constant buffer. Layout matches the float[] the Java side packs and the
@@ -314,7 +319,16 @@ public final class HlslShaderGenerator {
         if (hasTexcoord) {
             sb.append("  float2 texcoord : TEXCOORD0;\n");
         }
+        if (skinned) {
+            sb.append("  float4 joints : BLENDINDICES;\n");
+            sb.append("  float4 weights : BLENDWEIGHT;\n");
+        }
         sb.append("};\n");
+        if (skinned) {
+            // the joint rows, three per joint (cn1_windows_d3d.cpp binds b1)
+            sb.append("cbuffer CN1Joints : register(b1) {\n  float4 joints[")
+                    .append(Material.MAX_JOINTS * 3).append("];\n};\n");
+        }
 
         sb.append("struct VSOutput {\n");
         sb.append("  float4 position : SV_Position;\n");
@@ -335,11 +349,29 @@ public final class HlslShaderGenerator {
         // Vertex shader.
         sb.append("VSOutput ").append(VERTEX_FUNCTION).append("(VSInput input) {\n");
         sb.append("  VSOutput output;\n");
+        if (skinned) {
+            sb.append("  float4 r0 = float4(0.0, 0.0, 0.0, 0.0);\n  float4 r1 = r0;\n  float4 r2 = r0;\n");
+            String[] cc = {"x", "y", "z", "w"};
+            for (int k = 0; k < 4; k++) {
+                sb.append("  int j").append(k).append(" = (int) (input.joints.").append(cc[k])
+                        .append(" + 0.5) * 3;\n");
+                for (int row = 0; row < 3; row++) {
+                    sb.append("  r").append(row).append(" += input.weights.").append(cc[k]).append(" * joints[j")
+                            .append(k).append(" + ").append(row).append("];\n");
+                }
+            }
+            sb.append("  float4 sp = float4(input.position, 1.0);\n");
+            sb.append("  float3 p0 = float3(dot(r0, sp), dot(r1, sp), dot(r2, sp));\n");
+            if (hasNormal) {
+                sb.append("  float3 n0 = float3(dot(r0.xyz, input.normal), dot(r1.xyz, input.normal), "
+                        + "dot(r2.xyz, input.normal));\n");
+            }
+        }
         if (offset != null) {
             ShaderEmitter e = new ShaderEmitter(ShaderEmitter.Dialect.HLSL, c.shader, new Inputs(c, false), sb,
                     "  ", "_v");
             String o = e.emit(offset);
-            sb.append("  float3 pos = input.position + ").append(o).append(";\n");
+            sb.append("  float3 pos = ").append(p0).append(" + ").append(o).append(";\n");
         }
         sb.append("  float4 clip = mul(mvp, float4(").append(pos).append(", 1.0));\n");
         // Adapt the portable GL-convention clip space to Direct3D: only remap Z
@@ -351,7 +383,8 @@ public final class HlslShaderGenerator {
         sb.append("  clip.z = (clip.z + clip.w) * 0.5;\n");
         sb.append("  output.position = clip;\n");
         if (normalOut) {
-            sb.append("  output.worldNormal = mul(normalMatrix, float4(input.normal, 0.0)).xyz;\n");
+            sb.append("  output.worldNormal = mul(normalMatrix, float4(").append(skinned ? "n0" : "input.normal")
+                    .append(", 0.0)).xyz;\n");
         }
         if (world) {
             sb.append("  output.worldPos = mul(model, float4(").append(pos).append(", 1.0)).xyz;\n");

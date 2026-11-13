@@ -31,6 +31,8 @@ import com.codename1.gpu.Material;
 import com.codename1.gpu.Mesh;
 import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexBuffer;
+import com.codename1.gpu.VertexFormat;
+import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Image;
 import com.codename1.util.Base64;
@@ -43,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class AnimatedModelTest extends UITestBase {
     private static final float EPS = 1e-4f;
 
-    static final class StubDevice extends GraphicsDevice {
+    static class StubDevice extends GraphicsDevice {
         public GpuCapabilities getCapabilities() {
             throw new UnsupportedOperationException();
         }
@@ -197,6 +199,75 @@ class AnimatedModelTest extends UITestBase {
         float[] prop = m.getParts()[1].getMesh().getVertices().getData();
         assertVertex(prop, 1, 0, 2, 0);
         assertTrue(m.getParts()[0].getMesh().getVertices().isDirty());
+    }
+
+    static final class GpuSkinDevice extends StubDevice {
+        @Override
+        public boolean isGpuSkinning() {
+            return true;
+        }
+    }
+
+    // What the generated vertex stage computes: blend the four joints' rows
+    // by weight, then dot each row with the bind pose position.
+    private static float[] shaderSkin(float[] data, int v, float[] rows) {
+        float[] r = new float[12];
+        for (int k = 0; k < 4; k++) {
+            int j = (int) (data[v * 16 + 8 + k] + 0.5f) * 12;
+            float w = data[v * 16 + 12 + k];
+            for (int i = 0; i < 12; i++) {
+                r[i] += w * rows[j + i];
+            }
+        }
+        float[] out = new float[3];
+        for (int row = 0; row < 3; row++) {
+            out[row] = r[row * 4] * data[v * 16] + r[row * 4 + 1] * data[v * 16 + 1]
+                    + r[row * 4 + 2] * data[v * 16 + 2] + r[row * 4 + 3];
+        }
+        return out;
+    }
+
+    @Test
+    void gpuSkinningMovesTheSameVerticesTheCpuDoes() {
+        AnimatedModel cpu = new AnimatedModel(new StubDevice(), GltfLoader.loadScene(armGltf()));
+        AnimatedModel gpu = new AnimatedModel(new GpuSkinDevice(), GltfLoader.loadScene(armGltf()));
+        Material skinMat = gpu.getParts()[0].getMaterial();
+        assertTrue(skinMat.isSkinned());
+        assertFalse(gpu.getParts()[1].getMaterial().isSkinned()); // the rigid prop stays on the CPU
+        assertSame(VertexFormat.SKINNED, gpu.getParts()[0].getMesh().getVertices().getFormat());
+        assertTrue(GlslShaderGenerator.isSkinned(skinMat, VertexFormat.SKINNED));
+        assertTrue(GlslShaderGenerator.needsOwnDepthProgram(skinMat));
+        String vs = new GlslShaderGenerator(skinMat, VertexFormat.SKINNED, null, false).getVertexSource();
+        assertTrue(vs.contains("uniform vec4 u_joints[" + skinMat.getJointCount() * 3 + "]"), vs);
+        assertTrue(vs.contains("attribute vec4 a_weights"), vs);
+        cpu.play("Bend", false);
+        gpu.play("Bend", false);
+        cpu.update(0.6f);
+        gpu.update(0.6f);
+        float[] expected = cpu.getParts()[0].getMesh().getVertices().getData();
+        float[] bind = gpu.getParts()[0].getMesh().getVertices().getData();
+        for (int v = 0; v < gpu.getParts()[0].getMesh().getVertices().getVertexCount(); v++) {
+            float[] got = shaderSkin(bind, v, skinMat.getJointRows());
+            assertEquals(expected[v * 8], got[0], EPS, "x of vertex " + v);
+            assertEquals(expected[v * 8 + 1], got[1], EPS, "y of vertex " + v);
+            assertEquals(expected[v * 8 + 2], got[2], EPS, "z of vertex " + v);
+        }
+        float[] prop = cpu.getParts()[1].getMesh().getVertices().getData();
+        assertVertex(gpu.getParts()[1].getMesh().getVertices().getData(), 1, prop[8], prop[9], prop[10]);
+    }
+
+    @Test
+    void skinningTakesAtMostMaxJoints() {
+        Material m = new Material(Material.Type.LAMBERT);
+        assertThrows(IllegalArgumentException.class,
+                () -> m.setSkinning(new float[(Material.MAX_JOINTS + 1) * 12], Material.MAX_JOINTS + 1));
+        assertThrows(IllegalArgumentException.class, () -> m.setSkinning(new float[11], 1));
+        String plain = m.getShaderKey();
+        m.setSkinning(new float[24], 2);
+        assertNotEquals(plain, m.getShaderKey());
+        assertFalse(GlslShaderGenerator.isSkinned(m, VertexFormat.POSITION_NORMAL_TEXCOORD));
+        m.setSkinning(null, 0);
+        assertEquals(plain, m.getShaderKey());
     }
 
     @Test

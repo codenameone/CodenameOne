@@ -109,6 +109,25 @@ public class ShaderDump {
             write(b + ".metal", new IOSMetalShaderGenerator(lit[i], VertexFormat.POSITION_NORMAL_TEXCOORD, ibl, true).getSource());
             write(b + ".hlsl", new HlslShaderGenerator(lit[i], VertexFormat.POSITION_NORMAL_TEXCOORD, ibl, true).getSource());
         }
+        // GPU skinning: lit, unlit textured, a vertex-moving shader, and the
+        // depth-only caster each skinned
+        float[] rows = new float[Material.MAX_JOINTS * 12];
+        Material[] skinned = {new Material(Material.Type.PBR).setSkinning(rows, Material.MAX_JOINTS),
+                new Material(Material.Type.UNLIT).setTexture(new Texture(4, 4)).setSkinning(rows, 8),
+                new Material(Material.Type.PBR).setShader(Water.ocean()).setSkinning(rows, 2)};
+        for (int i = 0; i < skinned.length; i++) {
+            String b = dir + "/skin" + i;
+            GlslShaderGenerator g = new GlslShaderGenerator(skinned[i], VertexFormat.SKINNED, ibl, true);
+            write(b + ".vert", "#version 100\n" + g.getVertexSource());
+            write(b + ".frag", "#version 100\n" + g.getFragmentSource());
+            write(b + ".metal", new IOSMetalShaderGenerator(skinned[i], VertexFormat.SKINNED, ibl, true).getSource());
+            write(b + ".hlsl", new HlslShaderGenerator(skinned[i], VertexFormat.SKINNED, ibl, true).getSource());
+            GlslShaderGenerator dg = GlslShaderGenerator.depthOnly(skinned[i], VertexFormat.SKINNED);
+            write(b + "d.vert", "#version 100\n" + dg.getVertexSource());
+            write(b + "d.frag", "#version 100\n" + dg.getFragmentSource());
+            write(b + "d.metal", IOSMetalShaderGenerator.depthOnly(skinned[i], VertexFormat.SKINNED).getSource());
+            write(b + "d.hlsl", HlslShaderGenerator.depthOnly(skinned[i], VertexFormat.SKINNED).getSource());
+        }
         write(dir + "/post.frag", "#version 100\n" + GlslShaderGenerator.compositeFragment());
         write(dir + "/post.metal", IOSMetalShaderGenerator.postSource());
         write(dir + "/post.hlsl", HlslShaderGenerator.postCompositeSource());
