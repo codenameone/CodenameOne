@@ -46,7 +46,6 @@ The same switch is available to any launcher as the system property `cn1.mcp.por
 
 Projects created by the Initializr include `Sim.java`, a single-file client in `.agent-skills/codename-one/tools/`. It wraps the tools as shell commands, so an agent needs no MCP host at all:
 
-[source,bash]
 ----
 ./mvnw cn1:agent &
 java .agent-skills/codename-one/tools/Sim.java wait
