@@ -72,8 +72,50 @@ final class Layouts {
             this.javaName = javaName;
             this.typeVar = typeVar;
             this.parent = parent;
-            this.bodyNames = def.scope.assigned;
+            this.bodyNames = bodyBindings(def);
         }
+    }
+
+    /// The names a class body binds. A bare annotation (`name_rules: List[Rule]`)
+    /// binds nothing -- it only records the annotation -- so a name that only
+    /// appears that way is left out, and stays free to be a field: bs4 annotates
+    /// every instance attribute of `Tag` and `SoupStrainer` in the class body. A body
+    /// with any statement whose bindings are not read here keeps the scope's set.
+    static Set<String> bodyBindings(ClassDef def) {
+        Set<String> bare = new HashSet<String>();
+        Set<String> bound = new HashSet<String>();
+        for (Stmt s : def.body) {
+            if (s instanceof AnnAssign && ((AnnAssign) s).value == null) {
+                if (((AnnAssign) s).target instanceof Name) {
+                    bare.add(((Name) ((AnnAssign) s).target).id);
+                }
+            } else if (s instanceof AnnAssign) {
+                names(((AnnAssign) s).target, bound);
+            } else if (s instanceof Assign) {
+                for (Expr t : ((Assign) s).targets) {
+                    names(t, bound);
+                }
+            } else if (s instanceof AugAssign) {
+                names(((AugAssign) s).target, bound);
+            } else if (s instanceof FunctionDef) {
+                bound.add(((FunctionDef) s).name);
+            } else if (s instanceof ClassDef) {
+                bound.add(((ClassDef) s).name);
+            } else if (!(s instanceof ExprStmt) && !(s instanceof Pass)) {
+                return def.scope.assigned;
+            }
+        }
+        bare.removeAll(bound);
+        if (bare.isEmpty()) {
+            return def.scope.assigned;
+        }
+        Set<String> r = new HashSet<String>(def.scope.assigned);
+        r.removeAll(bare);
+        return r;
+    }
+
+    private static boolean bareAnnotation(Stmt s) {
+        return s instanceof AnnAssign && ((AnnAssign) s).value == null;
     }
 
     final Map<ClassDef, Cls> classes = new LinkedHashMap<ClassDef, Cls>();
@@ -120,13 +162,15 @@ final class Layouts {
         FORBIDDEN.add("__new__");
     }
 
+    /// `moduleAssigned` is every name the module binds, imports included.
     /// `attrStores` is the module scope's (`Scope.attrStores`): a field the
     /// module itself assigns on a class is left to the generic path, since
     /// the class attribute -- a property, say -- must then decide its reads.
-    static Layouts plan(List<Stmt> body, String prefix, Set<String> attrStores) {
+    static Layouts plan(List<Stmt> body, String prefix, Set<String> attrStores, Set<String> moduleAssigned) {
         Layouts l = new Layouts();
         Map<String, Cls> byName = new LinkedHashMap<String, Cls>();
         int n = 0;
+        boolean bindsObject = moduleAssigned.contains("object");
         for (Stmt s : body) {
             if (!(s instanceof ClassDef)) {
                 continue;
@@ -136,8 +180,15 @@ final class Layouts {
             boolean ok = c.keywords.isEmpty() && c.decorators.isEmpty() && c.bases.size() <= 1;
             if (ok && c.bases.size() == 1) {
                 Expr b = c.bases.get(0);
-                parent = b instanceof Name ? byName.get(((Name) b).id) : null;
-                ok = parent != null;
+                // `class X(object)` is a class with no base: the builtin adds
+                // nothing a compiled layout must defer to. Only when the
+                // module never rebinds the name, which it then could.
+                if (b instanceof Name && "object".equals(((Name) b).id) && !bindsObject) {
+                    ok = true;
+                } else {
+                    parent = b instanceof Name ? byName.get(((Name) b).id) : null;
+                    ok = parent != null;
+                }
             }
             for (String f : FORBIDDEN) {
                 ok &= !c.scope.assigned.contains(f);
@@ -194,7 +245,9 @@ final class Layouts {
                     } else if (s instanceof AugAssign) {
                         names(((AugAssign) s).target, b);
                     } else if (s instanceof AnnAssign) {
-                        names(((AnnAssign) s).target, b);
+                        if (!bareAnnotation(s)) {
+                            names(((AnnAssign) s).target, b);
+                        }
                     } else if (!(s instanceof ExprStmt) && !(s instanceof Pass)) {
                         b.addAll(k.bodyNames);
                     }
@@ -238,7 +291,9 @@ final class Layouts {
                 } else if (s instanceof AugAssign) {
                     names(((AugAssign) s).target, rebound);
                 } else if (s instanceof AnnAssign) {
-                    names(((AnnAssign) s).target, rebound);
+                    if (!bareAnnotation(s)) {
+                        names(((AnnAssign) s).target, rebound);
+                    }
                 } else if (s instanceof For) {
                     names(((For) s).target, rebound);
                 } else if (s instanceof ClassDef) {

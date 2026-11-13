@@ -360,7 +360,7 @@ public final class Emitter {
         sc = ms;
         uncell(ms);
         findDirectLong(m.body);
-        layouts = Layouts.plan(m.body, "", ms.attrStores);
+        layouts = Layouts.plan(m.body, "", ms.attrStores, ms.assigned);
         for (Layouts.Cls k : layouts.classes.values()) {
             k.ref = className + "." + k.javaName;
         }
