@@ -259,7 +259,9 @@ public final class ElasticsearchEngine implements SearchEngine {
             Map inner = new LinkedHashMap();
             inner.put(exactName(exact, (String) e.getKey()), e.getValue());
             // Equality, as the SQL engine compares: term on the keyword form.
-            clause.put("term", inner);
+            // A text field with no keyword form has only its tokens, so a
+            // phrase is the closest it can come.
+            clause.put(TEXT_ONLY.equals(exact.get(e.getKey())) ? "match_phrase" : "term", inner);
             filters.add(clause);
         }
         if (!filters.isEmpty()) {
@@ -338,9 +340,12 @@ public final class ElasticsearchEngine implements SearchEngine {
         return parse(json(r));
     }
 
+    /// Recorded for a `text` field that has no `keyword` sub-field.
+    static final String TEXT_ONLY = "";
+
     private static String exactName(Map exact, String field) {
         Object n = exact.get(field);
-        return n == null ? field : (String) n;
+        return n == null || TEXT_ONLY.equals(n) ? field : (String) n;
     }
 
     /// Looks up how `field` is mapped and records the name exact operations
@@ -378,10 +383,15 @@ public final class ElasticsearchEngine implements SearchEngine {
         exact.put(field, name);
     }
 
-    /// The exact-operation name in a `_mapping/field` response, or null if
-    /// the field is not mapped. Package visible for tests.
+    /// The exact-operation name in a `_mapping/field` response, [#TEXT_ONLY]
+    /// for a text field without a keyword form, or null if the field is not
+    /// mapped. Package visible for tests.
     static String keywordName(Map response, String index, String field) {
         Object idx = response.get(index);
+        if (idx == null && response.size() == 1) {
+            // Searched through an alias: the reply is keyed by the index behind it.
+            idx = response.values().iterator().next();
+        }
         Object mappings = idx instanceof Map ? ((Map) idx).get("mappings") : null;
         Object entry = mappings instanceof Map ? ((Map) mappings).get(field) : null;
         Object mapping = entry instanceof Map ? ((Map) entry).get("mapping") : null;
@@ -395,7 +405,7 @@ public final class ElasticsearchEngine implements SearchEngine {
         Object fields = ((Map) def).get("fields");
         Object kw = fields instanceof Map ? ((Map) fields).get("keyword") : null;
         return kw instanceof Map && "keyword".equals(((Map) kw).get("type"))
-                ? field + ".keyword" : field;
+                ? field + ".keyword" : TEXT_ONLY;
     }
 
     static SearchResult parse(Map response) {

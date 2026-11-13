@@ -75,7 +75,7 @@ class SearchEngineTest {
     }
 
     @Test
-    void queryBodyAndTerms() {
+    void queryBodyAndTerms() throws Exception {
         Map body = ElasticsearchEngine.body(new SearchQuery("red shoe").fields("name")
                 .filter("brand", "acme").filter("stock", Integer.valueOf(3)).page(20, 10));
         assertEquals(Integer.valueOf(20), body.get("from"));
@@ -89,6 +89,18 @@ class SearchEngineTest {
                 () -> ElasticsearchEngine.requireIndexName("../x"));
         assertThrows(IllegalArgumentException.class,
                 () -> ElasticsearchEngine.requireIndexName("Upper"));
+        Map dyn = com.codename1.backend.Json.parseObject("{\"real\":{\"mappings\":{\"t\":{\"mapping\":"
+                + "{\"t\":{\"type\":\"text\",\"fields\":{\"keyword\":{\"type\":\"keyword\"}}}}}}}}");
+        // Through an alias the reply is keyed by the real index.
+        assertEquals("t.keyword", ElasticsearchEngine.keywordName(dyn, "alias", "t"));
+        Map text = com.codename1.backend.Json.parseObject("{\"i\":{\"mappings\":{\"t\":{\"mapping\":"
+                + "{\"t\":{\"type\":\"text\"}}}}}}");
+        assertEquals(ElasticsearchEngine.TEXT_ONLY, ElasticsearchEngine.keywordName(text, "i", "t"));
+        Map num = com.codename1.backend.Json.parseObject("{\"i\":{\"mappings\":{\"n\":{\"mapping\":"
+                + "{\"n\":{\"type\":\"long\"}}}}}}");
+        assertEquals("n", ElasticsearchEngine.keywordName(num, "i", "n"));
+        assertNull(ElasticsearchEngine.keywordName(
+                com.codename1.backend.Json.parseObject("{\"i\":{\"mappings\":{}}}"), "i", "n"));
     }
 
     private static Map product(String name, String brand, String color, int price) {
