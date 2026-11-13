@@ -1526,6 +1526,8 @@ public final class Backend {
         private MetricReader metricReader;
         private OwnRoute managementRoute;
         private OwnRoute mcpRoute;
+        /// The build's OpenAPI document, when it linked the docs; see [#openApi].
+        private String openApiDocument;
         private boolean testApplication;
         private SecurityRoute securityRoute;
         private String[] compiledSettings;
@@ -1801,6 +1803,15 @@ public final class Backend {
             return this;
         }
 
+        /// Serves `document`, the OpenAPI document the build wrote from the route
+        /// table, and a Swagger UI page for it, unless the configuration turns them
+        /// off; see [com.codename1.impl.backend.OpenApiDocs]. Like [#management],
+        /// the generated entry point calls this only for a build that asked.
+        Builder openApi(String document) {
+            this.openApiDocument = document;
+            return this;
+        }
+
         /// Puts the security layer in front of the application's routes; see
         /// [com.codename1.backend.security.SecurityFilterChain]. Like [#mcp] and
         /// [#management], this is the only code that names the layer, and the
@@ -1903,6 +1914,7 @@ public final class Backend {
             // acted on is refused here rather than silently doing nothing.
             BuildTimeSettings.require(config, managementRoute != null || testApplication,
                     mcpRoute != null || testApplication,
+                    openApiDocument != null || testApplication,
                     tracer != null || metricReader != null || testApplication);
             // And the other way: a server built to export that is told not to.
             boolean telemetryOff = BuildTimeSettings.leftOut(config,
@@ -2037,6 +2049,15 @@ public final class Backend {
                 // FIRST: it answers one exact path, and a catch-all handler
                 // added before it would otherwise take the app's exports.
                 routers.add(relay);
+            }
+            // The OpenAPI document and Swagger UI ahead of the application's own
+            // routers, so a catch-all route cannot answer them; but among the
+            // application's routers, so the security layer stands in front of them.
+            com.codename1.impl.backend.OpenApiDocs openApiDocs = openApiDocument == null
+                    || BuildTimeSettings.leftOut(config, BuildTimeSettings.OPENAPI) ? null
+                    : com.codename1.impl.backend.OpenApiDocs.fromConfig(config, openApiDocument);
+            if (openApiDocs != null) {
+                routers.add(openApiDocs);
             }
             routers.addAll(handlers);
             // FIRST among the routers, after the relay: its paths are its own, and

@@ -55,6 +55,11 @@ final class Access extends BackendAccess {
     }
 
     @Override
+    public void openApi(Backend.Builder builder, String document) {
+        builder.openApi(document);
+    }
+
+    @Override
     public void security(Backend.Builder builder) {
         builder.security();
     }

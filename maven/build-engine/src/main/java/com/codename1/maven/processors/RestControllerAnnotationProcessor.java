@@ -37,6 +37,8 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -299,6 +301,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String produces;
         /** The expression building the route's @CrossOrigin policy, or null. */
         String cors;
+        /// Method security (`@PreAuthorize`, `@Secured`, `@RolesAllowed`) applies,
+        /// for the OpenAPI document.
+        boolean secured;
     }
 
     private static final class Param {
@@ -325,6 +330,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
          * cn1Arg{index}, reporting into cn1Violations; null when it has none.
          */
         String validation;
+        /// The parameter's annotations, for the constraints in the OpenAPI document.
+        Map<String, AnnotationValues> annotations;
     }
 
     /// The @ControllerAdvice classes: binary name to the resolver source.
@@ -835,6 +842,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String declared = RestClientAnnotationProcessor.canonicalPath(pattern);
         route.pattern = declared.length() == 0 ? "/" : declared;
         route.javaMethod = m.getName();
+        for (String guard : new String[] {BackendBeans.PRE_AUTHORIZE, BackendBeans.SECURED,
+                BackendBeans.ROLES_ALLOWED}) {
+            route.secured |= m.getAnnotation(guard) != null
+                    || cls.getClassAnnotation(guard) != null;
+        }
 
         // THE WHOLE PATTERN, not the part that becomes matcher bytes. A route's
         // prefix goes through byteArrayLiteral, which refuses a non-ASCII
@@ -955,6 +967,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     : RestClientAnnotationProcessor.javaTypeFor(paramTypes[i], genericParams[i]);
             Map<String, AnnotationValues> annotations = i < paramAnnotations.size()
                     ? paramAnnotations.get(i) : Collections.<String, AnnotationValues>emptyMap();
+            p.annotations = annotations;
             AnnotationValues pathVariable = annotations.get(PATH_VARIABLE);
             AnnotationValues requestParam = annotations.get(REQUEST_PARAM);
             AnnotationValues requestHeader = annotations.get(REQUEST_HEADER);
@@ -1863,6 +1876,26 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             sources.putAll(codecSources);
         }
+        // The OpenAPI document, from the route table just checked. After the codecs:
+        // the schemas walk their model and must not add a codec of their own.
+        String openApi = controllers.isEmpty() ? null : openApiDocument(ctx);
+        if (ctx.hasErrors()) {
+            return;
+        }
+        boolean serveOpenApi = openApi != null && (devTools
+                || (settings != null && settings.openApi));
+        if (serveOpenApi) {
+            String holder = qualify(entryPackage, OPENAPI_CLASS);
+            if (isNotOurOwnOutput(ctx, holder)) {
+                ctx.error(holder + " already exists, and the OpenAPI document generated "
+                        + "under that name would replace it. Rename that class.");
+                return;
+            }
+            sources.put(holder, openApiSource(entryPackage, openApi));
+            openApiHolder = holder;
+        } else {
+            openApiHolder = null;
+        }
         Map<String, String> extra = new LinkedHashMap<String, String>(adviceSources);
         if (validation != null) {
             extra.putAll(validation.sources());
@@ -1910,6 +1943,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             MvcAssets.removeObsoleteClasses(ctx.getOutputClassDir(), sources.keySet());
             ctx.emitResource(MAIN_CLASS_RESOURCE, asciiBytes(bootstrap));
             ctx.emitResource(WIRING_RESOURCE, asciiBytes(wiringRecord(entryPackage)));
+            // The class path copy ships in the artifact, so only a build that
+            // serves the document carries it: a packaged server that did not ask
+            // must not hand its whole API surface to whoever unzips it. The copy
+            // under target/ never ships, and is always current -- or gone.
+            if (openApiHolder != null) {
+                ctx.emitResource(OPENAPI_RESOURCE, asciiBytes(openApi));
+            }
+            writeOpenApiFile(ctx, openApi);
         } catch (IOException ioe) {
             throw new ProcessingException("Could not compile the generated @RestController "
                     + "sources: " + ioe.getMessage(), ioe);
@@ -3685,6 +3726,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // calls -- and pays one null check per request for its absence.
             sb.append("        cn1Access.security(cn1Builder);\n");
         }
+        if (openApiHolder != null) {
+            // The ONLY reference to the OpenAPI document and its handler, made for
+            // a build that asked: a packaged server that did not has neither.
+            sb.append("        cn1Access.openApi(cn1Builder, ").append(openApiHolder)
+              .append(".document());\n");
+        }
         if (devTools || (settings != null && settings.management)) {
             // The ONLY call that names the management endpoints, so a packaged
             // server that did not ask for them has none of their code: the
@@ -3715,6 +3762,170 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("    }\n");
         sb.append("}\n");
         return sb.toString();
+    }
+
+    /// The class, in the entry point's package, that holds the OpenAPI document.
+    static final String OPENAPI_CLASS = "Cn1OpenApiDocument";
+    /// The class-path resource the OpenAPI document is also written to.
+    static final String OPENAPI_RESOURCE = "META-INF/cn1/openapi.json";
+    /// Set by [#finish] when the entry point serves the document.
+    private String openApiHolder;
+
+    /// The OpenAPI document of every route, as JSON.
+    String openApiDocument(ProcessorContext ctx) {
+        List<OpenApiWriter.Operation> ops = new ArrayList<OpenApiWriter.Operation>();
+        // A tag per controller, by simple name unless two controllers share one.
+        Map<String, Integer> simpleNames = new HashMap<String, Integer>();
+        for (Controller c : controllers.values()) {
+            Integer n = simpleNames.get(c.simpleName);
+            simpleNames.put(c.simpleName, n == null ? 1 : n + 1);
+        }
+        for (Controller c : controllers.values()) {
+            String tag = simpleNames.get(c.simpleName) > 1 ? c.binaryName : c.simpleName;
+            for (Route r : c.routes) {
+                OpenApiWriter.Operation op = new OpenApiWriter.Operation();
+                op.method = r.httpMethod;
+                op.path = r.pattern;
+                op.tag = tag;
+                op.operationId = c.routes.size() > 1 && sameMethodTwice(c, r)
+                        ? r.javaMethod + "_" + r.httpMethod.toLowerCase(java.util.Locale.ROOT)
+                        : r.javaMethod;
+                op.status = r.status;
+                op.consumes = r.consumes;
+                op.produces = r.produces;
+                op.returnType = r.returnJavaType == null ? "void" : r.returnJavaType;
+                op.handBuilt = isResponseType(op.returnType);
+                op.view = r.view;
+                op.secured = r.secured;
+                for (Param p : r.params) {
+                    String in = "PATH".equals(p.kind) ? "path" : "QUERY".equals(p.kind) ? "query"
+                            : "HEADER".equals(p.kind) ? "header" : "BODY".equals(p.kind) ? "body"
+                            : "PART".equals(p.kind) ? "part" : null;
+                    if (in == null) {
+                        continue;     // bound from the request or the security layer
+                    }
+                    OpenApiWriter.Param op1 = new OpenApiWriter.Param();
+                    op1.in = in;
+                    op1.name = p.name;
+                    op1.type = p.genericJavaType != null ? p.genericJavaType : p.javaType;
+                    op1.required = p.required;
+                    op1.defaultValue = p.defaultValue;
+                    final Map<String, AnnotationValues> annotations = p.annotations;
+                    if (annotations != null && !annotations.isEmpty()) {
+                        op1.constraints = new BackendJsonCodecs.ConstraintSource() {
+                            @Override
+                            public AnnotationValues get(String descriptor) {
+                                return annotations.get(descriptor);
+                            }
+                        };
+                    }
+                    op.params.add(op1);
+                }
+                ops.add(op);
+            }
+        }
+        // operationIds must be unique across the document.
+        // A suffix can itself be a real method's name (list_2, or an overload's
+        // list_get), so every id taken is reserved before any is renamed, and a
+        // renamed one skips forward to a free name.
+        Set<String> taken = new HashSet<String>();
+        Set<String> reserved = new HashSet<String>();
+        for (OpenApiWriter.Operation op : ops) {
+            reserved.add(op.operationId);
+        }
+        for (OpenApiWriter.Operation op : ops) {
+            if (taken.add(op.operationId)) {
+                continue;
+            }
+            String base = op.operationId;
+            int n = 2;
+            while (reserved.contains(base + "_" + n) || taken.contains(base + "_" + n)) {
+                n++;
+            }
+            op.operationId = base + "_" + n;
+            taken.add(op.operationId);
+        }
+        java.util.Properties props = ctx.getProjectSettings();
+        String title = settingOr("cn1.openapi.title", props == null ? null
+                : props.getProperty("codename1.displayName"), "API");
+        String version = settingOr("cn1.openapi.version", props == null ? null
+                : props.getProperty("codename1.version"), "1.0");
+        String security = settings == null ? null : settings.values.get("cn1.openapi.security");
+        try {
+            return new OpenApiWriter(codecs(ctx)).write(title, version, ops, security);
+        } catch (IllegalArgumentException e) {
+            ctx.error(e.getMessage());
+            return null;
+        }
+    }
+
+    private String settingOr(String key, String fallback, String last) {
+        String v = settings == null ? null : settings.values.get(key);
+        if (v != null && v.trim().length() > 0) {
+            return v.trim();
+        }
+        return fallback != null && fallback.trim().length() > 0 ? fallback.trim() : last;
+    }
+
+    private static boolean sameMethodTwice(Controller c, Route r) {
+        int n = 0;
+        for (Route other : c.routes) {
+            if (other.javaMethod.equals(r.javaMethod)) {
+                n++;
+            }
+        }
+        return n > 1;
+    }
+
+    /// The class holding the document: a string literal is limited to 65535 bytes
+    /// in a class file, so it is joined from chunks at run time.
+    static String openApiSource(String pkg, String json) {
+        StringBuilder sb = new StringBuilder();
+        if (pkg.length() > 0) {
+            sb.append("package ").append(pkg).append(";\n\n");
+        }
+        sb.append("/** The OpenAPI document of this module, written by the build. */\n");
+        sb.append("@com.codename1.backend.annotations.Generated\n");
+        sb.append("final class ").append(OPENAPI_CLASS).append(" {\n");
+        sb.append("    private ").append(OPENAPI_CLASS).append("() {\n    }\n\n");
+        sb.append("    static String document() {\n");
+        sb.append("        StringBuilder sb = new StringBuilder(").append(json.length())
+          .append(");\n");
+        for (int i = 0; i < json.length(); i += 8000) {
+            sb.append("        sb.append(").append(quote(json.substring(i,
+                    Math.min(json.length(), i + 8000)))).append(");\n");
+        }
+        sb.append("        return sb.toString();\n    }\n}\n");
+        return sb.toString();
+    }
+
+    /// `target/openapi.json`, beside the classes, for a consumer that wants the
+    /// document without starting the server.
+    private static void writeOpenApiFile(ProcessorContext ctx, String json) {
+        File target = ctx.getOutputClassDir().getParentFile();
+        if (target == null) {
+            return;
+        }
+        if (json == null) {
+            // An incremental build whose last controller went away: the earlier
+            // document would describe routes that no longer exist.
+            File stale = new File(target, "openapi.json");
+            if (stale.isFile() && !stale.delete()) {
+                ctx.getLog().warn("cn1: could not delete the stale target/openapi.json");
+            }
+            return;
+        }
+        try {
+            java.io.FileOutputStream out = new java.io.FileOutputStream(
+                    new File(target, "openapi.json"));
+            try {
+                out.write(asciiBytes(json));
+            } finally {
+                out.close();
+            }
+        } catch (IOException err) {
+            ctx.getLog().warn("cn1: could not write target/openapi.json: " + err.getMessage());
+        }
     }
 
     private boolean hasMvcControllers() {

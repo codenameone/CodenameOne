@@ -54,6 +54,8 @@ final class BuildTimeSettings {
     static final String MANAGEMENT = "cn1.management.enabled";
     /// `cn1.mcp.enabled`: the MCP endpoint.
     static final String MCP = "cn1.mcp.enabled";
+    /// `cn1.openapi.enabled`: the OpenAPI document and Swagger UI.
+    static final String OPENAPI = "cn1.openapi.enabled";
     /// `cn1.otel.enabled`: the OpenTelemetry exporters.
     static final String TELEMETRY = "cn1.otel.enabled";
 
@@ -65,6 +67,7 @@ final class BuildTimeSettings {
             "calls Migrations.register(SecuritySchema.migrations()) before it starts"},
         {MANAGEMENT, "the management endpoints were", "nothing would serve them", null},
         {MCP, "the MCP endpoint was", "nothing would serve it", null},
+        {OPENAPI, "the OpenAPI document was", "nothing would serve it", null},
         {TELEMETRY, "the OpenTelemetry exporters were", "nothing would be exported",
             "passes an OtlpTracer to Backend.Builder.tracing() and an OtlpMetricExporter "
                     + "to metrics()"},
@@ -90,13 +93,15 @@ final class BuildTimeSettings {
     /// @param config the server's configuration, compiled-in settings included
     /// @param management whether the management endpoints were linked
     /// @param mcp whether the MCP endpoint was linked
+    /// @param openApi whether the OpenAPI document was linked
     /// @param telemetry whether a tracer or a metric reader was given
     /// @throws IllegalStateException for the first key that is true and not built in
     /// @throws IOException if a setting cannot be read
-    static void require(Config config, boolean management, boolean mcp, boolean telemetry)
-            throws IOException {
+    static void require(Config config, boolean management, boolean mcp, boolean openApi,
+            boolean telemetry) throws IOException {
         boolean[] builtIn = {
-            MigrationRegistry.find(SECURITY_SCHEMA_SET) != null, management, mcp, telemetry
+            MigrationRegistry.find(SECURITY_SCHEMA_SET) != null, management, mcp, openApi,
+            telemetry
         };
         for (int i = 0; i < SETTINGS.length; i++) {
             String[] setting = SETTINGS[i];
