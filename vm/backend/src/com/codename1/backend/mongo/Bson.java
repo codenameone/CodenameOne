@@ -154,8 +154,8 @@ public final class Bson {
         } else if (v instanceof Object[]) {
             Object[] a = (Object[]) v;
             List l = new ArrayList(a.length);
-            for (int i = 0; i < a.length; i++) {
-                l.add(a[i]);
+            for (Object eachAItem : a) {
+                l.add(eachAItem);
             }
             header(out, 0x04, key);
             writeArray(out, l, depth);
@@ -168,8 +168,8 @@ public final class Bson {
     private static void header(ByteArrayOutputStream out, int type, String key) {
         out.write(type);
         byte[] k = WireBuffer.utf8(key);
-        for (int i = 0; i < k.length; i++) {
-            if (k[i] == 0) {
+        for (byte eachKItem : k) {
+            if (eachKItem == 0) {
                 // A NUL ends a BSON key; one inside it would split the field and
                 // let the rest of the name be read as a value.
                 throw new IllegalArgumentException("A BSON key cannot contain NUL");

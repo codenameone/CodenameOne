@@ -168,8 +168,8 @@ public final class MongoClient implements java.io.Closeable {
             drained = new ArrayList(idle);
             idle.clear();
         }
-        for (int i = 0; i < drained.size(); i++) {
-            ((MongoConnection) drained.get(i)).close();
+        for (Object eachDrainedItem : drained) {
+            ((MongoConnection) eachDrainedItem).close();
         }
     }
 }

@@ -78,8 +78,8 @@ public final class MongoCollection {
 
     /// Inserts documents in order, stopping at the first that fails.
     public void insertMany(List documents) throws IOException {
-        for (int i = 0; i < documents.size(); i++) {
-            Map d = (Map) documents.get(i);
+        for (Object eachDocument : documents) {
+            Map d = (Map) eachDocument;
             if (!d.containsKey("_id")) {
                 d.put("_id", ObjectId.generate());
             }

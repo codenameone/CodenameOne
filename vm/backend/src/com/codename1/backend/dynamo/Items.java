@@ -80,8 +80,8 @@ public final class Items {
         } else if (value instanceof List) {
             List list = (List) value;
             List out = new ArrayList(list.size());
-            for (int i = 0; i < list.size(); i++) {
-                out.add(toAttribute(list.get(i)));
+            for (Object eachListItem : list) {
+                out.add(toAttribute(eachListItem));
             }
             av.put("L", out);
         } else if (value instanceof Map) {
@@ -161,8 +161,8 @@ public final class Items {
             return out;
         }
         List in = (List) raw;
-        for (int i = 0; i < in.size(); i++) {
-            Object v = in.get(i);
+        for (Object eachInItem : in) {
+            Object v = eachInItem;
             if (scalar == null) {
                 out.add(v instanceof Map ? fromAttribute((Map) v) : null);
             } else if ("N".equals(scalar)) {

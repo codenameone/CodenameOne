@@ -75,9 +75,9 @@ public final class SqlSearchEngine implements SearchEngine {
         this.data = data;
         this.ownsData = ownsData;
         Dialect d = data.dialect();
-        if (d == Dialect.POSTGRES) {
+        if (Dialect.POSTGRES.equals(d)) {
             kind = POSTGRES;
-        } else if (d == Dialect.MYSQL || d == Dialect.MARIADB) {
+        } else if (Dialect.MYSQL.equals(d) || Dialect.MARIADB.equals(d)) {
             kind = MYSQL;
         } else {
             kind = SQLITE;
@@ -141,8 +141,8 @@ public final class SqlSearchEngine implements SearchEngine {
             }
         } else if (value instanceof List) {
             List l = (List) value;
-            for (int i = 0; i < l.size(); i++) {
-                collectText(l.get(i), out, depth + 1);
+            for (Object eachLItem : l) {
+                collectText(eachLItem, out, depth + 1);
             }
         }
     }
@@ -285,8 +285,8 @@ public final class SqlSearchEngine implements SearchEngine {
 
     private static double occurrences(String body, List terms) {
         int n = 0;
-        for (int i = 0; i < terms.size(); i++) {
-            String t = (String) terms.get(i);
+        for (Object eachTerm : terms) {
+            String t = (String) eachTerm;
             int at = body.indexOf(t);
             while (at >= 0) {
                 n++;
@@ -298,12 +298,12 @@ public final class SqlSearchEngine implements SearchEngine {
 
     private static boolean termsInFields(Map doc, List fields, List terms) {
         StringBuilder text = new StringBuilder();
-        for (int i = 0; i < fields.size(); i++) {
-            collectText(value(doc, (String) fields.get(i)), text, 0);
+        for (Object eachField : fields) {
+            collectText(value(doc, (String) eachField), text, 0);
         }
         String folded = fold(text.toString());
-        for (int i = 0; i < terms.size(); i++) {
-            if (folded.indexOf((String) terms.get(i)) < 0) {
+        for (Object eachTerm : terms) {
+            if (folded.indexOf((String) eachTerm) < 0) {
                 return false;
             }
         }
@@ -380,8 +380,7 @@ public final class SqlSearchEngine implements SearchEngine {
                     // Missing values last in either direction, as the clusters do.
                     return SqlSearchEngine.compare(a, b);
                 }
-                int c = SqlSearchEngine.compare(a, b);
-                return ascending ? c : -c;
+                return ascending ? SqlSearchEngine.compare(a, b) : SqlSearchEngine.compare(b, a);
             }
         });
     }
@@ -390,21 +389,19 @@ public final class SqlSearchEngine implements SearchEngine {
         Collections.sort(hits, new Comparator() {
             @Override
             public int compare(Object x, Object y) {
-                double a = ((SearchHit) x).getScore();
-                double b = ((SearchHit) y).getScore();
-                return a > b ? -1 : (a < b ? 1 : 0);
+                return Double.compare(((SearchHit) y).getScore(), ((SearchHit) x).getScore());
             }
         });
     }
 
     private static Map facet(List hits, String field) {
         final Map counts = new LinkedHashMap();
-        for (int i = 0; i < hits.size(); i++) {
-            Object v = value(((SearchHit) hits.get(i)).getDocument(), field);
+        for (Object eachHit : hits) {
+            Object v = value(((SearchHit) eachHit).getDocument(), field);
             if (v instanceof List) {
                 List l = (List) v;
-                for (int j = 0; j < l.size(); j++) {
-                    count(counts, l.get(j));
+                for (Object eachLItem : l) {
+                    count(counts, eachLItem);
                 }
             } else if (v != null) {
                 count(counts, v);

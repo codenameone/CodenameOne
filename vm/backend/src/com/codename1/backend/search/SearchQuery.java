@@ -56,8 +56,8 @@ public final class SearchQuery {
 
     /// Matches only in these fields instead of every string.
     public SearchQuery fields(String... names) {
-        for (int i = 0; i < names.length; i++) {
-            fields.add(names[i]);
+        for (String eachName : names) {
+            fields.add(eachName);
         }
         return this;
     }

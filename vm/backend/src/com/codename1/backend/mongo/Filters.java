@@ -133,8 +133,8 @@ public final class Filters {
 
     private static Map combine(String op, Map[] filters) {
         List l = new ArrayList(filters.length);
-        for (int i = 0; i < filters.length; i++) {
-            l.add(filters[i]);
+        for (Map eachFilter : filters) {
+            l.add(eachFilter);
         }
         Map m = new LinkedHashMap();
         m.put(op, l);

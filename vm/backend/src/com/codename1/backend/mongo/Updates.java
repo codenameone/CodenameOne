@@ -76,8 +76,8 @@ public final class Updates {
     /// One update with the operators of all of these.
     public static Map combine(Map... updates) {
         Map out = new LinkedHashMap();
-        for (int i = 0; i < updates.length; i++) {
-            Iterator it = updates[i].entrySet().iterator();
+        for (Map eachUpdate : updates) {
+            Iterator it = eachUpdate.entrySet().iterator();
             while (it.hasNext()) {
                 Map.Entry e = (Map.Entry) it.next();
                 Map existing = (Map) out.get(e.getKey());

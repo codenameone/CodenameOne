@@ -140,7 +140,7 @@ final class MongoUri {
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException err) {
-            throw new IOException(key + " is not a number: " + value);
+            throw new IOException(key + " is not a number: " + value, err);
         }
     }
 

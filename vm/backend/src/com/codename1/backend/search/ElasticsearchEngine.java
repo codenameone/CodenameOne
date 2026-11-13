@@ -336,8 +336,8 @@ public final class ElasticsearchEngine implements SearchEngine {
             Object list = hitsNode.get("hits");
             if (list instanceof List) {
                 List l = (List) list;
-                for (int i = 0; i < l.size(); i++) {
-                    Map h = (Map) l.get(i);
+                for (Object eachLItem : l) {
+                    Map h = (Map) eachLItem;
                     Object score = h.get("_score");
                     hits.add(new SearchHit(String.valueOf(h.get("_id")),
                             score instanceof Number ? ((Number) score).doubleValue() : 0,
@@ -355,8 +355,8 @@ public final class ElasticsearchEngine implements SearchEngine {
                 Object buckets = ((Map) e.getValue()).get("buckets");
                 if (buckets instanceof List) {
                     List b = (List) buckets;
-                    for (int i = 0; i < b.size(); i++) {
-                        Map bucket = (Map) b.get(i);
+                    for (Object eachBItem : b) {
+                        Map bucket = (Map) eachBItem;
                         Object key = bucket.get("key_as_string");
                         if (key == null) {
                             key = bucket.get("key");

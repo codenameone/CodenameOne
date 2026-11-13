@@ -261,8 +261,8 @@ public final class DynamoDb {
             Object items = resp.get("Items");
             if (items instanceof List) {
                 List l = (List) items;
-                for (int i = 0; i < l.size(); i++) {
-                    Object v = l.get(i);
+                for (Object eachLItem : l) {
+                    Object v = eachLItem;
                     if (v instanceof Map) {
                         out.add(Items.fromAttributes((Map) v));
                     }
@@ -312,7 +312,7 @@ public final class DynamoDb {
             Thread.sleep(Math.min(2000L, 50L << attempt));
         } catch (InterruptedException err) {
             Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while retrying a batch write");
+            throw new IOException("Interrupted while retrying a batch write", err);
         }
     }
 
