@@ -1013,25 +1013,24 @@ final class XmlScan {
             }
             Object cls = lx.classFor(tag);
             Object el = NEW.call1(cls, cls);
+            // The attributes in _Element.__init__'s order, which fixes the
+            // instance dict's order, each stored once with its final value:
+            // the defaults it then overwrote cost a store and, for the
+            // containers, an allocation each per element.
             X_KIND.set(el, "e");
-            X_TAG.set(el, Py.NONE);
-            X_ATTRIB.set(el, new PyDict());
-            X_NS.set(el, new PyDict());
+            X_TAG.set(el, tag);
+            X_ATTRIB.set(el, attrib);
+            X_NS.set(el, ns);
             PyList kids = new PyList();
             X_KIDS.set(el, kids);
             X_PARENT.set(el, Py.NONE);
             X_TEXT.set(el, Py.NONE);
             X_TAIL.set(el, Py.NONE);
-            X_PFX.set(el, lx.noHint);
+            X_PFX.set(el, hint);
             X_LOOKUP.set(el, lx.lookup);
             X_DOC.set(el, Py.NONE);
             X_TARGET.set(el, Py.NONE);
-            X_CNT.set(el, new PyList());
-            X_TAG.set(el, tag);
-            X_PFX.set(el, hint);
             X_CNT.set(el, lx.cnt);
-            X_NS.set(el, ns);
-            X_ATTRIB.set(el, attrib);
             if (!open.isEmpty()) {
                 Object parent = open.get(open.size() - 1);
                 X_PARENT.set(el, parent);
