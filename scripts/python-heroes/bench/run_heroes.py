@@ -69,7 +69,11 @@ TIMINGS = ("IMPORT", "BENCH", "COLD", "TOTAL")
 SUITES = {
     "llm": {"workload": "llm_session", "test_requirements": [
         "pytest==9.2.0", "pytest-asyncio==1.4.1.post1", "httpx2-pytest==2.0.0", "numpy==2.5.4"]},
-    "markitdown": {"workload": "markitdown_convert", "test_requirements": ["pytest==9.2.0"],
+    "markitdown": {"workload": "markitdown_convert",
+                   # pandas is what the XLSX and XLS converters read with; the
+                   # transpiled side bundles it, so CPython gets it too and the
+                   # two counts cover the same tests.
+                   "test_requirements": ["pytest==9.2.0", "pandas==3.1.1"],
                    # Tests that fail transpiled by design, each for a decision the
                    # developer guide documents (see Python-Hero-Ports).
                    "diverges": {
@@ -208,25 +212,82 @@ def cpython_env(name, reqs, work, args, extra=(), python=None):
     return py, site
 
 
+def cpython_base_bytes(py):
+    """The interpreter and its standard library (compiled extension modules
+    included, site-packages and the test package left out), as a Python
+    install would ship them."""
+    probe = ("import os,sys,sysconfig;"
+             "print(os.path.realpath(sys.executable));"
+             "print(sysconfig.get_paths()['stdlib']);"
+             "print(sysconfig.get_config_var('LIBDIR') or '');"
+             "print(sysconfig.get_config_var('LDLIBRARY') or '');"
+             "print(sysconfig.get_config_var('PYTHONFRAMEWORKPREFIX') or '')")
+    exe, stdlib, libdir, ldlib, framework = subprocess.run([py, "-I", "-c", probe], stdout=subprocess.PIPE,
+                                                universal_newlines=True, check=True).stdout.splitlines()
+    total = os.path.getsize(exe)
+    # A macOS framework build names its library relative to the framework
+    # prefix, not LIBDIR.
+    lib = next((c for c in (os.path.join(libdir, ldlib), os.path.join(framework, ldlib))
+                if ldlib and os.path.isfile(c)), None)
+    if lib:
+        total += os.path.getsize(lib)
+    for root, dirs, files in os.walk(stdlib):
+        dirs[:] = [d for d in dirs if d not in ("site-packages", "test", "__pycache__")]
+        for f in files:
+            total += os.path.getsize(os.path.join(root, f))
+    return total
+
+
+def launch(cmd, cwd, env):
+    """One process launch: the workload's own timings plus its wall time."""
+    out, seconds = timed(cmd, cwd=cwd, env=env)
+    found = parse(out)
+    found["wall_ms"] = int(seconds * 1000)
+    return found
+
+
 def side(cmd, cwd, rounds, env):
-    best = None
-    walls = []
-    for _ in range(rounds):
-        out, seconds = timed(cmd, cwd=cwd, env=env)
-        found = parse(out)
-        if best is not None and found["result"] != best["result"]:
-            raise RuntimeError("%s is not deterministic" % " ".join(cmd))
-        walls.append(seconds)
-        if best is None:
-            best = found
-        else:
-            # The fastest of each timing, as run_bench takes.
-            for k, v in found.items():
-                if k != "result":
-                    best[k] = min(best[k], v)
-    best["wall_ms"] = int(min(walls) * 1000)
-    best["peak_rss"] = peak_rss(cmd, cwd=cwd, env=env)
-    return best
+    """A side that is reported but not judged: one launch and its peak RSS."""
+    found = launch(cmd, cwd, env)
+    found["peak_rss"] = peak_rss(cmd, cwd=cwd, env=env)
+    return found
+
+
+def median(values):
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    return ordered[mid] if len(ordered) % 2 else (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def judged(sides, launches, cwd):
+    """Launches every judged side `launches` times, interleaved (A B A B ...)
+    so that thermal state, page cache and background load fall on both sides
+    alike, after one discarded warm-up launch each that fills the page cache
+    for both. Each metric is the median over the launches, and so is peak
+    RSS, which is measured in launches of its own. Answers one report per
+    side, carrying the raw samples too."""
+    samples = dict((label, []) for label in sides)
+    rss = dict((label, []) for label in sides)
+    for label, (cmd, env) in sides.items():
+        launch(cmd, cwd, env)
+    for _ in range(launches):
+        for label, (cmd, env) in sides.items():
+            samples[label].append(launch(cmd, cwd, env))
+            rss[label].append(peak_rss(cmd, cwd=cwd, env=env))
+    reports = {}
+    for label, runs in samples.items():
+        results = set(r["result"] for r in runs)
+        if len(results) != 1:
+            raise RuntimeError("%s is not deterministic: %s" % (label, sorted(results)))
+        report = {"result": runs[0]["result"], "launches": launches}
+        for key in runs[0]:
+            if key != "result":
+                report[key] = median([r[key] for r in runs])
+                report[key + "_samples"] = [r[key] for r in runs]
+        report["peak_rss"] = median(rss[label])
+        report["peak_rss_samples"] = rss[label]
+        reports[label] = report
+    return reports
 
 
 def matches(test, pattern):
@@ -269,7 +330,9 @@ def measure(name, work, harness, args):
     theirs_env = dict(os.environ, MARKITDOWN_FIXTURES=fixtures)
     run_cp = os.pathsep.join([classes, args.runtime_jar, args.core_jar, args.run_cp])
     ours = [java(args, "java"), "-cp", run_cp, "HeroMain", fs, str(args.rounds)]
-    theirs = [py, "-B", os.path.join(HERE, "workloads", name + ".py"), str(args.rounds)]
+    # -I keeps the user's site-packages, PYTHONPATH and the current
+    # directory out of CPython's path; -B keeps both sides from writing.
+    theirs = [py, "-I", "-B", os.path.join(HERE, "workloads", name + ".py"), str(args.rounds)]
     sides = {"cpython": side(theirs, work, 1, theirs_env), "cn1_jvm": side(ours, work, 1, ours_env)}
     if sides["cpython"]["result"] != sides["cn1_jvm"]["result"]:
         raise RuntimeError("%s computes something else:\n  cpython %s\n  cn1     %s%s"
@@ -284,12 +347,25 @@ def measure(name, work, harness, args):
                                         PYBENCH_RUNTIME=args.runtime_jar,
                                         HERO_NATIVE_LTO="0" if args.fast else "1"))
     native_env = dict(theirs_env, CN1_RESOURCE_PATH=classes)
-    sides["cn1_native"] = side([binary, str(args.rounds)], work, 1, native_env)
+    # The judged pair: CPython and the native binary, interleaved. The JVM
+    # arm above is reported from one launch and never judged.
+    sides.update(judged({"cpython": (theirs, theirs_env),
+                         "cn1_native": ([binary, str(args.rounds)], native_env)},
+                        args.launches, work))
     if sides["cn1_native"]["result"] != sides["cpython"]["result"]:
         raise RuntimeError("%s computes something else natively: %s" % (name, sides["cn1_native"]["result"]))
-    sides["cn1_native"]["ship_bytes"] = os.path.getsize(binary) + os.path.getsize(
+    # Counted stripped, as a release build ships it: the symbol table alone
+    # is about a tenth of the unstripped file.
+    stripped = binary + "-stripped"
+    shutil.copy(binary, stripped)
+    subprocess.run(["strip", stripped], check=True)
+    sides["cn1_native"]["ship_bytes"] = os.path.getsize(stripped) + os.path.getsize(
         os.path.join(classes, "cn1python.dat"))
-    sides["cpython"]["ship_bytes"] = tree_bytes(site)
+    # What each side needs on a machine with nothing installed. The native
+    # binary carries its runtime, standard library and packages; CPython
+    # needs the interpreter and its standard library besides the packages.
+    sides["cpython"]["ship_bytes"] = tree_bytes(site) + cpython_base_bytes(py)
+    sides["cpython"]["packages_bytes"] = tree_bytes(site)
     # The other interpreters run the same file against the same pins and must
     # compute the same digest; they are reported beside CPython, not judged.
     for label, python in (args.compare or ()):
@@ -314,7 +390,7 @@ def measure(name, work, harness, args):
     ratios = {}
     for key in ("import_us", "bench_us", "cold_us", "wall_ms", "peak_rss"):
         ratios[key] = round(sides["cn1_native"][key] / float(max(1, sides["cpython"][key])), 3)
-    return {"sides": sides, "ratios": ratios}
+    return {"sides": sides, "ratios": ratios, "rounds": args.rounds, "launches": args.launches}
 
 
 def counts(text):
@@ -381,6 +457,11 @@ def suite(name, work, harness, args):
             result["diverged"].append(test)
         else:
             result["unexplained"].append(test)
+    # Every documented divergence must still be one: an entry that matches no
+    # failing test is stale and would silently excuse the next failure there.
+    for pattern in sorted(diverges):
+        if not any(matches(t, pattern) for t in result["diverged"]):
+            result["unexplained"].append("documented divergence no longer fails: " + pattern)
     return result
 
 
@@ -396,30 +477,57 @@ def failed_ids(text, separator):
     return ids
 
 
+def platform_key():
+    """The machine a baseline was measured on: the ratio of the native binary to
+    CPython depends on the compiler and the CPU, so a ratio recorded on one
+    platform says nothing about another."""
+    import platform
+    return "%s-%s" % (sys.platform, platform.machine().lower())
+
+
 def check(report, baseline):
     failures = []
     tolerance = baseline.get("tolerance", {})
+    key = report.get("platform") or platform_key()
+    measured = baseline.get("platforms", {}).get(key)
+    if measured is None:
+        return ["no baseline for %s; seed it from this run's report with run_heroes.py --fold <report.json>"
+                % key]
+    # A ratio holds only for the work it was measured over: a run of fewer
+    # rounds weighs import against the rounds differently.
+    for knob in ("rounds", "launches"):
+        if measured.get(knob) is not None and report.get(knob) != measured[knob]:
+            failures.append("baseline for %s was measured with %s=%s, this run used %s"
+                            % (key, knob, measured[knob], report.get(knob)))
     for name, entry in report["workloads"].items():
-        base = baseline.get("ratios", {}).get(name)
+        base = measured.get("ratios", {}).get(name)
         if base is None:
-            failures.append("%s has no baseline; run with --write-baseline" % name)
+            failures.append("%s has no baseline on %s; seed it with --fold" % (name, key))
             continue
-        for key, ratio in entry["ratios"].items():
-            limit = base[key] * (1 + tolerance.get(key, 0.25))
+        for metric, ratio in entry["ratios"].items():
+            limit = base[metric] * (1 + tolerance.get(metric, 0.25))
             if ratio > limit:
                 failures.append("%s %s: ratio %.3f exceeds baseline %.3f (limit %.3f)"
-                                % (name, key, ratio, base[key], limit))
+                                % (name, metric, ratio, base[metric], limit))
     return failures
 
 
 def write_baseline(report, path=BASELINE):
-    baseline = {"tolerance": {"import_us": 0.3, "bench_us": 0.3, "cold_us": 0.3, "wall_ms": 0.3,
-                              "peak_rss": 0.15},
-                "ratios": {k: e["ratios"] for k, e in report["workloads"].items()},
-                "python": report.get("python")}
+    """Records this report's ratios as its platform's baseline, keeping every
+    other platform's and the tolerances."""
+    baseline = {"tolerance": {"import_us": 0.2, "bench_us": 0.2, "cold_us": 0.2, "wall_ms": 0.2,
+                              "peak_rss": 0.1},
+                "platforms": {}}
     if os.path.exists(path):
         with open(path) as f:
-            baseline["tolerance"] = json.load(f).get("tolerance", baseline["tolerance"])
+            old = json.load(f)
+        baseline["tolerance"] = old.get("tolerance", baseline["tolerance"])
+        baseline["platforms"] = old.get("platforms", {})
+    baseline["platforms"][report.get("platform") or platform_key()] = {
+        "python": report.get("python"),
+        "rounds": report.get("rounds"),
+        "launches": report.get("launches"),
+        "ratios": {k: e["ratios"] for k, e in report["workloads"].items()}}
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(baseline, f, indent=2, sort_keys=True)
@@ -452,7 +560,10 @@ def render(report):
                 name, label, s["import_us"] // 1000, s["cold_us"] // 1000, s["bench_us"] // 1000,
                 s["wall_ms"], s["peak_rss"] / 1048576.0, s["ship_bytes"] / 1048576.0))
     lines.append("")
-    lines.append("CPython: %s. Both sides computed the same RESULT digest." % report["python"])
+    lines.append("CPython: %s. Both sides computed the same RESULT digest. CPython and native are the "
+                 "median of %s interleaved launches of %s rounds each, after a discarded warm-up launch; "
+                 "the JVM row is one launch, reported and not judged."
+                 % (report["python"], report.get("launches"), report.get("rounds")))
     return "\n".join(lines)
 
 
@@ -460,6 +571,19 @@ def main():
     if len(sys.argv) == 3 and sys.argv[1] == "--fold":
         with open(sys.argv[2]) as f:
             write_baseline(json.load(f))
+        return 0
+    if "--fold" in sys.argv[1:]:
+        # Only a saved report is needed, none of the build inputs.
+        fold = argparse.ArgumentParser()
+        fold.add_argument("--fold", required=True, metavar="REPORT")
+        path = fold.parse_args().fold
+        with open(path) as f:
+            report = json.load(f)
+        if not report.get("platform"):
+            print("%s names no platform: it predates per-platform baselines" % path, file=sys.stderr)
+            return 1
+        write_baseline(report)
+        print("recorded %s as the %s baseline" % (path, report["platform"]))
         return 0
     p = argparse.ArgumentParser()
     p.add_argument("--java-home", required=True)
@@ -472,7 +596,9 @@ def main():
     p.add_argument("--python", default=sys.executable)
     p.add_argument("--compare", action="append", type=lambda v: tuple(v.split("=", 1)),
                    help="label=interpreter, another Python measured beside CPython (pypy, graalpy)")
-    p.add_argument("--rounds", type=int, default=3)
+    p.add_argument("--rounds", type=int, default=5)
+    p.add_argument("--launches", type=int, default=5,
+                   help="interleaved launches per judged side; every metric is their median")
     p.add_argument("--workload", action="append")
     p.add_argument("--work", help="build here and keep it: the next run reuses the resolved packages and the "
                                   "CPython environments")
@@ -485,6 +611,9 @@ def main():
     g = p.add_mutually_exclusive_group()
     g.add_argument("--check", action="store_true")
     g.add_argument("--write-baseline", action="store_true")
+    g.add_argument("--fold", metavar="REPORT",
+                   help="record a saved report (--json) as its platform's baseline, and measure nothing: "
+                        "how the CI runner's ratios are seeded from its uploaded report")
     args = p.parse_args()
     for key in ("runtime_jar", "core_jar", "markitdown_tests", "llm_tests"):
         if getattr(args, key):
@@ -500,9 +629,9 @@ def main():
     else:
         work = tempfile.mkdtemp(prefix="python-heroes-")
     harness = compile_harness(args, work)
-    report = {"python": subprocess.run([args.python, "--version"], stdout=subprocess.PIPE,
+    report = {"platform": platform_key(), "python": subprocess.run([args.python, "--version"], stdout=subprocess.PIPE,
                                        universal_newlines=True).stdout.strip(),
-              "workloads": {}}
+              "rounds": args.rounds, "launches": args.launches, "workloads": {}}
     for name in args.workload or sorted(WORKLOADS):
         print("measuring", name, file=sys.stderr)
         report["workloads"][name] = measure(name, work, harness, args)
@@ -531,16 +660,12 @@ def main():
         print("SUITE " + line, file=sys.stderr)
     if suite_failures:
         return 1
-    if args.check and not os.path.exists(BASELINE):
-        # Seeded from the CI runner's own report, never from a laptop: the
-        # ratios depend on the machine.
-        print("no baseline yet (%s): reporting only. Seed it with "
-              "run_heroes.py --fold <this run's python-heroes.json>." % os.path.relpath(BASELINE),
-              file=sys.stderr)
-        return 0
     if args.check:
-        with open(BASELINE) as f:
-            failures = check(report, json.load(f))
+        baseline = {}
+        if os.path.exists(BASELINE):
+            with open(BASELINE) as f:
+                baseline = json.load(f)
+        failures = check(report, baseline)
         for line in failures:
             print("REGRESSION " + line, file=sys.stderr)
         return 1 if failures else 0

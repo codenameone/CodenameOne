@@ -86,14 +86,13 @@ parameters.
 | None.
 
 | MarkItDown (11 modules)
-| 742 passed, 48 failed
-| 763 passed, 27 failed
-| Neither side installs the optional extras (legacy XLS, Outlook, speech),
-  and the 14 tests that need them fail on both. CPython also fails the XLSX
-  tests, because `pandas` isn't among the pinned requirements; the
-  Codename One runtime provides it. The 13 tests that fail only transpiled
-  are the decisions described below: nine for legacy text encodings and
-  four for the recursion limit.
+| 776 passed
+| 763 passed
+| Both sides have the same packages, `pandas` included, and neither
+  installs the optional extras (legacy XLS, Outlook, speech); the tests
+  that need those fail on both. The 13 tests that fail only transpiled are
+  the decisions described below: nine for legacy text encodings and four
+  for the recursion limit.
 |===
 
 `llm`'s command line tests are left out, because a phone application has no
@@ -101,9 +100,12 @@ command line. MarkItDown's tests for the cloud services (Azure Document
 Intelligence, Content Understanding), YouTube transcripts and image
 description are left out because they call a network service.
 
-The CI job `.github/workflows/python-heroes.yml` runs both suites nightly and
-fails if the transpiled side passes fewer tests than CPython, other than the
-listed differences, or fails a test CPython passes.
+The suites run transpiled on the JVM; the native binary runs the benchmark
+workloads below, built from the same classes. The CI job
+`.github/workflows/python-heroes.yml` runs both suites nightly and fails if
+the transpiled side fails a test CPython passes, other than the listed
+differences, or if a listed difference starts passing, so the list can't go
+stale.
 
 ==== Measured against CPython
 
@@ -122,56 +124,117 @@ the size of what ships.
   notebook, JSON and a ZIP). The Markdown must hash identically on every
   side.
 
-Measured on an Apple silicon Mac against CPython 3.14.5, five rounds each.
-"Wall" is the whole process, from launch to exit:
+Measured on an Apple silicon Mac against CPython 3.14.5. Each workload runs
+five rounds per launch; CPython and the native binary are launched five times
+each, alternately, after a warm-up launch that's discarded, and every figure
+is the median of the five. "Wall" is the whole process, from launch to exit.
+"Ships" is what a machine with nothing installed needs: the stripped binary
+and its packaged data, against CPython's interpreter, standard library and
+installed packages. The JVM rows are one launch each.
 
 [cols="3,1,1,1,1,1,1",options="header"]
 |===
 | Workload | Import | First round | Best round | Wall | Peak memory | Ships
 
 | `llm_session`, CPython
-| 372 ms | 132 ms | 118 ms | 1,062 ms | 72 MB | 55.9 MB
+| 348 ms | 129 ms | 115 ms | 1,132 ms | 72 MB | 94 MB
 | `llm_session`, Codename One native
-| 125 ms | 162 ms | 140 ms | 945 ms | 233 MB | 197.6 MB
+| 83 ms | 173 ms | 125 ms | 916 ms | 236 MB | 175 MB
 | `llm_session`, Codename One on the JVM
-| 1,291 ms | 1,296 ms | 176 ms | 3,749 ms | 634 MB | 56.9 MB
+| 1,578 ms | 675 ms | 201 ms | 3,539 ms | 636 MB | 57 MB
 | `markitdown_convert`, CPython
-| 668 ms | 559 ms | 496 ms | 3,511 ms | 230 MB | 281.8 MB
+| 370 ms | 559 ms | 504 ms | 3,152 ms | 228 MB | 320 MB
 | `markitdown_convert`, Codename One native
-| 117 ms | 421 ms | 368 ms | 2,099 ms | 529 MB | 148.5 MB
+| 80 ms | 420 ms | 387 ms | 2,135 ms | 537 MB | 132 MB
 | `markitdown_convert`, Codename One on the JVM
-| 2,721 ms | 3,053 ms | 515 ms | 9,701 ms | 794 MB | 45.4 MB
+| 2,152 ms | 1,143 ms | 408 ms | 5,874 ms | 782 MB | 45 MB
 |===
 
-What the numbers say:
+===== Why these two projects are hard
 
-* *Startup.* The native binary imports llm three times faster than CPython
-  and MarkItDown 5.7 times faster: modules are compiled code, so
-  importing one runs its top level and nothing else.
-* *Speed.* The native MarkItDown converts the set about 25% faster than
-  CPython, and is faster on every document in it. llm's conversation round
-  is about 19% slower than CPython's: it spends its time in `pydantic` model
-  construction and SQLite, dynamic paths the transpiler can't type. Counting
-  startup, the whole run is faster than CPython for both projects, by 11% for
-  llm and 40% for MarkItDown.
-* *Size.* MarkItDown ships 149 MB natively against 282 MB of installed
-  packages; the build includes only the modules the application imports,
-  and the converters' native wheels, `onnxruntime` among them, aren't
-  needed. The llm binary is larger than its installed packages: it's the
-  whole application in one executable, runtime included, while the CPython
-  figure counts the installed packages and not the interpreter or its
-  standard library.
-* *Memory.* Peak memory is higher than CPython's, by about 3 times for llm
-  and 2 times for MarkItDown. Every Python value is an object on a garbage
-  collected heap, and the collector lets the heap grow before it reclaims
-  it, where CPython frees each object as its last reference goes.
+Neither project was chosen to flatter a compiler. Both spend their time
+where ahead-of-time translation helps least:
+
+* *They're dynamic by design.* `pydantic` builds its models' validators
+  when a class is defined, from annotations it reads at run time, and llm
+  constructs a model for every prompt, response and log row. MarkItDown's
+  converters walk trees of objects whose attributes are set by name. Code
+  like this gives the transpiler few types to compile against, so most of
+  it runs through the same dictionary lookups and boxed values that CPython
+  uses.
+* *Their hot code is C in CPython.* `lxml`, `pydantic_core` (Rust), the
+  regular expression engine, `zlib` and `sqlite3` are compiled extensions
+  under CPython. On Codename One each is a reimplementation in Java or
+  Python, so the comparison in those parts is between Codename One's code and
+  optimised native libraries, not the interpreter.
+* *llm's round is mostly I/O.* Profiling the round with `sample` puts about
+  half of it in system calls on both sides, `fsync`, journal writes and the
+  creation and deletion of SQLite's rollback journal, because llm commits
+  each log entry. Both sides make the same calls and retire about the same
+  number of instructions over the whole run, so that half can't get faster
+  and a 2-to-1 win on the rest would show as a third.
+
+===== Where Codename One is faster, and why
+
+* *Startup.* The native binary imports llm 4 times faster than CPython and
+  MarkItDown 4.6 times faster. An import under CPython finds the module's
+  file, reads its cached bytecode, unmarshals it into code objects and
+  runs the top level. A translated module is compiled code already linked
+  into the binary, so importing it runs the top level and nothing else.
+* *Typed code.* Where a function's local types can be inferred, as in much
+  of the string building and the loops over cells, runs and tokens in the
+  converters and their parsers, the transpiler emits typed Java and
+  ParparVM compiles it to C with no boxing and no dictionary lookup. The
+  MarkItDown round is 23% faster than CPython's for that reason, and the
+  JSON and notebook converters several times faster.
+* *Whole program.* The build sees every module, so attribute reads on
+  classes whose layout it knows become field reads, and calls to known
+  functions become direct calls. CPython specialises at run time and has to
+  guard each specialisation.
+
+===== Where it's slower, and why
+
+* *llm's round, 9% slower.* The time that isn't I/O goes, under ParparVM,
+  to allocation and collection: 20% of the samples are in the allocator or
+  the collector, against 4% for CPython's allocator. `pydantic` validation
+  and the SQLite row-to-dictionary path create many small, short-lived
+  objects (dictionaries, tuples, boxed integers and strings) per row.
+  CPython frees each one when its reference count reaches zero, into a
+  free list that the next allocation reuses while it's still in the cache;
+  a tracing collector reaches it only at the next collection.
+* *The first round.* The first round touches code for the first time, and
+  the native binary's code is 175 MB, so its first round pays for page
+  faults that CPython's interpreter, a few megabytes, mostly doesn't.
+* *Peak memory, 3.3 times for llm and 2.4 times for MarkItDown.* Part of it
+  isn't memory the application allocates: `vmmap` shows 85 MB of the native
+  llm process's resident pages are its code, and 32 MB its link-edit
+  segment. Both are clean pages mapped from the binary, which the system
+  can drop and read back at any time; iOS doesn't count them against an
+  application's memory limit. The pages the application wrote come to
+  about 130 MB for llm, against CPython's 72 MB, and MarkItDown's physical
+  footprint peaks at 413 MB, against 228 MB. The rest of the difference is
+  the collector: the heap grows to a threshold before it's collected, where
+  reference counting frees memory as it goes, and every Python value is a
+  Java object with a header.
+* *Size, for llm.* A translated module is larger than its bytecode, and the
+  binary contains the runtime, its standard library and every package llm
+  imports. MarkItDown's binary is smaller than CPython's install, because
+  the build includes only the modules the application imports, and the
+  converters' native wheels (`onnxruntime` among them) aren't needed.
 * *The JVM.* The simulator is a development tool and is slowest to start,
   because the JVM compiles the hot code as it runs; its figures aren't
   what a device runs.
 
-A nightly job runs both workloads and fails when a ratio to CPython grows by
-more than 30% (15% for memory), so the numbers are guarded against
-regression.
+===== Guarding the numbers
+
+A nightly job, `.github/workflows/python-heroes.yml`, builds both workloads
+natively on Linux, runs them against CPython on the same runner, and fails
+when a ratio to CPython grows past the baseline by more than 20% (30% for
+the first round, 10% for memory). Comparing ratios measured on one machine
+in one run makes the gate independent of how fast the runner is; the
+baseline is kept per platform in `bench/baseline/ratios.json`, along with
+the rounds and launches it was measured with. The job runs on pull requests
+only when the workflow itself changes.
 
 The comparison is with a desktop interpreter because no phone ships one:
 on iOS and Android, the alternative to the translated application isn't
@@ -192,7 +255,8 @@ API for the OpenAI SDK. About seventy modules were added.
 a Codename One implementation of the same public API, in Python or Java:
 
 * `lxml` (used by `python-pptx`), with lxml's tree model, over the
-  runtime's pure-Python expat parser.
+  runtime's expat parser, whose tokenizer scans the common tag shapes in
+  Java and leaves anything unusual to its regular expressions.
 * `pydantic_core` and `jiter`, the Rust core of `pydantic` and the OpenAI
   SDK's JSON parser.
 * `cryptography`, as far as `pdfminer.six` uses it for encrypted PDFs.
@@ -233,8 +297,11 @@ tests cover these encodings.
 *No recursion limit.* `sys.setrecursionlimit` is accepted and not enforced:
 the depth a thread can reach is set by its stack size, and the limit
 CPython uses to protect its own C stack doesn't mean the same thing on the
-JVM or under ParparVM. Four MarkItDown tests feed it nested
-documents and expect `RecursionError` at CPython's depth.
+JVM or under ParparVM. Running out of stack still raises `RecursionError`,
+on the JVM and natively alike, because both turn a stack overflow into one,
+so the program doesn't crash; it only gets much deeper first. Four MarkItDown
+tests lower the limit, feed it nested documents, and expect `RecursionError`
+at that depth, where the transpiled side converts the document in full.
 
 *Plugins are requirements.* llm installs plugins with `pip` at run time. An
 application can't install code after it's reviewed and signed, so a plugin

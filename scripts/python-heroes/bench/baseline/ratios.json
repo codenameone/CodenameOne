@@ -1,26 +1,32 @@
 {
-  "python": "Python 3.14.5",
-  "ratios": {
-    "llm_session": {
-      "bench_us": 1.18,
-      "cold_us": 1.231,
-      "import_us": 0.337,
-      "peak_rss": 3.247,
-      "wall_ms": 0.89
-    },
-    "markitdown_convert": {
-      "bench_us": 0.744,
-      "cold_us": 0.753,
-      "import_us": 0.176,
-      "peak_rss": 2.304,
-      "wall_ms": 0.598
+  "platforms": {
+    "darwin-arm64": {
+      "launches": 5,
+      "python": "Python 3.14.5",
+      "ratios": {
+        "llm_session": {
+          "bench_us": 1.083,
+          "cold_us": 1.342,
+          "import_us": 0.24,
+          "peak_rss": 3.296,
+          "wall_ms": 0.809
+        },
+        "markitdown_convert": {
+          "bench_us": 0.768,
+          "cold_us": 0.752,
+          "import_us": 0.216,
+          "peak_rss": 2.354,
+          "wall_ms": 0.677
+        }
+      },
+      "rounds": 5
     }
   },
   "tolerance": {
-    "bench_us": 0.3,
+    "bench_us": 0.2,
     "cold_us": 0.3,
-    "import_us": 0.3,
-    "peak_rss": 0.15,
-    "wall_ms": 0.3
+    "import_us": 0.2,
+    "peak_rss": 0.1,
+    "wall_ms": 0.2
   }
 }

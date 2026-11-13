@@ -10,13 +10,11 @@ name: Python hero ports
 
 on:
   # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
-  # fails), and on a pull request only when this workflow's own tree changes.
-  # Runtime and transpiler changes reach it through the nightly.
+  # fails). A pull request runs it only when it edits this file: the two
+  # applications take most of an hour to build natively, and runtime and
+  # transpiler changes reach them through the nightly.
   pull_request:
     paths:
-      - 'scripts/python-heroes/**'
-      # run_heroes.py imports run_bench.py's timing helpers.
-      - 'scripts/python-bench/run_bench.py'
       - '.github/workflows/python-heroes.yml'
   schedule:
     - cron: '11 0 * * *'
@@ -71,6 +69,15 @@ jobs:
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" -pl python-transpiler -Dmdep.includeScope=test \
               -Dmdep.outputFile="$GITHUB_WORKSPACE/transpiler-test.cp"
 
+      # The native leg translates each application with ParparVM, as an iOS
+      # build does; the gate's ratios are that binary's against CPython.
+      - name: Build the ParparVM translator and its class library on JDK 8
+        run: |
+          JAVA_HOME="$JAVA_HOME_8" bash scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -f vm/pom.xml -pl JavaAPI,ByteCodeTranslator -am
+
       - name: Pack the repository
         run: |
           tar -C "$GITHUB_WORKSPACE" -czf framework-m2.tgz m2 build-engine.cp transpiler-test.cp \
@@ -84,18 +91,42 @@ jobs:
           retention-days: 1
 
   measure:
-    name: jvm
+    name: heroes
     needs: framework
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Two LTO builds of a whole application each, both workloads three ways,
+    # and both upstream suites twice.
+    timeout-minutes: 180
+    env:
+      PYBENCH_M2: ${{ github.workspace }}/m2
     steps:
       - uses: actions/checkout@v4
+
+      # clang for the translated C; the native binary reads SQLite through
+      # the system libsqlite3 (bench/native/cn1_hostsql.c).
+      - name: Install the native toolchain
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          sudo apt-get install -y clang libsqlite3-dev
+
+      # The translator runs on JDK 8, the generated Java compiles on JDK 17.
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '8'
+
+      - name: Remember JDK 8
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
+      - name: Remember JDK 17
+        run: echo "JAVA17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
       - name: Set up CPython
         uses: actions/setup-python@v5
