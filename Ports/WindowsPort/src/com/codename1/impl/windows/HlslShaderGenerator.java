@@ -116,7 +116,7 @@ public final class HlslShaderGenerator {
         boolean tone = lit && environment != null && environment.isToneMapping();
         boolean emissive = lit && (material.getEmissive() & 0xffffff) != 0;
         boolean shadow = lit && shadowed && material.isReceiveShadows();
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         Custom c = null;
         if (sm != null) {
             c = new Custom();
@@ -384,7 +384,7 @@ public final class HlslShaderGenerator {
             }
             sb.append(shadow ? "  float shade = shadowAt(input.shadowPos, n, l);\n" : "  float shade = 1.0;\n");
             if (pbr) {
-                appendPbr(sb, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
+                appendPbr(sb, hemi, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
                         hook[ShaderMaterial.Hook.ROUGHNESS.ordinal()]);
             } else {
                 sb.append("  rgb = base.rgb * (amb + lightColor.xyz * ndotl * shade);\n");
@@ -597,7 +597,7 @@ public final class HlslShaderGenerator {
 
     // Cook-Torrance with a GGX distribution, Smith-Schlick geometry and
     // Schlick's Fresnel, as in the GLSL generator.
-    private static void appendPbr(StringBuilder sb, String metallicHook, String roughHook) {
+    private static void appendPbr(StringBuilder sb, boolean hemi, String metallicHook, String roughHook) {
         sb.append("  float metallic = ")
                 .append(metallicHook != null ? "saturate(" + metallicHook + ")" : "params.y").append(";\n");
         // below 0.04 the GGX lobe is a sub-pixel spike that aliases
@@ -619,8 +619,19 @@ public final class HlslShaderGenerator {
         sb.append("  float3 spec = ggx * geo * fres / (4.0 * max(ndotl, 0.001) * ndotv);\n");
         sb.append("  float3 kd = (float3(1.0, 1.0, 1.0) - fres) * (1.0 - metallic);\n");
         sb.append("  float3 direct = (kd * base.rgb + spec * 3.14159265) * lightColor.xyz * ndotl * shade;\n");
-        sb.append("  float3 fa = f0 + (max(float3(1.0 - rough, 1.0 - rough, 1.0 - rough), f0) - f0) * pow(1.0 - ndotv, 5.0);\n");
-        sb.append("  float3 ambLit = amb * (base.rgb * (1.0 - metallic) * (float3(1.0, 1.0, 1.0) - fa) + fa * (1.0 - rough * 0.7));\n");
+        // ambient (analytic image based lighting): the diffuse term reads the
+        // environment along the normal; the specular term along the reflected
+        // view ray, pulled toward the normal as roughness blurs it, weighted by
+        // Karis' fitted split-sum BRDF instead of a baked lookup table
+        sb.append("  float3 rr = reflect(-v, n);\n");
+        sb.append("  float3 rdir = normalize(lerp(rr, n, rough * rough));\n");
+        sb.append("  float3 envSpec = " + (hemi ? "lerp(groundColor.xyz, skyColor.xyz, rdir.y * 0.5 + 0.5)" : "amb") + ";\n");
+        sb.append("  float4 ec0 = float4(-1.0, -0.0275, -0.572, 0.022);\n");
+        sb.append("  float4 ec1 = float4(1.0, 0.0425, 1.04, -0.04);\n");
+        sb.append("  float4 er = rough * ec0 + ec1;\n");
+        sb.append("  float ea = min(er.x * er.x, exp2(-9.28 * ndotv)) * er.x + er.y;\n");
+        sb.append("  float3 envF = f0 * (-1.04 * ea + er.z) + (1.04 * ea + er.w);\n");
+        sb.append("  float3 ambLit = amb * base.rgb * (1.0 - metallic) * (1.0 - envF) + envSpec * envF;\n");
         sb.append("  rgb = direct + ambLit;\n");
     }
 

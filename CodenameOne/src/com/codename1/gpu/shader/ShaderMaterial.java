@@ -324,6 +324,45 @@ public final class ShaderMaterial {
         return uniformValues;
     }
 
+    /// Returns the name of the uniform in a slot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: 0 to `getUniformCount() - 1`
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getUniformName(int slot) {
+        return uniformNames[slot];
+    }
+
+    /// Returns the type of the uniform in a slot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: 0 to `getUniformCount() - 1`
+    ///
+    /// #### Returns
+    ///
+    /// the type
+    public ShaderType getUniformType(int slot) {
+        return uniformTypes[slot];
+    }
+
+    /// Returns the name of the texture in a slot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: 0 to `getTextureCount() - 1`
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getTextureName(int slot) {
+        return textureNames[slot];
+    }
+
     /// Returns the slot of a texture, its index among the material's custom
     /// textures. For backends.
     ///

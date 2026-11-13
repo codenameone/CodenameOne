@@ -124,7 +124,7 @@ public final class GlslShaderGenerator {
         f.toneMap = f.lit && environment != null && environment.isToneMapping();
         f.shadow = f.lit && shadowed && material.isReceiveShadows();
         f.emissive = f.lit && (material.getEmissive() & 0xffffff) != 0;
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         if (sm != null) {
             f.shader = sm;
             f.hasNormal = hasNormal;
@@ -484,7 +484,7 @@ public final class GlslShaderGenerator {
             }
             sb.append(f.shadow ? "  float shade = shadowAt(n, l);\n" : "  float shade = 1.0;\n");
             if (f.pbr) {
-                appendPbr(sb, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
+                appendPbr(sb, f.hemisphere, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
                         hook[ShaderMaterial.Hook.ROUGHNESS.ordinal()]);
             } else {
                 sb.append("  rgb = base.rgb * (ambient + u_lightColor * ndotl * shade);\n");
@@ -590,7 +590,7 @@ public final class GlslShaderGenerator {
     // Schlick's Fresnel: the metallic/roughness model glTF assets are authored
     // for. The light colour is scaled by pi so a white light on a white
     // dielectric gives the same brightness as LAMBERT does.
-    private static void appendPbr(StringBuilder sb, String metallicHook, String roughHook) {
+    private static void appendPbr(StringBuilder sb, boolean hemi, String metallicHook, String roughHook) {
         sb.append("  float metallic = ")
                 .append(metallicHook != null ? "clamp(" + metallicHook + ", 0.0, 1.0)" : "u_pbr.x").append(";\n");
         // below 0.04 the GGX lobe is a sub-pixel spike that aliases
@@ -612,10 +612,19 @@ public final class GlslShaderGenerator {
         sb.append("  vec3 spec = ggx * geo * fres / (4.0 * max(ndotl, 0.001) * ndotv);\n");
         sb.append("  vec3 kd = (vec3(1.0) - fres) * (1.0 - metallic);\n");
         sb.append("  vec3 direct = (kd * base.rgb + spec * 3.14159265) * u_lightColor * ndotl * shade;\n");
-        // ambient: diffuse from the hemisphere plus a rough stand-in for the
-        // reflection of it, so metal is not black in shadow
-        sb.append("  vec3 fa = f0 + (max(vec3(1.0 - rough), f0) - f0) * pow(1.0 - ndotv, 5.0);\n");
-        sb.append("  vec3 amb = ambient * (base.rgb * (1.0 - metallic) * (vec3(1.0) - fa) + fa * (1.0 - rough * 0.7));\n");
+        // ambient (analytic image based lighting): the diffuse term reads the
+        // environment along the normal; the specular term along the reflected
+        // view ray, pulled toward the normal as roughness blurs it, weighted by
+        // Karis' fitted split-sum BRDF instead of a baked lookup table
+        sb.append("  vec3 rr = reflect(-v, n);\n");
+        sb.append("  vec3 rdir = normalize(mix(rr, n, rough * rough));\n");
+        sb.append("  vec3 envSpec = " + (hemi ? "mix(u_ground, u_sky, rdir.y * 0.5 + 0.5)" : "ambient") + ";\n");
+        sb.append("  vec4 ec0 = vec4(-1.0, -0.0275, -0.572, 0.022);\n");
+        sb.append("  vec4 ec1 = vec4(1.0, 0.0425, 1.04, -0.04);\n");
+        sb.append("  vec4 er = rough * ec0 + ec1;\n");
+        sb.append("  float ea = min(er.x * er.x, exp2(-9.28 * ndotv)) * er.x + er.y;\n");
+        sb.append("  vec3 envF = f0 * (-1.04 * ea + er.z) + (1.04 * ea + er.w);\n");
+        sb.append("  vec3 amb = ambient * base.rgb * (1.0 - metallic) * (1.0 - envF) + envSpec * envF;\n");
         sb.append("  rgb = direct + amb;\n");
     }
 

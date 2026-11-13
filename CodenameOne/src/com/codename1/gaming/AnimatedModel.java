@@ -181,6 +181,7 @@ public class AnimatedModel {
                 if (t != null) {
                     material.setTexture(t);
                 }
+                info.applyMaps(scene, device, material);
                 if (info.isDoubleSided()) {
                     state.setCullMode(RenderState.CullMode.NONE);
                 }

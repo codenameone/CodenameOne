@@ -576,7 +576,7 @@ class JavaSESoftwareDevice extends GraphicsDevice {
     private final float[] shaderOut = new float[4];
 
     private void prepareShader(Material material) {
-        final ShaderMaterial sm = material.getShader();
+        final ShaderMaterial sm = material.getEffectiveShader();
         if (sm == null) {
             shaderEval = null;
             vertexOffset = null;

@@ -311,13 +311,13 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         Light sl = getLight();
         uniforms[o++] = sl.getShadowBias();
         uniforms[o++] = sl.getShadowStrength();
-        uniforms[o++] = 1.0f / Math.max(1, shadowSize);
+        uniforms[o++] = sl.getShadowSoftness() / Math.max(1, shadowSize);
         uniforms[o++] = 0.0f;
         uniforms[o++] = getTime();
         uniforms[o++] = 0.0f;
         uniforms[o++] = 0.0f;
         uniforms[o++] = 0.0f;
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         int n = sm == null ? 0 : sm.getUniformCount() * 4;
         if (n > 0) {
             System.arraycopy(sm.getUniformValues(), 0, uniforms, o, n);
@@ -329,7 +329,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
 
     // binds the material's custom textures at t2/s2 and up for the next draw
     private void bindShaderTextures(Material material) {
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         if (sm == null) {
             return;
         }

@@ -327,7 +327,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         uniforms[129] = 0.0f;
         uniforms[130] = 0.0f;
         uniforms[131] = 0.0f;
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         int n = sm == null ? 0 : sm.getUniformCount() * 4;
         if (n > 0) {
             System.arraycopy(sm.getUniformValues(), 0, uniforms, 132, n);
@@ -341,7 +341,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
     // next draw; an unbound one gets the null peer, which the native side
     // replaces with a 1x1 white texture
     private void bindShaderTextures(Material material) {
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         if (sm == null) {
             return;
         }
@@ -365,7 +365,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
         uniforms[124] = light.getShadowBias();
         uniforms[125] = light.getShadowStrength();
-        uniforms[126] = 1.0f / Math.max(1, shadowSize);
+        uniforms[126] = light.getShadowSoftness() / Math.max(1, shadowSize);
         uniforms[127] = 0.0f;
     }
 

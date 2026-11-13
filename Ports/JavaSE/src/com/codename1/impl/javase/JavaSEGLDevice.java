@@ -574,7 +574,7 @@ class JavaSEGLDevice extends GraphicsDevice {
     // the material's own textures on units 2 and up -- 0 is the base texture,
     // 1 the shadow map.
     private void applyShader(Program p, Material material) {
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         if (sm == null) {
             return;
         }
@@ -630,7 +630,7 @@ class JavaSEGLDevice extends GraphicsDevice {
             }
             Light light = getLight();
             uniform3(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
-                    1f / shadowTarget.width);
+                    light.getShadowSoftness() / shadowTarget.width);
             sampler(p, "u_shadowMap", 1, shadowTarget.tex);
         }
     }

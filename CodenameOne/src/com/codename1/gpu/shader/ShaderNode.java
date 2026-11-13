@@ -977,6 +977,72 @@ public final class ShaderNode {
         return new ShaderNode(SELECT, a.type, null, null, new ShaderNode[]{condition, a, b});
     }
 
+    // ---------------------------------------------------------- normal maps
+
+    /// Decodes a texel of a tangent space normal map (the usual blue-ish
+    /// image) into a direction, scaling its slope by `strength`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `texel`: a `VEC4` read with `sample`
+    ///
+    /// - `strength`: 1 for the map as authored, 0 for flat
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` tangent space normal, not normalized
+    public static ShaderNode unpackNormal(ShaderNode texel, float strength) {
+        requireType(texel, ShaderType.VEC4, "unpackNormal");
+        ShaderNode xy = texel.xy().mul(2f).sub(1f).mul(strength);
+        return vec(xy, texel.z().mul(2f).sub(1f));
+    }
+
+    /// Bends the world space surface normal by a tangent space normal, for
+    /// the `NORMAL` hook. The tangent frame is derived from the surface
+    /// normal and the world axes, so it needs no tangents in the mesh and is
+    /// the same on every backend: on ground and water, tangent `x` runs
+    /// along world `x` and `y` along world `z`; on walls it runs around the
+    /// vertical. That suits tiling detail, noise and terrain maps. A map
+    /// painted for one model's UV layout reads correctly where that layout
+    /// follows the world axes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tangentNormal`: a `VEC3`, such as `unpackNormal`'s
+    ///
+    /// #### Returns
+    ///
+    /// the unit world space normal
+    public static ShaderNode perturbNormal(ShaderNode tangentNormal) {
+        requireType(tangentNormal, ShaderType.VEC3, "perturbNormal");
+        ShaderNode n = normalize(worldNormal());
+        // Up is a poor reference on a level face; fall back to +z there
+        ShaderNode flat = step(f(0.999f), abs(n.y()));
+        ShaderNode ref = select(flat, vec3(0f, 0f, 1f), vec3(0f, 1f, 0f));
+        ShaderNode t = normalize(cross(ref, n));
+        ShaderNode b = cross(n, t);
+        return normalize(t.mul(tangentNormal.x()).add(b.mul(tangentNormal.y()))
+                .add(n.mul(tangentNormal.z())));
+    }
+
+    /// Blends two tangent space normals so the detail rides on the base
+    /// rather than averaging it flat ("whiteout" blend).
+    ///
+    /// #### Parameters
+    ///
+    /// - `base`: a `VEC3` tangent space normal
+    ///
+    /// - `detail`: another
+    ///
+    /// #### Returns
+    ///
+    /// the combined `VEC3`, not normalized
+    public static ShaderNode blendNormals(ShaderNode base, ShaderNode detail) {
+        requireType(base, ShaderType.VEC3, "blendNormals");
+        requireType(detail, ShaderType.VEC3, "blendNormals");
+        return vec(base.xy().add(detail.xy()), base.z().mul(detail.z()));
+    }
+
     // ------------------------------------------------------------- utilities
 
     /// Repeats a `FLOAT` into a vector of `t`, or returns the node itself

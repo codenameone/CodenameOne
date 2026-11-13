@@ -39,6 +39,7 @@ public final class Light {
     private float shadowCenterY;
     private float shadowCenterZ;
     private float shadowBias = 0.0015f;
+    private float shadowSoftness = 1f;
     private float shadowStrength = 0.8f;
 
     /// Sets the world space direction the light travels.
@@ -222,6 +223,28 @@ public final class Light {
     /// Returns how dark a shadow is, from 0 to 1.
     public float getShadowStrength() {
         return shadowStrength;
+    }
+
+    /// Sets how soft shadow edges are: the spacing, in shadow map texels, of
+    /// the 3 by 3 samples every shaded pixel averages. 1 is a crisp edge
+    /// with its stair steps smoothed; 2 to 3 is a soft outdoor penumbra.
+    /// Larger values start to show the sample pattern.
+    ///
+    /// #### Parameters
+    ///
+    /// - `softness`: the sample spacing in texels, at least 0.5
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowSoftness(float softness) {
+        this.shadowSoftness = Math.max(0.5f, softness);
+        return this;
+    }
+
+    /// Returns the shadow softness set with `setShadowSoftness`.
+    public float getShadowSoftness() {
+        return shadowSoftness;
     }
 
     /// Returns the shadow depth bias.

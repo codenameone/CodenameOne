@@ -117,7 +117,7 @@ public final class IOSMetalShaderGenerator {
         f.emissive = f.lit && (material.getEmissive() & 0xffffff) != 0;
         f.hasNormal = hasNormal;
         f.hasTexcoord = hasTexcoord;
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         if (sm != null) {
             f.shader = sm;
             f.fragWorld = ShaderEmitter.uses(sm, true, "worldPos") || ShaderEmitter.uses(sm, true, "viewDir");
@@ -396,7 +396,7 @@ public final class IOSMetalShaderGenerator {
             sb.append(f.shadow ? "  float shade = cn1ShadowAt(in.shadowPos, n, l, u, shadowMap);\n"
                     : "  float shade = 1.0;\n");
             if (f.pbr) {
-                appendPbr(sb, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
+                appendPbr(sb, f.hemisphere, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
                         hook[ShaderMaterial.Hook.ROUGHNESS.ordinal()]);
             } else {
                 sb.append("  rgb = base.rgb * (ambient + u.lightColor.xyz * ndotl * shade);\n");
@@ -598,7 +598,7 @@ public final class IOSMetalShaderGenerator {
 
     // Cook-Torrance with a GGX distribution, Smith-Schlick geometry and
     // Schlick's Fresnel, matching the GLSL generator term for term.
-    private static void appendPbr(StringBuilder sb, String metallicHook, String roughHook) {
+    private static void appendPbr(StringBuilder sb, boolean hemi, String metallicHook, String roughHook) {
         sb.append("  float metallic = ")
                 .append(metallicHook != null ? "clamp(" + metallicHook + ", 0.0, 1.0)" : "u.pbrP.x").append(";\n");
         // below 0.04 the GGX lobe is a sub-pixel spike that aliases
@@ -620,8 +620,19 @@ public final class IOSMetalShaderGenerator {
         sb.append("  float3 spec = ggx * geo * fres / (4.0 * max(ndotl, 0.001) * ndotv);\n");
         sb.append("  float3 kd = (float3(1.0) - fres) * (1.0 - metallic);\n");
         sb.append("  float3 direct = (kd * base.rgb + spec * 3.14159265) * u.lightColor.xyz * ndotl * shade;\n");
-        sb.append("  float3 fa = f0 + (max(float3(1.0 - rough), f0) - f0) * pow(1.0 - ndotv, 5.0);\n");
-        sb.append("  float3 amb = ambient * (base.rgb * (1.0 - metallic) * (float3(1.0) - fa) + fa * (1.0 - rough * 0.7));\n");
+        // ambient (analytic image based lighting): the diffuse term reads the
+        // environment along the normal; the specular term along the reflected
+        // view ray, pulled toward the normal as roughness blurs it, weighted by
+        // Karis' fitted split-sum BRDF instead of a baked lookup table
+        sb.append("  float3 rr = reflect(-v, n);\n");
+        sb.append("  float3 rdir = normalize(mix(rr, n, rough * rough));\n");
+        sb.append("  float3 envSpec = " + (hemi ? "mix(u.ground.xyz, u.skyC.xyz, rdir.y * 0.5 + 0.5)" : "ambient") + ";\n");
+        sb.append("  float4 ec0 = float4(-1.0, -0.0275, -0.572, 0.022);\n");
+        sb.append("  float4 ec1 = float4(1.0, 0.0425, 1.04, -0.04);\n");
+        sb.append("  float4 er = rough * ec0 + ec1;\n");
+        sb.append("  float ea = min(er.x * er.x, exp2(-9.28 * ndotv)) * er.x + er.y;\n");
+        sb.append("  float3 envF = f0 * (-1.04 * ea + er.z) + (1.04 * ea + er.w);\n");
+        sb.append("  float3 amb = ambient * base.rgb * (1.0 - metallic) * (1.0 - envF) + envSpec * envF;\n");
         sb.append("  rgb = direct + amb;\n");
     }
 

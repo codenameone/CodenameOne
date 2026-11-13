@@ -333,14 +333,14 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         if (shadowed) {
             uniforms[o++] = light.getShadowBias();
             uniforms[o++] = light.getShadowStrength();
-            uniforms[o++] = shadowSize > 0 ? 1.0f / shadowSize : 0.0f;
+            uniforms[o++] = shadowSize > 0 ? light.getShadowSoftness() / shadowSize : 0.0f;
         } else {
             uniforms[o++] = 0f;
             uniforms[o++] = 0f;
             uniforms[o++] = 0f;
         }
         uniforms[o++] = getTime();
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         int n = sm == null ? 0 : sm.getUniformCount() * 4;
         if (n > 0) {
             System.arraycopy(sm.getUniformValues(), 0, uniforms, o, n);
@@ -352,7 +352,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
 
     // binds the material's custom textures on units 2 and up for the next draw
     private void bindShaderTextures(Material material) {
-        ShaderMaterial sm = material.getShader();
+        ShaderMaterial sm = material.getEffectiveShader();
         if (sm == null) {
             return;
         }
