@@ -111,13 +111,27 @@ public class Trainers {
         this.rates = rates;
     }
 
-    /// The classes `trainer` teaches from the start of today for a week.
+    /// The classes `trainer` teaches from the start of today for a week,
+    /// and before them a class of yesterday's that is not over yet.
     @Transactional(readOnly = true)
     public List<SessionDto> classes(String trainer) throws IOException {
-        Instant from = Instant.ofEpochMilli(System.currentTimeMillis() / 86400000L * 86400000L);
-        return studio.describe(trainer,
+        long now = System.currentTimeMillis();
+        Instant from = Instant.ofEpochMilli(now / 86400000L * 86400000L);
+        // The day turns over in UTC, which is the middle of the evening in
+        // half the world: a class begun before it and still running is the
+        // one the trainer is standing in, so it stays on the list. Read from
+        // a day earlier and keep, of that day, only what has not ended.
+        List<ClassSession> found =
                 sessions.findByTrainerAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
-                        trainer, from, from.plusMillis(7L * 86400000L)));
+                        trainer, from.minusMillis(86400000L), from.plusMillis(7L * 86400000L));
+        List<ClassSession> kept = new ArrayList<ClassSession>();
+        for (int iter = 0; iter < found.size(); iter++) {
+            ClassSession row = found.get(iter);
+            if (!row.getStartsAt().isBefore(from) || row.getEndsAt().toEpochMilli() > now) {
+                kept.add(row);
+            }
+        }
+        return studio.describe(trainer, kept);
     }
 
     /// Who is booked into a class, who is waiting, who came; with what the

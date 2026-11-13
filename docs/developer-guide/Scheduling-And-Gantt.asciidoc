@@ -73,7 +73,7 @@ single button with a menu.
 
 The figures that follow are one schedule, three people's month, in each view.
 
-.The day view: two meetings at the same time share the column
+.The day view: two overlapping meetings share the column
 image::img/generated/scheduler-day.png["A day with the hours down the side, a band of working time, two overlapping meetings side by side and a hatched blocked hour",scaledwidth=30%]
 
 .The work week
@@ -334,7 +334,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/scheduling
 more of a resource than there is. `ProjectModel.clearLeveling()` removes the
 delays again.
 
-.The same project leveled: the task that had slack was moved, and the load is within capacity
+.The same project leveled: the task with room to move was moved, and the load is within capacity
 image::img/generated/gantt-leveled.png["The chart with one task delayed and the histogram under it no higher than its capacity line",scaledwidth=30%]
 
 === Printing and export
