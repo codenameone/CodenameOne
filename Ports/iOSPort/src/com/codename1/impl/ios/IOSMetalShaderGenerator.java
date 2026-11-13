@@ -100,6 +100,29 @@ public final class IOSMetalShaderGenerator {
     ///   material receives it
     public IOSMetalShaderGenerator(Material material, VertexFormat format, Environment environment,
             boolean shadowed) {
+        this(material, format, environment, shadowed, false);
+    }
+
+    /// The depth-only caster program of a material whose custom shader moves
+    /// vertices or discards fragments: the shadow pass then runs the same
+    /// vertex offset and discard, so the shadow matches what is drawn. Its
+    /// fragment function writes no colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `material`: the casting material
+    ///
+    /// - `format`: the mesh vertex layout
+    ///
+    /// #### Returns
+    ///
+    /// the generator
+    public static IOSMetalShaderGenerator depthOnly(Material material, VertexFormat format) {
+        return new IOSMetalShaderGenerator(material, format, null, false, true);
+    }
+
+    private IOSMetalShaderGenerator(Material material, VertexFormat format, Environment environment,
+            boolean shadowed, boolean depthOnly) {
         boolean hasNormal = format.findByUsage(VertexAttribute.Usage.NORMAL) != null;
         boolean hasTexcoord = format.findByUsage(VertexAttribute.Usage.TEXCOORD) != null;
         Features f = new Features();
@@ -117,6 +140,18 @@ public final class IOSMetalShaderGenerator {
         f.emissive = f.lit && (material.getEmissive() & 0xffffff) != 0;
         f.hasNormal = hasNormal;
         f.hasTexcoord = hasTexcoord;
+        if (depthOnly) {
+            f.depthOnly = true;
+            f.lit = false;
+            f.phong = false;
+            f.pbr = false;
+            f.fog = false;
+            f.sky = false;
+            f.hemisphere = false;
+            f.toneMap = false;
+            f.shadow = false;
+            f.emissive = false;
+        }
         ShaderMaterial sm = material.getEffectiveShader();
         if (sm != null) {
             f.shader = sm;
@@ -144,6 +179,7 @@ public final class IOSMetalShaderGenerator {
         boolean fragWorld;
         boolean fragNormal;
         boolean fragUv;
+        boolean depthOnly;
     }
 
     // custom shading inputs; the vertex stage reads CN1VertexIn, the fragment
@@ -336,7 +372,7 @@ public final class IOSMetalShaderGenerator {
             sb.append("}\n");
         }
         // Fragment function.
-        sb.append("fragment float4 ").append(FRAGMENT_FUNCTION).append("(\n");
+        sb.append(f.depthOnly ? "fragment void " : "fragment float4 ").append(FRAGMENT_FUNCTION).append("(\n");
         sb.append("    CN1VertexOut in [[stage_in]],\n");
         sb.append("    constant CN1Uniforms& u [[buffer(1)]]");
         if (textured) {
@@ -375,6 +411,10 @@ public final class IOSMetalShaderGenerator {
         if (hook[ShaderMaterial.Hook.DISCARD.ordinal()] != null) {
             sb.append("  if (").append(hook[ShaderMaterial.Hook.DISCARD.ordinal()]).append(" > 0.5) {\n");
             sb.append("    discard_fragment();\n  }\n");
+        }
+        if (f.depthOnly) {
+            sb.append("  (void) base;\n}\n");
+            return sb.toString();
         }
         String customEmissive = hook[ShaderMaterial.Hook.EMISSIVE.ordinal()];
         sb.append("  float3 rgb = base.rgb;\n");

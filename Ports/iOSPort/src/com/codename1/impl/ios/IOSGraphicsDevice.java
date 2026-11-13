@@ -406,6 +406,10 @@ class IOSGraphicsDevice extends GraphicsDevice {
         if (vboHandle == 0) {
             return;
         }
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawCustomShadowCaster(mesh, material, modelMatrix, vb, fmt, vboHandle);
+            return;
+        }
         String key = "shadow|s" + fmt.getStrideBytes() + "|b0|c0|dt1|dw1";
         Long existing = pipelines.get(key);
         long pipeline;
@@ -439,6 +443,58 @@ class IOSGraphicsDevice extends GraphicsDevice {
             IOSImplementation.nativeInstance.gl3dDrawArrays(
                     contextPeer, pipeline, vboHandle, strideBytes,
                     vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, 0, 0, 0);
+        }
+    }
+
+    // A caster whose custom shader moves vertices or discards fragments: the
+    // material's own depth-only program, with its full uniforms and textures
+    // so the offset and the discard read what the colour pass reads.
+    private void drawCustomShadowCaster(Mesh mesh, Material material, float[] modelMatrix, VertexBuffer vb,
+            VertexFormat fmt, long vboHandle) {
+        String key = "shadow|depth|" + material.getShaderKey() + "|s" + fmt.getStrideBytes();
+        Long existing = pipelines.get(key);
+        long pipeline;
+        if (existing != null) {
+            pipeline = existing.longValue();
+        } else {
+            pipeline = IOSImplementation.nativeInstance.gl3dGetOrCreatePipeline(
+                    contextPeer, key, IOSMetalShaderGenerator.depthOnly(material, fmt).getSource(), 0, 0, 1, 1);
+            pipelines.put(key, Long.valueOf(pipeline));
+        }
+        if (pipeline == 0) {
+            return;
+        }
+        float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
+        packUniforms(material, model);
+        Matrix4.multiply(shadowMatrix, model, mvp);
+        for (int i = 0; i < 16; i++) {
+            uniforms[i] = mvp[i];
+        }
+        long texHandle = 0;
+        int texFilter = 0;
+        int texWrap = 0;
+        Texture tex = material.getTexture();
+        if (tex != null && tex.getHandle() instanceof Long) {
+            texHandle = ((Long) tex.getHandle()).longValue();
+            texFilter = tex.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+            texWrap = tex.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+        }
+        bindShaderTextures(material);
+        int primitive = primitiveCode(mesh.getPrimitiveType());
+        int strideBytes = fmt.getStrideBytes();
+        if (mesh.isIndexed()) {
+            IndexBuffer ib = mesh.getIndices();
+            long iboHandle = uploadIndexBuffer(ib);
+            if (iboHandle == 0) {
+                return;
+            }
+            IOSImplementation.nativeInstance.gl3dDrawIndexed(
+                    contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
+                    ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, texFilter, texWrap);
+        } else {
+            IOSImplementation.nativeInstance.gl3dDrawArrays(
+                    contextPeer, pipeline, vboHandle, strideBytes,
+                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, texFilter, texWrap);
         }
     }
 

@@ -217,9 +217,22 @@ class JavaSEGLDevice extends GraphicsDevice {
         boolean shadowed = shadowReady && isShadowMapCurrent() && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         Program program = getProgram(material, fmt, env, shadowed);
+        Camera cam = getCamera();
+        drawWith(mesh, material, modelMatrix, program, cam != null ? cam.getViewProjection() : Matrix4.identity(),
+                shadowed, false);
+    }
+
+    // One draw of a mesh through a program. vp is the camera's view projection,
+    // or the light's for a caster whose material needs its own depth program;
+    // a caster draws with depth on, no blending and both faces.
+    private void drawWith(Mesh mesh, Material material, float[] modelMatrix, Program program, float[] vp,
+            boolean shadowed, boolean caster) {
         if (program.handle == 0) {
             return;
         }
+        VertexBuffer vb = mesh.getVertices();
+        VertexFormat fmt = vb.getFormat();
+        Environment env = getEnvironment();
         gl.glUseProgram(program.handle);
 
         if (modelMatrix != null) {
@@ -228,7 +241,6 @@ class JavaSEGLDevice extends GraphicsDevice {
             Matrix4.setIdentity(model);
         }
         Camera cam = getCamera();
-        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         Matrix4.multiply(vp, model, mvp);
         float[] nm = Matrix4.normalMatrix(model);
         for (int i = 0; i < 16; i++) {
@@ -295,7 +307,14 @@ class JavaSEGLDevice extends GraphicsDevice {
             }
         }
 
-        applyRenderState(material.getRenderState());
+        if (caster) {
+            gl.glEnable(GL2ES2.GL_DEPTH_TEST);
+            gl.glDepthMask(true);
+            gl.glDisable(GL2ES2.GL_BLEND);
+            gl.glDisable(GL2ES2.GL_CULL_FACE);
+        } else {
+            applyRenderState(material.getRenderState());
+        }
 
         int vbo = uploadVertexBuffer(vb);
         gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, vbo);
@@ -485,6 +504,17 @@ class JavaSEGLDevice extends GraphicsDevice {
         GlslShaderGenerator gen = new GlslShaderGenerator(material, fmt, env, shadowed);
         p = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
         programs.put(key, p);
+        return p;
+    }
+
+    private Program getDepthProgram(Material material, VertexFormat fmt) {
+        String key = "depth|" + material.getShaderKey() + "|" + System.identityHashCode(fmt);
+        Program p = programs.get(key);
+        if (p == null) {
+            GlslShaderGenerator gen = GlslShaderGenerator.depthOnly(material, fmt);
+            p = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
+            programs.put(key, p);
+        }
         return p;
     }
 
@@ -745,6 +775,10 @@ class JavaSEGLDevice extends GraphicsDevice {
         }
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawWith(mesh, material, modelMatrix, getDepthProgram(material, fmt), shadowMatrix, false, true);
+            return;
+        }
         gl.glUseProgram(shadowProgram.handle);
         if (modelMatrix != null) {
             Matrix4.copy(modelMatrix, model);

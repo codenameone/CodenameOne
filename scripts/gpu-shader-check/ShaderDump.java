@@ -84,6 +84,17 @@ public class ShaderDump {
                     new IOSMetalShaderGenerator(mat, VertexFormat.POSITION_NORMAL_TEXCOORD, env, true).getSource());
             write(dir + "/" + e.getKey() + ".hlsl",
                     new HlslShaderGenerator(mat, VertexFormat.POSITION_NORMAL_TEXCOORD, env, true).getSource());
+            if (GlslShaderGenerator.needsOwnDepthProgram(mat)) {
+                // the depth-only caster program of a material that moves or cuts its surface
+                String d = dir + "/" + e.getKey() + ".depth";
+                GlslShaderGenerator dg = GlslShaderGenerator.depthOnly(mat, VertexFormat.POSITION_NORMAL_TEXCOORD);
+                write(d + ".vert", "#version 100\n" + dg.getVertexSource());
+                write(d + ".frag", "#version 100\n" + dg.getFragmentSource());
+                write(d + ".metal",
+                        IOSMetalShaderGenerator.depthOnly(mat, VertexFormat.POSITION_NORMAL_TEXCOORD).getSource());
+                write(d + ".hlsl",
+                        HlslShaderGenerator.depthOnly(mat, VertexFormat.POSITION_NORMAL_TEXCOORD).getSource());
+            }
         }
         write(dir + "/post.frag", "#version 100\n" + GlslShaderGenerator.compositeFragment());
         write(dir + "/post.metal", IOSMetalShaderGenerator.postSource());

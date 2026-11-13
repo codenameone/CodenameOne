@@ -240,6 +240,18 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         return pipeline;
     }
 
+    private long depthPipeline(Material material, VertexFormat fmt) {
+        String key = "depth|" + material.getShaderKey() + "|f" + System.identityHashCode(fmt);
+        Long existing = pipelines.get(key);
+        if (existing != null) {
+            return existing.longValue();
+        }
+        GlslShaderGenerator gen = GlslShaderGenerator.depthOnly(material, fmt);
+        long pipeline = createPipeline(key, gen.getVertexSource(), gen.getFragmentSource(), 0, 0, 1, 1);
+        pipelines.put(key, Long.valueOf(pipeline));
+        return pipeline;
+    }
+
     private long createPipeline(String key, String vertex, String fragment,
                                 int blend, int cull, int depthTest, int depthWrite) {
         return LinuxNative.gl3dGetOrCreatePipeline(contextPeer, key,
@@ -412,6 +424,22 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             return;
         }
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
+        long pipeline = shadowPipeline;
+        long texHandle = 0;
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            // a material that moves its vertices or discards casts through a
+            // depth program of its own, with every uniform a normal draw has
+            pipeline = depthPipeline(material, vb.getFormat());
+            if (pipeline == 0) {
+                return;
+            }
+            packUniforms(material, model, getEnvironment(), false);
+            bindShaderTextures(material);
+            Texture tex = material.getTexture();
+            if (tex != null && tex.getHandle() instanceof Long) {
+                texHandle = ((Long) tex.getHandle()).longValue();
+            }
+        }
         Matrix4.multiply(shadowMatrix, model, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
@@ -424,11 +452,11 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             if (iboHandle == 0) {
                 return;
             }
-            LinuxNative.gl3dDrawIndexed(contextPeer, shadowPipeline, vboHandle, strideBytes,
-                    iboHandle, ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS, 0, 0, 0, 0);
+            LinuxNative.gl3dDrawIndexed(contextPeer, pipeline, vboHandle, strideBytes,
+                    iboHandle, ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, 1, 1, 0);
         } else {
-            LinuxNative.gl3dDrawArrays(contextPeer, shadowPipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, 0, 0, 0, 0);
+            LinuxNative.gl3dDrawArrays(contextPeer, pipeline, vboHandle, strideBytes,
+                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, 1, 1, 0);
         }
     }
 

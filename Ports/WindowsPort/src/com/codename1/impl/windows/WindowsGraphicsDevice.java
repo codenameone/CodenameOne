@@ -381,6 +381,10 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         }
         VertexBuffer vb = mesh.getVertices();
         long vboHandle = uploadVertexBuffer(vb);
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawCustomShadowCaster(mesh, material, modelMatrix, vb, vboHandle);
+            return;
+        }
         long pipeline = getOrCreateAuxPipeline("cn1-shadow", HlslShaderGenerator.shadowSource(), 0, 1);
         if (vboHandle == 0 || pipeline == 0) {
             return;
@@ -406,6 +410,54 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         } else {
             WindowsNative.gl3dDrawArrays(contextPeer, pipeline, vboHandle, strideBytes,
                     vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, 0, 0, 0);
+        }
+    }
+
+    // A caster whose custom shader moves vertices or discards fragments: the
+    // material's own depth-only program with its full uniforms and textures, so
+    // the offset and the discard read what the colour pass reads.
+    private void drawCustomShadowCaster(Mesh mesh, Material material, float[] modelMatrix, VertexBuffer vb,
+            long vboHandle) {
+        VertexFormat fmt = vb.getFormat();
+        String key = "cn1-shadow-depth|" + material.getShaderKey() + "|s" + fmt.getStrideBytes();
+        Long existing = pipelines.get(key);
+        long pipeline;
+        if (existing != null) {
+            pipeline = existing.longValue();
+        } else {
+            pipeline = getOrCreateAuxPipeline(key, HlslShaderGenerator.depthOnly(material, fmt).getSource(), 0, 1);
+        }
+        if (vboHandle == 0 || pipeline == 0) {
+            return;
+        }
+        float[] m = modelMatrix != null ? modelMatrix : Matrix4.identity();
+        packUniforms(material, m);
+        Matrix4.multiply(shadowMatrix, m, mvp);
+        for (int i = 0; i < 16; i++) {
+            uniforms[i] = mvp[i];
+        }
+        long texHandle = 0;
+        int texFilter = 0;
+        int texWrap = 0;
+        Texture tex = material.getTexture();
+        if (tex != null && tex.getHandle() instanceof Long) {
+            texHandle = ((Long) tex.getHandle()).longValue();
+            texFilter = tex.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+            texWrap = tex.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+        }
+        bindShaderTextures(material);
+        int primitive = primitiveCode(mesh.getPrimitiveType());
+        int strideBytes = fmt.getStrideBytes();
+        if (mesh.isIndexed()) {
+            IndexBuffer ib = mesh.getIndices();
+            long iboHandle = uploadIndexBuffer(ib);
+            if (iboHandle != 0) {
+                WindowsNative.gl3dDrawIndexed(contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
+                        ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, texFilter, texWrap);
+            }
+        } else {
+            WindowsNative.gl3dDrawArrays(contextPeer, pipeline, vboHandle, strideBytes,
+                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, texHandle, texFilter, texWrap);
         }
     }
 

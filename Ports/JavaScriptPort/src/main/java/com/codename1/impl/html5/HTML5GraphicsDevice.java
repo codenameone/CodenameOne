@@ -259,17 +259,26 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         ProgramEntry entry = getProgram(material, format, env, shadowed);
+        Camera camera = getCamera();
+        drawWith(mesh, material, modelMatrix, entry,
+                camera != null ? camera.getViewProjection() : Matrix4.identity(), shadowed, false);
+    }
+
+    // One draw of a mesh through a program. vp is the camera's view projection,
+    // or the light's for a caster whose material needs its own depth program;
+    // a caster draws with depth on, no blending and both faces.
+    private void drawWith(Mesh mesh, Material material, float[] modelMatrix, ProgramEntry entry, float[] vp,
+            boolean shadowed, boolean caster) {
+        VertexBuffer vertices = mesh.getVertices();
+        VertexFormat format = vertices.getFormat();
+        Environment env = getEnvironment();
         gl.useProgram(entry.program);
         applyEnvironment(entry, material, env, shadowed);
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        Camera camera = getCamera();
         float[] mvp = Matrix4.identity();
-        if (camera != null) {
-            Matrix4.multiply(camera.getViewProjection(), model, mvp);
-        } else {
-            Matrix4.copy(model, mvp);
-        }
+        Matrix4.multiply(vp, model, mvp);
+        Camera camera = getCamera();
         if (entry.uMvp != null) {
             gl.uniformMatrix4fv(entry.uMvp, false, mvp);
         }
@@ -327,7 +336,14 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             gl.uniform1i(entry.uTexture, 0);
         }
 
-        applyRenderState(material.getRenderState());
+        if (caster) {
+            gl.enable(DEPTH_TEST);
+            gl.depthMask(true);
+            gl.disable(BLEND);
+            gl.disable(CULL_FACE);
+        } else {
+            applyRenderState(material.getRenderState());
+        }
 
         WebGLBuffer vbo = uploadVertexBuffer(vertices);
         gl.bindBuffer(ARRAY_BUFFER, vbo);
@@ -476,6 +492,17 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         GlslShaderGenerator gen = new GlslShaderGenerator(material, format, env, shadowed);
         entry = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
         programs.put(key, entry);
+        return entry;
+    }
+
+    private ProgramEntry getDepthProgram(Material material, VertexFormat format) {
+        String key = "depth|" + material.getShaderKey() + "|" + formatKey(format);
+        ProgramEntry entry = programs.get(key);
+        if (entry == null) {
+            GlslShaderGenerator gen = GlslShaderGenerator.depthOnly(material, format);
+            entry = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
+            programs.put(key, entry);
+        }
         return entry;
     }
 
@@ -740,6 +767,10 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawWith(mesh, material, modelMatrix, getDepthProgram(material, fmt), shadowMatrix, false, true);
+            return;
+        }
         gl.useProgram(shadowProgram.program);
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
         float[] mvp = Matrix4.identity();

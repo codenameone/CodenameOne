@@ -499,10 +499,14 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
         return nil;
     }
     id<MTLFunction> vfn = [lib newFunctionWithName:@"cn1_vertex_main"];
-    // A "shadow|" key is a depth-only caster pipeline: no fragment function and
-    // no colour attachment, to match the shadow map pass.
+    // A "shadow|" key is a depth-only caster pipeline with no colour
+    // attachment, to match the shadow map pass. The plain caster has no
+    // fragment function; a material whose custom shader moves vertices or
+    // discards fragments ("shadow|depth|") brings one that writes no colour
+    // and only discards.
     BOOL depthOnly = [key hasPrefix:@"shadow|"];
-    id<MTLFunction> ffn = depthOnly ? nil : [lib newFunctionWithName:@"cn1_fragment_main"];
+    id<MTLFunction> ffn = (depthOnly && ![key hasPrefix:@"shadow|depth|"]) ? nil
+            : [lib newFunctionWithName:@"cn1_fragment_main"];
     if (vfn == nil || (ffn == nil && !depthOnly)) {
         NSLog(@"[CN1GL3D] missing shader entry points for %@", key);
         return nil;

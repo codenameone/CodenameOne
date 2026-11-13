@@ -102,16 +102,39 @@ public final class HlslShaderGenerator {
     ///   the material receives it
     public HlslShaderGenerator(Material material, VertexFormat format, Environment environment,
                                boolean shadowed) {
+        this(material, format, environment, shadowed, false);
+    }
+
+    /// The depth-only caster program of a material whose custom shader moves
+    /// vertices or discards fragments: the shadow pass then runs the same
+    /// vertex offset and discard, and writes the depth into the R32_FLOAT map
+    /// exactly as `shadowSource()` does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `material`: the casting material
+    ///
+    /// - `format`: the mesh vertex layout
+    ///
+    /// #### Returns
+    ///
+    /// the generator
+    public static HlslShaderGenerator depthOnly(Material material, VertexFormat format) {
+        return new HlslShaderGenerator(material, format, null, false, true);
+    }
+
+    private HlslShaderGenerator(Material material, VertexFormat format, Environment environment,
+                                boolean shadowed, boolean depthOnly) {
         boolean hasNormal = format.findByUsage(VertexAttribute.Usage.NORMAL) != null;
         boolean hasTexcoord = format.findByUsage(VertexAttribute.Usage.TEXCOORD) != null;
         Material.Type type = material.getType();
         boolean sky = type == Material.Type.SKYBOX;
-        boolean lit = material.isLit() && hasNormal;
-        boolean phong = type == Material.Type.PHONG && hasNormal;
-        boolean pbr = type == Material.Type.PBR && hasNormal;
+        boolean lit = !depthOnly && material.isLit() && hasNormal;
+        boolean phong = !depthOnly && type == Material.Type.PHONG && hasNormal;
+        boolean pbr = !depthOnly && type == Material.Type.PBR && hasNormal;
         boolean textured = material.getTexture() != null && hasTexcoord;
-        boolean fog = environment != null && environment.isFog() && !sky && material.isFogged();
-        boolean skyOn = sky && environment != null && environment.isSky();
+        boolean fog = !depthOnly && environment != null && environment.isFog() && !sky && material.isFogged();
+        boolean skyOn = !depthOnly && sky && environment != null && environment.isSky();
         boolean hemi = lit && environment != null && environment.isHemisphere();
         boolean tone = lit && environment != null && environment.isToneMapping();
         boolean emissive = lit && (material.getEmissive() & 0xffffff) != 0;
@@ -128,7 +151,7 @@ public final class HlslShaderGenerator {
             c.fragUv = hasTexcoord && ShaderEmitter.uses(sm, true, "uv");
         }
         this.source = build(lit, phong, pbr, textured, hasNormal, hasTexcoord, fog, skyOn,
-                hemi, tone, emissive, shadow, c);
+                hemi, tone, emissive, shadow, c, depthOnly);
     }
 
     // a material's ShaderMaterial and which inputs its fragment graphs read
@@ -211,7 +234,7 @@ public final class HlslShaderGenerator {
     private static String build(boolean lit, boolean phong, boolean pbr, boolean textured,
                                 boolean hasNormal, boolean hasTexcoord, boolean fog,
                                 boolean sky, boolean hemi, boolean tone, boolean emissive,
-                                boolean shadow, Custom c) {
+                                boolean shadow, Custom c, boolean depthOnly) {
         if (c != null) {
             c.lit = lit;
             c.textured = textured;
@@ -364,6 +387,13 @@ public final class HlslShaderGenerator {
         if (hook[ShaderMaterial.Hook.DISCARD.ordinal()] != null) {
             sb.append("  if (").append(hook[ShaderMaterial.Hook.DISCARD.ordinal()]).append(" > 0.5) {\n");
             sb.append("    discard;\n  }\n");
+        }
+        if (depthOnly) {
+            // SV_Position.z here is the remapped clip depth, z / w * 0.5 + 0.5,
+            // which is what the plain caster writes from its own varying
+            sb.append("  float d = saturate(input.position.z);\n");
+            sb.append("  return float4(d, d, d, 1.0);\n}\n");
+            return sb.toString();
         }
         String customEmissive = hook[ShaderMaterial.Hook.EMISSIVE.ordinal()];
         sb.append("  float3 rgb = base.rgb;\n");

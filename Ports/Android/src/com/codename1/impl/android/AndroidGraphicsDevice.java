@@ -230,9 +230,22 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         boolean shadowed = shadowReady && isShadowMapCurrent() && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         Program program = getProgram(material, fmt, env, shadowed);
+        Camera cam = getCamera();
+        drawWith(mesh, material, modelMatrix, program, cam != null ? cam.getViewProjection() : Matrix4.identity(),
+                shadowed, false);
+    }
+
+    // One draw of a mesh through a program. vp is the camera's view projection,
+    // or the light's for a caster whose material needs its own depth program;
+    // a caster draws with depth on, no blending and both faces.
+    private void drawWith(Mesh mesh, Material material, float[] modelMatrix, Program program, float[] vp,
+            boolean shadowed, boolean caster) {
         if (program.handle == 0) {
             return;
         }
+        VertexBuffer vb = mesh.getVertices();
+        VertexFormat fmt = vb.getFormat();
+        Environment env = getEnvironment();
         GLES20.glUseProgram(program.handle);
         applyEnvironment(program, material, env, shadowed);
 
@@ -243,7 +256,6 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             Matrix4.setIdentity(model);
         }
         Camera cam = getCamera();
-        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         Matrix4.multiply(vp, model, mvp);
         float[] nm = Matrix4.normalMatrix(model);
         for (int i = 0; i < 16; i++) {
@@ -312,7 +324,14 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             }
         }
 
-        applyRenderState(material.getRenderState());
+        if (caster) {
+            GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+            GLES20.glDepthMask(true);
+            GLES20.glDisable(GLES20.GL_BLEND);
+            GLES20.glDisable(GLES20.GL_CULL_FACE);
+        } else {
+            applyRenderState(material.getRenderState());
+        }
 
         // Upload (if dirty) and bind the vertex buffer, then wire the attribute
         // pointers from the interleaved format offsets.
@@ -507,6 +526,17 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         GlslShaderGenerator gen = new GlslShaderGenerator(material, fmt, env, shadowed);
         p = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
         programs.put(key, p);
+        return p;
+    }
+
+    private Program getDepthProgram(Material material, VertexFormat fmt) {
+        String key = "depth|" + material.getShaderKey() + "|" + System.identityHashCode(fmt);
+        Program p = programs.get(key);
+        if (p == null) {
+            GlslShaderGenerator gen = GlslShaderGenerator.depthOnly(material, fmt);
+            p = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
+            programs.put(key, p);
+        }
         return p;
     }
 
@@ -764,6 +794,10 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         }
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawWith(mesh, material, modelMatrix, getDepthProgram(material, fmt), shadowMatrix, false, true);
+            return;
+        }
         GLES20.glUseProgram(shadowProgram.handle);
         if (modelMatrix != null) {
             Matrix4.copy(modelMatrix, model);

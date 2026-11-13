@@ -109,6 +109,49 @@ public final class GlslShaderGenerator {
     /// - `shadowed`: true if a shadow map is bound and the material receives it
     public GlslShaderGenerator(Material material, VertexFormat format, Environment environment,
             boolean shadowed) {
+        this(material, format, environment, shadowed, false);
+    }
+
+    /// Generates the depth only program of a material: what its vertex offset
+    /// moves and its discard hook keeps, written as packed depth
+    /// (`unpackDepth` reads it back). The shadow pass draws a material through
+    /// it when `needsOwnDepthProgram` says the shared caster program would put
+    /// its depth in the wrong place; the backend sets `u_mvp` to the light's
+    /// (or the camera's) view projection times the model matrix, and the
+    /// rest of the uniforms as for a normal draw.
+    ///
+    /// #### Parameters
+    ///
+    /// - `material`: the material
+    ///
+    /// - `format`: the mesh vertex layout
+    ///
+    /// #### Returns
+    ///
+    /// the generator
+    public static GlslShaderGenerator depthOnly(Material material, VertexFormat format) {
+        return new GlslShaderGenerator(material, format, null, false, true);
+    }
+
+    /// True if a material moves its vertices or discards fragments, so its
+    /// depth only needs a program of its own rather than the shared caster
+    /// program that only reads the position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `material`: the material
+    ///
+    /// #### Returns
+    ///
+    /// true if `depthOnly` must be used for this material
+    public static boolean needsOwnDepthProgram(Material material) {
+        ShaderMaterial sm = material.getEffectiveShader();
+        return sm != null && (sm.get(ShaderMaterial.Hook.VERTEX_OFFSET) != null
+                || sm.get(ShaderMaterial.Hook.DISCARD) != null);
+    }
+
+    private GlslShaderGenerator(Material material, VertexFormat format, Environment environment,
+            boolean shadowed, boolean depthOnly) {
         boolean hasNormal = format.findByUsage(VertexAttribute.Usage.NORMAL) != null;
         boolean hasTexcoord = format.findByUsage(VertexAttribute.Usage.TEXCOORD) != null;
         Features f = new Features();
@@ -140,6 +183,18 @@ public final class GlslShaderGenerator {
             f.vertEye = ShaderEmitter.uses(sm, false, "cameraPos");
             f.vertSun = ShaderEmitter.uses(sm, false, "sunDir") || ShaderEmitter.uses(sm, false, "sunColor");
             f.time = ShaderEmitter.uses(sm, "time");
+        }
+        if (depthOnly) {
+            f.depthOnly = true;
+            f.lit = false;
+            f.phong = false;
+            f.pbr = false;
+            f.fog = false;
+            f.sky = false;
+            f.hemisphere = false;
+            f.toneMap = false;
+            f.shadow = false;
+            f.emissive = false;
         }
         this.vertexSource = buildVertex(f);
         this.fragmentSource = buildFragment(f);
@@ -186,6 +241,7 @@ public final class GlslShaderGenerator {
         boolean vertEye;
         boolean vertSun;
         boolean time;
+        boolean depthOnly;
 
         boolean world() {
             return lit || fog || sky || fragWorld;
@@ -371,7 +427,10 @@ public final class GlslShaderGenerator {
         boolean world = f.world();
         StringBuilder sb = new StringBuilder();
         // custom graphs (noise, waves) need the precision world space math does
-        sb.append(f.shadow || f.shader != null ? HIGHP : "precision mediump float;\n");
+        sb.append(f.shadow || f.shader != null || f.depthOnly ? HIGHP : "precision mediump float;\n");
+        if (f.depthOnly) {
+            sb.append(PACK);
+        }
         sb.append("uniform vec4 u_color;\n");
         if (f.textured) {
             sb.append("uniform sampler2D u_texture;\n");
@@ -465,6 +524,12 @@ public final class GlslShaderGenerator {
             sb.append("  if (").append(hook[ShaderMaterial.Hook.DISCARD.ordinal()]).append(" > 0.5) {\n");
             sb.append("    discard;\n  }\n");
         }
+        if (f.depthOnly) {
+            // packDepth(1.0) wraps to 0, the nearest depth there is
+            sb.append("  gl_FragColor = packDepth(min(gl_FragCoord.z, 0.99999));\n");
+            sb.append("}\n");
+            return sb.toString();
+        }
         sb.append("  vec3 rgb = base.rgb;\n");
         if (f.sky) {
             appendSky(sb);
@@ -533,7 +598,9 @@ public final class GlslShaderGenerator {
                 "  ", "_f");
         for (int i = 0; i < all.length; i++) {
             ShaderNode g = f.shader.get(all[i]);
-            if (g != null && all[i].isFragment()) {
+            boolean wanted = !f.depthOnly || all[i] == ShaderMaterial.Hook.DISCARD
+                    || all[i] == ShaderMaterial.Hook.BASE_COLOR;
+            if (g != null && wanted && all[i].isFragment()) {
                 out[i] = e.emit(g);
             }
         }
