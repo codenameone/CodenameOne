@@ -40,7 +40,7 @@ An agent working in a terminal can't click a menu or restart its host, so the bu
 
 - The loopback MCP server listens from the first frame, on port 8765 or the port given by `-Dcn1.mcp.port` (`-Pcn1.mcp.port`). When 8765 is taken and no port was given, a free one is used and written to `common/target/cn1-agent.port` (`build/cn1-agent.port` under Gradle).
 - The simulator window never takes the keyboard focus and shows no Dock icon on macOS, so a developer can keep working while an agent drives it.
-- On Linux with no display, the Maven goal starts an Xvfb server for the simulator. Under Gradle, run the task with `xvfb-run -a`.
+- On Linux with no display, the Maven goal starts a virtual X server (Xvfb) for the simulator. Under Gradle, run the task with `xvfb-run -a`.
 
 The same switch is available to any launcher as the system property `cn1.mcp.port`, or the environment variable `CN1_MCP_PORT`, which reaches the simulator even when a project's run configuration forwards no JVM arguments.
 
