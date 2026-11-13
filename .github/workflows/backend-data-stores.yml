@@ -1,0 +1,165 @@
+name: Backend data stores
+
+# The backend's MongoDB, DynamoDB and search clients, and the entity mapping
+# over them, against the real servers. Every test that needs one reads its
+# address from the environment and SKIPS when it is unset, so without this job
+# they report green having run nothing but the encoders: the wire protocol,
+# SigV4 against DynamoDB Local, a compound _id, a Query against a Scan and the
+# search engines' own query languages are exactly what such a run leaves out.
+#
+#   MongoClientTest, DocumentSessionTest   CN1_TEST_MONGODB_URI
+#   DynamoDbTest, DocumentSessionTest      CN1_TEST_DYNAMODB_ENDPOINT
+#   SearchEngineTest                       CN1_TEST_SEARCH_URL (OpenSearch),
+#                                          CN1_TEST_DATABASE_URL (the SQL
+#                                          engines' full-text search: PostgreSQL,
+#                                          then MariaDB)
+#
+# Runs on a pull request that touches these clients or the shared ORM classes
+# they map, and nightly on master (see "Nightly CI" in CLAUDE.md).
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/backend-data-stores.yml'
+      - 'scripts/ci/retry.sh'
+      - 'vm/backend/src/com/codename1/backend/aws/**'
+      - 'vm/backend/src/com/codename1/backend/bson/**'
+      - 'vm/backend/src/com/codename1/backend/document/**'
+      - 'vm/backend/src/com/codename1/backend/dynamo/**'
+      - 'vm/backend/src/com/codename1/backend/mongo/**'
+      - 'vm/backend/src/com/codename1/backend/search/**'
+      - 'maven/backend/src/test/java/com/codename1/backend/document/**'
+      - 'maven/backend/src/test/java/com/codename1/backend/dynamo/**'
+      - 'maven/backend/src/test/java/com/codename1/backend/mongo/**'
+      - 'maven/backend/src/test/java/com/codename1/backend/search/**'
+      - 'CodenameOne/src/com/codename1/impl/orm/**'
+      - 'CodenameOne/src/com/codename1/annotations/db/**'
+  schedule:
+    - cron: '11 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  data-stores:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      mongo:
+        image: mongo:7
+        env:
+          MONGO_INITDB_ROOT_USERNAME: cn1
+          MONGO_INITDB_ROOT_PASSWORD: cn1secret
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+      dynamodb:
+        image: amazon/dynamodb-local:2.5.2
+        ports:
+          - 8000:8000
+      opensearch:
+        image: opensearchproject/opensearch:2.17.1
+        env:
+          discovery.type: single-node
+          DISABLE_SECURITY_PLUGIN: 'true'
+          DISABLE_INSTALL_DEMO_CONFIG: 'true'
+          OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fs http://localhost:9200/_cluster/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cn1
+          POSTGRES_PASSWORD: cn1secret
+          POSTGRES_DB: cn1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cn1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: cn1secret
+          MARIADB_DATABASE: cn1
+          MARIADB_USER: cn1
+          MARIADB_PASSWORD: cn1secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # DynamoDB Local accepts any credentials, but the client signs every
+      # request and refuses to send one unsigned.
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      CN1_TEST_MONGODB_URI: mongodb://cn1:cn1secret@127.0.0.1:27017/cn1test?authSource=admin
+      CN1_TEST_DYNAMODB_ENDPOINT: http://127.0.0.1:8000
+      CN1_TEST_SEARCH_URL: http://127.0.0.1:9200
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+
+      - name: Install core and the backend
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl backend -am install -DskipTests \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+
+      # Not through retry.sh: it retries every nonzero exit, and a failing test
+      # must fail once, not three times.
+      - name: Data store tests (MongoDB, DynamoDB, OpenSearch, PostgreSQL)
+        working-directory: maven
+        env:
+          CN1_TEST_DATABASE_URL: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
+        run: |
+          mvn -B -o -pl backend test \
+            -Dtest='MongoClientTest,DynamoDbTest,DocumentSessionTest,SearchEngineTest,SearchIndexerTest' \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+
+      - name: SQL full-text search on MariaDB
+        working-directory: maven
+        env:
+          CN1_TEST_DATABASE_URL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
+        run: |
+          mvn -B -o -pl backend test -Dtest='SearchEngineTest' \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+
+      # A test that finds its variable unset skips, and a skipped suite is
+      # green. Every one of these must have actually run.
+      - name: Require that nothing skipped
+        working-directory: maven/backend/target/surefire-reports
+        run: |
+          set -e
+          for t in MongoClientTest DynamoDbTest DocumentSessionTest SearchEngineTest SearchIndexerTest; do
+            f=$(ls *."$t".txt)
+            grep -q "Skipped: 0," "$f" || { echo "::error::$t skipped tests"; cat "$f"; exit 1; }
+          done
