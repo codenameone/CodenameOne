@@ -285,6 +285,15 @@ class LinuxGraphicsDevice extends GraphicsDevice {
     private void packUniforms(Material material, float[] model, Environment env, boolean shadowed) {
         Camera cam = getCamera();
         float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
+        if (inRenderTarget) {
+            // GL stores a target's rows bottom up; flipping clip space Y leaves
+            // the texture upright, as an uploaded image is (the native side
+            // flips the front face winding to match)
+            for (int i = 0; i < 16; i++) {
+                flippedVp[i] = (i & 3) == 1 ? -vp[i] : vp[i];
+            }
+            vp = flippedVp;
+        }
         Matrix4.multiply(vp, model, mvp);
         float[] nm = Matrix4.normalMatrix(model);
 
@@ -597,6 +606,40 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             LinuxNative.gl3dDisposeBuffer(((Long) handle).longValue());
         }
         buffer.setHandle(null);
+    }
+
+    private boolean inRenderTarget;
+    private final float[] flippedVp = new float[16];
+
+    public Texture createRenderTarget(int width, int height) {
+        if (contextPeer == 0 || width <= 0 || height <= 0) {
+            return null;
+        }
+        long peer = LinuxNative.gl3dCreateRenderTarget(contextPeer, width, height);
+        if (peer == 0) {
+            return null;
+        }
+        Texture tex = new Texture(width, height);
+        tex.setHandle(Long.valueOf(peer));
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        if (contextPeer == 0 || target == null || !(target.getHandle() instanceof Long) || inRenderTarget
+                || inShadowPass || activePost != null) {
+            return false;
+        }
+        inRenderTarget = LinuxNative.gl3dBeginRenderTarget(contextPeer, ((Long) target.getHandle()).longValue(),
+                target.getWidth(), target.getHeight(), clearArgb);
+        return inRenderTarget;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        LinuxNative.gl3dEndRenderTarget(contextPeer);
     }
 
     public void dispose(Texture texture) {

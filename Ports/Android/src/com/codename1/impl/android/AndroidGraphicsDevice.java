@@ -235,8 +235,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         boolean shadowed = shadowReady && isShadowMapCurrent() && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         Program program = getProgram(material, fmt, env, shadowed);
-        Camera cam = getCamera();
-        drawWith(mesh, material, modelMatrix, program, cam != null ? cam.getViewProjection() : Matrix4.identity(),
+        drawWith(mesh, material, modelMatrix, program, cameraViewProjection(),
                 shadowed, false);
     }
 
@@ -427,7 +426,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         } else {
             GLES20.glEnable(GLES20.GL_CULL_FACE);
             // The portable winding convention treats counter clockwise as front.
-            GLES20.glFrontFace(GLES20.GL_CCW);
+            GLES20.glFrontFace(inRenderTarget ? GLES20.GL_CW : GLES20.GL_CCW);
             GLES20.glCullFace(cull == RenderState.CullMode.FRONT
                     ? GLES20.GL_FRONT : GLES20.GL_BACK);
         }
@@ -1040,7 +1039,75 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         }
     }
 
+
+    // Render targets: each is a colour texture with a depth buffer of its own.
+    // GL stores a target's rows bottom up while an uploaded image starts at
+    // the top, so draws into a target flip clip space Y (and with it the
+    // winding) to leave the texture upright, as Metal and Direct3D have it.
+    private final Map<Texture, Target> renderTargets = new HashMap<Texture, Target>();
+    private boolean inRenderTarget;
+    private final int[] rtSavedFbo = new int[1];
+    private final int[] rtSavedViewport = new int[4];
+    private final float[] flippedVp = new float[16];
+
+    public Texture createRenderTarget(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        // creating the framebuffer binds it; drawing stays where it was
+        int[] bound = new int[1];
+        GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, bound, 0);
+        Target t = target(null, width, height, true);
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, bound[0]);
+        Texture tex = new Texture(width, height);
+        tex.setHandle(new TexHandle(t.tex, width, height));
+        renderTargets.put(tex, t);
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        Target t = target == null ? null : renderTargets.get(target);
+        if (t == null || inRenderTarget || inShadowPass || activePost != null) {
+            return false;
+        }
+        GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, rtSavedFbo, 0);
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, rtSavedViewport, 0);
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, t.fbo);
+        GLES20.glViewport(0, 0, t.width, t.height);
+        inRenderTarget = true;
+        clear(clearArgb, true, true);
+        return true;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, rtSavedFbo[0]);
+        GLES20.glViewport(rtSavedViewport[0], rtSavedViewport[1], rtSavedViewport[2], rtSavedViewport[3]);
+    }
+
+    // the camera's view projection, flipped in Y inside a render target
+    private float[] cameraViewProjection() {
+        Camera cam = getCamera();
+        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
+        if (!inRenderTarget) {
+            return vp;
+        }
+        for (int i = 0; i < 16; i++) {
+            flippedVp[i] = (i & 3) == 1 ? -vp[i] : vp[i];
+        }
+        return flippedVp;
+    }
+
     public void dispose(Texture texture) {
+        Target rt = renderTargets.remove(texture);
+        if (rt != null) {
+            releaseTarget(rt);
+            texture.setHandle(null);
+            return;
+        }
         TexHandle h = (TexHandle) texture.getHandle();
         if (h != null) {
             GLES20.glDeleteTextures(1, new int[]{h.id}, 0);

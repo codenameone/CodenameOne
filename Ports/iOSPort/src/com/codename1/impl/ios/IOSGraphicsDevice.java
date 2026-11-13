@@ -667,6 +667,39 @@ class IOSGraphicsDevice extends GraphicsDevice {
         buffer.setHandle(null);
     }
 
+    private boolean inRenderTarget;
+
+    public Texture createRenderTarget(int width, int height) {
+        if (contextPeer == 0 || width <= 0 || height <= 0) {
+            return null;
+        }
+        long peer = IOSImplementation.nativeInstance.gl3dCreateRenderTarget(contextPeer, width, height);
+        if (peer == 0) {
+            return null;
+        }
+        Texture tex = new Texture(width, height);
+        tex.setHandle(Long.valueOf(peer));
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        if (contextPeer == 0 || target == null || !(target.getHandle() instanceof Long) || inRenderTarget
+                || inShadowPass || activePost != null) {
+            return false;
+        }
+        inRenderTarget = IOSImplementation.nativeInstance.gl3dBeginRenderTarget(contextPeer, ((Long) target.getHandle()).longValue(),
+                target.getWidth(), target.getHeight(), clearArgb);
+        return inRenderTarget;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        IOSImplementation.nativeInstance.gl3dEndRenderTarget(contextPeer);
+    }
+
     public void dispose(Texture texture) {
         Object handle = texture.getHandle();
         if (handle instanceof Long) {

@@ -85,6 +85,8 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     private static final int BLEND = 0x0BE2;
     private static final int FRONT = 0x0404;
     private static final int BACK = 0x0405;
+    private static final int CW = 0x0900;
+    private static final int CCW = 0x0901;
     private static final int TEXTURE_2D = 0x0DE1;
     private static final int UNSIGNED_BYTE = 0x1401;
     private static final int UNSIGNED_SHORT = 0x1403;
@@ -264,9 +266,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         ProgramEntry entry = getProgram(material, format, env, shadowed);
-        Camera camera = getCamera();
-        drawWith(mesh, material, modelMatrix, entry,
-                camera != null ? camera.getViewProjection() : Matrix4.identity(), shadowed, false);
+        drawWith(mesh, material, modelMatrix, entry, cameraViewProjection(), shadowed, false);
     }
 
     // One draw of a mesh through a program. vp is the camera's view projection,
@@ -467,6 +467,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             gl.disable(CULL_FACE);
         } else {
             gl.enable(CULL_FACE);
+            gl.frontFace(inRenderTarget ? CW : CCW);
             gl.cullFace(cull == RenderState.CullMode.FRONT ? FRONT : BACK);
         }
     }
@@ -992,7 +993,71 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
     }
 
+
+    // Render targets: each is a colour texture with a depth buffer of its own.
+    // GL stores a target's rows bottom up while an uploaded image starts at
+    // the top, so draws into a target flip clip space Y (and with it the
+    // winding) to leave the texture upright, as Metal and Direct3D have it.
+    private final Map<Texture, Target> renderTargets = new HashMap<Texture, Target>();
+    private boolean inRenderTarget;
+    private final int[] rtSavedViewport = new int[4];
+    private final float[] flippedVp = new float[16];
+
+    public Texture createRenderTarget(int width, int height) {
+        if (gl == null || width <= 0 || height <= 0) {
+            return null;
+        }
+        Target t = target(null, width, height, true, LINEAR);
+        // creating the framebuffer binds it; drawing stays where it was
+        gl.bindFramebuffer(FRAMEBUFFER, activePost != null && sceneTarget != null ? sceneTarget.fbo : null);
+        Texture tex = new Texture(width, height);
+        tex.setHandle(t.tex);
+        renderTargets.put(tex, t);
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        Target t = target == null ? null : renderTargets.get(target);
+        if (t == null || inRenderTarget || inShadowPass || activePost != null) {
+            return false;
+        }
+        System.arraycopy(viewport, 0, rtSavedViewport, 0, 4);
+        gl.bindFramebuffer(FRAMEBUFFER, t.fbo);
+        setViewport(0, 0, t.width, t.height);
+        inRenderTarget = true;
+        clear(clearArgb, true, true);
+        return true;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        gl.bindFramebuffer(FRAMEBUFFER, null);
+        setViewport(rtSavedViewport[0], rtSavedViewport[1], rtSavedViewport[2], rtSavedViewport[3]);
+    }
+
+    // the camera's view projection, flipped in Y inside a render target
+    private float[] cameraViewProjection() {
+        Camera cam = getCamera();
+        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
+        if (!inRenderTarget) {
+            return vp;
+        }
+        for (int i = 0; i < 16; i++) {
+            flippedVp[i] = (i & 3) == 1 ? -vp[i] : vp[i];
+        }
+        return flippedVp;
+    }
+
     public void dispose(Texture texture) {
+        Target rt = renderTargets.remove(texture);
+        if (rt != null) {
+            releaseTarget(rt);
+            texture.setHandle(null);
+            return;
+        }
         if (texture.getHandle() instanceof WebGLTexture) {
             gl.deleteTexture((WebGLTexture) texture.getHandle());
             texture.setHandle(null);

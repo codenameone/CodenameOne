@@ -82,7 +82,20 @@ typedef struct {
     GLuint quadVbo;
     GLint savedFbo;
     GLint savedVp[4];
+    /* Render targets share one framebuffer and one depth buffer, resized to
+     * the target being drawn (attachments must match in size on GLES 2); the
+     * colour texture is the target. */
+    GLuint rtFbo;
+    GLuint rtDepth;
+    int rtDepthW, rtDepthH;
+    GLint rtSavedFbo;
+    GLint rtSavedVp[4];
 } CN1GlContext;
+
+/* The winding of a front face. A render target is drawn with clip space Y
+ * flipped (LinuxGraphicsDevice), so its texture rows come out top first like
+ * an uploaded image, and the winding flips with it. */
+static GLenum cn1GlFrontFace = GL_CCW;
 
 /* Layout of the packed uniform array a draw passes in; must match
  * LinuxGraphicsDevice.packUniforms (178 floats). A size of 16 is a mat4, 64
@@ -202,6 +215,12 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDestroyContext___long(CODENAM
     cn1GlReleaseTarget(&c->scene);
     cn1GlReleaseTarget(&c->bloomA);
     cn1GlReleaseTarget(&c->bloomB);
+    if (c->rtFbo) {
+        glDeleteFramebuffers(1, &c->rtFbo);
+    }
+    if (c->rtDepth) {
+        glDeleteRenderbuffers(1, &c->rtDepth);
+    }
     if (c->quadVbo) {
         glDeleteBuffers(1, &c->quadVbo);
     }
@@ -579,7 +598,7 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
         glDisable(GL_CULL_FACE);
     } else {
         glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CCW);
+        glFrontFace(cn1GlFrontFace);
         glCullFace(p->cull == 2 ? GL_FRONT : GL_BACK);
     }
     if (p->depthTest) {
@@ -772,6 +791,75 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndShadowPass___long(CODENAME
         cn1GlMakeCurrent(c);
         cn1GlRestoreTarget(c);
     }
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateRenderTarget___long_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT height) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    GLuint tex = 0;
+    if (!c || width <= 0 || height <= 0) {
+        return 0;
+    }
+    cn1GlMakeCurrent(c);
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return (JAVA_LONG) tex;
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginRenderTarget___long_long_int_int_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG texturePeer, JAVA_INT width, JAVA_INT height, JAVA_INT argb) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    if (!c || texturePeer == 0 || width <= 0 || height <= 0) {
+        return JAVA_FALSE;
+    }
+    cn1GlMakeCurrent(c);
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &c->rtSavedFbo);
+    glGetIntegerv(GL_VIEWPORT, c->rtSavedVp);
+    if (!c->rtFbo) {
+        glGenFramebuffers(1, &c->rtFbo);
+    }
+    if (!c->rtDepth || c->rtDepthW != width || c->rtDepthH != height) {
+        int dw = width;
+        int dh = height;
+        if (!c->rtDepth) {
+            glGenRenderbuffers(1, &c->rtDepth);
+        }
+        glBindRenderbuffer(GL_RENDERBUFFER, c->rtDepth);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, dw, dh);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        c->rtDepthW = dw;
+        c->rtDepthH = dh;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, c->rtFbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, (GLuint) texturePeer, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, c->rtDepth);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint) c->rtSavedFbo);
+        return JAVA_FALSE;
+    }
+    glViewport(0, 0, width, height);
+    glClearColor(((argb >> 16) & 0xff) / 255.0f, ((argb >> 8) & 0xff) / 255.0f, (argb & 0xff) / 255.0f,
+            ((argb >> 24) & 0xff) / 255.0f);
+    glClearDepthf(1.0f);
+    glDepthMask(GL_TRUE);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    cn1GlFrontFace = GL_CW;
+    return JAVA_TRUE;
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndRenderTarget___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    cn1GlFrontFace = GL_CCW;
+    if (!c) {
+        return;
+    }
+    cn1GlMakeCurrent(c);
+    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint) c->rtSavedFbo);
+    glViewport(c->rtSavedVp[0], c->rtSavedVp[1], c->rtSavedVp[2], c->rtSavedVp[3]);
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginPost___long_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_BOOLEAN bloom) {

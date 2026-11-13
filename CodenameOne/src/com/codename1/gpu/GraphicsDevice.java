@@ -226,6 +226,58 @@ public abstract class GraphicsDevice {
     public void endShadowPass() {
     }
 
+    /// Creates an offscreen image the scene can be drawn into with
+    /// `beginRenderTarget` and then sampled like any other texture: a mirror,
+    /// a security camera screen, a minimap, the refraction behind glass.
+    ///
+    /// The result is an ordinary `Texture`; hand it to a material or to a
+    /// `ShaderMaterial` texture slot, and release it with `dispose(Texture)`.
+    /// It has a depth buffer of its own while it is drawn into.
+    ///
+    /// The default implementation cannot draw offscreen and returns null, as
+    /// the software simulator device does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the width in pixels
+    ///
+    /// - `height`: the height in pixels
+    ///
+    /// #### Returns
+    ///
+    /// the target, or null when this device has no offscreen drawing
+    public Texture createRenderTarget(int width, int height) {
+        return null;
+    }
+
+    /// Sends the draws that follow into `target` until `endRenderTarget`,
+    /// clearing its colour to `clearArgb` and its depth first. The viewport
+    /// covers the whole target, and the camera, light and environment are the
+    /// device's as usual, so set a camera for the view the target shows.
+    ///
+    /// Draw render targets first in a frame: before the shadow pass, before
+    /// `beginPostProcess` and before the scene itself. They do not nest, and
+    /// on some devices the depth of scene draws made earlier in the frame is
+    /// not kept across one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: a texture from `createRenderTarget` on this device
+    ///
+    /// - `clearArgb`: the colour the target starts from
+    ///
+    /// #### Returns
+    ///
+    /// true if drawing now goes into the target
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        return false;
+    }
+
+    /// Ends the pass `beginRenderTarget` started; drawing returns to the
+    /// target and viewport that were active before it.
+    public void endRenderTarget() {
+    }
+
     /// Redirects drawing into an offscreen image so `endPostProcess` can apply
     /// `effects` to it on its way to the screen.
     ///

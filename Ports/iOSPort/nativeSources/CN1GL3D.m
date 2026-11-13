@@ -82,6 +82,7 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     BOOL _postActive;
     BOOL _shadowReady;
     BOOL _postBloom;
+    BOOL _inTarget;
 }
 @property (nonatomic, strong) id<MTLTexture> shadowTexture;
 @property (nonatomic, strong) id<MTLTexture> sceneTexture;
@@ -89,6 +90,8 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
 @property (nonatomic, strong) id<MTLTexture> bloomB;
 @property (nonatomic, strong) CN1GL3DPost *post;
 @property (nonatomic, strong) id<MTLTexture> depthTexture;
+// the depth buffer render targets share, sized to the target being drawn
+@property (nonatomic, strong) id<MTLTexture> targetDepth;
 @property (nonatomic, strong) CADisplayLink *displayLink;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, CN1GL3DPipeline *> *pipelineCache;
 @property (nonatomic, strong) id<MTLRenderCommandEncoder> currentEncoder;
@@ -96,6 +99,10 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
 - (BOOL)beginShadowPass:(int)width height:(int)size;
 - (void)endShadowPass;
 - (BOOL)isInShadowPass;
+- (BOOL)isInRenderTarget;
+- (id<MTLTexture>)newRenderTarget:(int)w height:(int)h;
+- (BOOL)beginRenderTarget:(id<MTLTexture>)target clear:(int)argb;
+- (void)endRenderTarget;
 - (BOOL)shadowAvailable;
 - (BOOL)beginPostProcess:(NSString *)source bloom:(BOOL)bloom;
 - (void)endPostProcess:(const float *)params;
@@ -230,6 +237,9 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     if (_inShadow) {
         [self endShadowPass];
     }
+    if (_inTarget) {
+        [self endRenderTarget];
+    }
     if (_postActive) {
         _postActive = NO;
         [self.currentEncoder endEncoding];
@@ -342,6 +352,68 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     self.currentEncoder = enc;
     _inShadow = YES;
     return YES;
+}
+
+- (BOOL)isInRenderTarget {
+    return _inTarget;
+}
+
+// A render target is a colour texture in the drawable's format, so every
+// pipeline built for the frame draws into it unchanged.
+- (id<MTLTexture>)newRenderTarget:(int)w height:(int)h {
+    if (w < 1 || h < 1 || w > 16384 || h > 16384) {
+        return nil;
+    }
+    MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                                                  width:w height:h mipmapped:NO];
+    td.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    td.storageMode = MTLStorageModePrivate;
+    return [_device newTextureWithDescriptor:td];
+}
+
+// Opens a pass of its own into the target, like the shadow pass. The main
+// pass reopens at the next draw after it, loading its colour; the frame's
+// pending clear, if nothing drew yet, still applies there.
+- (BOOL)beginRenderTarget:(id<MTLTexture>)target clear:(int)argb {
+    if (_frameCB == nil || _inShadow || _inTarget || _postActive || target == nil) {
+        return NO;
+    }
+    int w = (int) target.width;
+    int h = (int) target.height;
+    if (self.targetDepth == nil || (int) self.targetDepth.width != w || (int) self.targetDepth.height != h) {
+        MTLTextureDescriptor *dd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:CN1GL3D_DEPTH_FORMAT
+                                                                                      width:w height:h mipmapped:NO];
+        dd.usage = MTLTextureUsageRenderTarget;
+        dd.storageMode = MTLStorageModePrivate;
+        self.targetDepth = [_device newTextureWithDescriptor:dd];
+        if (self.targetDepth == nil) {
+            return NO;
+        }
+    }
+    [self closeEncoder];
+    MTLRenderPassDescriptor *rpd = [MTLRenderPassDescriptor renderPassDescriptor];
+    rpd.colorAttachments[0].texture = target;
+    rpd.colorAttachments[0].clearColor = MTLClearColorMake(((argb >> 16) & 0xff) / 255.0,
+            ((argb >> 8) & 0xff) / 255.0, (argb & 0xff) / 255.0, ((argb >> 24) & 0xff) / 255.0);
+    rpd.colorAttachments[0].loadAction = MTLLoadActionClear;
+    rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
+    rpd.depthAttachment.texture = self.targetDepth;
+    rpd.depthAttachment.clearDepth = 1.0;
+    rpd.depthAttachment.loadAction = MTLLoadActionClear;
+    rpd.depthAttachment.storeAction = MTLStoreActionDontCare;
+    id<MTLRenderCommandEncoder> enc = [_frameCB renderCommandEncoderWithDescriptor:rpd];
+    [enc setViewport:(MTLViewport){0.0, 0.0, (double) w, (double) h, 0.0, 1.0}];
+    self.currentEncoder = enc;
+    _inTarget = YES;
+    return YES;
+}
+
+- (void)endRenderTarget {
+    if (!_inTarget) {
+        return;
+    }
+    [self closeEncoder];
+    _inTarget = NO;
 }
 
 - (void)endShadowPass {
@@ -807,8 +879,9 @@ void com_codename1_impl_ios_IOSNative_gl3dSetViewport___long_int_int_int_int(
     if (contextPeer == 0) return;
     CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
     // Inside a shadow pass the viewport picks the cascade's square of the
-    // shadow map; it is not the frame's viewport, so it is not recorded.
-    if ([view isInShadowPass]) {
+    // shadow map, and inside a render target a part of the target; neither
+    // is the frame's viewport, so it is not recorded.
+    if ([view isInShadowPass] || [view isInRenderTarget]) {
         if (view.currentEncoder != nil) {
             [view.currentEncoder setViewport:(MTLViewport){(double) x, (double) y, (double) width,
                     (double) height, 0.0, 1.0}];
@@ -965,6 +1038,32 @@ void com_codename1_impl_ios_IOSNative_gl3dEndShadowPass___long(
     if (contextPeer == 0) return;
     CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
     [view endShadowPass];
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateRenderTarget___long_int_int_R_long(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT height) {
+    if (contextPeer == 0) return 0;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    id<MTLTexture> tex = [view newRenderTarget:width height:height];
+    if (tex == nil) return 0;
+    // released by gl3dDisposeTexture like any texture
+    return (JAVA_LONG)(__bridge_retained void *) tex;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginRenderTarget___long_long_int_int_int_R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_LONG texturePeer,
+        JAVA_INT width, JAVA_INT height, JAVA_INT argb) {
+    if (contextPeer == 0 || texturePeer == 0) return 0;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    id<MTLTexture> tex = (__bridge id<MTLTexture>)(void *) texturePeer;
+    return [view beginRenderTarget:tex clear:argb] ? 1 : 0;
+}
+
+void com_codename1_impl_ios_IOSNative_gl3dEndRenderTarget___long(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer) {
+    if (contextPeer == 0) return;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    [view endRenderTarget];
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginPostProcess___long_java_lang_String_boolean_R_boolean(

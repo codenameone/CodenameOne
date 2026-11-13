@@ -838,6 +838,10 @@ public class IOSNative {
 
     native boolean gl3dBeginShadowPass(long contextPeer, int width, int size);
     native void gl3dEndShadowPass(long contextPeer);
+    // a sampleable colour texture passes can draw into, and the pass itself
+    native long gl3dCreateRenderTarget(long contextPeer, int width, int height);
+    native boolean gl3dBeginRenderTarget(long contextPeer, long texturePeer, int width, int height, int argb);
+    native void gl3dEndRenderTarget(long contextPeer);
     native boolean gl3dBeginPostProcess(long contextPeer, String mslSource, boolean bloom);
     native void gl3dEndPostProcess(long contextPeer, float[] params);
 
