@@ -4,17 +4,17 @@
 Some ideas are easiest to explain as boxes and the lines between them: the
 services of a system and who calls whom, an organization chart, a dependency
 map, or a pipeline the user builds by wiring blocks together. `NodeGraph`
-covers both kinds. It shows a diagram the application lays out, and it is an
+covers both kinds. It shows a diagram the application lays out, and it's an
 editor in which the user drags nodes and connects their ports.
 
 The component is in `com.codename1.ui.graph`. It draws from a model in
 `com.codename1.graph` that has no user interface in it, so a graph can be
-built, laid out, tested and stored without a form on screen. The arrangements are
+built, laid out, tested and stored without a form on the screen. The arrangements are
 in `com.codename1.graph.arrange`.
 
 `NodeGraph` paints its nodes and edges directly instead of building a
 component for each one. A graph with thousands of nodes pans and zooms the way
-one with ten does, because only what is on screen is drawn. When the user
+one with ten does, because only what's on the screen is drawn. When the user
 zooms far out, nodes are drawn as plain cards without text.
 
 === A first graph
@@ -29,7 +29,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/graph/Grap
 ----
 
 Give the graph the center of a `BorderLayout`. It pans and zooms inside the
-room it is given, so it does not belong in a container that scrolls too. The
+room it's given, so it doesn't belong in a container that scrolls too. The
 user pans by dragging the background, zooms with a pinch or the mouse wheel,
 and taps a node to select it.
 
@@ -53,7 +53,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/graph/Grap
 ----
 
 `setEdgeStyle` chooses how edges are drawn: `EDGE_STRAIGHT`,
-`EDGE_ORTHOGONAL`, `EDGE_CURVED`, or `EDGE_AUTO`, which follows the route a
+`EDGE_ORTHOGONAL`, `EDGE_CURVED`, or `EDGE_AUTO`, which follows the route an
 arrangement computed when there is one.
 
 .Two groups, edge labels and orthogonal edges
@@ -109,7 +109,7 @@ where the user holds them, and the rest of the graph moves around them.
 include::../demos/common/src/main/java/com/codenameone/developerguide/graph/GraphSnippets.java[tag=graph-live,indent=0]
 ----
 
-A node marked with `setPinned(true)` stays where it is while `ForceArrangement`
+A node marked with `setPinned(true)` stays where it's while `ForceArrangement`
 arranges the others.
 
 === A node editor
@@ -117,7 +117,7 @@ arranges the others.
 Give a node ports and the graph becomes an editor. Inputs are drawn on one
 side of the card and outputs on the other. With editing on, the user drags
 from an output to an input to connect them, drags nodes around, long presses
-or Shift-drags the background to select several with a box, and deletes what is selected with
+or Shift-drags the background to select several with a box, and deletes what's selected with
 `deleteSelection`. `setLabelEditing(true)` also lets the user double tap a
 node to rename it.
 
@@ -134,12 +134,12 @@ ports whose types differ, from an input to an input, from a node to itself, a
 second copy of an edge that exists, and an edge past a port's
 `setMaxConnections` limit. `setAllowCycles(false)` also refuses an edge that
 would close a loop. While the user drags a connection, the port under the
-finger shows whether it would accept it, and a drop on a port that would not
-connects to the nearest one on that node that would.
+finger shows whether it would accept it, and a drop on a port that refuses it
+connects to the nearest one on that node that accepts it.
 
 Nodes without ports can be connected too. A selected node shows a handle on
 its trailing edge, and dragging from it, or from a long press on the node,
-draws a new edge to wherever it is dropped.
+draws a new edge to wherever it's dropped.
 
 === Listening and refusing
 
@@ -162,7 +162,7 @@ model the default.
 Nodes are painted, but a node can carry a real component as well: a slider, a
 text field or a button. The factory is asked for one per node, and a node it
 returns null for stays painted. The component is placed over the node's card
-while the node is on screen and the zoom is above `setComponentZoom`. Below
+while the node is on the screen and the zoom is above `setComponentZoom`. Below
 that, the card is painted alone.
 
 [source,java]
@@ -176,7 +176,7 @@ image::img/generated/graph-components.png["The node editor with a real slider in
 === Finding your way
 
 `setMinimapVisible(true)` shows a small map of the whole graph in a corner,
-with the part on screen outlined. Tapping the map moves the view there.
+with the part on the screen outlined. Tapping the map moves the view there.
 `centerOn(node)` moves the view to a node, `setZoomRange` limits how far the
 user can zoom, and `toImage` paints the whole graph into an image for sharing
 or printing.
