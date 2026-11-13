@@ -140,7 +140,7 @@ public class DefaultGraphNodeRenderer implements GraphNodeRenderer {
                 if (detail && p.getLabel() != null) {
                     g.setFont(f);
                     g.setColor(GraphLook.mix(bg, fg, 190));
-                    int room = labelRoom(graph, node, p, py, f, pad, pass == 0 ? outs : ins);
+                    int room = labelRoom(graph, node, py, f, pad, pass == 0 ? outs : ins);
                     String text = GraphLook.fit(p.getLabel(), f, room);
                     int ly = py - f.getHeight() / 2;
                     if (p.isInput()) {
@@ -156,7 +156,7 @@ public class DefaultGraphNodeRenderer implements GraphNodeRenderer {
     // The width a port label may take: the whole card when nothing faces it,
     // otherwise what the label across the same row leaves, but never less
     // than half the card, so the two share a crowded row evenly.
-    private static int labelRoom(NodeGraph graph, GraphNode node, GraphPort port, int py,
+    private static int labelRoom(NodeGraph graph, GraphNode node, int py,
             Font f, int pad, List<GraphPort> across) {
         int full = graph.worldToScreenLength(node.getWidth()) - pad * 2;
         int half = full / 2 - pad;
@@ -171,6 +171,8 @@ public class DefaultGraphNodeRenderer implements GraphNodeRenderer {
         if (taken == 0) {
             return full;
         }
-        return Math.max(half, full - taken - pad * 2);
+        // full already leaves the inset on both edges; only a gap between
+        // the two labels is left to take.
+        return Math.max(half, full - taken - GraphLook.mm(2));
     }
 }
