@@ -194,6 +194,68 @@ says so through `GpuCapabilities.isShadowsSupported()` and
 software rasterizer applies the fog, the ambient, tone mapping and the sky
 gradient, but not shadows, clouds or the post chain.
 
+=== Custom shaders and the shader library
+
+A material's look can be extended per pixel and per vertex without writing
+shader source. `com.codename1.gpu.shader.ShaderNode` is a typed expression
+in Java -- arithmetic, `mix`, `smoothstep`, noise, texture reads and built in
+inputs such as `worldPos()`, `uv()`, `time()` and `sunDir()` -- and every port
+prints the same graph as GLSL, Metal or HLSL. A `ShaderMaterial` plugs graphs
+into hooks of the standard lighting path: `VERTEX_OFFSET`, `BASE_COLOR`,
+`NORMAL`, `METALLIC`, `ROUGHNESS`, `EMISSIVE` and `DISCARD`. A hook left unset
+keeps the material's own behavior, so fog, shadows, the environment and tone
+mapping keep working around custom code. A material takes up to 16 uniforms
+and 4 textures, set by name with `setUniform` and `setTexture`.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava009Snippet.java[tag=3d-graphics-java-009,indent=0]
+----
+
+Most scenes need no graph at all. `com.codename1.gpu.shaders` is a library
+of ready materials, each built only from public `ShaderNode` calls, so its
+source doubles as a set of examples:
+
+* `Water` -- `ocean()`, `lake()` and `river()`: Gerstner waves, depth color,
+  fresnel and sun glitter, crest foam.
+* `Terrain` and `Foliage` -- layered ground by height and slope, rock, and
+  wind sway for plants, leaves and grass.
+* `Surface` -- painted metal, rust, wood, concrete, glass, ice, fabric, car
+  paint, paint splats.
+* `Toon`, `Fx` and `Liquid` -- cel shading, hatching, flat low poly; dissolve,
+  hologram, force field, beam, fire, smoke, portal, x-ray, pulse; lava,
+  toxic sludge, caustics.
+* `Sky` -- a procedural sky dome in day, dusk, night and overcast moods.
+* `Noise` and `Shading` -- the building blocks: value, fractal, ridged and
+  cellular noise, bump normals, fresnel and rim terms.
+
+`ScenePresets` bundles a light, an environment, a post chain and a sky that
+belong together: `harbourDusk()`, `clearNoon()`, `overcast()`, `night()`,
+`desert()` and `arctic()`.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava008Snippet.java[tag=3d-graphics-java-008,indent=0]
+----
+
+The post chain also offers FXAA, chromatic aberration and god rays from the
+sun's position (`setFxaa`, `setChromaticAberration`, `setGodRays`).
+
+Animated shaders read `time()`. A `GameView` advances it every frame; a plain
+`RenderView` calls `GraphicsDevice.setTime` itself, and a test pins it to
+capture the same frame each run.
+
+Many copies of one mesh -- crates, rocks, a fleet -- draw with
+`GraphicsDevice.drawInstanced(mesh, material, matrices, colors, count)`, or
+`Model.setInstances` in a `GameView`. Each copy gets its own transform and
+tint, and a shader tells them apart through `instanceId()`,
+`instanceRandom()` and `instanceColor()`.
+
+The software rasterizer of the JavaSE simulator evaluates the vertex
+offset, color, emissive and discard hooks on the CPU, so a custom material
+keeps roughly its look there; normal, metallic and roughness hooks need a
+GPU.
+
 === Platform notes
 
 * *JavaSE simulator* - OpenGL through JOGL, loaded from an isolated class so a
