@@ -486,6 +486,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawArrays___long_long_long_i
 }
 JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dBindTexture___long_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT index, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
     (void) contextPeer; (void) index; (void) texturePeer; (void) texFilter; (void) texWrap;
+    cn1LinuxStubOnce("gl3dBindTexture");
 }
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT size) {
     (void) contextPeer; (void) width; (void) size;
@@ -495,6 +496,7 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int
 JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndShadowPass___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer) {
     (void) contextPeer;
     cn1LinuxStubOnce("gl3dEndShadowPass");
+}
 JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateRenderTarget___long_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT height) {
     (void) contextPeer; (void) width; (void) height;
     cn1LinuxStubOnce("gl3dCreateRenderTarget");
@@ -508,7 +510,6 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginRenderTarget___long_l
 JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndRenderTarget___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer) {
     (void) contextPeer;
     cn1LinuxStubOnce("gl3dEndRenderTarget");
-}
 }
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginPost___long_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_BOOLEAN bloom) {
     (void) contextPeer; (void) bloom;
