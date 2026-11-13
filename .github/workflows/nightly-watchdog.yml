@@ -226,7 +226,7 @@ jobs:
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner, repo, issue_number: issue.number, per_page: 100,
               });
-              const pings = comments.filter(c => (c.body || '').includes('still failing:'));
+              const pings = comments.filter(c => c.user && c.user.type === 'Bot' && (c.body || '').includes('still failing:'));
               const announced = pings.length ? pings[pings.length - 1].body : (issue.body || '');
               const changed = problems.some(p => !announced.includes(p));
               await github.rest.issues.update({ owner, repo, issue_number: issue.number, body });
