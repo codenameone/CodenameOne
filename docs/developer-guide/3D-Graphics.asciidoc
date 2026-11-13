@@ -191,6 +191,13 @@ A `PostProcess` on the view renders the scene offscreen and adds bloom, a
 color grade, a vignette and film grain on the way to the screen. Touch
 controls are drawn after it and are never graded.
 
+`PostProcess.addPass` adds a full screen effect of your own, written with the
+same shader nodes as a material. The pass's `BASE_COLOR` graph runs once per
+pixel: `ShaderNode.screenUv()` is the pixel's place on screen and
+`ShaderNode.sceneColor(uv)` reads the frame. Passes run in order before the
+built-in effects. A frame with passes leaves out ambient occlusion, depth of
+field and the outline, because those read the scene's depth.
+
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava007Snippet.java[tag=3d-graphics-java-007,indent=0]

@@ -128,6 +128,20 @@ public class ShaderDump {
             write(b + "d.metal", IOSMetalShaderGenerator.depthOnly(skinned[i], VertexFormat.SKINNED).getSource());
             write(b + "d.hlsl", HlslShaderGenerator.depthOnly(skinned[i], VertexFormat.SKINNED).getSource());
         }
+        // custom full screen passes, drawn as the device draws them: an
+        // unlit, unfogged material over a quad
+        com.codename1.gpu.shader.ShaderNode suv = com.codename1.gpu.shader.ShaderNode.screenUv();
+        com.codename1.gpu.PostProcess passes = new com.codename1.gpu.PostProcess()
+                .addPass(new com.codename1.gpu.shader.ShaderMaterial().set(
+                        com.codename1.gpu.shader.ShaderMaterial.Hook.BASE_COLOR,
+                        com.codename1.gpu.shader.ShaderNode.sceneColor(suv.add(
+                                com.codename1.gpu.shader.ShaderNode.vec2(0.01f, 0f)))));
+        Material passMat = new Material(Material.Type.UNLIT).setFogged(false).setShader(passes.getPass(0));
+        GlslShaderGenerator pg = new GlslShaderGenerator(passMat, VertexFormat.POSITION_NORMAL_TEXCOORD, ibl, true);
+        write(dir + "/pass.vert", "#version 100\n" + pg.getVertexSource());
+        write(dir + "/pass.frag", "#version 100\n" + pg.getFragmentSource());
+        write(dir + "/pass.metal", new IOSMetalShaderGenerator(passMat, VertexFormat.POSITION_NORMAL_TEXCOORD, ibl, true).getSource());
+        write(dir + "/pass.hlsl", new HlslShaderGenerator(passMat, VertexFormat.POSITION_NORMAL_TEXCOORD, ibl, true).getSource());
         write(dir + "/post.frag", "#version 100\n" + GlslShaderGenerator.compositeFragment());
         write(dir + "/post.metal", IOSMetalShaderGenerator.postSource());
         write(dir + "/post.hlsl", HlslShaderGenerator.postCompositeSource());

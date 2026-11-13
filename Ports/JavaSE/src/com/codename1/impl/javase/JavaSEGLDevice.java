@@ -898,7 +898,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, 0);
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (gl == null || effects == null) {
             return false;
         }
@@ -928,7 +928,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;

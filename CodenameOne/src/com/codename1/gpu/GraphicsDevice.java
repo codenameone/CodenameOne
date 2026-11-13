@@ -35,6 +35,16 @@ import com.codename1.ui.Image;
 /// at the `Material` and the mesh `VertexFormat`, generates (once) the matching
 /// platform shader, uploads any dirty buffers and issues the draw call.
 public abstract class GraphicsDevice {
+    private final Texture[] passTargets = new Texture[2];
+    private final int[] passSizes = new int[4];
+    private PostProcess passFrame;
+    private PostProcess passRest;
+    private int passWidth;
+    private int passHeight;
+    private Mesh passQuad;
+    private Material passMaterial;
+    private Camera passCamera;
+
     private Camera camera;
     private boolean shadowMapCurrent;
     private Light light = new Light();
@@ -293,7 +303,76 @@ public abstract class GraphicsDevice {
     }
 
     /// Redirects drawing into an offscreen image so `endPostProcess` can apply
-    /// `effects` to it on its way to the screen.
+    /// `effects` to it on its way to the screen. When `effects` has custom
+    /// passes (`PostProcess.addPass`) and this device can draw into a render
+    /// target, the scene goes into one, and `endPostProcess` runs the passes
+    /// before the built-in effects.
+    ///
+    /// Draw the shadow pass and any render targets before this call.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the effects to apply
+    ///
+    /// - `width`: the width of the frame in pixels
+    ///
+    /// - `height`: the height of the frame in pixels
+    ///
+    /// #### Returns
+    ///
+    /// true if drawing now goes offscreen; false means the caller draws
+    /// straight to the screen
+    public final boolean beginPostProcess(PostProcess effects, int width, int height) {
+        passFrame = null;
+        if (effects != null && effects.getPassCount() > 0 && passTarget(0, width, height)
+                && beginRenderTarget(passTargets[0], 0xff000000)) {
+            passFrame = effects;
+            passWidth = width;
+            passHeight = height;
+            return true;
+        }
+        return beginPostEffects(effects, width, height);
+    }
+
+    /// Applies the effects passed to `beginPostProcess` and draws the result
+    /// to the screen. Drawing goes to the screen again afterwards.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeSeconds`: a running clock, which animates the film grain
+    public final void endPostProcess(float timeSeconds) {
+        PostProcess effects = passFrame;
+        if (effects == null) {
+            endPostEffects(timeSeconds);
+            return;
+        }
+        passFrame = null;
+        endRenderTarget();
+        int src = 0;
+        int last = effects.getPassCount() - 1;
+        for (int i = 0; i < last; i++) {
+            int dst = 1 - src;
+            if (!passTarget(dst, passWidth, passHeight) || !beginRenderTarget(passTargets[dst], 0xff000000)) {
+                break;
+            }
+            drawPass(effects.getPass(i), passTargets[src]);
+            endRenderTarget();
+            src = dst;
+        }
+        if (passRest == null) {
+            passRest = new PostProcess();
+        }
+        passRest.copyWithoutDepth(effects);
+        boolean chain = beginPostEffects(passRest, passWidth, passHeight);
+        drawPass(effects.getPass(last), passTargets[src]);
+        if (chain) {
+            endPostEffects(timeSeconds);
+        }
+    }
+
+    /// The device's own post processing: redirects drawing into an offscreen
+    /// image so `endPostEffects` can apply the built-in effects of `effects`.
+    /// Custom passes are handled by `beginPostProcess` and never reach this.
     ///
     /// The default implementation supports no post processing and returns
     /// false; the caller then draws straight to the screen.
@@ -309,17 +388,58 @@ public abstract class GraphicsDevice {
     /// #### Returns
     ///
     /// true if drawing now goes offscreen
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         return false;
     }
 
-    /// Applies the effects passed to `beginPostProcess` and draws the result
-    /// to the screen. Drawing goes to the screen again afterwards.
+    /// Applies the effects passed to `beginPostEffects` and draws the result
+    /// to the screen.
     ///
     /// #### Parameters
     ///
     /// - `timeSeconds`: a running clock, which animates the film grain
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
+    }
+
+    // Makes sure render target `index` exists at the frame size.
+    private boolean passTarget(int index, int width, int height) {
+        if (passTargets[index] != null && passSizes[index * 2] == width && passSizes[index * 2 + 1] == height) {
+            return true;
+        }
+        if (passTargets[index] != null) {
+            dispose(passTargets[index]);
+            passTargets[index] = null;
+        }
+        Texture t = createRenderTarget(Math.max(1, width), Math.max(1, height));
+        if (t == null) {
+            return false;
+        }
+        passTargets[index] = t;
+        passSizes[index * 2] = width;
+        passSizes[index * 2 + 1] = height;
+        return true;
+    }
+
+    // Draws one custom pass over the whole of the current target: a quad
+    // filling clip space under an orthographic camera, depth off.
+    private void drawPass(ShaderMaterial pass, Texture source) {
+        if (passQuad == null) {
+            passQuad = Primitives.quad(this, 2f);
+            RenderState rs = RenderState.opaque();
+            rs.setDepthTest(false);
+            rs.setDepthWrite(false);
+            rs.setCullMode(RenderState.CullMode.NONE);
+            passMaterial = new Material(Material.Type.UNLIT).setFogged(false);
+            passMaterial.setRenderState(rs);
+            passCamera = new Camera().setOrthographic(2f, 0.1f, 10f).setAspect(1f)
+                    .setPosition(0f, 0f, 1f).setTarget(0f, 0f, 0f);
+        }
+        pass.setTexture(PostProcess.SCENE_COLOR, source);
+        passMaterial.setShader(pass);
+        Camera saved = getCamera();
+        setCamera(passCamera);
+        draw(passQuad, passMaterial, Matrix4.identity());
+        setCamera(saved);
     }
 
     /// Draws a mesh with the supplied material and model matrix. The device

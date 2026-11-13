@@ -520,7 +520,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         }
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (contextPeer == 0 || effects == null) {
             return false;
         }
@@ -541,7 +541,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;

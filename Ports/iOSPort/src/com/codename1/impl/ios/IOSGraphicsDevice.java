@@ -547,7 +547,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (contextPeer == 0 || effects == null || activePost != null) {
             return false;
         }
@@ -562,7 +562,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;

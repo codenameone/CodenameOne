@@ -523,7 +523,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         return pipeline;
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (contextPeer == 0 || effects == null) {
             return false;
         }
@@ -539,7 +539,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;

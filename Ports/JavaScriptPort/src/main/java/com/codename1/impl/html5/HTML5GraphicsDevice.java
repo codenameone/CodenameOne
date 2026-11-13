@@ -918,7 +918,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (effects == null) {
             return false;
         }
@@ -957,7 +957,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;

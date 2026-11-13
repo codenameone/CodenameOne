@@ -22,6 +22,8 @@
  */
 package com.codename1.gpu;
 
+import com.codename1.gpu.shader.ShaderMaterial;
+
 /// Full screen effects applied to a rendered frame: bloom, a colour grade,
 /// vignette and film grain. It is what turns a correctly lit scene into one
 /// that looks shot through a lens.
@@ -47,6 +49,12 @@ package com.codename1.gpu;
 /// All effects start off, so `new PostProcess()` changes nothing but the cost
 /// of the extra pass.
 public final class PostProcess {
+    /// The texture name a custom pass reads the frame from. `addPass`
+    /// declares it on the pass; read it with
+    /// `com.codename1.gpu.shader.ShaderNode.sceneColor`.
+    public static final String SCENE_COLOR = "cn1SceneColor";
+
+    private ShaderMaterial[] passes = new ShaderMaterial[0];
     private float bloomThreshold = 1f;
     private float bloomIntensity;
     private float contrast = 1f;
@@ -369,5 +377,100 @@ public final class PostProcess {
     /// depth of field or outline.
     public boolean isDepthEffects() {
         return aoStrength > 0f || dofBlur > 0f || outline > 0f;
+    }
+
+    /// Adds a full screen effect of your own, written with the same
+    /// `com.codename1.gpu.shader.ShaderNode` graphs as a material. The pass's
+    /// `ShaderMaterial.Hook.BASE_COLOR` graph is evaluated for every pixel of
+    /// the frame: `ShaderNode.screenUv()` is the pixel's place on screen (0,0
+    /// top left) and `ShaderNode.sceneColor(uv)` reads the frame as it stands
+    /// so far. Its own uniforms, textures and `ShaderNode.time()` work as on
+    /// any material.
+    ///
+    /// ```java
+    /// ShaderNode uv = ShaderNode.screenUv();
+    /// ShaderNode wobble = ShaderNode.sin(uv.y().mul(ShaderNode.f(40f)).add(ShaderNode.time()))
+    ///         .mul(ShaderNode.f(0.004f));
+    /// post.addPass(new ShaderMaterial().set(ShaderMaterial.Hook.BASE_COLOR,
+    ///         ShaderNode.sceneColor(uv.add(ShaderNode.vec(wobble, ShaderNode.f(0f))))));
+    /// ```
+    ///
+    /// Passes run in the order they were added, each reading the one before,
+    /// and the built-in effects run on the result. The depth based effects
+    /// (`isDepthEffects`) read the depth of the scene, which a pass does not
+    /// have, so they are left out of a frame with passes. A device that
+    /// cannot draw offscreen draws the scene without the passes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pass`: a shader material with a `BASE_COLOR` graph
+    ///
+    /// #### Returns
+    ///
+    /// this post process for chaining
+    public PostProcess addPass(ShaderMaterial pass) {
+        if (pass == null || pass.get(ShaderMaterial.Hook.BASE_COLOR) == null) {
+            throw new IllegalArgumentException("A pass needs a BASE_COLOR graph");
+        }
+        if (pass.getTextureSlot(SCENE_COLOR) < 0) {
+            pass.declareTexture(SCENE_COLOR, null);
+        }
+        ShaderMaterial[] next = new ShaderMaterial[passes.length + 1];
+        System.arraycopy(passes, 0, next, 0, passes.length);
+        next[passes.length] = pass;
+        passes = next;
+        return this;
+    }
+
+    /// Removes every pass `addPass` added.
+    ///
+    /// #### Returns
+    ///
+    /// this post process for chaining
+    public PostProcess clearPasses() {
+        passes = new ShaderMaterial[0];
+        return this;
+    }
+
+    /// Returns how many custom passes there are.
+    public int getPassCount() {
+        return passes.length;
+    }
+
+    /// Returns a custom pass.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: 0 for the first pass added
+    ///
+    /// #### Returns
+    ///
+    /// the pass
+    public ShaderMaterial getPass(int index) {
+        return passes[index];
+    }
+
+    /// Copies every built-in effect of `from` into this one except the depth
+    /// based effects, and none of its passes.
+    void copyWithoutDepth(PostProcess from) {
+        bloomThreshold = from.bloomThreshold;
+        bloomIntensity = from.bloomIntensity;
+        contrast = from.contrast;
+        saturation = from.saturation;
+        shadowTint = from.shadowTint;
+        highlightTint = from.highlightTint;
+        vignette = from.vignette;
+        grain = from.grain;
+        aberration = from.aberration;
+        fxaa = from.fxaa;
+        godRays = from.godRays;
+        aoStrength = 0f;
+        aoRadius = from.aoRadius;
+        focusDistance = from.focusDistance;
+        dofBlur = 0f;
+        outline = 0f;
+        outlineColor = from.outlineColor;
+        lut = from.lut;
+        lutStrength = from.lutStrength;
     }
 }

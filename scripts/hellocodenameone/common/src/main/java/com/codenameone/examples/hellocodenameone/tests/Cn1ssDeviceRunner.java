@@ -544,6 +544,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new GpuRenderTargetScreenshotTest(),
             new GpuPostDepthScreenshotTest(),
             new GpuSkinningScreenshotTest(),
+            new GpuPostPassScreenshotTest(),
             // Keep this as the last portrait screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             // Rotates under a native modal and restores portrait itself (#6080).

@@ -210,6 +210,32 @@ public final class ShaderNode {
         return new ShaderNode(SAMPLE, ShaderType.VEC4, textureName, null, new ShaderNode[]{uv});
     }
 
+    /// Reads the frame in a custom full screen pass
+    /// (`com.codename1.gpu.PostProcess.addPass`): the scene, or the output
+    /// of the pass before. Means nothing on an ordinary material.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uv`: the `VEC2` place on screen, 0,0 top left; usually
+    ///   `screenUv()` or an offset from it
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC4` colour
+    public static ShaderNode sceneColor(ShaderNode uv) {
+        return sample(com.codename1.gpu.PostProcess.SCENE_COLOR, uv);
+    }
+
+    /// The place of the pixel on screen in a custom full screen pass, from
+    /// 0,0 top left to 1,1 bottom right. In a pass it is the same as `uv()`.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC2` node
+    public static ShaderNode screenUv() {
+        return uv();
+    }
+
     private static ShaderNode builtin(String name, ShaderType type) {
         return new ShaderNode(BUILTIN, type, name, null, null);
     }
