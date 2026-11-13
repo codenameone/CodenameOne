@@ -43,6 +43,7 @@ public abstract class BaseAudioContext {
     private final AtomicLong renderedFrames = new AtomicLong();
     private final AtomicReference<Runnable[]> pending = new AtomicReference<Runnable[]>(NONE);
     private final AudioDestinationNode destination;
+    private final AudioListener listener;
     private final PeriodicWave[] standardWaves = new PeriodicWave[4];
 
     // ---- render side ----
@@ -55,6 +56,7 @@ public abstract class BaseAudioContext {
         checkSampleRate(sampleRate);
         this.sampleRate = sampleRate;
         destination = new AudioDestinationNode(this, destinationChannels, maxChannels);
+        listener = new AudioListener(this);
     }
 
     /// Times reach the renderer as `float` seconds more often than not
@@ -107,6 +109,35 @@ public abstract class BaseAudioContext {
     /// the destination
     public AudioDestinationNode getDestination() {
         return destination;
+    }
+
+    /// The listener every [PannerNode] of this context is heard from.
+    ///
+    /// #### Returns
+    ///
+    /// the listener
+    public AudioListener getListener() {
+        return listener;
+    }
+
+    /// Creates a 3D panner, equal-power with the inverse distance model until changed.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public PannerNode createPanner() {
+        return new PannerNode(this);
+    }
+
+    /// Whether [PanningModel#HRTF] renders binaurally on this platform. It is
+    /// always true: the head model is portable code. The method exists so code
+    /// written for platforms where HRTF might fall back to equal-power can ask.
+    ///
+    /// #### Returns
+    ///
+    /// true
+    public boolean isHrtfSupported() {
+        return true;
     }
 
     /// The life cycle state.

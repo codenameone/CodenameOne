@@ -427,4 +427,139 @@ class AudioGraphTest extends UITestBase {
         src.start();
         return c;
     }
+
+    private static AudioData pan(float x, float y, float z, PannerNode[] hold) {
+        OfflineAudioContext c = ctx(2, 256);
+        ConstantSourceNode s = c.createConstantSource();
+        PannerNode p = c.createPanner();
+        p.setPosition(x, y, z);
+        if (hold != null) {
+            hold[0] = p;
+        }
+        s.connect(p).connect(c.getDestination());
+        s.start();
+        return c.startRendering();
+    }
+
+    @FormTest
+    void pannerPlacesSourcesByAzimuthAndInverseDistance() {
+        AudioData right = pan(1, 0, 0, null);
+        Assertions.assertEquals(0, right.getChannelData(0)[50], 1e-5);
+        Assertions.assertEquals(1, right.getChannelData(1)[50], 1e-5);
+        AudioData left = pan(-1, 0, 0, null);
+        Assertions.assertEquals(1, left.getChannelData(0)[50], 1e-5);
+        Assertions.assertEquals(0, left.getChannelData(1)[50], 1e-5);
+        // straight ahead at distance 2: equal power and 1 / (1 + (2 - 1)) = 0.5
+        AudioData front = pan(0, 0, -2, null);
+        Assertions.assertEquals(Math.sqrt(0.5) * 0.5, front.getChannelData(0)[50], 1e-5);
+        Assertions.assertEquals(Math.sqrt(0.5) * 0.5, front.getChannelData(1)[50], 1e-5);
+        // behind mirrors to the front
+        AudioData back = pan(0, 0, 2, null);
+        Assertions.assertEquals(front.getChannelData(0)[50], back.getChannelData(0)[50], 1e-5);
+    }
+
+    @FormTest
+    void distanceModelsAndConeFollowTheSpecFormulas() {
+        Assertions.assertEquals(1 - (5.0 - 1) / (10 - 1),
+                PannerNode.distanceGain(DistanceModelType.LINEAR, 5, 1, 10, 1), 1e-9);
+        Assertions.assertEquals(0, PannerNode.distanceGain(DistanceModelType.LINEAR, 50, 1, 10, 1), 1e-9);
+        Assertions.assertEquals(Math.pow(4, -2),
+                PannerNode.distanceGain(DistanceModelType.EXPONENTIAL, 4, 1, 10, 2), 1e-9);
+        Assertions.assertEquals(1, PannerNode.distanceGain(DistanceModelType.INVERSE, 0.5, 1, 10, 1), 1e-9);
+        // facing +x, listener behind (at -x): outside a 90 degree outer cone
+        Assertions.assertEquals(0.25, PannerNode.coneGain(-1, 0, 0, 1, 0, 0, 60, 90, 0.25), 1e-9);
+        Assertions.assertEquals(1, PannerNode.coneGain(1, 0, 0, 1, 0, 0, 60, 90, 0.25), 1e-9);
+        // 37.5 degrees off axis, halfway between 30 and 45
+        double a = Math.toRadians(37.5);
+        Assertions.assertEquals(0.625, PannerNode.coneGain(Math.cos(a), Math.sin(a), 0, 1, 0, 0, 60, 90, 0.25), 1e-9);
+
+        OfflineAudioContext c = ctx(2, 128);
+        ConstantSourceNode s = c.createConstantSource();
+        PannerNode p = c.createPanner();
+        p.setPosition(0, 0, -1);
+        p.setOrientation(0, 0, -1);
+        p.setConeInnerAngle(10);
+        p.setConeOuterAngle(20);
+        p.setConeOuterGain(0.5);
+        s.connect(p).connect(c.getDestination());
+        s.start();
+        Assertions.assertEquals(Math.sqrt(0.5) * 0.5, c.startRendering().getChannelData(0)[20], 1e-5);
+    }
+
+    @FormTest
+    void rotatedListenerHearsAheadAsRight() {
+        OfflineAudioContext c = ctx(2, 128);
+        // facing -x, a source at -z is on the listener's right
+        c.getListener().setOrientation(-1, 0, 0, 0, 1, 0);
+        ConstantSourceNode s = c.createConstantSource();
+        PannerNode p = c.createPanner();
+        p.setPosition(0, 0, -1);
+        s.connect(p).connect(c.getDestination());
+        s.start();
+        AudioData out = c.startRendering();
+        Assertions.assertEquals(0, out.getChannelData(0)[10], 1e-5);
+        Assertions.assertEquals(1, out.getChannelData(1)[10], 1e-5);
+    }
+
+    @FormTest
+    void hrtfDelaysAndShadowsTheFarEar() {
+        OfflineAudioContext c = ctx(2, 1024);
+        AudioData imp = c.createBuffer(1, 1, SR);
+        imp.getChannelData(0)[0] = 1;
+        AudioBufferSourceNode s = c.createBufferSource();
+        s.setBuffer(imp);
+        PannerNode p = c.createPanner();
+        p.setPanningModel(PanningModel.HRTF);
+        p.setPosition(1, 0, 0);
+        s.connect(p).connect(c.getDestination());
+        s.start();
+        AudioData out = c.startRendering();
+        float[] l = out.getChannelData(0);
+        float[] r = out.getChannelData(1);
+        int pl = 0;
+        int pr = 0;
+        double el = 0;
+        double er = 0;
+        for (int i = 0; i < l.length; i++) {
+            if (Math.abs(l[i]) > Math.abs(l[pl])) {
+                pl = i;
+            }
+            if (Math.abs(r[i]) > Math.abs(r[pr])) {
+                pr = i;
+            }
+            el += l[i] * l[i];
+            er += r[i] * r[i];
+        }
+        Assertions.assertTrue(er > 2 * el, "near ear louder: " + er + " vs " + el);
+        // Woodworth: a / c * (theta + sin theta) at 90 degrees = 0.656 ms
+        double itd = 0.0875 / 343 * (Math.PI / 2 + 1) * SR;
+        Assertions.assertEquals(itd, pl - pr, 3, "left " + pl + " right " + pr);
+    }
+
+    @FormTest
+    void pannerAndHrtfRenderWithoutAllocating() {
+        bytesFor(1);
+        // the context allocates its result up front, 2 channels of floats per frame
+        long extra = bytesFor(10) - bytesFor(1) - 2L * 4 * (long) SR * 9;
+        Assertions.assertTrue(extra < 4096, "render loop allocated " + extra + " bytes");
+    }
+
+    private static long bytesFor(int seconds) {
+        OfflineAudioContext c = new OfflineAudioContext(2, (int) SR * seconds, SR);
+        OscillatorNode o = c.createOscillator();
+        PannerNode p = c.createPanner();
+        p.setPanningModel(PanningModel.HRTF);
+        p.getPositionX().linearRampToValueAtTime(-5, seconds);
+        PannerNode q = c.createPanner();
+        q.getPositionZ().linearRampToValueAtTime(5, seconds);
+        o.connect(p).connect(c.getDestination());
+        o.connect(q).connect(c.getDestination());
+        o.start();
+        com.sun.management.ThreadMXBean b =
+                (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+        long t = Thread.currentThread().getId();
+        long before = b.getThreadAllocatedBytes(t);
+        c.startRendering();
+        return b.getThreadAllocatedBytes(t) - before;
+    }
 }

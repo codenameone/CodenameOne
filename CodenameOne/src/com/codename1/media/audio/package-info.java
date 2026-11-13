@@ -29,6 +29,12 @@
 /// parameters are [AudioParam]s with sample-accurate automation and can be
 /// modulated by other nodes.
 ///
+/// [PannerNode] places a source in 3D around the context's [AudioListener],
+/// with the specification's distance models and sound cones. Its
+/// [PanningModel#HRTF] mode renders binaurally for headphones from a
+/// structural head model (interaural delay, head shadow and pinna echoes), so
+/// it is the same portable code, with the same result, on every platform.
+///
 /// [OfflineAudioContext] renders to memory on every platform. [AudioContext]
 /// plays to the speaker where the platform has a real-time output; call
 /// [AudioContext#isSupported()] first. Names and behaviour follow the
