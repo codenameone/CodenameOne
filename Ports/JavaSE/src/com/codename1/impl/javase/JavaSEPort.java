@@ -17644,6 +17644,28 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isAudioOutputSupported() {
+        return JavaSEAudioOutput.isAvailable();
+    }
+
+    @Override
+    public com.codename1.media.audio.AudioOutputPeer openAudioOutput(int sampleRate, int channels,
+            com.codename1.media.audio.AudioRenderCallback callback) {
+        try {
+            final JavaSEAudioOutput out = new JavaSEAudioOutput(sampleRate, channels, callback);
+            addDeinitializeHook(new Runnable() {
+                public void run() {
+                    out.close();
+                }
+            });
+            return out;
+        } catch (Exception e) {
+            com.codename1.io.Log.e(e);
+            return null;
+        }
+    }
+
+    @Override
     public boolean isSoundPoolSupported() {
         return true;
     }

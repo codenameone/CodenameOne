@@ -6246,6 +6246,31 @@ public final class Display extends CN1Constants {
         return impl.createSoundPool(maxStreams);
     }
 
+    /// Indicates whether this platform can play a `com.codename1.media.audio.AudioContext`
+    /// in real time. Applications call `AudioContext.isSupported()` instead.
+    public boolean isAudioOutputSupported() {
+        return impl.isAudioOutputSupported();
+    }
+
+    /// Opens the real-time PCM output behind `com.codename1.media.audio.AudioContext`.
+    /// Applications call `AudioContext.create()` instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sampleRate`: the rate wanted, or 0 for the device's own
+    ///
+    /// - `channels`: the interleaved channel count wanted
+    ///
+    /// - `callback`: supplies the samples
+    ///
+    /// #### Returns
+    ///
+    /// the output, or null when the platform has none
+    public com.codename1.media.audio.AudioOutputPeer openAudioOutput(int sampleRate, int channels,
+            com.codename1.media.audio.AudioRenderCallback callback) {
+        return impl.openAudioOutput(sampleRate, channels, callback);
+    }
+
     /// Creates a soft/weak reference to an object that allows it to be collected
     /// yet caches it. This method is in the porting layer since CLDC only includes
     /// weak references while some platforms include nothing at all and some include
