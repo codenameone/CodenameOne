@@ -2849,6 +2849,60 @@ bindNative([
   yield jvm.invokeHostNative("__cn1_camera_close__", [{ video: ref }]);
 });
 
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraControl_com_codename1_html5_js_dom_HTMLVideoElement_java_lang_String_double_double_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraControl___com_codename1_html5_js_dom_HTMLVideoElement_java_lang_String_double_double_R_boolean"
+], function*(video, op, a, b) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  const ref = jvm.unwrapJsValue(video);
+  const o = op == null ? "" : jvm.toNativeString(op);
+  return (yield jvm.invokeHostNative("__cn1_camera_control__", [{ video: ref, op: o, a: +a, b: +b }])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSuspend_com_codename1_html5_js_dom_HTMLVideoElement",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraSuspend___com_codename1_html5_js_dom_HTMLVideoElement"
+], function*(video) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return;
+  }
+  yield jvm.invokeHostNative("__cn1_camera_suspend__", [{ video: jvm.unwrapJsValue(video) }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraResume_com_codename1_html5_js_dom_HTMLVideoElement_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraResume___com_codename1_html5_js_dom_HTMLVideoElement_R_boolean"
+], function*(video) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  return (yield jvm.invokeHostNative("__cn1_camera_resume__", [{ video: jvm.unwrapJsValue(video) }])) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraRecordStart_com_codename1_html5_js_dom_HTMLVideoElement_boolean_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraRecordStart___com_codename1_html5_js_dom_HTMLVideoElement_boolean_R_java_lang_String"
+], function*(video, audio) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return jvm.createStringLiteral("Video recording needs the browser host");
+  }
+  const r = yield jvm.invokeHostNative("__cn1_camera_record_start__", [{ video: jvm.unwrapJsValue(video), audio: !!audio }]);
+  return jvm.createStringLiteral(r == null ? "" : String(r));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraRecordStop_com_codename1_html5_js_dom_HTMLVideoElement_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5CameraImpl_nativeCameraRecordStop___com_codename1_html5_js_dom_HTMLVideoElement_R_java_lang_String"
+], function*(video) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  const r = yield jvm.invokeHostNative("__cn1_camera_record_stop__", [{ video: jvm.unwrapJsValue(video) }]);
+  return r == null ? null : jvm.createStringLiteral(String(r));
+});
+
 // WebRTC (com.codename1.webrtc via HTML5WebRtc). RTCPeerConnection,
 // getUserMedia and <video> are main-thread only, so each nativeRtc* native is a
 // round-trip to the __cn1_webrtc__ host native in browser_bridge.js. Events the

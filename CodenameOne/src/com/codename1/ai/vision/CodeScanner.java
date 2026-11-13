@@ -24,6 +24,7 @@ package com.codename1.ai.vision;
 
 import com.codename1.camera.Camera;
 import com.codename1.camera.CameraInfo;
+import com.codename1.camera.CameraSession;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
@@ -35,6 +36,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.util.UITimer;
 import com.codename1.components.SpanLabel;
 import com.codename1.util.AsyncResource;
 
@@ -157,13 +159,28 @@ public final class CodeScanner {
         private Form previous;
         private Form scannerForm;
         private boolean finished;
+        private UITimer focusTimer;
+        private int focusTicks;
 
         Session(CodeScannerOptions options) {
             this.options = options;
             this.formats = options.getFormats();
             this.view = new VisionCameraView<Barcode[]>(
-                    new BarcodeScanner(options.getVisionOptions()));
+                    new BarcodeScanner(detectorOptions(options)));
             this.view.setFacing(options.getFacing());
+        }
+
+        /// The vision options the detector is built with: the caller's, plus
+        /// the accepted formats, so the platform detector looks for those
+        /// symbologies alone instead of every one it knows and filtering
+        /// afterwards. Formats set on the caller's own vision options win.
+        private static VisionOptions detectorOptions(CodeScannerOptions options) {
+            VisionOptions source = options.getVisionOptions();
+            VisionOptions out = source == null ? new VisionOptions() : source.snapshot();
+            if (out.getBarcodeFormats().length == 0) {
+                out.barcodeFormats(options.getFormats());
+            }
+            return out;
         }
 
         AsyncResource<Barcode> show() {
@@ -200,7 +217,40 @@ public final class CodeScanner {
             // before. Re-register it so the Android hardware back button and
             // the iOS edge swipe dismiss the scanner, not just the arrow.
             scannerForm.setBackCommand(back);
+            startCenterFocus();
             return result;
+        }
+
+        /// Ticks of the focus timer between two focus requests.
+        private static final int REFOCUS_TICKS = 6;
+        private static final int FOCUS_TICK_MILLIS = 500;
+
+        /// Keeps the lens focused where the user aims the code: the center.
+        /// Continuous auto focus settles on whatever has the most contrast in
+        /// the whole field, which for a small, dense code held close (a PDF417
+        /// on a document) is often the table behind it, and a code out of
+        /// focus never decodes. So the scanner asks for focus at the center as
+        /// soon as the camera is open, and again every three seconds until a
+        /// code is read: each request ends in the camera's own continuous mode
+        /// again, so moving the phone is still followed between requests.
+        private void startCenterFocus() {
+            focusTimer = UITimer.timer(FOCUS_TICK_MILLIS, true, scannerForm,
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            if (finished) {
+                                return;
+                            }
+                            CameraSession session = view.getSession();
+                            if (session == null) {
+                                return;
+                            }
+                            if (focusTicks % REFOCUS_TICKS == 0) {
+                                session.focus(0.5f, 0.5f);
+                            }
+                            focusTicks++;
+                        }
+                    });
         }
 
         private Container buildFooter() {
@@ -272,6 +322,10 @@ public final class CodeScanner {
                 return;
             }
             finished = true;
+            if (focusTimer != null) {
+                focusTimer.cancel();
+                focusTimer = null;
+            }
             view.close();
             if (previous != null) {
                 previous.showBack();

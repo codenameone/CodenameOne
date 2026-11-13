@@ -88,6 +88,24 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_cameraSessionStart___int_int_
 JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionStop___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
 }
 
+/* cn1_windows_camera.cpp */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionSetZoom___long_float(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_FLOAT ratio) {
+}
+
+/* cn1_windows_camera.cpp */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionFocus___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+}
+
+/* cn1_windows_camera.cpp */
+JAVA_INT com_codename1_impl_windows_WindowsNative_cameraSessionStartRecording___long_java_lang_String_boolean_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT path, JAVA_BOOLEAN audio) {
+    return -1;
+}
+
+/* cn1_windows_camera.cpp */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_cameraSessionStopRecording___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    return 0;
+}
+
 /* cn1_windows_screenshot.cpp */
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_captureDesktopWindowToPngBytes___int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
     return 0;
