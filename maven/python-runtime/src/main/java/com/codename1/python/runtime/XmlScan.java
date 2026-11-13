@@ -380,16 +380,18 @@ final class XmlScan {
 
     /// What `_cn1xml.lxml_build` needs of the lxml shim to build a tree as
     /// its `_XMLDriver` feeding a `_TreeSink` does: `(text, from_bytes,
-    /// class_for, lookup, nohint, cnt, remove_blank_text)`. `class_for(tag)`
-    /// answers the element class; the shim passes it only for a lookup whose
-    /// answer depends on nothing but the tag, so it is asked once per tag.
+    /// class_for, lookup, nohint, cnt, remove_blank_text, cache)`.
+    /// `class_for(tag)` answers the element class; the shim passes it only
+    /// for a lookup whose answer depends on nothing but the tag, so it is
+    /// asked once per tag, and `cache` is the shim's tag -> class dict for
+    /// the lookup, kept across parses while no registration changed it.
     static final class Lxml {
         final Object classFor;
         final Object lookup;
         final Object noHint;
         final Object cnt;
         final boolean removeBlankText;
-        final java.util.HashMap<String, Object> classes = new java.util.HashMap<String, Object>();
+        final PyDict classes;
 
         Lxml(Object[] a) {
             classFor = a[2];
@@ -397,13 +399,14 @@ final class XmlScan {
             noHint = a[4];
             cnt = a[5];
             removeBlankText = Py.isTrue(a[6]);
+            classes = a.length > 7 && a[7] instanceof PyDict ? (PyDict) a[7] : new PyDict();
         }
 
         Object classFor(String tag) {
-            Object c = classes.get(tag);
+            Object c = classes.getOrNull(tag);
             if (c == null) {
                 c = Py.call(classFor, tag);
-                classes.put(tag, c);
+                classes.setItem(tag, c);
             }
             return c;
         }

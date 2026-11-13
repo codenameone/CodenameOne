@@ -962,6 +962,7 @@ class FallbackElementClassLookup(ElementClassLookup):
 
     def set_fallback(self, lookup):
         self.fallback = lookup
+        _LOOKUP_GEN[0] += 1
 
     def _fall(self, kind, tag):
         if self.fallback is not None:
@@ -969,10 +970,54 @@ class FallbackElementClassLookup(ElementClassLookup):
         return None
 
 
+# Bumped by everything that can change the class a lookup answers for a
+# tag: lxml makes a lookup's own classes and fallback read-only, so that is
+# set_fallback and the namespace registries. The tag -> class caches the
+# fast parse keeps per lookup (_class_cache) are good while it holds.
+_LOOKUP_GEN = [0]
+_CLASS_CACHES = {}
+
+
+def _class_cache(lookup):
+    entry = _CLASS_CACHES.get(id(lookup))
+    if entry is None or entry[0] is not lookup or entry[1] != _LOOKUP_GEN[0]:
+        entry = (lookup, _LOOKUP_GEN[0], {})
+        _CLASS_CACHES[id(lookup)] = entry
+    return entry[2]
+
+
 class _NamespaceRegistry(dict):
     def __init__(self, uri):
         dict.__init__(self)
         self._uri = uri
+
+    def __setitem__(self, key, value):
+        dict.__setitem__(self, key, value)
+        _LOOKUP_GEN[0] += 1
+
+    def __delitem__(self, key):
+        dict.__delitem__(self, key)
+        _LOOKUP_GEN[0] += 1
+
+    def update(self, *args, **kwargs):
+        dict.update(self, *args, **kwargs)
+        _LOOKUP_GEN[0] += 1
+
+    def clear(self):
+        dict.clear(self)
+        _LOOKUP_GEN[0] += 1
+
+    def pop(self, *args):
+        _LOOKUP_GEN[0] += 1
+        return dict.pop(self, *args)
+
+    def popitem(self):
+        _LOOKUP_GEN[0] += 1
+        return dict.popitem(self)
+
+    def setdefault(self, key, default=None):
+        _LOOKUP_GEN[0] += 1
+        return dict.setdefault(self, key, default)
 
     def __call__(self, obj):
         self[getattr(obj, "__name__", None)] = obj
@@ -1315,7 +1360,7 @@ def _fast_parse(driver, data):
         return _class_for(lookup, "e", tag)
 
     return _cn1xml.lxml_build(src, not isinstance(data, str), class_for, lookup, _NOHINT, sink.cnt,
-                              opts.remove_blank_text)
+                              opts.remove_blank_text, _class_cache(lookup))
 
 
 class _BaseParser(object):
