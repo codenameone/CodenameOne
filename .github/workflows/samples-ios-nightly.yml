@@ -44,7 +44,9 @@ jobs:
     name: iOS builds (${{ matrix.shard }})
     needs: build-ios-port
     runs-on: macos-15
-    timeout-minutes: 180
+    # Five steps at their 45-minute cap; a slow night must fail a step, not
+    # kill the job and leave the rest of the shard unrun.
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
@@ -138,11 +140,11 @@ jobs:
         timeout-minutes: 45
       - name: 'iOS: dash'
         if: ${{ !cancelled() && contains(matrix.samples, ' dash ') }}
-        run: scripts/ci/build-sample-ios-simulator.sh scripts/dash
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/dash --watch
         timeout-minutes: 45
       - name: 'iOS: pulse'
         if: ${{ !cancelled() && contains(matrix.samples, ' pulse ') }}
-        run: scripts/ci/build-sample-ios-simulator.sh scripts/pulse
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/pulse --watch
         timeout-minutes: 45
       - name: 'iOS: bastion'
         if: ${{ !cancelled() && contains(matrix.samples, ' bastion ') }}
@@ -158,11 +160,11 @@ jobs:
         timeout-minutes: 45
       - name: 'iOS: splat'
         if: ${{ !cancelled() && contains(matrix.samples, ' splat ') }}
-        run: scripts/ci/build-sample-ios-simulator.sh scripts/splat
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/splat --watch
         timeout-minutes: 45
       - name: 'iOS: slate'
         if: ${{ !cancelled() && contains(matrix.samples, ' slate ') }}
-        run: scripts/ci/build-sample-ios-simulator.sh scripts/slate
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/slate --watch
         timeout-minutes: 45
       - name: 'iOS: skirmish'
         if: ${{ !cancelled() && contains(matrix.samples, ' skirmish ') }}

@@ -5,12 +5,34 @@
 # CN1 + iOS port tree, CocoaPods, XcodeGen) instead of each taking a runner of
 # its own -- macOS concurrency, not build time, is what the nightly waited on.
 #
-# Usage: scripts/ci/build-sample-ios-simulator.sh scripts/<sample>
+# Usage: scripts/ci/build-sample-ios-simulator.sh scripts/<sample> [--watch]
+#
+# --watch is for a sample with an embedded watch app: it drops -sdk, exactly as
+# that sample's own PR job does (see below). Without it the build is the same
+# `-sdk iphonesimulator` build the other samples' PR jobs run, so the nightly
+# and the pull-request leg build the same thing.
 set -euo pipefail
 
-APP_DIR="${1:?usage: $0 scripts/<sample>}"
+APP_DIR="${1:?usage: $0 scripts/<sample> [--watch]}"
+WATCH="${2:-}"
 NAME="$(basename "$APP_DIR")"
-OUT="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/ios-sample-$NAME-out.XXXXXX")"
+SCRATCH="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+OUT="$(mktemp "$SCRATCH/ios-sample-$NAME-out.XXXXXX")"
+DERIVED_DATA="$SCRATCH/$NAME-dd"
+
+# Several samples build in turn on one runner. Whatever this one leaves behind
+# -- its derived data, its translated Xcode project and Pods -- is never read
+# again, and five apps' worth (two with watch apps) can fill a runner's disk,
+# failing every later sample for a reason that is not theirs. Clean up on
+# failure too.
+cleanup() {
+  rm -rf "$DERIVED_DATA" "$APP_DIR/ios/target"
+}
+trap cleanup EXIT
+
+# build-ios-app.sh writes its stats and logs to ARTIFACTS_DIR, by default one
+# directory for the whole checkout; keep each sample's apart.
+export ARTIFACTS_DIR="$SCRATCH/artifacts-$NAME"
 
 # build-ios-app.sh reports the workspace and scheme through GITHUB_OUTPUT;
 # point it at a file of this call's own so samples cannot read each other's.
@@ -22,7 +44,6 @@ if [ -z "$WORKSPACE" ] || [ -z "$SCHEME" ]; then
   exit 1
 fi
 
-DERIVED_DATA="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/$NAME-dd"
 rm -rf "$DERIVED_DATA"
 # One architecture, the host's: the port's SIMD natives are NEON under
 # __aarch64__, and a universal simulator build compiles an x86_64 slice that has
@@ -35,11 +56,15 @@ XCB_CONTAINER_FLAG="-workspace"
 if [[ "$WORKSPACE" != *.xcworkspace ]]; then
   XCB_CONTAINER_FLAG="-project"
 fi
-# No -sdk: it forces every target of the scheme onto the iPhone SDK, an
-# embedded watch app included (dash, pulse, splat, slate), whose watch-only icon
-# then has nothing to compile for. The destination picks each target's own SDK,
-# which for a plain app is iphonesimulator -- the same build -sdk asked for.
+# With a watch app, no -sdk: it forces every target of the scheme onto the
+# iPhone SDK, the embedded watch app included, whose watch-only icon then has
+# nothing to compile for. The destination picks each target's own SDK.
+SDK_ARGS=(-sdk iphonesimulator)
+if [ "$WATCH" = "--watch" ]; then
+  SDK_ARGS=()
+fi
 xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+  ${SDK_ARGS[@]+"${SDK_ARGS[@]}"} \
   -configuration Debug \
   -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath "$DERIVED_DATA" \
@@ -53,6 +78,3 @@ if [ -z "$APP_BUNDLE" ]; then
   exit 1
 fi
 echo "Built $APP_BUNDLE"
-# The derived data of a finished sample is not read again; free the disk for
-# the next one on this runner.
-rm -rf "$DERIVED_DATA"
