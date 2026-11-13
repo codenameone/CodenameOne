@@ -2000,9 +2000,11 @@ public final class Emitter {
         indent(out, ind);
         out.append("final Object ").append(mgr).append(" = ").append(expr(item.context)).append(";\n");
         indent(out, ind);
-        out.append("final Object ").append(exit).append(" = Py.getattr(").append(mgr)
-                .append(", \"__exit__\");\n");
-        String entered = "Py.callMethod(" + mgr + ", \"__enter__\")";
+        // Both through cached sites, as any attribute: by name each time,
+        // they cost a full lookup per with-statement executed.
+        out.append("final Object ").append(exit).append(" = ").append(site("__exit__")).append(".get(").append(mgr)
+                .append(");\n");
+        String entered = site("__enter__") + ".call0(" + mgr + ")";
         if (item.vars != null) {
             String ev = fresh("en");
             indent(out, ind);
