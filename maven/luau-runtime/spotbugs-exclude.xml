@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Luau has reference semantics: a table's metatable, the global table
+         and the running thread are the very objects scripts share, and a
+         defensive copy would change what a program observes (setting a
+         field on getmetatable(t) must be visible through t). -->
+    <Match>
+        <Package name="com.codename1.luau"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+    <!-- The thrown Luau value is transient because Luau values are not
+         serializable; an error is never serialized across a process. -->
+    <Match>
+        <Class name="com.codename1.luau.LuaError"/>
+        <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+    </Match>
+</FindBugsFilter>
