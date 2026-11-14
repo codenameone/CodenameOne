@@ -30,6 +30,10 @@ import com.codename1.gpu.Texture;
 /// shadowed, fogged and tone mapped like every other.
 ///
 /// ```java
+/// import com.codename1.gpu.Material;
+/// import com.codename1.gpu.shader.*;
+///
+/// Material material = new Material(Material.Type.PBR);
 /// ShaderMaterial waves = new ShaderMaterial()
 ///         .declareUniform("amp", ShaderType.FLOAT)
 ///         .set(ShaderMaterial.Hook.VERTEX_OFFSET, ShaderNode.vec(ShaderNode.f(0f),

@@ -35,6 +35,9 @@ import static com.codename1.gpu.shader.ShaderNode.*;
 /// sun's glitter.
 ///
 /// ```java
+/// import com.codename1.gpu.Material;
+/// import com.codename1.gpu.shaders.Water;
+///
 /// Material sea = new Material(Material.Type.PBR).setShader(Water.ocean()
 ///         .setColorUniform(Water.DEEP, 0x0b3d4f).setUniform(Water.WAVE_HEIGHT, 0.6f));
 /// ```

@@ -158,7 +158,6 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     // here because reading it back would need a typed array across the bridge.
     private final int[] viewport = new int[4];
     private final int[] savedViewport = new int[4];
-    private float[] jointScratch = new float[0];
 
     /// Cached compiled program together with the locations the device binds.
     /// Attribute locations are GLint indices (-1 when absent); uniform locations
@@ -365,12 +364,12 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         bindAttributes(entry, format);
         if (entry.uJoints != null && material.isSkinned()) {
             // exactly the joints in use: WebGL sizes the upload by the array
+            // (the runtime snapshots array arguments when it queues the call,
+            // see parparvm_runtime.js, so reusing an array here would be safe)
             int n = material.getJointCount() * 12;
-            if (jointScratch.length != n) {
-                jointScratch = new float[n];
-            }
-            System.arraycopy(material.getJointRows(), 0, jointScratch, 0, n);
-            gl.uniform4fv(entry.uJoints, jointScratch);
+            float[] joints = new float[n];
+            System.arraycopy(material.getJointRows(), 0, joints, 0, n);
+            gl.uniform4fv(entry.uJoints, joints);
         }
 
         PrimitiveType pt = mesh.getPrimitiveType();

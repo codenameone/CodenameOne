@@ -199,6 +199,14 @@ class AndroidGraphicsDevice extends GraphicsDevice {
 
         GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, w, h, 0,
                 GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, pixels);
+        // GL's default minification filter samples mipmaps, which this upload
+        // has none of: the texture is then incomplete and reads as black. A
+        // material re-sets these when it binds the texture, but a texture
+        // bound only by sampler() -- the post chain's colour LUT -- never is.
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
         return id;
     }

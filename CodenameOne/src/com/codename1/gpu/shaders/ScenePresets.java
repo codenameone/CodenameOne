@@ -33,11 +33,16 @@ import com.codename1.gpu.shader.ShaderMaterial;
 /// adjust; every part is an ordinary object you can change.
 ///
 /// ```java
-/// ScenePresets.Preset look = ScenePresets.harbourDusk();
-/// look.apply(device);
-/// Material dome = new Material(Material.Type.UNLIT).setShader(look.getSky()).setFogged(false);
-/// // per frame, after drawing the scene:
-/// device.beginPostProcess(look.getPost(), w, h);
+/// import com.codename1.gpu.*;
+/// import com.codename1.gpu.shaders.ScenePresets;
+///
+/// void frame(GraphicsDevice device, int w, int h) {
+///     ScenePresets.Preset look = ScenePresets.harbourDusk();
+///     look.apply(device);
+///     Material dome = new Material(Material.Type.UNLIT).setShader(look.getSky()).setFogged(false);
+///     // per frame, after drawing the scene:
+///     device.beginPostProcess(look.getPost(), w, h);
+/// }
 /// ```
 public final class ScenePresets {
     private ScenePresets() {

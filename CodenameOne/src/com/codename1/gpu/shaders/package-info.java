@@ -32,11 +32,16 @@
 /// every frame, without rebuilding anything.
 ///
 /// ```java
-/// ScenePresets.Preset look = ScenePresets.harbourDusk();
-/// look.apply(device);
-/// Mesh sea = Primitives.grid(120f, 160);
-/// Material water = new Material(Material.Type.PBR).setShader(Water.ocean());
-/// Material quay = new Material(Material.Type.PBR).setShader(Surface.concrete());
-/// Material crates = new Material(Material.Type.PBR).setShader(Surface.paintedMetal());
+/// import com.codename1.gpu.*;
+/// import com.codename1.gpu.shaders.*;
+///
+/// void setUp(GraphicsDevice device) {
+///     ScenePresets.Preset look = ScenePresets.harbourDusk();
+///     look.apply(device);
+///     Mesh sea = Primitives.grid(120f, 160);
+///     Material water = new Material(Material.Type.PBR).setShader(Water.ocean());
+///     Material quay = new Material(Material.Type.PBR).setShader(Surface.concrete());
+///     Material crates = new Material(Material.Type.PBR).setShader(Surface.paintedMetal());
+/// }
 /// ```
 package com.codename1.gpu.shaders;

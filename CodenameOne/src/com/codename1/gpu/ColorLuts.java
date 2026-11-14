@@ -27,9 +27,13 @@ package com.codename1.gpu;
 /// `GraphicsDevice.createTexture(ColorLuts.WIDTH, ColorLuts.HEIGHT, pixels)`.
 ///
 /// ```java
-/// Texture look = device.createTexture(ColorLuts.WIDTH, ColorLuts.HEIGHT,
-///         ColorLuts.filmic(0.6f, 0.15f));
-/// post.setColorLut(look, 1f);
+/// import com.codename1.gpu.*;
+///
+/// void grade(GraphicsDevice device, PostProcess post) {
+///     Texture look = device.createTexture(ColorLuts.WIDTH, ColorLuts.HEIGHT,
+///             ColorLuts.filmic(0.6f, 0.15f));
+///     post.setColorLut(look, 1f);
+/// }
 /// ```
 public final class ColorLuts {
     /// The strip's width in pixels.

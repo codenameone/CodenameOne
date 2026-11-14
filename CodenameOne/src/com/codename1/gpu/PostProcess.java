@@ -388,6 +388,11 @@ public final class PostProcess {
     /// any material.
     ///
     /// ```java
+    /// import com.codename1.gpu.PostProcess;
+    /// import com.codename1.gpu.shader.ShaderMaterial;
+    /// import com.codename1.gpu.shader.ShaderNode;
+    ///
+    /// PostProcess post = new PostProcess();
     /// ShaderNode uv = ShaderNode.screenUv();
     /// ShaderNode wobble = ShaderNode.sin(uv.y().mul(ShaderNode.f(40f)).add(ShaderNode.time()))
     ///         .mul(ShaderNode.f(0.004f));

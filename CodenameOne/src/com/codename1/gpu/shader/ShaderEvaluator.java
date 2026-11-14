@@ -36,6 +36,11 @@ import java.util.Map;
 /// - **Tests** of a graph's values.
 ///
 /// ```java
+/// import com.codename1.gpu.shader.*;
+/// import com.codename1.gpu.shaders.Water;
+///
+/// ShaderMaterial water = Water.ocean();
+/// float now = 2.5f, boatX = 3f, boatZ = -4f;
 /// ShaderEvaluator ev = new ShaderEvaluator(water)
 ///         .setInput("time", now)
 ///         .setInput("position", boatX, 0f, boatZ);

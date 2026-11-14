@@ -38,8 +38,13 @@ import com.codename1.ui.Image;
 /// bright as white.
 ///
 /// ```java
-/// Environment env = look.getEnvironment();
-/// env.setEnvironmentMap(EnvironmentMaps.fromSky(device, env, light));
+/// import com.codename1.gpu.*;
+/// import com.codename1.gpu.shaders.ScenePresets;
+///
+/// void light(GraphicsDevice device, ScenePresets.Preset look, Light light) {
+///     Environment env = look.getEnvironment();
+///     env.setEnvironmentMap(EnvironmentMaps.fromSky(device, env, light));
+/// }
 /// ```
 ///
 /// Rebake when the sky changes; a bake costs a few tens of milliseconds.
@@ -162,7 +167,7 @@ public final class EnvironmentMaps {
             int r = Math.min(WIDTH / 2 - 1, (int) Math.ceil(s * 2.5f));
             float sum = 0f;
             for (int k = -r; k <= r; k++) {
-                w[k + r] = (float) Math.exp(-0.5 * (k * k) / (s * s));
+                w[k + r] = (float) com.codename1.util.MathUtil.exp(-0.5 * (k * k) / (s * s));
                 sum += w[k + r];
             }
             int row = y * WIDTH;
@@ -191,7 +196,7 @@ public final class EnvironmentMaps {
         int r = Math.min(BAND_HEIGHT, (int) Math.ceil(s * 2.5f));
         float[] w = new float[2 * r + 1];
         for (int k = -r; k <= r; k++) {
-            w[k + r] = (float) Math.exp(-0.5 * (k * k) / (s * s));
+            w[k + r] = (float) com.codename1.util.MathUtil.exp(-0.5 * (k * k) / (s * s));
         }
         for (int x = 0; x < WIDTH; x++) {
             for (int y = 0; y < BAND_HEIGHT; y++) {
@@ -259,7 +264,7 @@ public final class EnvironmentMaps {
                 float g;
                 float b;
                 if (d[1] >= 0f) {
-                    float t = (float) Math.pow(d[1], 0.55);
+                    float t = (float) com.codename1.util.MathUtil.pow(d[1], 0.55);
                     r = hor[0] + (zen[0] - hor[0]) * t;
                     g = hor[1] + (zen[1] - hor[1]) * t;
                     b = hor[2] + (zen[2] - hor[2]) * t;
@@ -277,7 +282,7 @@ public final class EnvironmentMaps {
                     b = hor[2] + (ground[2] - hor[2]) * t;
                 }
                 float sd = Math.max(0f, d[0] * sx + d[1] * sy + d[2] * sz);
-                float glow = (float) (Math.pow(sd, 8.0) * 0.35 + Math.pow(sd, 64.0) * 0.8);
+                float glow = (float) (com.codename1.util.MathUtil.pow(sd, 8.0) * 0.35 + com.codename1.util.MathUtil.pow(sd, 64.0) * 0.8);
                 if (sd > 0.9990f) {
                     glow += 1.2f;
                 }

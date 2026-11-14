@@ -111,10 +111,30 @@ class PortraitStudio {
     }
 
     private static float[] bounds(AnimatedModel m) {
-        // getBounds, not the parts' buffers: where the device skins on the
-        // GPU those hold the bind pose, sixteen floats a vertex
-        float[] b = m.getBounds();
-        return b != null ? b : new float[] {-0.5f, 0f, -0.5f, 0.5f, 1f, 0.5f};
+        float[] b = {Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE,
+            -Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE};
+        Model[] parts = m.getParts();
+        for (int p = 0; p < parts.length; p++) {
+            if (!parts[p].isVisible()) {
+                continue;
+            }
+            // the buffer's own stride: a device that skins on the GPU keeps
+            // the bind pose in a wider format, so a fixed stride of eight
+            // reads normals and weights as positions
+            com.codename1.gpu.VertexBuffer vb = parts[p].getMesh().getVertices();
+            int stride = vb.getFormat().getFloatsPerVertex();
+            float[] d = vb.getData();
+            for (int i = 0; i + 2 < d.length; i += stride) {
+                for (int k = 0; k < 3; k++) {
+                    b[k] = Math.min(b[k], d[i + k]);
+                    b[k + 3] = Math.max(b[k + 3], d[i + k]);
+                }
+            }
+        }
+        if (b[0] > b[3]) {
+            return new float[] {-0.5f, 0f, -0.5f, 0.5f, 1f, 0.5f};
+        }
+        return b;
     }
 
     private static BufferedImage downsample(BufferedImage src, int ss) {

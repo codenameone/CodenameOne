@@ -186,6 +186,13 @@ class JavaSEGLDevice extends GraphicsDevice {
         pixels.position(0);
         gl.glTexImage2D(GL2ES2.GL_TEXTURE_2D, 0, GL2ES2.GL_RGBA, w, h, 0,
                 GL2ES2.GL_RGBA, GL2ES2.GL_UNSIGNED_BYTE, pixels);
+        // no mipmaps are uploaded, so the default mipmapped minification would
+        // leave the texture incomplete (black) wherever nothing re-sets it --
+        // the post chain's colour LUT is bound without touching its filters
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MIN_FILTER, GL2ES2.GL_LINEAR);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, GL2ES2.GL_LINEAR);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_S, GL2ES2.GL_CLAMP_TO_EDGE);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_T, GL2ES2.GL_CLAMP_TO_EDGE);
         gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, 0);
         t.setHandle(new TexHandle(id));
         return t;
