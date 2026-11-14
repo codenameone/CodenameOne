@@ -249,6 +249,11 @@ final class GanttChart extends ScrollSurface {
         // after the last bar.
         long from = TimeMath.startOfDay(first, zone) - 3 * TimeMath.DAY;
         long to = TimeMath.startOfDay(last, zone) + 12 * TimeMath.DAY;
+        // What fitting shows: the project's own days, not the room around
+        // them, or a week's plan fits as three weeks.
+        long fitFrom = TimeMath.startOfDay(first, zone);
+        long fitTo = Math.max(fitFrom + TimeMath.DAY,
+                TimeMath.startOfDay(last - 1, zone) + TimeMath.DAY);
         long keep = scaled ? axis.time(getOffX()) : Long.MIN_VALUE;
         axis.setZone(zone);
         axis.setFirstDayOfWeek(owner.getFirstDayOfWeek());
@@ -293,13 +298,15 @@ final class GanttChart extends ScrollSurface {
         if (!scaled && width > 0) {
             scaled = true;
             if (fit) {
-                axis.setMillisPerPixel((double) span / bodyW);
+                // The axis clamps this to its coarsest scale: a chart too
+                // narrow for the project and its names shows what fits.
+                axis.setMillisPerPixel(fitScale(model, rows, f, fitFrom, fitTo, bodyW, barH));
             } else {
                 axis.setMillisPerPixel(Math.min(dayScale, Math.max((double) span / bodyW,
                         (double) TimeMath.DAY / Look.mm(14))));
             }
+            setOffsets(fit ? axis.x(fitFrom) - Look.mm(2) : 0, getOffY());
             fit = false;
-            setOffsets(0, getOffY());
         } else if (keep != Long.MIN_VALUE) {
             // The range may have grown at its start: what was at the left
             // edge stays there.
@@ -549,6 +556,32 @@ final class GanttChart extends ScrollSurface {
             to = start + steps * step;
         }
         return model.getCalendar().nextWorkingTime(to);
+    }
+
+    // The scale that fits the project's days into the body with a margin on
+    // either side, and with the name written after each bar still in view:
+    // fitting the bars alone clipped the last bar's label and its milestone.
+    private static double fitScale(ProjectModel model, List<GanttTask> rows, Font f,
+            long fitFrom, long fitTo, int bodyW, int barH) {
+        int pad = Look.mm(2);
+        int floor = Math.max(1, bodyW / 3);
+        double scale = (double) (fitTo - fitFrom) / Math.max(floor, bodyW - 2 * pad);
+        if (model == null) {
+            return scale;
+        }
+        // As painted: the gap, the selected row's extra step, and a
+        // milestone's diamond reaching half a bar past its time.
+        int gap = Look.mm(2.2f) + Look.mm(3);
+        for (int i = 0; i < rows.size(); i++) { //NOPMD ForLoopCanBeForeach - matches the paint loops over rows
+            GanttTask t = rows.get(i);
+            String label = labelOf(model, t);
+            if (label != null && t.getEnd() > fitFrom) {
+                int reach = t.isMilestone() ? barH / 2 : 0;
+                int room = Math.max(floor, bodyW - 2 * pad - gap - reach - f.stringWidth(label));
+                scale = Math.max(scale, (double) (t.getEnd() - fitFrom) / room);
+            }
+        }
+        return scale;
     }
 
     // Who a task is assigned to, written after its bar.

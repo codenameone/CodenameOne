@@ -267,6 +267,37 @@ class ProjectSchedulerTest {
     }
 
     @Test
+    void manualTasksWeighInTheirSummarysProgressByTheirDates() {
+        ProjectModel p = project();
+        GanttTask parent = new GanttTask("parent", "parent");
+        p.addTask(parent);
+        GanttTask one = new GanttTask("one", "one").setManuallyScheduled(true)
+                .setDates(at(14, 9), at(14, 17)).setPercentComplete(20);
+        GanttTask two = new GanttTask("two", "two").setManuallyScheduled(true)
+                .setDates(at(15, 9), at(15, 17)).setPercentComplete(60);
+        p.addTask(parent, one);
+        p.addTask(parent, two);
+        p.update();
+        // the duration it was given is left alone
+        assertEquals(0, one.getDuration());
+        assertEquals(40, parent.getPercentComplete());
+    }
+
+    @Test
+    void aSummaryOfManualTasksInHoursOffStillRollsUp() {
+        ProjectModel p = project();
+        GanttTask parent = new GanttTask("parent", "parent");
+        p.addTask(parent);
+        // 20:00 to 22:00 is outside the project's working hours
+        p.addTask(parent, new GanttTask("one", "one").setManuallyScheduled(true)
+                .setDates(at(14, 20), at(14, 22)).setPercentComplete(30));
+        p.addTask(parent, new GanttTask("two", "two").setManuallyScheduled(true)
+                .setDates(at(15, 19), at(15, 23)).setPercentComplete(50));
+        p.update();
+        assertEquals(40, parent.getPercentComplete());
+    }
+
+    @Test
     void removingATaskRemovesItsLinksAndTheBaselineRemembers() {
         ProjectModel p = project();
         GanttTask a = task(p, "a", 1);

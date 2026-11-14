@@ -72,6 +72,13 @@ public final class BoardForm extends LiveChannel.Adapter {
         new BoardForm(previous).form.show();
     }
 
+    /// The board for `day`, the start of a day, as the staffing plan opens it.
+    public static void show(Form previous, long day) {
+        BoardForm board = new BoardForm(previous);
+        board.day = Times.dayStart(day);
+        board.form.show();
+    }
+
     @Override
     public void scheduleChanged(String username) {
         load();

@@ -34,6 +34,9 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// A provider's schedule asked for by a phone in another time zone than the
@@ -71,5 +74,33 @@ class ScheduleZoneTest {
             found |= shift.start() == nineThere;
         }
         assertTrue(found, "the shift at 09:00 on " + day + " is missing from " + s.shifts());
+    }
+
+    @Test
+    void theStaffingPlanCoversTheWholeWeekAndNoMore() throws Exception {
+        Service service = People.service(services, 60);
+        String provider = People.provider(accounts, offers, hours, service);
+        ZoneId zone = ZoneId.of(People.tx(() -> locations.findById(People.LOCATION).getTimeZone()));
+        LocalDate monday = LocalDate.now(zone).plusDays(7).with(java.time.DayOfWeek.MONDAY);
+
+        List<ScheduleDto> week = schedules.days(monday.toString(), 7);
+        List<ScheduleDto> capped = schedules.days(monday.toString(), 400);
+
+        ScheduleDto mine = null;
+        for (ScheduleDto s : week) {
+            if (s.username().equals(provider)) {
+                mine = s;
+            }
+        }
+        assertTrue(mine != null, "the provider is missing from the plan");
+        assertEquals(monday.atStartOfDay(zone).toInstant().toEpochMilli(), mine.from());
+        assertEquals(monday.plusDays(7).atStartOfDay(zone).toInstant().toEpochMilli(), mine.to());
+        for (ShiftDto shift : mine.shifts()) {
+            assertTrue(shift.start() >= mine.from() && shift.end() <= mine.to(),
+                    "a shift outside the week: " + shift);
+        }
+        for (ScheduleDto s : capped) {
+            assertTrue(s.to() - s.from() <= 32 * 86400000L, "the plan was not capped: " + s);
+        }
     }
 }

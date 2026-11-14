@@ -309,6 +309,27 @@ include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slat
 include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/owner/OwnerForm.java[tag=slate-owner-dashboard,indent=0]
 ----
 
+The staffing plan is the framework's <<scheduling-and-gantt,`Gantt`>> over a
+`ProjectModel` built from a week of the same schedules the board reads,
+`GET /api/owner/staffing`. Every provider is a summary task, and each shift is
+a task under it. Its dates are fixed with `setManuallyScheduled`, so the
+project's scheduling passes leave the hours exactly as they were set. The
+booked share of a shift is both its progress and its assignment's units, so
+the resource load under the chart, `setLoadVisible(true)`, reads as
+utilisation against a capacity of one. A listener refuses every drag, because
+hours are edited on the provider and not on the plan:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/owner/StaffingForm.java[tag=slate-staffing,indent=0]
+----
+
+A business that books rooms or chairs can plan them the same way: make each
+resource a `ScheduleResource` with the number of them as its capacity, and
+assign the bookings that use it. Where two bookings want the same chair at
+once, the load goes over the line, and `ResourceLeveler` can propose which of
+them to move.
+
 === Tests
 
 [source,bash]

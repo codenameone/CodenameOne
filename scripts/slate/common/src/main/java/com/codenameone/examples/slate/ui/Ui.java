@@ -196,8 +196,12 @@ public final class Ui {
         back.setDesktopShortcut('[');
         final boolean[] added = new boolean[1];
         form.addShowListener(e -> {
+            // A docked screen keeps its content in a body beside the menu,
+            // and that body is where its own top is.
+            Container holder = form instanceof Screen ? ((Screen) form).body()
+                    : form.getContentPane();
             if (added[0] || form.getToolbar().getParent() != null
-                    || !(form.getContentPane().getLayout() instanceof BorderLayout)) {
+                    || !(holder.getLayout() instanceof BorderLayout)) {
                 return;
             }
             added[0] = true;
@@ -211,7 +215,7 @@ public final class Ui {
             if (title != null && title.length() > 0) {
                 bar.add(BorderLayout.CENTER, plain(title, "SvPaneTitle"));
             }
-            Component top = ((BorderLayout) form.getContentPane().getLayout()).getNorth();
+            Component top = ((BorderLayout) holder.getLayout()).getNorth();
             if (top == null) {
                 form.add(BorderLayout.NORTH, bar);
             } else {

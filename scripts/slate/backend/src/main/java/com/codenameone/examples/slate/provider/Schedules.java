@@ -269,12 +269,20 @@ public class Schedules {
     /// side-by-side view.
     @Transactional(readOnly = true)
     public List<ScheduleDto> day(String dayText) {
+        return days(dayText, 1);
+    }
+
+    /// Every active provider's schedule for `days` days from `dayText`, at
+    /// most [#MAX_DAYS], for the owner's staffing plan.
+    @Transactional(readOnly = true)
+    public List<ScheduleDto> days(String dayText, int days) {
         LocalDate day = Availability.day(dayText);
+        int span = Math.max(1, Math.min(MAX_DAYS, days));
         List<Provider> all = providers.findByActiveOrderByDisplayNameAsc(true);
         List<ScheduleDto> out = new ArrayList<ScheduleDto>();
         for (int iter = 0; iter < all.size(); iter++) {
             Provider p = all.get(iter);
-            out.add(schedule(p, day, 1, zoneOf(p.getDefaultLocation())));
+            out.add(schedule(p, day, span, zoneOf(p.getDefaultLocation())));
         }
         return out;
     }

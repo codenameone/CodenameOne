@@ -43,7 +43,7 @@ import java.util.List;
 // tag::slate-owner-dashboard[]
 /// The owner's home: how the last weeks went -- booked, done, no-shows,
 /// cancelled, takings and how full the providers' hours were -- and the way
-/// into the day board, the catalogue and the booking rules.
+/// into the day board, the staffing plan, the catalogue and the booking rules.
 public class OwnerForm extends LiveChannel.Adapter implements Nav.Home {
     private final Form form = Ui.home("Owner");
     private final Menu menu = new Menu(form, Nav.OWNER);
@@ -58,6 +58,8 @@ public class OwnerForm extends LiveChannel.Adapter implements Nav.Home {
     public void start() {
         menu.item(FontImage.MATERIAL_DASHBOARD, "Dashboard", "dashboard", () -> form.showBack());
         menu.item(FontImage.MATERIAL_VIEW_WEEK, "Day board", "board", () -> BoardForm.show(form));
+        menu.item(FontImage.MATERIAL_VIEW_TIMELINE, "Staffing", "staffing",
+                () -> StaffingForm.show(form));
         menu.item(FontImage.MATERIAL_SPA, "Services", "services",
                 () -> CatalogForm.show(form, CatalogForm.SERVICES));
         menu.item(FontImage.MATERIAL_PEOPLE, "Providers", "providers",
@@ -129,6 +131,7 @@ public class OwnerForm extends LiveChannel.Adapter implements Nav.Home {
         counts(page, "Most booked", d.topServices(), FontImage.MATERIAL_SPA);
         counts(page, "Busiest providers", d.providerLoad(), FontImage.MATERIAL_PERSON);
         page.add(Ui.primary("Open the day board", "open-board", e -> BoardForm.show(form)));
+        page.add(Ui.secondary("Plan the week", "open-staffing", e -> StaffingForm.show(form)));
         Layouts.broaden(page);
         Ui.relayout(page);
     }

@@ -22,6 +22,7 @@ import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.record.RecordingOptions;
 import com.codename1.impl.javase.record.SimulatorRecorder;
 import com.codename1.impl.javase.record.TouchOverlay;
+import com.codename1.ui.scheduler.Gantt;
 import com.codenameone.examples.slate.client.Times;
 import com.codenameone.examples.slate.ui.Timeline;
 
@@ -29,7 +30,8 @@ import java.io.File;
 import java.util.Map;
 
 /// The demo videos: the simulator's own recorder films the common journeys
-/// with captions. On the desktop window, an owner running the place and a
+/// with captions. On the desktop window, an owner running the place (the
+/// board and the week's staffing plan) and a
 /// provider working through their diary; on the phone, a client booking.
 /// It checks nothing the other tests do not, so it runs only when
 /// `slate.e2e.video` names the directory to write to (`run-e2e.sh --video`).
@@ -86,6 +88,16 @@ public class DemoVideoTest extends E2e {
                 && OwnerTest.booked((Timeline) findByName("board-grid")), 20000,
                 "the day's bookings on the board");
         caption("The board: every provider's day side by side", 3000);
+        waitFor(3400);
+        place("menu-staffing", "Staffing");
+        until(() -> findByName("staffing-gantt") instanceof Gantt
+                && OwnerTest.staffed((Gantt) findByName("staffing-gantt")), 20000,
+                "the week's shifts on the staffing plan");
+        // The chart fits the week once it has been laid out.
+        waitFor(800);
+        caption("Staffing: the week's shifts on a Gantt chart", 3000);
+        waitFor(3400);
+        caption("How booked each shift is, and each provider's load", 3000);
         waitFor(3400);
         place("menu-services", "Catalog");
         until(() -> has("save"), 20000, "the first service's editor");
