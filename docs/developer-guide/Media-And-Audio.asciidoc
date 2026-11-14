@@ -59,3 +59,82 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 `equalize(...)` is a simple three-band tone shaper for lightweight cleanup and demos. `removeCenter(...)`, `isolateCenter(...)`, and `midSide(...)` use classic stereo mid/side processing. They can reduce, isolate, or enhance centered dialog only when the source is stereo and the voice is actually centered. These methods aren't source-separation, speech-isolation, or noise-reduction APIs.
 
 `AudioMixer` and the simple buffer-wide `AudioEffects` operations use the `com.codename1.util.Simd` float-array API internally when the current platform supports it. Stateful filters, such as the equalizer, stay scalar because each sample depends on the previous filter state. You can force scalar behavior for diagnostics with `AudioMixer.setSimdOptimizationsEnabled(false)` or `AudioEffects.setSimdOptimizationsEnabled(false)`.
+
+[[audio-graph]]
+=== The Audio Graph
+
+The `com.codename1.media.audio` package is a real-time and offline audio graph modelled on the W3C Web Audio API. Sources feed processing nodes that end at the context's destination, and every node parameter is an `AudioParam` with sample-accurate automation. The node set and its behavior follow the specification, so Web Audio articles and tutorials apply with Java naming: `gain.gain.value = 0.5` becomes `gain.getGain().setValue(0.5f)`.
+
+The graph is rendered by portable code on every platform, and each port only supplies an output that plays the rendered samples. A graph therefore sounds the same everywhere it runs, and an `OfflineAudioContext` that renders to memory produces the same samples on a device as in a unit test.
+
+==== Playing Sound in Real Time
+
+`AudioContext.create()` opens the speaker and answers null on a platform with no real-time output, so check for null, or ask `AudioContext.isSupported()` first. The simulator, Android, iOS, macOS, Windows, Linux and the browser have one. The example below plays a filtered beep with an attack and a decay:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AudioGraphSnippets.java[tag=audio-graph-beep,indent=0]
+----
+
+The nodes available are:
+
+* *Sources:* `AudioBufferSourceNode` (with loop points, playback rate and detune), `OscillatorNode` with the standard waves and custom `PeriodicWave` shapes, `ConstantSourceNode` and `MicrophoneSourceNode`.
+* *Processing:* `GainNode`, `DelayNode`, `BiquadFilterNode` (all eight filter types, with `getFrequencyResponse`), `IIRFilterNode`, `WaveShaperNode` with oversampling, `DynamicsCompressorNode`, `ConvolverNode` for reverb, `StereoPannerNode`, `ChannelSplitterNode` and `ChannelMergerNode`.
+* *Spatial:* `PannerNode` and the context's `AudioListener`.
+* *Analysis:* `AnalyserNode`.
+* *Custom:* `AudioProcessorNode`, which runs your own Java code.
+
+==== Spatial Sound
+
+A `PannerNode` places a source in 3D around the context's `AudioListener`, with the specification's linear, inverse and exponential distance models and sound cones. `PanningModel.EQUALPOWER` pans between the speakers; `PanningModel.HRTF` renders binaurally for headphones, so a sound can come from behind or above the listener:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AudioGraphSnippets.java[tag=audio-graph-spatial,indent=0]
+----
+
+The HRTF mode uses a structural model of the head (the delay between the ears, the shadow of the head and the echoes of the outer ear) rather than a measured data set. It runs the same portable code on every platform, so `isHrtfSupported()` is always true.
+
+==== Analysis and Visualization
+
+An `AnalyserNode` passes its input through unchanged and exposes its spectrum and waveform for a visualizer or a level meter. Read it from the EDT, for example in an animation callback:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AudioGraphSnippets.java[tag=audio-graph-analyser,indent=0]
+----
+
+==== Custom Processing
+
+`createAudioProcessor` is the counterpart of the Web Audio `AudioWorkletNode`. The `AudioProcessor` you pass is called once per block of 128 frames on the audio thread, with the same `inputs[input][channel][frame]` layout a worklet gets. Declare parameters with `AudioParamDescriptor` to automate them like any other `AudioParam`. The code runs on the audio thread, so it must not block, wait for the EDT or allocate memory on every call:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AudioGraphSnippets.java[tag=audio-graph-processor,indent=0]
+----
+
+A processor that throws is stopped and outputs silence, and the handler set with `setOnProcessorError` runs on the EDT.
+
+==== Microphone Input
+
+`createMicrophoneSource` plays the `AudioBuffer` a recorder fills when it's built with `redirectToAudioBuffer(true)` (see <<pcm-audio-section>>), resampled to the context's rate. `isMicrophoneSourceSupported()` answers whether the platform implements that capture; it's false on the native Windows and Linux ports, whose recorders always write a file:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AudioGraphSnippets.java[tag=audio-graph-microphone,indent=0]
+----
+
+==== Offline Rendering and Decoding
+
+An `OfflineAudioContext` renders a graph to memory as fast as the device can, for export, for tests, or to bake an effect into a clip. `decodeAudioData` reads WAV files whose samples are integers of 8 to 32 bits or floats of 32 or 64 bits, and returns null for any other format. Decode compressed audio before it reaches the graph, or play it with `Media`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AudioGraphSnippets.java[tag=audio-graph-offline,indent=0]
+----
+
+==== Platform Notes
+
+* `AudioContext.getOutputLatency()` reports the delay of the platform's output, so a game can schedule sounds against what the player hears.
+* On Android the output is 16-bit PCM.
+* In the browser, the graph is rendered in Java and played through the browser's own audio context. Like any web audio, it starts after the first tap or key press on the page.

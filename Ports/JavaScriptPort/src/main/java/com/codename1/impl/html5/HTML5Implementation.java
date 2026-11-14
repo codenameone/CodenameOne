@@ -6317,6 +6317,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     @Override
+    public boolean isAudioBufferCaptureSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isAudioOutputSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.audio.AudioOutputPeer openAudioOutput(int sampleRate, int channels,
+            com.codename1.media.audio.AudioRenderCallback callback) {
+        return HTML5AudioOutput.open(sampleRate, channels, callback);
+    }
+
+    @Override
     public boolean isSoundPoolSupported() {
         return true;
     }

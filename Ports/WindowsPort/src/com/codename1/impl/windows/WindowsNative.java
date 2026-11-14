@@ -953,6 +953,29 @@ public final class WindowsNative {
     /** Stops recording, finalizes the WAV header and frees the peer. */
     public static native void audioRecStop(long peer);
 
+    // ---- real-time PCM output (com.codename1.media.audio.AudioContext), cn1_windows_audioout.c ----
+    /// Opens the default output; 0 when there is none.
+    public static native long audioOutOpen(int sampleRate, int channels);
+
+    /// The rate the output runs at.
+    public static native int audioOutRate(long handle);
+
+    /// Queues up to `frames` interleaved frames from frame `offsetFrames`
+    /// without blocking; answers the frames taken.
+    public static native int audioOutWrite(long handle, float[] pcm, int offsetFrames, int frames);
+
+    /// Starts or resumes playback.
+    public static native void audioOutStart(long handle);
+
+    /// Pauses playback.
+    public static native void audioOutStop(long handle);
+
+    /// Releases the output.
+    public static native void audioOutClose(long handle);
+
+    /// Seconds between queueing a frame and hearing it.
+    public static native double audioOutLatency(long handle);
+
     /* ------------------------------------------- biometric (Windows Hello) */
 
     /**

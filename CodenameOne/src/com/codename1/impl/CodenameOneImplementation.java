@@ -5943,6 +5943,41 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Indicates whether a recorder built with
+    /// `MediaRecorderBuilder.redirectToAudioBuffer(true)` captures PCM on this
+    /// platform. The default returns false; ports that implement the redirect
+    /// override it.
+    public boolean isAudioBufferCaptureSupported() {
+        return false;
+    }
+
+    /// Indicates whether this platform can stream rendered PCM to the speaker in
+    /// real time, which is what `com.codename1.media.audio.AudioContext` needs.
+    /// The default returns false; a port that overrides it must also override
+    /// `#openAudioOutput(int, int, com.codename1.media.audio.AudioRenderCallback)`.
+    public boolean isAudioOutputSupported() {
+        return false;
+    }
+
+    /// Opens a real-time PCM output that pulls interleaved float samples from
+    /// `callback` on an audio thread. The returned peer starts stopped.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sampleRate`: the rate wanted, or 0 for the device's own
+    ///
+    /// - `channels`: the interleaved channel count wanted
+    ///
+    /// - `callback`: supplies the samples
+    ///
+    /// #### Returns
+    ///
+    /// the output, or null when none can be opened (the default)
+    public com.codename1.media.audio.AudioOutputPeer openAudioOutput(int sampleRate, int channels,
+            com.codename1.media.audio.AudioRenderCallback callback) {
+        return null;
+    }
+
     /// Creates media asynchronously.
     ///
     /// #### Parameters
