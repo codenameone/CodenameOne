@@ -3045,7 +3045,7 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void sortKeyNamesOneColumnOfATwoColumnIdentifier() throws Exception {
         File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("sortkey.Message","package sortkey; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Message { @Id(autoIncrement=false) public String channel; @Id(autoIncrement=false) @SortKey public long sentAt; public String text; }");
+        sources.put("sortkey.Message","package sortkey; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity public class Message { @Id(autoIncrement=false) public String channel; @Id(autoIncrement=false) @SortKey public long sentAt; public String text; }");
         sources.put("sortkey.Plain","package sortkey; import com.codename1.annotations.*; @Entity public class Plain { @Id public long id; }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
@@ -3063,18 +3063,18 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void sortKeyIsRejectedOffATwoColumnIdentifier() throws Exception {
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("badsort.Single","package badsort; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Single { @Id(autoIncrement=false) @SortKey public long id; }");
+        sources.put("badsort.Single","package badsort; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity public class Single { @Id(autoIncrement=false) @SortKey public long id; }");
         rejectsMappingForBothRuntimes(sources,"@SortKey requires an identifier of exactly two columns");
         sources.clear();
-        sources.put("badsort.NotId","package badsort; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class NotId { @Id(autoIncrement=false) public String a; @Id(autoIncrement=false) public long b; @SortKey public long c; }");
+        sources.put("badsort.NotId","package badsort; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity public class NotId { @Id(autoIncrement=false) public String a; @Id(autoIncrement=false) public long b; @SortKey public long c; }");
         rejectsMappingForBothRuntimes(sources,"@SortKey marks an identifier column");
     }
 
     @Test
     public void searchableNamesItsIndexAndFields() throws Exception {
         File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("search.Product","package search; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @Searchable(index=\"products\") public class Product { @Id public long id; @SearchField public String name; public String secret; }");
-        sources.put("search.Note","package search; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"Field_Notes\") @Searchable public class Note { @Id public long id; public String body; }");
+        sources.put("search.Product","package search; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity @Searchable(index=\"products\") public class Product { @Id public long id; @SearchField public String name; public String secret; }");
+        sources.put("search.Note","package search; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity(table=\"Field_Notes\") @Searchable public class Note { @Id public long id; public String body; }");
         sources.put("search.Plain","package search; import com.codename1.annotations.*; @Entity public class Plain { @Id public long id; }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
@@ -3098,14 +3098,14 @@ public class OrmAnnotationProcessorTest {
     @Test
     public void searchableRejectsABadIndexAndAStraySearchField() throws Exception {
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("badsearch.Upper","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @Searchable(index=\"Products\") public class Upper { @Id public long id; }");
+        sources.put("badsearch.Upper","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity @Searchable(index=\"Products\") public class Upper { @Id public long id; }");
         rejectsMappingForBothRuntimes(sources,"@Searchable index 'Products'");
         sources.clear();
-        sources.put("badsearch.Stray","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Stray { @Id public long id; @SearchField public String name; }");
+        sources.put("badsearch.Stray","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity public class Stray { @Id public long id; @SearchField public String name; }");
         rejectsMappingForBothRuntimes(sources,"@SearchField name needs @Searchable");
         sources.clear();
         sources.put("badsearch.Money","package badsearch; import com.codename1.annotations.db.*; @Embeddable public class Money { public long cents; public String currency; }");
-        sources.put("badsearch.Order","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity @Searchable public class Order { @Id public long id; @Embedded @SearchField public Money total; }");
+        sources.put("badsearch.Order","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity @Searchable public class Order { @Id public long id; @Embedded @SearchField public Money total; }");
         rejectsMappingForBothRuntimes(sources,"@SearchField goes on the fields of the @Embeddable");
     }
 

@@ -20,41 +20,31 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.annotations.db;
+package com.codename1.backend.annotations;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/// Keeps a full-text search index in step with an entity on the server.
+/// Marks the sort key of a two-column composite identifier, for a document store.
 ///
-/// After a transaction commits, every entity of this type it persisted or
-/// updated is written to the index, and every one it removed is deleted from
-/// it, through the server's search engine (`cn1.search.url`: Elasticsearch,
-/// OpenSearch, or the application's own database). A transaction that rolls
-/// back changes nothing in the index.
-///
-/// The search document holds the entity's persistent fields, keyed by column
-/// name. When any field is marked [SearchField] only those fields are indexed,
-/// which keeps a password hash or a token out of a search cluster.
+/// A DynamoDB table is keyed by a partition key and, optionally, a sort key; the
+/// items of one partition are stored in sort-key order and read together. An
+/// entity says which identifier column is which by marking one of exactly two
+/// `@Id` columns (or two components of an `@EmbeddedId`) with this annotation;
+/// the other is the partition key. MongoDB stores the pair as a compound `_id`.
 ///
 /// ```java
-/// @Entity @Searchable(index = "products")
-/// public class Product {
-///     @Id public long id;
-///     @SearchField public String name;
-///     @SearchField public String description;
-///     String supplierCode;
+/// @Entity
+/// public class Message {
+///     @Id(autoIncrement = false) String channel;
+///     @Id(autoIncrement = false) @SortKey long sentAt;
+///     String text;
 /// }
 /// ```
 ///
-/// A bulk `update` or `delete` statement changes rows, not entities, and is not
-/// reflected in the index. On a device this annotation has no effect.
+/// A SQL session ignores it: the pair is the table's composite primary key there.
 @Retention(RetentionPolicy.CLASS)
-@Target(ElementType.TYPE)
-@com.codename1.impl.SharedWithBackend
-public @interface Searchable {
-    /// The index name: lowercase letters, digits, `-` and `_`, not starting
-    /// with `-` or `_`. Empty means the entity's table name.
-    String index() default "";
+@Target(ElementType.FIELD)
+public @interface SortKey {
 }

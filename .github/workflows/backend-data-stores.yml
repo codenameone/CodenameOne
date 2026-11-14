@@ -41,6 +41,8 @@ on:
       - 'maven/build-engine/src/main/java/com/codename1/maven/processors/OrmAnnotationProcessor.java'
       - 'CodenameOne/src/com/codename1/impl/orm/**'
       - 'CodenameOne/src/com/codename1/annotations/db/**'
+      - 'vm/backend/src/com/codename1/backend/annotations/Search*.java'
+      - 'vm/backend/src/com/codename1/backend/annotations/SortKey.java'
   schedule:
     - cron: '11 0 * * *'
   workflow_dispatch:

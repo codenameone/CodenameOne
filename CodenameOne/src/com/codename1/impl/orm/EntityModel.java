@@ -85,12 +85,12 @@ public abstract class EntityModel<T> {
     public int generation() {
         return 0;
     }
-    /// The attribute marked `@SortKey`, or -1. Only a document store reads it:
+    /// The attribute marked `@com.codename1.backend.annotations.SortKey`, or -1. Only a document store reads it:
     /// the other identifier column is then the partition key.
     public int sortKeyIndex() {
         return -1;
     }
-    /// The search index an `@Searchable` entity is kept in, or null when the
+    /// The search index a `@com.codename1.backend.annotations.Searchable` entity is kept in, or null when the
     /// entity is not searchable.
     public String searchIndex() {
         return null;

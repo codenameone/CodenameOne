@@ -28,6 +28,7 @@ import android.content.SharedPreferences;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
 import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.io.Storage;
+import com.codename1.ui.Display;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -49,7 +50,7 @@ public class SharedPreferencesApplyDeferredTest {
 
     @Test
     public void applyWritesOnceLater() {
-        SharedPreferences prefs = AndroidTestSupport.context()
+        final SharedPreferences prefs = AndroidTestSupport.context()
                 .getSharedPreferences("apply-deferred", Context.MODE_PRIVATE);
         Storage real = Storage.getInstance();
         final ArrayList<Object> writes = new ArrayList<Object>();
@@ -61,17 +62,35 @@ public class SharedPreferencesApplyDeferredTest {
             }
         });
         try {
-            prefs.edit().putString("k", "one").apply();
-            prefs.edit().putString("k", "two").apply();
+            // The main thread is the EDT, another thread than this test's,
+            // so the applies and the checks between them run on it: from
+            // here the queued write could run before the next line.
+            final int[] seen = new int[1];
+            Display.getInstance().callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    prefs.edit().putString("k", "one").apply();
+                    prefs.edit().putString("k", "two").apply();
+                    seen[0] = writes.size();
+                }
+            });
             assertEquals("two", prefs.getString("k", null));
-            assertEquals("apply does not wait on storage", 0, writes.size());
+            assertEquals("apply does not wait on storage", 0, seen[0]);
             MainThreadRule.drain();
             assertEquals("the applies share one write", 1, writes.size());
             assertEquals("two", ((Map<?, ?>) writes.get(0)).get("k"));
 
-            prefs.edit().putString("k", "three").apply();
-            assertTrue(prefs.edit().putString("k", "four").commit());
-            assertEquals(2, writes.size());
+            final boolean[] committed = new boolean[1];
+            Display.getInstance().callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    prefs.edit().putString("k", "three").apply();
+                    committed[0] = prefs.edit().putString("k", "four").commit();
+                    seen[0] = writes.size();
+                }
+            });
+            assertTrue(committed[0]);
+            assertEquals(2, seen[0]);
             MainThreadRule.drain();
             assertEquals("the commit already wrote the applied value", 2, writes.size());
             assertEquals("four", ((Map<?, ?>) writes.get(1)).get("k"));

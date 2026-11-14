@@ -423,7 +423,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(indexes instanceof List) for(Object index:(List)indexes) ec.indexes.add((AnnotationValues)index);
         String table = unquoteName(entityAnn.getString("table"));
         ec.tableName = (table == null || table.length() == 0) ? physical(ec.simpleName) : table;
-        AnnotationValues searchable = cls.getClassAnnotation("Lcom/codename1/annotations/db/Searchable;");
+        AnnotationValues searchable = cls.getClassAnnotation("Lcom/codename1/backend/annotations/Searchable;");
         if (searchable != null) {
             String index = searchable.getString("index");
             ec.searchIndex = index == null || index.length() == 0 ? asciiLower(ec.tableName) : index;
@@ -493,8 +493,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             pf.fieldName = fieldPath.path;pf.declaringType=fieldPath.declaringType;
             pf.embeddedParent = fieldPath.prefix;
             pf.version = f.getAnnotation("Lcom/codename1/annotations/db/Version;") != null;
-            pf.sortKey = f.getAnnotation("Lcom/codename1/annotations/db/SortKey;") != null;
-            pf.searchField = f.getAnnotation("Lcom/codename1/annotations/db/SearchField;") != null;
+            pf.sortKey = f.getAnnotation("Lcom/codename1/backend/annotations/SortKey;") != null;
+            pf.searchField = f.getAnnotation("Lcom/codename1/backend/annotations/SearchField;") != null;
             pf.kind = PropertyTypeKind.of(f);
             pf.record = ec.record;
             if(f.isFinal() && !ec.record && pf.kind.kind!=PropertyTypeKind.Kind.PROPERTY) ctx.error(cls,"Persistent fields must be writable: "+pf.fieldName);
@@ -1179,7 +1179,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                     if(entity.embeddedId!=null) ctx.error("Multiple embedded identifiers");
                     entity.embeddedId=path;
                 }
-                if(field.getAnnotation("Lcom/codename1/annotations/db/SearchField;")!=null) {
+                if(field.getAnnotation("Lcom/codename1/backend/annotations/SearchField;")!=null) {
                     // The value is stored as its own columns; marking the holder
                     // would otherwise be dropped and every column indexed.
                     ctx.error("@SearchField goes on the fields of the @Embeddable, not on the embedded value: "+path);

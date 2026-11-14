@@ -49,7 +49,7 @@
 ///   ObjectId (MongoDB) or a random 128-bit hex id (DynamoDB); a generated
 ///   number needs a SQL sequence.
 /// - **A composite identifier has exactly two columns, one marked
-///   [com.codename1.annotations.db.SortKey].** That is DynamoDB's partition and
+///   [com.codename1.backend.annotations.SortKey].** That is DynamoDB's partition and
 ///   sort key, and a compound `_id` in MongoDB.
 /// - **No identity map or dirty tracking.** Each call goes to the store:
 ///   `merge` writes the whole entity, and two `find`s return two objects.

@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.annotations.db;
+package com.codename1.backend.annotations;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -30,6 +30,5 @@ import java.lang.annotation.Target;
 /// one field is marked, only marked fields (and the identifier) are indexed.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
-@com.codename1.impl.SharedWithBackend
 public @interface SearchField {
 }
