@@ -2131,6 +2131,8 @@ public class UIManager {
                                            Font plain, Font bold) {
         java.util.HashSet<String> themed = new java.util.HashSet<String>();
         schedulingThemed = themed;
+        // Left from a pass that didn't finish, a key would be refilled here.
+        schedulingRefill.clear();
         boolean dark = darkMode;
         // A theme that carries its dark styles as `$Dark` entries turns dark
         // with the device and has no `darkModeBool` to say so. The defaults
