@@ -880,12 +880,26 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dGetOrCreatePipeline___long_java_l
     NSString *srcStr = toNSString(CN1_THREAD_GET_STATE_PASS_ARG mslSource);
     // Recover the stride from the key encoding "...|sNN|..." so we can build the
     // vertex descriptor. Falls back to position-only on parse failure.
+    // Searched from the END, for "|s" followed by a digit: the material part of
+    // the key comes first and has its own "|s" segments ("|sh:" for a custom
+    // shader, "|skin3" for skinning), and taking the first match parsed those as
+    // a zero stride, so the descriptor declared position alone and Metal
+    // rejected every pipeline whose shader reads a normal, uv or joints.
     int strideBytes = 12;
-    NSRange r = [keyStr rangeOfString:@"|s"];
-    if (r.location != NSNotFound) {
-        NSString *tail = [keyStr substringFromIndex:r.location + 2];
-        int parsed = (int)[tail intValue];
-        if (parsed > 0) strideBytes = parsed;
+    NSRange search = NSMakeRange(0, [keyStr length]);
+    while (search.length > 0) {
+        NSRange r = [keyStr rangeOfString:@"|s" options:NSBackwardsSearch range:search];
+        if (r.location == NSNotFound) break;
+        NSUInteger at = r.location + 2;
+        if (at < [keyStr length]) {
+            unichar c = [keyStr characterAtIndex:at];
+            if (c >= '0' && c <= '9') {
+                int parsed = (int)[[keyStr substringFromIndex:at] intValue];
+                if (parsed > 0) strideBytes = parsed;
+                break;
+            }
+        }
+        search = NSMakeRange(0, r.location);
     }
     CN1GL3DPipeline *p = [view pipelineForKey:keyStr source:srcStr
                                     blendMode:blendMode cullMode:cullMode

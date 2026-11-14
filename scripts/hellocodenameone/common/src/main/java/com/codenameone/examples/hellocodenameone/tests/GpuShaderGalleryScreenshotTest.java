@@ -117,7 +117,7 @@ public class GpuShaderGalleryScreenshotTest extends BaseTest {
             public void run() {
                 // capture only once a frame has been drawn after the slow
                 // first one, or after 20s so a broken device still reports
-                if (frames.get() >= 2 || polls++ > 90) {
+                if (frames.get() >= 2 || polls++ > maxPolls()) {
                     UITimer.timer(400, false, parent, run);
                     return;
                 }

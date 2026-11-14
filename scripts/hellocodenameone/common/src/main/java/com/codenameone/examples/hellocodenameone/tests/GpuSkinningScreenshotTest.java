@@ -221,7 +221,7 @@ public class GpuSkinningScreenshotTest extends BaseTest {
             public void run() {
                 // a third frame has started once two are complete; give up
                 // after ~20s so a broken device still reports
-                if (frames.get() >= 3 || polls++ > 90) {
+                if (frames.get() >= 3 || polls++ > maxPolls()) {
                     UITimer.timer(400, false, parent, run);
                     return;
                 }

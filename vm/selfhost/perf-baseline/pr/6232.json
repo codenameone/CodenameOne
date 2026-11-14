@@ -1,4 +1,140 @@
 {
+ "calibrate": {
+  "linux-x64@intel-xeon-6975p-c": {
+   "arrayRandom": {
+    "all": {
+     "memory": 0.199,
+     "runs": 1,
+     "time": 1.003,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   },
+   "arraySequential": {
+    "all": {
+     "memory": 0.359,
+     "runs": 1,
+     "time": 2.129,
+     "tolerance": {
+      "time": 0.3
+     }
+    }
+   },
+   "hashMapChurn": {
+    "all": {
+     "memory": 0.101,
+     "runs": 1,
+     "time": 1.422,
+     "tolerance": {
+      "time": 0.55
+     }
+    }
+   },
+   "hello": {
+    "all": {
+     "memory": 0.837,
+     "runs": 1,
+     "time": 1.11,
+     "tolerance": {
+      "memory": 0.45,
+      "time": 0.5
+     }
+    }
+   },
+   "intArithmetic": {
+    "all": {
+     "memory": 0.039,
+     "runs": 1,
+     "time": 1.011,
+     "tolerance": {
+      "memory": 0.55
+     }
+    }
+   },
+   "longArithmetic": {
+    "all": {
+     "memory": 0.038,
+     "runs": 1,
+     "time": 1.061,
+     "tolerance": {
+      "memory": 0.65
+     }
+    }
+   },
+   "mathTranscendental": {
+    "all": {
+     "memory": 0.041,
+     "runs": 1,
+     "time": 1.032,
+     "tolerance": {
+      "memory": 1.0,
+      "time": 0.3
+     }
+    }
+   },
+   "objectAllocation": {
+    "all": {
+     "memory": 0.361,
+     "runs": 1,
+     "time": 1.222,
+     "tolerance": {
+      "memory": 0.65,
+      "time": 0.5
+     }
+    }
+   },
+   "quicksort": {
+    "all": {
+     "memory": 0.099,
+     "runs": 1,
+     "time": 1.095
+    }
+   },
+   "recursion": {
+    "all": {
+     "memory": 0.04,
+     "runs": 1,
+     "time": 1.389,
+     "tolerance": {
+      "memory": 1.0
+     }
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "memory": 0.268,
+     "runs": 1,
+     "time": 1.539,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "memory": 0.478,
+     "runs": 1,
+     "time": 0.587,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.35
+     }
+    }
+   },
+   "valueEscape": {
+    "all": {
+     "memory": 0.031,
+     "runs": 1,
+     "time": 0.129,
+     "tolerance": {
+      "memory": 0.55,
+      "time": 0.4
+     }
+    }
+   }
+  }
+ },
  "pr": 6232,
  "rebaseline": {
   "windows-x64@intel64-family-6-model-207-genuineintel": {
