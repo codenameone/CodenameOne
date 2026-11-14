@@ -286,6 +286,11 @@ image::img/slate-desktop-owner-dashboard.png["The owner's dashboard on the deskt
 
 image::img/slate-desktop-owner-catalog.png["The services list with the editor of the one picked beside it",scaledwidth=80%]
 
+* The staffing plan has the room to show the whole week's shifts and every
+  provider's load under them.
+
+image::img/slate-desktop-owner-staffing.png["The week's staffing on the desktop: each provider's shifts on a Gantt chart, how booked each one is, and the load under the chart",scaledwidth=80%]
+
 * The provider's week shows all seven days at once.
 
 image::img/slate-desktop-provider-week.png["A provider's week on the desktop, seven days side by side",scaledwidth=80%]

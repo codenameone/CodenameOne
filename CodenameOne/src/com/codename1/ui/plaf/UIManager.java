@@ -194,6 +194,8 @@ public class UIManager {
     /// hands the whole theme back in, these included, and without this they
     /// would read as the application's own styles and never be replaced.
     private final HashMap<String, Object> schedulingDefaults = new HashMap<String, Object>();
+    // Stale keys of theme-owned scheduling UIIDs, refilled by the next pass.
+    private final java.util.HashSet<String> schedulingRefill = new java.util.HashSet<String>();
     private final java.util.Set<String> nativeFontKeys = new java.util.HashSet<String>();
     private final java.util.Set<String> nativeColorKeys = new java.util.HashSet<String>();
     private final java.util.Set<String> nativeBorderKeys = new java.util.HashSet<String>();
@@ -2162,6 +2164,18 @@ public class UIManager {
                 }
             }
             if (stale != null) {
+                // A stale key of a UIID the theme owns is refilled with this
+                // pass's default (schedulingStyle): without it a transparent
+                // grid, whose transparency 0 equals the default, kept its
+                // bgColor and lost its transparency, and painted black.
+                for (String key : stale) {
+                    int dot = key.indexOf('.');
+                    if (dot > 0 && themed.contains(key.substring(0, dot))) {
+                        schedulingRefill.add(key);
+                    }
+                }
+            }
+            if (stale != null) {
                 // The theme is applied over the defaults once this returns,
                 // so the old ones have to leave it or they win again.
                 for (String key : stale) {
@@ -2306,6 +2320,7 @@ public class UIManager {
             schedulingState("PickerMaterialTab", "sel#", variant, raised, "0");
             schedulingState("PickerMaterialTab", "press#", onTint, tint, "255");
         }
+        schedulingRefill.clear();
         schedulingDefaults.clear();
         for (Map.Entry<String, Object> e : themeProps.entrySet()) {
             String key = e.getKey();
@@ -2320,6 +2335,9 @@ public class UIManager {
     private boolean schedulingStyle(java.util.HashSet<String> themed, String id, String fg, String bg,
                                     String transparency, String padding, Font font) {
         if (themed.contains(id)) {
+            refill(id + ".fgColor", fg);
+            refill(id + ".bgColor", bg);
+            refill(id + ".transparency", transparency);
             return false;
         }
         themeProps.put(id + ".fgColor", fg);
@@ -2335,6 +2353,13 @@ public class UIManager {
             themeProps.put(id + ".font", font);
         }
         return true;
+    }
+
+    // Puts this pass's default for a key the theme's own UIID lost as stale.
+    private void refill(String key, String value) {
+        if (schedulingRefill.remove(key)) {
+            themeProps.put(key, value);
+        }
     }
 
     /// A state of a default style. It derives the unselected one, so it keeps

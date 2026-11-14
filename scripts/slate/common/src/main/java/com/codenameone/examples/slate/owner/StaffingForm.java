@@ -42,6 +42,8 @@ import com.codenameone.examples.slate.ui.Lang;
 import com.codenameone.examples.slate.ui.Ui;
 
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 // tag::slate-staffing[]
@@ -153,9 +155,9 @@ public final class StaffingForm extends LiveChannel.Adapter {
                 if (shift.end() <= shift.start()) {
                     continue;
                 }
-                long off = overlap(shift, s.busy(), "TIME_OFF");
+                long off = covered(timeOff(shift, s.busy()));
                 long open = shift.end() - shift.start() - off;
-                GanttTask task = new GanttTask(s.username() + "-" + n++,
+                GanttTask task = new GanttTask("s-" + s.username() + "-" + n++,
                         Times.shortDay(shift.start()) + " " + Times.clock(shift.start()));
                 task.setManuallyScheduled(true);
                 task.setDates(shift.start(), shift.end());
@@ -163,7 +165,7 @@ public final class StaffingForm extends LiveChannel.Adapter {
                     task.setName(Times.shortDay(shift.start()) + " " + Lang.tr("Time off"));
                     task.setUIID("SvTimelineBusy");
                 } else {
-                    float used = Math.min(1f, booked(shift, s.appointments()) / (float) open);
+                    float used = Math.min(1f, booked(shift, s.appointments(), s.busy()) / (float) open);
                     task.setPercentComplete(Math.round(used * 100));
                     if (used > 0) {
                         // An assignment is in units greater than zero; an
@@ -178,30 +180,53 @@ public final class StaffingForm extends LiveChannel.Adapter {
         return project;
     }
 
-    // The booked time inside a shift, counting a booking's buffers since the
-    // provider can't take anyone else then either.
-    private static long booked(ShiftDto shift, List<AppointmentDto> appointments) {
-        long total = 0;
+    // The booked time inside a shift that isn't time off. A booking's buffers
+    // count, since the provider can't take anyone else then either; time
+    // covered twice (overlapping blocks, a booking inside time off) counts once.
+    private static long booked(ShiftDto shift, List<AppointmentDto> appointments,
+            List<BusyDto> busy) {
+        List<long[]> taken = timeOff(shift, busy);
+        long off = covered(taken);
         for (AppointmentDto a : appointments) {
-            if ("CANCELLED".equals(a.state()) || "EXPIRED".equals(a.state())) {
-                continue;
+            if (!"CANCELLED".equals(a.state()) && !"EXPIRED".equals(a.state())) {
+                clip(taken, shift, a.blockStart() > 0 ? a.blockStart() : a.start(),
+                        a.blockEnd() > 0 ? a.blockEnd() : a.end());
             }
-            long from = Math.max(shift.start(), a.blockStart() > 0 ? a.blockStart() : a.start());
-            long to = Math.min(shift.end(), a.blockEnd() > 0 ? a.blockEnd() : a.end());
-            total += Math.max(0, to - from);
         }
-        return total / MINUTE * MINUTE;
+        return (covered(taken) - off) / MINUTE * MINUTE;
     }
 
-    private static long overlap(ShiftDto shift, List<BusyDto> busy, String kind) {
-        long total = 0;
+    private static List<long[]> timeOff(ShiftDto shift, List<BusyDto> busy) {
+        List<long[]> out = new ArrayList<>();
         for (BusyDto b : busy) {
-            if (kind.equals(b.kind())) {
-                total += Math.max(0, Math.min(shift.end(), b.end())
-                        - Math.max(shift.start(), b.start()));
+            if ("TIME_OFF".equals(b.kind())) {
+                clip(out, shift, b.start(), b.end());
             }
         }
-        return Math.min(total, shift.end() - shift.start());
+        return out;
+    }
+
+    private static void clip(List<long[]> out, ShiftDto shift, long from, long to) {
+        long f = Math.max(shift.start(), from);
+        long t = Math.min(shift.end(), to);
+        if (t > f) {
+            out.add(new long[] {f, t});
+        }
+    }
+
+    // The length of the union of the intervals.
+    private static long covered(List<long[]> spans) {
+        List<long[]> sorted = new ArrayList<>(spans);
+        Collections.sort(sorted, (x, y) -> Long.compare(x[0], y[0]));
+        long total = 0;
+        long end = Long.MIN_VALUE;
+        for (long[] s : sorted) {
+            if (s[1] > end) {
+                total += s[1] - Math.max(s[0], end);
+                end = s[1];
+            }
+        }
+        return total;
     }
 }
 // end::slate-staffing[]

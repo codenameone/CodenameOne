@@ -135,6 +135,10 @@ This is the lightweight argument in one picture. A native date picker looks the 
 <video controls playsinline preload="metadata" poster="/blog/release-2026-11-13/slate-desktop-demo-poster.jpg" width="1280" height="746" style="width:100%;height:auto;display:block;margin:16px auto" aria-label="Slate on the desktop: a client picks a service, a day and a free time, and books it"><source src="/blog/release-2026-11-13/slate-desktop-demo.mp4" type="video/mp4"><a href="/blog/release-2026-11-13/slate-desktop-demo.mp4">Download the desktop video</a>.</video>
 {{< /guide-block >}}
 
+{{< guide-block >}}
+<video controls playsinline preload="metadata" poster="/blog/release-2026-11-13/slate-owner-demo-poster.jpg" width="1280" height="746" style="width:100%;height:auto;display:block;margin:16px auto" aria-label="Slate on the desktop: the owner's dashboard, the day board on the scheduler, and the week's staffing on a Gantt chart"><source src="/blog/release-2026-11-13/slate-owner-demo.mp4" type="video/mp4"><a href="/blog/release-2026-11-13/slate-owner-demo.mp4">Download the owner video</a>.</video>
+{{< /guide-block >}}
+
 Slate is our new full-stack template: an appointment booking app and its server, in one Maven project. Salons, clinics, tutors, personal trainers: anyone who sells time. Generate it from the [Initializr](/initializr/) under your own name and package. The source is MIT-0, so you owe nothing and credit nobody.
 
 {{< guide-block >}}

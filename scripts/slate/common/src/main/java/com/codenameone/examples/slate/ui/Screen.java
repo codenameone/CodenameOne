@@ -69,6 +69,12 @@ final class Screen extends Form {
         body = moved;
     }
 
+    /// Where the screen's own content is: the body beside the menu once
+    /// docked, the content pane before.
+    Container body() {
+        return body == null ? getContentPane() : body;
+    }
+
     @Override
     public void addComponent(Component cmp) {
         if (body == null) {

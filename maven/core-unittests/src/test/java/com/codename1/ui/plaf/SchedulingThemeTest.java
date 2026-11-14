@@ -98,6 +98,28 @@ public class SchedulingThemeTest extends UITestBase {
     }
 
     @Test
+    public void aTransparentGridStaysTransparentAcrossARefresh() {
+        UIManager m = UIManager.getInstance();
+        // A layer with no scheduler styles gets the defaults, the grid's
+        // transparency 0 among them...
+        m.setThemeProps(new Hashtable<String, Object>());
+        Hashtable<String, Object> app = new Hashtable<String, Object>();
+        // ...and an application theme then makes the grid transparent, which
+        // CSS writes as a black colour with transparency 0, equal to the default.
+        app.put("SchedulerGrid.bgColor", "000000");
+        app.put("SchedulerGrid.transparency", "0");
+        try {
+            m.addThemeProps(app);
+            m.refreshTheme();
+            assertEquals(0, m.getComponentStyle("SchedulerGrid").getBgTransparency() & 0xff);
+            // the colour it didn't set is still the default's
+            assertEquals(0xdadce0, m.getComponentStyle("SchedulerGrid").getFgColor());
+        } finally {
+            m.setThemeProps(new Hashtable<String, Object>());
+        }
+    }
+
+    @Test
     public void androidMaterialThemeTurnsMaterialPickersOn() throws Exception {
         Hashtable theme = load("AndroidMaterialTheme.res");
         if (theme == null) {
