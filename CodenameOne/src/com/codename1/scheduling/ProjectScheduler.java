@@ -389,6 +389,14 @@ public final class ProjectScheduler {
         t.setDuration(Math.max(0, cal.workingTimeBetween(t.earlyStart, t.earlyFinish)));
         if (work > 0) {
             t.setPercentComplete((int) (done / work));
+        } else if (!t.children.isEmpty()) {
+            // Nothing to weigh by (manual tasks in hours off, milestones):
+            // every child counts the same rather than leaving it stale.
+            int sum = 0;
+            for (int c = 0; c < t.children.size(); c++) {
+                sum += t.children.get(c).getPercentComplete();
+            }
+            t.setPercentComplete(sum / t.children.size());
         }
     }
 

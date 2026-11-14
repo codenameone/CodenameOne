@@ -120,6 +120,28 @@ public class SchedulingThemeTest extends UITestBase {
     }
 
     @Test
+    public void aThemesStateKeyEqualToADefaultSurvivesRefreshes() {
+        UIManager m = UIManager.getInstance();
+        m.setThemeProps(new Hashtable<String, Object>());
+        Hashtable<String, Object> app = new Hashtable<String, Object>();
+        app.put("GanttRow.bgColor", "ff0000");
+        app.put("GanttRow.sel#bgColor", "00ff00");
+        // equal to the default's selected transparency
+        app.put("GanttRow.sel#transparency", "255");
+        try {
+            m.addThemeProps(app);
+            m.refreshTheme();
+            m.refreshTheme();
+            Style sel = m.getComponentSelectedStyle("GanttRow");
+            assertEquals(0x00ff00, sel.getBgColor());
+            assertEquals(255, sel.getBgTransparency() & 0xff);
+            assertEquals(0xff0000, m.getComponentStyle("GanttRow").getBgColor());
+        } finally {
+            m.setThemeProps(new Hashtable<String, Object>());
+        }
+    }
+
+    @Test
     public void androidMaterialThemeTurnsMaterialPickersOn() throws Exception {
         Hashtable theme = load("AndroidMaterialTheme.res");
         if (theme == null) {

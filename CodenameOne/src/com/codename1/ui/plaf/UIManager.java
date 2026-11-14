@@ -196,6 +196,8 @@ public class UIManager {
     private final HashMap<String, Object> schedulingDefaults = new HashMap<String, Object>();
     // Stale keys of theme-owned scheduling UIIDs, refilled by the next pass.
     private final java.util.HashSet<String> schedulingRefill = new java.util.HashSet<String>();
+    // The UIIDs the theme being installed styles itself, for one pass.
+    private java.util.HashSet<String> schedulingThemed;
     private final java.util.Set<String> nativeFontKeys = new java.util.HashSet<String>();
     private final java.util.Set<String> nativeColorKeys = new java.util.HashSet<String>();
     private final java.util.Set<String> nativeBorderKeys = new java.util.HashSet<String>();
@@ -2128,6 +2130,7 @@ public class UIManager {
     private void installSchedulingDefaults(HashMap<String, Object> installedTheme, boolean darkMode,
                                            Font plain, Font bold) {
         java.util.HashSet<String> themed = new java.util.HashSet<String>();
+        schedulingThemed = themed;
         boolean dark = darkMode;
         // A theme that carries its dark styles as `$Dark` entries turns dark
         // with the device and has no `darkModeBool` to say so. The defaults
@@ -2254,7 +2257,7 @@ public class UIManager {
         schedulingStyle(themed, "SchedulerToolbar", onSurface, surface, "255", "1,1,1,1", null);
         schedulingStyle(themed, "SchedulerTitle", onSurface, surface, "0", "1,1,2,2", bold);
         if (schedulingStyle(themed, "SchedulerViewButton", primary, surface, "0", "1,1,2,2", null)) {
-            themeProps.put("SchedulerViewButton.align", Integer.valueOf(Component.CENTER));
+            schedulingDefault("SchedulerViewButton", "SchedulerViewButton.align", Integer.valueOf(Component.CENTER));
             schedulingState("SchedulerViewButton", "sel#", primary, surface, "0");
             // a toggle that is down draws its pressed style
             schedulingState("SchedulerViewButton", "press#", onTint, tint, "255");
@@ -2263,13 +2266,13 @@ public class UIManager {
         // Material pickers
         schedulingStyle(themed, "PickerMaterial", onSurface, raised, "255", "0,0,0,0", null);
         if (schedulingStyle(themed, "PickerMaterialDialog", onSurface, raised, "255", "2,2,2,2", null)) {
-            themeProps.put("PickerMaterialDialog.border", RoundRectBorder.create().cornerRadius(4f));
+            schedulingDefault("PickerMaterialDialog", "PickerMaterialDialog.border", RoundRectBorder.create().cornerRadius(4f));
         }
         schedulingStyle(themed, "PickerMaterialHeader", onSurface, raised, "0", "2,2,3,3", null);
         schedulingStyle(themed, "PickerMaterialOverline", variant, raised, "0", "0,0,0,0", small);
         schedulingStyle(themed, "PickerMaterialHeadline", onSurface, raised, "0", "1,0,0,0", large);
         if (schedulingStyle(themed, "PickerMaterialButton", primary, raised, "0", "1.5,1.5,2,2", null)) {
-            themeProps.put("PickerMaterialButton.align", Integer.valueOf(Component.CENTER));
+            schedulingDefault("PickerMaterialButton", "PickerMaterialButton.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialButton", "sel#", primary, raised, "0");
             schedulingState("PickerMaterialButton", "press#", onTint, tint, "255");
         }
@@ -2282,30 +2285,30 @@ public class UIManager {
         }
         schedulingStyle(themed, "PickerMaterialWeekday", variant, raised, "0", null, small);
         if (schedulingStyle(themed, "PickerMaterialYear", onSurface, raised, "0", "1.5,1.5,1,1", null)) {
-            themeProps.put("PickerMaterialYear.align", Integer.valueOf(Component.CENTER));
+            schedulingDefault("PickerMaterialYear", "PickerMaterialYear.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialYear", "sel#", onSurface, raised, "0");
             schedulingState("PickerMaterialYear", "press#", onTint, tint, "255");
         }
         if (schedulingStyle(themed, "PickerMaterialYearSelected", onPrimary, primary, "255", "1.5,1.5,1,1", null)) {
-            themeProps.put("PickerMaterialYearSelected.align", Integer.valueOf(Component.CENTER));
+            schedulingDefault("PickerMaterialYearSelected", "PickerMaterialYearSelected.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialYearSelected", "sel#", onPrimary, primary, "255");
             schedulingState("PickerMaterialYearSelected", "press#", onPrimary, primary, "255");
         }
         if (!themed.contains("PickerMaterialField")) {
-            themeProps.put("PickerMaterialField.derive", "TextField");
-            themeProps.put("PickerMaterialField.sel#derive", "TextField.sel");
-            themeProps.put("PickerMaterialField.press#derive", "TextField.press");
-            themeProps.put("PickerMaterialField.dis#derive", "TextField.dis");
+            schedulingDefault("PickerMaterialField", "PickerMaterialField.derive", "TextField");
+            schedulingDefault("PickerMaterialField", "PickerMaterialField.sel#derive", "TextField.sel");
+            schedulingDefault("PickerMaterialField", "PickerMaterialField.press#derive", "TextField.press");
+            schedulingDefault("PickerMaterialField", "PickerMaterialField.dis#derive", "TextField.dis");
         }
         schedulingStyle(themed, "PickerMaterialError", error, raised, "0", "0,1,3,3", small);
         if (schedulingStyle(themed, "PickerMaterialTimeField", onSurface, well, "255", "2,2,3,3", large)) {
-            themeProps.put("PickerMaterialTimeField.align", Integer.valueOf(Component.CENTER));
+            schedulingDefault("PickerMaterialTimeField", "PickerMaterialTimeField.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialTimeField", "sel#", onSurface, well, "255");
             schedulingState("PickerMaterialTimeField", "press#", onTint, tint, "255");
         }
         schedulingStyle(themed, "PickerMaterialTimeSeparator", onSurface, raised, "0", "0,0,1,1", large);
         if (schedulingStyle(themed, "PickerMaterialPeriod", variant, well, "255", "1,1,2,2", null)) {
-            themeProps.put("PickerMaterialPeriod.align", Integer.valueOf(Component.CENTER));
+            schedulingDefault("PickerMaterialPeriod", "PickerMaterialPeriod.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialPeriod", "sel#", variant, well, "255");
             schedulingState("PickerMaterialPeriod", "press#", onTint, tint, "255");
         }
@@ -2316,11 +2319,12 @@ public class UIManager {
             schedulingState("PickerMaterialDial", "dis#", dark ? "6f6a75" : "b0acb5", well, "255");
         }
         if (schedulingStyle(themed, "PickerMaterialTab", variant, raised, "0", "1.5,1.5,2,2", null)) {
-            themeProps.put("PickerMaterialTab.align", Integer.valueOf(Component.CENTER));
+            schedulingDefault("PickerMaterialTab", "PickerMaterialTab.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialTab", "sel#", variant, raised, "0");
             schedulingState("PickerMaterialTab", "press#", onTint, tint, "255");
         }
         schedulingRefill.clear();
+        schedulingThemed = null;
         schedulingDefaults.clear();
         for (Map.Entry<String, Object> e : themeProps.entrySet()) {
             String key = e.getKey();
@@ -2334,41 +2338,42 @@ public class UIManager {
     /// millimetres, top, bottom, left, right; null leaves the theme's default.
     private boolean schedulingStyle(java.util.HashSet<String> themed, String id, String fg, String bg,
                                     String transparency, String padding, Font font) {
-        if (themed.contains(id)) {
-            refill(id + ".fgColor", fg);
-            refill(id + ".bgColor", bg);
-            refill(id + ".transparency", transparency);
-            return false;
-        }
-        themeProps.put(id + ".fgColor", fg);
-        themeProps.put(id + ".bgColor", bg);
-        themeProps.put(id + ".transparency", transparency);
-        themeProps.put(id + ".margin", "0,0,0,0");
+        schedulingDefault(id, id + ".fgColor", fg);
+        schedulingDefault(id, id + ".bgColor", bg);
+        schedulingDefault(id, id + ".transparency", transparency);
+        schedulingDefault(id, id + ".margin", "0,0,0,0");
         if (padding != null) {
-            themeProps.put(id + ".padding", padding);
-            themeProps.put(id + ".padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS,
+            schedulingDefault(id, id + ".padding", padding);
+            schedulingDefault(id, id + ".padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS,
                     Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
         }
         if (font != null) {
-            themeProps.put(id + ".font", font);
+            schedulingDefault(id, id + ".font", font);
         }
+        // The states are passed through as well: on a theme's own UIID they
+        // only refill what went stale.
         return true;
     }
 
-    // Puts this pass's default for a key the theme's own UIID lost as stale.
-    private void refill(String key, String value) {
-        if (schedulingRefill.remove(key)) {
-            themeProps.put(key, value);
+    // Writes a default, or on a UIID the theme owns only puts back a key of
+    // it that was dropped as a stale default from the last pass.
+    private void schedulingDefault(String id, String key, Object value) {
+        if (schedulingThemed != null && schedulingThemed.contains(id)) {
+            if (schedulingRefill.remove(key)) {
+                themeProps.put(key, value);
+            }
+            return;
         }
+        themeProps.put(key, value);
     }
 
     /// A state of a default style. It derives the unselected one, so it keeps
     /// the padding, alignment and font and changes the colours alone.
     private void schedulingState(String id, String state, String fg, String bg, String transparency) {
-        themeProps.put(id + "." + state + "derive", id);
-        themeProps.put(id + "." + state + "fgColor", fg);
-        themeProps.put(id + "." + state + "bgColor", bg);
-        themeProps.put(id + "." + state + "transparency", transparency);
+        schedulingDefault(id, id + "." + state + "derive", id);
+        schedulingDefault(id, id + "." + state + "fgColor", fg);
+        schedulingDefault(id, id + "." + state + "bgColor", bg);
+        schedulingDefault(id, id + "." + state + "transparency", transparency);
     }
 
     /// Adds the given theme properties on top of the existing properties without

@@ -284,6 +284,20 @@ class ProjectSchedulerTest {
     }
 
     @Test
+    void aSummaryOfManualTasksInHoursOffStillRollsUp() {
+        ProjectModel p = project();
+        GanttTask parent = new GanttTask("parent", "parent");
+        p.addTask(parent);
+        // 20:00 to 22:00 is outside the project's working hours
+        p.addTask(parent, new GanttTask("one", "one").setManuallyScheduled(true)
+                .setDates(at(14, 20), at(14, 22)).setPercentComplete(30));
+        p.addTask(parent, new GanttTask("two", "two").setManuallyScheduled(true)
+                .setDates(at(15, 19), at(15, 23)).setPercentComplete(50));
+        p.update();
+        assertEquals(40, parent.getPercentComplete());
+    }
+
+    @Test
     void removingATaskRemovesItsLinksAndTheBaselineRemembers() {
         ProjectModel p = project();
         GanttTask a = task(p, "a", 1);
