@@ -143,8 +143,32 @@ class GanttTest extends UITestBase {
         int left = chart.axis().x(first) - chart.getOffX();
         int right = chart.axis().x(last) - chart.getOffX();
         int body = chart.bodyWidth();
-        assertEquals(0, left, 1, "the first day starts at the left edge");
-        assertEquals(body, right, 2, "the last day ends at the right edge");
+        int pad = Look.mm(2);
+        assertEquals(pad, left, 1, "the first day starts a margin in from the left edge");
+        assertTrue(right <= body - pad + 2 && right >= body - pad - 4,
+                "the last day ends a margin in from the right edge: " + right + " of " + body);
+    }
+
+    @FormTest
+    void zoomToFitKeepsTheNameAfterTheLastBarInView() {
+        ProjectModel p = project();
+        p.addResource(new ScheduleResource("ann", "Somebody With A Long Name"));
+        GanttTask a = task(p, null, "a", 15);
+        GanttTask b = task(p, null, "b", 10).assign("ann");
+        p.link(a, b);
+        p.update();
+        Gantt g = show(p);
+        GanttChart chart = g.surface();
+
+        g.zoomToFit();
+        chart.layoutNow();
+
+        String label = "Somebody With A Long Name";
+        int textW = Look.style("GanttRow").getFont().stringWidth(label);
+        int barEnd = chart.axis().x(b.getEnd()) - chart.getOffX();
+        assertTrue(barEnd + Look.mm(2.2f) + textW <= chart.bodyWidth(),
+                "the label ends inside the chart: bar ends at " + barEnd + ", label is " + textW
+                + " wide, body is " + chart.bodyWidth());
     }
 
     @FormTest
