@@ -3218,8 +3218,12 @@ public class CertificateWizard extends Lifecycle {
     private void showModal(InteractionDialog d) {
         Display display = Display.getInstance();
         Form current = display.getCurrent();
-        int w = current == null || current.getWidth() <= 0 ? display.getDisplayWidth() : current.getWidth();
-        int h = current == null || current.getHeight() <= 0 ? display.getDisplayHeight() : current.getHeight();
+        // Measure the pane the dialog is shown in, not the form: a desktop form's title area sits
+        // outside the content pane, and centring against the whole form left the dialog that much
+        // short, clipping its action row.
+        Container pane = current == null ? null : current.getContentPane();
+        int w = pane == null || pane.getWidth() <= 0 ? display.getDisplayWidth() : pane.getWidth();
+        int h = pane == null || pane.getHeight() <= 0 ? display.getDisplayHeight() : pane.getHeight();
         int min = display.convertToPixels(4);
         applyFontScale(d);
         // Never narrower than the widest row of buttons. A button grid gives every cell the width
@@ -3257,8 +3261,12 @@ public class CertificateWizard extends Lifecycle {
     private void showLargeModal(InteractionDialog d) {
         Display display = Display.getInstance();
         Form current = display.getCurrent();
-        int w = current == null || current.getWidth() <= 0 ? display.getDisplayWidth() : current.getWidth();
-        int h = current == null || current.getHeight() <= 0 ? display.getDisplayHeight() : current.getHeight();
+        // Measure the pane the dialog is shown in, not the form: a desktop form's title area sits
+        // outside the content pane, and centring against the whole form left the dialog that much
+        // short, clipping its action row.
+        Container pane = current == null ? null : current.getContentPane();
+        int w = pane == null || pane.getWidth() <= 0 ? display.getDisplayWidth() : pane.getWidth();
+        int h = pane == null || pane.getHeight() <= 0 ? display.getDisplayHeight() : pane.getHeight();
         int min = display.convertToPixels(4);
         applyFontScale(d);
         // As in showModal, plus the scrollbar a large modal keeps beside its content.
