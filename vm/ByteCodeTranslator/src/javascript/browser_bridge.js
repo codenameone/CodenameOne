@@ -5397,6 +5397,8 @@
         v.setAttribute('playsinline', '');
         v.setAttribute('autoplay', '');
         v.srcObject = stream;
+        // Kept so a resume after a suspend can ask for the same device again.
+        v.__cn1CameraRequest = { facing: facing, audio: audio };
         try { var p = v.play(); if (p && p.catch) { p.catch(function() {}); } } catch (e) {}
         global.__cn1_camera_error = '';
         return hostResult(v);
@@ -5432,9 +5434,202 @@
     }
   });
 
+  function cn1CameraVideoTrack(v) {
+    try {
+      var s = v && v.srcObject;
+      var t = s ? s.getVideoTracks() : [];
+      return t.length > 0 ? t[0] : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Torch, zoom and focus through MediaStreamTrack constraints (Image Capture
+  // extensions). Each is applied only when the track's capabilities list it,
+  // so a browser or webcam without the control answers 0 instead of
+  // rejecting; the Java side treats that as the documented no-op.
+  hostBridge.register('__cn1_camera_control__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    var track = cn1CameraVideoTrack(v);
+    if (!track || typeof track.applyConstraints !== 'function') { return 0; }
+    var caps = {};
+    try { caps = typeof track.getCapabilities === 'function' ? (track.getCapabilities() || {}) : {}; } catch (e) {}
+    var op = String(request.op || '');
+    var c = null;
+    if (op === 'torch') {
+      if (!caps.torch) { return 0; }
+      c = { torch: !!request.a };
+    } else if (op === 'zoom') {
+      if (!caps.zoom) { return 0; }
+      // The API's ratio is relative to no zoom; a track's zoom range is in
+      // its own units, whose minimum is "no zoom".
+      var min = typeof caps.zoom.min === 'number' ? caps.zoom.min : 1;
+      var max = typeof caps.zoom.max === 'number' ? caps.zoom.max : min;
+      var value = min * Math.max(1, +request.a || 1);
+      c = { zoom: Math.max(min, Math.min(max, value)) };
+    } else if (op === 'focus') {
+      var modes = caps.focusMode || [];
+      c = {};
+      if (caps.pointsOfInterest !== undefined || 'pointsOfInterest' in caps) {
+        c.pointsOfInterest = [{ x: +request.a, y: +request.b }];
+      }
+      if (modes.indexOf('single-shot') >= 0) {
+        c.focusMode = 'single-shot';
+      } else if (modes.indexOf('continuous') >= 0) {
+        c.focusMode = 'continuous';
+      }
+      if (c.focusMode === undefined && c.pointsOfInterest === undefined) { return 0; }
+    } else {
+      return 0;
+    }
+    return track.applyConstraints({ advanced: [c] }).then(function() {
+      if (op === 'focus' && c.focusMode === 'single-shot' && modes.indexOf('continuous') >= 0) {
+        // Single-shot locks focus where it settled; hand control back to
+        // continuous focus once it has, as the native ports do.
+        setTimeout(function() {
+          try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function() {}); } catch (e) {}
+        }, 3000);
+      }
+      return 1;
+    }, function() { return 0; });
+  });
+
+  // Pause releases the camera (the light goes off, another page or app can
+  // take it); resume asks for the same device again on the same <video>.
+  hostBridge.register('__cn1_camera_suspend__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    if (!v) { return 0; }
+    try {
+      if (v.srcObject) {
+        var t = v.srcObject.getTracks();
+        for (var i = 0; i < t.length; i++) { t[i].stop(); }
+      }
+      v.pause();
+      v.srcObject = null;
+      // A recording's own microphone track is not on the preview stream, and
+      // while it is live the recorder keeps capturing audio: pause has to
+      // release the hardware, so end the recording's capture too.
+      var st = v.__cn1Recorder;
+      if (st) {
+        for (var j = 0; j < st.extra.length; j++) { try { st.extra[j].stop(); } catch (e2) {} }
+        try { if (st.recorder.state !== 'inactive') { st.recorder.stop(); } } catch (e3) {}
+      }
+    } catch (e) {}
+    return 1;
+  });
+
+  hostBridge.register('__cn1_camera_resume__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    if (!v || !navigator.mediaDevices) { return 0; }
+    var req = v.__cn1CameraRequest || { facing: 'environment', audio: false };
+    return navigator.mediaDevices.getUserMedia({ video: { facingMode: req.facing }, audio: req.audio })
+      .then(function(stream) {
+        v.srcObject = stream;
+        try { var p = v.play(); if (p && p.catch) { p.catch(function() {}); } } catch (e) {}
+        return 1;
+      }, function(e) {
+        global.__cn1_camera_error = (e && e.name) ? e.name : ('' + e);
+        return 0;
+      });
+  });
+
+  // Video recording with MediaRecorder over the preview's own stream (plus a
+  // microphone track when audio is asked for and the session opened without
+  // one). Answers '' on success or the reason it could not start.
+  hostBridge.register('__cn1_camera_record_start__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    if (!v || !v.srcObject) { return 'Camera not open'; }
+    if (typeof MediaRecorder === 'undefined') { return 'MediaRecorder is not supported by this browser'; }
+    if (v.__cn1Recorder) { return 'A video recording is already in progress'; }
+    var wantAudio = !!(request && request.audio);
+    var start = function(stream, extraTracks) {
+      // A codec string naming no audio codec can be refused for a stream that
+      // has an audio track, so the audio case asks for one with both.
+      var types = stream.getAudioTracks().length > 0
+        ? ['video/mp4;codecs=avc1,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus',
+          'video/mp4', 'video/webm']
+        : ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+      var type = '';
+      for (var i = 0; i < types.length; i++) {
+        if (typeof MediaRecorder.isTypeSupported !== 'function' || MediaRecorder.isTypeSupported(types[i])) {
+          type = types[i];
+          break;
+        }
+      }
+      var rec;
+      try {
+        rec = type ? new MediaRecorder(stream, { mimeType: type }) : new MediaRecorder(stream);
+      } catch (e) {
+        return 'Could not start MediaRecorder: ' + ((e && e.message) || e);
+      }
+      var chunks = [];
+      rec.ondataavailable = function(ev) { if (ev.data && ev.data.size > 0) { chunks.push(ev.data); } };
+      try {
+        rec.start(1000);
+      } catch (e) {
+        var ex = extraTracks || [];
+        for (var k = 0; k < ex.length; k++) { try { ex[k].stop(); } catch (e2) {} }
+        return 'Could not start MediaRecorder: ' + ((e && e.message) || e);
+      }
+      // Published only once started, so a failed start does not leave every
+      // later one answering "already in progress".
+      v.__cn1Recorder = { recorder: rec, chunks: chunks, extra: extraTracks || [] };
+      return '';
+    };
+    var stream = v.srcObject;
+    if (!wantAudio || stream.getAudioTracks().length > 0) {
+      return start(stream, null);
+    }
+    return navigator.mediaDevices.getUserMedia({ audio: true }).then(function(mic) {
+      var tracks = stream.getVideoTracks().concat(mic.getAudioTracks());
+      return start(new MediaStream(tracks), mic.getAudioTracks());
+    }, function(e) {
+      return 'Microphone unavailable: ' + ((e && e.name) || e);
+    });
+  });
+
+  // Stops the recording and answers "<mime>\n<base64>" of the whole file, or
+  // null when nothing was recorded.
+  hostBridge.register('__cn1_camera_record_stop__', function(request) {
+    var v = resolveHostRef(request && request.video);
+    var state = v && v.__cn1Recorder;
+    if (!state) { return null; }
+    v.__cn1Recorder = null;
+    return new Promise(function(resolve) {
+      var rec = state.recorder;
+      var finish = function() {
+        for (var i = 0; i < state.extra.length; i++) { try { state.extra[i].stop(); } catch (e) {} }
+        if (state.chunks.length === 0) { resolve(null); return; }
+        var blob = new Blob(state.chunks, { type: rec.mimeType || 'video/webm' });
+        var fr = new FileReader();
+        fr.onload = function() {
+          var res = String(fr.result || '');
+          var comma = res.indexOf(',');
+          resolve((rec.mimeType || 'video/webm') + '\n' + (comma >= 0 ? res.substring(comma + 1) : res));
+        };
+        fr.onerror = function() { resolve(null); };
+        fr.readAsDataURL(blob);
+      };
+      if (rec.state === 'inactive') {
+        finish();
+        return;
+      }
+      rec.onstop = finish;
+      try { rec.stop(); } catch (e) { finish(); }
+    });
+  });
+
   hostBridge.register('__cn1_camera_close__', function(request) {
     var v = resolveHostRef(request && request.video);
     if (!v) { return 0; }
+    try {
+      if (v.__cn1Recorder) {
+        var r = v.__cn1Recorder;
+        v.__cn1Recorder = null;
+        if (r.recorder.state !== 'inactive') { r.recorder.stop(); }
+        for (var j = 0; j < r.extra.length; j++) { r.extra[j].stop(); }
+      }
+    } catch (e) {}
     try {
       if (v.srcObject) {
         var t = v.srcObject.getTracks();

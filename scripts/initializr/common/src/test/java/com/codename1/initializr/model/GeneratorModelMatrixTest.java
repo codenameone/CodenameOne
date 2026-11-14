@@ -1125,7 +1125,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ".agent-skills/codename-one/references/flutter-to-cn1.md",
                 ".agent-skills/codename-one/tools/README.md",
                 ".agent-skills/codename-one/tools/IsApiSupported.java",
-                ".agent-skills/codename-one/tools/IsCssValid.java"
+                ".agent-skills/codename-one/tools/IsCssValid.java",
+                ".agent-skills/codename-one/tools/Sim.java"
         };
         for (int i = 0; i < expectedSkillEntries.length; i++) {
             assertNotNull(entries.get(expectedSkillEntries[i]),

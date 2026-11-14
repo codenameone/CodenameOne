@@ -163,6 +163,28 @@ class VisionApiTest extends UITestBase {
     }
 
     @Test
+    void barcodeFormatsAreCopiedAndSurviveTheOptionSnapshot() {
+        RecordingVisionImpl backend = new RecordingVisionImpl();
+        implementation.setVisionImpl(backend);
+        assertEquals(0, new VisionOptions().getBarcodeFormats().length,
+                "no formats means every format");
+
+        String[] formats = {BarcodeFormat.PDF417};
+        VisionOptions options = new VisionOptions().barcodeFormats(formats);
+        formats[0] = BarcodeFormat.QR_CODE;
+        options.getBarcodeFormats()[0] = BarcodeFormat.QR_CODE;
+        assertEquals(BarcodeFormat.PDF417, options.getBarcodeFormats()[0]);
+
+        BarcodeScanner scanner = new BarcodeScanner(options);
+        options.barcodeFormats(BarcodeFormat.EAN_13);
+        await(scanner.process(VisionImage.encoded(new byte[] {1})));
+        assertEquals(1, backend.options.getBarcodeFormats().length);
+        assertEquals(BarcodeFormat.PDF417, backend.options.getBarcodeFormats()[0]);
+        assertEquals(0, options.barcodeFormats((String[]) null).getBarcodeFormats().length);
+        scanner.close();
+    }
+
+    @Test
     void textScriptDefaultsToNullAndSurvivesTheOptionSnapshot() {
         RecordingVisionImpl backend = new RecordingVisionImpl();
         implementation.setVisionImpl(backend);

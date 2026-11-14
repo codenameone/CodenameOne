@@ -606,6 +606,24 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionStop___long(CODENAME
     (void) handle;
     cn1LinuxStubOnce("cameraSessionStop");
 }
+JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionSetZoom___long_float(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_FLOAT ratio) {
+    (void) handle; (void) ratio;
+    cn1LinuxStubOnce("cameraSessionSetZoom");
+}
+JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionFocus___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    (void) handle;
+    cn1LinuxStubOnce("cameraSessionFocus");
+}
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_cameraSessionStartRecording___long_java_lang_String_boolean_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT path, JAVA_BOOLEAN audio) {
+    (void) handle; (void) path; (void) audio;
+    cn1LinuxStubOnce("cameraSessionStartRecording");
+    return JAVA_NULL;
+}
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_cameraSessionStopRecording___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    (void) handle;
+    cn1LinuxStubOnce("cameraSessionStopRecording");
+    return JAVA_FALSE;
+}
 JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionSetPaused___long_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_BOOLEAN paused) {
     (void) handle; (void) paused;
     cn1LinuxStubOnce("cameraSessionSetPaused");

@@ -1061,6 +1061,34 @@ public final class WindowsNative {
      */
     public static native int[] cameraSessionLatestFrame(long handle, int[] outDims);
 
+    /**
+     * Sets the zoom ratio (1.0 = none) through the device's IAMCameraControl,
+     * clamped to its range. A device without a zoom control ignores it.
+     */
+    public static native void cameraSessionSetZoom(long handle, float ratio);
+
+    /**
+     * Asks the lens to refocus by switching its focus control to auto (UVC has no
+     * focus point). A device without auto focus ignores it.
+     */
+    public static native void cameraSessionFocus(long handle);
+
+    /**
+     * Starts writing the session's frames to an H.264 MP4 at the native
+     * {@code path}, with AAC audio from the default microphone when
+     * {@code audio}. Returns 0 when recording as requested, 1 when recording
+     * video only because no audio capture device could be opened, -1 for a bad
+     * handle or a recording already running, -2 while the camera is not open
+     * yet, -3 when the writer or encoder could not be set up.
+     */
+    public static native int cameraSessionStartRecording(long handle, String path, boolean audio);
+
+    /**
+     * Stops recording and finalizes the MP4. False when no recording was running
+     * or nothing playable was written.
+     */
+    public static native boolean cameraSessionStopRecording(long handle);
+
     // ----------------------------------------------------------- native peers
 
     /**

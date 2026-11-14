@@ -173,3 +173,17 @@ The pattern is intentionally minimal — drop a new `.java` file into this direc
 - One question per tool. Print one line of result on stdout. Send diagnostics to stderr.
 - Exit codes: `0` success, `1` negative answer / validation failed, `2` discovery or usage error.
 - Auto-discover the CN1 jars from `~/.m2/repository/com/codenameone/`. Tell the user when discovery fails and what to fix.
+
+### `Sim.java`
+
+Drives a running simulator (`./mvnw cn1:agent &`, or `./gradlew cn1Agent &`) over its loopback MCP port, so an agent can look at and operate the app with no window and no MCP host. It reads the port from `cn1-agent.port`, which the goal writes.
+
+```bash
+java tools/Sim.java wait                 # until the first form is on screen
+java tools/Sim.java snapshot             # the UI tree as JSON
+java tools/Sim.java tap "Hello World"    # by label or node id
+java tools/Sim.java screenshot shot.png
+java tools/Sim.java record-start flow.mp4 && java tools/Sim.java record-stop
+```
+
+The comment at the top of the file lists every command, including `device-screenshot` and `device-record` for an iOS simulator or an Android emulator.

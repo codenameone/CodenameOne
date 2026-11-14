@@ -42,6 +42,7 @@ public final class VisionOptions {
     private float minimumConfidence;
     private int maximumResults;
     private TextScript textScript;
+    private String[] barcodeFormats = new String[0];
 
     /// @param value selector, or {@code null} to restore automatic selection
     /// @return this options object
@@ -83,6 +84,38 @@ public final class VisionOptions {
         return this;
     }
 
+    /// Limits {@link BarcodeScanner} to the given {@link BarcodeFormat}
+    /// constants. The platform detector is configured with only these
+    /// symbologies, so it neither spends frame time on formats the application
+    /// will never accept nor reports one of them by mistake -- which matters
+    /// most for dense codes such as PDF417, where every frame counts.
+    /// Analyzers other than the barcode scanner ignore it, as does a backend
+    /// with no way to restrict its detector (it still reports every format).
+    ///
+    /// {@link CodeScannerOptions#formats(String...)} sets this for the
+    /// scanner it opens, so a {@link CodeScanner} caller does not need both.
+    ///
+    /// @param values format constants; empty or {@code null} detects every
+    ///        format the backend supports
+    /// @return this options object
+    public VisionOptions barcodeFormats(String... values) {
+        if (values == null) {
+            barcodeFormats = new String[0];
+        } else {
+            barcodeFormats = new String[values.length];
+            System.arraycopy(values, 0, barcodeFormats, 0, values.length);
+        }
+        return this;
+    }
+
+    /// @return defensive copy of the barcode formats to detect; empty detects
+    ///         every format
+    public String[] getBarcodeFormats() {
+        String[] out = new String[barcodeFormats.length];
+        System.arraycopy(barcodeFormats, 0, out, 0, barcodeFormats.length);
+        return out;
+    }
+
     /// @return selected backend, never {@code null}
     public VisionBackend getBackend() {
         return backend;
@@ -108,6 +141,7 @@ public final class VisionOptions {
         return new VisionOptions().backend(backend)
                 .minimumConfidence(minimumConfidence)
                 .maximumResults(maximumResults)
-                .textScript(textScript);
+                .textScript(textScript)
+                .barcodeFormats(barcodeFormats);
     }
 }
