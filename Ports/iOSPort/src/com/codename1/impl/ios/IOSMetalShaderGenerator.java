@@ -26,6 +26,10 @@ import com.codename1.gpu.Environment;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderEmitter;
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.impl.gpu.GlslShaderGenerator;
 
 /// Runtime generator of Metal Shading Language (MSL) source for the iOS 3D
 /// backend. This mirrors the logic of the portable GLSL generator
@@ -97,6 +101,29 @@ public final class IOSMetalShaderGenerator {
     ///   material receives it
     public IOSMetalShaderGenerator(Material material, VertexFormat format, Environment environment,
             boolean shadowed) {
+        this(material, format, environment, shadowed, false);
+    }
+
+    /// The depth-only caster program of a material whose custom shader moves
+    /// vertices or discards fragments: the shadow pass then runs the same
+    /// vertex offset and discard, so the shadow matches what is drawn. Its
+    /// fragment function writes no colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `material`: the casting material
+    ///
+    /// - `format`: the mesh vertex layout
+    ///
+    /// #### Returns
+    ///
+    /// the generator
+    public static IOSMetalShaderGenerator depthOnly(Material material, VertexFormat format) {
+        return new IOSMetalShaderGenerator(material, format, null, false, true);
+    }
+
+    private IOSMetalShaderGenerator(Material material, VertexFormat format, Environment environment,
+            boolean shadowed, boolean depthOnly) {
         boolean hasNormal = format.findByUsage(VertexAttribute.Usage.NORMAL) != null;
         boolean hasTexcoord = format.findByUsage(VertexAttribute.Usage.TEXCOORD) != null;
         Features f = new Features();
@@ -106,14 +133,36 @@ public final class IOSMetalShaderGenerator {
         f.phong = type == Material.Type.PHONG && hasNormal;
         f.pbr = type == Material.Type.PBR && hasNormal;
         boolean sky = type == Material.Type.SKYBOX;
-        f.fog = environment != null && environment.isFog() && !sky;
+        f.fog = environment != null && environment.isFog() && !sky && material.isFogged();
         f.sky = sky && environment != null && environment.isSky();
         f.hemisphere = f.lit && environment != null && environment.isHemisphere();
         f.toneMap = f.lit && environment != null && environment.isToneMapping();
+        f.ibl = f.lit && environment != null && environment.isEnvironmentMap();
         f.shadow = f.lit && shadowed && material.isReceiveShadows();
         f.emissive = f.lit && (material.getEmissive() & 0xffffff) != 0;
         f.hasNormal = hasNormal;
         f.hasTexcoord = hasTexcoord;
+        f.skinned = GlslShaderGenerator.isSkinned(material, format);
+        if (depthOnly) {
+            f.depthOnly = true;
+            f.lit = false;
+            f.phong = false;
+            f.pbr = false;
+            f.fog = false;
+            f.sky = false;
+            f.hemisphere = false;
+            f.toneMap = false;
+            f.ibl = false;
+            f.shadow = false;
+            f.emissive = false;
+        }
+        ShaderMaterial sm = material.getEffectiveShader();
+        if (sm != null) {
+            f.shader = sm;
+            f.fragWorld = ShaderEmitter.uses(sm, true, "worldPos") || ShaderEmitter.uses(sm, true, "viewDir");
+            f.fragNormal = hasNormal && ShaderEmitter.uses(sm, true, "worldNormal");
+            f.fragUv = hasTexcoord && ShaderEmitter.uses(sm, true, "uv");
+        }
         this.source = build(format, f);
     }
 
@@ -125,11 +174,84 @@ public final class IOSMetalShaderGenerator {
         boolean fog;
         boolean hemisphere;
         boolean toneMap;
+        boolean ibl;
         boolean emissive;
         boolean sky;
         boolean shadow;
         boolean hasNormal;
         boolean hasTexcoord;
+        ShaderMaterial shader;
+        boolean fragWorld;
+        boolean fragNormal;
+        boolean fragUv;
+        boolean depthOnly;
+        boolean skinned;
+    }
+
+    // custom shading inputs; the vertex stage reads CN1VertexIn, the fragment
+    // stage CN1VertexOut, both as `in`
+    private static final class Inputs implements ShaderEmitter.Inputs {
+        private final Features f;
+        private final boolean fragment;
+
+        Inputs(Features f, boolean fragment) {
+            this.f = f;
+            this.fragment = fragment;
+        }
+
+        public String builtin(String name) {
+            if ("time".equals(name)) {
+                return "u.timeP.x";
+            }
+            if ("cameraPos".equals(name)) {
+                return "u.eye.xyz";
+            }
+            if ("sunDir".equals(name)) {
+                return "normalize(-u.lightDir.xyz)";
+            }
+            if ("sunColor".equals(name)) {
+                return "u.lightColor.xyz";
+            }
+            if (!fragment) {
+                if ("position".equals(name)) {
+                    return f.skinned ? "p0" : "in.position";
+                }
+                if ("normal".equals(name)) {
+                    return f.hasNormal ? (f.skinned ? "n0" : "in.normal") : "float3(0.0, 1.0, 0.0)";
+                }
+                if ("uv".equals(name)) {
+                    return f.hasTexcoord ? "in.texcoord" : "float2(0.0)";
+                }
+                if ("worldPos".equals(name)) {
+                    return "(u.model * float4(" + (f.skinned ? "p0" : "in.position") + ", 1.0)).xyz";
+                }
+                return null;
+            }
+            if ("worldPos".equals(name)) {
+                return "in.worldPos";
+            }
+            if ("worldNormal".equals(name)) {
+                return f.lit || f.fragNormal ? "normalize(in.worldNormal)" : "float3(0.0, 1.0, 0.0)";
+            }
+            if ("viewDir".equals(name)) {
+                return "normalize(u.eye.xyz - in.worldPos)";
+            }
+            if ("uv".equals(name)) {
+                return f.textured || f.fragUv ? "in.texcoord" : "float2(0.0)";
+            }
+            if ("baseColor".equals(name)) {
+                return "base";
+            }
+            return null;
+        }
+
+        public String uniform(int slot) {
+            return "u.cu[" + slot + "]";
+        }
+
+        public String sample(int slot, String uv) {
+            return fragment ? "ct" + slot + ".sample(cs" + slot + ", " + uv + ")" : null;
+        }
     }
 
     private static String build(VertexFormat format, Features f) {
@@ -137,7 +259,12 @@ public final class IOSMetalShaderGenerator {
         boolean textured = f.textured;
         boolean hasNormal = f.hasNormal;
         boolean hasTexcoord = f.hasTexcoord;
-        boolean world = f.lit || f.fog || f.sky;
+        boolean world = f.lit || f.fog || f.sky || f.fragWorld;
+        boolean normalOut = lit || f.fragNormal;
+        boolean uvOut = textured || f.fragUv;
+        ShaderNode offset = f.shader == null ? null : f.shader.get(ShaderMaterial.Hook.VERTEX_OFFSET);
+        String p0 = f.skinned ? "p0" : "in.position";
+        String pos = offset != null ? "pos" : p0;
         int posOff = offsetOf(format, VertexAttribute.Usage.POSITION);
         int normOff = offsetOf(format, VertexAttribute.Usage.NORMAL);
         int uvOff = offsetOf(format, VertexAttribute.Usage.TEXCOORD);
@@ -169,7 +296,10 @@ public final class IOSMetalShaderGenerator {
         sb.append("  float4 horizon;\n");
         sb.append("  float4 sun;\n");        // rgb, cloud cover
         sb.append("  float4x4 shadowMatrix;\n");
-        sb.append("  float4 shadowP;\n");   // bias, strength, texel size
+        sb.append("  float4 shadowP;\n");   // bias, strength, texel size, cascade ratio
+        // custom shading: the clock, then one float4 per declared uniform
+        sb.append("  float4 timeP;\n");
+        sb.append("  float4 cu[").append(ShaderMaterial.MAX_UNIFORMS).append("];\n");
         sb.append("};\n");
 
         // Vertex input. The interleaved buffer is decoded with explicit
@@ -182,17 +312,23 @@ public final class IOSMetalShaderGenerator {
         if (hasTexcoord) {
             sb.append("  float2 texcoord [[attribute(").append(uvOff).append(")]];\n");
         }
+        if (f.skinned) {
+            sb.append("  float4 joints [[attribute(").append(offsetOf(format, VertexAttribute.Usage.JOINTS))
+                    .append(")]];\n");
+            sb.append("  float4 weights [[attribute(").append(offsetOf(format, VertexAttribute.Usage.WEIGHTS))
+                    .append(")]];\n");
+        }
         sb.append("};\n");
 
         sb.append("struct CN1VertexOut {\n");
         sb.append("  float4 position [[position]];\n");
-        if (lit) {
+        if (normalOut) {
             sb.append("  float3 worldNormal;\n");
         }
         if (world) {
             sb.append("  float3 worldPos;\n");
         }
-        if (textured) {
+        if (uvOut) {
             sb.append("  float2 texcoord;\n");
         }
         if (f.shadow) {
@@ -203,9 +339,37 @@ public final class IOSMetalShaderGenerator {
         // Vertex function.
         sb.append("vertex CN1VertexOut ").append(VERTEX_FUNCTION).append("(\n");
         sb.append("    CN1VertexIn in [[stage_in]],\n");
-        sb.append("    constant CN1Uniforms& u [[buffer(1)]]) {\n");
+        sb.append("    constant CN1Uniforms& u [[buffer(1)]]");
+        if (f.skinned) {
+            // the joint rows, three per joint, after the uniforms (CN1GL3D.m)
+            sb.append(",\n    constant float4* joints [[buffer(2)]]");
+        }
+        sb.append(") {\n");
         sb.append("  CN1VertexOut out;\n");
-        sb.append("  float4 clip = u.mvp * float4(in.position, 1.0);\n");
+        if (f.skinned) {
+            sb.append("  float4 r0 = float4(0.0);\n  float4 r1 = float4(0.0);\n  float4 r2 = float4(0.0);\n");
+            String[] c = {"x", "y", "z", "w"};
+            for (int k = 0; k < 4; k++) {
+                sb.append("  int j").append(k).append(" = int(in.joints.").append(c[k]).append(" + 0.5) * 3;\n");
+                for (int row = 0; row < 3; row++) {
+                    sb.append("  r").append(row).append(" += in.weights.").append(c[k]).append(" * joints[j")
+                            .append(k).append(" + ").append(row).append("];\n");
+                }
+            }
+            sb.append("  float4 sp = float4(in.position, 1.0);\n");
+            sb.append("  float3 p0 = float3(dot(r0, sp), dot(r1, sp), dot(r2, sp));\n");
+            if (hasNormal) {
+                sb.append("  float3 n0 = float3(dot(r0.xyz, in.normal), dot(r1.xyz, in.normal), "
+                        + "dot(r2.xyz, in.normal));\n");
+            }
+        }
+        if (offset != null) {
+            ShaderEmitter e = new ShaderEmitter(ShaderEmitter.Dialect.MSL, f.shader, new Inputs(f, false), sb,
+                    "  ", "_v");
+            String o = e.emit(offset);
+            sb.append("  float3 pos = ").append(p0).append(" + ").append(o).append(";\n");
+        }
+        sb.append("  float4 clip = u.mvp * float4(").append(pos).append(", 1.0);\n");
         // Adapt the portable GL-convention clip space to Metal: only remap Z from
         // GL's [-w, w] to Metal's [0, w] depth range. Y is NOT flipped here -- the
         // GL backend (the reference) does not flip either, and Metal's viewport
@@ -214,13 +378,14 @@ public final class IOSMetalShaderGenerator {
         // counter-clockwise to match the portable convention).
         sb.append("  clip.z = (clip.z + clip.w) * 0.5;\n");
         sb.append("  out.position = clip;\n");
-        if (lit) {
-            sb.append("  out.worldNormal = (u.normalMatrix * float4(in.normal, 0.0)).xyz;\n");
+        if (normalOut) {
+            sb.append("  out.worldNormal = (u.normalMatrix * float4(").append(f.skinned ? "n0" : "in.normal")
+                    .append(", 0.0)).xyz;\n");
         }
         if (world) {
-            sb.append("  out.worldPos = (u.model * float4(in.position, 1.0)).xyz;\n");
+            sb.append("  out.worldPos = (u.model * float4(").append(pos).append(", 1.0)).xyz;\n");
         }
-        if (textured) {
+        if (uvOut) {
             sb.append("  out.texcoord = in.texcoord;\n");
         }
         if (f.shadow) {
@@ -242,8 +407,21 @@ public final class IOSMetalShaderGenerator {
             sb.append("  return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n");
             sb.append("}\n");
         }
+        if (f.ibl) {
+            // the environment map lookup of GlslShaderGenerator: six
+            // equirectangular bands stacked in v, at half intensity
+            sb.append("float3 envAt(texture2d<float> m, float3 d, float band) {\n");
+            sb.append("  constexpr sampler es(coord::normalized, address::clamp_to_edge, filter::linear);\n");
+            sb.append("  float2 uv = float2(atan2(d.z, d.x) * 0.15915494 + 0.5, acos(clamp(d.y, -1.0, 1.0)) * 0.31830989);\n");
+            sb.append("  uv = float2(clamp(uv.x, 0.0039, 0.9961), (clamp(uv.y, 0.0079, 0.9921) + band) / 6.0);\n");
+            sb.append("  return m.sample(es, uv).rgb * 2.0;\n}\n");
+            sb.append("float3 envSpecular(texture2d<float> m, float3 d, float rough) {\n");
+            sb.append("  float lv = clamp(rough, 0.0, 1.0) * 4.0;\n");
+            sb.append("  float l0 = floor(lv);\n");
+            sb.append("  return mix(envAt(m, d, l0), envAt(m, d, min(l0 + 1.0, 4.0)), lv - l0);\n}\n");
+        }
         // Fragment function.
-        sb.append("fragment float4 ").append(FRAGMENT_FUNCTION).append("(\n");
+        sb.append(f.depthOnly ? "fragment void " : "fragment float4 ").append(FRAGMENT_FUNCTION).append("(\n");
         sb.append("    CN1VertexOut in [[stage_in]],\n");
         sb.append("    constant CN1Uniforms& u [[buffer(1)]]");
         if (textured) {
@@ -253,20 +431,58 @@ public final class IOSMetalShaderGenerator {
         if (f.shadow) {
             sb.append(",\n    depth2d<float> shadowMap [[texture(1)]]");
         }
+        if (f.ibl) {
+            sb.append(",\n    texture2d<float> envMap [[texture(6)]]");
+        }
+        // custom textures on 2 and up; the native side binds a sampler with each
+        int customTextures = f.shader == null ? 0 : f.shader.getTextureCount();
+        for (int i = 0; i < customTextures; i++) {
+            sb.append(",\n    texture2d<float> ct").append(i).append(" [[texture(").append(2 + i).append(")]]");
+            sb.append(",\n    sampler cs").append(i).append(" [[sampler(").append(2 + i).append(")]]");
+        }
         sb.append(") {\n");
         sb.append("  float4 base = u.color;\n");
         if (textured) {
             sb.append("  base = base * tex.sample(texSampler, in.texcoord);\n");
         }
+        String[] hook = new String[ShaderMaterial.Hook.values().length];
+        if (f.shader != null) {
+            ShaderEmitter e = new ShaderEmitter(ShaderEmitter.Dialect.MSL, f.shader, new Inputs(f, true), sb,
+                    "  ", "_f");
+            ShaderMaterial.Hook[] all = ShaderMaterial.Hook.values();
+            for (int i = 0; i < all.length; i++) {
+                ShaderNode g = f.shader.get(all[i]);
+                if (g != null && all[i].isFragment()) {
+                    hook[i] = e.emit(g);
+                }
+            }
+        }
+        if (hook[ShaderMaterial.Hook.BASE_COLOR.ordinal()] != null) {
+            sb.append("  base = ").append(hook[ShaderMaterial.Hook.BASE_COLOR.ordinal()]).append(";\n");
+        }
+        if (hook[ShaderMaterial.Hook.DISCARD.ordinal()] != null) {
+            sb.append("  if (").append(hook[ShaderMaterial.Hook.DISCARD.ordinal()]).append(" > 0.5) {\n");
+            sb.append("    discard_fragment();\n  }\n");
+        }
+        if (f.depthOnly) {
+            sb.append("  (void) base;\n}\n");
+            return sb.toString();
+        }
+        String customEmissive = hook[ShaderMaterial.Hook.EMISSIVE.ordinal()];
         sb.append("  float3 rgb = base.rgb;\n");
         if (f.sky) {
             appendSky(sb);
         }
         if (lit) {
             sb.append("  float3 n = normalize(in.worldNormal);\n");
+            if (hook[ShaderMaterial.Hook.NORMAL.ordinal()] != null) {
+                sb.append("  n = normalize(").append(hook[ShaderMaterial.Hook.NORMAL.ordinal()]).append(");\n");
+            }
             sb.append("  float3 l = normalize(-u.lightDir.xyz);\n");
             sb.append("  float ndotl = max(dot(n, l), 0.0);\n");
-            if (f.hemisphere) {
+            if (f.ibl) {
+                sb.append("  float3 ambient = envAt(envMap, n, 5.0);\n");
+            } else if (f.hemisphere) {
                 sb.append("  float3 ambient = mix(u.ground.xyz, u.skyC.xyz, n.y * 0.5 + 0.5);\n");
             } else {
                 sb.append("  float3 ambient = u.ambient.xyz;\n");
@@ -274,7 +490,8 @@ public final class IOSMetalShaderGenerator {
             sb.append(f.shadow ? "  float shade = cn1ShadowAt(in.shadowPos, n, l, u, shadowMap);\n"
                     : "  float shade = 1.0;\n");
             if (f.pbr) {
-                appendPbr(sb);
+                appendPbr(sb, f.hemisphere, f.ibl, hook[ShaderMaterial.Hook.METALLIC.ordinal()],
+                        hook[ShaderMaterial.Hook.ROUGHNESS.ordinal()]);
             } else {
                 sb.append("  rgb = base.rgb * (ambient + u.lightColor.xyz * ndotl * shade);\n");
                 if (f.phong) {
@@ -289,9 +506,14 @@ public final class IOSMetalShaderGenerator {
             if (f.emissive) {
                 sb.append("  rgb += u.emissive.xyz;\n");
             }
+            if (customEmissive != null) {
+                sb.append("  rgb += ").append(customEmissive).append(";\n");
+            }
             if (f.toneMap) {
                 sb.append("  rgb = aces(rgb * u.fogColor.w);\n");
             }
+        } else if (customEmissive != null) {
+            sb.append("  rgb += ").append(customEmissive).append(";\n");
         }
         if (f.fog) {
             sb.append("  float dist = length(in.worldPos - u.eye.xyz);\n");
@@ -311,14 +533,17 @@ public final class IOSMetalShaderGenerator {
     private static void appendShadowLookup(StringBuilder sb) {
         sb.append("float cn1ShadowAt(float4 sp, float3 n, float3 l, constant CN1Uniforms& u, depth2d<float> map) {\n");
         sb.append("  constexpr sampler ss(coord::normalized, address::clamp_to_edge, filter::nearest);\n");
-        sb.append("  float3 p = sp.xyz / sp.w * 0.5 + 0.5;\n");
+        sb.append("  float3 p = sp.xyz / sp.w;\n");
+        sb.append("  float2 tx = float2(u.shadowP.z);\n");
+        GlslShaderGenerator.appendCascadePick(sb, "u.shadowP.w", "tx");
+        sb.append("  p = p * 0.5 + 0.5;\n");
         sb.append("  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) {\n");
         sb.append("    return 1.0;\n  }\n");
         sb.append("  float bias = u.shadowP.x * (1.0 + 2.0 * (1.0 - max(dot(n, l), 0.0)));\n");
         sb.append("  float lit = 0.0;\n");
         sb.append("  for (int y = -1; y <= 1; y++) {\n");
         sb.append("    for (int x = -1; x <= 1; x++) {\n");
-        sb.append("      float d = map.sample(ss, float2(p.x, 1.0 - p.y) + float2(float(x), float(y)) * u.shadowP.z);\n");
+        sb.append("      float d = map.sample(ss, float2(p.x, 1.0 - p.y) + float2(float(x), float(y)) * tx);\n");
         sb.append("      lit += p.z - bias > d ? 0.0 : 1.0;\n");
         sb.append("    }\n  }\n");
         sb.append("  return 1.0 - u.shadowP.y * (1.0 - lit / 9.0);\n");
@@ -359,7 +584,8 @@ public final class IOSMetalShaderGenerator {
     /// from the vertex id) and the bright, blur and composite fragment
     /// functions. Each fragment function reads one `float4` (bright, blur) or a
     /// `CN1PostU` (composite) at fragment buffer 0 and the scene at texture 0,
-    /// the bloom at texture 1. Mirrors the GLSL passes term for term.
+    /// the bloom at texture 1, the scene depth at texture 2 and the colour
+    /// lookup at texture 3. Mirrors the GLSL passes term for term.
     ///
     /// #### Returns
     ///
@@ -374,6 +600,11 @@ public final class IOSMetalShaderGenerator {
         sb.append("  float4 lift;\n");
         sb.append("  float4 gain;\n");
         sb.append("  float4 b;\n");     // grain, time, width, height
+        sb.append("  float4 fx;\n");    // aberration, fxaa, god rays, unused
+        sb.append("  float4 sun;\n");   // sun position in uv
+        sb.append("  float4 dfx;\n");   // ao strength, ao radius, focus, blur
+        sb.append("  float4 dfx2;\n");  // outline, near, far, lut strength
+        sb.append("  float4 ocol;\n");  // outline colour
         sb.append("};\n");
         sb.append("vertex CN1PostV cn1_post_vertex(uint vid [[vertex_id]]) {\n");
         sb.append("  float2 p = float2((vid & 1u) != 0u ? 1.0 : -1.0, (vid & 2u) != 0u ? 1.0 : -1.0);\n");
@@ -406,15 +637,22 @@ public final class IOSMetalShaderGenerator {
         sb.append("  c += scene.sample(cn1PostS, in.uv - a.xy * 3.2307692).rgb * 0.0702703;\n");
         sb.append("  return float4(c, 1.0);\n");
         sb.append("}\n");
+        sb.append("float3 cn1Px(texture2d<float> t, float2 p) {\n  return t.sample(cn1PostS, p).rgb;\n}\n");
+        sb.append("float cn1Depth(depth2d<float> t, float2 p) {\n  return t.sample(cn1PostS, p);\n}\n");
+        sb.append("float3 cn1Lut(texture2d<float> t, float2 p) {\n  return t.sample(cn1PostS, p).rgb;\n}\n");
         sb.append("fragment float4 cn1_composite_fragment(CN1PostV in [[stage_in]], constant CN1PostU& u [[buffer(0)]],\n");
-        sb.append("    texture2d<float> scene [[texture(0)]], texture2d<float> bloom [[texture(1)]]) {\n");
-        sb.append("  float3 c = scene.sample(cn1PostS, in.uv).rgb;\n");
+        sb.append("    texture2d<float> scene [[texture(0)]], texture2d<float> bloom [[texture(1)]],\n");
+        sb.append("    depth2d<float> depth [[texture(2)]], texture2d<float> lut [[texture(3)]]) {\n");
+        sb.append("  float2 uv0 = in.uv;\n");
+        sb.append(com.codename1.impl.gpu.GlslShaderGenerator.postEffects("msl", "u.fx", "u.sun.xy", "u.b.zw"));
+        sb.append(com.codename1.impl.gpu.GlslShaderGenerator.depthEffects("msl", "u.dfx", "u.dfx2", "u.ocol.xyz"));
         sb.append("  c += bloom.sample(cn1PostS, in.uv).rgb * u.a.x;\n");
         sb.append("  c = (c - 0.5) * u.a.y + 0.5;\n");
         sb.append("  float luma = dot(c, float3(0.2126, 0.7152, 0.0722));\n");
         sb.append("  c = mix(float3(luma), c, u.a.z);\n");
         sb.append("  c = clamp(c, 0.0, 1.0);\n");
         sb.append("  c = (u.lift.xyz + c * (1.0 - u.lift.xyz)) * u.gain.xyz;\n");
+        sb.append(com.codename1.impl.gpu.GlslShaderGenerator.lutEffect("msl", "u.dfx2.w"));
         sb.append("  float2 d = in.uv - 0.5;\n");
         sb.append("  c *= 1.0 - u.a.w * smoothstep(0.25, 0.75, dot(d, d) * 2.0);\n");
         sb.append("  float2 px = floor(in.uv * u.b.zw);\n");
@@ -470,9 +708,13 @@ public final class IOSMetalShaderGenerator {
 
     // Cook-Torrance with a GGX distribution, Smith-Schlick geometry and
     // Schlick's Fresnel, matching the GLSL generator term for term.
-    private static void appendPbr(StringBuilder sb) {
-        sb.append("  float metallic = u.pbrP.x;\n");
-        sb.append("  float rough = u.pbrP.y;\n");
+    private static void appendPbr(StringBuilder sb, boolean hemi, boolean ibl, String metallicHook,
+            String roughHook) {
+        sb.append("  float metallic = ")
+                .append(metallicHook != null ? "clamp(" + metallicHook + ", 0.0, 1.0)" : "u.pbrP.x").append(";\n");
+        // below 0.04 the GGX lobe is a sub-pixel spike that aliases
+        sb.append("  float rough = ")
+                .append(roughHook != null ? "clamp(" + roughHook + ", 0.04, 1.0)" : "u.pbrP.y").append(";\n");
         sb.append("  float3 v = normalize(u.eye.xyz - in.worldPos);\n");
         sb.append("  float3 h = normalize(l + v);\n");
         sb.append("  float ndotv = max(dot(n, v), 0.001);\n");
@@ -489,8 +731,24 @@ public final class IOSMetalShaderGenerator {
         sb.append("  float3 spec = ggx * geo * fres / (4.0 * max(ndotl, 0.001) * ndotv);\n");
         sb.append("  float3 kd = (float3(1.0) - fres) * (1.0 - metallic);\n");
         sb.append("  float3 direct = (kd * base.rgb + spec * 3.14159265) * u.lightColor.xyz * ndotl * shade;\n");
-        sb.append("  float3 fa = f0 + (max(float3(1.0 - rough), f0) - f0) * pow(1.0 - ndotv, 5.0);\n");
-        sb.append("  float3 amb = ambient * (base.rgb * (1.0 - metallic) * (float3(1.0) - fa) + fa * (1.0 - rough * 0.7));\n");
+        // ambient (analytic image based lighting): the diffuse term reads the
+        // environment along the normal; the specular term along the reflected
+        // view ray, pulled toward the normal as roughness blurs it, weighted by
+        // Karis' fitted split-sum BRDF instead of a baked lookup table
+        sb.append("  float3 rr = reflect(-v, n);\n");
+        sb.append("  float3 rdir = normalize(mix(rr, n, rough * rough));\n");
+        if (ibl) {
+            sb.append("  float3 envSpec = envSpecular(envMap, rr, rough);\n");
+        } else {
+            sb.append("  float3 envSpec = " + (hemi ? "mix(u.ground.xyz, u.skyC.xyz, rdir.y * 0.5 + 0.5)" : "ambient")
+                    + ";\n");
+        }
+        sb.append("  float4 ec0 = float4(-1.0, -0.0275, -0.572, 0.022);\n");
+        sb.append("  float4 ec1 = float4(1.0, 0.0425, 1.04, -0.04);\n");
+        sb.append("  float4 er = rough * ec0 + ec1;\n");
+        sb.append("  float ea = min(er.x * er.x, exp2(-9.28 * ndotv)) * er.x + er.y;\n");
+        sb.append("  float3 envF = f0 * (-1.04 * ea + er.z) + (1.04 * ea + er.w);\n");
+        sb.append("  float3 amb = ambient * base.rgb * (1.0 - metallic) * (1.0 - envF) + envSpec * envF;\n");
         sb.append("  rgb = direct + amb;\n");
     }
 

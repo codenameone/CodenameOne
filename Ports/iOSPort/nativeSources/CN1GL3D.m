@@ -82,20 +82,29 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     BOOL _postActive;
     BOOL _shadowReady;
     BOOL _postBloom;
+    BOOL _inTarget;
 }
 @property (nonatomic, strong) id<MTLTexture> shadowTexture;
 @property (nonatomic, strong) id<MTLTexture> sceneTexture;
+// the colour lookup strip of the next composite, or nil (gl3dSetPostLut)
+@property (nonatomic, strong) id<MTLTexture> postLut;
 @property (nonatomic, strong) id<MTLTexture> bloomA;
 @property (nonatomic, strong) id<MTLTexture> bloomB;
 @property (nonatomic, strong) CN1GL3DPost *post;
 @property (nonatomic, strong) id<MTLTexture> depthTexture;
+// the depth buffer render targets share, sized to the target being drawn
+@property (nonatomic, strong) id<MTLTexture> targetDepth;
 @property (nonatomic, strong) CADisplayLink *displayLink;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, CN1GL3DPipeline *> *pipelineCache;
 @property (nonatomic, strong) id<MTLRenderCommandEncoder> currentEncoder;
 - (id<MTLRenderCommandEncoder>)activeEncoder;
-- (BOOL)beginShadowPass:(int)size;
+- (BOOL)beginShadowPass:(int)width height:(int)size;
 - (void)endShadowPass;
 - (BOOL)isInShadowPass;
+- (BOOL)isInRenderTarget;
+- (id<MTLTexture>)newRenderTarget:(int)w height:(int)h;
+- (BOOL)beginRenderTarget:(id<MTLTexture>)target clear:(int)argb;
+- (void)endRenderTarget;
 - (BOOL)shadowAvailable;
 - (BOOL)beginPostProcess:(NSString *)source bloom:(BOOL)bloom;
 - (void)endPostProcess:(const float *)params;
@@ -166,7 +175,9 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     }
     MTLTextureDescriptor *dd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:CN1GL3D_DEPTH_FORMAT
                                                                                   width:w height:h mipmapped:NO];
-    dd.usage = MTLTextureUsageRenderTarget;
+    // shader read too: the post composite samples it for ambient occlusion,
+    // depth of field and outlines
+    dd.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     dd.storageMode = MTLStorageModePrivate;
     _depthTexture = [_device newTextureWithDescriptor:dd];
     _depthWidth = w;
@@ -230,6 +241,9 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     if (_inShadow) {
         [self endShadowPass];
     }
+    if (_inTarget) {
+        [self endRenderTarget];
+    }
     if (_postActive) {
         _postActive = NO;
         [self.currentEncoder endEncoding];
@@ -287,7 +301,8 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     rpd.depthAttachment.clearDepth = 1.0;
     rpd.depthAttachment.loadAction = _pendingClearDepth ? MTLLoadActionClear
             : (_encodedThisFrame ? MTLLoadActionLoad : MTLLoadActionDontCare);
-    rpd.depthAttachment.storeAction = MTLStoreActionDontCare;
+    // the scene's depth is kept while post processing, for the composite
+    rpd.depthAttachment.storeAction = _postActive ? MTLStoreActionStore : MTLStoreActionDontCare;
     _pendingClearColor = NO;
     _pendingClearDepth = NO;
     id<MTLRenderCommandEncoder> encoder = [_frameCB renderCommandEncoderWithDescriptor:rpd];
@@ -316,13 +331,14 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     }
 }
 
-- (BOOL)beginShadowPass:(int)size {
-    if (_frameCB == nil || _inShadow || size < 16 || size > 8192) {
+- (BOOL)beginShadowPass:(int)width height:(int)size {
+    if (_frameCB == nil || _inShadow || size < 16 || size > 8192 || width < size || width > 16384) {
         return NO;
     }
-    if (self.shadowTexture == nil || (int) self.shadowTexture.width != size) {
+    if (self.shadowTexture == nil || (int) self.shadowTexture.width != width
+            || (int) self.shadowTexture.height != size) {
         MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:CN1GL3D_DEPTH_FORMAT
-                                                                                      width:size height:size mipmapped:NO];
+                                                                                      width:width height:size mipmapped:NO];
         td.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
         td.storageMode = MTLStorageModePrivate;
         self.shadowTexture = [_device newTextureWithDescriptor:td];
@@ -337,10 +353,72 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     rpd.depthAttachment.loadAction = MTLLoadActionClear;
     rpd.depthAttachment.storeAction = MTLStoreActionStore;
     id<MTLRenderCommandEncoder> enc = [_frameCB renderCommandEncoderWithDescriptor:rpd];
-    [enc setViewport:(MTLViewport){0.0, 0.0, (double) size, (double) size, 0.0, 1.0}];
+    [enc setViewport:(MTLViewport){0.0, 0.0, (double) width, (double) size, 0.0, 1.0}];
     self.currentEncoder = enc;
     _inShadow = YES;
     return YES;
+}
+
+- (BOOL)isInRenderTarget {
+    return _inTarget;
+}
+
+// A render target is a colour texture in the drawable's format, so every
+// pipeline built for the frame draws into it unchanged.
+- (id<MTLTexture>)newRenderTarget:(int)w height:(int)h {
+    if (w < 1 || h < 1 || w > 16384 || h > 16384) {
+        return nil;
+    }
+    MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                                                  width:w height:h mipmapped:NO];
+    td.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    td.storageMode = MTLStorageModePrivate;
+    return [_device newTextureWithDescriptor:td];
+}
+
+// Opens a pass of its own into the target, like the shadow pass. The main
+// pass reopens at the next draw after it, loading its colour; the frame's
+// pending clear, if nothing drew yet, still applies there.
+- (BOOL)beginRenderTarget:(id<MTLTexture>)target clear:(int)argb {
+    if (_frameCB == nil || _inShadow || _inTarget || _postActive || target == nil) {
+        return NO;
+    }
+    int w = (int) target.width;
+    int h = (int) target.height;
+    if (self.targetDepth == nil || (int) self.targetDepth.width != w || (int) self.targetDepth.height != h) {
+        MTLTextureDescriptor *dd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:CN1GL3D_DEPTH_FORMAT
+                                                                                      width:w height:h mipmapped:NO];
+        dd.usage = MTLTextureUsageRenderTarget;
+        dd.storageMode = MTLStorageModePrivate;
+        self.targetDepth = [_device newTextureWithDescriptor:dd];
+        if (self.targetDepth == nil) {
+            return NO;
+        }
+    }
+    [self closeEncoder];
+    MTLRenderPassDescriptor *rpd = [MTLRenderPassDescriptor renderPassDescriptor];
+    rpd.colorAttachments[0].texture = target;
+    rpd.colorAttachments[0].clearColor = MTLClearColorMake(((argb >> 16) & 0xff) / 255.0,
+            ((argb >> 8) & 0xff) / 255.0, (argb & 0xff) / 255.0, ((argb >> 24) & 0xff) / 255.0);
+    rpd.colorAttachments[0].loadAction = MTLLoadActionClear;
+    rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
+    rpd.depthAttachment.texture = self.targetDepth;
+    rpd.depthAttachment.clearDepth = 1.0;
+    rpd.depthAttachment.loadAction = MTLLoadActionClear;
+    rpd.depthAttachment.storeAction = MTLStoreActionDontCare;
+    id<MTLRenderCommandEncoder> enc = [_frameCB renderCommandEncoderWithDescriptor:rpd];
+    [enc setViewport:(MTLViewport){0.0, 0.0, (double) w, (double) h, 0.0, 1.0}];
+    self.currentEncoder = enc;
+    _inTarget = YES;
+    return YES;
+}
+
+- (void)endRenderTarget {
+    if (!_inTarget) {
+        return;
+    }
+    [self closeEncoder];
+    _inTarget = NO;
 }
 
 - (void)endShadowPass {
@@ -397,6 +475,8 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     return [_device newTextureWithDescriptor:td];
 }
 
+static id<MTLTexture> CN1GL3DWhite(CN1GL3DView *view);
+
 - (BOOL)beginPostProcess:(NSString *)source bloom:(BOOL)bloom {
     if (_frameCB == nil || _postActive || _inShadow || _frameW < 1 || _frameH < 1) {
         return NO;
@@ -438,12 +518,18 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
     if (t1 != nil) {
         [enc setFragmentTexture:t1 atIndex:1];
     }
+    if (pso == self.post.composite) {
+        id<MTLTexture> lut = self.postLut != nil ? self.postLut : CN1GL3DWhite(self);
+        [enc setFragmentTexture:_depthTexture atIndex:2];
+        [enc setFragmentTexture:lut atIndex:3];
+    }
     [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
     [enc endEncoding];
 }
 
 // params: 0 threshold, 1 bloom intensity, 2 contrast, 3 saturation, 4-7 lift,
-// 8-11 gain, 12 vignette, 13 grain, 14 time, 15 bloom on.
+// 8-11 gain, 12 vignette, 13 grain, 14 time, 15 bloom on, 16-21 effects,
+// 22-33 the depth effects GraphicsDevice.packDepthEffects writes.
 - (void)endPostProcess:(const float *)p {
     if (!_postActive) {
         return;
@@ -468,13 +554,19 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
         }
         bloomTex = self.bloomA;
     }
-    float u[16] = {
+    // 16-21 are the effects GraphicsDevice.packPostEffects writes
+    float u[36] = {
         bloom ? p[1] : 0.0f, p[2], p[3], p[12],
         p[4], p[5], p[6], 0.0f,
         p[8], p[9], p[10], 0.0f,
-        p[13], p[14], (float) scene.width, (float) scene.height
+        p[13], p[14], (float) scene.width, (float) scene.height,
+        p[16], p[17], p[18], 0.0f,
+        p[19], p[20], 0.0f, 0.0f,
+        p[22], p[23], p[24], p[25],
+        p[26], p[27], p[28], self.postLut != nil ? p[29] : 0.0f,
+        p[30], p[31], p[32], 0.0f
     };
-    [self postPass:_frameDrawable.texture pipeline:self.post.composite tex0:scene tex1:bloomTex bytes:u length:64];
+    [self postPass:_frameDrawable.texture pipeline:self.post.composite tex0:scene tex1:bloomTex bytes:u length:144];
     // Drawing continues on the screen, which now holds the composite; its depth
     // was never stored, so it starts clean.
     _pendingClearColor = NO;
@@ -496,10 +588,14 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
         return nil;
     }
     id<MTLFunction> vfn = [lib newFunctionWithName:@"cn1_vertex_main"];
-    // A "shadow|" key is a depth-only caster pipeline: no fragment function and
-    // no colour attachment, to match the shadow map pass.
+    // A "shadow|" key is a depth-only caster pipeline with no colour
+    // attachment, to match the shadow map pass. The plain caster has no
+    // fragment function; a material whose custom shader moves vertices or
+    // discards fragments ("shadow|depth|") brings one that writes no colour
+    // and only discards.
     BOOL depthOnly = [key hasPrefix:@"shadow|"];
-    id<MTLFunction> ffn = depthOnly ? nil : [lib newFunctionWithName:@"cn1_fragment_main"];
+    id<MTLFunction> ffn = (depthOnly && ![key hasPrefix:@"shadow|depth|"]) ? nil
+            : [lib newFunctionWithName:@"cn1_fragment_main"];
     if (vfn == nil || (ffn == nil && !depthOnly)) {
         NSLog(@"[CN1GL3D] missing shader entry points for %@", key);
         return nil;
@@ -567,6 +663,21 @@ static const MTLPixelFormat CN1GL3D_DEPTH_FORMAT = MTLPixelFormatDepth32Float;
         vd.attributes[6].format = MTLVertexFormatFloat2;
         vd.attributes[6].offset = 24;
         vd.attributes[6].bufferIndex = 0;
+    } else if (strideFloats == 16) {
+        // VertexFormat.SKINNED: position, normal, texcoord, then four joint
+        // indices at float 8 and their weights at float 12
+        vd.attributes[3].format = MTLVertexFormatFloat3;
+        vd.attributes[3].offset = 12;
+        vd.attributes[3].bufferIndex = 0;
+        vd.attributes[6].format = MTLVertexFormatFloat2;
+        vd.attributes[6].offset = 24;
+        vd.attributes[6].bufferIndex = 0;
+        vd.attributes[8].format = MTLVertexFormatFloat4;
+        vd.attributes[8].offset = 32;
+        vd.attributes[8].bufferIndex = 0;
+        vd.attributes[12].format = MTLVertexFormatFloat4;
+        vd.attributes[12].offset = 48;
+        vd.attributes[12].bufferIndex = 0;
     }
     vd.layouts[0].stride = strideBytes;
     vd.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
@@ -798,10 +909,20 @@ void com_codename1_impl_ios_IOSNative_gl3dSetViewport___long_int_int_int_int(
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
     if (contextPeer == 0) return;
     CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    // Inside a shadow pass the viewport picks the cascade's square of the
+    // shadow map, and inside a render target a part of the target; neither
+    // is the frame's viewport, so it is not recorded.
+    if ([view isInShadowPass] || [view isInRenderTarget]) {
+        if (view.currentEncoder != nil) {
+            [view.currentEncoder setViewport:(MTLViewport){(double) x, (double) y, (double) width,
+                    (double) height, 0.0, 1.0}];
+        }
+        return;
+    }
     [view recordViewport:x y:y width:width height:height];
     // Only an already open main pass is touched; opening one here would run
-    // ahead of a shadow pass or post process target the frame is about to begin.
-    id<MTLRenderCommandEncoder> enc = [view isInShadowPass] ? nil : view.currentEncoder;
+    // ahead of a post process target the frame is about to begin.
+    id<MTLRenderCommandEncoder> enc = view.currentEncoder;
     if (enc != nil) {
         MTLViewport vp = (MTLViewport){(double) x, (double) y, (double) width, (double) height, 0.0, 1.0};
         [enc setViewport:vp];
@@ -819,6 +940,49 @@ static MTLPrimitiveType CN1GL3DPrimitive(int primitive) {
     }
 }
 
+// One sampler per filter/wrap pair, made once per device: a scene of sprites
+// draws hundreds of textured quads a frame, and a new sampler state for each
+// was an allocation per draw.
+static id<MTLSamplerState> CN1GL3DSampler(CN1GL3DView *view, int texFilter, int texWrap) {
+    static id<MTLSamplerState> cn1Samplers[4];
+    static void *cn1SamplerDevice = NULL;
+    if (cn1SamplerDevice != (__bridge void *) view.device) {
+        for (int i = 0; i < 4; i++) {
+            cn1Samplers[i] = nil;
+        }
+        cn1SamplerDevice = (__bridge void *) view.device;
+    }
+    int key = (texFilter ? 1 : 0) | (texWrap ? 2 : 0);
+    if (cn1Samplers[key] == nil) {
+        MTLSamplerDescriptor *sd = [[MTLSamplerDescriptor alloc] init];
+        sd.minFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
+        sd.magFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
+        sd.sAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
+        sd.tAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
+        cn1Samplers[key] = [view.device newSamplerStateWithDescriptor:sd];
+    }
+    return cn1Samplers[key];
+}
+
+// A 1x1 white texture for a declared custom texture with nothing bound: Metal
+// leaves an unbound slot undefined, GL samples it as black or white by driver.
+static id<MTLTexture> CN1GL3DWhite(CN1GL3DView *view) {
+    static id<MTLTexture> cn1White = nil;
+    static void *cn1WhiteDevice = NULL;
+    if (cn1White == nil || cn1WhiteDevice != (__bridge void *) view.device) {
+        MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                     width:1 height:1 mipmapped:NO];
+        cn1White = [view.device newTextureWithDescriptor:td];
+        uint32_t px = 0xffffffffu;
+        [cn1White replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:&px bytesPerRow:4];
+        cn1WhiteDevice = (__bridge void *) view.device;
+    }
+    return cn1White;
+}
+
+// Floats in the CN1Uniforms block; IOSGraphicsDevice.UNIFORM_FLOATS.
+#define CN1GL3D_UNIFORM_FLOATS 196
+
 static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
         id<MTLBuffer> vbo, JAVA_OBJECT uniforms, int uniformFloats,
         long texturePeer, int texFilter, int texWrap) {
@@ -835,9 +999,19 @@ static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
     [enc setVertexBuffer:vbo offset:0 atIndex:0];
 
     JAVA_ARRAY_FLOAT *uptr = (JAVA_ARRAY_FLOAT *)CN1_ARRAY_DATA((JAVA_ARRAY)uniforms);
-    int ubytes = (int)(uniformFloats * sizeof(JAVA_ARRAY_FLOAT));
+    // A skinned draw appends its joint rows (three float4 per joint) after
+    // the CN1Uniforms block (IOSGraphicsDevice.packUniforms); the vertex
+    // function reads them from buffer 2. Uniforms and the 64 joints together
+    // stay under setVertexBytes' 4 KB.
+    int baseFloats = uniformFloats > CN1GL3D_UNIFORM_FLOATS ? CN1GL3D_UNIFORM_FLOATS : uniformFloats;
+    int ubytes = (int)(baseFloats * sizeof(JAVA_ARRAY_FLOAT));
     [enc setVertexBytes:uptr length:ubytes atIndex:1];
     [enc setFragmentBytes:uptr length:ubytes atIndex:1];
+    if (uniformFloats > CN1GL3D_UNIFORM_FLOATS) {
+        [enc setVertexBytes:uptr + CN1GL3D_UNIFORM_FLOATS
+                     length:(NSUInteger)(uniformFloats - CN1GL3D_UNIFORM_FLOATS) * sizeof(JAVA_ARRAY_FLOAT)
+                    atIndex:2];
+    }
 
     // The shadow map rides along at fragment texture 1 for every draw once one
     // has been rendered; shaders that do not sample it ignore the binding.
@@ -847,27 +1021,7 @@ static void CN1GL3DBindCommon(CN1GL3DView *view, CN1GL3DPipeline *p,
     if (texturePeer != 0) {
         id<MTLTexture> tex = (__bridge id<MTLTexture>)(void *) texturePeer;
         [enc setFragmentTexture:tex atIndex:0];
-        // One sampler per filter/wrap pair, made once per device: a scene of
-        // sprites draws hundreds of textured quads a frame, and a new sampler
-        // state for each was an allocation per draw.
-        static id<MTLSamplerState> cn1Samplers[4];
-        static void *cn1SamplerDevice = NULL;
-        if (cn1SamplerDevice != (__bridge void *) view.device) {
-            for (int i = 0; i < 4; i++) {
-                cn1Samplers[i] = nil;
-            }
-            cn1SamplerDevice = (__bridge void *) view.device;
-        }
-        int key = (texFilter ? 1 : 0) | (texWrap ? 2 : 0);
-        if (cn1Samplers[key] == nil) {
-            MTLSamplerDescriptor *sd = [[MTLSamplerDescriptor alloc] init];
-            sd.minFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
-            sd.magFilter = texFilter ? MTLSamplerMinMagFilterLinear : MTLSamplerMinMagFilterNearest;
-            sd.sAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
-            sd.tAddressMode = texWrap ? MTLSamplerAddressModeRepeat : MTLSamplerAddressModeClampToEdge;
-            cn1Samplers[key] = [view.device newSamplerStateWithDescriptor:sd];
-        }
-        [enc setFragmentSamplerState:cn1Samplers[key] atIndex:0];
+        [enc setFragmentSamplerState:CN1GL3DSampler(view, texFilter, texWrap) atIndex:0];
     }
 }
 
@@ -904,11 +1058,23 @@ void com_codename1_impl_ios_IOSNative_gl3dDrawArrays___long_long_long_int_int_in
     [[view activeEncoder] drawPrimitives:CN1GL3DPrimitive(primitive) vertexStart:0 vertexCount:vertexCount];
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginShadowPass___long_int_R_boolean(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT size) {
+void com_codename1_impl_ios_IOSNative_gl3dBindTexture___long_int_long_int_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT index,
+        JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
+    if (contextPeer == 0) return;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    id<MTLRenderCommandEncoder> enc = [view activeEncoder];
+    if (enc == nil) return;
+    id<MTLTexture> tex = texturePeer != 0 ? (__bridge id<MTLTexture>)(void *) texturePeer : CN1GL3DWhite(view);
+    [enc setFragmentTexture:tex atIndex:index];
+    [enc setFragmentSamplerState:CN1GL3DSampler(view, texFilter, texWrap) atIndex:index];
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginShadowPass___long_int_int_R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT size) {
     if (contextPeer == 0) return 0;
     CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
-    return [view beginShadowPass:size] ? 1 : 0;
+    return [view beginShadowPass:width height:size] ? 1 : 0;
 }
 
 void com_codename1_impl_ios_IOSNative_gl3dEndShadowPass___long(
@@ -918,6 +1084,32 @@ void com_codename1_impl_ios_IOSNative_gl3dEndShadowPass___long(
     [view endShadowPass];
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_gl3dCreateRenderTarget___long_int_int_R_long(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT height) {
+    if (contextPeer == 0) return 0;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    id<MTLTexture> tex = [view newRenderTarget:width height:height];
+    if (tex == nil) return 0;
+    // released by gl3dDisposeTexture like any texture
+    return (JAVA_LONG)(__bridge_retained void *) tex;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginRenderTarget___long_long_int_int_int_R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_LONG texturePeer,
+        JAVA_INT width, JAVA_INT height, JAVA_INT argb) {
+    if (contextPeer == 0 || texturePeer == 0) return 0;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    id<MTLTexture> tex = (__bridge id<MTLTexture>)(void *) texturePeer;
+    return [view beginRenderTarget:tex clear:argb] ? 1 : 0;
+}
+
+void com_codename1_impl_ios_IOSNative_gl3dEndRenderTarget___long(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer) {
+    if (contextPeer == 0) return;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    [view endRenderTarget];
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginPostProcess___long_java_lang_String_boolean_R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer,
         JAVA_OBJECT mslSource, JAVA_BOOLEAN bloom) {
@@ -925,6 +1117,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_gl3dBeginPostProcess___long_java_l
     CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
     NSString *src = mslSource == JAVA_NULL ? nil : toNSString(CN1_THREAD_GET_STATE_PASS_ARG mslSource);
     return [view beginPostProcess:src bloom:bloom ? YES : NO] ? 1 : 0;
+}
+
+void com_codename1_impl_ios_IOSNative_gl3dSetPostLut___long_long(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG contextPeer, JAVA_LONG texturePeer) {
+    if (contextPeer == 0) return;
+    CN1GL3DView *view = (__bridge CN1GL3DView *)(void *) contextPeer;
+    view.postLut = texturePeer != 0 ? (__bridge id<MTLTexture>)(void *) texturePeer : nil;
 }
 
 void com_codename1_impl_ios_IOSNative_gl3dEndPostProcess___long_float_1ARRAY(

@@ -37,6 +37,7 @@ import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
@@ -69,15 +70,22 @@ class LinuxGraphicsDevice extends GraphicsDevice {
 
     private final float[] mvp = new float[16];
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, the matrix of the cascade being drawn, and the
+    // cascade count of the shadow pass in progress (the map is that many
+    // squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private final float[] casterMatrix = new float[16];
+    private int shadowCascades = 1;
 
     // The packed uniform array; the order must match CN1_UNIFORMS in
     // cn1_linux_gl.c: u_mvp, u_model, u_normalMatrix, u_shadowMatrix (16 each),
     // u_color(4), u_lightDir(3), u_lightColor(3), u_ambient(3), u_eye(3),
     // u_shininess(1), u_fogColor(3), u_fog(3), u_sky(3), u_ground(3),
     // u_exposure(1), u_pbr(2), u_emissive(3), u_zenith(3), u_horizon(3),
-    // u_sun(4), u_shadow(3).
-    private static final int UNIFORM_FLOATS = 112;
-    private final float[] uniforms = new float[UNIFORM_FLOATS];
+    // u_sun(4), u_shadow(4), u_time(1), u_cu(64).
+    private static final int UNIFORM_FLOATS = 178;
+    // a skinned draw appends its joint rows after the named uniforms
+    private final float[] uniforms = new float[UNIFORM_FLOATS + Material.MAX_JOINTS * 12];
 
     private long shadowPipeline;
     private long brightPipeline;
@@ -87,7 +95,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
     private boolean shadowReady;
     private int shadowSize;
     private PostProcess activePost;
-    private final float[] postParams = new float[13];
+    private final float[] postParams = new float[31];
 
     LinuxGraphicsDevice(long contextPeer) {
         this.contextPeer = contextPeer;
@@ -148,7 +156,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         }
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        packUniforms(material, model, env, shadowed);
+        int uniformFloats = packUniforms(material, model, env, shadowed);
 
         long texHandle = 0;
         int texFilter = 0;
@@ -162,6 +170,8 @@ class LinuxGraphicsDevice extends GraphicsDevice {
 
         int primitive = primitiveCode(mesh.getPrimitiveType());
         int strideBytes = fmt.getStrideBytes();
+        bindShaderTextures(material);
+        bindEnvironmentMap();
 
         if (mesh.isIndexed()) {
             IndexBuffer ib = mesh.getIndices();
@@ -171,12 +181,12 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             }
             LinuxNative.gl3dDrawIndexed(
                     contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
-                    ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    ib.getIndexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap, shadowed ? 1 : 0);
         } else {
             LinuxNative.gl3dDrawArrays(
                     contextPeer, pipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap, shadowed ? 1 : 0);
         }
     }
@@ -238,6 +248,18 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         return pipeline;
     }
 
+    private long depthPipeline(Material material, VertexFormat fmt) {
+        String key = "depth|" + material.getShaderKey() + "|f" + System.identityHashCode(fmt);
+        Long existing = pipelines.get(key);
+        if (existing != null) {
+            return existing.longValue();
+        }
+        GlslShaderGenerator gen = GlslShaderGenerator.depthOnly(material, fmt);
+        long pipeline = createPipeline(key, gen.getVertexSource(), gen.getFragmentSource(), 0, 0, 1, 1);
+        pipelines.put(key, Long.valueOf(pipeline));
+        return pipeline;
+    }
+
     private long createPipeline(String key, String vertex, String fragment,
                                 int blend, int cull, int depthTest, int depthWrite) {
         return LinuxNative.gl3dGetOrCreatePipeline(contextPeer, key,
@@ -261,9 +283,20 @@ class LinuxGraphicsDevice extends GraphicsDevice {
     }
 
     // Packs the per-draw uniforms in the order of CN1_UNIFORMS in cn1_linux_gl.c.
-    private void packUniforms(Material material, float[] model, Environment env, boolean shadowed) {
+    // Returns the number of floats to pass: the named uniforms, plus the
+    // joint rows of a skinned material.
+    private int packUniforms(Material material, float[] model, Environment env, boolean shadowed) {
         Camera cam = getCamera();
         float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
+        if (inRenderTarget) {
+            // GL stores a target's rows bottom up; flipping clip space Y leaves
+            // the texture upright, as an uploaded image is (the native side
+            // flips the front face winding to match)
+            for (int i = 0; i < 16; i++) {
+                flippedVp[i] = (i & 3) == 1 ? -vp[i] : vp[i];
+            }
+            vp = flippedVp;
+        }
         Matrix4.multiply(vp, model, mvp);
         float[] nm = Matrix4.normalMatrix(model);
 
@@ -331,12 +364,60 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         if (shadowed) {
             uniforms[o++] = light.getShadowBias();
             uniforms[o++] = light.getShadowStrength();
-            uniforms[o++] = shadowSize > 0 ? 1.0f / shadowSize : 0.0f;
+            uniforms[o++] = shadowSize > 0 ? light.getShadowSoftness() / shadowSize : 0.0f;
+            uniforms[o++] = light.getShadowCascadeRatio();
         } else {
             uniforms[o++] = 0f;
             uniforms[o++] = 0f;
             uniforms[o++] = 0f;
+            uniforms[o++] = 0f;
         }
+        uniforms[o++] = getTime();
+        ShaderMaterial sm = material.getEffectiveShader();
+        int n = sm == null ? 0 : sm.getUniformCount() * 4;
+        if (n > 0) {
+            System.arraycopy(sm.getUniformValues(), 0, uniforms, o, n);
+        }
+        for (int i = n; i < ShaderMaterial.MAX_UNIFORMS * 4; i++) {
+            uniforms[o + i] = 0f;
+        }
+        if (!material.isSkinned()) {
+            return UNIFORM_FLOATS;
+        }
+        int joints = material.getJointCount() * 12;
+        System.arraycopy(material.getJointRows(), 0, uniforms, UNIFORM_FLOATS, joints);
+        return UNIFORM_FLOATS + joints;
+    }
+
+    // binds the material's custom textures on units 2 and up for the next draw
+    private void bindShaderTextures(Material material) {
+        ShaderMaterial sm = material.getEffectiveShader();
+        if (sm == null) {
+            return;
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            long peer = 0;
+            int filter = 1;
+            int wrap = 1;
+            if (t != null && t.getHandle() instanceof Long) {
+                peer = ((Long) t.getHandle()).longValue();
+                filter = t.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+                wrap = t.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+            }
+            LinuxNative.gl3dBindTexture(contextPeer, 2 + i, peer, filter, wrap);
+        }
+    }
+
+    // binds the environment map image based lighting samples, slot 6, when
+    // the environment has one; programs without IBL ignore the slot
+    private void bindEnvironmentMap() {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null || !(t.getHandle() instanceof Long)) {
+            return;
+        }
+        LinuxNative.gl3dBindTexture(contextPeer, 6, ((Long) t.getHandle()).longValue(), 1, 0);
     }
 
     public boolean beginShadowPass(Light light) {
@@ -348,11 +429,13 @@ class LinuxGraphicsDevice extends GraphicsDevice {
                     GlslShaderGenerator.shadowFragment());
         }
         int size = light.getShadowMapSize();
-        if (shadowPipeline == 0 || !LinuxNative.gl3dBeginShadowPass(contextPeer, size)) {
+        if (shadowPipeline == 0 || !LinuxNative.gl3dBeginShadowPass(contextPeer, size * light.getShadowCascades(), size)) {
             return false;
         }
         shadowSize = size;
-        light.computeShadowMatrix(shadowMatrix);
+        shadowCascades = light.getShadowCascades();
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -369,7 +452,25 @@ class LinuxGraphicsDevice extends GraphicsDevice {
 
     // Depth only draw of one caster into the shadow map: the shadow program reads
     // u_mvp (light space) and a_position only.
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        int size = shadowSize;
+        if (shadowCascades < 2) {
+            Matrix4.copy(shadowMatrix, casterMatrix);
+            drawShadowCascade(mesh, material, modelMatrix);
+            return;
+        }
+        LinuxNative.gl3dSetViewport(contextPeer, 0, 0, size, size);
+        Matrix4.copy(shadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        LinuxNative.gl3dSetViewport(contextPeer, size, 0, size, size);
+        Matrix4.copy(farShadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        LinuxNative.gl3dSetViewport(contextPeer, 0, 0, size * 2, size);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix) {
         if (!material.isCastShadows()
                 || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
@@ -381,7 +482,25 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             return;
         }
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        long pipeline = shadowPipeline;
+        long texHandle = 0;
+        int uniformFloats = UNIFORM_FLOATS;
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            // a material that moves its vertices or discards casts through a
+            // depth program of its own, with every uniform a normal draw has
+            pipeline = depthPipeline(material, vb.getFormat());
+            if (pipeline == 0) {
+                return;
+            }
+            uniformFloats = packUniforms(material, model, getEnvironment(), false);
+            bindShaderTextures(material);
+        bindEnvironmentMap();
+            Texture tex = material.getTexture();
+            if (tex != null && tex.getHandle() instanceof Long) {
+                texHandle = ((Long) tex.getHandle()).longValue();
+            }
+        }
+        Matrix4.multiply(casterMatrix, model, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
         }
@@ -393,15 +512,15 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             if (iboHandle == 0) {
                 return;
             }
-            LinuxNative.gl3dDrawIndexed(contextPeer, shadowPipeline, vboHandle, strideBytes,
-                    iboHandle, ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS, 0, 0, 0, 0);
+            LinuxNative.gl3dDrawIndexed(contextPeer, pipeline, vboHandle, strideBytes,
+                    iboHandle, ib.getIndexCount(), primitive, uniforms, uniformFloats, texHandle, 1, 1, 0);
         } else {
-            LinuxNative.gl3dDrawArrays(contextPeer, shadowPipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS, 0, 0, 0, 0);
+            LinuxNative.gl3dDrawArrays(contextPeer, pipeline, vboHandle, strideBytes,
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats, texHandle, 1, 1, 0);
         }
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (contextPeer == 0 || effects == null) {
             return false;
         }
@@ -422,7 +541,7 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;
@@ -438,6 +557,15 @@ class LinuxGraphicsDevice extends GraphicsDevice {
         p[10] = pp.getVignette();
         p[11] = pp.getGrain();
         p[12] = timeSeconds;
+        packPostEffects(pp, p, 13);
+        packDepthEffects(pp, p, 19);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof Long) {
+            LinuxNative.gl3dBindTexture(contextPeer, 3, ((Long) lut.getHandle()).longValue(), 1, 0);
+        } else {
+            p[26] = 0f;
+            LinuxNative.gl3dBindTexture(contextPeer, 3, 0L, 1, 0);
+        }
         LinuxNative.gl3dEndPost(contextPeer, brightPipeline, blurPipeline, compositePipeline,
                 pp.isBloom(), p);
     }
@@ -496,6 +624,45 @@ class LinuxGraphicsDevice extends GraphicsDevice {
             LinuxNative.gl3dDisposeBuffer(((Long) handle).longValue());
         }
         buffer.setHandle(null);
+    }
+
+    private boolean inRenderTarget;
+    private final float[] flippedVp = new float[16];
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
+
+    public Texture createRenderTarget(int width, int height) {
+        if (contextPeer == 0 || width <= 0 || height <= 0) {
+            return null;
+        }
+        long peer = LinuxNative.gl3dCreateRenderTarget(contextPeer, width, height);
+        if (peer == 0) {
+            return null;
+        }
+        Texture tex = new Texture(width, height);
+        tex.setHandle(Long.valueOf(peer));
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        if (contextPeer == 0 || target == null || !(target.getHandle() instanceof Long) || inRenderTarget
+                || inShadowPass || activePost != null) {
+            return false;
+        }
+        inRenderTarget = LinuxNative.gl3dBeginRenderTarget(contextPeer, ((Long) target.getHandle()).longValue(),
+                target.getWidth(), target.getHeight(), clearArgb);
+        return inRenderTarget;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        LinuxNative.gl3dEndRenderTarget(contextPeer);
     }
 
     public void dispose(Texture texture) {

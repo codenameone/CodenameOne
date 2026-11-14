@@ -66,6 +66,12 @@ public class Model {
     private final float[] scratchA = new float[16];
     private final float[] scratchB = new float[16];
     private final float[] matrix = new float[16];
+    private float[] instances;
+    private int[] instanceColors;
+    private int instanceCount;
+    private float[] worldInstances;
+    private final float[] one = new float[16];
+    private final float[] oneWorld = new float[16];
 
     /// Creates a model for the given mesh with a default unlit white material.
     public Model(Mesh mesh) {
@@ -175,5 +181,57 @@ public class Model {
 
     public void setUserData(Object userData) {
         this.userData = userData;
+    }
+
+    /// Draws this model as many copies, each placed by its own transform
+    /// relative to the model's position, rotation and scale: a stack of
+    /// crates, a row of lamp posts, a field of grass from one blade. The
+    /// arrays are read every frame, so moving the copies is writing new
+    /// values into them; they are not copied.
+    ///
+    /// #### Parameters
+    ///
+    /// - `matrices`: 16 column-major floats per copy, or null to draw the
+    ///   model once again
+    ///
+    /// - `colors`: an ARGB colour per copy for `ShaderNode.instanceColor`,
+    ///   or null for white
+    ///
+    /// - `count`: how many copies to draw
+    ///
+    /// #### Returns
+    ///
+    /// this model
+    public Model setInstances(float[] matrices, int[] colors, int count) {
+        if (matrices != null && matrices.length < count * 16) {
+            throw new IllegalArgumentException("Need " + count * 16 + " floats for " + count + " copies");
+        }
+        this.instances = matrices;
+        this.instanceColors = colors;
+        this.instanceCount = matrices == null ? 0 : count;
+        return this;
+    }
+
+    /// Returns how many copies `setInstances` asked for, 0 for a single model.
+    public int getInstanceCount() {
+        return instanceCount;
+    }
+
+    int[] instanceColors() {
+        return instanceColors;
+    }
+
+    /// The copies' world transforms for this frame, reused between calls.
+    float[] instanceMatrices() {
+        float[] base = modelMatrix();
+        if (worldInstances == null || worldInstances.length < instanceCount * 16) {
+            worldInstances = new float[instanceCount * 16];
+        }
+        for (int i = 0; i < instanceCount; i++) {
+            System.arraycopy(instances, i * 16, one, 0, 16);
+            Matrix4.multiply(base, one, oneWorld);
+            System.arraycopy(oneWorld, 0, worldInstances, i * 16, 16);
+        }
+        return worldInstances;
     }
 }

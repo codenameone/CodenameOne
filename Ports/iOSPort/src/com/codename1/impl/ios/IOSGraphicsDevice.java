@@ -35,6 +35,7 @@ import com.codename1.gpu.PostProcess;
 import com.codename1.gpu.PrimitiveType;
 import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
 import com.codename1.impl.gpu.GlslShaderGenerator;
@@ -79,18 +80,27 @@ class IOSGraphicsDevice extends GraphicsDevice {
     // environment, PBR and sky values (see packEnvironment), then the shadow
     // matrix (16 floats) and a vec4 of bias, strength and texel size.
     // We pad to a multiple of 16 for the aligned allocator.
-    private static final int UNIFORM_FLOATS = 128;
+    // 0-127 the engine's own; 128-131 the clock, 132-195 the custom
+    // ShaderMaterial slots (CN1Uniforms.timeP and cu[16])
+    private static final int UNIFORM_FLOATS = 196;
 
     // Shadow map state: the light's view-projection (also read by receivers
     // through the uniform block), and whether a map has been rendered yet.
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, the matrix of the cascade being drawn, and the
+    // cascade count of the shadow pass in progress (the map is that many
+    // squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private final float[] casterMatrix = new float[16];
+    private int shadowCascades = 1;
     private int shadowSize = 1;
     private boolean inShadowPass;
     private boolean shadowReady;
     private PostProcess activePost;
     private String postSource;
-    private final float[] postParams = new float[16];
-    private final float[] uniforms = allocAligned(UNIFORM_FLOATS);
+    private final float[] postParams = new float[34];
+    // a skinned draw appends its joint rows after the uniform block
+    private final float[] uniforms = allocAligned(UNIFORM_FLOATS + Material.MAX_JOINTS * 12);
 
     IOSGraphicsDevice(long contextPeer) {
         this.contextPeer = contextPeer;
@@ -163,7 +173,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        packUniforms(material, model);
+        int uniformFloats = packUniforms(material, model);
         if (shadowed) {
             packShadow(getLight());
         }
@@ -180,6 +190,8 @@ class IOSGraphicsDevice extends GraphicsDevice {
 
         int primitive = primitiveCode(type);
         int strideBytes = fmt.getStrideBytes();
+        bindShaderTextures(material);
+        bindEnvironmentMap();
 
         if (mesh.isIndexed()) {
             IndexBuffer ib = mesh.getIndices();
@@ -189,12 +201,12 @@ class IOSGraphicsDevice extends GraphicsDevice {
             }
             IOSImplementation.nativeInstance.gl3dDrawIndexed(
                     contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
-                    ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    ib.getIndexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap);
         } else {
             IOSImplementation.nativeInstance.gl3dDrawArrays(
                     contextPeer, pipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap);
         }
     }
@@ -258,7 +270,10 @@ class IOSGraphicsDevice extends GraphicsDevice {
 
     // Packs the per-draw uniform block into the SIMD aligned float array. The
     // ordering matches the CN1Uniforms struct in the generated MSL.
-    private void packUniforms(Material material, float[] model) {
+    // Returns the number of floats to pass: the uniform block, plus the joint
+    // rows of a skinned material, which CN1GL3D.m hands the vertex stage as
+    // buffer 2.
+    private int packUniforms(Material material, float[] model) {
         Camera cam = getCamera();
         float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         Matrix4.multiply(vp, model, mvp);
@@ -312,9 +327,64 @@ class IOSGraphicsDevice extends GraphicsDevice {
         o = 72;
         packEnvironment(material, o);
         // a draw that does not receive shadows must not see the previous one's
-        for (int i = 108; i < UNIFORM_FLOATS; i++) {
+        for (int i = 108; i < 128; i++) {
             uniforms[i] = 0.0f;
         }
+        packShader(material);
+        if (!material.isSkinned()) {
+            return UNIFORM_FLOATS;
+        }
+        int joints = material.getJointCount() * 12;
+        System.arraycopy(material.getJointRows(), 0, uniforms, UNIFORM_FLOATS, joints);
+        return UNIFORM_FLOATS + joints;
+    }
+
+    private void packShader(Material material) {
+        uniforms[128] = getTime();
+        uniforms[129] = 0.0f;
+        uniforms[130] = 0.0f;
+        uniforms[131] = 0.0f;
+        ShaderMaterial sm = material.getEffectiveShader();
+        int n = sm == null ? 0 : sm.getUniformCount() * 4;
+        if (n > 0) {
+            System.arraycopy(sm.getUniformValues(), 0, uniforms, 132, n);
+        }
+        for (int i = 132 + n; i < UNIFORM_FLOATS; i++) {
+            uniforms[i] = 0.0f;
+        }
+    }
+
+    // binds the material's custom textures on Metal slots 2 and up for the
+    // next draw; an unbound one gets the null peer, which the native side
+    // replaces with a 1x1 white texture
+    private void bindShaderTextures(Material material) {
+        ShaderMaterial sm = material.getEffectiveShader();
+        if (sm == null) {
+            return;
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            long peer = 0;
+            int filter = 1;
+            int wrap = 1;
+            if (t != null && t.getHandle() instanceof Long) {
+                peer = ((Long) t.getHandle()).longValue();
+                filter = t.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+                wrap = t.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+            }
+            IOSImplementation.nativeInstance.gl3dBindTexture(contextPeer, 2 + i, peer, filter, wrap);
+        }
+    }
+
+    // binds the environment map image based lighting samples, slot 6, when
+    // the environment has one; programs without IBL ignore the slot
+    private void bindEnvironmentMap() {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null || !(t.getHandle() instanceof Long)) {
+            return;
+        }
+        IOSImplementation.nativeInstance.gl3dBindTexture(contextPeer, 6, ((Long) t.getHandle()).longValue(), 1, 0);
     }
 
     private void packShadow(Light light) {
@@ -323,8 +393,8 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
         uniforms[124] = light.getShadowBias();
         uniforms[125] = light.getShadowStrength();
-        uniforms[126] = 1.0f / Math.max(1, shadowSize);
-        uniforms[127] = 0.0f;
+        uniforms[126] = light.getShadowSoftness() / Math.max(1, shadowSize);
+        uniforms[127] = light.getShadowCascadeRatio();
     }
 
     public boolean beginShadowPass(Light light) {
@@ -332,11 +402,13 @@ class IOSGraphicsDevice extends GraphicsDevice {
             return false;
         }
         int size = light.getShadowMapSize();
-        if (!IOSImplementation.nativeInstance.gl3dBeginShadowPass(contextPeer, size)) {
+        if (!IOSImplementation.nativeInstance.gl3dBeginShadowPass(contextPeer, size * light.getShadowCascades(), size)) {
             return false;
         }
         shadowSize = size;
-        light.computeShadowMatrix(shadowMatrix);
+        shadowCascades = light.getShadowCascades();
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -353,7 +425,25 @@ class IOSGraphicsDevice extends GraphicsDevice {
 
     // Depth only draw from the light. The pipeline key's "shadow|" prefix is
     // what tells the native side to build it without a colour attachment.
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        int size = shadowSize;
+        if (shadowCascades < 2) {
+            Matrix4.copy(shadowMatrix, casterMatrix);
+            drawShadowCascade(mesh, material, modelMatrix);
+            return;
+        }
+        IOSImplementation.nativeInstance.gl3dSetViewport(contextPeer, 0, 0, size, size);
+        Matrix4.copy(shadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        IOSImplementation.nativeInstance.gl3dSetViewport(contextPeer, size, 0, size, size);
+        Matrix4.copy(farShadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        IOSImplementation.nativeInstance.gl3dSetViewport(contextPeer, 0, 0, size * 2, size);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix) {
         if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
             return;
@@ -362,6 +452,10 @@ class IOSGraphicsDevice extends GraphicsDevice {
         VertexFormat fmt = vb.getFormat();
         long vboHandle = uploadVertexBuffer(vb);
         if (vboHandle == 0) {
+            return;
+        }
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawCustomShadowCaster(mesh, material, modelMatrix, vb, fmt, vboHandle);
             return;
         }
         String key = "shadow|s" + fmt.getStrideBytes() + "|b0|c0|dt1|dw1";
@@ -378,7 +472,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
             return;
         }
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(casterMatrix, model, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
         }
@@ -400,7 +494,60 @@ class IOSGraphicsDevice extends GraphicsDevice {
         }
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    // A caster whose custom shader moves vertices or discards fragments: the
+    // material's own depth-only program, with its full uniforms and textures
+    // so the offset and the discard read what the colour pass reads.
+    private void drawCustomShadowCaster(Mesh mesh, Material material, float[] modelMatrix, VertexBuffer vb,
+            VertexFormat fmt, long vboHandle) {
+        String key = "shadow|depth|" + material.getShaderKey() + "|s" + fmt.getStrideBytes();
+        Long existing = pipelines.get(key);
+        long pipeline;
+        if (existing != null) {
+            pipeline = existing.longValue();
+        } else {
+            pipeline = IOSImplementation.nativeInstance.gl3dGetOrCreatePipeline(
+                    contextPeer, key, IOSMetalShaderGenerator.depthOnly(material, fmt).getSource(), 0, 0, 1, 1);
+            pipelines.put(key, Long.valueOf(pipeline));
+        }
+        if (pipeline == 0) {
+            return;
+        }
+        float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
+        int uniformFloats = packUniforms(material, model);
+        Matrix4.multiply(casterMatrix, model, mvp);
+        for (int i = 0; i < 16; i++) {
+            uniforms[i] = mvp[i];
+        }
+        long texHandle = 0;
+        int texFilter = 0;
+        int texWrap = 0;
+        Texture tex = material.getTexture();
+        if (tex != null && tex.getHandle() instanceof Long) {
+            texHandle = ((Long) tex.getHandle()).longValue();
+            texFilter = tex.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+            texWrap = tex.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+        }
+        bindShaderTextures(material);
+        bindEnvironmentMap();
+        int primitive = primitiveCode(mesh.getPrimitiveType());
+        int strideBytes = fmt.getStrideBytes();
+        if (mesh.isIndexed()) {
+            IndexBuffer ib = mesh.getIndices();
+            long iboHandle = uploadIndexBuffer(ib);
+            if (iboHandle == 0) {
+                return;
+            }
+            IOSImplementation.nativeInstance.gl3dDrawIndexed(
+                    contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
+                    ib.getIndexCount(), primitive, uniforms, uniformFloats, texHandle, texFilter, texWrap);
+        } else {
+            IOSImplementation.nativeInstance.gl3dDrawArrays(
+                    contextPeer, pipeline, vboHandle, strideBytes,
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats, texHandle, texFilter, texWrap);
+        }
+    }
+
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (contextPeer == 0 || effects == null || activePost != null) {
             return false;
         }
@@ -415,7 +562,7 @@ class IOSGraphicsDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;
@@ -440,6 +587,11 @@ class IOSGraphicsDevice extends GraphicsDevice {
         p[13] = pp.getGrain();
         p[14] = timeSeconds;
         p[15] = pp.isBloom() ? 1.0f : 0.0f;
+        packPostEffects(pp, p, 16);
+        packDepthEffects(pp, p, 22);
+        Texture lut = pp.getColorLut();
+        IOSImplementation.nativeInstance.gl3dSetPostLut(contextPeer,
+                lut != null && lut.getHandle() instanceof Long ? ((Long) lut.getHandle()).longValue() : 0L);
         IOSImplementation.nativeInstance.gl3dEndPostProcess(contextPeer, p);
     }
 
@@ -527,6 +679,44 @@ class IOSGraphicsDevice extends GraphicsDevice {
             IOSImplementation.nativeInstance.gl3dDisposeBuffer(((Long) handle).longValue());
         }
         buffer.setHandle(null);
+    }
+
+    private boolean inRenderTarget;
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
+
+    public Texture createRenderTarget(int width, int height) {
+        if (contextPeer == 0 || width <= 0 || height <= 0) {
+            return null;
+        }
+        long peer = IOSImplementation.nativeInstance.gl3dCreateRenderTarget(contextPeer, width, height);
+        if (peer == 0) {
+            return null;
+        }
+        Texture tex = new Texture(width, height);
+        tex.setHandle(Long.valueOf(peer));
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        if (contextPeer == 0 || target == null || !(target.getHandle() instanceof Long) || inRenderTarget
+                || inShadowPass || activePost != null) {
+            return false;
+        }
+        inRenderTarget = IOSImplementation.nativeInstance.gl3dBeginRenderTarget(contextPeer, ((Long) target.getHandle()).longValue(),
+                target.getWidth(), target.getHeight(), clearArgb);
+        return inRenderTarget;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        IOSImplementation.nativeInstance.gl3dEndRenderTarget(contextPeer);
     }
 
     public void dispose(Texture texture) {

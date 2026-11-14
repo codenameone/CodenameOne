@@ -599,6 +599,20 @@
       ]
     },
     {
+      "id": "gpu-shaders",
+      "category": "Media and graphics",
+      "name": "GPU shaders and effects",
+      "description": "Checks custom shader materials, the shader library, image based lighting, render targets, GPU skinning, depth post effects and custom full screen passes.",
+      "tests": [
+        "GpuPostDepthScreenshotTest",
+        "GpuPostPassScreenshotTest",
+        "GpuRenderTargetScreenshotTest",
+        "GpuShaderGalleryScreenshotTest",
+        "GpuShaderHarbourScreenshotTest",
+        "GpuSkinningScreenshotTest"
+      ]
+    },
+    {
       "id": "orientation",
       "category": "Input and lifecycle",
       "name": "Orientation locking",
@@ -1557,6 +1571,30 @@
     {
       "pattern": "Gpu3DAnimation",
       "test": "Gpu3DAnimationTest"
+    },
+    {
+      "pattern": "GpuPostDepth",
+      "test": "GpuPostDepthScreenshotTest"
+    },
+    {
+      "pattern": "GpuPostPass",
+      "test": "GpuPostPassScreenshotTest"
+    },
+    {
+      "pattern": "GpuRenderTarget",
+      "test": "GpuRenderTargetScreenshotTest"
+    },
+    {
+      "pattern": "GpuShaderGallery",
+      "test": "GpuShaderGalleryScreenshotTest"
+    },
+    {
+      "pattern": "GpuShaderHarbour",
+      "test": "GpuShaderHarbourScreenshotTest"
+    },
+    {
+      "pattern": "GpuSkinning",
+      "test": "GpuSkinningScreenshotTest"
     },
     {
       "pattern": "landscape",

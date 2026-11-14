@@ -22,6 +22,7 @@
  */
 package com.codename1.gpu;
 
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.ui.Image;
 
 /// The low level command surface of the 3D API, bound to a single `RenderView`
@@ -34,6 +35,17 @@ import com.codename1.ui.Image;
 /// at the `Material` and the mesh `VertexFormat`, generates (once) the matching
 /// platform shader, uploads any dirty buffers and issues the draw call.
 public abstract class GraphicsDevice {
+    private final Texture[] passTargets = new Texture[2];
+    private final int[] passSizes = new int[4];
+    private PostProcess passFrame;
+    private PostProcess passRest;
+    private int passWidth;
+    private int passHeight;
+    private Mesh passQuad;
+    private Material passMaterial;
+    private Camera passCamera;
+    private boolean passWarned;
+
     private Camera camera;
     private boolean shadowMapCurrent;
     private Light light = new Light();
@@ -173,6 +185,29 @@ public abstract class GraphicsDevice {
         return environment;
     }
 
+    private float time;
+
+    /// Sets the clock that custom shaders read with
+    /// `com.codename1.gpu.shader.ShaderNode.time()`, in seconds. Call it once
+    /// per frame before drawing; animated library shaders such as water move
+    /// with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: the time
+    public void setTime(float seconds) {
+        this.time = seconds;
+    }
+
+    /// Returns the clock set with `setTime`.
+    ///
+    /// #### Returns
+    ///
+    /// seconds
+    public float getTime() {
+        return time;
+    }
+
     /// Starts rendering the light's shadow map. Until `endShadowPass`, `draw`
     /// writes only depth as seen from the light, and skips materials that do
     /// not cast shadows. Draws after `endShadowPass` that receive shadows
@@ -202,8 +237,147 @@ public abstract class GraphicsDevice {
     public void endShadowPass() {
     }
 
+    /// Creates an offscreen image the scene can be drawn into with
+    /// `beginRenderTarget` and then sampled like any other texture: a mirror,
+    /// a security camera screen, a minimap, the refraction behind glass.
+    ///
+    /// The result is an ordinary `Texture`; hand it to a material or to a
+    /// `ShaderMaterial` texture slot, and release it with `dispose(Texture)`.
+    /// It has a depth buffer of its own while it is drawn into.
+    ///
+    /// The default implementation cannot draw offscreen and returns null, as
+    /// the software simulator device does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the width in pixels
+    ///
+    /// - `height`: the height in pixels
+    ///
+    /// #### Returns
+    ///
+    /// the target, or null when this device has no offscreen drawing
+    public Texture createRenderTarget(int width, int height) {
+        return null;
+    }
+
+    /// True if this device skins meshes on the GPU: it draws a mesh in
+    /// `VertexFormat.SKINNED` with a material given `Material.setSkinning`
+    /// by moving each vertex in its vertex stage. Where it answers false,
+    /// as the software simulator device does, skin on the CPU and draw the
+    /// result as an ordinary mesh; `com.codename1.gaming.AnimatedModel`
+    /// picks the path by itself.
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    public boolean isGpuSkinning() {
+        return false;
+    }
+
+    /// Sends the draws that follow into `target` until `endRenderTarget`,
+    /// clearing its colour to `clearArgb` and its depth first. The viewport
+    /// covers the whole target, and the camera, light and environment are the
+    /// device's as usual, so set a camera for the view the target shows.
+    ///
+    /// Draw render targets first in a frame: before the shadow pass, before
+    /// `beginPostProcess` and before the scene itself. They do not nest, and
+    /// on some devices the depth of scene draws made earlier in the frame is
+    /// not kept across one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: a texture from `createRenderTarget` on this device
+    ///
+    /// - `clearArgb`: the colour the target starts from
+    ///
+    /// #### Returns
+    ///
+    /// true if drawing now goes into the target
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        return false;
+    }
+
+    /// Ends the pass `beginRenderTarget` started; drawing returns to the
+    /// target and viewport that were active before it.
+    public void endRenderTarget() {
+    }
+
     /// Redirects drawing into an offscreen image so `endPostProcess` can apply
-    /// `effects` to it on its way to the screen.
+    /// `effects` to it on its way to the screen. When `effects` has custom
+    /// passes (`PostProcess.addPass`) and this device can draw into a render
+    /// target, the scene goes into one, and `endPostProcess` runs the passes
+    /// before the built-in effects.
+    ///
+    /// Draw the shadow pass and any render targets before this call.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the effects to apply
+    ///
+    /// - `width`: the width of the frame in pixels
+    ///
+    /// - `height`: the height of the frame in pixels
+    ///
+    /// #### Returns
+    ///
+    /// true if drawing now goes offscreen; false means the caller draws
+    /// straight to the screen
+    public final boolean beginPostProcess(PostProcess effects, int width, int height) {
+        passFrame = null;
+        if (effects != null && effects.getPassCount() > 0 && passTarget(0, width, height)
+                && beginRenderTarget(passTargets[0], 0xff000000)) {
+            passFrame = effects;
+            passWidth = width;
+            passHeight = height;
+            return true;
+        }
+        if (effects != null && effects.getPassCount() > 0) {
+            passesDropped("this device cannot draw offscreen");
+        }
+        return beginPostEffects(effects, width, height);
+    }
+
+    /// Applies the effects passed to `beginPostProcess` and draws the result
+    /// to the screen. Drawing goes to the screen again afterwards.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeSeconds`: a running clock, which animates the film grain
+    public final void endPostProcess(float timeSeconds) {
+        PostProcess effects = passFrame;
+        if (effects == null) {
+            endPostEffects(timeSeconds);
+            return;
+        }
+        passFrame = null;
+        endRenderTarget();
+        int src = 0;
+        int last = effects.getPassCount() - 1;
+        for (int i = 0; i < last; i++) {
+            int dst = 1 - src;
+            if (!passTarget(dst, passWidth, passHeight) || !beginRenderTarget(passTargets[dst], 0xff000000)) {
+                passesDropped("a second render target is not available, so only the last pass runs");
+                break;
+            }
+            drawPass(effects.getPass(i), passTargets[src]);
+            endRenderTarget();
+            src = dst;
+        }
+        if (passRest == null) {
+            passRest = new PostProcess();
+        }
+        passRest.copyWithoutDepth(effects);
+        boolean chain = beginPostEffects(passRest, passWidth, passHeight);
+        drawPass(effects.getPass(last), passTargets[src]);
+        if (chain) {
+            endPostEffects(timeSeconds);
+        }
+    }
+
+    /// The device's own post processing: redirects drawing into an offscreen
+    /// image so `endPostEffects` can apply the built-in effects of `effects`.
+    /// Custom passes are handled by `beginPostProcess` and never reach this.
     ///
     /// The default implementation supports no post processing and returns
     /// false; the caller then draws straight to the screen.
@@ -219,17 +393,67 @@ public abstract class GraphicsDevice {
     /// #### Returns
     ///
     /// true if drawing now goes offscreen
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         return false;
     }
 
-    /// Applies the effects passed to `beginPostProcess` and draws the result
-    /// to the screen. Drawing goes to the screen again afterwards.
+    /// Applies the effects passed to `beginPostEffects` and draws the result
+    /// to the screen.
     ///
     /// #### Parameters
     ///
     /// - `timeSeconds`: a running clock, which animates the film grain
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
+    }
+
+    // Says once per device that custom passes were left out, so a pass that
+    // never shows is not a silent mystery.
+    private void passesDropped(String why) {
+        if (!passWarned) {
+            passWarned = true;
+            com.codename1.io.Log.p("PostProcess: custom passes skipped: " + why);
+        }
+    }
+
+    // Makes sure render target `index` exists at the frame size.
+    private boolean passTarget(int index, int width, int height) {
+        if (passTargets[index] != null && passSizes[index * 2] == width && passSizes[index * 2 + 1] == height) {
+            return true;
+        }
+        if (passTargets[index] != null) {
+            dispose(passTargets[index]);
+            passTargets[index] = null;
+        }
+        Texture t = createRenderTarget(Math.max(1, width), Math.max(1, height));
+        if (t == null) {
+            return false;
+        }
+        passTargets[index] = t;
+        passSizes[index * 2] = width;
+        passSizes[index * 2 + 1] = height;
+        return true;
+    }
+
+    // Draws one custom pass over the whole of the current target: a quad
+    // filling clip space under an orthographic camera, depth off.
+    private void drawPass(ShaderMaterial pass, Texture source) {
+        if (passQuad == null) {
+            passQuad = Primitives.quad(this, 2f);
+            RenderState rs = RenderState.opaque();
+            rs.setDepthTest(false);
+            rs.setDepthWrite(false);
+            rs.setCullMode(RenderState.CullMode.NONE);
+            passMaterial = new Material(Material.Type.UNLIT).setFogged(false);
+            passMaterial.setRenderState(rs);
+            passCamera = new Camera().setOrthographic(2f, 0.1f, 10f).setAspect(1f)
+                    .setPosition(0f, 0f, 1f).setTarget(0f, 0f, 0f);
+        }
+        pass.setTexture(PostProcess.SCENE_COLOR, source);
+        passMaterial.setShader(pass);
+        Camera saved = getCamera();
+        setCamera(passCamera);
+        draw(passQuad, passMaterial, Matrix4.identity());
+        setCamera(saved);
     }
 
     /// Draws a mesh with the supplied material and model matrix. The device
@@ -247,6 +471,64 @@ public abstract class GraphicsDevice {
     ///   the identity
     public abstract void draw(Mesh mesh, Material material, float[] modelMatrix);
 
+    private final float[] instanceMatrix = new float[16];
+
+    /// Draws `count` copies of a mesh, each with its own transform and,
+    /// optionally, colour: crates along a quay, a field of grass, a flock.
+    /// The material's shader tells the copies apart with
+    /// `ShaderNode.instanceId`, `instanceRandom` and `instanceColor`, so
+    /// one material varies size, tint and motion across thousands of
+    /// copies.
+    ///
+    /// Every device draws the copies one after another from a single
+    /// compiled pipeline, changing only the transform and the per copy
+    /// uniforms between them, which is what makes it cheaper than a model
+    /// per copy: no state is looked up or rebound and the scene walks one
+    /// node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mesh`: the mesh
+    ///
+    /// - `material`: the material shared by every copy
+    ///
+    /// - `matrices`: 16 column-major floats per copy
+    ///
+    /// - `colors`: an ARGB colour per copy, or null for white
+    ///
+    /// - `count`: how many copies to draw
+    public void drawInstanced(Mesh mesh, Material material, float[] matrices, int[] colors, int count) {
+        ShaderMaterial sm = material.getShader();
+        int idSlot = sm == null ? -1 : sm.getUniformSlot(ShaderMaterial.INSTANCE);
+        int colorSlot = sm == null ? -1 : sm.getUniformSlot(ShaderMaterial.INSTANCE_COLOR);
+        float[] u = sm == null ? null : sm.getUniformValues();
+        float[] m = instanceMatrix;
+        for (int i = 0; i < count; i++) {
+            System.arraycopy(matrices, i * 16, m, 0, 16);
+            if (idSlot >= 0) {
+                u[idSlot * 4] = i;
+                // a cheap integer hash, the same copy always gets the same number
+                int h = i * 0x27d4eb2d;
+                h ^= h >>> 15;
+                h *= 0x165667b1;
+                h ^= h >>> 13;
+                u[idSlot * 4 + 1] = (h & 0xffff) / 65535f;
+            }
+            if (colorSlot >= 0) {
+                int c = colors == null ? 0xffffffff : colors[i];
+                u[colorSlot * 4] = ((c >> 16) & 0xff) / 255f;
+                u[colorSlot * 4 + 1] = ((c >> 8) & 0xff) / 255f;
+                u[colorSlot * 4 + 2] = (c & 0xff) / 255f;
+                u[colorSlot * 4 + 3] = ((c >>> 24) & 0xff) / 255f;
+            }
+            draw(mesh, material, m);
+        }
+        if (idSlot >= 0) {
+            u[idSlot * 4] = 0f;
+            u[idSlot * 4 + 1] = 0f;
+        }
+    }
+
     /// Releases the GPU resources backing a vertex buffer.
     public abstract void dispose(VertexBuffer buffer);
 
@@ -255,4 +537,83 @@ public abstract class GraphicsDevice {
 
     /// Releases the GPU resources backing a texture.
     public abstract void dispose(Texture texture);
+
+    /// Writes the parameters of the post effects added after grain into
+    /// `out` from `offset`: chromatic aberration, FXAA (0 or 1), god ray
+    /// strength scaled by how visible the sun is, and the sun's position in
+    /// texture space (0, 0 is the top left). Every device packs them in this
+    /// order, so the composite passes of every shading language agree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the post process being composited
+    ///
+    /// - `out`: the parameter array
+    ///
+    /// - `offset`: where to write the six floats
+    protected final void packPostEffects(PostProcess effects, float[] out, int offset) {
+        out[offset] = effects.getChromaticAberration();
+        out[offset + 1] = effects.isFxaa() ? 1f : 0f;
+        out[offset + 2] = 0f;
+        out[offset + 3] = 0.5f;
+        out[offset + 4] = 0.5f;
+        out[offset + 5] = 0f;
+        Camera cam = getCamera();
+        Light light = getLight();
+        if (effects.getGodRays() <= 0f || cam == null || light == null) {
+            return;
+        }
+        // the sun is far along the reverse of the light's direction
+        float sx = cam.getEyeX() - light.getDirectionX() * 1000f;
+        float sy = cam.getEyeY() - light.getDirectionY() * 1000f;
+        float sz = cam.getEyeZ() - light.getDirectionZ() * 1000f;
+        float[] m = cam.getViewProjection();
+        float cx = m[0] * sx + m[4] * sy + m[8] * sz + m[12];
+        float cy = m[1] * sx + m[5] * sy + m[9] * sz + m[13];
+        float cw = m[3] * sx + m[7] * sy + m[11] * sz + m[15];
+        if (cw <= 0.0001f) {
+            return;
+        }
+        float u = cx / cw * 0.5f + 0.5f;
+        float v = 0.5f - cy / cw * 0.5f;
+        // full strength on screen, fading to nothing half a screen outside it
+        float du = Math.max(0f, Math.abs(u - 0.5f) - 0.5f);
+        float dv = Math.max(0f, Math.abs(v - 0.5f) - 0.5f);
+        float fade = Math.max(0f, 1f - (du + dv) * 2f);
+        out[offset + 2] = effects.getGodRays() * fade;
+        out[offset + 3] = u;
+        out[offset + 4] = v;
+    }
+
+    /// Writes the parameters of the depth effects and the colour lookup into
+    /// `out` from `offset`, twelve floats: ambient occlusion strength and
+    /// radius in pixels, focus distance, depth of field blur in pixels,
+    /// outline strength, the camera's near and far planes, lookup strength,
+    /// and the outline colour as red, green, blue (0 to 1) and a zero. Every
+    /// device packs them in this order, so the composite passes of every
+    /// shading language agree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the post process being composited
+    ///
+    /// - `out`: the parameter array
+    ///
+    /// - `offset`: where to write the twelve floats
+    protected final void packDepthEffects(PostProcess effects, float[] out, int offset) {
+        Camera cam = getCamera();
+        out[offset] = effects.getAmbientOcclusion();
+        out[offset + 1] = effects.getAmbientOcclusionRadius();
+        out[offset + 2] = effects.getFocusDistance();
+        out[offset + 3] = effects.getDepthOfFieldBlur();
+        out[offset + 4] = effects.getOutline();
+        out[offset + 5] = cam == null ? 0.1f : cam.getNear();
+        out[offset + 6] = cam == null ? 100f : cam.getFar();
+        out[offset + 7] = effects.getColorLutStrength();
+        int c = effects.getOutlineColor();
+        out[offset + 8] = ((c >> 16) & 0xff) / 255f;
+        out[offset + 9] = ((c >> 8) & 0xff) / 255f;
+        out[offset + 10] = (c & 0xff) / 255f;
+        out[offset + 11] = 0f;
+    }
 }

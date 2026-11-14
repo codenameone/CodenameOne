@@ -37,6 +37,7 @@ import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
@@ -70,12 +71,21 @@ class WindowsGraphicsDevice extends GraphicsDevice {
     // (24: color, light dir, light colour, ambient, eye, params) + 7 vec4 (28:
     // fog colour, fog, sky, ground, emissive, zenith, horizon) + sun (4).
     // + shadow matrix (16) + shadow params (4, bias / strength / texel size).
-    private static final int UNIFORM_FLOATS = 124;
-    private final float[] uniforms = new float[UNIFORM_FLOATS];
+    // 0-123 the engine's own; 124-127 the clock, 128-191 the custom
+    // ShaderMaterial slots (CN1Uniforms.timeP and cu[16])
+    private static final int UNIFORM_FLOATS = 192;
+    // a skinned draw appends its joint rows after the uniform block
+    private final float[] uniforms = new float[UNIFORM_FLOATS + Material.MAX_JOINTS * 12];
 
     // Shadow state, as in JavaSEGLDevice: the light matrix of the last shadow
     // pass, whether a pass is running, and whether its map may be sampled.
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, the matrix of the cascade being drawn, and the
+    // cascade count of the shadow pass in progress (the map is that many
+    // squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private final float[] casterMatrix = new float[16];
+    private int shadowCascades = 1;
     private final float[] model = new float[16];
     private boolean inShadowPass;
     private boolean shadowReady;
@@ -85,7 +95,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
     private long postBright;
     private long postBlur;
     private long postComposite;
-    private final float[] postParams = new float[16];
+    private final float[] postParams = new float[34];
 
     WindowsGraphicsDevice(long contextPeer) {
         this.contextPeer = contextPeer;
@@ -149,7 +159,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         }
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        packUniforms(material, model);
+        int uniformFloats = packUniforms(material, model);
 
         long texHandle = 0;
         int texFilter = 0;
@@ -163,6 +173,8 @@ class WindowsGraphicsDevice extends GraphicsDevice {
 
         int primitive = primitiveCode(mesh.getPrimitiveType());
         int strideBytes = fmt.getStrideBytes();
+        bindShaderTextures(material);
+        bindEnvironmentMap();
 
         if (mesh.isIndexed()) {
             IndexBuffer ib = mesh.getIndices();
@@ -172,12 +184,12 @@ class WindowsGraphicsDevice extends GraphicsDevice {
             }
             WindowsNative.gl3dDrawIndexed(
                     contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
-                    ib.getIndexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    ib.getIndexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap);
         } else {
             WindowsNative.gl3dDrawArrays(
                     contextPeer, pipeline, vboHandle, strideBytes,
-                    vb.getVertexCount(), primitive, uniforms, UNIFORM_FLOATS,
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats,
                     texHandle, texFilter, texWrap);
         }
     }
@@ -240,7 +252,10 @@ class WindowsGraphicsDevice extends GraphicsDevice {
 
     // Packs the per-draw uniform block. Ordering matches the CN1Uniforms cbuffer
     // in the generated HLSL.
-    private void packUniforms(Material material, float[] model) {
+    // Returns the number of floats to pass: the uniform block, plus the joint
+    // rows of a skinned material, which cn1_windows_d3d.cpp copies into the
+    // vertex shader's constant buffer b1.
+    private int packUniforms(Material material, float[] model) {
         Camera cam = getCamera();
         float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         Matrix4.multiply(vp, model, mvp);
@@ -307,8 +322,57 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         Light sl = getLight();
         uniforms[o++] = sl.getShadowBias();
         uniforms[o++] = sl.getShadowStrength();
-        uniforms[o++] = 1.0f / Math.max(1, shadowSize);
+        uniforms[o++] = sl.getShadowSoftness() / Math.max(1, shadowSize);
+        uniforms[o++] = sl.getShadowCascadeRatio();
+        uniforms[o++] = getTime();
         uniforms[o++] = 0.0f;
+        uniforms[o++] = 0.0f;
+        uniforms[o++] = 0.0f;
+        ShaderMaterial sm = material.getEffectiveShader();
+        int n = sm == null ? 0 : sm.getUniformCount() * 4;
+        if (n > 0) {
+            System.arraycopy(sm.getUniformValues(), 0, uniforms, o, n);
+        }
+        for (int i = o + n; i < UNIFORM_FLOATS; i++) {
+            uniforms[i] = 0.0f;
+        }
+        if (!material.isSkinned()) {
+            return UNIFORM_FLOATS;
+        }
+        int joints = material.getJointCount() * 12;
+        System.arraycopy(material.getJointRows(), 0, uniforms, UNIFORM_FLOATS, joints);
+        return UNIFORM_FLOATS + joints;
+    }
+
+    // binds the material's custom textures at t2/s2 and up for the next draw
+    private void bindShaderTextures(Material material) {
+        ShaderMaterial sm = material.getEffectiveShader();
+        if (sm == null) {
+            return;
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            long peer = 0;
+            int filter = 1;
+            int wrap = 1;
+            if (t != null && t.getHandle() instanceof Long) {
+                peer = ((Long) t.getHandle()).longValue();
+                filter = t.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+                wrap = t.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+            }
+            WindowsNative.gl3dBindTexture(contextPeer, 2 + i, peer, filter, wrap);
+        }
+    }
+
+    // binds the environment map image based lighting samples, slot 6, when
+    // the environment has one; programs without IBL ignore the slot
+    private void bindEnvironmentMap() {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null || !(t.getHandle() instanceof Long)) {
+            return;
+        }
+        WindowsNative.gl3dBindTexture(contextPeer, 6, ((Long) t.getHandle()).longValue(), 1, 0);
     }
 
     public boolean beginShadowPass(Light light) {
@@ -316,12 +380,14 @@ class WindowsGraphicsDevice extends GraphicsDevice {
             return false;
         }
         int size = light.getShadowMapSize();
-        if (!WindowsNative.gl3dBeginShadowPass(contextPeer, size)) {
+        if (!WindowsNative.gl3dBeginShadowPass(contextPeer, size * light.getShadowCascades(), size)) {
             return false;
         }
         shadowSize = size;
         shadowSampling = false;
-        light.computeShadowMatrix(shadowMatrix);
+        shadowCascades = light.getShadowCascades();
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -338,13 +404,35 @@ class WindowsGraphicsDevice extends GraphicsDevice {
 
     // Renders one caster's depth into the shadow map: only positions are read,
     // the first uniform matrix is shadowMatrix * model.
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        int size = shadowSize;
+        if (shadowCascades < 2) {
+            Matrix4.copy(shadowMatrix, casterMatrix);
+            drawShadowCascade(mesh, material, modelMatrix);
+            return;
+        }
+        WindowsNative.gl3dSetViewport(contextPeer, 0, 0, size, size);
+        Matrix4.copy(shadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        WindowsNative.gl3dSetViewport(contextPeer, size, 0, size, size);
+        Matrix4.copy(farShadowMatrix, casterMatrix);
+        drawShadowCascade(mesh, material, modelMatrix);
+        WindowsNative.gl3dSetViewport(contextPeer, 0, 0, size * 2, size);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix) {
         if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
             return;
         }
         VertexBuffer vb = mesh.getVertices();
         long vboHandle = uploadVertexBuffer(vb);
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawCustomShadowCaster(mesh, material, modelMatrix, vb, vboHandle);
+            return;
+        }
         long pipeline = getOrCreateAuxPipeline("cn1-shadow", HlslShaderGenerator.shadowSource(), 0, 1);
         if (vboHandle == 0 || pipeline == 0) {
             return;
@@ -354,7 +442,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         } else {
             Matrix4.setIdentity(model);
         }
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(casterMatrix, model, mvp);
         for (int i = 0; i < 16; i++) {
             uniforms[i] = mvp[i];
         }
@@ -373,6 +461,55 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         }
     }
 
+    // A caster whose custom shader moves vertices or discards fragments: the
+    // material's own depth-only program with its full uniforms and textures, so
+    // the offset and the discard read what the colour pass reads.
+    private void drawCustomShadowCaster(Mesh mesh, Material material, float[] modelMatrix, VertexBuffer vb,
+            long vboHandle) {
+        VertexFormat fmt = vb.getFormat();
+        String key = "cn1-shadow-depth|" + material.getShaderKey() + "|s" + fmt.getStrideBytes();
+        Long existing = pipelines.get(key);
+        long pipeline;
+        if (existing != null) {
+            pipeline = existing.longValue();
+        } else {
+            pipeline = getOrCreateAuxPipeline(key, HlslShaderGenerator.depthOnly(material, fmt).getSource(), 0, 1);
+        }
+        if (vboHandle == 0 || pipeline == 0) {
+            return;
+        }
+        float[] m = modelMatrix != null ? modelMatrix : Matrix4.identity();
+        int uniformFloats = packUniforms(material, m);
+        Matrix4.multiply(casterMatrix, m, mvp);
+        for (int i = 0; i < 16; i++) {
+            uniforms[i] = mvp[i];
+        }
+        long texHandle = 0;
+        int texFilter = 0;
+        int texWrap = 0;
+        Texture tex = material.getTexture();
+        if (tex != null && tex.getHandle() instanceof Long) {
+            texHandle = ((Long) tex.getHandle()).longValue();
+            texFilter = tex.getFilter() == Texture.Filter.LINEAR ? 1 : 0;
+            texWrap = tex.getWrap() == Texture.Wrap.REPEAT ? 1 : 0;
+        }
+        bindShaderTextures(material);
+        bindEnvironmentMap();
+        int primitive = primitiveCode(mesh.getPrimitiveType());
+        int strideBytes = fmt.getStrideBytes();
+        if (mesh.isIndexed()) {
+            IndexBuffer ib = mesh.getIndices();
+            long iboHandle = uploadIndexBuffer(ib);
+            if (iboHandle != 0) {
+                WindowsNative.gl3dDrawIndexed(contextPeer, pipeline, vboHandle, strideBytes, iboHandle,
+                        ib.getIndexCount(), primitive, uniforms, uniformFloats, texHandle, texFilter, texWrap);
+            }
+        } else {
+            WindowsNative.gl3dDrawArrays(contextPeer, pipeline, vboHandle, strideBytes,
+                    vb.getVertexCount(), primitive, uniforms, uniformFloats, texHandle, texFilter, texWrap);
+        }
+    }
+
     // A pipeline for the shadow and post passes: no blending, no culling, depth
     // test and write as given.
     private long getOrCreateAuxPipeline(String key, String source, int depthTest, int depthWrite) {
@@ -386,7 +523,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         return pipeline;
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (contextPeer == 0 || effects == null) {
             return false;
         }
@@ -402,7 +539,7 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;
@@ -427,6 +564,15 @@ class WindowsGraphicsDevice extends GraphicsDevice {
         p[13] = 0f;
         p[14] = 0f;
         p[15] = pp.isBloom() ? 1f : 0f;
+        packPostEffects(pp, p, 16);
+        packDepthEffects(pp, p, 22);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof Long) {
+            WindowsNative.gl3dBindTexture(contextPeer, 3, ((Long) lut.getHandle()).longValue(), 1, 0);
+        } else {
+            p[29] = 0f;
+            WindowsNative.gl3dBindTexture(contextPeer, 3, 0L, 1, 0);
+        }
         WindowsNative.gl3dEndPost(contextPeer, postBright, postBlur, postComposite, p);
         shadowSampling = false;
     }
@@ -494,6 +640,44 @@ class WindowsGraphicsDevice extends GraphicsDevice {
             WindowsNative.gl3dDisposeBuffer(((Long) handle).longValue());
         }
         buffer.setHandle(null);
+    }
+
+    private boolean inRenderTarget;
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
+
+    public Texture createRenderTarget(int width, int height) {
+        if (contextPeer == 0 || width <= 0 || height <= 0) {
+            return null;
+        }
+        long peer = WindowsNative.gl3dCreateRenderTarget(contextPeer, width, height);
+        if (peer == 0) {
+            return null;
+        }
+        Texture tex = new Texture(width, height);
+        tex.setHandle(Long.valueOf(peer));
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        if (contextPeer == 0 || target == null || !(target.getHandle() instanceof Long) || inRenderTarget
+                || inShadowPass || activePost != null) {
+            return false;
+        }
+        inRenderTarget = WindowsNative.gl3dBeginRenderTarget(contextPeer, ((Long) target.getHandle()).longValue(),
+                target.getWidth(), target.getHeight(), clearArgb);
+        return inRenderTarget;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        WindowsNative.gl3dEndRenderTarget(contextPeer);
     }
 
     public void dispose(Texture texture) {

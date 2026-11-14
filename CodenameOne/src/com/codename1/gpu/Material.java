@@ -22,6 +22,10 @@
  */
 package com.codename1.gpu;
 
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.gpu.shader.ShaderType;
+
 /// A declarative description of how a surface should be shaded. The 3D engine is
 /// responsible for translating a material into a platform shader (GLSL on OpenGL
 /// ES and WebGL, Metal Shading Language on iOS); applications never write shader
@@ -61,6 +65,25 @@ public final class Material {
     private int emissive = 0xff000000;
     private boolean receiveShadows = true;
     private boolean castShadows = true;
+    private boolean fogged = true;
+    private float[] jointRows;
+    private int jointCount;
+    private ShaderMaterial shader;
+    private Texture normalMap;
+    private float normalStrength = 1f;
+    private Texture detailNormal;
+    private float detailScale = 1f;
+    private float detailScrollU;
+    private float detailScrollV;
+    private float detailStrength = 1f;
+    private Texture metallicRoughnessMap;
+    private Texture occlusionMap;
+    private float occlusionStrength = 1f;
+    private Texture emissiveMap;
+    private ShaderMaterial composed;
+    private int composedUserVersion = -1;
+    private ShaderMaterial composedUser;
+    private boolean mapsChanged = true;
 
     /// Creates an unlit white material.
     public Material() {
@@ -288,7 +311,383 @@ public final class Material {
     ///
     /// a shader variant cache key
     public String getShaderKey() {
-        return type.name() + (texture != null ? "|tex" : "|notex")
-                + (receiveShadows ? "|rs" : "|nrs") + ((emissive & 0xffffff) != 0 ? "|em" : "");
+        String k = type.name() + (texture != null ? "|tex" : "|notex")
+                + (receiveShadows ? "|rs" : "|nrs") + (fogged ? "" : "|nofog") + ((emissive & 0xffffff) != 0 ? "|em" : "");
+        if (jointRows != null) {
+            k += "|skin" + jointCount;
+        }
+        ShaderMaterial eff = getEffectiveShader();
+        return eff == null ? k : k + "|sh:" + eff.getShaderKey();
+    }
+
+    /// The most joints `setSkinning` takes. A rig of more is skinned on the
+    /// CPU by `com.codename1.gaming.AnimatedModel`.
+    public static final int MAX_JOINTS = 64;
+
+    /// Skins the meshes drawn with this material on the GPU. Each joint is
+    /// three rows of its 4x4 matrix (the fourth is always 0, 0, 0, 1), so
+    /// joint `j` is `rows[j * 12 .. j * 12 + 11]`: the first row's four
+    /// values, then the second's, then the third's. A mesh in
+    /// `VertexFormat.SKINNED` moves each vertex by its four joints blended by
+    /// their weights; a mesh without joints draws as it is. The array is read
+    /// at every draw, so an animation updates it in place. Use it only where
+    /// `GraphicsDevice.isGpuSkinning` says the device can.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the joint rows, at least `count * 12` floats, or null to
+    ///   stop skinning
+    ///
+    /// - `count`: the number of joints, at most `MAX_JOINTS`
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setSkinning(float[] rows, int count) {
+        if (rows != null && (count < 1 || count > MAX_JOINTS || rows.length < count * 12)) {
+            throw new IllegalArgumentException("joint count " + count);
+        }
+        this.jointRows = rows;
+        this.jointCount = rows == null ? 0 : count;
+        return this;
+    }
+
+    /// Returns the joint rows `setSkinning` gave, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the rows, shared and not copied
+    public float[] getJointRows() {
+        return jointRows;
+    }
+
+    /// Returns the number of joints `setSkinning` gave, 0 without skinning.
+    ///
+    /// #### Returns
+    ///
+    /// the joint count
+    public int getJointCount() {
+        return jointCount;
+    }
+
+    /// True if the material skins its meshes on the GPU.
+    ///
+    /// #### Returns
+    ///
+    /// true after `setSkinning` with joints
+    public boolean isSkinned() {
+        return jointRows != null;
+    }
+
+    /// Returns false when the environment's fog skips this material.
+    ///
+    /// #### Returns
+    ///
+    /// true when fogged, the default
+    public boolean isFogged() {
+        return fogged;
+    }
+
+    /// Sets whether the environment's fog applies to this material. Turn it
+    /// off for sky domes and distant backdrops that already paint their own
+    /// haze, which fog would wash out to a flat colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fogged`: false to draw without fog
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setFogged(boolean fogged) {
+        this.fogged = fogged;
+        return this;
+    }
+
+    /// Returns the custom shading attached to this material.
+    ///
+    /// #### Returns
+    ///
+    /// the shader, or null for the engine's own
+    public ShaderMaterial getShader() {
+        return shader;
+    }
+
+    /// Attaches custom shading: graphs that replace inputs of the shader the
+    /// material's type selects. The library in `com.codename1.gpu.shaders`
+    /// builds ready made ones.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shader`: the shader, or null for the engine's own
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setShader(ShaderMaterial shader) {
+        this.shader = shader;
+        return this;
+    }
+
+    /// Sets a tangent space normal map, sampled with the primary texture
+    /// coordinate. The tangent frame comes from the surface normal (see
+    /// `ShaderNode.perturbNormal`), so a mesh needs no tangents. Lit types
+    /// only.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the normal map, or null for none
+    ///
+    /// - `strength`: 1 for the map as authored
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setNormalMap(Texture map, float strength) {
+        normalMap = map;
+        normalStrength = strength;
+        mapsChanged = true;
+        return this;
+    }
+
+    /// Returns the normal map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getNormalMap() {
+        return normalMap;
+    }
+
+    /// Sets a tiling detail normal map, layered over the normal map, that can
+    /// scroll with time: ripples on water, grain on stone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: a tileable normal map, or null for none
+    ///
+    /// - `scale`: how many times it repeats per unit of texture coordinate
+    ///
+    /// - `scrollU`: texture coordinate units per second along u
+    ///
+    /// - `scrollV`: texture coordinate units per second along v
+    ///
+    /// - `strength`: 1 for the map as authored
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setDetailNormal(Texture map, float scale, float scrollU, float scrollV, float strength) {
+        detailNormal = map;
+        detailScale = scale;
+        detailScrollU = scrollU;
+        detailScrollV = scrollV;
+        detailStrength = strength;
+        mapsChanged = true;
+        return this;
+    }
+
+    /// Returns the detail normal map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getDetailNormal() {
+        return detailNormal;
+    }
+
+    /// Sets a glTF style metallic-roughness map: roughness in green and
+    /// metallic in blue, each multiplying the material's own factor. PBR only.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setMetallicRoughnessMap(Texture map) {
+        metallicRoughnessMap = map;
+        mapsChanged = true;
+        return this;
+    }
+
+    /// Returns the metallic-roughness map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getMetallicRoughnessMap() {
+        return metallicRoughnessMap;
+    }
+
+    /// Sets an ambient occlusion map, read from its red channel, that darkens
+    /// creases and contact areas.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map, or null for none
+    ///
+    /// - `strength`: 0 for no effect, 1 for the full map
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setOcclusionMap(Texture map, float strength) {
+        occlusionMap = map;
+        occlusionStrength = strength;
+        mapsChanged = true;
+        return this;
+    }
+
+    /// Returns the occlusion map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getOcclusionMap() {
+        return occlusionMap;
+    }
+
+    /// Sets an emissive map, multiplied by the emissive colour (or by white
+    /// when that is black): windows lit at night, glowing runes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setEmissiveMap(Texture map) {
+        emissiveMap = map;
+        mapsChanged = true;
+        return this;
+    }
+
+    /// Returns the emissive map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getEmissiveMap() {
+        return emissiveMap;
+    }
+
+    private boolean hasMaps() {
+        return normalMap != null || detailNormal != null || metallicRoughnessMap != null
+                || occlusionMap != null || emissiveMap != null;
+    }
+
+    /// Returns the shading backends draw this material with: the attached
+    /// `ShaderMaterial` combined with the graphs the texture maps on this
+    /// material need. A hook the attached shader sets wins over a map. For
+    /// backends; applications use `getShader`.
+    ///
+    /// #### Returns
+    ///
+    /// the shader to draw with, or null for the engine's own
+    public ShaderMaterial getEffectiveShader() {
+        if (!hasMaps()) {
+            return shader;
+        }
+        int userVersion = shader == null ? -1 : shader.getVersion();
+        if (composed == null || mapsChanged || composedUser != shader || composedUserVersion != userVersion) { //NOPMD CompareObjectsWithEquals - a different ShaderMaterial instance needs a new composition
+            composed = compose();
+            composedUser = shader;
+            composedUserVersion = userVersion;
+            mapsChanged = false;
+        }
+        syncComposed();
+        return composed;
+    }
+
+    private static final String U_MR = "cn1MetalRough";
+    private static final String U_DETAIL = "cn1Detail";
+    private static final String U_EMIT = "cn1EmitColor";
+
+    private ShaderMaterial compose() {
+        ShaderMaterial m = new ShaderMaterial();
+        ShaderMaterial.Hook[] hooks = ShaderMaterial.Hook.values();
+        if (shader != null) {
+            for (int i = 0; i < shader.getUniformCount(); i++) {
+                m.declareUniform(shader.getUniformName(i), shader.getUniformType(i));
+            }
+            for (int i = 0; i < shader.getTextureCount(); i++) {
+                m.declareTexture(shader.getTextureName(i), shader.getTexture(i));
+            }
+            for (ShaderMaterial.Hook h : hooks) {
+                m.set(h, shader.get(h));
+            }
+        }
+        ShaderNode uv = ShaderNode.uv();
+        if (m.get(ShaderMaterial.Hook.NORMAL) == null && (normalMap != null || detailNormal != null)) {
+            ShaderNode tn = null;
+            if (normalMap != null) {
+                m.declareTexture("cn1NormalMap", normalMap);
+                tn = ShaderNode.unpackNormal(ShaderNode.sample("cn1NormalMap", uv), normalStrength);
+            }
+            if (detailNormal != null) {
+                m.declareTexture("cn1DetailMap", detailNormal);
+                m.declareUniform(U_DETAIL, ShaderType.VEC3);
+                ShaderNode d = ShaderNode.uniform(U_DETAIL, ShaderType.VEC3);
+                ShaderNode duv = uv.mul(d.x()).add(d.swizzle("yz").mul(ShaderNode.time()));
+                ShaderNode dn = ShaderNode.unpackNormal(ShaderNode.sample("cn1DetailMap", duv), detailStrength);
+                tn = tn == null ? dn : ShaderNode.blendNormals(tn, dn);
+            }
+            m.set(ShaderMaterial.Hook.NORMAL, ShaderNode.perturbNormal(tn));
+        }
+        if (metallicRoughnessMap != null && (m.get(ShaderMaterial.Hook.METALLIC) == null
+                || m.get(ShaderMaterial.Hook.ROUGHNESS) == null)) {
+            m.declareTexture("cn1MrMap", metallicRoughnessMap);
+            m.declareUniform(U_MR, ShaderType.VEC2);
+            ShaderNode mr = ShaderNode.sample("cn1MrMap", uv);
+            ShaderNode factors = ShaderNode.uniform(U_MR, ShaderType.VEC2);
+            if (m.get(ShaderMaterial.Hook.METALLIC) == null) {
+                m.set(ShaderMaterial.Hook.METALLIC, mr.z().mul(factors.x()));
+            }
+            if (m.get(ShaderMaterial.Hook.ROUGHNESS) == null) {
+                m.set(ShaderMaterial.Hook.ROUGHNESS, mr.y().mul(factors.y()));
+            }
+        }
+        if (occlusionMap != null && m.get(ShaderMaterial.Hook.BASE_COLOR) == null) {
+            m.declareTexture("cn1AoMap", occlusionMap);
+            ShaderNode ao = ShaderNode.mix(ShaderNode.f(1f), ShaderNode.sample("cn1AoMap", uv).x(),
+                    ShaderNode.f(occlusionStrength));
+            ShaderNode base = ShaderNode.baseColor();
+            m.set(ShaderMaterial.Hook.BASE_COLOR, ShaderNode.vec(base.rgb().mul(ao), base.w()));
+        }
+        if (emissiveMap != null && m.get(ShaderMaterial.Hook.EMISSIVE) == null) {
+            m.declareTexture("cn1EmitMap", emissiveMap);
+            m.declareUniform(U_EMIT, ShaderType.VEC3);
+            m.set(ShaderMaterial.Hook.EMISSIVE, ShaderNode.sample("cn1EmitMap", uv).rgb()
+                    .mul(ShaderNode.uniform(U_EMIT, ShaderType.VEC3)));
+        }
+        return m;
+    }
+
+    private void syncComposed() {
+        if (shader != null) {
+            for (int i = 0; i < shader.getUniformCount(); i++) {
+                float[] v = shader.getUniformValues();
+                composed.setUniform(shader.getUniformName(i), v[i * 4], v[i * 4 + 1], v[i * 4 + 2], v[i * 4 + 3]);
+            }
+            for (int i = 0; i < shader.getTextureCount(); i++) {
+                composed.setTexture(shader.getTextureName(i), shader.getTexture(i));
+            }
+        }
+        if (composed.getUniformSlot(U_MR) >= 0) {
+            composed.setUniform(U_MR, metallic, roughness);
+        }
+        if (composed.getUniformSlot(U_DETAIL) >= 0) {
+            composed.setUniform(U_DETAIL, detailScale, detailScrollU, detailScrollV);
+        }
+        if (composed.getUniformSlot(U_EMIT) >= 0) {
+            if ((emissive & 0xffffff) == 0) {
+                composed.setUniform(U_EMIT, 1f, 1f, 1f);
+            } else {
+                composed.setColorUniform(U_EMIT, emissive);
+            }
+        }
     }
 }

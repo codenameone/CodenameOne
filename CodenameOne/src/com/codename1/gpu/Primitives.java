@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.gpu;
 
@@ -230,6 +243,63 @@ public final class Primitives {
             }
         }
         VertexBuffer vb = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, vertexCount);
+        vb.setData(v);
+        IndexBuffer ib = new IndexBuffer(idx.length);
+        ib.setData(idx);
+        return new Mesh(vb, ib, PrimitiveType.TRIANGLES);
+    }
+
+    /// Creates a flat, finely subdivided square in the XZ plane facing up,
+    /// centred on the origin: the surface for water, terrain and anything a
+    /// `ShaderMaterial` displaces. Texture coordinates run 0 to 1 across it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: the edge length
+    ///
+    /// - `cells`: the number of cells along each edge, 1 to 255
+    ///
+    /// #### Returns
+    ///
+    /// an indexed triangle mesh
+    public static Mesh grid(float size, int cells) {
+        if (size <= 0f) {
+            throw new IllegalArgumentException("size must be positive");
+        }
+        if (cells < 1 || cells > 255) {
+            throw new IllegalArgumentException("cells must be between 1 and 255");
+        }
+        int row = cells + 1;
+        float[] v = new float[row * row * 8];
+        int o = 0;
+        for (int r = 0; r <= cells; r++) {
+            float tz = (float) r / cells;
+            for (int c = 0; c <= cells; c++) {
+                float tx = (float) c / cells;
+                v[o] = (tx - 0.5f) * size;
+                v[o + 2] = (tz - 0.5f) * size;
+                v[o + 4] = 1f;
+                v[o + 6] = tx;
+                v[o + 7] = tz;
+                o += 8;
+            }
+        }
+        int[] idx = new int[cells * cells * 6];
+        int i = 0;
+        for (int r = 0; r < cells; r++) {
+            for (int c = 0; c < cells; c++) {
+                int first = r * row + c;
+                int second = first + row;
+                idx[i] = first;
+                idx[i + 1] = second;
+                idx[i + 2] = first + 1;
+                idx[i + 3] = second;
+                idx[i + 4] = second + 1;
+                idx[i + 5] = first + 1;
+                i += 6;
+            }
+        }
+        VertexBuffer vb = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, row * row);
         vb.setData(v);
         IndexBuffer ib = new IndexBuffer(idx.length);
         ib.setData(idx);

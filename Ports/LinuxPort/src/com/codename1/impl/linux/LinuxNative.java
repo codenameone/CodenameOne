@@ -1250,10 +1250,21 @@ public final class LinuxNative {
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap, int shadowMap);
 
-    /** Binds a size x size packed-depth shadow target and clears it. */
-    public static native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    /** Binds a ShaderMaterial texture on unit `index` for the next draw. */
+    public static native void gl3dBindTexture(long contextPeer, int index, long texturePeer, int texFilter,
+            int texWrap);
+
+    /** Binds a width x size packed-depth shadow target (one size x size square per cascade) and clears it. */
+    public static native boolean gl3dBeginShadowPass(long contextPeer, int width, int size);
     /** Restores the target and viewport that were bound at gl3dBeginShadowPass. */
     public static native void gl3dEndShadowPass(long contextPeer);
+    /** Creates a sampleable colour texture a pass can draw into; 0 when it cannot. */
+    public static native long gl3dCreateRenderTarget(long contextPeer, int width, int height);
+    /** Draws into the target texture (width x height, with its own depth) cleared to argb, until gl3dEndRenderTarget. */
+    public static native boolean gl3dBeginRenderTarget(long contextPeer, long texturePeer, int width, int height,
+            int argb);
+    /** Restores the target and viewport that were bound at gl3dBeginRenderTarget. */
+    public static native void gl3dEndRenderTarget(long contextPeer);
     /** Redirects subsequent draws into an offscreen scene target the size of the viewport. */
     public static native boolean gl3dBeginPost(long contextPeer, boolean bloom);
     /**
