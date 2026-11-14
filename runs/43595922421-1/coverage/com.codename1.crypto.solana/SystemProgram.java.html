@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SystemProgram.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.solana</a> &gt; <span class="el_source">SystemProgram.java</span></div><h1>SystemProgram.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.solana;
+
+/// Instructions of the System Program. Amounts are lamports, 10^9 to the SOL, and are
+/// written as unsigned 64-bit values.
+@com.codename1.impl.SharedWithBackend
+public final class SystemProgram {
+    /// Lamports in one SOL.
+    public static final long LAMPORTS_PER_SOL = 1000000000L;
+
+<span class="fc" id="L32">    private static final SolanaAddress RECENT_BLOCKHASHES =</span>
+<span class="fc" id="L33">            SolanaAddress.parse(&quot;SysvarRecentB1ockHashes11111111111111111111&quot;);</span>
+
+    private SystemProgram() {
+    }
+
+    /// Moves lamports between two system accounts; `from` signs.
+    public static Instruction transfer(SolanaAddress from, SolanaAddress to, long lamports) {
+<span class="fc" id="L40">        return new Instruction(SolanaAddress.SYSTEM_PROGRAM,</span>
+<span class="fc" id="L41">                new AccountMeta[] {AccountMeta.signerWritable(from), AccountMeta.writable(to)},</span>
+<span class="fc" id="L42">                new ShortVec().u32(2).u64(lamports).toBytes());</span>
+    }
+
+    /// Creates an account owned by a program, funded with `lamports` and sized `space` bytes;
+    /// both the payer and the new account sign.
+    public static Instruction createAccount(SolanaAddress payer, SolanaAddress newAccount, long lamports,
+            long space, SolanaAddress owner) {
+<span class="nc" id="L49">        return new Instruction(SolanaAddress.SYSTEM_PROGRAM,</span>
+<span class="nc" id="L50">                new AccountMeta[] {AccountMeta.signerWritable(payer), AccountMeta.signerWritable(newAccount)},</span>
+<span class="nc" id="L51">                new ShortVec().u32(0).u64(lamports).u64(space).bytes(owner.raw()).toBytes());</span>
+    }
+
+    /// Assigns an account to a program.
+    public static Instruction assign(SolanaAddress account, SolanaAddress owner) {
+<span class="nc" id="L56">        return new Instruction(SolanaAddress.SYSTEM_PROGRAM,</span>
+<span class="nc" id="L57">                new AccountMeta[] {AccountMeta.signerWritable(account)},</span>
+<span class="nc" id="L58">                new ShortVec().u32(1).bytes(owner.raw()).toBytes());</span>
+    }
+
+    /// Allocates space in an account.
+    public static Instruction allocate(SolanaAddress account, long space) {
+<span class="nc" id="L63">        return new Instruction(SolanaAddress.SYSTEM_PROGRAM,</span>
+<span class="nc" id="L64">                new AccountMeta[] {AccountMeta.signerWritable(account)},</span>
+<span class="nc" id="L65">                new ShortVec().u32(8).u64(space).toBytes());</span>
+    }
+
+    /// Advances a durable nonce. It must be the first instruction of a transaction whose
+    /// recent blockhash is the nonce value.
+    public static Instruction advanceNonceAccount(SolanaAddress nonceAccount, SolanaAddress authority) {
+<span class="nc" id="L71">        return new Instruction(SolanaAddress.SYSTEM_PROGRAM,</span>
+<span class="nc" id="L72">                new AccountMeta[] {AccountMeta.writable(nonceAccount), AccountMeta.readonly(RECENT_BLOCKHASHES),</span>
+<span class="nc" id="L73">                    AccountMeta.signer(authority)},</span>
+<span class="nc" id="L74">                new ShortVec().u32(4).toBytes());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

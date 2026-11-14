@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Process.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Process.java</span></div><h1>Process.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.concurrent.TimeUnit;
+
+/// A child OS process. Stream directions and lifecycle methods follow JavaSE.
+/// Read stdout and stderr concurrently to avoid filling a pipe. Never wait or do
+/// blocking stream I/O on the EDT. Interrupting a wait does not kill the child.
+/// Unlike JavaSE, this class is AutoCloseable: close forcibly terminates the direct
+/// child and closes its three streams. Descendants are not terminated.
+@com.codename1.impl.SharedWithBackend
+<span class="nc" id="L36">public abstract class Process implements AutoCloseable {</span>
+    /// The child's stdin (the parent writes to it).
+    public abstract OutputStream getOutputStream();
+    /// The child's stdout (the parent reads from it).
+    public abstract InputStream getInputStream();
+    /// The child's stderr; EOF when redirectErrorStream(true) was selected.
+    public abstract InputStream getErrorStream();
+    /// Returns the exit code, or throws IllegalThreadStateException while alive.
+    public abstract int exitValue();
+    /// Requests termination of the direct child. On Windows this is forcible.
+    public abstract void destroy();
+    /// Forcibly terminates the direct child; completion is asynchronous.
+    public abstract Process destroyForcibly();
+    /// Whether the direct child is still running.
+    public boolean isAlive() {
+        try {
+<span class="nc" id="L52">            exitValue();</span>
+<span class="nc" id="L53">            return false;</span>
+<span class="nc" id="L54">        } catch (IllegalThreadStateException ex) {</span>
+<span class="nc" id="L55">            return true;</span>
+        }
+    }
+    /// Waits for exit. An interrupt cancels only this wait.
+    public int waitFor() throws InterruptedException {
+        while (true) {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            if (Thread.interrupted()) {</span>
+<span class="nc" id="L62">                throw new InterruptedException();</span>
+            }
+            try {
+<span class="nc" id="L65">                return exitValue();</span>
+<span class="nc" id="L66">            } catch (IllegalThreadStateException ex) {</span>
+<span class="nc" id="L67">                pause(10);</span>
+<span class="nc" id="L68">            }</span>
+        }
+    }
+    /// Waits at most timeout milliseconds. Zero/negative values only poll.
+    public boolean waitFor(long timeoutMillis) throws InterruptedException {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (Thread.interrupted()) {</span>
+<span class="nc" id="L74">            throw new InterruptedException();</span>
+        }
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (!isAlive()) {</span>
+<span class="nc" id="L77">            return true;</span>
+        }
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (timeoutMillis &lt;= 0) {</span>
+<span class="nc" id="L80">            return false;</span>
+        }
+        // Subtraction remains valid across nanoTime's signed wraparound.
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        long budget = timeoutMillis &gt; Long.MAX_VALUE / 1000000L ? Long.MAX_VALUE : timeoutMillis * 1000000L;</span>
+<span class="nc" id="L84">        long start = System.nanoTime();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        while (isAlive()) {</span>
+<span class="nc" id="L86">            long remaining = budget - (System.nanoTime() - start);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (remaining &lt;= 0) {</span>
+<span class="nc" id="L88">                return false;</span>
+            }
+<span class="nc" id="L90">            pause(Math.min(10L, Math.max(1L, remaining / 1000000L)));</span>
+<span class="nc" id="L91">        }</span>
+<span class="nc" id="L92">        return true;</span>
+    }
+    /// Port hook for a bounded wait between exit polls.
+    protected void pause(long millis) throws InterruptedException {
+<span class="nc" id="L96">        Thread.sleep(millis);</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (Thread.interrupted()) {</span>
+<span class="nc" id="L98">            throw new InterruptedException();</span>
+        }
+<span class="nc" id="L100">    }</span>
+    /// JavaSE-style timed wait; sub-millisecond positive durations round up.
+    public boolean waitFor(long timeout, TimeUnit unit) throws InterruptedException {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (unit == null) {</span>
+<span class="nc" id="L104">            throw new NullPointerException(&quot;unit&quot;);</span>
+        }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        return waitFor(timeout &gt; 0 ? Math.max(1L, unit.toMillis(timeout)) : 0L);</span>
+    }
+    /// Forcibly terminates the child and releases all pipes, even if one close fails.
+    /// The runtime reaps it independently; this does not wait for termination.
+    @Override
+    public void close() throws IOException {
+<span class="nc" id="L112">        destroyForcibly();</span>
+<span class="nc" id="L113">        IOException failure = null;</span>
+        try {
+<span class="nc" id="L115">            getOutputStream().close();</span>
+<span class="nc" id="L116">        } catch (IOException ex) {</span>
+<span class="nc" id="L117">            failure = ex;</span>
+<span class="nc" id="L118">        }</span>
+        try {
+<span class="nc" id="L120">            getInputStream().close();</span>
+<span class="nc" id="L121">        } catch (IOException ex) {</span>
+<span class="nc" id="L122">            failure = ex;</span>
+<span class="nc" id="L123">        }</span>
+        try {
+<span class="nc" id="L125">            getErrorStream().close();</span>
+<span class="nc" id="L126">        } catch (IOException ex) {</span>
+<span class="nc" id="L127">            failure = ex;</span>
+<span class="nc" id="L128">        }</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (failure != null) {</span>
+<span class="nc" id="L130">            throw failure;</span>
+        }
+<span class="nc" id="L132">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KeyAgreement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">KeyAgreement.java</span></div><h1>KeyAgreement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.io.Util;
+
+/// Elliptic-curve Diffie-Hellman key agreement over P-256.
+///
+/// Two parties that each hold a key pair from [KeyGenerator#ec(int)] exchange
+/// public keys; each combines its own private key with the other's public key
+/// and both arrive at the same secret, which no one watching the exchange can
+/// compute. That secret is not a key yet -- run it through [Hkdf] first.
+///
+/// ```java
+/// KeyPair alice = KeyGenerator.ec(256);
+/// KeyPair bob = KeyGenerator.ec(256);
+/// byte[] a = KeyAgreement.ecdh(alice.getPrivateKey(), bob.getPublicKey());
+/// byte[] b = KeyAgreement.ecdh(bob.getPrivateKey(), alice.getPublicKey());
+/// // a and b hold the same 32 bytes
+/// ```
+///
+/// The computation runs in the platform's native crypto provider.
+public final class KeyAgreement {
+    private KeyAgreement() {}
+
+    /// Computes the ECDH shared secret: the 32-byte x coordinate of the
+    /// product of `mine` and `theirs`, as SEC 1 and the JCA define it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mine`: this side's EC private key
+    ///
+    /// - `theirs`: the other side's EC public key
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: if either key is not a P-256 key, or the public key
+    ///   is not a point on the curve
+    public static byte[] ecdh(PrivateKey mine, PublicKey theirs) {
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">        if (mine == null || theirs == null) {</span>
+<span class="nc" id="L61">            throw new CryptoException(&quot;ECDH keys must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">        if (!PublicKey.EC.equals(mine.getAlgorithm()) || !PublicKey.EC.equals(theirs.getAlgorithm())) {</span>
+<span class="fc" id="L64">            throw new CryptoException(&quot;ECDH needs EC keys, got &quot; + mine.getAlgorithm()</span>
+<span class="fc" id="L65">                    + &quot; and &quot; + theirs.getAlgorithm());</span>
+        }
+<span class="fc" id="L67">        byte[] privateDer = mine.getEncoded();</span>
+<span class="fc" id="L68">        byte[] publicDer = theirs.getEncoded();</span>
+        // The EC label says nothing about the curve. Some providers would
+        // agree over an imported P-384 key and others refuse it, so a key that
+        // does not name P-256 is refused here, the same on every port.
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">        if (!namesP256(privateDer) || !namesP256(publicDer)) {</span>
+<span class="fc" id="L73">            throw new CryptoException(&quot;ECDH supports P-256 keys only&quot;);</span>
+        }
+        try {
+<span class="fc" id="L76">            return Util.ecdhAgree(privateDer, publicDer);</span>
+<span class="nc" id="L77">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L78">            throw new CryptoException(re.getMessage(), re);</span>
+        }
+    }
+
+    /// The DER encoding of the P-256 curve's object identifier,
+    /// 1.2.840.10045.3.1.7, which a PKCS#8 or X.509 EC key carries in its
+    /// algorithm parameters.
+<span class="fc" id="L85">    private static final byte[] P256_OID = {</span>
+        0x06, 0x08, 0x2a, (byte) 0x86, 0x48, (byte) 0xce, 0x3d, 0x03, 0x01, 0x07
+    };
+
+    private static boolean namesP256(byte[] der) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (der == null) {</span>
+<span class="nc" id="L91">            return false;</span>
+        }
+<span class="fc" id="L93">        int last = der.length - P256_OID.length;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int i = 0; i &lt;= last; i++) {</span>
+<span class="fc" id="L95">            int j = 0;</span>
+<span class="fc bfc" id="L96" title="All 4 branches covered.">            while (j &lt; P256_OID.length &amp;&amp; der[i + j] == P256_OID[j]) {</span>
+<span class="fc" id="L97">                j++;</span>
+            }
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (j == P256_OID.length) {</span>
+<span class="fc" id="L100">                return true;</span>
+            }
+        }
+<span class="fc" id="L103">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

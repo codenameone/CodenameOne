@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PwmChannel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.hardware</a> &gt; <span class="el_source">PwmChannel.java</span></div><h1>PwmChannel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.hardware;
+
+/// A hardware PWM channel, opened through [Hardware#openPwm(int, int)].
+///
+/// ```java
+/// PwmChannel servo = Hardware.getInstance().openPwm(0, 0);
+/// servo.configure(20000000L, 1500000L, true);  // 50 Hz, 1.5 ms pulse: centred
+/// ```
+@com.codename1.impl.SharedWithBackend
+public final class PwmChannel {
+
+    private final Hardware hw;
+    private final int handle;
+    private final int chip;
+    private final int channel;
+    private long periodNanos;
+    private long dutyNanos;
+    private boolean enabled;
+    private boolean closed;
+
+<span class="nc" id="L43">    PwmChannel(Hardware hw, int handle, int chip, int channel) {</span>
+<span class="nc" id="L44">        this.hw = hw;</span>
+<span class="nc" id="L45">        this.handle = handle;</span>
+<span class="nc" id="L46">        this.chip = chip;</span>
+<span class="nc" id="L47">        this.channel = channel;</span>
+<span class="nc" id="L48">    }</span>
+
+    /// The PWM controller number.
+    public int getChip() {
+<span class="nc" id="L52">        return chip;</span>
+    }
+
+    /// The channel within the controller.
+    public int getChannel() {
+<span class="nc" id="L57">        return channel;</span>
+    }
+
+    /// Sets the period, the high time and whether the output runs.
+    ///
+    /// #### Throws
+    ///
+    /// - `HardwareException`: when the duty exceeds the period, the
+    ///   controller rejects the values, or the channel is closed
+    public void configure(long periodNanos, long dutyNanos, boolean enabled) throws HardwareException {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L68">            throw new HardwareException(&quot;PWM channel &quot; + chip + &quot;/&quot; + channel + &quot; is closed&quot;);</span>
+        }
+<span class="nc bnc" id="L70" title="All 6 branches missed.">        if (periodNanos &lt;= 0 || dutyNanos &lt; 0 || dutyNanos &gt; periodNanos) {</span>
+<span class="nc" id="L71">            throw new HardwareException(&quot;PWM duty must be within 0..period&quot;);</span>
+        }
+<span class="nc" id="L73">        hw.pwmConfigure(handle, periodNanos, dutyNanos, enabled);</span>
+<span class="nc" id="L74">        this.periodNanos = periodNanos;</span>
+<span class="nc" id="L75">        this.dutyNanos = dutyNanos;</span>
+<span class="nc" id="L76">        this.enabled = enabled;</span>
+<span class="nc" id="L77">    }</span>
+
+    /// Sets the duty cycle as a fraction of the current period, keeping the
+    /// period and enabled state.
+    ///
+    /// #### Throws
+    ///
+    /// - `HardwareException`: when no period was configured yet
+    public void setDutyCycle(double fraction) throws HardwareException {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (periodNanos &lt;= 0) {</span>
+<span class="nc" id="L87">            throw new HardwareException(&quot;Configure a PWM period first&quot;);</span>
+        }
+<span class="nc bnc" id="L89" title="All 4 branches missed.">        double f = fraction &lt; 0 ? 0 : (fraction &gt; 1 ? 1 : fraction);</span>
+<span class="nc" id="L90">        configure(periodNanos, (long) (periodNanos * f), enabled);</span>
+<span class="nc" id="L91">    }</span>
+
+    /// The configured period in nanoseconds, `0` before [#configure(long, long, boolean)].
+    public long getPeriodNanos() {
+<span class="nc" id="L95">        return periodNanos;</span>
+    }
+
+    /// The configured high time in nanoseconds.
+    public long getDutyNanos() {
+<span class="nc" id="L100">        return dutyNanos;</span>
+    }
+
+    /// `true` while the output runs.
+    public boolean isEnabled() {
+<span class="nc" id="L105">        return enabled;</span>
+    }
+
+    /// Disables the output and releases the channel. Closing twice is harmless.
+    public void close() {
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (!closed) {</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (enabled) {</span>
+                try {
+<span class="nc" id="L113">                    hw.pwmConfigure(handle, periodNanos, dutyNanos, false);</span>
+<span class="nc" id="L114">                } catch (HardwareException ignored) {</span>
+                    // Releasing is what matters; the controller may already be gone.
+<span class="nc" id="L116">                }</span>
+            }
+<span class="nc" id="L118">            closed = true;</span>
+<span class="nc" id="L119">            hw.close(handle, false);</span>
+        }
+<span class="nc" id="L121">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

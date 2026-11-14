@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Tag.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nfc</a> &gt; <span class="el_source">Tag.java</span></div><h1>Tag.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nfc;
+
+import com.codename1.util.AsyncResource;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
+/// A tag discovered by [Nfc#readTag(NfcReadOptions)] or
+/// [Nfc#addTagListener(NfcListener)]. The lifetime of a `Tag` is tied to the
+/// reader session that produced it: once the tag leaves the field (or the
+/// caller closes the session) all subsequent calls on this instance fail
+/// with [NfcError#TAG_LOST].
+///
+/// Apps inspect the tag via [#getTypes()] to learn which technologies are
+/// available and call one of:
+///
+/// - [#readNdef()] / [#writeNdef(NdefMessage)] for any [TagType#NDEF] tag
+/// - [#getIsoDep()] for ISO-7816 smart cards / payment / passport
+/// - [#getMifareClassic()] / [#getMifareUltralight()] for NXP MIFARE
+/// - [#getNfcA()] / [#getNfcB()] / [#getNfcF()] / [#getNfcV()] for raw
+///   low-level transceive
+///
+/// A `Tag` may return `null` from a technology accessor when the underlying
+/// tag does not support that technology (consult [#supports(TagType)]
+/// first). Ports subclass `Tag` to provide the native transceive
+/// implementation -- application code never instantiates `Tag` directly.
+public abstract class Tag {
+
+    private final Set&lt;TagType&gt; types;
+    private final byte[] id;
+
+    /// Subclasses populate the technology list and (when known) the tag's
+    /// hardware UID. Pass an empty array for `id` if the platform does not
+    /// expose one.
+<span class="fc" id="L58">    protected Tag(Set&lt;TagType&gt; types, byte[] id) {</span>
+<span class="fc" id="L59">        Set&lt;TagType&gt; copy = new HashSet&lt;TagType&gt;();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (types != null) {</span>
+<span class="fc" id="L61">            copy.addAll(types);</span>
+        }
+<span class="fc" id="L63">        this.types = Collections.unmodifiableSet(copy);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (id == null) {</span>
+<span class="fc" id="L65">            id = new byte[0];</span>
+        }
+<span class="fc" id="L67">        this.id = new byte[id.length];</span>
+<span class="fc" id="L68">        System.arraycopy(id, 0, this.id, 0, id.length);</span>
+<span class="fc" id="L69">    }</span>
+
+    /// Technologies advertised by this tag. Always at least one entry on a
+    /// discovered tag; an empty set indicates a tag the platform could not
+    /// classify (rare).
+    public final Set&lt;TagType&gt; getTypes() {
+<span class="fc" id="L75">        return types;</span>
+    }
+
+    /// Convenience: `getTypes().contains(t)`.
+    public final boolean supports(TagType t) {
+<span class="fc" id="L80">        return types.contains(t);</span>
+    }
+
+    /// Tag's hardware identifier (`NFCA.uid` on iOS / `Tag.getId()` on
+    /// Android). Defensively copied. Returns an empty array if the platform
+    /// did not surface a UID.
+    public final byte[] getId() {
+<span class="fc" id="L87">        byte[] out = new byte[id.length];</span>
+<span class="fc" id="L88">        System.arraycopy(id, 0, out, 0, id.length);</span>
+<span class="fc" id="L89">        return out;</span>
+    }
+
+    /// Reads the NDEF message currently stored on this tag. Fails with
+    /// [NfcError#UNSUPPORTED_TAG] if [#supports(TagType)] of [TagType#NDEF]
+    /// is `false`.
+    public AsyncResource&lt;NdefMessage&gt; readNdef() {
+<span class="fc" id="L96">        AsyncResource&lt;NdefMessage&gt; r = new AsyncResource&lt;NdefMessage&gt;();</span>
+<span class="fc" id="L97">        r.error(new NfcException(NfcError.UNSUPPORTED_TAG,</span>
+                &quot;this tag does not implement readNdef()&quot;));
+<span class="fc" id="L99">        return r;</span>
+    }
+
+    /// Writes (or overwrites) the NDEF message on this tag. Fails with
+    /// [NfcError#READ_ONLY] if the tag has been locked, and with
+    /// [NfcError#CAPACITY_EXCEEDED] when the serialised message is larger
+    /// than [#getMaxNdefSize()]. Default implementation reports
+    /// [NfcError#UNSUPPORTED_TAG].
+    public AsyncResource&lt;Boolean&gt; writeNdef(NdefMessage message) {
+<span class="fc" id="L108">        AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L109">        r.error(new NfcException(NfcError.UNSUPPORTED_TAG,</span>
+                &quot;this tag does not implement writeNdef()&quot;));
+<span class="fc" id="L111">        return r;</span>
+    }
+
+    /// Permanently locks the tag's NDEF area against future writes. Not all
+    /// tags expose this operation -- on those the call fails with
+    /// [NfcError#UNSUPPORTED_TAG]. **Irreversible** -- a locked tag cannot
+    /// be re-armed.
+    public AsyncResource&lt;Boolean&gt; makeReadOnly() {
+<span class="fc" id="L119">        AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L120">        r.error(new NfcException(NfcError.UNSUPPORTED_TAG,</span>
+                &quot;this tag does not implement makeReadOnly()&quot;));
+<span class="fc" id="L122">        return r;</span>
+    }
+
+    /// Largest NDEF message size (in bytes) that fits on this tag. Returns
+    /// `-1` when the platform does not expose the figure (iOS Core NFC
+    /// hides it on non-NDEF-formatted tags).
+    public int getMaxNdefSize() {
+<span class="fc" id="L129">        return -1;</span>
+    }
+
+    /// `true` when the tag's NDEF area is writable. Defaults to `false` on
+    /// the base class.
+    public boolean isWritable() {
+<span class="fc" id="L135">        return false;</span>
+    }
+
+    /// Convenience: `true` when [#readNdef()] returns at least one
+    /// [NdefRecord] right now. Defaults to `supports(TagType.NDEF)`.
+    public boolean hasNdef() {
+<span class="fc" id="L141">        return supports(TagType.NDEF);</span>
+    }
+
+    /// Returns an [IsoDep] view of this tag for ISO 7816 / EMV / passport
+    /// APDU exchange, or `null` if the tag does not advertise
+    /// [TagType#ISO_DEP].
+    public IsoDep getIsoDep() {
+<span class="fc" id="L148">        return null;</span>
+    }
+
+    /// Returns a [MifareClassic] view of this tag, or `null` when not
+    /// supported. iOS always returns `null` for MIFARE Classic.
+    public MifareClassic getMifareClassic() {
+<span class="fc" id="L154">        return null;</span>
+    }
+
+    /// Returns a [MifareUltralight] view, or `null` when not supported.
+    public MifareUltralight getMifareUltralight() {
+<span class="fc" id="L159">        return null;</span>
+    }
+
+    /// Raw NFC-A (ISO 14443-3A) transceive view, or `null`.
+    public NfcA getNfcA() {
+<span class="fc" id="L164">        return null;</span>
+    }
+
+    /// Raw NFC-B (ISO 14443-3B) transceive view, or `null`. Android-only.
+    public NfcB getNfcB() {
+<span class="fc" id="L169">        return null;</span>
+    }
+
+    /// Raw FeliCa (JIS X 6319-4) transceive view, or `null`.
+    public NfcF getNfcF() {
+<span class="fc" id="L174">        return null;</span>
+    }
+
+    /// Raw ISO 15693 / vicinity transceive view, or `null`. Android-only.
+    public NfcV getNfcV() {
+<span class="fc" id="L179">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Material.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Material.java</span></div><h1>Material.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu;
+
+/// A declarative description of how a surface should be shaded. The 3D engine is
+/// responsible for translating a material into a platform shader (GLSL on OpenGL
+/// ES and WebGL, Metal Shading Language on iOS); applications never write shader
+/// source. A material combines a lighting model (`Type`), a base color, an
+/// optional texture and pipeline `RenderState`.
+public final class Material {
+    /// The built in lighting model used to shade a surface.
+<span class="fc" id="L32">    public enum Type {</span>
+        /// Flat, unlit shading. The fragment color is the base color modulated
+        /// by the texture and vertex color. Ideal for UI, sprites and emissive
+        /// surfaces.
+<span class="fc" id="L36">        UNLIT,</span>
+        /// Diffuse only (Lambert) lighting using a single directional light.
+<span class="fc" id="L38">        LAMBERT,</span>
+        /// Diffuse and specular (Blinn-Phong) lighting using a single
+        /// directional light and the `shininess` property.
+<span class="fc" id="L41">        PHONG,</span>
+        /// Physically based shading (metallic/roughness with a GGX specular
+        /// lobe, the model glTF describes) using the directional light, the
+        /// environment's hemisphere ambient and, when the light casts them,
+        /// shadows. See `setMetallic`, `setRoughness` and `setEmissive`.
+<span class="fc" id="L46">        PBR,</span>
+        /// Unlit shading intended for screen aligned sprites and billboards.
+<span class="fc" id="L48">        SPRITE,</span>
+        /// Unlit shading sampling a background cube/sky texture, rendered behind
+        /// all other geometry.
+<span class="fc" id="L51">        SKYBOX</span>
+    }
+
+<span class="fc" id="L54">    private Type type = Type.UNLIT;</span>
+<span class="fc" id="L55">    private int color = 0xffffffff;</span>
+    private Texture texture;
+<span class="fc" id="L57">    private float shininess = 32.0f;</span>
+<span class="fc" id="L58">    private RenderState renderState = RenderState.opaque();</span>
+    private float metallic;
+<span class="fc" id="L60">    private float roughness = 0.8f;</span>
+<span class="fc" id="L61">    private int emissive = 0xff000000;</span>
+<span class="fc" id="L62">    private boolean receiveShadows = true;</span>
+<span class="fc" id="L63">    private boolean castShadows = true;</span>
+
+    /// Creates an unlit white material.
+<span class="fc" id="L66">    public Material() {</span>
+<span class="fc" id="L67">    }</span>
+
+    /// Creates a material of the supplied type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the lighting model
+<span class="fc" id="L74">    public Material(Type type) {</span>
+<span class="fc" id="L75">        this.type = type;</span>
+<span class="fc" id="L76">    }</span>
+
+    /// Returns the lighting model.
+    public Type getType() {
+<span class="fc" id="L80">        return type;</span>
+    }
+
+    /// Sets the lighting model.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the lighting model
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setType(Type type) {
+<span class="nc" id="L93">        this.type = type;</span>
+<span class="nc" id="L94">        return this;</span>
+    }
+
+    /// Returns the base color as a packed ARGB integer.
+    public int getColor() {
+<span class="fc" id="L99">        return color;</span>
+    }
+
+    /// Sets the base color as a packed ARGB integer (0xAARRGGBB).
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the packed ARGB color
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setColor(int argb) {
+<span class="fc" id="L112">        this.color = argb;</span>
+<span class="fc" id="L113">        return this;</span>
+    }
+
+    /// Returns the diffuse texture, or null when the material is untextured.
+    public Texture getTexture() {
+<span class="fc" id="L118">        return texture;</span>
+    }
+
+    /// Sets the diffuse texture. Pass null for an untextured material.
+    ///
+    /// #### Parameters
+    ///
+    /// - `texture`: the diffuse texture or null
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setTexture(Texture texture) {
+<span class="fc" id="L131">        this.texture = texture;</span>
+<span class="fc" id="L132">        return this;</span>
+    }
+
+    /// Returns the Phong specular exponent.
+    public float getShininess() {
+<span class="nc" id="L137">        return shininess;</span>
+    }
+
+    /// Sets the Phong specular exponent (used only by `Type.PHONG`).
+    ///
+    /// #### Parameters
+    ///
+    /// - `shininess`: the specular exponent
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setShininess(float shininess) {
+<span class="nc" id="L150">        this.shininess = shininess;</span>
+<span class="nc" id="L151">        return this;</span>
+    }
+
+    /// Returns the pipeline render state.
+    public RenderState getRenderState() {
+<span class="nc" id="L156">        return renderState;</span>
+    }
+
+    /// Sets the pipeline render state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderState`: the render state
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setRenderState(RenderState renderState) {
+<span class="fc" id="L169">        this.renderState = renderState;</span>
+<span class="fc" id="L170">        return this;</span>
+    }
+
+    /// Returns how metallic a `Type.PBR` surface is, from 0 (a dielectric such
+    /// as paint, plastic or wood) to 1 (bare metal).
+    public float getMetallic() {
+<span class="nc" id="L176">        return metallic;</span>
+    }
+
+    /// Sets how metallic a `Type.PBR` surface is.
+    ///
+    /// #### Parameters
+    ///
+    /// - `metallic`: 0 for a dielectric, 1 for metal
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setMetallic(float metallic) {
+<span class="fc" id="L189">        this.metallic = Math.max(0f, Math.min(1f, metallic));</span>
+<span class="fc" id="L190">        return this;</span>
+    }
+
+    /// Returns how rough a `Type.PBR` surface is, from 0 (mirror) to 1 (chalk).
+    public float getRoughness() {
+<span class="nc" id="L195">        return roughness;</span>
+    }
+
+    /// Sets how rough a `Type.PBR` surface is. Rough surfaces spread their
+    /// highlight wide and dim; smooth ones make it small and bright.
+    ///
+    /// #### Parameters
+    ///
+    /// - `roughness`: 0 for a mirror, 1 for fully diffuse
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setRoughness(float roughness) {
+<span class="fc" id="L209">        this.roughness = Math.max(0.04f, Math.min(1f, roughness));</span>
+<span class="fc" id="L210">        return this;</span>
+    }
+
+    /// Returns the light the surface gives off by itself, as RGB in an ARGB
+    /// int; black for none.
+    public int getEmissive() {
+<span class="fc" id="L216">        return emissive;</span>
+    }
+
+    /// Sets the light the surface gives off by itself: a lamp, a screen, wet
+    /// paint catching the sun. Emissive colour is added after lighting and is
+    /// what a bloom post effect picks up. Used by `Type.PBR`, `Type.LAMBERT`
+    /// and `Type.PHONG`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the emitted colour; black for none
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setEmissive(int argb) {
+<span class="fc" id="L232">        this.emissive = argb | 0xff000000;</span>
+<span class="fc" id="L233">        return this;</span>
+    }
+
+    /// Returns true if the surface is darkened by shadows the light casts.
+    public boolean isReceiveShadows() {
+<span class="fc" id="L238">        return receiveShadows;</span>
+    }
+
+    /// Sets whether the surface is darkened by the light's shadows. A ground
+    /// plane receives them; a particle or a muzzle flash should not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `receiveShadows`: true to receive shadows
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setReceiveShadows(boolean receiveShadows) {
+<span class="nc" id="L252">        this.receiveShadows = receiveShadows;</span>
+<span class="nc" id="L253">        return this;</span>
+    }
+
+    /// Returns true if geometry drawn with this material casts a shadow.
+    public boolean isCastShadows() {
+<span class="nc" id="L258">        return castShadows;</span>
+    }
+
+    /// Sets whether geometry drawn with this material casts a shadow.
+    /// Transparent and unlit effects normally should not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `castShadows`: true to cast shadows
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setCastShadows(boolean castShadows) {
+<span class="nc" id="L272">        this.castShadows = castShadows;</span>
+<span class="nc" id="L273">        return this;</span>
+    }
+
+    /// Returns true if this material is lit by the directional light.
+    public boolean isLit() {
+<span class="pc bpc" id="L278" title="1 of 6 branches missed.">        return type == Type.LAMBERT || type == Type.PHONG || type == Type.PBR;</span>
+    }
+
+    /// Returns a stable string identifying the shader variant required by this
+    /// material. Backends use it together with the mesh `VertexFormat` to cache
+    /// generated and compiled shader programs. The key intentionally depends
+    /// only on properties that change the generated source, not on values such
+    /// as the color which are passed as uniforms.
+    ///
+    /// #### Returns
+    ///
+    /// a shader variant cache key
+    public String getShaderKey() {
+<span class="nc bnc" id="L291" title="All 6 branches missed.">        return type.name() + (texture != null ? &quot;|tex&quot; : &quot;|notex&quot;)</span>
+                + (receiveShadows ? &quot;|rs&quot; : &quot;|nrs&quot;) + ((emissive &amp; 0xffffff) != 0 ? &quot;|em&quot; : &quot;&quot;);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

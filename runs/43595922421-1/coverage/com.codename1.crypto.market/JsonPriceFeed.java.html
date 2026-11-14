@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonPriceFeed.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.market</a> &gt; <span class="el_source">JsonPriceFeed.java</span></div><h1>JsonPriceFeed.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.market;
+
+import com.codename1.io.JSONParser;
+import com.codename1.crypto.rpc.RpcTransport;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+/// A feed over any HTTP API that answers one price in JSON. The URL is a template in which
+/// `{base}`/`{quote}` become the lower-case tickers and `{BASE}`/`{QUOTE}` the upper-case ones;
+/// the path names the price in the reply, member names and array indices separated by dots.
+///
+/// ```java
+/// // Coinbase: {&quot;data&quot;:{&quot;amount&quot;:&quot;67187.33&quot;,&quot;base&quot;:&quot;BTC&quot;,&quot;currency&quot;:&quot;USD&quot;}}
+/// RpcTransport transport = new NetworkTransport();
+/// PriceFeed coinbase = new JsonPriceFeed(transport,
+///         &quot;https://api.coinbase.com/v2/prices/{BASE}-{QUOTE}/spot&quot;, &quot;data.amount&quot;, &quot;coinbase&quot;);
+/// // Kraken: {&quot;result&quot;:{&quot;XXBTZUSD&quot;:{&quot;c&quot;:[&quot;67187.30000&quot;,&quot;0.01&quot;]}}} -- the pair key varies, so
+/// // pass a path per pair or use a feed that knows the exchange.
+/// ```
+///
+/// The price may be a JSON number or a numeric string.
+@com.codename1.impl.SharedWithBackend
+public class JsonPriceFeed implements PriceFeed {
+    private final RpcTransport transport;
+    private final String template;
+    private final String[] path;
+    private final String name;
+
+    /// A feed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `transport`: how to send the request
+    /// - `urlTemplate`: the URL with `{base}`, `{quote}`, `{BASE}`, `{QUOTE}` placeholders
+    /// - `pricePath`: where the price is in the reply, such as `data.amount`
+    /// - `name`: the source name the quotes carry
+<span class="fc" id="L60">    public JsonPriceFeed(RpcTransport transport, String urlTemplate, String pricePath, String name) {</span>
+<span class="pc bpc" id="L61" title="3 of 6 branches missed.">        if (transport == null || urlTemplate == null || pricePath == null) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(&quot;transport, urlTemplate and pricePath are required&quot;);</span>
+        }
+<span class="fc" id="L64">        this.transport = transport;</span>
+<span class="fc" id="L65">        this.template = urlTemplate;</span>
+<span class="fc" id="L66">        this.path = split(pricePath);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        this.name = name == null ? &quot;json&quot; : name;</span>
+<span class="fc" id="L68">    }</span>
+
+    private static String[] split(String p) {
+<span class="fc" id="L71">        java.util.ArrayList&lt;String&gt; out = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L72">        int start = 0;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (int i = 0; i &lt;= p.length(); i++) {</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">            if (i == p.length() || p.charAt(i) == '.') {</span>
+<span class="fc" id="L75">                out.add(p.substring(start, i));</span>
+<span class="fc" id="L76">                start = i + 1;</span>
+            }
+        }
+<span class="fc" id="L79">        return out.toArray(new String[out.size()]);</span>
+    }
+
+    @Override
+    public Quote getQuote(String base, String quote) throws IOException {
+<span class="fc" id="L84">        String url = replace(template, &quot;{base}&quot;, PriceFeeds.encode(PriceFeeds.lower(base)));</span>
+<span class="fc" id="L85">        url = replace(url, &quot;{quote}&quot;, PriceFeeds.encode(PriceFeeds.lower(quote)));</span>
+<span class="fc" id="L86">        url = replace(url, &quot;{BASE}&quot;, PriceFeeds.encode(PriceFeeds.upper(base)));</span>
+<span class="fc" id="L87">        url = replace(url, &quot;{QUOTE}&quot;, PriceFeeds.encode(PriceFeeds.upper(quote)));</span>
+<span class="fc" id="L88">        String body = transport.send(&quot;GET&quot;, url, null, null);</span>
+        Object node;
+        try {
+<span class="fc" id="L91">            node = JSONParser.parseStrict(body, true);</span>
+<span class="nc" id="L92">        } catch (IOException e) {</span>
+<span class="nc" id="L93">            throw new IOException(name + &quot; answered something that is not JSON&quot;, e);</span>
+<span class="fc" id="L94">        }</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (String pathItem : path) {</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (node instanceof Map) {</span>
+<span class="fc" id="L97">                node = ((Map&lt;?, ?&gt;) node).get(pathItem);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            } else if (node instanceof List) {</span>
+                int index;
+                try {
+<span class="fc" id="L101">                    index = Integer.parseInt(pathItem);</span>
+<span class="nc" id="L102">                } catch (NumberFormatException e) {</span>
+<span class="nc" id="L103">                    throw new IOException(name + &quot;: &quot; + pathItem + &quot; indexes an array&quot;, e);</span>
+<span class="fc" id="L104">                }</span>
+<span class="fc" id="L105">                List&lt;?&gt; l = (List&lt;?&gt;) node;</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">                node = index &gt;= 0 &amp;&amp; index &lt; l.size() ? l.get(index) : null;</span>
+<span class="fc" id="L107">            } else {</span>
+<span class="fc" id="L108">                node = null;</span>
+            }
+        }
+<span class="fc" id="L111">        return new Quote(base, quote, PriceFeeds.number(node, name + &quot; &quot; + base + &quot;/&quot; + quote),</span>
+<span class="fc" id="L112">                System.currentTimeMillis(), name);</span>
+    }
+
+    private static String replace(String s, String what, String with) {
+<span class="fc" id="L116">        StringBuilder b = new StringBuilder();</span>
+<span class="fc" id="L117">        int from = 0;</span>
+        while (true) {
+<span class="fc" id="L119">            int i = s.indexOf(what, from);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (i &lt; 0) {</span>
+<span class="fc" id="L121">                b.append(s.substring(from));</span>
+<span class="fc" id="L122">                return b.toString();</span>
+            }
+<span class="fc" id="L124">            b.append(s.substring(from, i)).append(with);</span>
+<span class="fc" id="L125">            from = i + what.length();</span>
+<span class="fc" id="L126">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

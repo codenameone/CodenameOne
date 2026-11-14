@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Ref.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.orm</a> &gt; <span class="el_source">Ref.java</span></div><h1>Ref.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.orm;
+
+import com.codename1.impl.orm.Holder;
+
+/// A to-one relationship of a record entity, read on first use.
+///
+/// A record cannot be changed after it is built, so it cannot hold a lazy
+/// relationship the way an enhanced class does. It holds a `Ref` instead:
+///
+/// ```java
+/// import com.codename1.annotations.Entity;
+/// import com.codename1.annotations.Id;
+/// import com.codename1.annotations.db.ManyToOne;
+/// import com.codename1.orm.Ref;
+///
+/// @Entity
+/// record Customer(@Id long id, String name) {}
+///
+/// @Entity
+/// record Order(@Id long id, @ManyToOne Ref&lt;Customer&gt; customer) {}
+///
+/// Order order = new Order(1, Ref.of(new Customer(7, &quot;Ada&quot;)));
+/// String name = order.customer().get().name();
+/// ```
+///
+/// An order the session reads holds an unread `Ref`: `order.customer().id()`
+/// answers the stored key without a query, and `get()` reads the customer the
+/// first time it's called.
+///
+/// A `Ref` loaded by a session reads its target through that session, and only
+/// while it is open: `get()` on a `Ref` that was never read, once the session is
+/// closed, throws `LazyInitializationException`. `id()` and `isPresent()` read
+/// nothing either, with one exception: on the inverse side of a one-to-one,
+/// `@OneToOne(mappedBy = ...)`, the record's own row stores no key, so they read
+/// the target, and throw the same way once the session is gone.
+///
+/// To point a record at another entity, build it with `Ref.of(target)`, or
+/// `Ref.empty()` for none. Two refs are equal when they point at the same
+/// entity: the same target type and the same identifier.
+@com.codename1.impl.SharedWithBackend
+public final class Ref&lt;T&gt; extends Holder {
+    private Ref() {
+    }
+
+    /// A ref to `target`, or an empty one when `target` is null.
+    public static &lt;T&gt; Ref&lt;T&gt; of(T target) {
+<span class="nc" id="L69">        Ref&lt;T&gt; ref = new Ref&lt;T&gt;();</span>
+<span class="nc" id="L70">        ref.assign(target);</span>
+<span class="nc" id="L71">        return ref;</span>
+    }
+
+    /// A ref to nothing.
+    public static &lt;T&gt; Ref&lt;T&gt; empty() {
+<span class="nc" id="L76">        return of(null);</span>
+    }
+
+    /// The target, read through the owning session if it has not been read
+    /// yet; null when the ref is empty.
+    ///
+    /// #### Throws
+    ///
+    /// - `com.codename1.orm.session.LazyInitializationException`: if the target
+    ///   was never read and the session that loaded the ref is closed
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public T get() {
+<span class="nc" id="L88">        load();</span>
+<span class="nc" id="L89">        return (T) current();</span>
+    }
+
+    /// True when the ref points at an entity, read or not.
+    public boolean isPresent() {
+<span class="nc bnc" id="L94" title="All 6 branches missed.">        return loaded() ? current() != null : identifier() != null;</span>
+    }
+
+    /// The target's identifier, without reading it unless the ref is the inverse
+    /// side of a one-to-one; null for an empty ref, or a target that has not
+    /// been saved yet.
+    public Object id() {
+<span class="nc" id="L101">        return identifier();</span>
+    }
+
+    /// True once the target has been read, or for a ref that was built with a
+    /// value.
+    public boolean isLoaded() {
+<span class="nc" id="L107">        return loaded();</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (other == this) {</span>
+<span class="nc" id="L113">            return true;</span>
+        }
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (!(other instanceof Ref)) {</span>
+<span class="nc" id="L116">            return false;</span>
+        }
+<span class="nc" id="L118">        Ref&lt;?&gt; ref = (Ref&lt;?&gt;) other;</span>
+<span class="nc bnc" id="L119" title="All 4 branches missed.">        if (unreadable() || ref.unreadable()) {</span>
+            // An unread inverse side of a detached record: nothing is known
+            // about its target, so it is equal only to itself. Throwing here
+            // would keep every such record out of sets and maps.
+<span class="nc" id="L123">            return false;</span>
+        }
+<span class="nc" id="L125">        Object id = identifier();</span>
+<span class="nc" id="L126">        Object otherId = ref.identifier();</span>
+<span class="nc bnc" id="L127" title="All 4 branches missed.">        if (id == null || otherId == null) {</span>
+            // Without identifiers only the same target, or nothing, is equal.
+<span class="nc bnc" id="L129" title="All 10 branches missed.">            return id == null &amp;&amp; otherId == null &amp;&amp; loaded() &amp;&amp; ref.loaded() &amp;&amp; current() == ref.current(); //NOPMD CompareObjectsWithEquals - identity is the point</span>
+        }
+<span class="nc" id="L131">        Class type = targetType();</span>
+<span class="nc" id="L132">        Class otherType = ref.targetType();</span>
+<span class="nc bnc" id="L133" title="All 6 branches missed.">        return id.equals(otherId) &amp;&amp; (type == null || otherType == null</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">                || type.isAssignableFrom(otherType) || otherType.isAssignableFrom(type));</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (unreadable()) {</span>
+<span class="nc" id="L140">            return 0;</span>
+        }
+<span class="nc" id="L142">        Object id = identifier();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (id != null) {</span>
+<span class="nc" id="L144">            return id.hashCode();</span>
+        }
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        Object value = loaded() ? current() : null;</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        return value == null ? 0 : System.identityHashCode(value);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L152">        Object id = storedIdentifier();</span>
+<span class="nc bnc" id="L153" title="All 6 branches missed.">        return &quot;Ref[&quot; + (id != null ? id : !loaded() ? &quot;unread&quot; : current() != null ? current() : &quot;empty&quot;) + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

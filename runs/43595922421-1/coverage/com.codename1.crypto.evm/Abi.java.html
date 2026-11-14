@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Abi.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.evm</a> &gt; <span class="el_source">Abi.java</span></div><h1>Abi.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.evm;
+
+import java.nio.charset.StandardCharsets;
+import com.codename1.crypto.UInt256;
+import com.codename1.security.Hash;
+import java.util.ArrayList;
+import java.util.List;
+
+/// The Solidity contract ABI: function selectors, call data and return values.
+///
+/// ```java
+/// EvmAddress recipient = EvmAddress.parse(&quot;0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed&quot;);
+/// UInt256 amount = UInt256.parseUnits(&quot;25&quot;, 6);
+/// byte[] data = Abi.encodeCall(&quot;transfer(address,uint256)&quot;, recipient, amount);
+/// byte[] returned = new byte[32];                   // what eth_call answered
+/// List&lt;Object&gt; out = Abi.decode(&quot;(uint256)&quot;, returned);   // [UInt256]
+/// ```
+///
+/// Types are written as in a Solidity signature: `uint8`..`uint256`, `int8`..`int256`,
+/// `address`, `bool`, `bytes1`..`bytes32`, `bytes`, `string`, arrays `T[]` and `T[k]`, and
+/// tuples `(T1,T2)`. Values map to Java as:
+///
+/// | ABI | encode accepts | decode answers |
+/// |---|---|---|
+/// | `uintN` | `UInt256`, `Long`, `Integer`, decimal or `0x` `String` | `UInt256` |
+/// | `intN` | `Long`, `Integer`, decimal `String` | `Long` up to 64 bits, decimal `String` above |
+/// | `address` | `EvmAddress` or its `String` | `EvmAddress` |
+/// | `bool` | `Boolean` | `Boolean` |
+/// | `bytesN`, `bytes` | `byte[]` | `byte[]` |
+/// | `string` | `String` | `String` |
+/// | arrays, tuples | `List` or `Object[]` | `List&lt;Object&gt;` |
+@com.codename1.impl.SharedWithBackend
+public final class Abi {
+    private Abi() {
+    }
+
+    /// The 4-byte selector of a function signature such as `transfer(address,uint256)`.
+    public static byte[] selector(String signature) {
+<span class="fc" id="L61">        byte[] hash = Hash.keccak256(canonical(signature).getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L62">        byte[] out = new byte[4];</span>
+<span class="fc" id="L63">        System.arraycopy(hash, 0, out, 0, 4);</span>
+<span class="fc" id="L64">        return out;</span>
+    }
+
+    /// The topic 0 of an event signature such as `Transfer(address,address,uint256)`.
+    public static byte[] eventTopic(String signature) {
+<span class="fc" id="L69">        return Hash.keccak256(canonical(signature).getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    /// The call data for a function: its selector followed by the encoded arguments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `signature`: `name(type1,type2,...)`
+    ///
+    /// - `args`: one value per parameter
+    public static byte[] encodeCall(String signature, Object... args) {
+<span class="fc" id="L80">        String sig = canonical(signature);</span>
+<span class="fc" id="L81">        int open = sig.indexOf('(');</span>
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">        if (open &lt;= 0 || !sig.endsWith(&quot;)&quot;)) {</span>
+<span class="nc" id="L83">            throw new IllegalArgumentException(&quot;not a function signature: &quot; + signature);</span>
+        }
+<span class="fc" id="L85">        byte[] params = encode(sig.substring(open), args);</span>
+<span class="fc" id="L86">        byte[] sel = selector(sig);</span>
+<span class="fc" id="L87">        byte[] out = new byte[4 + params.length];</span>
+<span class="fc" id="L88">        System.arraycopy(sel, 0, out, 0, 4);</span>
+<span class="fc" id="L89">        System.arraycopy(params, 0, out, 4, params.length);</span>
+<span class="fc" id="L90">        return out;</span>
+    }
+
+    /// Encodes values against a tuple type such as `(address,uint256[],string)`.
+    public static byte[] encode(String tupleType, Object... values) {
+<span class="fc" id="L95">        Type t = Type.parse(canonical(tupleType));</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (t.kind != Type.TUPLE) {</span>
+<span class="nc" id="L97">            throw new IllegalArgumentException(&quot;encode takes a tuple type such as (uint256)&quot;);</span>
+        }
+<span class="fc" id="L99">        return t.encode(values);</span>
+    }
+
+    /// Decodes ABI bytes against a tuple type, answering one value per member.
+    public static List&lt;Object&gt; decode(String tupleType, byte[] data) {
+<span class="fc" id="L104">        Type t = Type.parse(canonical(tupleType));</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (t.kind != Type.TUPLE) {</span>
+<span class="nc" id="L106">            throw new IllegalArgumentException(&quot;decode takes a tuple type such as (uint256)&quot;);</span>
+        }
+<span class="fc" id="L108">        return t.decodeMembers(data, 0);</span>
+    }
+
+    /// [#decode] from `0x` hex, the form `eth_call` returns.
+    public static List&lt;Object&gt; decodeHex(String tupleType, String hex) {
+<span class="fc" id="L113">        return decode(tupleType, Hash.fromHex(hex));</span>
+    }
+
+    /// Normalizes a signature: drops spaces and expands `uint`/`int` to their 256-bit names.
+    static String canonical(String signature) {
+<span class="fc" id="L118">        StringBuilder compact = new StringBuilder();</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        for (int iter = 0; iter &lt; signature.length(); iter++) {</span>
+<span class="fc" id="L120">            char c = signature.charAt(iter);</span>
+<span class="pc bpc" id="L121" title="3 of 6 branches missed.">            if (c != ' ' &amp;&amp; c != '\t' &amp;&amp; c != '\n') {</span>
+<span class="fc" id="L122">                compact.append(c);</span>
+            }
+        }
+<span class="fc" id="L125">        String s = compact.toString();</span>
+<span class="fc" id="L126">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L127">        int iter = 0;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        while (iter &lt; s.length()) {</span>
+<span class="fc" id="L129">            int end = iter;</span>
+<span class="fc bfc" id="L130" title="All 4 branches covered.">            while (end &lt; s.length() &amp;&amp; isIdent(s.charAt(end))) {</span>
+<span class="fc" id="L131">                end++;</span>
+            }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (end == iter) {</span>
+<span class="fc" id="L134">                out.append(s.charAt(iter));</span>
+<span class="fc" id="L135">                iter++;</span>
+<span class="fc" id="L136">                continue;</span>
+            }
+<span class="fc" id="L138">            String word = s.substring(iter, end);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            boolean typePosition = iter &gt; 0;</span>
+<span class="pc bpc" id="L140" title="1 of 6 branches missed.">            if (typePosition &amp;&amp; (&quot;uint&quot;.equals(word) || &quot;int&quot;.equals(word))) {</span>
+<span class="fc" id="L141">                out.append(word).append(&quot;256&quot;);</span>
+            } else {
+<span class="fc" id="L143">                out.append(word);</span>
+            }
+<span class="fc" id="L145">            iter = end;</span>
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">        return out.toString();</span>
+    }
+
+    private static boolean isIdent(char c) {
+<span class="pc bpc" id="L151" title="3 of 16 branches missed.">        return (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '_' || c == '$';</span>
+    }
+
+
+
+    /// A parsed ABI type.
+    static final class Type {
+        static final int UINT = 0;
+        static final int INT = 1;
+        static final int ADDRESS = 2;
+        static final int BOOL = 3;
+        static final int FIXED_BYTES = 4;
+        static final int BYTES = 5;
+        static final int STRING = 6;
+        static final int ARRAY = 7;
+        static final int FIXED_ARRAY = 8;
+        static final int TUPLE = 9;
+
+        final int kind;
+        final int size;
+        final Type element;
+        final Type[] members;
+        final String name;
+
+<span class="fc" id="L175">        Type(int kind, int size, Type element, Type[] members, String name) {</span>
+<span class="fc" id="L176">            this.kind = kind;</span>
+<span class="fc" id="L177">            this.size = size;</span>
+<span class="fc" id="L178">            this.element = element;</span>
+<span class="fc" id="L179">            this.members = members;</span>
+<span class="fc" id="L180">            this.name = name;</span>
+<span class="fc" id="L181">        }</span>
+
+        static Type parse(String text) {
+<span class="fc" id="L184">            int[] pos = {0};</span>
+<span class="fc" id="L185">            Type t = parseAt(text, pos);</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            if (pos[0] != text.length()) {</span>
+<span class="nc" id="L187">                throw new IllegalArgumentException(&quot;bad ABI type: &quot; + text);</span>
+            }
+<span class="fc" id="L189">            return t;</span>
+        }
+
+        private static Type parseAt(String s, int[] pos) {
+            Type base;
+<span class="pc bpc" id="L194" title="1 of 4 branches missed.">            if (pos[0] &lt; s.length() &amp;&amp; s.charAt(pos[0]) == '(') {</span>
+<span class="fc" id="L195">                pos[0]++;</span>
+<span class="fc" id="L196">                List&lt;Type&gt; members = new ArrayList&lt;Type&gt;();</span>
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">                if (pos[0] &lt; s.length() &amp;&amp; s.charAt(pos[0]) == ')') {</span>
+<span class="nc" id="L198">                    pos[0]++;</span>
+                } else {
+                    while (true) {
+<span class="fc" id="L201">                        members.add(parseAt(s, pos));</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                        if (pos[0] &gt;= s.length()) {</span>
+<span class="nc" id="L203">                            throw new IllegalArgumentException(&quot;unterminated tuple: &quot; + s);</span>
+                        }
+<span class="fc" id="L205">                        char c = s.charAt(pos[0]++);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                        if (c == ')') {</span>
+<span class="fc" id="L207">                            break;</span>
+                        }
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                        if (c != ',') {</span>
+<span class="nc" id="L210">                            throw new IllegalArgumentException(&quot;bad ABI type: &quot; + s);</span>
+                        }
+<span class="fc" id="L212">                    }</span>
+                }
+<span class="fc" id="L214">                Type[] m = members.toArray(new Type[members.size()]);</span>
+<span class="fc" id="L215">                StringBuilder name = new StringBuilder(&quot;(&quot;);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                for (int iter = 0; iter &lt; m.length; iter++) {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                    if (iter &gt; 0) {</span>
+<span class="fc" id="L218">                        name.append(',');</span>
+                    }
+<span class="fc" id="L220">                    name.append(m[iter].name);</span>
+                }
+<span class="fc" id="L222">                base = new Type(TUPLE, m.length, null, m, name.append(')').toString());</span>
+<span class="fc" id="L223">            } else {</span>
+<span class="fc" id="L224">                int start = pos[0];</span>
+<span class="fc bfc" id="L225" title="All 4 branches covered.">                while (pos[0] &lt; s.length() &amp;&amp; isIdent(s.charAt(pos[0]))) {</span>
+<span class="fc" id="L226">                    pos[0]++;</span>
+                }
+<span class="fc" id="L228">                base = elementary(s.substring(start, pos[0]));</span>
+            }
+<span class="fc bfc" id="L230" title="All 4 branches covered.">            while (pos[0] &lt; s.length() &amp;&amp; s.charAt(pos[0]) == '[') {</span>
+<span class="fc" id="L231">                int close = s.indexOf(']', pos[0]);</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                if (close &lt; 0) {</span>
+<span class="nc" id="L233">                    throw new IllegalArgumentException(&quot;bad array type: &quot; + s);</span>
+                }
+<span class="fc" id="L235">                String len = s.substring(pos[0] + 1, close);</span>
+<span class="fc" id="L236">                pos[0] = close + 1;</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">                if (len.length() == 0) {</span>
+<span class="fc" id="L238">                    base = new Type(ARRAY, 0, base, null, base.name + &quot;[]&quot;);</span>
+                } else {
+<span class="nc" id="L240">                    int k = Integer.parseInt(len);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                    if (k &lt;= 0) {</span>
+<span class="nc" id="L242">                        throw new IllegalArgumentException(&quot;bad array length: &quot; + s);</span>
+                    }
+<span class="nc" id="L244">                    base = new Type(FIXED_ARRAY, k, base, null, base.name + &quot;[&quot; + k + &quot;]&quot;);</span>
+                }
+<span class="fc" id="L246">            }</span>
+<span class="fc" id="L247">            return base;</span>
+        }
+
+        private static Type elementary(String n) {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            if (&quot;address&quot;.equals(n)) {</span>
+<span class="fc" id="L252">                return new Type(ADDRESS, 160, null, null, n);</span>
+            }
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            if (&quot;bool&quot;.equals(n)) {</span>
+<span class="fc" id="L255">                return new Type(BOOL, 8, null, null, n);</span>
+            }
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (&quot;string&quot;.equals(n)) {</span>
+<span class="fc" id="L258">                return new Type(STRING, 0, null, null, n);</span>
+            }
+<span class="fc bfc" id="L260" title="All 2 branches covered.">            if (&quot;bytes&quot;.equals(n)) {</span>
+<span class="fc" id="L261">                return new Type(BYTES, 0, null, null, n);</span>
+            }
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            if (n.startsWith(&quot;bytes&quot;)) {</span>
+<span class="fc" id="L264">                int k = number(n.substring(5), n);</span>
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">                if (k &lt; 1 || k &gt; 32) {</span>
+<span class="nc" id="L266">                    throw new IllegalArgumentException(&quot;bad ABI type: &quot; + n);</span>
+                }
+<span class="fc" id="L268">                return new Type(FIXED_BYTES, k, null, null, n);</span>
+            }
+<span class="pc bpc" id="L270" title="1 of 4 branches missed.">            if (n.startsWith(&quot;uint&quot;) || n.startsWith(&quot;int&quot;)) {</span>
+<span class="fc" id="L271">                boolean signed = n.startsWith(&quot;int&quot;);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                String bits = n.substring(signed ? 3 : 4);</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                int m = bits.length() == 0 ? 256 : number(bits, n);</span>
+<span class="pc bpc" id="L274" title="3 of 6 branches missed.">                if (m &lt; 8 || m &gt; 256 || m % 8 != 0) {</span>
+<span class="nc" id="L275">                    throw new IllegalArgumentException(&quot;bad ABI type: &quot; + n);</span>
+                }
+<span class="fc bfc" id="L277" title="All 2 branches covered.">                String full = (signed ? &quot;int&quot; : &quot;uint&quot;) + m;</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                return new Type(signed ? INT : UINT, m, null, null, full);</span>
+            }
+<span class="nc" id="L280">            throw new IllegalArgumentException(&quot;unsupported ABI type: &quot; + n);</span>
+        }
+
+        private static int number(String digits, String type) {
+            try {
+<span class="fc" id="L285">                return Integer.parseInt(digits);</span>
+<span class="nc" id="L286">            } catch (NumberFormatException bad) {</span>
+<span class="nc" id="L287">                throw new IllegalArgumentException(&quot;bad ABI type: &quot; + type, bad);</span>
+            }
+        }
+
+        boolean isDynamic() {
+<span class="pc bpc" id="L292" title="1 of 4 branches missed.">            switch (kind) {</span>
+                case BYTES:
+                case STRING:
+                case ARRAY:
+<span class="fc" id="L296">                    return true;</span>
+                case FIXED_ARRAY:
+<span class="nc" id="L298">                    return element.isDynamic();</span>
+                case TUPLE:
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                    for (Type membersElem : members) {</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                        if (membersElem.isDynamic()) {</span>
+<span class="fc" id="L302">                            return true;</span>
+                        }
+                    }
+<span class="nc" id="L305">                    return false;</span>
+                default:
+<span class="fc" id="L307">                    return false;</span>
+            }
+        }
+
+        /// The size of the head of a static type, in bytes.
+        int headSize() {
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            if (isDynamic()) {</span>
+<span class="fc" id="L314">                return 32;</span>
+            }
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">            if (kind == FIXED_ARRAY) {</span>
+<span class="nc" id="L317">                return size * element.headSize();</span>
+            }
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            if (kind == TUPLE) {</span>
+<span class="nc" id="L320">                int total = 0;</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                for (Type membersElem : members) {</span>
+<span class="nc" id="L322">                    total += membersElem.headSize();</span>
+                }
+<span class="nc" id="L324">                return total;</span>
+            }
+<span class="fc" id="L326">            return 32;</span>
+        }
+
+        byte[] encode(Object value) {
+<span class="pc bpc" id="L330" title="1 of 10 branches missed.">            switch (kind) {</span>
+                case UINT:
+<span class="fc" id="L332">                    return uintWord(value);</span>
+                case INT:
+<span class="fc" id="L334">                    return intWord(value);</span>
+                case ADDRESS: {
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                    EvmAddress a = value instanceof EvmAddress ? (EvmAddress) value : EvmAddress.parse(str(value));</span>
+<span class="fc" id="L337">                    byte[] out = new byte[32];</span>
+<span class="fc" id="L338">                    System.arraycopy(a.toBytes(), 0, out, 12, 20);</span>
+<span class="fc" id="L339">                    return out;</span>
+                }
+                case BOOL: {
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">                    if (!(value instanceof Boolean)) {</span>
+<span class="nc" id="L343">                        throw new IllegalArgumentException(&quot;bool takes a Boolean&quot;);</span>
+                    }
+<span class="fc" id="L345">                    byte[] out = new byte[32];</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">                    out[31] = (byte) (((Boolean) value).booleanValue() ? 1 : 0);</span>
+<span class="fc" id="L347">                    return out;</span>
+                }
+                case FIXED_BYTES: {
+<span class="fc" id="L350">                    byte[] b = raw(value);</span>
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">                    if (b.length != size) {</span>
+<span class="nc" id="L352">                        throw new IllegalArgumentException(name + &quot; takes exactly &quot; + size + &quot; bytes&quot;);</span>
+                    }
+<span class="fc" id="L354">                    byte[] out = new byte[32];</span>
+<span class="fc" id="L355">                    System.arraycopy(b, 0, out, 0, size);</span>
+<span class="fc" id="L356">                    return out;</span>
+                }
+                case BYTES:
+<span class="fc" id="L359">                    return dynamicBytes(raw(value));</span>
+                case STRING:
+<span class="fc" id="L361">                    return dynamicBytes(str(value).getBytes(StandardCharsets.UTF_8));</span>
+                case ARRAY: {
+<span class="fc" id="L363">                    Object[] items = items(value);</span>
+<span class="fc" id="L364">                    byte[] body = sequence(element, items);</span>
+<span class="fc" id="L365">                    byte[] out = new byte[32 + body.length];</span>
+<span class="fc" id="L366">                    System.arraycopy(UInt256.valueOf(items.length).toBytes32(), 0, out, 0, 32);</span>
+<span class="fc" id="L367">                    System.arraycopy(body, 0, out, 32, body.length);</span>
+<span class="fc" id="L368">                    return out;</span>
+                }
+                case FIXED_ARRAY: {
+<span class="nc" id="L371">                    Object[] items = items(value);</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                    if (items.length != size) {</span>
+<span class="nc" id="L373">                        throw new IllegalArgumentException(name + &quot; takes &quot; + size + &quot; items&quot;);</span>
+                    }
+<span class="nc" id="L375">                    return sequence(element, items);</span>
+                }
+                default: {
+<span class="fc" id="L378">                    Object[] items = items(value);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">                    if (items.length != members.length) {</span>
+<span class="nc" id="L380">                        throw new IllegalArgumentException(name + &quot; takes &quot; + members.length + &quot; values, got &quot;</span>
+                                + items.length);
+                    }
+<span class="fc" id="L383">                    Type[] types = members;</span>
+<span class="fc" id="L384">                    return heads(types, items);</span>
+                }
+            }
+        }
+
+        private static byte[] sequence(Type element, Object[] items) {
+<span class="fc" id="L390">            Type[] types = new Type[items.length];</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">            for (int iter = 0; iter &lt; types.length; iter++) {</span>
+<span class="fc" id="L392">                types[iter] = element;</span>
+            }
+<span class="fc" id="L394">            return heads(types, items);</span>
+        }
+
+        private static byte[] heads(Type[] types, Object[] items) {
+<span class="fc" id="L398">            int headLen = 0;</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">            for (Type typesItem : types) {</span>
+<span class="fc" id="L400">                headLen += typesItem.headSize();</span>
+            }
+<span class="fc" id="L402">            java.io.ByteArrayOutputStream head = new java.io.ByteArrayOutputStream();</span>
+<span class="fc" id="L403">            java.io.ByteArrayOutputStream tail = new java.io.ByteArrayOutputStream();</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            for (int iter = 0; iter &lt; types.length; iter++) {</span>
+<span class="fc" id="L405">                byte[] enc = types[iter].encode(items[iter]);</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">                if (types[iter].isDynamic()) {</span>
+<span class="fc" id="L407">                    write(head, UInt256.valueOf(headLen + tail.size()).toBytes32());</span>
+<span class="fc" id="L408">                    write(tail, enc);</span>
+                } else {
+<span class="fc" id="L410">                    write(head, enc);</span>
+                }
+            }
+<span class="fc" id="L413">            write(head, tail.toByteArray());</span>
+<span class="fc" id="L414">            return head.toByteArray();</span>
+        }
+
+        Object decode(byte[] data, int base, int at) {
+<span class="pc bpc" id="L418" title="2 of 9 branches missed.">            switch (kind) {</span>
+                case UINT: {
+<span class="fc" id="L420">                    UInt256 v = UInt256.fromBytes(word(data, at));</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">                    if (v.bitLength() &gt; size) {</span>
+<span class="nc" id="L422">                        throw new IllegalArgumentException(name + &quot; out of range&quot;);</span>
+                    }
+<span class="fc" id="L424">                    return v;</span>
+                }
+                case INT:
+<span class="fc" id="L427">                    return decodeInt(word(data, at));</span>
+                case ADDRESS: {
+<span class="fc" id="L429">                    byte[] w = word(data, at);</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">                    for (int iter = 0; iter &lt; 12; iter++) {</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">                        if (w[iter] != 0) {</span>
+<span class="nc" id="L432">                            throw new IllegalArgumentException(&quot;dirty address word&quot;);</span>
+                        }
+                    }
+<span class="fc" id="L435">                    byte[] a = new byte[20];</span>
+<span class="fc" id="L436">                    System.arraycopy(w, 12, a, 0, 20);</span>
+<span class="fc" id="L437">                    return EvmAddress.fromBytes(a);</span>
+                }
+                case BOOL: {
+<span class="fc" id="L440">                    UInt256 v = UInt256.fromBytes(word(data, at));</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">                    if (v.bitLength() &gt; 1) {</span>
+<span class="nc" id="L442">                        throw new IllegalArgumentException(&quot;bool out of range&quot;);</span>
+                    }
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">                    return Boolean.valueOf(!v.isZero());</span>
+                }
+                case FIXED_BYTES: {
+<span class="nc" id="L447">                    byte[] w = word(data, at);</span>
+<span class="nc" id="L448">                    byte[] out = new byte[size];</span>
+<span class="nc" id="L449">                    System.arraycopy(w, 0, out, 0, size);</span>
+<span class="nc" id="L450">                    return out;</span>
+                }
+                case BYTES:
+                case STRING: {
+<span class="fc" id="L454">                    int off = base + offset(data, at);</span>
+<span class="fc" id="L455">                    int len = offset(data, off);</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">                    if (off + 32 + len &gt; data.length) {</span>
+<span class="nc" id="L457">                        throw new IllegalArgumentException(&quot;ABI data truncated&quot;);</span>
+                    }
+<span class="fc" id="L459">                    byte[] out = new byte[len];</span>
+<span class="fc" id="L460">                    System.arraycopy(data, off + 32, out, 0, len);</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">                    return kind == STRING ? new String(out, StandardCharsets.UTF_8) : out;</span>
+                }
+                case ARRAY: {
+<span class="fc" id="L464">                    int off = base + offset(data, at);</span>
+<span class="fc" id="L465">                    int len = offset(data, off);</span>
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">                    if ((long) len * 32 &gt; data.length) {</span>
+<span class="nc" id="L467">                        throw new IllegalArgumentException(&quot;ABI array length too large&quot;);</span>
+                    }
+<span class="fc" id="L469">                    return decodeSequence(element, len, data, off + 32);</span>
+                }
+                case FIXED_ARRAY:
+<span class="nc bnc" id="L472" title="All 2 branches missed.">                    if (isDynamic()) {</span>
+<span class="nc" id="L473">                        return decodeSequence(element, size, data, base + offset(data, at));</span>
+                    }
+<span class="nc" id="L475">                    return decodeSequence(element, size, data, at);</span>
+                default:
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">                    return decodeMembers(data, isDynamic() ? base + offset(data, at) : at);</span>
+            }
+        }
+
+        /// The members of a tuple whose encoding starts at `start`.
+        List&lt;Object&gt; decodeMembers(byte[] data, int start) {
+<span class="fc" id="L483">            List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L484">            int pos = start;</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">            for (Type membersItem : members) {</span>
+<span class="fc" id="L486">                out.add(membersItem.decode(data, start, pos));</span>
+<span class="fc" id="L487">                pos += membersItem.headSize();</span>
+            }
+<span class="fc" id="L489">            return out;</span>
+        }
+
+        private static List&lt;Object&gt; decodeSequence(Type element, int count, byte[] data, int start) {
+<span class="fc" id="L493">            List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L494">            int pos = start;</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">            for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L496">                out.add(element.decode(data, start, pos));</span>
+<span class="fc" id="L497">                pos += element.headSize();</span>
+            }
+<span class="fc" id="L499">            return out;</span>
+        }
+
+        private Object decodeInt(byte[] w) {
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">            boolean negative = w[0] &lt; 0;</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">            int fill = negative ? 0xff : 0;</span>
+<span class="fc bfc" id="L505" title="All 2 branches covered.">            for (int iter = 0; iter &lt; 32 - size / 8; iter++) {</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">                if ((w[iter] &amp; 0xff) != fill) {</span>
+<span class="nc" id="L507">                    throw new IllegalArgumentException(name + &quot; out of range&quot;);</span>
+                }
+            }
+<span class="pc bpc" id="L510" title="1 of 4 branches missed.">            if (32 - size / 8 &gt; 0 &amp;&amp; size &lt; 256) {</span>
+<span class="fc" id="L511">                int top = w[32 - size / 8] &amp; 0x80;</span>
+<span class="pc bpc" id="L512" title="2 of 4 branches missed.">                if ((top != 0) != negative) {</span>
+<span class="nc" id="L513">                    throw new IllegalArgumentException(name + &quot; out of range&quot;);</span>
+                }
+            }
+<span class="fc bfc" id="L516" title="All 2 branches covered.">            if (size &lt;= 64) {</span>
+<span class="fc" id="L517">                long v = 0;</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">                for (int iter = 24; iter &lt; 32; iter++) {</span>
+<span class="fc" id="L519">                    v = (v &lt;&lt; 8) | (w[iter] &amp; 0xff);</span>
+                }
+<span class="fc" id="L521">                return Long.valueOf(v);</span>
+            }
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">            if (!negative) {</span>
+<span class="nc" id="L524">                return UInt256.fromBytes(w).toString();</span>
+            }
+            // magnitude = ~w + 1
+<span class="fc" id="L527">            byte[] inv = new byte[32];</span>
+<span class="fc bfc" id="L528" title="All 2 branches covered.">            for (int iter = 0; iter &lt; 32; iter++) {</span>
+<span class="fc" id="L529">                inv[iter] = (byte) ~w[iter];</span>
+            }
+<span class="fc" id="L531">            return &quot;-&quot; + UInt256.fromBytes(inv).add(UInt256.ONE).toString();</span>
+        }
+
+        private byte[] uintWord(Object value) {
+            UInt256 v;
+<span class="fc bfc" id="L536" title="All 2 branches covered.">            if (value instanceof UInt256) {</span>
+<span class="fc" id="L537">                v = (UInt256) value;</span>
+<span class="pc bpc" id="L538" title="2 of 8 branches missed.">            } else if (value instanceof Long || value instanceof Integer || value instanceof Short</span>
+                    || value instanceof Byte) {
+<span class="fc" id="L540">                v = UInt256.valueOf(((Number) value).longValue());</span>
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">            } else if (value instanceof String) {</span>
+<span class="fc" id="L542">                v = UInt256.parse((String) value);</span>
+            } else {
+<span class="nc" id="L544">                throw new IllegalArgumentException(name + &quot; takes a UInt256, an integer or a numeric String&quot;);</span>
+            }
+<span class="fc bfc" id="L546" title="All 2 branches covered.">            if (v.bitLength() &gt; size) {</span>
+<span class="fc" id="L547">                throw new IllegalArgumentException(&quot;value does not fit in &quot; + name);</span>
+            }
+<span class="fc" id="L549">            return v.toBytes32();</span>
+        }
+
+        private byte[] intWord(Object value) {
+            boolean negative;
+            UInt256 magnitude;
+<span class="pc bpc" id="L555" title="3 of 8 branches missed.">            if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {</span>
+<span class="fc" id="L556">                long l = ((Number) value).longValue();</span>
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">                if (l == Long.MIN_VALUE) {</span>
+<span class="nc" id="L558">                    negative = true;</span>
+<span class="nc" id="L559">                    magnitude = UInt256.ONE.shiftLeft(63);</span>
+                } else {
+<span class="fc bfc" id="L561" title="All 2 branches covered.">                    negative = l &lt; 0;</span>
+<span class="fc bfc" id="L562" title="All 2 branches covered.">                    magnitude = UInt256.valueOf(negative ? -l : l);</span>
+                }
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">            } else if (value instanceof String) {</span>
+<span class="fc" id="L565">                String s = (String) value;</span>
+<span class="fc" id="L566">                negative = s.startsWith(&quot;-&quot;);</span>
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">                magnitude = UInt256.parse(negative ? s.substring(1) : s, 10);</span>
+<span class="pc bnc" id="L568" title="All 2 branches missed.">            } else if (value instanceof UInt256) {</span>
+<span class="nc" id="L569">                negative = false;</span>
+<span class="nc" id="L570">                magnitude = (UInt256) value;</span>
+            } else {
+<span class="nc" id="L572">                throw new IllegalArgumentException(name + &quot; takes an integer or a decimal String&quot;);</span>
+            }
+<span class="fc" id="L574">            int bits = magnitude.bitLength();</span>
+<span class="pc bpc" id="L575" title="3 of 10 branches missed.">            boolean fits = negative ? (bits &lt; size || (bits == size &amp;&amp; magnitude.equals(UInt256.ONE.shiftLeft(size - 1))))</span>
+                    : bits &lt; size;
+<span class="fc bfc" id="L577" title="All 2 branches covered.">            if (!fits) {</span>
+<span class="fc" id="L578">                throw new IllegalArgumentException(&quot;value does not fit in &quot; + name);</span>
+            }
+<span class="fc" id="L580">            byte[] w = magnitude.toBytes32();</span>
+<span class="pc bpc" id="L581" title="2 of 4 branches missed.">            if (!negative || magnitude.isZero()) {</span>
+<span class="nc" id="L582">                return w;</span>
+            }
+<span class="fc" id="L584">            int carry = 1;</span>
+<span class="fc bfc" id="L585" title="All 2 branches covered.">            for (int iter = 31; iter &gt;= 0; iter--) {</span>
+<span class="fc" id="L586">                int b = (~w[iter] &amp; 0xff) + carry;</span>
+<span class="fc" id="L587">                w[iter] = (byte) b;</span>
+<span class="fc" id="L588">                carry = b &gt;&gt; 8;</span>
+            }
+<span class="fc" id="L590">            return w;</span>
+        }
+
+        private static byte[] dynamicBytes(byte[] b) {
+<span class="fc" id="L594">            int padded = (b.length + 31) / 32 * 32;</span>
+<span class="fc" id="L595">            byte[] out = new byte[32 + padded];</span>
+<span class="fc" id="L596">            System.arraycopy(UInt256.valueOf(b.length).toBytes32(), 0, out, 0, 32);</span>
+<span class="fc" id="L597">            System.arraycopy(b, 0, out, 32, b.length);</span>
+<span class="fc" id="L598">            return out;</span>
+        }
+
+        private static byte[] word(byte[] data, int at) {
+<span class="pc bpc" id="L602" title="2 of 4 branches missed.">            if (at &lt; 0 || at + 32 &gt; data.length) {</span>
+<span class="nc" id="L603">                throw new IllegalArgumentException(&quot;ABI data truncated&quot;);</span>
+            }
+<span class="fc" id="L605">            byte[] out = new byte[32];</span>
+<span class="fc" id="L606">            System.arraycopy(data, at, out, 0, 32);</span>
+<span class="fc" id="L607">            return out;</span>
+        }
+
+        private static int offset(byte[] data, int at) {
+<span class="fc" id="L611">            UInt256 v = UInt256.fromBytes(word(data, at));</span>
+<span class="pc bpc" id="L612" title="2 of 4 branches missed.">            if (v.bitLength() &gt; 31 || v.longValueExact() &gt; data.length) {</span>
+<span class="nc" id="L613">                throw new IllegalArgumentException(&quot;ABI offset out of range&quot;);</span>
+            }
+<span class="fc" id="L615">            return (int) v.longValueExact();</span>
+        }
+
+        private static Object[] items(Object value) {
+<span class="fc bfc" id="L619" title="All 2 branches covered.">            if (value instanceof Object[]) {</span>
+<span class="fc" id="L620">                return (Object[]) value;</span>
+            }
+<span class="pc bpc" id="L622" title="1 of 2 branches missed.">            if (value instanceof List) {</span>
+<span class="fc" id="L623">                return ((List&lt;?&gt;) value).toArray();</span>
+            }
+<span class="nc" id="L625">            throw new IllegalArgumentException(&quot;arrays and tuples take a List or an Object[]&quot;);</span>
+        }
+
+        private static byte[] raw(Object value) {
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            if (value instanceof byte[]) {</span>
+<span class="fc" id="L630">                return (byte[]) value;</span>
+            }
+<span class="nc bnc" id="L632" title="All 2 branches missed.">            if (value instanceof String) {</span>
+<span class="nc" id="L633">                return Hash.fromHex((String) value);</span>
+            }
+<span class="nc" id="L635">            throw new IllegalArgumentException(&quot;bytes take a byte[] or a 0x String&quot;);</span>
+        }
+
+        private static String str(Object value) {
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">            if (!(value instanceof String)) {</span>
+<span class="nc" id="L640">                throw new IllegalArgumentException(&quot;expected a String&quot;);</span>
+            }
+<span class="fc" id="L642">            return (String) value;</span>
+        }
+
+        private static void write(java.io.ByteArrayOutputStream out, byte[] b) {
+<span class="fc" id="L646">            out.write(b, 0, b.length);</span>
+<span class="fc" id="L647">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

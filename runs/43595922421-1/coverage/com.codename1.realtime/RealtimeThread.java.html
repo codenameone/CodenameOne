@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RealtimeThread.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.realtime</a> &gt; <span class="el_source">RealtimeThread.java</span></div><h1>RealtimeThread.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.realtime;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+/// A thread that runs a [RealtimeTask] once per period. Created and started by
+/// [Realtime#start(String, RealtimeParameters, RealtimeTask)].
+///
+/// The thread applies its scheduling, runs the task's `setup()`, freezes allocation and
+/// then loops: wait for the next release, run `cycle()`. [#stop()] ends the loop after
+/// the cycle in progress.
+@com.codename1.impl.SharedWithBackend
+public final class RealtimeThread {
+    /// [#getState()]: created, not yet running cycles.
+    public static final int STATE_STARTING = 0;
+    /// [#getState()]: running cycles.
+    public static final int STATE_RUNNING = 1;
+    /// [#getState()]: ended by [#stop()].
+    public static final int STATE_STOPPED = 2;
+    /// [#getState()]: ended by a failure, see [#getFailure()].
+    public static final int STATE_FAILED = 3;
+
+    private final Realtime platform;
+    private final String name;
+    private final RealtimeParameters params;
+    private final RealtimeTask task;
+<span class="nc" id="L50">    private final AtomicBoolean running = new AtomicBoolean(true);</span>
+    // Made before the freeze: the VM throws this instance at a refused allocation, so
+    // the throw never needs the allocation it refused.
+<span class="nc" id="L53">    private final RealtimeAllocationError allocationError =</span>
+            new RealtimeAllocationError(&quot;allocation in a real-time cycle&quot;);
+    // Written by the real-time thread after every cycle, read by getStatistics().
+<span class="nc" id="L56">    private final long[] live = new long[RealtimeStatistics.COUNT];</span>
+    private Thread thread;
+    // Written by the real-time thread, read by any: atomics, not locks, so the
+    // real-time side never blocks on a reader.
+<span class="nc" id="L60">    private final AtomicInteger state = new AtomicInteger(STATE_STARTING);</span>
+<span class="nc" id="L61">    private final AtomicInteger applied = new AtomicInteger();</span>
+<span class="nc" id="L62">    private final AtomicReference&lt;Throwable&gt; failure = new AtomicReference&lt;Throwable&gt;();</span>
+
+    // The default (Java) timing in Realtime keeps its state here; a native
+    // implementation keeps its own, per thread, and leaves these alone.
+    long periodNanos;
+    long nextReleaseNanos;
+    long wokeNanos;
+<span class="nc" id="L69">    final long[] javaStats = new long[RealtimeStatistics.COUNT];</span>
+
+<span class="nc" id="L71">    RealtimeThread(Realtime platform, String name, RealtimeParameters params, RealtimeTask task) {</span>
+<span class="nc" id="L72">        this.platform = platform;</span>
+<span class="nc" id="L73">        this.name = name;</span>
+<span class="nc" id="L74">        this.params = params.copy();</span>
+<span class="nc" id="L75">        this.task = task;</span>
+<span class="nc" id="L76">    }</span>
+
+    void begin() {
+<span class="nc" id="L79">        thread = new Thread(new Runnable() {</span>
+            public void run() { //NOPMD MissingOverride - Java 5 source forbids @Override on an interface method
+<span class="nc" id="L81">                body();</span>
+<span class="nc" id="L82">            }</span>
+        }, name);
+<span class="nc" id="L84">        thread.start();</span>
+<span class="nc" id="L85">    }</span>
+
+    private void body() {
+<span class="nc" id="L88">        int r = platform.rawEnter(this, params.getPriority(), params.getCpu(), params.isIsolateCpu());</span>
+        try {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (r &lt; 0) {</span>
+<span class="nc" id="L91">                fail(new IllegalStateException(&quot;real-time scheduling rejected, errno &quot; + (-r)));</span>
+<span class="nc" id="L92">                return;</span>
+            }
+<span class="nc" id="L94">            applied.set(r);</span>
+<span class="nc bnc" id="L95" title="All 4 branches missed.">            if (params.isSchedulingRequired() &amp;&amp; (r &amp; Realtime.APPLIED_SCHEDULING) == 0) {</span>
+<span class="nc" id="L96">                fail(new IllegalStateException(&quot;real-time scheduling was refused by the operating system;&quot;</span>
+                        + &quot; the process needs CAP_SYS_NICE or an rtprio limit&quot;));
+<span class="nc" id="L98">                return;</span>
+            }
+            try {
+<span class="nc" id="L101">                task.setup();</span>
+<span class="nc" id="L102">            } catch (Throwable t) {</span>
+<span class="nc" id="L103">                fail(t);</span>
+<span class="nc" id="L104">                return;</span>
+<span class="nc" id="L105">            }</span>
+<span class="nc" id="L106">            platform.rawStartPeriod(this, params.getPeriodNanos());</span>
+<span class="nc" id="L107">            state.set(STATE_RUNNING);</span>
+<span class="nc" id="L108">            loop();</span>
+        } finally {
+<span class="nc" id="L110">            platform.rawThaw(this);</span>
+<span class="nc" id="L111">            platform.rawLeave(this);</span>
+            try {
+<span class="nc" id="L113">                task.stopped();</span>
+<span class="nc" id="L114">            } catch (Throwable t) {</span>
+<span class="nc" id="L115">                t.printStackTrace();</span>
+<span class="nc" id="L116">            }</span>
+        }
+<span class="nc" id="L118">    }</span>
+
+    // The steady state. Nothing here allocates: the flag is an AtomicBoolean read, the
+    // statistics are copied into an array made in the constructor, and every call is a
+    // primitive or the task's own.
+    private void loop() {
+<span class="nc" id="L124">        platform.rawFreeze(this, params.getAllocationBudget(), allocationError);</span>
+        try {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            while (running.get()) {</span>
+<span class="nc" id="L127">                int missed = platform.rawWaitNextPeriod(this);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                if (!running.get()) {</span>
+<span class="nc" id="L129">                    break;</span>
+                }
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                if (missed &gt; 0) {</span>
+<span class="nc" id="L132">                    task.periodsMissed(missed);</span>
+                }
+<span class="nc" id="L134">                task.cycle();</span>
+<span class="nc" id="L135">                platform.rawStatistics(this, live);</span>
+<span class="nc" id="L136">            }</span>
+<span class="nc" id="L137">            state.set(STATE_STOPPED);</span>
+<span class="nc" id="L138">        } catch (RealtimeAllocationError e) {</span>
+<span class="nc" id="L139">            platform.rawThaw(this);</span>
+<span class="nc" id="L140">            platform.rawStatistics(this, live);</span>
+<span class="nc" id="L141">            String cls = platform.rawLastViolation(this);</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            fail(new RealtimeAllocationError(&quot;a real-time cycle allocated &quot;</span>
+                    + (cls == null ? &quot;an object&quot; : cls)
+<span class="nc" id="L144">                    + &quot; beyond its budget of &quot; + params.getAllocationBudget() + &quot; per period&quot;));</span>
+<span class="nc" id="L145">        } catch (Throwable t) {</span>
+<span class="nc" id="L146">            platform.rawThaw(this);</span>
+<span class="nc" id="L147">            fail(t);</span>
+<span class="nc" id="L148">        }</span>
+<span class="nc" id="L149">    }</span>
+
+    private void fail(Throwable t) {
+<span class="nc" id="L152">        failure.set(t);</span>
+<span class="nc" id="L153">        state.set(STATE_FAILED);</span>
+        try {
+<span class="nc" id="L155">            task.failed(t);</span>
+<span class="nc" id="L156">        } catch (Throwable inner) {</span>
+<span class="nc" id="L157">            inner.printStackTrace();</span>
+<span class="nc" id="L158">        }</span>
+<span class="nc" id="L159">    }</span>
+
+    /// The name given at start.
+    public String getName() {
+<span class="nc" id="L163">        return name;</span>
+    }
+
+    /// One of the `STATE_` constants.
+    public int getState() {
+<span class="nc" id="L168">        return state.get();</span>
+    }
+
+    /// What ended the task when [#getState()] is `STATE_FAILED`, otherwise `null`.
+    public Throwable getFailure() {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        return state.get() == STATE_FAILED ? failure.get() : null;</span>
+    }
+
+    /// `true` when the operating system granted real-time scheduling. `false` on a
+    /// platform without it, or a process without the privilege, where the task runs at
+    /// normal priority.
+    public boolean isSchedulingApplied() {
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        return (applied.get() &amp; Realtime.APPLIED_SCHEDULING) != 0;</span>
+    }
+
+    /// `true` when the thread was pinned to the CPU its parameters named.
+    public boolean isCpuPinned() {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        return (applied.get() &amp; Realtime.APPLIED_AFFINITY) != 0;</span>
+    }
+
+    /// A snapshot of the thread's statistics, as of the last completed cycle.
+    public RealtimeStatistics getStatistics() {
+<span class="nc" id="L190">        long[] copy = new long[RealtimeStatistics.COUNT];</span>
+<span class="nc" id="L191">        System.arraycopy(live, 0, copy, 0, copy.length);</span>
+<span class="nc" id="L192">        return new RealtimeStatistics(copy);</span>
+    }
+
+    /// Ends the loop after the cycle in progress. The thread then calls the task's
+    /// `stopped()` and exits. Returns at once; use [#join(long)] to wait.
+    public void stop() {
+<span class="nc" id="L198">        running.set(false);</span>
+<span class="nc" id="L199">    }</span>
+
+    /// Waits for the thread to exit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `millis`: the longest to wait, 0 for no limit
+    public void join(long millis) throws InterruptedException {
+<span class="nc" id="L207">        Thread t = thread;</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (t != null) {</span>
+<span class="nc" id="L209">            t.join(millis);</span>
+        }
+<span class="nc" id="L211">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

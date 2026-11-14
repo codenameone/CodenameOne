@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Bip39English.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.hd</a> &gt; <span class="el_source">Bip39English.java</span></div><h1>Bip39English.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.hd;
+
+/// The BIP-39 English wordlist, 2048 words in sorted order, held as one string so the
+/// server and the device read it without a resource lookup.
+@com.codename1.impl.SharedWithBackend
+final class Bip39English {
+
+    private Bip39English() {
+    }
+
+    static String[] words() {
+<span class="fc" id="L34">        return WORDS;</span>
+    }
+
+    private static String[] split() {
+<span class="fc" id="L38">        String[] out = new String[2048];</span>
+<span class="fc" id="L39">        int n = 0;</span>
+<span class="fc" id="L40">        int start = 0;</span>
+<span class="fc" id="L41">        int len = ALL.length();</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (int iter = 0; iter &lt;= len; iter++) {</span>
+<span class="fc bfc" id="L43" title="All 4 branches covered.">            if (iter == len || ALL.charAt(iter) == ' ') {</span>
+<span class="fc" id="L44">                out[n++] = ALL.substring(start, iter);</span>
+<span class="fc" id="L45">                start = iter + 1;</span>
+            }
+        }
+<span class="fc" id="L48">        return out;</span>
+    }
+
+    private static final String ALL =
+            &quot;abandon ability able about above absent absorb abstract absurd abuse access accident &quot;
+            + &quot;account accuse achieve acid acoustic acquire across act action actor actress actual adapt &quot;
+            + &quot;add addict address adjust admit adult advance advice aerobic affair afford afraid again &quot;
+            + &quot;age agent agree ahead aim air airport aisle alarm album alcohol alert alien all alley &quot;
+            + &quot;allow almost alone alpha already also alter always amateur amazing among amount amused &quot;
+            + &quot;analyst anchor ancient anger angle angry animal ankle announce annual another answer &quot;
+            + &quot;antenna antique anxiety any apart apology appear apple approve april arch arctic area &quot;
+            + &quot;arena argue arm armed armor army around arrange arrest arrive arrow art artefact artist &quot;
+            + &quot;artwork ask aspect assault asset assist assume asthma athlete atom attack attend attitude &quot;
+            + &quot;attract auction audit august aunt author auto autumn average avocado avoid awake aware &quot;
+            + &quot;away awesome awful awkward axis baby bachelor bacon badge bag balance balcony ball bamboo &quot;
+            + &quot;banana banner bar barely bargain barrel base basic basket battle beach bean beauty &quot;
+            + &quot;because become beef before begin behave behind believe below belt bench benefit best &quot;
+            + &quot;betray better between beyond bicycle bid bike bind biology bird birth bitter black blade &quot;
+            + &quot;blame blanket blast bleak bless blind blood blossom blouse blue blur blush board boat &quot;
+            + &quot;body boil bomb bone bonus book boost border boring borrow boss bottom bounce box boy &quot;
+            + &quot;bracket brain brand brass brave bread breeze brick bridge brief bright bring brisk &quot;
+            + &quot;broccoli broken bronze broom brother brown brush bubble buddy budget buffalo build bulb &quot;
+            + &quot;bulk bullet bundle bunker burden burger burst bus business busy butter buyer buzz cabbage &quot;
+            + &quot;cabin cable cactus cage cake call calm camera camp can canal cancel candy cannon canoe &quot;
+            + &quot;canvas canyon capable capital captain car carbon card cargo carpet carry cart case cash &quot;
+            + &quot;casino castle casual cat catalog catch category cattle caught cause caution cave ceiling &quot;
+            + &quot;celery cement census century cereal certain chair chalk champion change chaos chapter &quot;
+            + &quot;charge chase chat cheap check cheese chef cherry chest chicken chief child chimney choice &quot;
+            + &quot;choose chronic chuckle chunk churn cigar cinnamon circle citizen city civil claim clap &quot;
+            + &quot;clarify claw clay clean clerk clever click client cliff climb clinic clip clock clog &quot;
+            + &quot;close cloth cloud clown club clump cluster clutch coach coast coconut code coffee coil &quot;
+            + &quot;coin collect color column combine come comfort comic common company concert conduct &quot;
+            + &quot;confirm congress connect consider control convince cook cool copper copy coral core corn &quot;
+            + &quot;correct cost cotton couch country couple course cousin cover coyote crack cradle craft &quot;
+            + &quot;cram crane crash crater crawl crazy cream credit creek crew cricket crime crisp critic &quot;
+            + &quot;crop cross crouch crowd crucial cruel cruise crumble crunch crush cry crystal cube &quot;
+            + &quot;culture cup cupboard curious current curtain curve cushion custom cute cycle dad damage &quot;
+            + &quot;damp dance danger daring dash daughter dawn day deal debate debris decade december decide &quot;
+            + &quot;decline decorate decrease deer defense define defy degree delay deliver demand demise &quot;
+            + &quot;denial dentist deny depart depend deposit depth deputy derive describe desert design desk &quot;
+            + &quot;despair destroy detail detect develop device devote diagram dial diamond diary dice &quot;
+            + &quot;diesel diet differ digital dignity dilemma dinner dinosaur direct dirt disagree discover &quot;
+            + &quot;disease dish dismiss disorder display distance divert divide divorce dizzy doctor &quot;
+            + &quot;document dog doll dolphin domain donate donkey donor door dose double dove draft dragon &quot;
+            + &quot;drama drastic draw dream dress drift drill drink drip drive drop drum dry duck dumb dune &quot;
+            + &quot;during dust dutch duty dwarf dynamic eager eagle early earn earth easily east easy echo &quot;
+            + &quot;ecology economy edge edit educate effort egg eight either elbow elder electric elegant &quot;
+            + &quot;element elephant elevator elite else embark embody embrace emerge emotion employ empower &quot;
+            + &quot;empty enable enact end endless endorse enemy energy enforce engage engine enhance enjoy &quot;
+            + &quot;enlist enough enrich enroll ensure enter entire entry envelope episode equal equip era &quot;
+            + &quot;erase erode erosion error erupt escape essay essence estate eternal ethics evidence evil &quot;
+            + &quot;evoke evolve exact example excess exchange excite exclude excuse execute exercise exhaust &quot;
+            + &quot;exhibit exile exist exit exotic expand expect expire explain expose express extend extra &quot;
+            + &quot;eye eyebrow fabric face faculty fade faint faith fall false fame family famous fan fancy &quot;
+            + &quot;fantasy farm fashion fat fatal father fatigue fault favorite feature february federal fee &quot;
+            + &quot;feed feel female fence festival fetch fever few fiber fiction field figure file film &quot;
+            + &quot;filter final find fine finger finish fire firm first fiscal fish fit fitness fix flag &quot;
+            + &quot;flame flash flat flavor flee flight flip float flock floor flower fluid flush fly foam &quot;
+            + &quot;focus fog foil fold follow food foot force forest forget fork fortune forum forward &quot;
+            + &quot;fossil foster found fox fragile frame frequent fresh friend fringe frog front frost frown &quot;
+            + &quot;frozen fruit fuel fun funny furnace fury future gadget gain galaxy gallery game gap &quot;
+            + &quot;garage garbage garden garlic garment gas gasp gate gather gauge gaze general genius genre &quot;
+            + &quot;gentle genuine gesture ghost giant gift giggle ginger giraffe girl give glad glance glare &quot;
+            + &quot;glass glide glimpse globe gloom glory glove glow glue goat goddess gold good goose &quot;
+            + &quot;gorilla gospel gossip govern gown grab grace grain grant grape grass gravity great green &quot;
+            + &quot;grid grief grit grocery group grow grunt guard guess guide guilt guitar gun gym habit &quot;
+            + &quot;hair half hammer hamster hand happy harbor hard harsh harvest hat have hawk hazard head &quot;
+            + &quot;health heart heavy hedgehog height hello helmet help hen hero hidden high hill hint hip &quot;
+            + &quot;hire history hobby hockey hold hole holiday hollow home honey hood hope horn horror horse &quot;
+            + &quot;hospital host hotel hour hover hub huge human humble humor hundred hungry hunt hurdle &quot;
+            + &quot;hurry hurt husband hybrid ice icon idea identify idle ignore ill illegal illness image &quot;
+            + &quot;imitate immense immune impact impose improve impulse inch include income increase index &quot;
+            + &quot;indicate indoor industry infant inflict inform inhale inherit initial inject injury &quot;
+            + &quot;inmate inner innocent input inquiry insane insect inside inspire install intact interest &quot;
+            + &quot;into invest invite involve iron island isolate issue item ivory jacket jaguar jar jazz &quot;
+            + &quot;jealous jeans jelly jewel job join joke journey joy judge juice jump jungle junior junk &quot;
+            + &quot;just kangaroo keen keep ketchup key kick kid kidney kind kingdom kiss kit kitchen kite &quot;
+            + &quot;kitten kiwi knee knife knock know lab label labor ladder lady lake lamp language laptop &quot;
+            + &quot;large later latin laugh laundry lava law lawn lawsuit layer lazy leader leaf learn leave &quot;
+            + &quot;lecture left leg legal legend leisure lemon lend length lens leopard lesson letter level &quot;
+            + &quot;liar liberty library license life lift light like limb limit link lion liquid list little &quot;
+            + &quot;live lizard load loan lobster local lock logic lonely long loop lottery loud lounge love &quot;
+            + &quot;loyal lucky luggage lumber lunar lunch luxury lyrics machine mad magic magnet maid mail &quot;
+            + &quot;main major make mammal man manage mandate mango mansion manual maple marble march margin &quot;
+            + &quot;marine market marriage mask mass master match material math matrix matter maximum maze &quot;
+            + &quot;meadow mean measure meat mechanic medal media melody melt member memory mention menu &quot;
+            + &quot;mercy merge merit merry mesh message metal method middle midnight milk million mimic mind &quot;
+            + &quot;minimum minor minute miracle mirror misery miss mistake mix mixed mixture mobile model &quot;
+            + &quot;modify mom moment monitor monkey monster month moon moral more morning mosquito mother &quot;
+            + &quot;motion motor mountain mouse move movie much muffin mule multiply muscle museum mushroom &quot;
+            + &quot;music must mutual myself mystery myth naive name napkin narrow nasty nation nature near &quot;
+            + &quot;neck need negative neglect neither nephew nerve nest net network neutral never news next &quot;
+            + &quot;nice night noble noise nominee noodle normal north nose notable note nothing notice novel &quot;
+            + &quot;now nuclear number nurse nut oak obey object oblige obscure observe obtain obvious occur &quot;
+            + &quot;ocean october odor off offer office often oil okay old olive olympic omit once one onion &quot;
+            + &quot;online only open opera opinion oppose option orange orbit orchard order ordinary organ &quot;
+            + &quot;orient original orphan ostrich other outdoor outer output outside oval oven over own &quot;
+            + &quot;owner oxygen oyster ozone pact paddle page pair palace palm panda panel panic panther &quot;
+            + &quot;paper parade parent park parrot party pass patch path patient patrol pattern pause pave &quot;
+            + &quot;payment peace peanut pear peasant pelican pen penalty pencil people pepper perfect permit &quot;
+            + &quot;person pet phone photo phrase physical piano picnic picture piece pig pigeon pill pilot &quot;
+            + &quot;pink pioneer pipe pistol pitch pizza place planet plastic plate play please pledge pluck &quot;
+            + &quot;plug plunge poem poet point polar pole police pond pony pool popular portion position &quot;
+            + &quot;possible post potato pottery poverty powder power practice praise predict prefer prepare &quot;
+            + &quot;present pretty prevent price pride primary print priority prison private prize problem &quot;
+            + &quot;process produce profit program project promote proof property prosper protect proud &quot;
+            + &quot;provide public pudding pull pulp pulse pumpkin punch pupil puppy purchase purity purpose &quot;
+            + &quot;purse push put puzzle pyramid quality quantum quarter question quick quit quiz quote &quot;
+            + &quot;rabbit raccoon race rack radar radio rail rain raise rally ramp ranch random range rapid &quot;
+            + &quot;rare rate rather raven raw razor ready real reason rebel rebuild recall receive recipe &quot;
+            + &quot;record recycle reduce reflect reform refuse region regret regular reject relax release &quot;
+            + &quot;relief rely remain remember remind remove render renew rent reopen repair repeat replace &quot;
+            + &quot;report require rescue resemble resist resource response result retire retreat return &quot;
+            + &quot;reunion reveal review reward rhythm rib ribbon rice rich ride ridge rifle right rigid &quot;
+            + &quot;ring riot ripple risk ritual rival river road roast robot robust rocket romance roof &quot;
+            + &quot;rookie room rose rotate rough round route royal rubber rude rug rule run runway rural sad &quot;
+            + &quot;saddle sadness safe sail salad salmon salon salt salute same sample sand satisfy satoshi &quot;
+            + &quot;sauce sausage save say scale scan scare scatter scene scheme school science scissors &quot;
+            + &quot;scorpion scout scrap screen script scrub sea search season seat second secret section &quot;
+            + &quot;security seed seek segment select sell seminar senior sense sentence series service &quot;
+            + &quot;session settle setup seven shadow shaft shallow share shed shell sheriff shield shift &quot;
+            + &quot;shine ship shiver shock shoe shoot shop short shoulder shove shrimp shrug shuffle shy &quot;
+            + &quot;sibling sick side siege sight sign silent silk silly silver similar simple since sing &quot;
+            + &quot;siren sister situate six size skate sketch ski skill skin skirt skull slab slam sleep &quot;
+            + &quot;slender slice slide slight slim slogan slot slow slush small smart smile smoke smooth &quot;
+            + &quot;snack snake snap sniff snow soap soccer social sock soda soft solar soldier solid &quot;
+            + &quot;solution solve someone song soon sorry sort soul sound soup source south space spare &quot;
+            + &quot;spatial spawn speak special speed spell spend sphere spice spider spike spin spirit split &quot;
+            + &quot;spoil sponsor spoon sport spot spray spread spring spy square squeeze squirrel stable &quot;
+            + &quot;stadium staff stage stairs stamp stand start state stay steak steel stem step stereo &quot;
+            + &quot;stick still sting stock stomach stone stool story stove strategy street strike strong &quot;
+            + &quot;struggle student stuff stumble style subject submit subway success such sudden suffer &quot;
+            + &quot;sugar suggest suit summer sun sunny sunset super supply supreme sure surface surge &quot;
+            + &quot;surprise surround survey suspect sustain swallow swamp swap swarm swear sweet swift swim &quot;
+            + &quot;swing switch sword symbol symptom syrup system table tackle tag tail talent talk tank &quot;
+            + &quot;tape target task taste tattoo taxi teach team tell ten tenant tennis tent term test text &quot;
+            + &quot;thank that theme then theory there they thing this thought three thrive throw thumb &quot;
+            + &quot;thunder ticket tide tiger tilt timber time tiny tip tired tissue title toast tobacco &quot;
+            + &quot;today toddler toe together toilet token tomato tomorrow tone tongue tonight tool tooth &quot;
+            + &quot;top topic topple torch tornado tortoise toss total tourist toward tower town toy track &quot;
+            + &quot;trade traffic tragic train transfer trap trash travel tray treat tree trend trial tribe &quot;
+            + &quot;trick trigger trim trip trophy trouble truck true truly trumpet trust truth try tube &quot;
+            + &quot;tuition tumble tuna tunnel turkey turn turtle twelve twenty twice twin twist two type &quot;
+            + &quot;typical ugly umbrella unable unaware uncle uncover under undo unfair unfold unhappy &quot;
+            + &quot;uniform unique unit universe unknown unlock until unusual unveil update upgrade uphold &quot;
+            + &quot;upon upper upset urban urge usage use used useful useless usual utility vacant vacuum &quot;
+            + &quot;vague valid valley valve van vanish vapor various vast vault vehicle velvet vendor &quot;
+            + &quot;venture venue verb verify version very vessel veteran viable vibrant vicious victory &quot;
+            + &quot;video view village vintage violin virtual virus visa visit visual vital vivid vocal voice &quot;
+            + &quot;void volcano volume vote voyage wage wagon wait walk wall walnut want warfare warm &quot;
+            + &quot;warrior wash wasp waste water wave way wealth weapon wear weasel weather web wedding &quot;
+            + &quot;weekend weird welcome west wet whale what wheat wheel when where whip whisper wide width &quot;
+            + &quot;wife wild will win window wine wing wink winner winter wire wisdom wise wish witness wolf &quot;
+            + &quot;woman wonder wood wool word work world worry worth wrap wreck wrestle wrist write wrong &quot;
+            + &quot;yard year yellow you young youth zebra zero zone zoo&quot;;
+
+    // After ALL, so the split sees it assigned.
+<span class="fc" id="L205">    private static final String[] WORDS = split();</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

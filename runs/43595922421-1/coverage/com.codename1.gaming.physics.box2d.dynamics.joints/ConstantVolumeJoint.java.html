@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConstantVolumeJoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">ConstantVolumeJoint.java</span></div><h1>ConstantVolumeJoint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.Body;
+import com.codename1.gaming.physics.box2d.dynamics.SolverData;
+import com.codename1.gaming.physics.box2d.dynamics.World;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.Position;
+import com.codename1.gaming.physics.box2d.dynamics.contacts.Velocity;
+
+public class ConstantVolumeJoint extends Joint {
+
+  private final Body[] bodies;
+  private float[] targetLengths;
+  private float targetVolume;
+
+  private Vec2[] normals;
+<span class="fc" id="L42">  private float m_impulse = 0.0f;</span>
+
+  private World world;
+
+  private DistanceJoint[] distanceJoints;
+
+  public Body[] getBodies() {
+<span class="nc" id="L49">    return bodies;</span>
+  }
+
+  public DistanceJoint[] getJoints() {
+<span class="nc" id="L53">    return distanceJoints;</span>
+  }
+
+  public void inflate(float factor) {
+<span class="nc" id="L57">    targetVolume *= factor;</span>
+<span class="nc" id="L58">  }</span>
+
+  public ConstantVolumeJoint(World argWorld, ConstantVolumeJointDef def) {
+<span class="fc" id="L61">    super(argWorld.getPool(), def);</span>
+<span class="fc" id="L62">    world = argWorld;</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">    if (def.bodies.size() &lt;= 2) {</span>
+<span class="nc" id="L64">      throw new IllegalArgumentException(</span>
+          &quot;You cannot create a constant volume joint with less than three bodies.&quot;);
+    }
+<span class="fc" id="L67">    bodies = def.bodies.toArray(new Body[0]);</span>
+
+<span class="fc" id="L69">    targetLengths = new float[bodies.length];</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">    for (int i = 0; i &lt; targetLengths.length; ++i) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">      final int next = (i == targetLengths.length - 1) ? 0 : i + 1;</span>
+<span class="fc" id="L72">      float dist = bodies[i].getWorldCenter().sub(bodies[next].getWorldCenter()).length();</span>
+<span class="fc" id="L73">      targetLengths[i] = dist;</span>
+    }
+<span class="fc" id="L75">    targetVolume = getBodyArea();</span>
+
+<span class="pc bpc" id="L77" title="3 of 4 branches missed.">    if (def.joints != null &amp;&amp; def.joints.size() != def.bodies.size()) {</span>
+<span class="nc" id="L78">      throw new IllegalArgumentException(</span>
+          &quot;Incorrect joint definition.  Joints have to correspond to the bodies&quot;);
+    }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">    if (def.joints == null) {</span>
+<span class="fc" id="L82">      final DistanceJointDef djd = new DistanceJointDef();</span>
+<span class="fc" id="L83">      distanceJoints = new DistanceJoint[bodies.length];</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">      for (int i = 0; i &lt; targetLengths.length; ++i) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        final int next = (i == targetLengths.length - 1) ? 0 : i + 1;</span>
+<span class="fc" id="L86">        djd.frequencyHz = def.frequencyHz;// 20.0f;</span>
+<span class="fc" id="L87">        djd.dampingRatio = def.dampingRatio;// 50.0f;</span>
+<span class="fc" id="L88">        djd.collideConnected = def.collideConnected;</span>
+<span class="fc" id="L89">        djd.initialize(bodies[i], bodies[next], bodies[i].getWorldCenter(),</span>
+<span class="fc" id="L90">            bodies[next].getWorldCenter());</span>
+<span class="fc" id="L91">        distanceJoints[i] = (DistanceJoint) world.createJoint(djd);</span>
+      }
+<span class="fc" id="L93">    } else {</span>
+<span class="nc" id="L94">      distanceJoints = def.joints.toArray(new DistanceJoint[0]);</span>
+    }
+
+<span class="fc" id="L97">    normals = new Vec2[bodies.length];</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">    for (int i = 0; i &lt; normals.length; ++i) {</span>
+<span class="fc" id="L99">      normals[i] = new Vec2();</span>
+    }
+<span class="fc" id="L101">  }</span>
+
+  public void destructor() {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">    for (int i = 0; i &lt; distanceJoints.length; ++i) {</span>
+<span class="fc" id="L105">      world.destroyJoint(distanceJoints[i]);</span>
+    }
+<span class="fc" id="L107">  }</span>
+
+  private float getBodyArea() {
+<span class="fc" id="L110">    float area = 0.0f;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">    for (int i = 0; i &lt; bodies.length - 1; ++i) {</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">      final int next = (i == bodies.length - 1) ? 0 : i + 1;</span>
+<span class="fc" id="L113">      area +=</span>
+<span class="fc" id="L114">          bodies[i].getWorldCenter().x * bodies[next].getWorldCenter().y</span>
+<span class="fc" id="L115">              - bodies[next].getWorldCenter().x * bodies[i].getWorldCenter().y;</span>
+    }
+<span class="fc" id="L117">    area *= .5f;</span>
+<span class="fc" id="L118">    return area;</span>
+  }
+
+  private float getSolverArea(Position[] positions) {
+<span class="fc" id="L122">    float area = 0.0f;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">    for (int i = 0; i &lt; bodies.length; ++i) {</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">      final int next = (i == bodies.length - 1) ? 0 : i + 1;</span>
+<span class="fc" id="L125">      area +=</span>
+          positions[bodies[i].m_islandIndex].c.x * positions[bodies[next].m_islandIndex].c.y
+              - positions[bodies[next].m_islandIndex].c.x * positions[bodies[i].m_islandIndex].c.y;
+    }
+<span class="fc" id="L129">    area *= .5f;</span>
+<span class="fc" id="L130">    return area;</span>
+  }
+
+  private boolean constrainEdges(Position[] positions) {
+<span class="fc" id="L134">    float perimeter = 0.0f;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">    for (int i = 0; i &lt; bodies.length; ++i) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">      final int next = (i == bodies.length - 1) ? 0 : i + 1;</span>
+<span class="fc" id="L137">      float dx = positions[bodies[next].m_islandIndex].c.x - positions[bodies[i].m_islandIndex].c.x;</span>
+<span class="fc" id="L138">      float dy = positions[bodies[next].m_islandIndex].c.y - positions[bodies[i].m_islandIndex].c.y;</span>
+<span class="fc" id="L139">      float dist = MathUtils.sqrt(dx * dx + dy * dy);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">      if (dist &lt; Settings.EPSILON) {</span>
+<span class="nc" id="L141">        dist = 1.0f;</span>
+      }
+<span class="fc" id="L143">      normals[i].x = dy / dist;</span>
+<span class="fc" id="L144">      normals[i].y = -dx / dist;</span>
+<span class="fc" id="L145">      perimeter += dist;</span>
+    }
+
+<span class="fc" id="L148">    final Vec2 delta = pool.popVec2();</span>
+
+<span class="fc" id="L150">    float deltaArea = targetVolume - getSolverArea(positions);</span>
+<span class="fc" id="L151">    float toExtrude = 0.5f * deltaArea / perimeter; // *relaxationFactor</span>
+    // float sumdeltax = 0.0f;
+<span class="fc" id="L153">    boolean done = true;</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">    for (int i = 0; i &lt; bodies.length; ++i) {</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">      final int next = (i == bodies.length - 1) ? 0 : i + 1;</span>
+<span class="fc" id="L156">      delta.set(toExtrude * (normals[i].x + normals[next].x), toExtrude</span>
+          * (normals[i].y + normals[next].y));
+      // sumdeltax += dx;
+<span class="fc" id="L159">      float normSqrd = delta.lengthSquared();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">      if (normSqrd &gt; Settings.maxLinearCorrection * Settings.maxLinearCorrection) {</span>
+<span class="fc" id="L161">        delta.mulLocal(Settings.maxLinearCorrection / MathUtils.sqrt(normSqrd));</span>
+      }
+<span class="fc bfc" id="L163" title="All 2 branches covered.">      if (normSqrd &gt; Settings.linearSlop * Settings.linearSlop) {</span>
+<span class="fc" id="L164">        done = false;</span>
+      }
+<span class="fc" id="L166">      positions[bodies[next].m_islandIndex].c.x += delta.x;</span>
+<span class="fc" id="L167">      positions[bodies[next].m_islandIndex].c.y += delta.y;</span>
+      // bodies[next].m_linearVelocity.x += delta.x * step.inv_dt;
+      // bodies[next].m_linearVelocity.y += delta.y * step.inv_dt;
+    }
+
+<span class="fc" id="L172">    pool.pushVec2(1);</span>
+    // System.out.println(sumdeltax);
+<span class="fc" id="L174">    return done;</span>
+  }
+
+  public void initVelocityConstraints(final SolverData step) {
+<span class="fc" id="L178">    Velocity[] velocities = step.velocities;</span>
+<span class="fc" id="L179">    Position[] positions = step.positions;</span>
+<span class="fc" id="L180">    final Vec2[] d = pool.getVec2Array(bodies.length);</span>
+
+<span class="fc bfc" id="L182" title="All 2 branches covered.">    for (int i = 0; i &lt; bodies.length; ++i) {</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">      final int prev = (i == 0) ? bodies.length - 1 : i - 1;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">      final int next = (i == bodies.length - 1) ? 0 : i + 1;</span>
+<span class="fc" id="L185">      d[i].set(positions[bodies[next].m_islandIndex].c);</span>
+<span class="fc" id="L186">      d[i].subLocal(positions[bodies[prev].m_islandIndex].c);</span>
+    }
+
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">    if (step.step.warmStarting) {</span>
+<span class="fc" id="L190">      m_impulse *= step.step.dtRatio;</span>
+      // float lambda = -2.0f * crossMassSum / dotMassSum;
+      // System.out.println(crossMassSum + &quot; &quot; +dotMassSum);
+      // lambda = MathUtils.clamp(lambda, -Settings.maxLinearCorrection,
+      // Settings.maxLinearCorrection);
+      // m_impulse = lambda;
+<span class="fc bfc" id="L196" title="All 2 branches covered.">      for (int i = 0; i &lt; bodies.length; ++i) {</span>
+<span class="fc" id="L197">        velocities[bodies[i].m_islandIndex].v.x += bodies[i].m_invMass * d[i].y * .5f * m_impulse;</span>
+<span class="fc" id="L198">        velocities[bodies[i].m_islandIndex].v.y += bodies[i].m_invMass * -d[i].x * .5f * m_impulse;</span>
+      }
+    } else {
+<span class="nc" id="L201">      m_impulse = 0.0f;</span>
+    }
+<span class="fc" id="L203">  }</span>
+
+  public boolean solvePositionConstraints(SolverData step) {
+<span class="fc" id="L206">    return constrainEdges(step.positions);</span>
+  }
+
+  public void solveVelocityConstraints(final SolverData step) {
+<span class="fc" id="L210">    float crossMassSum = 0.0f;</span>
+<span class="fc" id="L211">    float dotMassSum = 0.0f;</span>
+
+<span class="fc" id="L213">    Velocity[] velocities = step.velocities;</span>
+<span class="fc" id="L214">    Position[] positions = step.positions;</span>
+<span class="fc" id="L215">    final Vec2 d[] = pool.getVec2Array(bodies.length);</span>
+
+<span class="fc bfc" id="L217" title="All 2 branches covered.">    for (int i = 0; i &lt; bodies.length; ++i) {</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">      final int prev = (i == 0) ? bodies.length - 1 : i - 1;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">      final int next = (i == bodies.length - 1) ? 0 : i + 1;</span>
+<span class="fc" id="L220">      d[i].set(positions[bodies[next].m_islandIndex].c);</span>
+<span class="fc" id="L221">      d[i].subLocal(positions[bodies[prev].m_islandIndex].c);</span>
+<span class="fc" id="L222">      dotMassSum += (d[i].lengthSquared()) / bodies[i].getMass();</span>
+<span class="fc" id="L223">      crossMassSum += Vec2.cross(velocities[bodies[i].m_islandIndex].v, d[i]);</span>
+    }
+<span class="fc" id="L225">    float lambda = -2.0f * crossMassSum / dotMassSum;</span>
+    // System.out.println(crossMassSum + &quot; &quot; +dotMassSum);
+    // lambda = MathUtils.clamp(lambda, -Settings.maxLinearCorrection,
+    // Settings.maxLinearCorrection);
+<span class="fc" id="L229">    m_impulse += lambda;</span>
+    // System.out.println(m_impulse);
+<span class="fc bfc" id="L231" title="All 2 branches covered.">    for (int i = 0; i &lt; bodies.length; ++i) {</span>
+<span class="fc" id="L232">      velocities[bodies[i].m_islandIndex].v.x += bodies[i].m_invMass * d[i].y * .5f * lambda;</span>
+<span class="fc" id="L233">      velocities[bodies[i].m_islandIndex].v.y += bodies[i].m_invMass * -d[i].x * .5f * lambda;</span>
+    }
+<span class="fc" id="L235">  }</span>
+
+  /// No-op
+<span class="nc" id="L238">  public void getAnchorA(Vec2 argOut) {}</span>
+
+  /// No-op
+<span class="nc" id="L241">  public void getAnchorB(Vec2 argOut) {}</span>
+
+  /// No-op
+<span class="nc" id="L244">  public void getReactionForce(float inv_dt, Vec2 argOut) {}</span>
+
+  /// No-op
+  public float getReactionTorque(float inv_dt) {
+<span class="nc" id="L248">    return 0;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Bech32.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.encoding</a> &gt; <span class="el_source">Bech32.java</span></div><h1>Bech32.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.encoding;
+
+/// Bech32 (BIP-173) and Bech32m (BIP-350) encoding, bit regrouping and the
+/// SegWit address helpers built on them.
+@com.codename1.impl.SharedWithBackend
+public final class Bech32 {
+
+    /// Checksum variant constant for original Bech32 (BIP-173).
+    public static final int BECH32 = 1;
+
+    /// Checksum variant constant for Bech32m (BIP-350).
+    public static final int BECH32M = 2;
+
+    private static final String CHARSET = &quot;qpzry9x8gf2tvdw0s3jn54khce6mua7l&quot;;
+<span class="fc" id="L37">    private static final int[] REV = new int[128];</span>
+    private static final int BECH32_CONST = 1;
+    private static final int BECH32M_CONST = 0x2bc830a3;
+
+    static {
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (int i = 0; i &lt; REV.length; i++) {</span>
+<span class="fc" id="L43">            REV[i] = -1;</span>
+        }
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int i = 0; i &lt; CHARSET.length(); i++) {</span>
+<span class="fc" id="L46">            REV[CHARSET.charAt(i)] = i;</span>
+        }
+<span class="fc" id="L48">    }</span>
+
+    private Bech32() {
+    }
+
+    /// The result of [#decode(String)].
+    public static final class Decoded {
+        private final String hrp;
+        private final byte[] data;
+        private final int variant;
+
+<span class="fc" id="L59">        Decoded(String hrp, byte[] data, int variant) {</span>
+<span class="fc" id="L60">            this.hrp = hrp;</span>
+<span class="fc" id="L61">            this.data = data;</span>
+<span class="fc" id="L62">            this.variant = variant;</span>
+<span class="fc" id="L63">        }</span>
+
+        /// Returns the human readable part, lowercase.
+        public String getHrp() {
+<span class="fc" id="L67">            return hrp;</span>
+        }
+
+        /// Returns the 5-bit data values, without the checksum.
+        public byte[] getData() {
+<span class="fc" id="L72">            byte[] c = new byte[data.length];</span>
+<span class="fc" id="L73">            System.arraycopy(data, 0, c, 0, data.length);</span>
+<span class="fc" id="L74">            return c;</span>
+        }
+
+        /// Returns [#BECH32] or [#BECH32M].
+        public int getVariant() {
+<span class="fc" id="L79">            return variant;</span>
+        }
+    }
+
+    /// The result of [#decodeSegwitAddress(String, String)].
+    public static final class SegwitAddress {
+        private final int version;
+        private final byte[] program;
+
+<span class="fc" id="L88">        SegwitAddress(int version, byte[] program) {</span>
+<span class="fc" id="L89">            this.version = version;</span>
+<span class="fc" id="L90">            this.program = program;</span>
+<span class="fc" id="L91">        }</span>
+
+        /// Returns the witness version, 0 to 16.
+        public int getVersion() {
+<span class="fc" id="L95">            return version;</span>
+        }
+
+        /// Returns the witness program bytes.
+        public byte[] getProgram() {
+<span class="fc" id="L100">            byte[] c = new byte[program.length];</span>
+<span class="fc" id="L101">            System.arraycopy(program, 0, c, 0, program.length);</span>
+<span class="fc" id="L102">            return c;</span>
+        }
+    }
+
+    private static int polymod(byte[] values) {
+<span class="fc" id="L107">        int chk = 1;</span>
+<span class="fc" id="L108">        int[] gen = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (byte value : values) {</span>
+<span class="fc" id="L110">            int top = chk &gt;&gt;&gt; 25;</span>
+<span class="fc" id="L111">            chk = ((chk &amp; 0x1ffffff) &lt;&lt; 5) ^ (value &amp; 0xff);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            for (int j = 0; j &lt; 5; j++) {</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                if (((top &gt;&gt;&gt; j) &amp; 1) != 0) {</span>
+<span class="fc" id="L114">                    chk ^= gen[j];</span>
+                }
+            }
+        }
+<span class="fc" id="L118">        return chk;</span>
+    }
+
+    private static byte[] expandHrp(String hrp) {
+<span class="fc" id="L122">        int n = hrp.length();</span>
+<span class="fc" id="L123">        byte[] out = new byte[n * 2 + 1];</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L125">            char c = hrp.charAt(i);</span>
+<span class="fc" id="L126">            out[i] = (byte) (c &gt;&gt;&gt; 5);</span>
+<span class="fc" id="L127">            out[i + n + 1] = (byte) (c &amp; 31);</span>
+        }
+<span class="fc" id="L129">        return out;</span>
+    }
+
+
+    private static int constant(int variant) {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (variant == BECH32) {</span>
+<span class="fc" id="L135">            return BECH32_CONST;</span>
+        }
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (variant == BECH32M) {</span>
+<span class="fc" id="L138">            return BECH32M_CONST;</span>
+        }
+<span class="nc" id="L140">        throw new IllegalArgumentException(&quot;Unknown Bech32 variant&quot;);</span>
+    }
+
+    private static char fold(char c) {
+<span class="fc bfc" id="L144" title="All 4 branches covered.">        return (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') ? (char) (c + 32) : c;</span>
+    }
+
+    /// Encodes an HRP and 5-bit data into a Bech32 or Bech32m string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hrp`: the human readable part, 1 to 83 printable ASCII characters (33 to 126); uppercase is folded
+    /// - `data`: values in the range 0 to 31
+    /// - `variant`: [#BECH32] or [#BECH32M]
+    ///
+    /// #### Returns
+    ///
+    /// the lowercase encoded string
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for an invalid HRP, data value, variant or total length over 90
+    public static String encode(String hrp, byte[] data, int variant) {
+<span class="fc" id="L163">        int k = constant(variant);</span>
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        if (hrp.length() &lt; 1 || hrp.length() &gt; 83) {</span>
+<span class="nc" id="L165">            throw new IllegalArgumentException(&quot;Bad HRP length&quot;);</span>
+        }
+<span class="fc" id="L167">        StringBuilder h = new StringBuilder(hrp.length());</span>
+<span class="fc" id="L168">        boolean lower = false;</span>
+<span class="fc" id="L169">        boolean upper = false;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (int i = 0; i &lt; hrp.length(); i++) {</span>
+<span class="fc" id="L171">            char c = hrp.charAt(i);</span>
+<span class="pc bpc" id="L172" title="2 of 4 branches missed.">            if (c &lt; 33 || c &gt; 126) {</span>
+<span class="nc" id="L173">                throw new IllegalArgumentException(&quot;Bad HRP character&quot;);</span>
+            }
+<span class="pc bpc" id="L175" title="1 of 4 branches missed.">            if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="fc" id="L176">                lower = true;</span>
+            }
+<span class="pc bpc" id="L178" title="1 of 4 branches missed.">            if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="nc" id="L179">                upper = true;</span>
+            }
+<span class="fc" id="L181">            h.append(fold(c));</span>
+        }
+<span class="pc bpc" id="L183" title="1 of 4 branches missed.">        if (lower &amp;&amp; upper) {</span>
+<span class="nc" id="L184">            throw new IllegalArgumentException(&quot;Mixed case HRP&quot;);</span>
+        }
+<span class="fc" id="L186">        String hr = h.toString();</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (hr.length() + 1 + data.length + 6 &gt; 90) {</span>
+<span class="fc" id="L188">            throw new IllegalArgumentException(&quot;Bech32 string too long&quot;);</span>
+        }
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        for (byte datum : data) {</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if ((datum &amp; 0xe0) != 0) {</span>
+<span class="nc" id="L192">                throw new IllegalArgumentException(&quot;Data value out of range&quot;);</span>
+            }
+        }
+<span class="fc" id="L195">        byte[] values = Rlp.concat(Rlp.concat(expandHrp(hr), data), new byte[6]);</span>
+<span class="fc" id="L196">        int mod = polymod(values) ^ k;</span>
+<span class="fc" id="L197">        StringBuilder sb = new StringBuilder(hr.length() + 1 + data.length + 6);</span>
+<span class="fc" id="L198">        sb.append(hr).append('1');</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (byte datum : data) {</span>
+<span class="fc" id="L200">            sb.append(CHARSET.charAt(datum));</span>
+        }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (int i = 0; i &lt; 6; i++) {</span>
+<span class="fc" id="L203">            sb.append(CHARSET.charAt((mod &gt;&gt;&gt; (5 * (5 - i))) &amp; 31));</span>
+        }
+<span class="fc" id="L205">        return sb.toString();</span>
+    }
+
+    /// Decodes and validates a Bech32 or Bech32m string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`: the encoded text
+    ///
+    /// #### Returns
+    ///
+    /// the HRP, data and checksum variant
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for any violation of the BIP-173/BIP-350 rules
+    public static Decoded decode(String str) {
+<span class="fc" id="L222">        int n = str.length();</span>
+<span class="fc bfc" id="L223" title="All 4 branches covered.">        if (n &lt; 8 || n &gt; 90) {</span>
+<span class="fc" id="L224">            throw new IllegalArgumentException(&quot;Bad Bech32 length&quot;);</span>
+        }
+<span class="fc" id="L226">        boolean lower = false;</span>
+<span class="fc" id="L227">        boolean upper = false;</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L229">            char c = str.charAt(i);</span>
+<span class="pc bpc" id="L230" title="1 of 4 branches missed.">            if (c &lt; 33 || c &gt; 126) {</span>
+<span class="fc" id="L231">                throw new IllegalArgumentException(&quot;Bad Bech32 character&quot;);</span>
+            }
+<span class="pc bpc" id="L233" title="1 of 4 branches missed.">            if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="fc" id="L234">                lower = true;</span>
+<span class="pc bpc" id="L235" title="1 of 4 branches missed.">            } else if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="fc" id="L236">                upper = true;</span>
+            }
+        }
+<span class="fc bfc" id="L239" title="All 4 branches covered.">        if (lower &amp;&amp; upper) {</span>
+<span class="fc" id="L240">            throw new IllegalArgumentException(&quot;Mixed case Bech32&quot;);</span>
+        }
+<span class="fc" id="L242">        int pos = str.lastIndexOf('1');</span>
+<span class="fc bfc" id="L243" title="All 4 branches covered.">        if (pos &lt; 1 || pos + 7 &gt; n) {</span>
+<span class="fc" id="L244">            throw new IllegalArgumentException(&quot;Bad Bech32 separator position&quot;);</span>
+        }
+<span class="fc" id="L246">        StringBuilder h = new StringBuilder(pos);</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (int i = 0; i &lt; pos; i++) {</span>
+<span class="fc" id="L248">            h.append(fold(str.charAt(i)));</span>
+        }
+<span class="fc" id="L250">        String hrp = h.toString();</span>
+<span class="fc" id="L251">        byte[] values = new byte[n - pos - 1];</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        for (int i = 0; i &lt; values.length; i++) {</span>
+<span class="fc" id="L253">            char c = fold(str.charAt(pos + 1 + i));</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            int d = c &lt; 128 ? REV[c] : -1;</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (d &lt; 0) {</span>
+<span class="fc" id="L256">                throw new IllegalArgumentException(&quot;Bad Bech32 data character&quot;);</span>
+            }
+<span class="fc" id="L258">            values[i] = (byte) d;</span>
+        }
+<span class="fc" id="L260">        int chk = polymod(Rlp.concat(expandHrp(hrp), values));</span>
+        int variant;
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (chk == BECH32_CONST) {</span>
+<span class="fc" id="L263">            variant = BECH32;</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        } else if (chk == BECH32M_CONST) {</span>
+<span class="fc" id="L265">            variant = BECH32M;</span>
+        } else {
+<span class="fc" id="L267">            throw new IllegalArgumentException(&quot;Bad Bech32 checksum&quot;);</span>
+        }
+<span class="fc" id="L269">        byte[] data = new byte[values.length - 6];</span>
+<span class="fc" id="L270">        System.arraycopy(values, 0, data, 0, data.length);</span>
+<span class="fc" id="L271">        return new Decoded(hrp, data, variant);</span>
+    }
+
+    /// Regroups bits, for example 8-bit bytes to 5-bit values and back.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: input values, each fitting in `fromBits` bits
+    /// - `fromBits`: input group size, 1 to 8
+    /// - `toBits`: output group size, 1 to 8
+    /// - `pad`: whether leftover bits are zero padded (encoding) or must be zero and shorter than a group (decoding)
+    ///
+    /// #### Returns
+    ///
+    /// the regrouped values
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for an out-of-range value or invalid padding
+    public static byte[] convertBits(byte[] data, int fromBits, int toBits, boolean pad) {
+<span class="pc bpc" id="L291" title="4 of 8 branches missed.">        if (fromBits &lt; 1 || fromBits &gt; 8 || toBits &lt; 1 || toBits &gt; 8) {</span>
+<span class="nc" id="L292">            throw new IllegalArgumentException(&quot;Bad group size&quot;);</span>
+        }
+<span class="fc" id="L294">        int acc = 0;</span>
+<span class="fc" id="L295">        int bits = 0;</span>
+<span class="fc" id="L296">        int maxv = (1 &lt;&lt; toBits) - 1;</span>
+<span class="fc" id="L297">        byte[] out = new byte[(data.length * fromBits + toBits - 1) / toBits + 1];</span>
+<span class="fc" id="L298">        int len = 0;</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        for (byte datum : data) {</span>
+<span class="fc" id="L300">            int v = datum &amp; 0xff;</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">            if ((v &gt;&gt;&gt; fromBits) != 0) {</span>
+<span class="fc" id="L302">                throw new IllegalArgumentException(&quot;Value out of range&quot;);</span>
+            }
+<span class="fc" id="L304">            acc = ((acc &lt;&lt; fromBits) | v) &amp; 0xffff;</span>
+<span class="fc" id="L305">            bits += fromBits;</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            while (bits &gt;= toBits) {</span>
+<span class="fc" id="L307">                bits -= toBits;</span>
+<span class="fc" id="L308">                out[len++] = (byte) ((acc &gt;&gt;&gt; bits) &amp; maxv);</span>
+            }
+        }
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (pad) {</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">            if (bits &gt; 0) {</span>
+<span class="fc" id="L313">                out[len++] = (byte) ((acc &lt;&lt; (toBits - bits)) &amp; maxv);</span>
+            }
+<span class="fc bfc" id="L315" title="All 4 branches covered.">        } else if (bits &gt;= fromBits || ((acc &lt;&lt; (toBits - bits)) &amp; maxv) != 0) {</span>
+<span class="fc" id="L316">            throw new IllegalArgumentException(&quot;Invalid padding&quot;);</span>
+        }
+<span class="fc" id="L318">        byte[] res = new byte[len];</span>
+<span class="fc" id="L319">        System.arraycopy(out, 0, res, 0, len);</span>
+<span class="fc" id="L320">        return res;</span>
+    }
+
+    /// Encodes a SegWit address, using Bech32 for witness version 0 and Bech32m otherwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hrp`: the network prefix such as `bc` or `tb`
+    /// - `witnessVersion`: 0 to 16
+    /// - `program`: the witness program, 2 to 40 bytes (20 or 32 for version 0)
+    ///
+    /// #### Returns
+    ///
+    /// the address
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the version or program length is invalid
+    public static String encodeSegwitAddress(String hrp, int witnessVersion, byte[] program) {
+<span class="fc" id="L339">        checkProgram(witnessVersion, program.length);</span>
+<span class="fc" id="L340">        byte[] conv = convertBits(program, 8, 5, true);</span>
+<span class="fc" id="L341">        byte[] data = new byte[conv.length + 1];</span>
+<span class="fc" id="L342">        data[0] = (byte) witnessVersion;</span>
+<span class="fc" id="L343">        System.arraycopy(conv, 0, data, 1, conv.length);</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        return encode(hrp, data, witnessVersion == 0 ? BECH32 : BECH32M);</span>
+    }
+
+    /// Decodes and validates a SegWit address.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hrp`: the expected network prefix, compared without regard to case
+    /// - `addr`: the address
+    ///
+    /// #### Returns
+    ///
+    /// the witness version and program
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the address is invalid or has another HRP
+    public static SegwitAddress decodeSegwitAddress(String hrp, String addr) {
+<span class="fc" id="L362">        Decoded d = decode(addr);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (!d.getHrp().equalsIgnoreCase(hrp)) {</span>
+<span class="fc" id="L364">            throw new IllegalArgumentException(&quot;Unexpected HRP&quot;);</span>
+        }
+<span class="fc" id="L366">        byte[] data = d.data;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (data.length &lt; 1) {</span>
+<span class="fc" id="L368">            throw new IllegalArgumentException(&quot;Empty SegWit data&quot;);</span>
+        }
+<span class="fc" id="L370">        int version = data[0];</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        if (version &gt; 16) {</span>
+<span class="fc" id="L372">            throw new IllegalArgumentException(&quot;Bad witness version&quot;);</span>
+        }
+<span class="fc bfc" id="L374" title="All 6 branches covered.">        if ((version == 0) != (d.variant == BECH32)) {</span>
+<span class="fc" id="L375">            throw new IllegalArgumentException(&quot;Wrong checksum variant for witness version&quot;);</span>
+        }
+<span class="fc" id="L377">        byte[] rest = new byte[data.length - 1];</span>
+<span class="fc" id="L378">        System.arraycopy(data, 1, rest, 0, rest.length);</span>
+<span class="fc" id="L379">        byte[] program = convertBits(rest, 5, 8, false);</span>
+<span class="fc" id="L380">        checkProgram(version, program.length);</span>
+<span class="fc" id="L381">        return new SegwitAddress(version, program);</span>
+    }
+
+    private static void checkProgram(int version, int len) {
+<span class="pc bpc" id="L385" title="1 of 4 branches missed.">        if (version &lt; 0 || version &gt; 16) {</span>
+<span class="fc" id="L386">            throw new IllegalArgumentException(&quot;Bad witness version&quot;);</span>
+        }
+<span class="fc bfc" id="L388" title="All 4 branches covered.">        if (len &lt; 2 || len &gt; 40) {</span>
+<span class="fc" id="L389">            throw new IllegalArgumentException(&quot;Bad witness program length&quot;);</span>
+        }
+<span class="fc bfc" id="L391" title="All 6 branches covered.">        if (version == 0 &amp;&amp; len != 20 &amp;&amp; len != 32) {</span>
+<span class="fc" id="L392">            throw new IllegalArgumentException(&quot;Bad version 0 program length&quot;);</span>
+        }
+<span class="fc" id="L394">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

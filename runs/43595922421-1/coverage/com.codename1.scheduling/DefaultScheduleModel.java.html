@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultScheduleModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.scheduling</a> &gt; <span class="el_source">DefaultScheduleModel.java</span></div><h1>DefaultScheduleModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.scheduling;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// A schedule held in memory, which accepts every edit.
+///
+/// Override `updateItem`, `createItem` or `removeItem` to validate a change
+/// or to send it somewhere before it is accepted.
+<span class="fc" id="L33">public class DefaultScheduleModel extends AbstractScheduleModel {</span>
+<span class="fc" id="L34">    private final List&lt;ScheduleResource&gt; resources = new ArrayList&lt;ScheduleResource&gt;();</span>
+<span class="fc" id="L35">    private final List&lt;ScheduleItem&gt; items = new ArrayList&lt;ScheduleItem&gt;();</span>
+<span class="fc" id="L36">    private long defaultDuration = TimeMath.HOUR;</span>
+    private int created;
+<span class="fc" id="L38">    private boolean creationEnabled = true;</span>
+
+    public DefaultScheduleModel addResource(ScheduleResource r) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (r != null) {</span>
+<span class="fc" id="L42">            resources.add(r);</span>
+<span class="fc" id="L43">            fireChanged();</span>
+        }
+<span class="fc" id="L45">        return this;</span>
+    }
+
+    public DefaultScheduleModel removeResource(ScheduleResource r) {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (resources.remove(r)) {</span>
+<span class="nc" id="L50">            fireChanged();</span>
+        }
+<span class="nc" id="L52">        return this;</span>
+    }
+
+    public DefaultScheduleModel addItem(ScheduleItem item) {
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (item != null) {</span>
+<span class="fc" id="L57">            items.add(item);</span>
+<span class="fc" id="L58">            fireChanged();</span>
+        }
+<span class="fc" id="L60">        return this;</span>
+    }
+
+    /// Adds several items and fires one change.
+    public DefaultScheduleModel addItems(List&lt;ScheduleItem&gt; all) {
+<span class="nc" id="L65">        items.addAll(all);</span>
+<span class="nc" id="L66">        fireChanged();</span>
+<span class="nc" id="L67">        return this;</span>
+    }
+
+    /// Removes every item and keeps the resources.
+    public DefaultScheduleModel clearItems() {
+<span class="fc" id="L72">        items.clear();</span>
+<span class="fc" id="L73">        fireChanged();</span>
+<span class="fc" id="L74">        return this;</span>
+    }
+
+    public List&lt;ScheduleItem&gt; getAllItems() {
+<span class="fc" id="L78">        return Collections.unmodifiableList(items);</span>
+    }
+
+    public ScheduleItem getItem(String id) {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (ScheduleItem item : items) {</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (item.getId().equals(id)) {</span>
+<span class="fc" id="L84">                return item;</span>
+            }
+<span class="fc" id="L86">        }</span>
+<span class="fc" id="L87">        return null;</span>
+    }
+
+    /// Whether dragging on empty space makes an item. On by default.
+    public DefaultScheduleModel setCreationEnabled(boolean v) {
+<span class="fc" id="L92">        creationEnabled = v;</span>
+<span class="fc" id="L93">        return this;</span>
+    }
+
+    public boolean isCreationEnabled() {
+<span class="nc" id="L97">        return creationEnabled;</span>
+    }
+
+    /// The length of an item created by a tap, where there is no range.
+    public DefaultScheduleModel setDefaultDuration(long millis) {
+<span class="fc" id="L102">        defaultDuration = millis;</span>
+<span class="fc" id="L103">        return this;</span>
+    }
+
+    @Override
+    public List&lt;ScheduleResource&gt; getResources() {
+<span class="fc" id="L108">        return Collections.unmodifiableList(resources);</span>
+    }
+
+    @Override
+    public void getItems(long from, long to, List&lt;ScheduleItem&gt; out) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (ScheduleItem it : items) {</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (it.intersects(from, to)) {</span>
+<span class="fc" id="L115">                out.add(it);</span>
+            }
+<span class="fc" id="L117">        }</span>
+<span class="fc" id="L118">    }</span>
+
+    @Override
+    public boolean updateItem(ScheduleItem item, long start, long end, String resourceId) {
+<span class="fc" id="L122">        item.setTime(start, end);</span>
+<span class="fc" id="L123">        item.setResourceId(resourceId);</span>
+<span class="fc" id="L124">        fireChanged();</span>
+<span class="fc" id="L125">        return true;</span>
+    }
+
+    @Override
+    public ScheduleItem createItem(long start, long end, String resourceId) {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (!creationEnabled) {</span>
+<span class="fc" id="L131">            return null;</span>
+        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (end &lt;= start) {</span>
+<span class="fc" id="L134">            end = start + defaultDuration;</span>
+        }
+        // The application chooses its own ids and may have chosen this one.
+        String id;
+        do {
+<span class="fc" id="L139">            created++;</span>
+<span class="fc" id="L140">            id = &quot;new-&quot; + created;</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        } while (getItem(id) != null);</span>
+<span class="fc" id="L142">        ScheduleItem item = new ScheduleItem(id, &quot;&quot;, start, end).setResourceId(resourceId);</span>
+<span class="fc" id="L143">        items.add(item);</span>
+<span class="fc" id="L144">        fireChanged();</span>
+<span class="fc" id="L145">        return item;</span>
+    }
+
+    @Override
+    public boolean removeItem(ScheduleItem item) {
+<span class="fc" id="L150">        boolean removed = items.remove(item);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (removed) {</span>
+<span class="fc" id="L152">            fireChanged();</span>
+        }
+<span class="fc" id="L154">        return removed;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

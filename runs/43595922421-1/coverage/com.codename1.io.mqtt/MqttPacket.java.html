@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MqttPacket.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.mqtt</a> &gt; <span class="el_source">MqttPacket.java</span></div><h1>MqttPacket.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.mqtt;
+
+/// One MQTT 3.1.1 control packet as a value. Build one with the static
+/// factories and give it to [MqttCodec#write(MqttPacket, java.io.OutputStream)];
+/// [MqttCodec#read(java.io.InputStream, int)] returns one. Only the accessors
+/// that belong to the packet's [#getType()] carry meaning.
+public final class MqttPacket {
+    /// Packet type CONNECT.
+    public static final int CONNECT = 1;
+    /// Packet type CONNACK.
+    public static final int CONNACK = 2;
+    /// Packet type PUBLISH.
+    public static final int PUBLISH = 3;
+    /// Packet type PUBACK.
+    public static final int PUBACK = 4;
+    /// Packet type SUBSCRIBE.
+    public static final int SUBSCRIBE = 8;
+    /// Packet type SUBACK.
+    public static final int SUBACK = 9;
+    /// Packet type UNSUBSCRIBE.
+    public static final int UNSUBSCRIBE = 10;
+    /// Packet type UNSUBACK.
+    public static final int UNSUBACK = 11;
+    /// Packet type PINGREQ.
+    public static final int PINGREQ = 12;
+    /// Packet type PINGRESP.
+    public static final int PINGRESP = 13;
+    /// Packet type DISCONNECT.
+    public static final int DISCONNECT = 14;
+
+    private final int type;
+    private int packetId;
+    private String topic;
+    private byte[] payload;
+    private int qos;
+    private boolean retain;
+    private boolean dup;
+    private boolean sessionPresent;
+    private int returnCode;
+    private String[] filters;
+    private int[] qosList;
+    private String clientId;
+    private boolean cleanSession;
+    private int keepAlive;
+    private String username;
+    private byte[] password;
+    private String willTopic;
+    private byte[] willPayload;
+    private int willQos;
+    private boolean willRetain;
+
+<span class="fc" id="L74">    MqttPacket(int type) {</span>
+<span class="fc" id="L75">        this.type = type;</span>
+<span class="fc" id="L76">    }</span>
+
+    /// Builds a CONNECT packet from the options.
+    public static MqttPacket connect(MqttOptions o) {
+<span class="fc" id="L80">        MqttPacket p = new MqttPacket(CONNECT);</span>
+<span class="fc" id="L81">        p.clientId = o.getClientId();</span>
+<span class="fc" id="L82">        p.cleanSession = o.isCleanSession();</span>
+<span class="fc" id="L83">        p.keepAlive = o.getKeepAliveSeconds();</span>
+<span class="fc" id="L84">        p.username = o.getUsername();</span>
+<span class="fc" id="L85">        p.password = o.getPassword();</span>
+<span class="fc" id="L86">        p.willTopic = o.getWillTopic();</span>
+<span class="fc" id="L87">        p.willPayload = o.getWillPayload();</span>
+<span class="fc" id="L88">        p.willQos = o.getWillQos();</span>
+<span class="fc" id="L89">        p.willRetain = o.isWillRetain();</span>
+<span class="fc" id="L90">        return p;</span>
+    }
+
+    /// Builds a CONNACK packet.
+    public static MqttPacket connack(boolean sessionPresent, int returnCode) {
+<span class="fc" id="L95">        MqttPacket p = new MqttPacket(CONNACK);</span>
+<span class="fc" id="L96">        p.sessionPresent = sessionPresent;</span>
+<span class="fc" id="L97">        p.returnCode = returnCode;</span>
+<span class="fc" id="L98">        return p;</span>
+    }
+
+    /// Builds a PUBLISH packet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the topic name
+    ///
+    /// - `payload`: the body
+    ///
+    /// - `qos`: 0 or 1
+    ///
+    /// - `retain`: the retain flag
+    ///
+    /// - `dup`: the DUP flag, set on a re-delivery
+    ///
+    /// - `packetId`: 1 to 65535 for QoS 1, ignored for QoS 0
+    public static MqttPacket publish(String topic, byte[] payload, int qos, boolean retain, boolean dup, int packetId) {
+<span class="fc" id="L117">        MqttPacket p = new MqttPacket(PUBLISH);</span>
+<span class="fc" id="L118">        p.topic = topic;</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        p.payload = payload == null ? new byte[0] : payload;</span>
+<span class="fc" id="L120">        p.qos = qos;</span>
+<span class="fc" id="L121">        p.retain = retain;</span>
+<span class="fc" id="L122">        p.dup = dup;</span>
+<span class="fc" id="L123">        p.packetId = packetId;</span>
+<span class="fc" id="L124">        return p;</span>
+    }
+
+    /// Builds a PUBACK packet.
+    public static MqttPacket puback(int packetId) {
+<span class="fc" id="L129">        MqttPacket p = new MqttPacket(PUBACK);</span>
+<span class="fc" id="L130">        p.packetId = packetId;</span>
+<span class="fc" id="L131">        return p;</span>
+    }
+
+    /// Builds a SUBSCRIBE packet with parallel arrays of filters and requested QoS.
+    public static MqttPacket subscribe(int packetId, String[] filters, int[] qos) {
+<span class="fc" id="L136">        MqttPacket p = new MqttPacket(SUBSCRIBE);</span>
+<span class="fc" id="L137">        p.packetId = packetId;</span>
+<span class="fc" id="L138">        p.filters = filters;</span>
+<span class="fc" id="L139">        p.qosList = qos;</span>
+<span class="fc" id="L140">        return p;</span>
+    }
+
+    /// Builds a SUBACK packet; each code is the granted QoS or 0x80 for failure.
+    public static MqttPacket suback(int packetId, int[] returnCodes) {
+<span class="fc" id="L145">        MqttPacket p = new MqttPacket(SUBACK);</span>
+<span class="fc" id="L146">        p.packetId = packetId;</span>
+<span class="fc" id="L147">        p.qosList = returnCodes;</span>
+<span class="fc" id="L148">        return p;</span>
+    }
+
+    /// Builds an UNSUBSCRIBE packet.
+    public static MqttPacket unsubscribe(int packetId, String[] filters) {
+<span class="fc" id="L153">        MqttPacket p = new MqttPacket(UNSUBSCRIBE);</span>
+<span class="fc" id="L154">        p.packetId = packetId;</span>
+<span class="fc" id="L155">        p.filters = filters;</span>
+<span class="fc" id="L156">        return p;</span>
+    }
+
+    /// Builds an UNSUBACK packet.
+    public static MqttPacket unsuback(int packetId) {
+<span class="fc" id="L161">        MqttPacket p = new MqttPacket(UNSUBACK);</span>
+<span class="fc" id="L162">        p.packetId = packetId;</span>
+<span class="fc" id="L163">        return p;</span>
+    }
+
+    /// Builds a PINGREQ packet.
+    public static MqttPacket pingreq() {
+<span class="fc" id="L168">        return new MqttPacket(PINGREQ);</span>
+    }
+
+    /// Builds a PINGRESP packet.
+    public static MqttPacket pingresp() {
+<span class="fc" id="L173">        return new MqttPacket(PINGRESP);</span>
+    }
+
+    /// Builds a DISCONNECT packet.
+    public static MqttPacket disconnect() {
+<span class="fc" id="L178">        return new MqttPacket(DISCONNECT);</span>
+    }
+
+    /// The packet type, one of the constants of this class.
+    public int getType() {
+<span class="fc" id="L183">        return type;</span>
+    }
+
+    /// The packet identifier of PUBLISH (QoS 1), PUBACK, SUBSCRIBE, SUBACK,
+    /// UNSUBSCRIBE and UNSUBACK.
+    public int getPacketId() {
+<span class="fc" id="L189">        return packetId;</span>
+    }
+
+    /// The topic name of a PUBLISH.
+    public String getTopic() {
+<span class="fc" id="L194">        return topic;</span>
+    }
+
+    /// The body of a PUBLISH.
+    public byte[] getPayload() {
+<span class="fc" id="L199">        return payload;</span>
+    }
+
+    /// The QoS of a PUBLISH.
+    public int getQos() {
+<span class="fc" id="L204">        return qos;</span>
+    }
+
+    /// The retain flag of a PUBLISH.
+    public boolean isRetain() {
+<span class="fc" id="L209">        return retain;</span>
+    }
+
+    /// The DUP flag of a PUBLISH.
+    public boolean isDup() {
+<span class="fc" id="L214">        return dup;</span>
+    }
+
+    /// Sets the DUP flag, used when a PUBLISH is sent again.
+    public void setDup(boolean dup) {
+<span class="fc" id="L219">        this.dup = dup;</span>
+<span class="fc" id="L220">    }</span>
+
+    /// The session present flag of a CONNACK.
+    public boolean isSessionPresent() {
+<span class="fc" id="L224">        return sessionPresent;</span>
+    }
+
+    /// The return code of a CONNACK (0 accepted, 1 to 5 refused).
+    public int getReturnCode() {
+<span class="fc" id="L229">        return returnCode;</span>
+    }
+
+    /// The topic filters of a SUBSCRIBE or UNSUBSCRIBE.
+    public String[] getFilters() {
+<span class="fc" id="L234">        return filters;</span>
+    }
+
+    /// The requested QoS list of a SUBSCRIBE, or the return codes of a SUBACK.
+    public int[] getQosList() {
+<span class="fc" id="L239">        return qosList;</span>
+    }
+
+    /// The client identifier of a CONNECT.
+    public String getClientId() {
+<span class="fc" id="L244">        return clientId;</span>
+    }
+
+    /// The clean session flag of a CONNECT.
+    public boolean isCleanSession() {
+<span class="fc" id="L249">        return cleanSession;</span>
+    }
+
+    /// The keep alive, in seconds, of a CONNECT.
+    public int getKeepAlive() {
+<span class="fc" id="L254">        return keepAlive;</span>
+    }
+
+    /// The user name of a CONNECT, or null.
+    public String getUsername() {
+<span class="fc" id="L259">        return username;</span>
+    }
+
+    /// The password of a CONNECT, or null.
+    public byte[] getPassword() {
+<span class="fc" id="L264">        return password;</span>
+    }
+
+    /// The will topic of a CONNECT, or null.
+    public String getWillTopic() {
+<span class="fc" id="L269">        return willTopic;</span>
+    }
+
+    /// The will payload of a CONNECT, or null.
+    public byte[] getWillPayload() {
+<span class="fc" id="L274">        return willPayload;</span>
+    }
+
+    /// The will QoS of a CONNECT.
+    public int getWillQos() {
+<span class="fc" id="L279">        return willQos;</span>
+    }
+
+    /// The will retain flag of a CONNECT.
+    public boolean isWillRetain() {
+<span class="fc" id="L284">        return willRetain;</span>
+    }
+
+    void setConnectFields(String clientId, boolean clean, int keepAlive, String user, byte[] pass,
+            String willTopic, byte[] willPayload, int willQos, boolean willRetain) {
+<span class="fc" id="L289">        this.clientId = clientId;</span>
+<span class="fc" id="L290">        this.cleanSession = clean;</span>
+<span class="fc" id="L291">        this.keepAlive = keepAlive;</span>
+<span class="fc" id="L292">        this.username = user;</span>
+<span class="fc" id="L293">        this.password = pass;</span>
+<span class="fc" id="L294">        this.willTopic = willTopic;</span>
+<span class="fc" id="L295">        this.willPayload = willPayload;</span>
+<span class="fc" id="L296">        this.willQos = willQos;</span>
+<span class="fc" id="L297">        this.willRetain = willRetain;</span>
+<span class="fc" id="L298">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

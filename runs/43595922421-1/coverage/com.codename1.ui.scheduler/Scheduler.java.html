@@ -1,0 +1,985 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Scheduler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">Scheduler.java</span></div><h1>Scheduler.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.scheduling.ScheduleChangeListener;
+import com.codename1.scheduling.ScheduleItem;
+import com.codename1.scheduling.ScheduleModel;
+import com.codename1.scheduling.ScheduleResource;
+import com.codename1.scheduling.TimeMath;
+import com.codename1.scheduling.WorkCalendar;
+import com.codename1.ui.Button;
+import com.codename1.ui.ButtonGroup;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.UITimer;
+
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+
+/// A schedule on screen: the items of a `ScheduleModel` by day, week, month,
+/// as an agenda, or by resource.
+///
+/// ```java
+/// long start = System.currentTimeMillis();
+/// DefaultScheduleModel model = new DefaultScheduleModel();
+/// model.addItem(new ScheduleItem(&quot;1&quot;, &quot;Design review&quot;, start, start + TimeMath.HOUR));
+/// Scheduler scheduler = new Scheduler(model);
+/// scheduler.setView(Scheduler.View.WEEK);
+///
+/// Form form = new Form(&quot;Schedule&quot;, new BorderLayout());
+/// form.add(BorderLayout.CENTER, scheduler);
+/// form.show();
+/// ```
+///
+/// ![A week of a schedule](https://www.codenameone.com/developer-guide/img/generated/scheduler-week.png)
+///
+/// The same items by the day, by the month and against the people they are
+/// booked for:
+///
+/// ![The day view](https://www.codenameone.com/developer-guide/img/generated/scheduler-day.png)
+/// ![The month view](https://www.codenameone.com/developer-guide/img/generated/scheduler-month.png)
+/// ![The resource timeline](https://www.codenameone.com/developer-guide/img/generated/scheduler-resource-timeline.png)
+///
+/// The views draw their items and keep no component for each, so a schedule
+/// of thousands of items scrolls as one of ten does. Time zooms with a pinch
+/// or with the wheel and the control key held.
+///
+/// #### Editing
+///
+/// With a mouse an item is dragged to move it and by its edge to resize it,
+/// and a drag across empty time selects a range. On a touch screen a drag
+/// scrolls, so a long press picks an item up or starts a range, and the
+/// selected item has handles to resize it by. Every change is offered to the
+/// listeners first, then made through `ScheduleModel#updateItem`, and either
+/// may refuse. `setEditable(false)` makes the scheduler read only.
+///
+/// #### Pointer and motion
+///
+/// Under a mouse the item the pointer is over lights up, free time shows
+/// the slot a drag would start in, the cursor says what a drag would do,
+/// and a tooltip gives the item's title and time. An item that is picked
+/// up lifts: a shadow comes up under it and the place it left dims. Let go,
+/// it glides from where it was dropped to where it belongs. Each takes
+/// under a quarter of a second.
+///
+/// ![An item picked up, carried and dropped, as five stopped frames](https://www.codenameone.com/developer-guide/img/generated/scheduler-drag-stages.png)
+///
+/// `setAnimationTime` stops the clock these run by, for a screenshot or a
+/// test of a moment in the middle of one.
+///
+/// #### Styling
+///
+/// `SchedulerGrid` is the background, with its foreground the colour of the
+/// lines; `SchedulerOffHours` shades the time outside a `WorkCalendar`;
+/// `SchedulerHeader`, `SchedulerHeaderToday` and `SchedulerTimeLabel` are the
+/// headings; `SchedulerItem`, `SchedulerBackgroundItem` and
+/// `SchedulerBlocked` the items by kind; `SchedulerNow` the current time and
+/// `SchedulerSelection` a range being dragged out. The bar above the views
+/// is `SchedulerToolbar`, `SchedulerTitle` and `SchedulerViewButton`. An item
+/// that names a UIID of its own is painted with that one.
+///
+/// ![A schedule restyled from CSS](https://www.codenameone.com/developer-guide/img/generated/scheduler-css.png)
+public class Scheduler extends Container {
+    /// The ways a schedule is shown.
+<span class="fc" id="L117">    public enum View {</span>
+        /// One day, time running down.
+<span class="fc" id="L119">        DAY,</span>
+        /// The working days of a week side by side.
+<span class="fc" id="L121">        WORK_WEEK,</span>
+        /// A week side by side.
+<span class="fc" id="L123">        WEEK,</span>
+        /// A month of day cells.
+<span class="fc" id="L125">        MONTH,</span>
+        /// A list, day by day.
+<span class="fc" id="L127">        AGENDA,</span>
+        /// A row per resource, time running across.
+<span class="fc" id="L129">        RESOURCE_TIMELINE,</span>
+        /// One day with a column per resource.
+<span class="fc" id="L131">        RESOURCE_DAY</span>
+    }
+
+    private ScheduleModel model;
+<span class="fc" id="L135">    private View view = View.WEEK;</span>
+<span class="fc" id="L136">    private View[] views = {View.DAY, View.WEEK, View.MONTH, View.AGENDA};</span>
+<span class="fc" id="L137">    private ZoneId zone = ZoneId.systemDefault();</span>
+<span class="fc" id="L138">    private int firstDayOfWeek = 1;</span>
+    private WorkCalendar workCalendar;
+    private Boolean hours24;
+<span class="fc" id="L141">    private int snapMinutes = 15;</span>
+<span class="fc" id="L142">    private int defaultMinutes = 60;</span>
+<span class="fc" id="L143">    private int initialMinute = 7 * 60;</span>
+<span class="fc" id="L144">    private int timelineDays = 7;</span>
+<span class="fc" id="L145">    private int agendaDays = 30;</span>
+<span class="fc" id="L146">    private boolean editable = true;</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">    private boolean openOnTap = !Display.getInstance().isDesktop();</span>
+    private Boolean dragEdits;
+<span class="pc bpc" id="L149" title="2 of 4 branches missed.">    private boolean compactToolbar = !(Display.getInstance().isDesktop() || Display.getInstance().isTablet());</span>
+<span class="fc" id="L150">    private long fixedNow = -1;</span>
+<span class="fc" id="L151">    private long animationTime = -1;</span>
+    private long anchorDay;
+    private long visibleStart;
+    private long visibleEnd;
+    private ScheduleItem selected;
+<span class="fc" id="L156">    private ScheduleItemRenderer renderer = new DefaultScheduleItemRenderer();</span>
+<span class="fc" id="L157">    private final ArrayList&lt;SchedulerListener&gt; listeners = new ArrayList&lt;SchedulerListener&gt;();</span>
+
+    private DayGrid dayGrid;
+    private MonthGrid monthGrid;
+    private AgendaList agenda;
+    private ResourceTimeline timeline;
+    private Component current;
+<span class="fc" id="L164">    private final BarLayout bar = new BarLayout();</span>
+<span class="fc" id="L165">    private final Container toolbar = new Container(bar);</span>
+<span class="fc" id="L166">    private final Label title = new Label(&quot;&quot;, &quot;SchedulerTitle&quot;);</span>
+<span class="fc" id="L167">    private final Container viewButtons = new Container(BoxLayout.x());</span>
+    private UITimer clock;
+
+<span class="fc" id="L170">    private final ScheduleChangeListener modelListener = new ScheduleChangeListener() {</span>
+        @Override
+        public void scheduleChanged(ScheduleModel m) {
+            // A model that loads again makes new items for the same things:
+            // the selection follows the id, or is gone with the item.
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (selected != null) {</span>
+<span class="fc" id="L176">                ScheduleItem now = again(m, selected);</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                if (now == null) {</span>
+                    // Gone with the item, and the listeners hear of it as
+                    // they hear of any other change of the selection.
+<span class="nc" id="L180">                    viewSelected(null);</span>
+                } else {
+<span class="fc" id="L182">                    selected = now;</span>
+                }
+            }
+<span class="fc" id="L185">            refresh();</span>
+<span class="fc" id="L186">        }</span>
+
+        private ScheduleItem again(ScheduleModel m, ScheduleItem was) {
+<span class="fc" id="L189">            List&lt;ScheduleItem&gt; near = new ArrayList&lt;ScheduleItem&gt;();</span>
+<span class="fc" id="L190">            long span = Math.max(TimeMath.DAY, visibleEnd - visibleStart);</span>
+<span class="fc" id="L191">            m.getItems(Math.min(visibleStart, was.getStart()) - span, Math.max(visibleEnd, was.getEnd()) + span, near);</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            for (ScheduleItem item : near) {</span>
+<span class="pc bpc" id="L193" title="1 of 4 branches missed.">                if (item == was || item.getId().equals(was.getId())) { //NOPMD CompareObjectsWithEquals - the very item is the common case</span>
+<span class="fc" id="L194">                    return item;</span>
+                }
+<span class="fc" id="L196">            }</span>
+<span class="nc" id="L197">            return null;</span>
+        }
+    };
+
+    /// A scheduler with nothing in it yet.
+    public Scheduler() {
+<span class="nc" id="L203">        this(null);</span>
+<span class="nc" id="L204">    }</span>
+
+    public Scheduler(ScheduleModel model) {
+<span class="fc" id="L207">        super(new BorderLayout());</span>
+<span class="fc" id="L208">        setUIID(&quot;Scheduler&quot;);</span>
+<span class="fc" id="L209">        toolbar.setUIID(&quot;SchedulerToolbar&quot;);</span>
+<span class="fc" id="L210">        anchorDay = TimeMath.epochDay(System.currentTimeMillis(), zone);</span>
+<span class="fc" id="L211">        buildToolbar();</span>
+<span class="fc" id="L212">        add(BorderLayout.NORTH, toolbar);</span>
+<span class="fc" id="L213">        setModel(model);</span>
+<span class="fc" id="L214">    }</span>
+
+    // ------------------------------------------------------------ toolbar
+
+    private Button toolButton(String text, char icon, ActionListener action) {
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        Button b = new Button(text == null ? &quot;&quot; : text, &quot;SchedulerViewButton&quot;);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (icon != 0) {</span>
+<span class="fc" id="L221">            FontImage.setMaterialIcon(b, icon);</span>
+        }
+<span class="fc" id="L223">        b.addActionListener(action);</span>
+<span class="fc" id="L224">        return b;</span>
+    }
+
+    private void buildToolbar() {
+<span class="fc" id="L228">        Container nav = new Container(BoxLayout.x());</span>
+<span class="fc" id="L229">        nav.add(toolButton(null, FontImage.MATERIAL_CHEVRON_LEFT, new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L232">                previous();</span>
+<span class="nc" id="L233">            }</span>
+        }));
+<span class="fc" id="L235">        nav.add(toolButton(localize(&quot;scheduler.today&quot;, &quot;Today&quot;), (char) 0, new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L238">                today();</span>
+<span class="nc" id="L239">            }</span>
+        }));
+<span class="fc" id="L241">        nav.add(toolButton(null, FontImage.MATERIAL_CHEVRON_RIGHT, new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L244">                next();</span>
+<span class="nc" id="L245">            }</span>
+        }));
+        // In this order: BarLayout takes the first as what leads, the last
+        // as what trails and the one between as what fills.
+<span class="fc" id="L249">        toolbar.add(nav);</span>
+<span class="fc" id="L250">        toolbar.add(title);</span>
+<span class="fc" id="L251">        toolbar.add(viewButtons);</span>
+        // More views than a phone is wide are scrolled through.
+<span class="fc" id="L253">        viewButtons.setScrollableX(true);</span>
+<span class="fc" id="L254">        viewButtons.setScrollVisible(false);</span>
+<span class="fc" id="L255">        buildViewButtons();</span>
+<span class="fc" id="L256">    }</span>
+
+    /// The bar is a row where there is room for one, and two rows on a
+    /// screen as narrow as a phone's. It is decided here because this is
+    /// the first place the width is known.
+    @Override
+    public void layoutContainer() {
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (bar.fit(toolbar, getWidth() - getStyle().getHorizontalPadding())) {</span>
+<span class="nc" id="L264">            toolbar.setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L266">        super.layoutContainer();</span>
+<span class="fc" id="L267">    }</span>
+
+    private String viewName(View v) {
+<span class="fc bfc" id="L270" title="All 7 branches covered.">        switch (v) {</span>
+            case DAY:
+<span class="fc" id="L272">                return localize(&quot;scheduler.view.day&quot;, &quot;Day&quot;);</span>
+            case WORK_WEEK:
+<span class="fc" id="L274">                return localize(&quot;scheduler.view.workWeek&quot;, &quot;Work week&quot;);</span>
+            case WEEK:
+<span class="fc" id="L276">                return localize(&quot;scheduler.view.week&quot;, &quot;Week&quot;);</span>
+            case MONTH:
+<span class="fc" id="L278">                return localize(&quot;scheduler.view.month&quot;, &quot;Month&quot;);</span>
+            case AGENDA:
+<span class="fc" id="L280">                return localize(&quot;scheduler.view.agenda&quot;, &quot;Agenda&quot;);</span>
+            case RESOURCE_TIMELINE:
+<span class="fc" id="L282">                return localize(&quot;scheduler.view.timeline&quot;, &quot;Timeline&quot;);</span>
+            default:
+<span class="fc" id="L284">                return localize(&quot;scheduler.view.resources&quot;, &quot;Resources&quot;);</span>
+        }
+    }
+
+    private void buildViewButtons() {
+<span class="fc" id="L289">        viewButtons.removeAll();</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (views.length &lt; 2) {</span>
+<span class="nc" id="L291">            return;</span>
+        }
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (compactToolbar) {</span>
+            // One button that names the view and opens the list of them.
+<span class="fc" id="L295">            final Button pick = new Button(viewName(view), &quot;SchedulerViewButton&quot;);</span>
+<span class="fc" id="L296">            FontImage.setMaterialIcon(pick, FontImage.MATERIAL_ARROW_DROP_DOWN);</span>
+<span class="fc" id="L297">            pick.setTextPosition(Component.LEFT);</span>
+<span class="fc" id="L298">            pick.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L301">                    showViewMenu(pick);</span>
+<span class="nc" id="L302">                }</span>
+            });
+<span class="fc" id="L304">            viewButtons.add(pick);</span>
+<span class="fc" id="L305">            return;</span>
+        }
+<span class="nc" id="L307">        ButtonGroup group = new ButtonGroup();</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        for (final View v : views) {</span>
+<span class="nc" id="L309">            RadioButton b = new RadioButton(viewName(v));</span>
+<span class="nc" id="L310">            b.setToggle(true);</span>
+<span class="nc" id="L311">            b.setUIID(&quot;SchedulerViewButton&quot;);</span>
+<span class="nc" id="L312">            group.add(b);</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">            b.setSelected(v == view);</span>
+<span class="nc" id="L314">            b.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L317">                    setView(v);</span>
+<span class="nc" id="L318">                }</span>
+            });
+<span class="nc" id="L320">            viewButtons.add(b);</span>
+        }
+<span class="nc" id="L322">    }</span>
+
+    private void showViewMenu(Button anchor) {
+<span class="nc" id="L325">        final Dialog menu = new Dialog();</span>
+        // Placed against the button that opens it. In a window of its own it
+        // would come out centred, wherever the theme's default points.
+<span class="nc" id="L328">        menu.setNativeWindowMode(false);</span>
+<span class="nc" id="L329">        menu.setLayout(BoxLayout.y());</span>
+<span class="nc" id="L330">        menu.setDisposeWhenPointerOutOfBounds(true);</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        for (final View v : views) {</span>
+<span class="nc" id="L332">            Button b = new Button(viewName(v), &quot;SchedulerViewButton&quot;);</span>
+<span class="nc" id="L333">            b.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L336">                    menu.dispose();</span>
+<span class="nc" id="L337">                    setView(v);</span>
+<span class="nc" id="L338">                }</span>
+            });
+<span class="nc" id="L340">            menu.add(b);</span>
+        }
+<span class="nc" id="L342">        menu.showPopupDialog(anchor);</span>
+<span class="nc" id="L343">    }</span>
+
+    /// Whether the bar with the title and the buttons is shown. An
+    /// application with navigation of its own hides it and calls `next`,
+    /// `previous`, `today` and `setView` itself.
+    public void setToolbarVisible(boolean v) {
+<span class="nc" id="L349">        toolbar.setVisible(v);</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">        toolbar.setHidden(!v);</span>
+<span class="nc" id="L351">        revalidateLater();</span>
+<span class="nc" id="L352">    }</span>
+
+    public boolean isToolbarVisible() {
+<span class="nc" id="L355">        return toolbar.isVisible();</span>
+    }
+
+    /// Whether the views are picked from one button with a menu, as on a
+    /// phone, or each has a button of its own.
+    public void setCompactToolbar(boolean v) {
+<span class="nc" id="L361">        compactToolbar = v;</span>
+<span class="nc" id="L362">        buildViewButtons();</span>
+<span class="nc" id="L363">        revalidateLater();</span>
+<span class="nc" id="L364">    }</span>
+
+    public boolean isCompactToolbar() {
+<span class="nc" id="L367">        return compactToolbar;</span>
+    }
+
+    // -------------------------------------------------------------- model
+
+    public ScheduleModel getModel() {
+<span class="fc" id="L373">        return model;</span>
+    }
+
+    public void setModel(ScheduleModel m) {
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (model != null) {</span>
+<span class="nc" id="L378">            model.removeChangeListener(modelListener);</span>
+        }
+<span class="fc" id="L380">        model = m;</span>
+<span class="fc" id="L381">        selected = null;</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (model != null) {</span>
+<span class="fc" id="L383">            model.addChangeListener(modelListener);</span>
+        }
+<span class="fc" id="L385">        apply();</span>
+<span class="pc bpc" id="L386" title="2 of 4 branches missed.">        if (model != null &amp;&amp; visibleEnd &gt; visibleStart) {</span>
+            // The range has not moved, so apply told nobody; but this model
+            // has never heard it, and one that loads would load nothing.
+<span class="fc" id="L389">            model.setVisibleRange(visibleStart - (visibleEnd - visibleStart), visibleEnd + (visibleEnd - visibleStart));</span>
+        }
+<span class="fc" id="L391">    }</span>
+
+    /// Reads the model again. A model that fires its change listeners needs
+    /// no call to this.
+    public void refresh() {
+<span class="pc bpc" id="L396" title="1 of 4 branches missed.">        if (current == dayGrid &amp;&amp; dayGrid != null) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">            if (view == View.RESOURCE_DAY) {</span>
+                // The resources themselves may have changed.
+<span class="fc" id="L399">                apply();</span>
+            } else {
+<span class="fc" id="L401">                dayGrid.modelChanged();</span>
+            }
+<span class="pc bpc" id="L403" title="3 of 4 branches missed.">        } else if (current == monthGrid &amp;&amp; monthGrid != null) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one</span>
+<span class="nc" id="L404">            monthGrid.modelChanged();</span>
+<span class="pc bpc" id="L405" title="3 of 4 branches missed.">        } else if (current == agenda &amp;&amp; agenda != null) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one</span>
+<span class="nc" id="L406">            agenda.modelChanged();</span>
+<span class="pc bpc" id="L407" title="2 of 4 branches missed.">        } else if (current == timeline &amp;&amp; timeline != null) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one</span>
+<span class="fc" id="L408">            timeline.modelChanged();</span>
+        }
+<span class="fc" id="L410">    }</span>
+
+    /// The resource with an id, or null.
+    public ScheduleResource getResource(String id) {
+<span class="pc bpc" id="L414" title="1 of 4 branches missed.">        if (id == null || model == null) {</span>
+<span class="fc" id="L415">            return null;</span>
+        }
+<span class="fc" id="L417">        List&lt;ScheduleResource&gt; all = model.getResources();</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        for (ScheduleResource resource : all) {</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            if (id.equals(resource.getId())) {</span>
+<span class="fc" id="L420">                return resource;</span>
+            }
+<span class="nc" id="L422">        }</span>
+<span class="nc" id="L423">        return null;</span>
+    }
+
+    int resourceColor(String id) {
+<span class="fc" id="L427">        ScheduleResource r = getResource(id);</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        return r == null ? -1 : r.getColor();</span>
+    }
+
+    // --------------------------------------------------------------- view
+
+    public View getView() {
+<span class="nc" id="L434">        return view;</span>
+    }
+
+    public void setView(View v) {
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L439">            throw new IllegalArgumentException(&quot;view&quot;);</span>
+        }
+<span class="fc" id="L441">        view = v;</span>
+<span class="fc" id="L442">        buildViewButtons();</span>
+<span class="fc" id="L443">        apply();</span>
+<span class="fc" id="L444">    }</span>
+
+    /// The views the toolbar offers, in order. The default is day, week,
+    /// month and agenda; a schedule with resources adds the two resource
+    /// views.
+    public void setViews(View... offered) {
+<span class="nc" id="L450">        views = new View[offered.length];</span>
+<span class="nc" id="L451">        System.arraycopy(offered, 0, views, 0, offered.length);</span>
+<span class="nc" id="L452">        buildViewButtons();</span>
+<span class="nc" id="L453">        revalidateLater();</span>
+<span class="nc" id="L454">    }</span>
+
+    /// Shows the day, week or month that an instant is in.
+    public void setDate(long millis) {
+<span class="fc" id="L458">        anchorDay = TimeMath.epochDay(millis, zone);</span>
+<span class="fc" id="L459">        apply();</span>
+<span class="fc" id="L460">    }</span>
+
+    /// The start of the day the view is anchored on.
+    public long getDate() {
+<span class="nc" id="L464">        return TimeMath.startOfEpochDay(anchorDay, zone);</span>
+    }
+
+    /// Moves forward by what the view shows: a day, a week, a month.
+    public void next() {
+<span class="fc" id="L469">        step(1);</span>
+<span class="fc" id="L470">    }</span>
+
+    public void previous() {
+<span class="fc" id="L473">        step(-1);</span>
+<span class="fc" id="L474">    }</span>
+
+    /// Shows the current day, week or month.
+    public void today() {
+<span class="nc" id="L478">        anchorDay = TimeMath.epochDay(now(), zone);</span>
+<span class="nc" id="L479">        apply();</span>
+<span class="nc" id="L480">    }</span>
+
+    private void step(int direction) {
+<span class="pc bpc" id="L483" title="3 of 5 branches missed.">        switch (view) {</span>
+            case DAY:
+            case RESOURCE_DAY:
+<span class="nc" id="L486">                anchorDay += direction;</span>
+<span class="nc" id="L487">                break;</span>
+            case WEEK:
+            case WORK_WEEK:
+<span class="fc" id="L490">                anchorDay += 7L * direction;</span>
+<span class="fc" id="L491">                break;</span>
+            case MONTH:
+<span class="fc" id="L493">                anchorDay = TimeMath.plusMonths(anchorDay, direction);</span>
+<span class="fc" id="L494">                break;</span>
+            case AGENDA:
+<span class="nc" id="L496">                anchorDay += (long) agendaDays * direction;</span>
+<span class="nc" id="L497">                break;</span>
+            default:
+<span class="nc" id="L499">                anchorDay += (long) timelineDays * direction;</span>
+                break;
+        }
+<span class="fc" id="L502">        apply();</span>
+<span class="fc" id="L503">    }</span>
+
+    /// The start of what the view shows, inclusive.
+    public long getVisibleStart() {
+<span class="fc" id="L507">        return visibleStart;</span>
+    }
+
+    /// The end of what the view shows, exclusive.
+    public long getVisibleEnd() {
+<span class="fc" id="L512">        return visibleEnd;</span>
+    }
+
+    private void show(Component c) {
+<span class="pc bpc" id="L516" title="3 of 4 branches missed.">        if (animationTime &gt;= 0 &amp;&amp; c instanceof ScrollSurface) {</span>
+            // A view made after the clock was stopped stands at that time too.
+<span class="nc" id="L518">            ((ScrollSurface) c).setFixedClock(animationTime);</span>
+        }
+<span class="fc bfc" id="L520" title="All 2 branches covered.">        if (current == c) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one</span>
+<span class="fc" id="L521">            return;</span>
+        }
+<span class="fc bfc" id="L523" title="All 2 branches covered.">        if (current != null) {</span>
+<span class="fc" id="L524">            removeComponent(current);</span>
+        }
+<span class="fc" id="L526">        current = c;</span>
+<span class="fc" id="L527">        add(BorderLayout.CENTER, c);</span>
+<span class="fc" id="L528">        revalidateLater();</span>
+<span class="fc" id="L529">    }</span>
+
+    private void applyDragEdits(ScrollSurface s) {
+<span class="fc bfc" id="L532" title="All 2 branches covered.">        if (dragEdits != null) {</span>
+<span class="fc" id="L533">            s.setDragEdits(dragEdits.booleanValue());</span>
+        }
+<span class="fc" id="L535">    }</span>
+
+    // Puts the view, the date and the model on screen.
+    private void apply() {
+        long first;
+        int count;
+        String text;
+<span class="fc bfc" id="L542" title="All 4 branches covered.">        switch (view) {</span>
+            case MONTH: {
+<span class="fc bfc" id="L544" title="All 2 branches covered.">                if (monthGrid == null) {</span>
+<span class="fc" id="L545">                    monthGrid = new MonthGrid(this);</span>
+                }
+<span class="fc" id="L547">                applyDragEdits(monthGrid);</span>
+<span class="fc" id="L548">                monthGrid.show(anchorDay);</span>
+<span class="fc" id="L549">                show(monthGrid);</span>
+<span class="fc" id="L550">                first = monthGrid.firstDay();</span>
+<span class="fc" id="L551">                count = monthGrid.dayCount();</span>
+<span class="fc" id="L552">                text = Dates.monthTitle(anchorDay);</span>
+<span class="fc" id="L553">                break;</span>
+            }
+            case AGENDA: {
+<span class="fc bfc" id="L556" title="All 2 branches covered.">                if (agenda == null) {</span>
+<span class="fc" id="L557">                    agenda = new AgendaList(this);</span>
+                }
+<span class="fc" id="L559">                first = anchorDay;</span>
+<span class="fc" id="L560">                count = agendaDays;</span>
+<span class="fc" id="L561">                agenda.show(first, count);</span>
+<span class="fc" id="L562">                show(agenda);</span>
+<span class="fc" id="L563">                text = rangeTitle(first, count);</span>
+<span class="fc" id="L564">                break;</span>
+            }
+            case RESOURCE_TIMELINE: {
+<span class="fc bfc" id="L567" title="All 2 branches covered.">                if (timeline == null) {</span>
+<span class="fc" id="L568">                    timeline = new ResourceTimeline(this);</span>
+                }
+<span class="fc" id="L570">                applyDragEdits(timeline);</span>
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">                first = timelineDays &gt;= 7 ? TimeMath.startOfWeek(anchorDay, firstDayOfWeek) : anchorDay;</span>
+<span class="fc" id="L572">                count = timelineDays;</span>
+<span class="fc" id="L573">                timeline.show(first, count);</span>
+<span class="fc" id="L574">                show(timeline);</span>
+<span class="fc" id="L575">                text = rangeTitle(first, count);</span>
+<span class="fc" id="L576">                break;</span>
+            }
+            default: {
+<span class="fc bfc" id="L579" title="All 2 branches covered.">                if (dayGrid == null) {</span>
+<span class="fc" id="L580">                    dayGrid = new DayGrid(this);</span>
+                }
+<span class="fc" id="L582">                applyDragEdits(dayGrid);</span>
+<span class="fc bfc" id="L583" title="All 4 branches covered.">                if (view == View.DAY || view == View.RESOURCE_DAY) {</span>
+<span class="fc" id="L584">                    first = anchorDay;</span>
+<span class="fc" id="L585">                    count = 1;</span>
+<span class="pc bpc" id="L586" title="1 of 4 branches missed.">                    dayGrid.show(first, 1, view == View.RESOURCE_DAY &amp;&amp; model != null ? model.getResources() : null);</span>
+                } else {
+<span class="fc" id="L588">                    first = TimeMath.startOfWeek(anchorDay, firstDayOfWeek);</span>
+<span class="fc" id="L589">                    count = 7;</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">                    if (view == View.WORK_WEEK) {</span>
+<span class="fc" id="L591">                        dayGrid.show(workDays(first));</span>
+                    } else {
+<span class="fc" id="L593">                        dayGrid.show(first, 7, null);</span>
+                    }
+                }
+<span class="fc" id="L596">                show(dayGrid);</span>
+<span class="fc" id="L597">                text = rangeTitle(first, count);</span>
+                break;
+            }
+        }
+<span class="fc" id="L601">        title.setText(text);</span>
+<span class="fc" id="L602">        long from = TimeMath.startOfEpochDay(first, zone);</span>
+<span class="fc" id="L603">        long to = TimeMath.startOfEpochDay(first + count, zone);</span>
+<span class="fc bfc" id="L604" title="All 4 branches covered.">        boolean moved = from != visibleStart || to != visibleEnd;</span>
+<span class="fc" id="L605">        visibleStart = from;</span>
+<span class="fc" id="L606">        visibleEnd = to;</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">        if (moved) {</span>
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">            if (model != null) {</span>
+                // A model that loads from somewhere is told a wider range, so
+                // the next step is there before it is asked for.
+<span class="fc" id="L611">                model.setVisibleRange(from - (to - from), to + (to - from));</span>
+            }
+<span class="fc bfc" id="L613" title="All 2 branches covered.">            for (SchedulerListener l : told()) {</span>
+<span class="fc" id="L614">                l.visibleRangeChanged(this, from, to);</span>
+            }
+        }
+<span class="fc" id="L617">        repaint();</span>
+<span class="fc" id="L618">    }</span>
+
+    private long[] workDays(long weekStart) {
+<span class="fc" id="L621">        long[] tmp = new long[7];</span>
+<span class="fc" id="L622">        int n = 0;</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">        for (int i = 0; i &lt; 7; i++) {</span>
+<span class="fc" id="L624">            int dow = TimeMath.dayOfWeek(weekStart + i);</span>
+<span class="pc bpc" id="L625" title="1 of 4 branches missed.">            boolean working = workCalendar == null ? dow &lt;= 5 : workCalendar.isWorkingWeekday(dow);</span>
+<span class="fc bfc" id="L626" title="All 2 branches covered.">            if (working) {</span>
+<span class="fc" id="L627">                tmp[n++] = weekStart + i;</span>
+            }
+        }
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">        if (n == 0) {</span>
+<span class="nc" id="L631">            return new long[]{weekStart};</span>
+        }
+<span class="fc" id="L633">        long[] out = new long[n];</span>
+<span class="fc" id="L634">        System.arraycopy(tmp, 0, out, 0, n);</span>
+<span class="fc" id="L635">        return out;</span>
+    }
+
+    private String rangeTitle(long first, int count) {
+<span class="fc bfc" id="L639" title="All 2 branches covered.">        if (count &lt;= 1) {</span>
+<span class="fc" id="L640">            return Dates.dayTitle(first, TimeMath.dayOfWeek(first)) + &quot;, &quot; + Dates.year(first);</span>
+        }
+<span class="fc" id="L642">        long last = first + count - 1;</span>
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">        if (Dates.year(first) != Dates.year(last)) {</span>
+<span class="nc" id="L644">            return Dates.monthDay(first) + &quot;, &quot; + Dates.year(first) + &quot; - &quot; + Dates.monthDay(last) + &quot;, &quot;</span>
+<span class="nc" id="L645">                    + Dates.year(last);</span>
+        }
+<span class="fc bfc" id="L647" title="All 2 branches covered.">        if (Dates.month(first) != Dates.month(last)) {</span>
+<span class="fc" id="L648">            return Dates.monthDay(first) + &quot; - &quot; + Dates.monthDay(last) + &quot;, &quot; + Dates.year(last);</span>
+        }
+<span class="fc" id="L650">        return Dates.monthDay(first) + &quot; - &quot; + Dates.dayOfMonth(last) + &quot;, &quot; + Dates.year(last);</span>
+    }
+
+    // ----------------------------------------------------------- settings
+
+    public ZoneId getZone() {
+<span class="fc" id="L656">        return zone;</span>
+    }
+
+    /// The zone the days and hours are those of. The default is the
+    /// device's.
+    public void setZone(ZoneId z) {
+<span class="pc bpc" id="L662" title="1 of 2 branches missed.">        if (z == null) {</span>
+<span class="nc" id="L663">            throw new IllegalArgumentException(&quot;zone&quot;);</span>
+        }
+        // The same date in the new zone. The instant that date started at
+        // in the old zone may be the day before in the new one, and going by
+        // it would step back a day with every change to a zone further west.
+<span class="fc" id="L668">        zone = z;</span>
+<span class="fc" id="L669">        apply();</span>
+<span class="fc" id="L670">    }</span>
+
+    public int getFirstDayOfWeek() {
+<span class="fc" id="L673">        return firstDayOfWeek;</span>
+    }
+
+    /// The day a week starts on: 1 for Monday, which is the default, to 7
+    /// for Sunday.
+    public void setFirstDayOfWeek(int isoDay) {
+<span class="nc bnc" id="L679" title="All 4 branches missed.">        if (isoDay &lt; 1 || isoDay &gt; 7) {</span>
+<span class="nc" id="L680">            throw new IllegalArgumentException(&quot;isoDay &quot; + isoDay);</span>
+        }
+<span class="nc" id="L682">        firstDayOfWeek = isoDay;</span>
+<span class="nc" id="L683">        apply();</span>
+<span class="nc" id="L684">    }</span>
+
+    public WorkCalendar getWorkCalendar() {
+<span class="fc" id="L687">        return workCalendar;</span>
+    }
+
+    /// The working hours: time outside them is shaded, and the work week
+    /// shows the days this calendar works. A resource with a calendar of its
+    /// own is shaded by that one. Null, the default, shades nothing.
+    public void setWorkCalendar(WorkCalendar c) {
+<span class="nc" id="L694">        workCalendar = c;</span>
+<span class="nc" id="L695">        apply();</span>
+<span class="nc" id="L696">    }</span>
+
+    /// Whether times are written on a 24 hour clock. The default follows
+    /// the device's locale.
+    public boolean is24Hours() {
+<span class="pc bpc" id="L701" title="1 of 2 branches missed.">        if (hours24 == null) {</span>
+<span class="nc" id="L702">            hours24 = Boolean.valueOf(Dates.deviceUses24Hours());</span>
+        }
+<span class="fc" id="L704">        return hours24.booleanValue();</span>
+    }
+
+    public void set24Hours(boolean v) {
+<span class="fc" id="L708">        hours24 = Boolean.valueOf(v);</span>
+<span class="fc" id="L709">        apply();</span>
+<span class="fc" id="L710">    }</span>
+
+    public int getSnapMinutes() {
+<span class="fc" id="L713">        return snapMinutes;</span>
+    }
+
+    /// What a drag snaps to, in minutes. The default is 15.
+    public void setSnapMinutes(int minutes) {
+<span class="nc" id="L718">        snapMinutes = Math.max(1, minutes);</span>
+<span class="nc" id="L719">    }</span>
+
+    public int getDefaultMinutes() {
+<span class="fc" id="L722">        return defaultMinutes;</span>
+    }
+
+    /// The length of a range chosen without dragging, by a long press or a
+    /// double click. The default is 60.
+    public void setDefaultMinutes(int minutes) {
+<span class="nc" id="L728">        defaultMinutes = Math.max(1, minutes);</span>
+<span class="nc" id="L729">    }</span>
+
+    public int getInitialMinute() {
+<span class="fc" id="L732">        return initialMinute;</span>
+    }
+
+    /// The time of day the day and week views open scrolled to, in minutes
+    /// since midnight. The default is 07:00.
+    public void setInitialMinute(int minute) {
+<span class="nc" id="L738">        initialMinute = Math.max(0, Math.min(TimeMath.MINUTES_PER_DAY, minute));</span>
+<span class="nc bnc" id="L739" title="All 2 branches missed.">        if (dayGrid != null) {</span>
+<span class="nc" id="L740">            dayGrid.scrollToMinute(initialMinute);</span>
+        }
+<span class="nc" id="L742">    }</span>
+
+    public int getTimelineDays() {
+<span class="nc" id="L745">        return timelineDays;</span>
+    }
+
+    /// How many days the resource timeline covers. The default is 7.
+    public void setTimelineDays(int days) {
+<span class="nc" id="L750">        timelineDays = Math.max(1, days);</span>
+<span class="nc" id="L751">        apply();</span>
+<span class="nc" id="L752">    }</span>
+
+    public int getAgendaDays() {
+<span class="nc" id="L755">        return agendaDays;</span>
+    }
+
+    /// How many days the agenda lists. The default is 30.
+    public void setAgendaDays(int days) {
+<span class="nc" id="L760">        agendaDays = Math.max(1, days);</span>
+<span class="nc" id="L761">        apply();</span>
+<span class="nc" id="L762">    }</span>
+
+    @Override
+    public boolean isEditable() {
+<span class="fc" id="L766">        return editable;</span>
+    }
+
+    /// Whether items can be dragged and ranges selected. Selecting and
+    /// opening an item work either way.
+    public void setEditable(boolean v) {
+<span class="fc" id="L772">        editable = v;</span>
+<span class="fc" id="L773">    }</span>
+
+    public boolean isOpenOnTap() {
+<span class="fc" id="L776">        return openOnTap;</span>
+    }
+
+    /// Whether a single tap opens an item. The default is true on a touch
+    /// screen and false where there is a mouse, which double clicks to open.
+    public void setOpenOnTap(boolean v) {
+<span class="fc" id="L782">        openOnTap = v;</span>
+<span class="fc" id="L783">    }</span>
+
+    /// Whether a plain drag edits: moves the item under it, or selects a
+    /// range of empty time. The default is true where there is a mouse and
+    /// false on a touch screen, where a drag scrolls and a long press edits.
+    public void setDragEdits(boolean v) {
+<span class="fc" id="L789">        dragEdits = Boolean.valueOf(v);</span>
+<span class="fc" id="L790">        apply();</span>
+<span class="fc" id="L791">    }</span>
+
+    public ScheduleItemRenderer getItemRenderer() {
+<span class="fc" id="L794">        return renderer;</span>
+    }
+
+    public void setItemRenderer(ScheduleItemRenderer r) {
+<span class="pc bpc" id="L798" title="1 of 2 branches missed.">        if (r == null) {</span>
+<span class="nc" id="L799">            throw new IllegalArgumentException(&quot;renderer&quot;);</span>
+        }
+<span class="fc" id="L801">        renderer = r;</span>
+<span class="fc" id="L802">        repaint();</span>
+<span class="fc" id="L803">    }</span>
+
+    /// Fixes what the scheduler takes the current time to be, for a
+    /// screenshot or a test. A negative value returns to the clock.
+    public void setCurrentTime(long millis) {
+<span class="fc" id="L808">        fixedNow = millis;</span>
+<span class="fc" id="L809">        repaint();</span>
+<span class="fc" id="L810">    }</span>
+
+    /// Stops the clock the scheduler animates by at a time, for a screenshot of
+    /// an animation or a test of one: the light of a hover, the rise of
+    /// an item that is picked up and the travel of one
+    /// that was dropped are drawn as far along as that time
+    /// makes them. A negative value returns to the clock.
+    ///
+    /// ```java
+    /// Scheduler scheduler = new Scheduler();
+    /// scheduler.setAnimationTime(1000);  // nothing has started
+    /// // ... press, drag, release ...
+    /// scheduler.setAnimationTime(1100);  // 100 milliseconds into what followed
+    /// ```
+    public void setAnimationTime(long millis) {
+<span class="fc" id="L825">        animationTime = millis;</span>
+<span class="pc bpc" id="L826" title="1 of 2 branches missed.">        if (dayGrid != null) {</span>
+<span class="fc" id="L827">            dayGrid.setFixedClock(millis);</span>
+        }
+<span class="pc bpc" id="L829" title="1 of 2 branches missed.">        if (monthGrid != null) {</span>
+<span class="nc" id="L830">            monthGrid.setFixedClock(millis);</span>
+        }
+<span class="pc bpc" id="L832" title="1 of 2 branches missed.">        if (agenda != null) {</span>
+<span class="nc" id="L833">            agenda.setFixedClock(millis);</span>
+        }
+<span class="pc bpc" id="L835" title="1 of 2 branches missed.">        if (timeline != null) {</span>
+<span class="nc" id="L836">            timeline.setFixedClock(millis);</span>
+        }
+<span class="fc" id="L838">    }</span>
+
+    long now() {
+<span class="pc bpc" id="L841" title="1 of 2 branches missed.">        return fixedNow &gt;= 0 ? fixedNow : System.currentTimeMillis();</span>
+    }
+
+    // ---------------------------------------------------------- selection
+
+    public ScheduleItem getSelectedItem() {
+<span class="fc" id="L847">        return selected;</span>
+    }
+
+    /// Selects an item, or nothing when `item` is null. The listeners are
+    /// not told: this is the application's own doing.
+    public void setSelectedItem(ScheduleItem item) {
+<span class="nc" id="L853">        selected = item;</span>
+<span class="nc" id="L854">        repaint();</span>
+<span class="nc" id="L855">    }</span>
+
+    public void addSchedulerListener(SchedulerListener l) {
+<span class="pc bpc" id="L858" title="2 of 4 branches missed.">        if (l != null &amp;&amp; !listeners.contains(l)) {</span>
+<span class="fc" id="L859">            listeners.add(l);</span>
+        }
+<span class="fc" id="L861">    }</span>
+
+    public void removeSchedulerListener(SchedulerListener l) {
+<span class="nc" id="L864">        listeners.remove(l);</span>
+<span class="nc" id="L865">    }</span>
+
+    // The listeners as they are now: one that removes itself, or another,
+    // while it is told does not make the loop skip the one after it, which
+    // for `itemChanging` would be a refusal nobody heard.
+    private SchedulerListener[] told() {
+<span class="fc" id="L871">        return listeners.toArray(new SchedulerListener[listeners.size()]);</span>
+    }
+
+    void viewSelected(ScheduleItem item) {
+<span class="fc bfc" id="L875" title="All 2 branches covered.">        if (selected == item) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="fc" id="L876">            return;</span>
+        }
+<span class="fc" id="L878">        selected = item;</span>
+<span class="fc bfc" id="L879" title="All 2 branches covered.">        for (SchedulerListener l : told()) {</span>
+<span class="fc" id="L880">            l.itemSelected(this, item);</span>
+        }
+<span class="fc" id="L882">        repaint();</span>
+<span class="fc" id="L883">    }</span>
+
+    void viewOpened(ScheduleItem item) {
+<span class="fc bfc" id="L886" title="All 2 branches covered.">        for (SchedulerListener l : told()) {</span>
+<span class="fc" id="L887">            l.itemOpened(this, item);</span>
+        }
+<span class="fc" id="L889">    }</span>
+
+    void viewRange(long start, long end, String resourceId) {
+<span class="fc bfc" id="L892" title="All 2 branches covered.">        for (SchedulerListener l : told()) {</span>
+<span class="fc" id="L893">            l.rangeSelected(this, start, end, resourceId);</span>
+        }
+<span class="pc bpc" id="L895" title="1 of 2 branches missed.">        if (model != null) {</span>
+<span class="fc" id="L896">            ScheduleItem made = model.createItem(start, end, resourceId);</span>
+<span class="pc bpc" id="L897" title="1 of 2 branches missed.">            if (made != null) {</span>
+<span class="fc" id="L898">                viewSelected(made);</span>
+            }
+        }
+<span class="fc" id="L901">        repaint();</span>
+<span class="fc" id="L902">    }</span>
+
+    boolean viewChanged(ScheduleItem item, long start, long end, String resourceId) {
+<span class="pc bfc" id="L905" title="All 2 branches covered.">        for (SchedulerListener l : told()) {</span>
+<span class="pc bpc" id="L906" title="1 of 2 branches missed.">            if (!l.itemChanging(this, item, start, end, resourceId)) {</span>
+<span class="fc" id="L907">                repaint();</span>
+<span class="fc" id="L908">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L911" title="2 of 4 branches missed.">        boolean done = model != null &amp;&amp; model.updateItem(item, start, end, resourceId);</span>
+<span class="fc" id="L912">        refresh();</span>
+<span class="fc" id="L913">        return done;</span>
+    }
+
+    // A day was tapped in a view that shows many: go to it.
+    void viewDrill(long day) {
+<span class="nc bnc" id="L918" title="All 2 branches missed.">        for (View v : views) {</span>
+<span class="nc bnc" id="L919" title="All 2 branches missed.">            if (v == View.DAY) {</span>
+<span class="nc" id="L920">                anchorDay = day;</span>
+<span class="nc" id="L921">                setView(View.DAY);</span>
+<span class="nc" id="L922">                return;</span>
+            }
+        }
+<span class="nc" id="L925">    }</span>
+
+    // ---------------------------------------------------------------- text
+
+    /// The time of day of an instant, as the views write it.
+    public String formatTime(long millis) {
+<span class="fc" id="L931">        return Dates.time(TimeMath.minuteOfDay(millis, zone), is24Hours(), false);</span>
+    }
+
+    /// A start and an end as the views write them: &quot;9:00 AM - 10:30 AM&quot;.
+    public String formatRange(long start, long end) {
+<span class="pc bpc" id="L936" title="1 of 2 branches missed.">        if (end - start &gt;= TimeMath.DAY) {</span>
+<span class="nc" id="L937">            long a = TimeMath.epochDay(start, zone);</span>
+<span class="nc" id="L938">            long b = TimeMath.epochDay(Math.max(start, end - 1), zone);</span>
+<span class="nc bnc" id="L939" title="All 2 branches missed.">            return a == b ? Dates.monthDay(a) : Dates.monthDay(a) + &quot; - &quot; + Dates.monthDay(b);</span>
+        }
+<span class="fc" id="L941">        return formatTime(start) + &quot; - &quot; + formatTime(end);</span>
+    }
+
+    String localize(String key, String value) {
+<span class="fc" id="L945">        return UIManager.getInstance().localize(key, value);</span>
+    }
+
+    // ----------------------------------------------------------- lifecycle
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L952">        super.initComponent();</span>
+<span class="fc" id="L953">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L954" title="2 of 4 branches missed.">        if (f != null &amp;&amp; clock == null) {</span>
+            // The line of the current time moves, and midnight changes which
+            // day is today.
+<span class="fc" id="L957">            clock = UITimer.timer(60000, true, f, new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L960">                    repaint();</span>
+<span class="nc" id="L961">                }</span>
+            });
+        }
+<span class="fc" id="L964">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="pc bpc" id="L968" title="1 of 2 branches missed.">        if (clock != null) {</span>
+<span class="fc" id="L969">            clock.cancel();</span>
+<span class="fc" id="L970">            clock = null;</span>
+        }
+<span class="fc" id="L972">        super.deinitialize();</span>
+<span class="fc" id="L973">    }</span>
+
+    /// The range the toolbar names, for a printed page's heading.
+    String titleText() {
+<span class="fc" id="L977">        return title.getText();</span>
+    }
+
+    /// The surface of the current view, for the tests of this package.
+    Component surface() {
+<span class="fc" id="L982">        return current;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

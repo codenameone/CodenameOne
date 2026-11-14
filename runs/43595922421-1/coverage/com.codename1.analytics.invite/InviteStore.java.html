@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InviteStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics.invite</a> &gt; <span class="el_source">InviteStore.java</span></div><h1>InviteStore.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics.invite;
+
+import com.codename1.io.Log;
+import com.codename1.io.Storage;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+// The three durable records invite attribution keeps on the device.
+//
+// Storage rather than Preferences, for the reason Continuity records: a
+// Preferences write discards Storage.writeObject's boolean and the matching
+// read comes back out of the same in-memory map, so a failed write is
+// invisible. These records decide whether a user is attributed at all and
+// whether the same install is attributed twice, so a silent write failure has
+// to be observable.
+//
+// Every record is a flat map of strings. That is what survives Util's object
+// serialization on every port without registering an Externalizable, and it
+// keeps the format readable if it ever has to be inspected on a device.
+final class InviteStore {
+    // The fingerprint and the code seen before attribution resolves.
+    static final String PENDING = &quot;CN1$InvitePending&quot;;
+
+    // The resolved attribution, plus whether the application has been told.
+    static final String ATTRIBUTION = &quot;CN1$InviteAttribution&quot;;
+
+    // Mint registrations that have not reached the link service yet.
+    static final String OUTBOX = &quot;CN1$InviteOutbox&quot;;
+
+    /// Records that an erasure was asked for and could not finish.
+    ///
+    /// Its own record because it has to outlive the process: `erasurePending`
+    /// is a static, so a reset() whose deletes failed and whose application
+    /// then exited left nothing behind to retry from -- and a plain reset
+    /// keeps the client id, so the provider sees no identity change on the
+    /// next launch and never erases either. The surviving attribution came
+    /// back and was transmitted, which is what reset() promises will not
+    /// happen.
+    ///
+    /// Tiny and written rather than deleted, because the failure being
+    /// recorded is a failure to DELETE: a store that refuses removals may
+    /// still accept a small write, and if it refuses that too this is no worse
+    /// than what came before.
+    static final String ERASURE = &quot;CN1$InviteErasureOwed&quot;;
+
+    /// The client id the attribution provider last saw.
+    ///
+    /// Here rather than in Preferences for the reason every other durable
+    /// record is: `Preferences.set` updates a static table and swallows the
+    /// store's answer, so a failed write is indistinguishable from one that
+    /// never happened -- and the provider reads exactly that absence to decide
+    /// whether an identity reset is owed. A write here can be verified.
+    static final String BASELINE = &quot;CN1$InviteIdentityBaseline&quot;;
+
+    // Entries leave this queue when the server acknowledges them, so the cap is
+    // a safety ceiling rather than a working limit -- and it was far too low
+    // for that. A dropped registration is not recoverable: the code carries no
+    // inviter, campaign, payload or parameters, so a click on a link that was
+    // already shared can never be joined to any of it.
+    //
+    // 512 short JSON bodies is well under a megabyte, and reaching it means the
+    // device minted 512 invites without once reaching the network, which is far
+    // outside anything the design contemplates. An unbounded on-device queue is
+    // still not something to ship, so the ceiling stays -- but breaching it is
+    // logged rather than silent, because it means invites are being lost.
+    static final int MAX_OUTBOX = 512;
+
+    private InviteStore() {
+    }
+
+    static Map&lt;String, String&gt; read(String record) {
+        try {
+<span class="fc" id="L97">            Storage s = Storage.getInstance();</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">            if (s == null || !s.exists(record)) {</span>
+<span class="fc" id="L99">                return null;</span>
+            }
+<span class="fc" id="L101">            Object o = s.readObject(record);</span>
+            // Positive instanceof guards throughout: ParparVM does not throw
+            // on a failed cast, so the catch below would never see one and the
+            // wrong object would simply be read as the wrong type.
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (o instanceof Map) {</span>
+<span class="fc" id="L106">                Map raw = (Map) o;</span>
+<span class="fc" id="L107">                Map&lt;String, String&gt; out = new LinkedHashMap&lt;String, String&gt;();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                for (Object next : raw.entrySet()) {</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                    if (next instanceof Map.Entry) {</span>
+<span class="fc" id="L110">                        Map.Entry en = (Map.Entry) next;</span>
+<span class="fc" id="L111">                        Object k = en.getKey();</span>
+<span class="fc" id="L112">                        Object v = en.getValue();</span>
+<span class="pc bpc" id="L113" title="2 of 4 branches missed.">                        if (k instanceof String &amp;&amp; v instanceof String) {</span>
+<span class="fc" id="L114">                            out.put((String) k, (String) v);</span>
+                        }
+                    }
+<span class="fc" id="L117">                }</span>
+<span class="fc" id="L118">                return out;</span>
+            }
+<span class="nc" id="L120">            return null;</span>
+<span class="nc" id="L121">        } catch (Throwable t) {</span>
+<span class="nc" id="L122">            Log.e(t);</span>
+<span class="nc" id="L123">            return null;</span>
+        }
+    }
+
+    // Returns false when the record did not reach the disk. Callers that care
+    // about exactly-once behaviour check this; the rest may ignore it.
+    // The same seam for a named record. A full or read-only store cannot be
+    // produced from a test, and the paths that only run when a write fails are
+    // the ones most worth pinning.
+    private static String failNextNamed;
+
+    static void failNextWriteForTest(String name) {
+<span class="fc" id="L135">        failWritesForTest(name, 1);</span>
+<span class="fc" id="L136">    }</span>
+
+    // How many more writes of that record must fail. A single shot is not
+    // enough to hold a record undurable: readPending() retries the held copy
+    // the next time anything reads it, so a test that wants to observe &quot;still
+    // not saved&quot; has to outlast the retry as well as the first attempt.
+    private static int failNamedRemaining;
+
+    static void failWritesForTest(String name, int count) {
+<span class="fc" id="L145">        failNextNamed = name;</span>
+<span class="fc" id="L146">        failNamedRemaining = count;</span>
+<span class="fc" id="L147">    }</span>
+
+    // The same seam for a delete. Storage.deleteStorageFile cannot be made to
+    // fail from a test either, and the erasure path turns on exactly that.
+    private static String failNextDeleteNamed;
+
+    static void failNextDeleteForTest(String name) {
+<span class="fc" id="L154">        failNextDeleteNamed = name;</span>
+<span class="fc" id="L155">    }</span>
+
+    static boolean write(String record, Map&lt;String, String&gt; values) {
+<span class="pc bpc" id="L158" title="1 of 4 branches missed.">        if (record != null &amp;&amp; record.equals(failNextNamed)) {</span>
+<span class="fc" id="L159">            failNamedRemaining--;</span>
+            // Assigned unconditionally rather than inside an if. The guarded
+            // form is the shape PMD reads as a lazily initialised singleton,
+            // and the answer to that is not a lock -- this runs on the EDT
+            // like the rest of the framework, and it is a test seam, not a
+            // singleton.
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            failNextNamed = failNamedRemaining &gt; 0 ? failNextNamed : null;</span>
+<span class="fc" id="L166">            return false;</span>
+        }
+        try {
+<span class="fc" id="L169">            Storage s = Storage.getInstance();</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            if (s == null) {</span>
+<span class="nc" id="L171">                return false;</span>
+            }
+<span class="fc" id="L173">            return s.writeObject(record, new LinkedHashMap&lt;String, String&gt;(values));</span>
+<span class="nc" id="L174">        } catch (Throwable t) {</span>
+<span class="nc" id="L175">            Log.e(t);</span>
+<span class="nc" id="L176">            return false;</span>
+        }
+    }
+
+    /// Deletes a record and says whether it is really gone.
+    ///
+    /// `deleteStorageFile` reports nothing useful on either port that matters
+    /// -- Android's `Context.deleteFile()` and JavaSE's `File.delete()` both
+    /// return a boolean and neither throws -- so a failed delete looked
+    /// identical to a successful one. That is load bearing for erasure: the
+    /// caller went on to report the identity erased while the record was still
+    /// on the disk, ready to come back on the next launch.
+    ///
+    /// Existence is re-checked afterwards rather than trusted, and a record
+    /// that survives is OVERWRITTEN with an empty one. An empty record carries
+    /// no code, no inviter and no campaign, so a delete that cannot happen at
+    /// least leaves nothing behind to restore.
+    ///
+    /// - `record`: the record name
+    ///
+    /// #### Returns
+    ///
+    /// true when nothing readable is left
+    static boolean delete(String record) {
+<span class="fc" id="L200">        return deleteVerified(record, new LinkedHashMap&lt;String, String&gt;());</span>
+    }
+
+    /// The delete above, with the shape of the empty replacement left to the
+    /// caller.
+    ///
+    /// Shared with the outbox, which is a `List` and not a `Map`. Writing the
+    /// wrong one would not be caught by anything -- `readOutbox()` answers an
+    /// empty queue either way -- but it is what the next writer appends to.
+    ///
+    /// - `record`: the record name
+    /// - `empty`: what to leave behind when the delete cannot happen
+    ///
+    /// #### Returns
+    ///
+    /// true when nothing readable is left
+    private static boolean deleteVerified(String record, Object empty) {
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">        if (record != null &amp;&amp; record.equals(failNextDeleteNamed)) {</span>
+<span class="fc" id="L218">            failNextDeleteNamed = null;</span>
+<span class="fc" id="L219">            return false;</span>
+        }
+        try {
+<span class="fc" id="L222">            Storage s = Storage.getInstance();</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">            if (s == null) {</span>
+<span class="nc" id="L224">                return false;</span>
+            }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (!s.exists(record)) {</span>
+<span class="fc" id="L227">                return true;</span>
+            }
+<span class="fc" id="L229">            s.deleteStorageFile(record);</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (!s.exists(record)) {</span>
+<span class="fc" id="L231">                return true;</span>
+            }
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (!s.writeObject(record, empty)) {</span>
+<span class="nc" id="L234">                return false;</span>
+            }
+<span class="nc" id="L236">            Object left = s.readObject(record);</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">            if (left instanceof Map) {</span>
+<span class="nc" id="L238">                return ((Map) left).isEmpty();</span>
+            }
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            if (left instanceof List) {</span>
+<span class="nc" id="L241">                return ((List) left).isEmpty();</span>
+            }
+            // Neither shape came back, so nothing readable is left -- which is
+            // the question, and is why this is not an error.
+<span class="nc" id="L245">            return true;</span>
+<span class="nc" id="L246">        } catch (Throwable t) {</span>
+<span class="nc" id="L247">            Log.e(t);</span>
+<span class="nc" id="L248">            return false;</span>
+        }
+    }
+
+    static List&lt;String&gt; readOutbox() {
+<span class="fc" id="L253">        List&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+        try {
+<span class="fc" id="L255">            Storage s = Storage.getInstance();</span>
+<span class="pc bpc" id="L256" title="1 of 4 branches missed.">            if (s == null || !s.exists(OUTBOX)) {</span>
+<span class="fc" id="L257">                return out;</span>
+            }
+<span class="fc" id="L259">            Object o = s.readObject(OUTBOX);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (o instanceof List) {</span>
+<span class="fc" id="L261">                List raw = (List) o;</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                for (Object v : raw) {</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">                    if (v instanceof String) {</span>
+<span class="fc" id="L264">                        out.add((String) v);</span>
+                    }
+<span class="fc" id="L266">                }</span>
+            }
+<span class="nc" id="L268">        } catch (Throwable t) {</span>
+<span class="nc" id="L269">            Log.e(t);</span>
+<span class="fc" id="L270">        }</span>
+<span class="fc" id="L271">        return out;</span>
+    }
+
+    /// Returns false when the queue could not be persisted -- a full or
+    /// read-only store. The caller has to know: an entry that never reached
+    /// the outbox carries the campaign, channel, payload and preview of a link
+    /// that has already been handed out, and nothing can reconstruct it later.
+    // Package private test seam. A full or read-only store cannot be produced
+    // from a test, and the paths that only run when the write fails are the
+    // ones most worth pinning -- they are what happens when the durable queue
+    // is gone.
+    private static boolean failNextWrite;
+
+    static void failNextOutboxWriteForTest() {
+<span class="fc" id="L285">        failNextWrite = true;</span>
+<span class="fc" id="L286">    }</span>
+
+    static boolean writeOutbox(List&lt;String&gt; entries) {
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (failNextWrite) {</span>
+<span class="fc" id="L290">            failNextWrite = false;</span>
+<span class="fc" id="L291">            return false;</span>
+        }
+        // The cap is applied OUTSIDE the try, deliberately.
+        //
+        // copy.remove(0) on a List&lt;String&gt; compiles to a CHECKCAST, and
+        // ParparVM does not throw for a failed cast -- so a checked cast inside
+        // a catch(Throwable) is a handler that cannot run on iOS, which
+        // check-cast-semantics.sh refuses outright. Nothing here can fail
+        // anyway: it is a copy, a size comparison and a removal.
+<span class="fc" id="L300">        List&lt;String&gt; copy = new ArrayList&lt;String&gt;(entries);</span>
+<span class="fc" id="L301">        int dropped = 0;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        while (copy.size() &gt; MAX_OUTBOX) {</span>
+            // Reported to Invites before it goes, so isRegistered() can keep
+            // saying no about it. That method reads absence from BOTH the
+            // outbox and the unacknowledged set as acknowledgement, and an
+            // evicted entry is in neither -- so the one registration the server
+            // is guaranteed never to have received was reported as registered,
+            // and only the log below said otherwise.
+<span class="fc" id="L309">            Invites.registrationEvicted(copy.remove(0));</span>
+<span class="fc" id="L310">            dropped++;</span>
+        }
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (dropped &gt; 0) {</span>
+<span class="fc" id="L313">            Log.p(&quot;invite: dropped &quot; + dropped + &quot; unacknowledged registration(s); &quot;</span>
+                    + &quot;those invite links can no longer be attributed&quot;, Log.ERROR);
+        }
+        try {
+<span class="fc" id="L317">            Storage s = Storage.getInstance();</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            if (s == null) {</span>
+<span class="nc" id="L319">                return false;</span>
+            }
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (copy.isEmpty()) {</span>
+                // Verified, exactly as delete() is, and for the same reason:
+                // deleteStorageFile() reports nothing useful on either port
+                // that matters, so a failed delete looked identical to a
+                // successful one. This is the path that empties the queue when
+                // the LAST registration is acknowledged, and reporting success
+                // over a surviving file meant every later flush resent an
+                // acknowledged registration while isRegistered() went on
+                // answering false about it.
+<span class="fc" id="L330">                return deleteVerified(OUTBOX, new ArrayList&lt;String&gt;());</span>
+            }
+<span class="fc" id="L332">            return s.writeObject(OUTBOX, copy);</span>
+<span class="nc" id="L333">        } catch (Throwable t) {</span>
+<span class="nc" id="L334">            Log.e(t);</span>
+        }
+<span class="nc" id="L336">        return false;</span>
+    }
+
+    static String get(Map&lt;String, String&gt; record, String key, String def) {
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (record == null) {</span>
+<span class="fc" id="L341">            return def;</span>
+        }
+<span class="fc" id="L343">        String v = record.get(key);</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        return v == null ? def : v;</span>
+    }
+
+    static long getLong(Map&lt;String, String&gt; record, String key, long def) {
+<span class="fc" id="L348">        String v = get(record, key, null);</span>
+<span class="pc bpc" id="L349" title="1 of 4 branches missed.">        if (v == null || v.length() == 0) {</span>
+<span class="fc" id="L350">            return def;</span>
+        }
+        try {
+<span class="fc" id="L353">            return Long.parseLong(v);</span>
+<span class="nc" id="L354">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L355">            return def;</span>
+        }
+    }
+
+    static int getInt(Map&lt;String, String&gt; record, String key, int def) {
+<span class="fc" id="L360">        return (int) getLong(record, key, def);</span>
+    }
+
+    static double getDouble(Map&lt;String, String&gt; record, String key, double def) {
+<span class="fc" id="L364">        String v = get(record, key, null);</span>
+<span class="pc bpc" id="L365" title="2 of 4 branches missed.">        if (v == null || v.length() == 0) {</span>
+<span class="nc" id="L366">            return def;</span>
+        }
+        try {
+<span class="fc" id="L369">            return Double.parseDouble(v);</span>
+<span class="nc" id="L370">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L371">            return def;</span>
+        }
+    }
+
+    static boolean getBoolean(Map&lt;String, String&gt; record, String key, boolean def) {
+<span class="fc" id="L376">        String v = get(record, key, null);</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        if (v == null) {</span>
+<span class="fc" id="L378">            return def;</span>
+        }
+<span class="fc" id="L380">        return &quot;true&quot;.equals(v);</span>
+    }
+
+    static void put(Map&lt;String, String&gt; record, String key, String value) {
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L385">            record.put(key, value);</span>
+        }
+<span class="fc" id="L387">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

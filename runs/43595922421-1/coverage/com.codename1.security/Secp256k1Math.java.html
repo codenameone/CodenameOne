@@ -1,0 +1,1571 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Secp256k1Math.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Secp256k1Math.java</span></div><h1>Secp256k1Math.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// The arithmetic behind [Secp256k1]: the field modulo
+/// `p = 2^256 - 2^32 - 977`, the curve group over it, and a constant-time
+/// modular inverse that serves both the field and the group order.
+///
+/// #### Field elements
+///
+/// A field element is an `int[10]` of 26-bit limbs, little endian, the top
+/// limb 22 bits wide. Additions do not carry: an element's *magnitude* is how
+/// many reduced values were summed into it, and every limb of a magnitude-`m`
+/// element is at most `2 * m * (2^26 - 1)`. [#mul] and [#sqr] accept inputs
+/// whose magnitudes multiply to at most 48 (a column of ten 58-bit products
+/// then stays below 2^63) and return magnitude 1. Each caller tracks the
+/// magnitudes in comments; [#weak] brings any element back to magnitude 1.
+///
+/// #### Points
+///
+/// Public-data code (verification, recovery, parsing) uses Jacobian
+/// coordinates with an explicit infinity flag and formulas that branch.
+/// Secret-data code (key derivation, signing) uses [#mulGen], a signed-digit
+/// comb over a fixed table whose 64 additions use the complete projective
+/// formula of Renes, Costello and Batina and read every table entry, so the
+/// sequence of operations and the memory touched do not depend on the
+/// scalar.
+///
+/// #### Inversion
+///
+/// [#modInverse] is the constant-time &quot;safegcd&quot; of Bernstein and Yang
+/// (2019): twenty batches of thirty division steps on 30-bit signed limbs,
+/// each batch applied as a 2x2 matrix. It has no data-dependent branch and is
+/// several times faster than inverting by Fermat's little theorem.
+@com.codename1.impl.SharedWithBackend
+final class Secp256k1Math {
+    static final int M26 = 0x3FFFFFF;
+    static final int M22 = 0x3FFFFF;
+    private static final int M30 = 0x3FFFFFFF;
+
+<span class="fc" id="L61">    private static final int[] P26 = {</span>
+        0x3FFFC2F, 0x3FFFFBF, M26, M26, M26, M26, M26, M26, M26, M22
+    };
+
+    /// `p` in the 30-bit limbs [#modInverse] takes.
+<span class="fc" id="L66">    static final int[] P30 = {</span>
+        0x3FFFFC2F, 0x3FFFFFFB, M30, M30, M30, M30, M30, M30, 0xFFFF
+    };
+    /// `p^-1 mod 2^30`
+    static final int P_INV30 = 0x2DDACACF;
+
+    /// The group order `n` in 30-bit limbs.
+<span class="fc" id="L73">    static final int[] N30 = {</span>
+        0x10364141, 0x3F497A33, 0x348A03BB, 0x2BB739AB, 0x3FFFFEBA, M30, M30, M30, 0xFFFF
+    };
+    /// `n^-1 mod 2^30`
+    static final int N_INV30 = 0x2A774EC1;
+
+    /// A cube root of unity in the field: `(beta * x, y)` is `lambda * (x, y)`.
+<span class="fc" id="L80">    static final int[] BETA = {</span>
+        0x19501EE, 0x25B0A1C, 0x995C13, 0x1D44BD6, 0x19CF049, 0x30D0D3A, 0x24479EA, 0x1C41B9, 0x22B657C, 0x1EBA5A
+    };
+
+    private Secp256k1Math() {
+    }
+
+    // ----------------------------------------------------------------
+    // field
+
+    static int[] fe() {
+<span class="fc" id="L91">        return new int[10];</span>
+    }
+
+    static void set(int[] r, int[] a) {
+<span class="fc" id="L95">        System.arraycopy(a, 0, r, 0, 10);</span>
+<span class="fc" id="L96">    }</span>
+
+    static void setInt(int[] r, int v) {
+<span class="fc" id="L99">        r[0] = v;</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (int i = 1; i &lt; 10; i++) {</span>
+<span class="fc" id="L101">            r[i] = 0;</span>
+        }
+<span class="fc" id="L103">    }</span>
+
+    // On x86 HotSpot the schoolbook product's 100 multiplications are bound by
+    // the one 64-bit multiplier and by register spills, while arm64 keeps them
+    // all live; Ed25519Math chooses its field product the same way.
+<span class="fc" id="L108">    private static final boolean KARATSUBA = isX86();</span>
+
+    private static boolean isX86() {
+<span class="fc" id="L111">        String arch = System.getProperty(&quot;os.arch&quot;);</span>
+<span class="pc bpc" id="L112" title="5 of 6 branches missed.">        return &quot;amd64&quot;.equals(arch) || &quot;x86_64&quot;.equals(arch) || &quot;x86&quot;.equals(arch)</span>
+<span class="pc bnc" id="L113" title="All 4 branches missed.">                || &quot;i386&quot;.equals(arch) || &quot;i686&quot;.equals(arch);</span>
+    }
+
+    /// r = a * b, magnitude 1. r may alias a or b.
+    ///
+    /// The 19 product columns (each below 2^63) reduce in place: column
+    /// 10 + j sits at bit 260 + 26j, and 2^260 = 16 * 2^256 == 16 *
+    /// 0x1000003D1 = 0x400 * 2^26 + 0x3D10 (mod p), so once the high columns
+    /// are 26 bits each they fold onto columns j and j + 1. The bits left at
+    /// or above 2^256 fold once more by 2^256 == 0x1000003D1. [#sqr] reduces
+    /// the same way; the code is repeated rather than called because a call
+    /// with nineteen long arguments cost as much as the multiplication.
+    static void mul(int[] r, int[] a, int[] b) {
+<span class="fc" id="L126">        long a0 = a[0];</span>
+<span class="fc" id="L127">        long a1 = a[1];</span>
+<span class="fc" id="L128">        long a2 = a[2];</span>
+<span class="fc" id="L129">        long a3 = a[3];</span>
+<span class="fc" id="L130">        long a4 = a[4];</span>
+<span class="fc" id="L131">        long a5 = a[5];</span>
+<span class="fc" id="L132">        long a6 = a[6];</span>
+<span class="fc" id="L133">        long a7 = a[7];</span>
+<span class="fc" id="L134">        long a8 = a[8];</span>
+<span class="fc" id="L135">        long a9 = a[9];</span>
+<span class="fc" id="L136">        long b0 = b[0];</span>
+<span class="fc" id="L137">        long b1 = b[1];</span>
+<span class="fc" id="L138">        long b2 = b[2];</span>
+<span class="fc" id="L139">        long b3 = b[3];</span>
+<span class="fc" id="L140">        long b4 = b[4];</span>
+<span class="fc" id="L141">        long b5 = b[5];</span>
+<span class="fc" id="L142">        long b6 = b[6];</span>
+<span class="fc" id="L143">        long b7 = b[7];</span>
+<span class="fc" id="L144">        long b8 = b[8];</span>
+<span class="fc" id="L145">        long b9 = b[9];</span>
+        long c0;
+        long c1;
+        long c2;
+        long c3;
+        long c4;
+        long c5;
+        long c6;
+        long c7;
+        long c8;
+        long c9;
+        long c10;
+        long c11;
+        long c12;
+        long c13;
+        long c14;
+        long c15;
+        long c16;
+        long c17;
+        long c18;
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (KARATSUBA) {</span>
+            // 2^130 splits the limbs into halves of five, so a * b = L + (L + U - D) 2^130 + U 2^260
+            // with D = (a_lo - a_hi)(b_lo - b_hi): 75 products for 100. Limbs are never negative,
+            // so a difference of two is no larger than the larger of them and every product keeps
+            // the schoolbook bound. Each column's true value is the schoolbook column's, below
+            // 2^63; L + U - D may wrap on the way there and comes back exactly, as two's
+            // complement arithmetic does.
+<span class="fc" id="L172">            long da0 = a0 - a5;</span>
+<span class="fc" id="L173">            long db0 = b0 - b5;</span>
+<span class="fc" id="L174">            long da1 = a1 - a6;</span>
+<span class="fc" id="L175">            long db1 = b1 - b6;</span>
+<span class="fc" id="L176">            long da2 = a2 - a7;</span>
+<span class="fc" id="L177">            long db2 = b2 - b7;</span>
+<span class="fc" id="L178">            long da3 = a3 - a8;</span>
+<span class="fc" id="L179">            long db3 = b3 - b8;</span>
+<span class="fc" id="L180">            long da4 = a4 - a9;</span>
+<span class="fc" id="L181">            long db4 = b4 - b9;</span>
+<span class="fc" id="L182">            long l0 = a0 * b0;</span>
+<span class="fc" id="L183">            long l1 = a0 * b1 + a1 * b0;</span>
+<span class="fc" id="L184">            long l2 = a0 * b2 + a1 * b1 + a2 * b0;</span>
+<span class="fc" id="L185">            long l3 = a0 * b3 + a1 * b2 + a2 * b1 + a3 * b0;</span>
+<span class="fc" id="L186">            long l4 = a0 * b4 + a1 * b3 + a2 * b2 + a3 * b1 + a4 * b0;</span>
+<span class="fc" id="L187">            long l5 = a1 * b4 + a2 * b3 + a3 * b2 + a4 * b1;</span>
+<span class="fc" id="L188">            long l6 = a2 * b4 + a3 * b3 + a4 * b2;</span>
+<span class="fc" id="L189">            long l7 = a3 * b4 + a4 * b3;</span>
+<span class="fc" id="L190">            long l8 = a4 * b4;</span>
+<span class="fc" id="L191">            long u0 = a5 * b5;</span>
+<span class="fc" id="L192">            long u1 = a5 * b6 + a6 * b5;</span>
+<span class="fc" id="L193">            long u2 = a5 * b7 + a6 * b6 + a7 * b5;</span>
+<span class="fc" id="L194">            long u3 = a5 * b8 + a6 * b7 + a7 * b6 + a8 * b5;</span>
+<span class="fc" id="L195">            long u4 = a5 * b9 + a6 * b8 + a7 * b7 + a8 * b6 + a9 * b5;</span>
+<span class="fc" id="L196">            long u5 = a6 * b9 + a7 * b8 + a8 * b7 + a9 * b6;</span>
+<span class="fc" id="L197">            long u6 = a7 * b9 + a8 * b8 + a9 * b7;</span>
+<span class="fc" id="L198">            long u7 = a8 * b9 + a9 * b8;</span>
+<span class="fc" id="L199">            long u8 = a9 * b9;</span>
+<span class="fc" id="L200">            long d0 = da0 * db0;</span>
+<span class="fc" id="L201">            long d1 = da0 * db1 + da1 * db0;</span>
+<span class="fc" id="L202">            long d2 = da0 * db2 + da1 * db1 + da2 * db0;</span>
+<span class="fc" id="L203">            long d3 = da0 * db3 + da1 * db2 + da2 * db1 + da3 * db0;</span>
+<span class="fc" id="L204">            long d4 = da0 * db4 + da1 * db3 + da2 * db2 + da3 * db1 + da4 * db0;</span>
+<span class="fc" id="L205">            long d5 = da1 * db4 + da2 * db3 + da3 * db2 + da4 * db1;</span>
+<span class="fc" id="L206">            long d6 = da2 * db4 + da3 * db3 + da4 * db2;</span>
+<span class="fc" id="L207">            long d7 = da3 * db4 + da4 * db3;</span>
+<span class="fc" id="L208">            long d8 = da4 * db4;</span>
+<span class="fc" id="L209">            c0 = l0;</span>
+<span class="fc" id="L210">            c1 = l1;</span>
+<span class="fc" id="L211">            c2 = l2;</span>
+<span class="fc" id="L212">            c3 = l3;</span>
+<span class="fc" id="L213">            c4 = l4;</span>
+<span class="fc" id="L214">            c5 = l5 + l0 + u0 - d0;</span>
+<span class="fc" id="L215">            c6 = l6 + l1 + u1 - d1;</span>
+<span class="fc" id="L216">            c7 = l7 + l2 + u2 - d2;</span>
+<span class="fc" id="L217">            c8 = l8 + l3 + u3 - d3;</span>
+<span class="fc" id="L218">            c9 = l4 + u4 - d4;</span>
+<span class="fc" id="L219">            c10 = l5 + u5 - d5 + u0;</span>
+<span class="fc" id="L220">            c11 = l6 + u6 - d6 + u1;</span>
+<span class="fc" id="L221">            c12 = l7 + u7 - d7 + u2;</span>
+<span class="fc" id="L222">            c13 = l8 + u8 - d8 + u3;</span>
+<span class="fc" id="L223">            c14 = u4;</span>
+<span class="fc" id="L224">            c15 = u5;</span>
+<span class="fc" id="L225">            c16 = u6;</span>
+<span class="fc" id="L226">            c17 = u7;</span>
+<span class="fc" id="L227">            c18 = u8;</span>
+<span class="fc" id="L228">        } else {</span>
+<span class="nc" id="L229">            c0 = a0 * b0;</span>
+<span class="nc" id="L230">            c1 = a0 * b1 + a1 * b0;</span>
+<span class="nc" id="L231">            c2 = a0 * b2 + a1 * b1 + a2 * b0;</span>
+<span class="nc" id="L232">            c3 = a0 * b3 + a1 * b2 + a2 * b1 + a3 * b0;</span>
+<span class="nc" id="L233">            c4 = a0 * b4 + a1 * b3 + a2 * b2 + a3 * b1 + a4 * b0;</span>
+<span class="nc" id="L234">            c5 = a0 * b5 + a1 * b4 + a2 * b3 + a3 * b2 + a4 * b1 + a5 * b0;</span>
+<span class="nc" id="L235">            c6 = a0 * b6 + a1 * b5 + a2 * b4 + a3 * b3 + a4 * b2 + a5 * b1 + a6 * b0;</span>
+<span class="nc" id="L236">            c7 = a0 * b7 + a1 * b6 + a2 * b5 + a3 * b4 + a4 * b3 + a5 * b2 + a6 * b1 + a7 * b0;</span>
+<span class="nc" id="L237">            c8 = a0 * b8 + a1 * b7 + a2 * b6 + a3 * b5 + a4 * b4 + a5 * b3 + a6 * b2 + a7 * b1 + a8 * b0;</span>
+<span class="nc" id="L238">            c9 = a0 * b9 + a1 * b8 + a2 * b7 + a3 * b6 + a4 * b5 + a5 * b4 + a6 * b3 + a7 * b2 + a8 * b1 + a9 * b0;</span>
+<span class="nc" id="L239">            c10 = a1 * b9 + a2 * b8 + a3 * b7 + a4 * b6 + a5 * b5 + a6 * b4 + a7 * b3 + a8 * b2 + a9 * b1;</span>
+<span class="nc" id="L240">            c11 = a2 * b9 + a3 * b8 + a4 * b7 + a5 * b6 + a6 * b5 + a7 * b4 + a8 * b3 + a9 * b2;</span>
+<span class="nc" id="L241">            c12 = a3 * b9 + a4 * b8 + a5 * b7 + a6 * b6 + a7 * b5 + a8 * b4 + a9 * b3;</span>
+<span class="nc" id="L242">            c13 = a4 * b9 + a5 * b8 + a6 * b7 + a7 * b6 + a8 * b5 + a9 * b4;</span>
+<span class="nc" id="L243">            c14 = a5 * b9 + a6 * b8 + a7 * b7 + a8 * b6 + a9 * b5;</span>
+<span class="nc" id="L244">            c15 = a6 * b9 + a7 * b8 + a8 * b7 + a9 * b6;</span>
+<span class="nc" id="L245">            c16 = a7 * b9 + a8 * b8 + a9 * b7;</span>
+<span class="nc" id="L246">            c17 = a8 * b9 + a9 * b8;</span>
+<span class="nc" id="L247">            c18 = a9 * b9;</span>
+        }
+<span class="fc" id="L249">        c11 += c10 &gt;&gt; 26;</span>
+<span class="fc" id="L250">        c10 &amp;= M26;</span>
+<span class="fc" id="L251">        c12 += c11 &gt;&gt; 26;</span>
+<span class="fc" id="L252">        c11 &amp;= M26;</span>
+<span class="fc" id="L253">        c13 += c12 &gt;&gt; 26;</span>
+<span class="fc" id="L254">        c12 &amp;= M26;</span>
+<span class="fc" id="L255">        c14 += c13 &gt;&gt; 26;</span>
+<span class="fc" id="L256">        c13 &amp;= M26;</span>
+<span class="fc" id="L257">        c15 += c14 &gt;&gt; 26;</span>
+<span class="fc" id="L258">        c14 &amp;= M26;</span>
+<span class="fc" id="L259">        c16 += c15 &gt;&gt; 26;</span>
+<span class="fc" id="L260">        c15 &amp;= M26;</span>
+<span class="fc" id="L261">        c17 += c16 &gt;&gt; 26;</span>
+<span class="fc" id="L262">        c16 &amp;= M26;</span>
+<span class="fc" id="L263">        c18 += c17 &gt;&gt; 26;</span>
+<span class="fc" id="L264">        c17 &amp;= M26;</span>
+<span class="fc" id="L265">        long c19 = c18 &gt;&gt; 26;</span>
+<span class="fc" id="L266">        c18 &amp;= M26;</span>
+
+<span class="fc" id="L268">        c0 += c10 * 0x3D10L;</span>
+<span class="fc" id="L269">        c1 += c10 * 0x400L + c11 * 0x3D10L;</span>
+<span class="fc" id="L270">        c2 += c11 * 0x400L + c12 * 0x3D10L;</span>
+<span class="fc" id="L271">        c3 += c12 * 0x400L + c13 * 0x3D10L;</span>
+<span class="fc" id="L272">        c4 += c13 * 0x400L + c14 * 0x3D10L;</span>
+<span class="fc" id="L273">        c5 += c14 * 0x400L + c15 * 0x3D10L;</span>
+<span class="fc" id="L274">        c6 += c15 * 0x400L + c16 * 0x3D10L;</span>
+<span class="fc" id="L275">        c7 += c16 * 0x400L + c17 * 0x3D10L;</span>
+<span class="fc" id="L276">        c8 += c17 * 0x400L + c18 * 0x3D10L;</span>
+<span class="fc" id="L277">        c9 += c18 * 0x400L + c19 * 0x3D10L;</span>
+<span class="fc" id="L278">        long hi = c19 * 0x400L;</span>
+
+<span class="fc" id="L280">        c1 += c0 &gt;&gt; 26;</span>
+<span class="fc" id="L281">        c0 &amp;= M26;</span>
+<span class="fc" id="L282">        c2 += c1 &gt;&gt; 26;</span>
+<span class="fc" id="L283">        c1 &amp;= M26;</span>
+<span class="fc" id="L284">        c3 += c2 &gt;&gt; 26;</span>
+<span class="fc" id="L285">        c2 &amp;= M26;</span>
+<span class="fc" id="L286">        c4 += c3 &gt;&gt; 26;</span>
+<span class="fc" id="L287">        c3 &amp;= M26;</span>
+<span class="fc" id="L288">        c5 += c4 &gt;&gt; 26;</span>
+<span class="fc" id="L289">        c4 &amp;= M26;</span>
+<span class="fc" id="L290">        c6 += c5 &gt;&gt; 26;</span>
+<span class="fc" id="L291">        c5 &amp;= M26;</span>
+<span class="fc" id="L292">        c7 += c6 &gt;&gt; 26;</span>
+<span class="fc" id="L293">        c6 &amp;= M26;</span>
+<span class="fc" id="L294">        c8 += c7 &gt;&gt; 26;</span>
+<span class="fc" id="L295">        c7 &amp;= M26;</span>
+<span class="fc" id="L296">        c9 += c8 &gt;&gt; 26;</span>
+<span class="fc" id="L297">        c8 &amp;= M26;</span>
+<span class="fc" id="L298">        long top = (c9 &gt;&gt; 22) + (hi &lt;&lt; 4);</span>
+<span class="fc" id="L299">        c9 &amp;= M22;</span>
+
+<span class="fc" id="L301">        c0 += top * 0x3D1L;</span>
+<span class="fc" id="L302">        c1 += top &lt;&lt; 6;</span>
+<span class="fc" id="L303">        c1 += c0 &gt;&gt; 26;</span>
+<span class="fc" id="L304">        r[0] = (int) (c0 &amp; M26);</span>
+<span class="fc" id="L305">        c2 += c1 &gt;&gt; 26;</span>
+<span class="fc" id="L306">        r[1] = (int) (c1 &amp; M26);</span>
+<span class="fc" id="L307">        c3 += c2 &gt;&gt; 26;</span>
+<span class="fc" id="L308">        r[2] = (int) (c2 &amp; M26);</span>
+<span class="fc" id="L309">        c4 += c3 &gt;&gt; 26;</span>
+<span class="fc" id="L310">        r[3] = (int) (c3 &amp; M26);</span>
+<span class="fc" id="L311">        c5 += c4 &gt;&gt; 26;</span>
+<span class="fc" id="L312">        r[4] = (int) (c4 &amp; M26);</span>
+<span class="fc" id="L313">        c6 += c5 &gt;&gt; 26;</span>
+<span class="fc" id="L314">        r[5] = (int) (c5 &amp; M26);</span>
+<span class="fc" id="L315">        c7 += c6 &gt;&gt; 26;</span>
+<span class="fc" id="L316">        r[6] = (int) (c6 &amp; M26);</span>
+<span class="fc" id="L317">        c8 += c7 &gt;&gt; 26;</span>
+<span class="fc" id="L318">        r[7] = (int) (c7 &amp; M26);</span>
+<span class="fc" id="L319">        c9 += c8 &gt;&gt; 26;</span>
+<span class="fc" id="L320">        r[8] = (int) (c8 &amp; M26);</span>
+<span class="fc" id="L321">        r[9] = (int) c9;</span>
+<span class="fc" id="L322">    }</span>
+
+    /// r = a * a, magnitude 1. r may alias a.
+    static void sqr(int[] r, int[] a) {
+<span class="fc" id="L326">        long a0 = a[0];</span>
+<span class="fc" id="L327">        long a1 = a[1];</span>
+<span class="fc" id="L328">        long a2 = a[2];</span>
+<span class="fc" id="L329">        long a3 = a[3];</span>
+<span class="fc" id="L330">        long a4 = a[4];</span>
+<span class="fc" id="L331">        long a5 = a[5];</span>
+<span class="fc" id="L332">        long a6 = a[6];</span>
+<span class="fc" id="L333">        long a7 = a[7];</span>
+<span class="fc" id="L334">        long a8 = a[8];</span>
+<span class="fc" id="L335">        long a9 = a[9];</span>
+<span class="fc" id="L336">        long d0 = a0 &lt;&lt; 1;</span>
+<span class="fc" id="L337">        long d1 = a1 &lt;&lt; 1;</span>
+<span class="fc" id="L338">        long d2 = a2 &lt;&lt; 1;</span>
+<span class="fc" id="L339">        long d3 = a3 &lt;&lt; 1;</span>
+<span class="fc" id="L340">        long d4 = a4 &lt;&lt; 1;</span>
+<span class="fc" id="L341">        long d5 = a5 &lt;&lt; 1;</span>
+<span class="fc" id="L342">        long d6 = a6 &lt;&lt; 1;</span>
+<span class="fc" id="L343">        long d7 = a7 &lt;&lt; 1;</span>
+<span class="fc" id="L344">        long d8 = a8 &lt;&lt; 1;</span>
+<span class="fc" id="L345">        long c0 = a0 * a0;</span>
+<span class="fc" id="L346">        long c1 = d0 * a1;</span>
+<span class="fc" id="L347">        long c2 = d0 * a2 + a1 * a1;</span>
+<span class="fc" id="L348">        long c3 = d0 * a3 + d1 * a2;</span>
+<span class="fc" id="L349">        long c4 = d0 * a4 + d1 * a3 + a2 * a2;</span>
+<span class="fc" id="L350">        long c5 = d0 * a5 + d1 * a4 + d2 * a3;</span>
+<span class="fc" id="L351">        long c6 = d0 * a6 + d1 * a5 + d2 * a4 + a3 * a3;</span>
+<span class="fc" id="L352">        long c7 = d0 * a7 + d1 * a6 + d2 * a5 + d3 * a4;</span>
+<span class="fc" id="L353">        long c8 = d0 * a8 + d1 * a7 + d2 * a6 + d3 * a5 + a4 * a4;</span>
+<span class="fc" id="L354">        long c9 = d0 * a9 + d1 * a8 + d2 * a7 + d3 * a6 + d4 * a5;</span>
+<span class="fc" id="L355">        long c10 = d1 * a9 + d2 * a8 + d3 * a7 + d4 * a6 + a5 * a5;</span>
+<span class="fc" id="L356">        long c11 = d2 * a9 + d3 * a8 + d4 * a7 + d5 * a6;</span>
+<span class="fc" id="L357">        long c12 = d3 * a9 + d4 * a8 + d5 * a7 + a6 * a6;</span>
+<span class="fc" id="L358">        long c13 = d4 * a9 + d5 * a8 + d6 * a7;</span>
+<span class="fc" id="L359">        long c14 = d5 * a9 + d6 * a8 + a7 * a7;</span>
+<span class="fc" id="L360">        long c15 = d6 * a9 + d7 * a8;</span>
+<span class="fc" id="L361">        long c16 = d7 * a9 + a8 * a8;</span>
+<span class="fc" id="L362">        long c17 = d8 * a9;</span>
+<span class="fc" id="L363">        long c18 = a9 * a9;</span>
+<span class="fc" id="L364">        c11 += c10 &gt;&gt; 26;</span>
+<span class="fc" id="L365">        c10 &amp;= M26;</span>
+<span class="fc" id="L366">        c12 += c11 &gt;&gt; 26;</span>
+<span class="fc" id="L367">        c11 &amp;= M26;</span>
+<span class="fc" id="L368">        c13 += c12 &gt;&gt; 26;</span>
+<span class="fc" id="L369">        c12 &amp;= M26;</span>
+<span class="fc" id="L370">        c14 += c13 &gt;&gt; 26;</span>
+<span class="fc" id="L371">        c13 &amp;= M26;</span>
+<span class="fc" id="L372">        c15 += c14 &gt;&gt; 26;</span>
+<span class="fc" id="L373">        c14 &amp;= M26;</span>
+<span class="fc" id="L374">        c16 += c15 &gt;&gt; 26;</span>
+<span class="fc" id="L375">        c15 &amp;= M26;</span>
+<span class="fc" id="L376">        c17 += c16 &gt;&gt; 26;</span>
+<span class="fc" id="L377">        c16 &amp;= M26;</span>
+<span class="fc" id="L378">        c18 += c17 &gt;&gt; 26;</span>
+<span class="fc" id="L379">        c17 &amp;= M26;</span>
+<span class="fc" id="L380">        long c19 = c18 &gt;&gt; 26;</span>
+<span class="fc" id="L381">        c18 &amp;= M26;</span>
+
+<span class="fc" id="L383">        c0 += c10 * 0x3D10L;</span>
+<span class="fc" id="L384">        c1 += c10 * 0x400L + c11 * 0x3D10L;</span>
+<span class="fc" id="L385">        c2 += c11 * 0x400L + c12 * 0x3D10L;</span>
+<span class="fc" id="L386">        c3 += c12 * 0x400L + c13 * 0x3D10L;</span>
+<span class="fc" id="L387">        c4 += c13 * 0x400L + c14 * 0x3D10L;</span>
+<span class="fc" id="L388">        c5 += c14 * 0x400L + c15 * 0x3D10L;</span>
+<span class="fc" id="L389">        c6 += c15 * 0x400L + c16 * 0x3D10L;</span>
+<span class="fc" id="L390">        c7 += c16 * 0x400L + c17 * 0x3D10L;</span>
+<span class="fc" id="L391">        c8 += c17 * 0x400L + c18 * 0x3D10L;</span>
+<span class="fc" id="L392">        c9 += c18 * 0x400L + c19 * 0x3D10L;</span>
+<span class="fc" id="L393">        long hi = c19 * 0x400L;</span>
+
+<span class="fc" id="L395">        c1 += c0 &gt;&gt; 26;</span>
+<span class="fc" id="L396">        c0 &amp;= M26;</span>
+<span class="fc" id="L397">        c2 += c1 &gt;&gt; 26;</span>
+<span class="fc" id="L398">        c1 &amp;= M26;</span>
+<span class="fc" id="L399">        c3 += c2 &gt;&gt; 26;</span>
+<span class="fc" id="L400">        c2 &amp;= M26;</span>
+<span class="fc" id="L401">        c4 += c3 &gt;&gt; 26;</span>
+<span class="fc" id="L402">        c3 &amp;= M26;</span>
+<span class="fc" id="L403">        c5 += c4 &gt;&gt; 26;</span>
+<span class="fc" id="L404">        c4 &amp;= M26;</span>
+<span class="fc" id="L405">        c6 += c5 &gt;&gt; 26;</span>
+<span class="fc" id="L406">        c5 &amp;= M26;</span>
+<span class="fc" id="L407">        c7 += c6 &gt;&gt; 26;</span>
+<span class="fc" id="L408">        c6 &amp;= M26;</span>
+<span class="fc" id="L409">        c8 += c7 &gt;&gt; 26;</span>
+<span class="fc" id="L410">        c7 &amp;= M26;</span>
+<span class="fc" id="L411">        c9 += c8 &gt;&gt; 26;</span>
+<span class="fc" id="L412">        c8 &amp;= M26;</span>
+<span class="fc" id="L413">        long top = (c9 &gt;&gt; 22) + (hi &lt;&lt; 4);</span>
+<span class="fc" id="L414">        c9 &amp;= M22;</span>
+
+<span class="fc" id="L416">        c0 += top * 0x3D1L;</span>
+<span class="fc" id="L417">        c1 += top &lt;&lt; 6;</span>
+<span class="fc" id="L418">        c1 += c0 &gt;&gt; 26;</span>
+<span class="fc" id="L419">        r[0] = (int) (c0 &amp; M26);</span>
+<span class="fc" id="L420">        c2 += c1 &gt;&gt; 26;</span>
+<span class="fc" id="L421">        r[1] = (int) (c1 &amp; M26);</span>
+<span class="fc" id="L422">        c3 += c2 &gt;&gt; 26;</span>
+<span class="fc" id="L423">        r[2] = (int) (c2 &amp; M26);</span>
+<span class="fc" id="L424">        c4 += c3 &gt;&gt; 26;</span>
+<span class="fc" id="L425">        r[3] = (int) (c3 &amp; M26);</span>
+<span class="fc" id="L426">        c5 += c4 &gt;&gt; 26;</span>
+<span class="fc" id="L427">        r[4] = (int) (c4 &amp; M26);</span>
+<span class="fc" id="L428">        c6 += c5 &gt;&gt; 26;</span>
+<span class="fc" id="L429">        r[5] = (int) (c5 &amp; M26);</span>
+<span class="fc" id="L430">        c7 += c6 &gt;&gt; 26;</span>
+<span class="fc" id="L431">        r[6] = (int) (c6 &amp; M26);</span>
+<span class="fc" id="L432">        c8 += c7 &gt;&gt; 26;</span>
+<span class="fc" id="L433">        r[7] = (int) (c7 &amp; M26);</span>
+<span class="fc" id="L434">        c9 += c8 &gt;&gt; 26;</span>
+<span class="fc" id="L435">        r[8] = (int) (c8 &amp; M26);</span>
+<span class="fc" id="L436">        r[9] = (int) c9;</span>
+<span class="fc" id="L437">    }</span>
+
+
+    /// r += a; the magnitudes add.
+    static void add(int[] r, int[] a) {
+<span class="fc bfc" id="L442" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L443">            r[i] += a[i];</span>
+        }
+<span class="fc" id="L445">    }</span>
+
+    /// r *= k; the magnitude is multiplied by k.
+    static void mulInt(int[] r, int k) {
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L450">            r[i] *= k;</span>
+        }
+<span class="fc" id="L452">    }</span>
+
+    /// r = -a for an `a` of magnitude at most m; the result has magnitude
+    /// m + 1. r may alias a.
+    static void neg(int[] r, int[] a, int m) {
+<span class="fc" id="L457">        int f = 2 * (m + 1);</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L459">            r[i] = P26[i] * f - a[i];</span>
+        }
+<span class="fc" id="L461">    }</span>
+
+    /// Brings r to magnitude 1 without fully reducing it.
+    static void weak(int[] r) {
+<span class="fc" id="L465">        long t0 = r[0];</span>
+<span class="fc" id="L466">        long t1 = r[1];</span>
+<span class="fc" id="L467">        long t2 = r[2];</span>
+<span class="fc" id="L468">        long t3 = r[3];</span>
+<span class="fc" id="L469">        long t4 = r[4];</span>
+<span class="fc" id="L470">        long t5 = r[5];</span>
+<span class="fc" id="L471">        long t6 = r[6];</span>
+<span class="fc" id="L472">        long t7 = r[7];</span>
+<span class="fc" id="L473">        long t8 = r[8];</span>
+<span class="fc" id="L474">        long t9 = r[9];</span>
+<span class="fc" id="L475">        t1 += t0 &gt;&gt; 26;</span>
+<span class="fc" id="L476">        t0 &amp;= M26;</span>
+<span class="fc" id="L477">        t2 += t1 &gt;&gt; 26;</span>
+<span class="fc" id="L478">        t1 &amp;= M26;</span>
+<span class="fc" id="L479">        t3 += t2 &gt;&gt; 26;</span>
+<span class="fc" id="L480">        t2 &amp;= M26;</span>
+<span class="fc" id="L481">        t4 += t3 &gt;&gt; 26;</span>
+<span class="fc" id="L482">        t3 &amp;= M26;</span>
+<span class="fc" id="L483">        t5 += t4 &gt;&gt; 26;</span>
+<span class="fc" id="L484">        t4 &amp;= M26;</span>
+<span class="fc" id="L485">        t6 += t5 &gt;&gt; 26;</span>
+<span class="fc" id="L486">        t5 &amp;= M26;</span>
+<span class="fc" id="L487">        t7 += t6 &gt;&gt; 26;</span>
+<span class="fc" id="L488">        t6 &amp;= M26;</span>
+<span class="fc" id="L489">        t8 += t7 &gt;&gt; 26;</span>
+<span class="fc" id="L490">        t7 &amp;= M26;</span>
+<span class="fc" id="L491">        t9 += t8 &gt;&gt; 26;</span>
+<span class="fc" id="L492">        t8 &amp;= M26;</span>
+<span class="fc" id="L493">        long x = t9 &gt;&gt; 22;</span>
+<span class="fc" id="L494">        t9 &amp;= M22;</span>
+<span class="fc" id="L495">        t0 += x * 0x3D1L;</span>
+<span class="fc" id="L496">        t1 += x &lt;&lt; 6;</span>
+<span class="fc" id="L497">        t1 += t0 &gt;&gt; 26;</span>
+<span class="fc" id="L498">        r[0] = (int) (t0 &amp; M26);</span>
+<span class="fc" id="L499">        t2 += t1 &gt;&gt; 26;</span>
+<span class="fc" id="L500">        r[1] = (int) (t1 &amp; M26);</span>
+<span class="fc" id="L501">        t3 += t2 &gt;&gt; 26;</span>
+<span class="fc" id="L502">        r[2] = (int) (t2 &amp; M26);</span>
+<span class="fc" id="L503">        t4 += t3 &gt;&gt; 26;</span>
+<span class="fc" id="L504">        r[3] = (int) (t3 &amp; M26);</span>
+<span class="fc" id="L505">        t5 += t4 &gt;&gt; 26;</span>
+<span class="fc" id="L506">        r[4] = (int) (t4 &amp; M26);</span>
+<span class="fc" id="L507">        t6 += t5 &gt;&gt; 26;</span>
+<span class="fc" id="L508">        r[5] = (int) (t5 &amp; M26);</span>
+<span class="fc" id="L509">        t7 += t6 &gt;&gt; 26;</span>
+<span class="fc" id="L510">        r[6] = (int) (t6 &amp; M26);</span>
+<span class="fc" id="L511">        t8 += t7 &gt;&gt; 26;</span>
+<span class="fc" id="L512">        r[7] = (int) (t7 &amp; M26);</span>
+<span class="fc" id="L513">        t9 += t8 &gt;&gt; 26;</span>
+<span class="fc" id="L514">        r[8] = (int) (t8 &amp; M26);</span>
+<span class="fc" id="L515">        r[9] = (int) t9;</span>
+<span class="fc" id="L516">    }</span>
+
+    /// Reduces r to its canonical value in `[0, p)`. Constant time.
+    static void normalize(int[] r) {
+<span class="fc" id="L520">        weak(r);</span>
+        // weak leaves at most one bit at 2^256; fold it, which cannot carry
+        // out again
+<span class="fc" id="L523">        int x = r[9] &gt;&gt;&gt; 22;</span>
+<span class="fc" id="L524">        r[9] &amp;= M22;</span>
+<span class="fc" id="L525">        long t = r[0] + x * 0x3D1L;</span>
+<span class="fc" id="L526">        r[0] = (int) (t &amp; M26);</span>
+<span class="fc" id="L527">        t = r[1] + (x &lt;&lt; 6) + (t &gt;&gt; 26);</span>
+<span class="fc" id="L528">        r[1] = (int) (t &amp; M26);</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        for (int i = 2; i &lt; 10; i++) {</span>
+<span class="fc" id="L530">            t = r[i] + (t &gt;&gt; 26);</span>
+<span class="fc" id="L531">            r[i] = (int) (t &amp; M26);</span>
+        }
+        // now r &lt; 2^256 &lt; 2p: subtract p when r + (2^256 - p) carries out
+<span class="fc" id="L534">        int[] u = new int[10];</span>
+<span class="fc" id="L535">        t = r[0] + 0x3D1L;</span>
+<span class="fc" id="L536">        u[0] = (int) (t &amp; M26);</span>
+<span class="fc" id="L537">        t = r[1] + 0x40L + (t &gt;&gt; 26);</span>
+<span class="fc" id="L538">        u[1] = (int) (t &amp; M26);</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">        for (int i = 2; i &lt; 9; i++) {</span>
+<span class="fc" id="L540">            t = r[i] + (t &gt;&gt; 26);</span>
+<span class="fc" id="L541">            u[i] = (int) (t &amp; M26);</span>
+        }
+<span class="fc" id="L543">        t = r[9] + (t &gt;&gt; 26);</span>
+<span class="fc" id="L544">        u[9] = (int) (t &amp; M22);</span>
+<span class="fc" id="L545">        int mask = -(int) (t &gt;&gt; 22);</span>
+<span class="fc bfc" id="L546" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L547">            r[i] = (u[i] &amp; mask) | (r[i] &amp; ~mask);</span>
+        }
+<span class="fc" id="L549">    }</span>
+
+    /// True when a is zero modulo p. Leaves a untouched. Variable time.
+    static boolean isZero(int[] a) {
+        // after a weak reduction the value is below 2^256 + 2^33, so it is
+        // zero modulo p only as 0 or p itself
+<span class="fc" id="L555">        long t0 = a[0];</span>
+<span class="fc" id="L556">        long t1 = a[1];</span>
+<span class="fc" id="L557">        long t2 = a[2];</span>
+<span class="fc" id="L558">        long t3 = a[3];</span>
+<span class="fc" id="L559">        long t4 = a[4];</span>
+<span class="fc" id="L560">        long t5 = a[5];</span>
+<span class="fc" id="L561">        long t6 = a[6];</span>
+<span class="fc" id="L562">        long t7 = a[7];</span>
+<span class="fc" id="L563">        long t8 = a[8];</span>
+<span class="fc" id="L564">        long t9 = a[9];</span>
+<span class="fc" id="L565">        t1 += t0 &gt;&gt; 26;</span>
+<span class="fc" id="L566">        t0 &amp;= M26;</span>
+<span class="fc" id="L567">        t2 += t1 &gt;&gt; 26;</span>
+<span class="fc" id="L568">        t1 &amp;= M26;</span>
+<span class="fc" id="L569">        t3 += t2 &gt;&gt; 26;</span>
+<span class="fc" id="L570">        t2 &amp;= M26;</span>
+<span class="fc" id="L571">        t4 += t3 &gt;&gt; 26;</span>
+<span class="fc" id="L572">        t3 &amp;= M26;</span>
+<span class="fc" id="L573">        t5 += t4 &gt;&gt; 26;</span>
+<span class="fc" id="L574">        t4 &amp;= M26;</span>
+<span class="fc" id="L575">        t6 += t5 &gt;&gt; 26;</span>
+<span class="fc" id="L576">        t5 &amp;= M26;</span>
+<span class="fc" id="L577">        t7 += t6 &gt;&gt; 26;</span>
+<span class="fc" id="L578">        t6 &amp;= M26;</span>
+<span class="fc" id="L579">        t8 += t7 &gt;&gt; 26;</span>
+<span class="fc" id="L580">        t7 &amp;= M26;</span>
+<span class="fc" id="L581">        t9 += t8 &gt;&gt; 26;</span>
+<span class="fc" id="L582">        t8 &amp;= M26;</span>
+<span class="fc" id="L583">        long x = t9 &gt;&gt; 22;</span>
+<span class="fc" id="L584">        t9 &amp;= M22;</span>
+<span class="fc" id="L585">        t0 += x * 0x3D1L;</span>
+<span class="fc" id="L586">        t1 += x &lt;&lt; 6;</span>
+<span class="fc" id="L587">        t1 += t0 &gt;&gt; 26;</span>
+<span class="fc" id="L588">        t0 &amp;= M26;</span>
+<span class="fc" id="L589">        t2 += t1 &gt;&gt; 26;</span>
+<span class="fc" id="L590">        t1 &amp;= M26;</span>
+<span class="fc" id="L591">        t3 += t2 &gt;&gt; 26;</span>
+<span class="fc" id="L592">        t2 &amp;= M26;</span>
+<span class="fc" id="L593">        t4 += t3 &gt;&gt; 26;</span>
+<span class="fc" id="L594">        t3 &amp;= M26;</span>
+<span class="fc" id="L595">        t5 += t4 &gt;&gt; 26;</span>
+<span class="fc" id="L596">        t4 &amp;= M26;</span>
+<span class="fc" id="L597">        t6 += t5 &gt;&gt; 26;</span>
+<span class="fc" id="L598">        t5 &amp;= M26;</span>
+<span class="fc" id="L599">        t7 += t6 &gt;&gt; 26;</span>
+<span class="fc" id="L600">        t6 &amp;= M26;</span>
+<span class="fc" id="L601">        t8 += t7 &gt;&gt; 26;</span>
+<span class="fc" id="L602">        t7 &amp;= M26;</span>
+<span class="fc" id="L603">        t9 += t8 &gt;&gt; 26;</span>
+<span class="fc" id="L604">        t8 &amp;= M26;</span>
+<span class="fc" id="L605">        long z = t0 | t1 | t2 | t3 | t4 | t5 | t6 | t7 | t8 | t9;</span>
+<span class="pc bpc" id="L606" title="1 of 4 branches missed.">        return z == 0 || ((t0 ^ 0x3FFFC2FL) | (t1 ^ 0x3FFFFBFL) | (t2 ^ M26) | (t3 ^ M26) | (t4 ^ M26)</span>
+                | (t5 ^ M26) | (t6 ^ M26) | (t7 ^ M26) | (t8 ^ M26) | (t9 ^ M22)) == 0;
+    }
+
+    /// True when a and b are equal modulo p. Leaves both untouched.
+    static boolean equal(int[] a, int[] b) {
+<span class="fc" id="L612">        int[] t = new int[10];</span>
+<span class="fc" id="L613">        int[] u = new int[10];</span>
+<span class="fc" id="L614">        set(t, a);</span>
+<span class="fc" id="L615">        set(u, b);</span>
+<span class="fc" id="L616">        normalize(t);</span>
+<span class="fc" id="L617">        normalize(u);</span>
+<span class="fc" id="L618">        int acc = 0;</span>
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L620">            acc |= t[i] ^ u[i];</span>
+        }
+<span class="fc bfc" id="L622" title="All 2 branches covered.">        return acc == 0;</span>
+    }
+
+    /// Reads 32 big-endian bytes, without reducing them.
+    static void fromBytes(int[] r, byte[] b, int off) {
+<span class="fc bfc" id="L627" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L628">            r[i] = 0;</span>
+        }
+<span class="fc bfc" id="L630" title="All 2 branches covered.">        for (int i = 0; i &lt; 32; i++) {</span>
+<span class="fc" id="L631">            int bit = (31 - i) * 8;</span>
+<span class="fc" id="L632">            int v = b[off + i] &amp; 0xff;</span>
+<span class="fc" id="L633">            int limb = bit / 26;</span>
+<span class="fc" id="L634">            int shift = bit % 26;</span>
+<span class="fc" id="L635">            r[limb] |= (v &lt;&lt; shift) &amp; M26;</span>
+<span class="pc bpc" id="L636" title="1 of 4 branches missed.">            if (shift &gt; 18 &amp;&amp; limb &lt; 9) {</span>
+<span class="fc" id="L637">                r[limb + 1] |= v &gt;&gt;&gt; (26 - shift);</span>
+            }
+        }
+<span class="fc" id="L640">    }</span>
+
+    /// True when 32 big-endian bytes hold a value below p.
+    static boolean isCanonical(byte[] b, int off) {
+<span class="fc" id="L644">        int[] t = new int[10];</span>
+<span class="fc" id="L645">        fromBytes(t, b, off);</span>
+<span class="fc" id="L646">        int[] u = new int[10];</span>
+<span class="fc" id="L647">        set(u, t);</span>
+<span class="fc" id="L648">        normalize(u);</span>
+<span class="fc" id="L649">        int acc = 0;</span>
+<span class="fc bfc" id="L650" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L651">            acc |= t[i] ^ u[i];</span>
+        }
+<span class="fc bfc" id="L653" title="All 2 branches covered.">        return acc == 0;</span>
+    }
+
+    /// Writes a normalized element as 32 big-endian bytes.
+    static void toBytes(int[] a, byte[] out, int off) {
+<span class="fc bfc" id="L658" title="All 2 branches covered.">        for (int i = 0; i &lt; 32; i++) {</span>
+<span class="fc" id="L659">            int bit = (31 - i) * 8;</span>
+<span class="fc" id="L660">            int limb = bit / 26;</span>
+<span class="fc" id="L661">            int shift = bit % 26;</span>
+<span class="fc" id="L662">            int v = a[limb] &gt;&gt;&gt; shift;</span>
+<span class="pc bpc" id="L663" title="1 of 4 branches missed.">            if (shift &gt; 18 &amp;&amp; limb &lt; 9) {</span>
+<span class="fc" id="L664">                v |= a[limb + 1] &lt;&lt; (26 - shift);</span>
+            }
+<span class="fc" id="L666">            out[off + i] = (byte) v;</span>
+        }
+<span class="fc" id="L668">    }</span>
+
+    /// True when the normalized element is odd.
+    static boolean isOdd(int[] a) {
+<span class="fc bfc" id="L672" title="All 2 branches covered.">        return (a[0] &amp; 1) != 0;</span>
+    }
+
+    /// r = 1 / a mod p (0 maps to 0). Constant time. r may alias a.
+    static void inv(int[] r, int[] a) {
+<span class="fc" id="L677">        int[] t = new int[10];</span>
+<span class="fc" id="L678">        set(t, a);</span>
+<span class="fc" id="L679">        normalize(t);</span>
+<span class="fc" id="L680">        int[] s = feToS30(t);</span>
+<span class="fc" id="L681">        int[] q = modInverse(s, P30, P_INV30);</span>
+<span class="fc" id="L682">        s30ToFe(q, r);</span>
+<span class="fc" id="L683">    }</span>
+
+    // packs a normalized 26-bit-limb element into nine 30-bit limbs
+    private static int[] feToS30(int[] a) {
+<span class="fc" id="L687">        int[] out = new int[9];</span>
+<span class="fc" id="L688">        long acc = 0;</span>
+<span class="fc" id="L689">        int bits = 0;</span>
+<span class="fc" id="L690">        int o = 0;</span>
+<span class="fc bfc" id="L691" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L692">            acc |= ((long) a[i]) &lt;&lt; bits;</span>
+<span class="fc" id="L693">            bits += 26;</span>
+<span class="pc bpc" id="L694" title="1 of 4 branches missed.">            while (bits &gt;= 30 &amp;&amp; o &lt; 9) {</span>
+<span class="fc" id="L695">                out[o++] = (int) (acc &amp; M30);</span>
+<span class="fc" id="L696">                acc &gt;&gt;&gt;= 30;</span>
+<span class="fc" id="L697">                bits -= 30;</span>
+            }
+        }
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">        if (o &lt; 9) {</span>
+<span class="fc" id="L701">            out[o] = (int) acc;</span>
+        }
+<span class="fc" id="L703">        return out;</span>
+    }
+
+    private static void s30ToFe(int[] s, int[] r) {
+<span class="fc" id="L707">        long acc = 0;</span>
+<span class="fc" id="L708">        int bits = 0;</span>
+<span class="fc" id="L709">        int o = 0;</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">        for (int i = 0; i &lt; 9; i++) {</span>
+<span class="fc" id="L711">            acc |= ((long) s[i]) &lt;&lt; bits;</span>
+<span class="fc" id="L712">            bits += 30;</span>
+<span class="pc bpc" id="L713" title="1 of 4 branches missed.">            while (bits &gt;= 26 &amp;&amp; o &lt; 10) {</span>
+<span class="fc" id="L714">                r[o++] = (int) (acc &amp; M26);</span>
+<span class="fc" id="L715">                acc &gt;&gt;&gt;= 26;</span>
+<span class="fc" id="L716">                bits -= 26;</span>
+            }
+        }
+<span class="pc bpc" id="L719" title="1 of 2 branches missed.">        if (o &lt; 10) {</span>
+<span class="nc" id="L720">            r[o] = (int) acc;</span>
+        }
+<span class="fc" id="L722">    }</span>
+
+    /// r = sqrt(a) when a is a square; returns false (with r undefined)
+    /// otherwise. Since p == 3 mod 4 the root is a^((p+1)/4), computed by an
+    /// addition chain of 253 squarings and 13 multiplications. r must not
+    /// alias a.
+    static boolean sqrt(int[] r, int[] a) {
+<span class="fc" id="L729">        int[] x2 = fe();</span>
+<span class="fc" id="L730">        int[] x3 = fe();</span>
+<span class="fc" id="L731">        int[] x6 = fe();</span>
+<span class="fc" id="L732">        int[] x9 = fe();</span>
+<span class="fc" id="L733">        int[] x11 = fe();</span>
+<span class="fc" id="L734">        int[] x22 = fe();</span>
+<span class="fc" id="L735">        int[] x44 = fe();</span>
+<span class="fc" id="L736">        int[] x88 = fe();</span>
+<span class="fc" id="L737">        int[] x176 = fe();</span>
+<span class="fc" id="L738">        int[] x220 = fe();</span>
+<span class="fc" id="L739">        int[] x223 = fe();</span>
+<span class="fc" id="L740">        int[] t = fe();</span>
+<span class="fc" id="L741">        sqr(x2, a);</span>
+<span class="fc" id="L742">        mul(x2, x2, a);</span>
+<span class="fc" id="L743">        sqr(x3, x2);</span>
+<span class="fc" id="L744">        mul(x3, x3, a);</span>
+<span class="fc" id="L745">        sqrN(x6, x3, 3);</span>
+<span class="fc" id="L746">        mul(x6, x6, x3);</span>
+<span class="fc" id="L747">        sqrN(x9, x6, 3);</span>
+<span class="fc" id="L748">        mul(x9, x9, x3);</span>
+<span class="fc" id="L749">        sqrN(x11, x9, 2);</span>
+<span class="fc" id="L750">        mul(x11, x11, x2);</span>
+<span class="fc" id="L751">        sqrN(x22, x11, 11);</span>
+<span class="fc" id="L752">        mul(x22, x22, x11);</span>
+<span class="fc" id="L753">        sqrN(x44, x22, 22);</span>
+<span class="fc" id="L754">        mul(x44, x44, x22);</span>
+<span class="fc" id="L755">        sqrN(x88, x44, 44);</span>
+<span class="fc" id="L756">        mul(x88, x88, x44);</span>
+<span class="fc" id="L757">        sqrN(x176, x88, 88);</span>
+<span class="fc" id="L758">        mul(x176, x176, x88);</span>
+<span class="fc" id="L759">        sqrN(x220, x176, 44);</span>
+<span class="fc" id="L760">        mul(x220, x220, x44);</span>
+<span class="fc" id="L761">        sqrN(x223, x220, 3);</span>
+<span class="fc" id="L762">        mul(x223, x223, x3);</span>
+<span class="fc" id="L763">        sqrN(t, x223, 23);</span>
+<span class="fc" id="L764">        mul(t, t, x22);</span>
+<span class="fc" id="L765">        sqrN(t, t, 6);</span>
+<span class="fc" id="L766">        mul(t, t, x2);</span>
+<span class="fc" id="L767">        sqrN(r, t, 2);</span>
+<span class="fc" id="L768">        sqr(t, r);</span>
+<span class="fc" id="L769">        return equal(t, a);</span>
+    }
+
+    private static void sqrN(int[] r, int[] a, int n) {
+<span class="fc" id="L773">        sqr(r, a);</span>
+<span class="fc bfc" id="L774" title="All 2 branches covered.">        for (int i = 1; i &lt; n; i++) {</span>
+<span class="fc" id="L775">            sqr(r, r);</span>
+        }
+<span class="fc" id="L777">    }</span>
+
+    // ----------------------------------------------------------------
+    // safegcd modular inverse
+
+    /// The inverse of x modulo an odd modulus, both as nine 30-bit limbs
+    /// (x reduced, the modulus below 2^256), with `modInv30` the modulus's
+    /// inverse modulo 2^30. Constant time; 0 maps to 0.
+    static int[] modInverse(int[] x, int[] modulus, int modInv30) {
+<span class="fc" id="L786">        int[] d = new int[9];</span>
+<span class="fc" id="L787">        int[] e = new int[9];</span>
+<span class="fc" id="L788">        e[0] = 1;</span>
+<span class="fc" id="L789">        int[] f = new int[9];</span>
+<span class="fc" id="L790">        System.arraycopy(modulus, 0, f, 0, 9);</span>
+<span class="fc" id="L791">        int[] g = new int[9];</span>
+<span class="fc" id="L792">        System.arraycopy(x, 0, g, 0, 9);</span>
+<span class="fc" id="L793">        int[] t = new int[4];</span>
+<span class="fc" id="L794">        int zeta = -1;</span>
+        // 20 * 30 = 600 &gt; 590, the bound on divsteps for 256-bit inputs
+<span class="fc bfc" id="L796" title="All 2 branches covered.">        for (int i = 0; i &lt; 20; i++) {</span>
+<span class="fc" id="L797">            zeta = divsteps30(zeta, f[0], g[0], t);</span>
+<span class="fc" id="L798">            updateDe(d, e, t, modulus, modInv30);</span>
+<span class="fc" id="L799">            updateFg(f, g, t);</span>
+        }
+<span class="fc" id="L801">        normalize30(d, f[8], modulus);</span>
+<span class="fc" id="L802">        return d;</span>
+    }
+
+    // Thirty division steps on the low bits of f and g. zeta is
+    // -(delta + 1/2) of the paper; the returned matrix t = {u, v, q, r} is
+    // scaled by 2^30, so that [f', g'] = t [f, g] / 2^30.
+    private static int divsteps30(int zeta, int f0, int g0, int[] t) {
+<span class="fc" id="L809">        int u = 1;</span>
+<span class="fc" id="L810">        int v = 0;</span>
+<span class="fc" id="L811">        int q = 0;</span>
+<span class="fc" id="L812">        int r = 1;</span>
+<span class="fc" id="L813">        int f = f0;</span>
+<span class="fc" id="L814">        int g = g0;</span>
+<span class="fc bfc" id="L815" title="All 2 branches covered.">        for (int i = 0; i &lt; 30; i++) {</span>
+            // c1: zeta &lt; 0, so delta &gt; 0 and the step may swap; c2: g odd
+<span class="fc" id="L817">            int c1 = zeta &gt;&gt; 31;</span>
+<span class="fc" id="L818">            int c2 = -(g &amp; 1);</span>
+<span class="fc" id="L819">            int x = (f ^ c1) - c1;</span>
+<span class="fc" id="L820">            int y = (u ^ c1) - c1;</span>
+<span class="fc" id="L821">            int z = (v ^ c1) - c1;</span>
+<span class="fc" id="L822">            g += x &amp; c2;</span>
+<span class="fc" id="L823">            q += y &amp; c2;</span>
+<span class="fc" id="L824">            r += z &amp; c2;</span>
+<span class="fc" id="L825">            c1 &amp;= c2;</span>
+<span class="fc" id="L826">            zeta = (zeta ^ c1) - 1;</span>
+<span class="fc" id="L827">            f += g &amp; c1;</span>
+<span class="fc" id="L828">            u += q &amp; c1;</span>
+<span class="fc" id="L829">            v += r &amp; c1;</span>
+<span class="fc" id="L830">            g &gt;&gt;&gt;= 1;</span>
+<span class="fc" id="L831">            u &lt;&lt;= 1;</span>
+<span class="fc" id="L832">            v &lt;&lt;= 1;</span>
+        }
+<span class="fc" id="L834">        t[0] = u;</span>
+<span class="fc" id="L835">        t[1] = v;</span>
+<span class="fc" id="L836">        t[2] = q;</span>
+<span class="fc" id="L837">        t[3] = r;</span>
+<span class="fc" id="L838">        return zeta;</span>
+    }
+
+    // [d, e] = t [d, e] / 2^30 modulo the modulus, keeping both in
+    // (-2 modulus, modulus)
+    private static void updateDe(int[] d, int[] e, int[] t, int[] p, int pInv30) {
+<span class="fc" id="L844">        int u = t[0];</span>
+<span class="fc" id="L845">        int v = t[1];</span>
+<span class="fc" id="L846">        int q = t[2];</span>
+<span class="fc" id="L847">        int r = t[3];</span>
+<span class="fc" id="L848">        int sd = d[8] &gt;&gt; 31;</span>
+<span class="fc" id="L849">        int se = e[8] &gt;&gt; 31;</span>
+<span class="fc" id="L850">        int md = (u &amp; sd) + (v &amp; se);</span>
+<span class="fc" id="L851">        int me = (q &amp; sd) + (r &amp; se);</span>
+<span class="fc" id="L852">        long cd = (long) u * d[0] + (long) v * e[0];</span>
+<span class="fc" id="L853">        long ce = (long) q * d[0] + (long) r * e[0];</span>
+<span class="fc" id="L854">        md -= (pInv30 * (int) cd + md) &amp; M30;</span>
+<span class="fc" id="L855">        me -= (pInv30 * (int) ce + me) &amp; M30;</span>
+<span class="fc" id="L856">        cd += (long) p[0] * md;</span>
+<span class="fc" id="L857">        ce += (long) p[0] * me;</span>
+<span class="fc" id="L858">        cd &gt;&gt;= 30;</span>
+<span class="fc" id="L859">        ce &gt;&gt;= 30;</span>
+<span class="fc bfc" id="L860" title="All 2 branches covered.">        for (int i = 1; i &lt; 9; i++) {</span>
+<span class="fc" id="L861">            cd += (long) u * d[i] + (long) v * e[i] + (long) p[i] * md;</span>
+<span class="fc" id="L862">            ce += (long) q * d[i] + (long) r * e[i] + (long) p[i] * me;</span>
+<span class="fc" id="L863">            d[i - 1] = (int) cd &amp; M30;</span>
+<span class="fc" id="L864">            cd &gt;&gt;= 30;</span>
+<span class="fc" id="L865">            e[i - 1] = (int) ce &amp; M30;</span>
+<span class="fc" id="L866">            ce &gt;&gt;= 30;</span>
+        }
+<span class="fc" id="L868">        d[8] = (int) cd;</span>
+<span class="fc" id="L869">        e[8] = (int) ce;</span>
+<span class="fc" id="L870">    }</span>
+
+    private static void updateFg(int[] f, int[] g, int[] t) {
+<span class="fc" id="L873">        int u = t[0];</span>
+<span class="fc" id="L874">        int v = t[1];</span>
+<span class="fc" id="L875">        int q = t[2];</span>
+<span class="fc" id="L876">        int r = t[3];</span>
+<span class="fc" id="L877">        long cf = (long) u * f[0] + (long) v * g[0];</span>
+<span class="fc" id="L878">        long cg = (long) q * f[0] + (long) r * g[0];</span>
+<span class="fc" id="L879">        cf &gt;&gt;= 30;</span>
+<span class="fc" id="L880">        cg &gt;&gt;= 30;</span>
+<span class="fc bfc" id="L881" title="All 2 branches covered.">        for (int i = 1; i &lt; 9; i++) {</span>
+<span class="fc" id="L882">            cf += (long) u * f[i] + (long) v * g[i];</span>
+<span class="fc" id="L883">            cg += (long) q * f[i] + (long) r * g[i];</span>
+<span class="fc" id="L884">            f[i - 1] = (int) cf &amp; M30;</span>
+<span class="fc" id="L885">            cf &gt;&gt;= 30;</span>
+<span class="fc" id="L886">            g[i - 1] = (int) cg &amp; M30;</span>
+<span class="fc" id="L887">            cg &gt;&gt;= 30;</span>
+        }
+<span class="fc" id="L889">        f[8] = (int) cf;</span>
+<span class="fc" id="L890">        g[8] = (int) cg;</span>
+<span class="fc" id="L891">    }</span>
+
+    // brings d from (-2 modulus, modulus) to [0, modulus), negating it when
+    // the final f (the sign of which is passed) is -1
+    private static void normalize30(int[] r, int sign, int[] p) {
+<span class="fc" id="L896">        int add = r[8] &gt;&gt; 31;</span>
+<span class="fc bfc" id="L897" title="All 2 branches covered.">        for (int i = 0; i &lt; 9; i++) {</span>
+<span class="fc" id="L898">            r[i] += p[i] &amp; add;</span>
+        }
+<span class="fc" id="L900">        int negate = sign &gt;&gt; 31;</span>
+<span class="fc bfc" id="L901" title="All 2 branches covered.">        for (int i = 0; i &lt; 9; i++) {</span>
+<span class="fc" id="L902">            r[i] = (r[i] ^ negate) - negate;</span>
+        }
+<span class="fc" id="L904">        carry30(r);</span>
+<span class="fc" id="L905">        add = r[8] &gt;&gt; 31;</span>
+<span class="fc bfc" id="L906" title="All 2 branches covered.">        for (int i = 0; i &lt; 9; i++) {</span>
+<span class="fc" id="L907">            r[i] += p[i] &amp; add;</span>
+        }
+<span class="fc" id="L909">        carry30(r);</span>
+<span class="fc" id="L910">    }</span>
+
+    private static void carry30(int[] r) {
+<span class="fc bfc" id="L913" title="All 2 branches covered.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L914">            r[i + 1] += r[i] &gt;&gt; 30;</span>
+<span class="fc" id="L915">            r[i] &amp;= M30;</span>
+        }
+<span class="fc" id="L917">    }</span>
+
+    // ----------------------------------------------------------------
+    // points
+
+    /// Scratch space for one operation, so the inner loops allocate nothing.
+<span class="fc" id="L923">    static final class Ctx {</span>
+<span class="fc" id="L924">        final int[] t0 = new int[10];</span>
+<span class="fc" id="L925">        final int[] t1 = new int[10];</span>
+<span class="fc" id="L926">        final int[] t2 = new int[10];</span>
+<span class="fc" id="L927">        final int[] t3 = new int[10];</span>
+<span class="fc" id="L928">        final int[] t4 = new int[10];</span>
+<span class="fc" id="L929">        final int[] t5 = new int[10];</span>
+<span class="fc" id="L930">        final int[] t6 = new int[10];</span>
+<span class="fc" id="L931">        final int[] t7 = new int[10];</span>
+<span class="fc" id="L932">        final int[] t8 = new int[10];</span>
+<span class="fc" id="L933">        final int[] t9 = new int[10];</span>
+    }
+
+    /// A point in Jacobian coordinates, `(x / z^2, y / z^3)`, or infinity.
+<span class="fc" id="L937">    static final class Gej {</span>
+<span class="fc" id="L938">        final int[] x = new int[10];</span>
+<span class="fc" id="L939">        final int[] y = new int[10];</span>
+<span class="fc" id="L940">        final int[] z = new int[10];</span>
+        boolean inf;
+
+        static Gej infinity() {
+<span class="nc" id="L944">            Gej p = new Gej();</span>
+<span class="nc" id="L945">            p.inf = true;</span>
+<span class="nc" id="L946">            return p;</span>
+        }
+
+        static Gej affine(int[] x, int[] y) {
+<span class="fc" id="L950">            Gej p = new Gej();</span>
+<span class="fc" id="L951">            Secp256k1Math.set(p.x, x);</span>
+<span class="fc" id="L952">            Secp256k1Math.set(p.y, y);</span>
+<span class="fc" id="L953">            p.z[0] = 1;</span>
+<span class="fc" id="L954">            return p;</span>
+        }
+
+        void set(Gej o) {
+<span class="fc" id="L958">            Secp256k1Math.set(x, o.x);</span>
+<span class="fc" id="L959">            Secp256k1Math.set(y, o.y);</span>
+<span class="fc" id="L960">            Secp256k1Math.set(z, o.z);</span>
+<span class="fc" id="L961">            inf = o.inf;</span>
+<span class="fc" id="L962">        }</span>
+    }
+
+    /// r = 2a. Inputs of magnitude at most (x 6, y 4, z 2), which every
+    /// point operation here returns; the result is (6, 4, 2). r may be a.
+    static void dbl(Ctx c, Gej r, Gej a) {
+<span class="fc bfc" id="L968" title="All 2 branches covered.">        if (a.inf) {</span>
+<span class="fc" id="L969">            r.inf = true;</span>
+<span class="fc" id="L970">            return;</span>
+        }
+<span class="fc" id="L972">        r.inf = false;</span>
+<span class="fc" id="L973">        int[] t1 = c.t0;</span>
+<span class="fc" id="L974">        int[] t2 = c.t1;</span>
+<span class="fc" id="L975">        int[] t3 = c.t2;</span>
+<span class="fc" id="L976">        int[] t4 = c.t3;</span>
+<span class="fc" id="L977">        mul(r.z, a.z, a.y);</span>
+<span class="fc" id="L978">        mulInt(r.z, 2);         // 2yz (2)</span>
+<span class="fc" id="L979">        sqr(t1, a.x);</span>
+<span class="fc" id="L980">        mulInt(t1, 3);          // 3x^2 (3)</span>
+<span class="fc" id="L981">        sqr(t2, t1);            // 9x^4 (1)</span>
+<span class="fc" id="L982">        sqr(t3, a.y);</span>
+<span class="fc" id="L983">        mulInt(t3, 2);          // 2y^2 (2)</span>
+<span class="fc" id="L984">        sqr(t4, t3);</span>
+<span class="fc" id="L985">        mulInt(t4, 2);          // 8y^4 (2)</span>
+<span class="fc" id="L986">        mul(t3, t3, a.x);       // 2xy^2 (1)</span>
+<span class="fc" id="L987">        set(r.x, t3);</span>
+<span class="fc" id="L988">        mulInt(r.x, 4);</span>
+<span class="fc" id="L989">        neg(r.x, r.x, 4);</span>
+<span class="fc" id="L990">        add(r.x, t2);           // 9x^4 - 8xy^2 (6)</span>
+<span class="fc" id="L991">        neg(t2, t2, 1);</span>
+<span class="fc" id="L992">        mulInt(t3, 6);</span>
+<span class="fc" id="L993">        add(t3, t2);            // 12xy^2 - 9x^4 (8)</span>
+<span class="fc" id="L994">        mul(r.y, t1, t3);       // (1)</span>
+<span class="fc" id="L995">        neg(t2, t4, 2);</span>
+<span class="fc" id="L996">        add(r.y, t2);           // 36x^3y^2 - 27x^6 - 8y^4 (4)</span>
+<span class="fc" id="L997">    }</span>
+
+    /// r = a + (bx, by), variable time, for public data only. `by` may have
+    /// magnitude 2; the result is (5, 3, 1). r may be a.
+    static void addGe(Ctx c, Gej r, Gej a, int[] bx, int[] by) {
+<span class="fc bfc" id="L1002" title="All 2 branches covered.">        if (a.inf) {</span>
+<span class="fc" id="L1003">            set(r.x, bx);</span>
+<span class="fc" id="L1004">            set(r.y, by);</span>
+<span class="fc" id="L1005">            weak(r.y);</span>
+<span class="fc" id="L1006">            setInt(r.z, 1);</span>
+<span class="fc" id="L1007">            r.inf = false;</span>
+<span class="fc" id="L1008">            return;</span>
+        }
+<span class="fc" id="L1010">        int[] z12 = c.t4;</span>
+<span class="fc" id="L1011">        int[] u1 = c.t5;</span>
+<span class="fc" id="L1012">        int[] u2 = c.t6;</span>
+<span class="fc" id="L1013">        int[] s1 = c.t7;</span>
+<span class="fc" id="L1014">        int[] s2 = c.t8;</span>
+<span class="fc" id="L1015">        int[] h = c.t9;</span>
+<span class="fc" id="L1016">        int[] i = c.t0;</span>
+<span class="fc" id="L1017">        sqr(z12, a.z);</span>
+<span class="fc" id="L1018">        set(u1, a.x);</span>
+<span class="fc" id="L1019">        weak(u1);</span>
+<span class="fc" id="L1020">        mul(u2, bx, z12);</span>
+<span class="fc" id="L1021">        set(s1, a.y);</span>
+<span class="fc" id="L1022">        weak(s1);</span>
+<span class="fc" id="L1023">        mul(s2, by, z12);</span>
+<span class="fc" id="L1024">        mul(s2, s2, a.z);</span>
+<span class="fc" id="L1025">        neg(h, u1, 1);</span>
+<span class="fc" id="L1026">        add(h, u2);             // (3)</span>
+<span class="fc" id="L1027">        neg(i, s1, 1);</span>
+<span class="fc" id="L1028">        add(i, s2);             // (3)</span>
+<span class="fc bfc" id="L1029" title="All 2 branches covered.">        if (isZero(h)) {</span>
+<span class="fc bfc" id="L1030" title="All 2 branches covered.">            if (isZero(i)) {</span>
+<span class="fc" id="L1031">                dbl(c, r, a);</span>
+            } else {
+<span class="fc" id="L1033">                r.inf = true;</span>
+            }
+<span class="fc" id="L1035">            return;</span>
+        }
+<span class="fc" id="L1037">        int[] i2 = c.t1;</span>
+<span class="fc" id="L1038">        int[] h2 = c.t2;</span>
+<span class="fc" id="L1039">        int[] h3 = c.t3;</span>
+<span class="fc" id="L1040">        sqr(i2, i);</span>
+<span class="fc" id="L1041">        sqr(h2, h);</span>
+<span class="fc" id="L1042">        mul(h3, h, h2);</span>
+<span class="fc" id="L1043">        mul(r.z, a.z, h);       // (1)</span>
+<span class="fc" id="L1044">        int[] t = c.t4;</span>
+<span class="fc" id="L1045">        mul(t, u1, h2);</span>
+<span class="fc" id="L1046">        set(r.x, t);</span>
+<span class="fc" id="L1047">        mulInt(r.x, 2);</span>
+<span class="fc" id="L1048">        add(r.x, h3);</span>
+<span class="fc" id="L1049">        neg(r.x, r.x, 3);</span>
+<span class="fc" id="L1050">        add(r.x, i2);           // (5)</span>
+<span class="fc" id="L1051">        neg(r.y, r.x, 5);</span>
+<span class="fc" id="L1052">        add(r.y, t);            // (7)</span>
+<span class="fc" id="L1053">        mul(r.y, r.y, i);</span>
+<span class="fc" id="L1054">        mul(h3, h3, s1);</span>
+<span class="fc" id="L1055">        neg(h3, h3, 1);</span>
+<span class="fc" id="L1056">        add(r.y, h3);           // (3)</span>
+<span class="fc" id="L1057">        r.inf = false;</span>
+<span class="fc" id="L1058">    }</span>
+
+    /// r = a + b, variable time, for public data only. The result is
+    /// (5, 3, 1). r may be a or b.
+    static void addGej(Ctx c, Gej r, Gej a, Gej b) {
+<span class="pc bpc" id="L1063" title="1 of 2 branches missed.">        if (a.inf) {</span>
+<span class="nc" id="L1064">            r.set(b);</span>
+<span class="nc" id="L1065">            return;</span>
+        }
+<span class="pc bpc" id="L1067" title="1 of 2 branches missed.">        if (b.inf) {</span>
+<span class="nc" id="L1068">            r.set(a);</span>
+<span class="nc" id="L1069">            return;</span>
+        }
+<span class="fc" id="L1071">        int[] z22 = c.t4;</span>
+<span class="fc" id="L1072">        int[] z12 = c.t5;</span>
+<span class="fc" id="L1073">        int[] u1 = c.t6;</span>
+<span class="fc" id="L1074">        int[] u2 = c.t7;</span>
+<span class="fc" id="L1075">        int[] s1 = c.t8;</span>
+<span class="fc" id="L1076">        int[] s2 = c.t9;</span>
+<span class="fc" id="L1077">        sqr(z22, b.z);</span>
+<span class="fc" id="L1078">        sqr(z12, a.z);</span>
+<span class="fc" id="L1079">        mul(u1, a.x, z22);</span>
+<span class="fc" id="L1080">        mul(u2, b.x, z12);</span>
+<span class="fc" id="L1081">        mul(s1, a.y, z22);</span>
+<span class="fc" id="L1082">        mul(s1, s1, b.z);</span>
+<span class="fc" id="L1083">        mul(s2, b.y, z12);</span>
+<span class="fc" id="L1084">        mul(s2, s2, a.z);</span>
+<span class="fc" id="L1085">        int[] h = c.t4;</span>
+<span class="fc" id="L1086">        int[] i = c.t5;</span>
+<span class="fc" id="L1087">        neg(h, u1, 1);</span>
+<span class="fc" id="L1088">        add(h, u2);             // (3)</span>
+<span class="fc" id="L1089">        neg(i, s1, 1);</span>
+<span class="fc" id="L1090">        add(i, s2);             // (3)</span>
+<span class="pc bpc" id="L1091" title="1 of 2 branches missed.">        if (isZero(h)) {</span>
+<span class="nc bnc" id="L1092" title="All 2 branches missed.">            if (isZero(i)) {</span>
+<span class="nc" id="L1093">                dbl(c, r, a);</span>
+            } else {
+<span class="nc" id="L1095">                r.inf = true;</span>
+            }
+<span class="nc" id="L1097">            return;</span>
+        }
+<span class="fc" id="L1099">        int[] i2 = c.t1;</span>
+<span class="fc" id="L1100">        int[] h2 = c.t2;</span>
+<span class="fc" id="L1101">        int[] h3 = c.t3;</span>
+<span class="fc" id="L1102">        sqr(i2, i);</span>
+<span class="fc" id="L1103">        sqr(h2, h);</span>
+<span class="fc" id="L1104">        mul(h3, h, h2);</span>
+<span class="fc" id="L1105">        mul(h, h, b.z);</span>
+<span class="fc" id="L1106">        mul(r.z, a.z, h);       // (1)</span>
+<span class="fc" id="L1107">        int[] t = c.t7;</span>
+<span class="fc" id="L1108">        mul(t, u1, h2);</span>
+<span class="fc" id="L1109">        set(r.x, t);</span>
+<span class="fc" id="L1110">        mulInt(r.x, 2);</span>
+<span class="fc" id="L1111">        add(r.x, h3);</span>
+<span class="fc" id="L1112">        neg(r.x, r.x, 3);</span>
+<span class="fc" id="L1113">        add(r.x, i2);           // (5)</span>
+<span class="fc" id="L1114">        neg(r.y, r.x, 5);</span>
+<span class="fc" id="L1115">        add(r.y, t);            // (7)</span>
+<span class="fc" id="L1116">        mul(r.y, r.y, i);</span>
+<span class="fc" id="L1117">        mul(h3, h3, s1);</span>
+<span class="fc" id="L1118">        neg(h3, h3, 1);</span>
+<span class="fc" id="L1119">        add(r.y, h3);           // (3)</span>
+<span class="fc" id="L1120">        r.inf = false;</span>
+<span class="fc" id="L1121">    }</span>
+
+    /// The affine coordinates of a, normalized; false for infinity.
+    static boolean toAffine(Ctx c, Gej a, int[] x, int[] y) {
+<span class="fc bfc" id="L1125" title="All 2 branches covered.">        if (a.inf) {</span>
+<span class="fc" id="L1126">            return false;</span>
+        }
+<span class="fc" id="L1128">        int[] zi = c.t0;</span>
+<span class="fc" id="L1129">        int[] zi2 = c.t1;</span>
+<span class="fc" id="L1130">        inv(zi, a.z);</span>
+<span class="fc" id="L1131">        sqr(zi2, zi);</span>
+<span class="fc" id="L1132">        mul(x, a.x, zi2);</span>
+<span class="fc" id="L1133">        mul(zi2, zi2, zi);</span>
+<span class="fc" id="L1134">        mul(y, a.y, zi2);</span>
+<span class="fc" id="L1135">        normalize(x);</span>
+<span class="fc" id="L1136">        normalize(y);</span>
+<span class="fc" id="L1137">        return true;</span>
+    }
+
+    /// Converts points (none at infinity) to affine with one inversion.
+    static void batchToAffine(Ctx c, Gej[] in, int count, int[][] xs, int[][] ys, int offset) {
+<span class="fc" id="L1142">        int[][] acc = new int[count][];</span>
+<span class="fc" id="L1143">        acc[0] = new int[10];</span>
+<span class="fc" id="L1144">        set(acc[0], in[0].z);</span>
+<span class="fc bfc" id="L1145" title="All 2 branches covered.">        for (int i = 1; i &lt; count; i++) {</span>
+<span class="fc" id="L1146">            acc[i] = new int[10];</span>
+<span class="fc" id="L1147">            mul(acc[i], acc[i - 1], in[i].z);</span>
+        }
+<span class="fc" id="L1149">        int[] inv = new int[10];</span>
+<span class="fc" id="L1150">        inv(inv, acc[count - 1]);</span>
+<span class="fc" id="L1151">        int[] zi = c.t2;</span>
+<span class="fc" id="L1152">        int[] zi2 = c.t3;</span>
+<span class="fc bfc" id="L1153" title="All 2 branches covered.">        for (int i = count - 1; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L1154" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L1155">                mul(zi, inv, acc[i - 1]);</span>
+<span class="fc" id="L1156">                mul(inv, inv, in[i].z);</span>
+            } else {
+<span class="fc" id="L1158">                set(zi, inv);</span>
+            }
+<span class="fc" id="L1160">            int[] x = new int[10];</span>
+<span class="fc" id="L1161">            int[] y = new int[10];</span>
+<span class="fc" id="L1162">            sqr(zi2, zi);</span>
+<span class="fc" id="L1163">            mul(x, in[i].x, zi2);</span>
+<span class="fc" id="L1164">            mul(zi2, zi2, zi);</span>
+<span class="fc" id="L1165">            mul(y, in[i].y, zi2);</span>
+<span class="fc" id="L1166">            normalize(x);</span>
+<span class="fc" id="L1167">            normalize(y);</span>
+<span class="fc" id="L1168">            xs[offset + i] = x;</span>
+<span class="fc" id="L1169">            ys[offset + i] = y;</span>
+        }
+<span class="fc" id="L1171">    }</span>
+
+    /// The point with abscissa x and the requested parity of y, or null
+    /// when x is not on the curve. x must be normalized.
+    static int[] liftY(int[] x, boolean odd) {
+<span class="fc" id="L1176">        int[] rhs = new int[10];</span>
+<span class="fc" id="L1177">        sqr(rhs, x);</span>
+<span class="fc" id="L1178">        mul(rhs, rhs, x);</span>
+<span class="fc" id="L1179">        int[] seven = new int[10];</span>
+<span class="fc" id="L1180">        seven[0] = 7;</span>
+<span class="fc" id="L1181">        add(rhs, seven);</span>
+<span class="fc" id="L1182">        int[] y = new int[10];</span>
+<span class="fc bfc" id="L1183" title="All 2 branches covered.">        if (!sqrt(y, rhs)) {</span>
+<span class="fc" id="L1184">            return null;</span>
+        }
+<span class="fc" id="L1186">        normalize(y);</span>
+<span class="fc bfc" id="L1187" title="All 2 branches covered.">        if (isOdd(y) != odd) {</span>
+<span class="fc" id="L1188">            neg(y, y, 1);</span>
+<span class="fc" id="L1189">            normalize(y);</span>
+        }
+<span class="fc" id="L1191">        return y;</span>
+    }
+
+    /// True when (x, y) satisfies y^2 = x^3 + 7.
+    static boolean onCurve(int[] x, int[] y) {
+<span class="fc" id="L1196">        int[] rhs = new int[10];</span>
+<span class="fc" id="L1197">        sqr(rhs, x);</span>
+<span class="fc" id="L1198">        mul(rhs, rhs, x);</span>
+<span class="fc" id="L1199">        int[] seven = new int[10];</span>
+<span class="fc" id="L1200">        seven[0] = 7;</span>
+<span class="fc" id="L1201">        add(rhs, seven);</span>
+<span class="fc" id="L1202">        int[] lhs = new int[10];</span>
+<span class="fc" id="L1203">        sqr(lhs, y);</span>
+<span class="fc" id="L1204">        return equal(lhs, rhs);</span>
+    }
+
+    // ----------------------------------------------------------------
+    // constant-time multiplication by the generator
+
+    /// A point in homogeneous projective coordinates `(x / z, y / z)`; the
+    /// point at infinity is `(0 : 1 : 0)`.
+<span class="fc" id="L1212">    static final class Proj {</span>
+<span class="fc" id="L1213">        final int[] x = new int[10];</span>
+<span class="fc" id="L1214">        final int[] y = new int[10];</span>
+<span class="fc" id="L1215">        final int[] z = new int[10];</span>
+    }
+
+    // r = r + (x2, y2) by the complete mixed addition of Renes, Costello and
+    // Batina (2016, algorithm 8, a = 0, b3 = 21): correct for every r,
+    // including infinity and r == +-(x2, y2), with no branch. Inputs of
+    // magnitude 1, result magnitude 1.
+    private static void addComplete(Ctx c, Proj r, int[] x2, int[] y2) {
+<span class="fc" id="L1223">        int[] t0 = c.t0;</span>
+<span class="fc" id="L1224">        int[] t1 = c.t1;</span>
+<span class="fc" id="L1225">        int[] t2 = c.t2;</span>
+<span class="fc" id="L1226">        int[] t3 = c.t3;</span>
+<span class="fc" id="L1227">        int[] t4 = c.t4;</span>
+<span class="fc" id="L1228">        int[] x3 = c.t5;</span>
+<span class="fc" id="L1229">        int[] y3 = c.t6;</span>
+<span class="fc" id="L1230">        int[] z3 = c.t7;</span>
+<span class="fc" id="L1231">        mul(t0, r.x, x2);</span>
+<span class="fc" id="L1232">        mul(t1, r.y, y2);</span>
+<span class="fc" id="L1233">        set(t3, x2);</span>
+<span class="fc" id="L1234">        add(t3, y2);</span>
+<span class="fc" id="L1235">        set(t4, r.x);</span>
+<span class="fc" id="L1236">        add(t4, r.y);</span>
+<span class="fc" id="L1237">        mul(t3, t3, t4);</span>
+<span class="fc" id="L1238">        set(t4, t0);</span>
+<span class="fc" id="L1239">        add(t4, t1);</span>
+<span class="fc" id="L1240">        neg(t4, t4, 2);</span>
+<span class="fc" id="L1241">        add(t3, t4);            // x1 y2 + x2 y1 (4)</span>
+<span class="fc" id="L1242">        mul(t4, y2, r.z);</span>
+<span class="fc" id="L1243">        add(t4, r.y);           // y1 + y2 z1 (2)</span>
+<span class="fc" id="L1244">        mul(y3, x2, r.z);</span>
+<span class="fc" id="L1245">        add(y3, r.x);           // x1 + x2 z1 (2)</span>
+<span class="fc" id="L1246">        set(x3, t0);</span>
+<span class="fc" id="L1247">        add(x3, t0);</span>
+<span class="fc" id="L1248">        add(t0, x3);            // 3 x1 x2 (3)</span>
+<span class="fc" id="L1249">        set(t2, r.z);</span>
+<span class="fc" id="L1250">        mulInt(t2, 21);</span>
+<span class="fc" id="L1251">        weak(t2);               // b3 z1 (1)</span>
+<span class="fc" id="L1252">        set(z3, t1);</span>
+<span class="fc" id="L1253">        add(z3, t2);            // (2)</span>
+<span class="fc" id="L1254">        neg(t2, t2, 1);</span>
+<span class="fc" id="L1255">        add(t1, t2);            // (3)</span>
+<span class="fc" id="L1256">        weak(y3);               // (1): 21 times magnitude 2 would overflow an int</span>
+<span class="fc" id="L1257">        mulInt(y3, 21);</span>
+<span class="fc" id="L1258">        weak(y3);               // (1)</span>
+<span class="fc" id="L1259">        mul(x3, t4, y3);</span>
+<span class="fc" id="L1260">        mul(t2, t3, t1);</span>
+<span class="fc" id="L1261">        neg(x3, x3, 1);</span>
+<span class="fc" id="L1262">        add(x3, t2);            // (3)</span>
+<span class="fc" id="L1263">        mul(y3, y3, t0);</span>
+<span class="fc" id="L1264">        mul(t1, t1, z3);</span>
+<span class="fc" id="L1265">        add(y3, t1);            // (2)</span>
+<span class="fc" id="L1266">        mul(t0, t0, t3);</span>
+<span class="fc" id="L1267">        mul(z3, z3, t4);</span>
+<span class="fc" id="L1268">        add(z3, t0);            // (2)</span>
+<span class="fc" id="L1269">        weak(x3);</span>
+<span class="fc" id="L1270">        weak(y3);</span>
+<span class="fc" id="L1271">        weak(z3);</span>
+<span class="fc" id="L1272">        set(r.x, x3);</span>
+<span class="fc" id="L1273">        set(r.y, y3);</span>
+<span class="fc" id="L1274">        set(r.z, z3);</span>
+<span class="fc" id="L1275">    }</span>
+
+    // Comb width for mulGen: each of GEN_WINDOWS windows of GEN_BITS bits
+    // adds one of GEN_ENTRIES odd multiples. Wider windows mean fewer
+    // additions and longer constant-time table scans; 6 bits is where the two
+    // balance (measured against 4 and 6), at 52 windows of 16 points.
+    private static final int GEN_BITS = 5;
+    private static final int GEN_ENTRIES = 1 &lt;&lt; (GEN_BITS - 1);
+    private static final int GEN_WINDOWS = (256 + GEN_BITS - 1) / GEN_BITS;
+
+    // the odd multiples (2j + 1) 2^(GEN_BITS i) G, then 2^(GEN_BITS GEN_WINDOWS) G
+    private static final class GenTable {
+<span class="fc" id="L1287">        static final int[][] X = new int[GEN_WINDOWS * GEN_ENTRIES + 1][];</span>
+<span class="fc" id="L1288">        static final int[][] Y = new int[GEN_WINDOWS * GEN_ENTRIES + 1][];</span>
+
+        static {
+<span class="fc" id="L1291">            Ctx c = new Ctx();</span>
+<span class="fc" id="L1292">            Gej[] pts = new Gej[GEN_WINDOWS * GEN_ENTRIES + 1];</span>
+<span class="fc" id="L1293">            Gej base = Gej.affine(G_X, G_Y);</span>
+<span class="fc bfc" id="L1294" title="All 2 branches covered.">            for (int i = 0; i &lt; GEN_WINDOWS; i++) {</span>
+<span class="fc" id="L1295">                Gej twice = new Gej();</span>
+<span class="fc" id="L1296">                dbl(c, twice, base);</span>
+<span class="fc" id="L1297">                Gej acc = new Gej();</span>
+<span class="fc" id="L1298">                acc.set(base);</span>
+<span class="fc bfc" id="L1299" title="All 2 branches covered.">                for (int j = 0; j &lt; GEN_ENTRIES; j++) {</span>
+<span class="fc" id="L1300">                    pts[i * GEN_ENTRIES + j] = new Gej();</span>
+<span class="fc" id="L1301">                    pts[i * GEN_ENTRIES + j].set(acc);</span>
+<span class="fc" id="L1302">                    addGej(c, acc, acc, twice);</span>
+                }
+<span class="fc bfc" id="L1304" title="All 2 branches covered.">                for (int k = 0; k &lt; GEN_BITS; k++) {</span>
+<span class="fc" id="L1305">                    dbl(c, base, base);</span>
+                }
+            }
+<span class="fc" id="L1308">            pts[GEN_WINDOWS * GEN_ENTRIES] = base;</span>
+<span class="fc" id="L1309">            batchToAffine(c, pts, pts.length, X, Y, 0);</span>
+<span class="fc" id="L1310">        }</span>
+    }
+
+    /// The generator's coordinates.
+<span class="fc" id="L1314">    static final int[] G_X = new int[10];</span>
+<span class="fc" id="L1315">    static final int[] G_Y = new int[10];</span>
+
+    static {
+<span class="fc" id="L1318">        byte[] gx = Hash.fromHex(&quot;79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798&quot;);</span>
+<span class="fc" id="L1319">        byte[] gy = Hash.fromHex(&quot;483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8&quot;);</span>
+<span class="fc" id="L1320">        fromBytes(G_X, gx, 0);</span>
+<span class="fc" id="L1321">        fromBytes(G_Y, gy, 0);</span>
+    }
+
+    /// k G for a scalar `0 &lt; k &lt; n` given as eight little-endian 32-bit
+    /// words, written to x and y normalized. Constant time.
+    ///
+    /// The scalar is made odd first (an even k is replaced by n - k and the
+    /// result negated), and an odd k has signed odd digits in base
+    /// `2^w` (w = GEN_BITS): with `b_i` the (w + 1)-bit window of k starting at
+    /// bit `w i`, `k = sum ((b_i | 1) - 2^w) 2^(w i) + 2^(w W)` over the W
+    /// windows. Every digit is odd, so every table entry added is a real
+    /// point and the comb has no zero case to leak.
+    static void mulGen(int[] k, int[] x, int[] y) {
+<span class="fc" id="L1334">        Ctx c = new Ctx();</span>
+<span class="fc" id="L1335">        int[] kk = new int[10];</span>
+<span class="fc" id="L1336">        int even = (k[0] &amp; 1) ^ 1;</span>
+<span class="fc" id="L1337">        int mask = -even;</span>
+        // kk = even ? n - k : k
+<span class="fc" id="L1339">        int[] nk = sub32(N_WORDS, k);</span>
+<span class="fc bfc" id="L1340" title="All 2 branches covered.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L1341">            kk[i] = (nk[i] &amp; mask) | (k[i] &amp; ~mask);</span>
+        }
+<span class="fc" id="L1343">        Proj r = new Proj();</span>
+<span class="fc" id="L1344">        set(r.x, GenTable.X[GEN_WINDOWS * GEN_ENTRIES]);</span>
+<span class="fc" id="L1345">        set(r.y, GenTable.Y[GEN_WINDOWS * GEN_ENTRIES]);</span>
+<span class="fc" id="L1346">        r.z[0] = 1;</span>
+<span class="fc" id="L1347">        int[] px = c.t8;</span>
+<span class="fc" id="L1348">        int[] py = c.t9;</span>
+<span class="fc" id="L1349">        int[] ny = new int[10];</span>
+<span class="fc" id="L1350">        int digitMask = (1 &lt;&lt; (GEN_BITS + 1)) - 1;</span>
+<span class="fc bfc" id="L1351" title="All 2 branches covered.">        for (int i = 0; i &lt; GEN_WINDOWS; i++) {</span>
+<span class="fc" id="L1352">            int bit = GEN_BITS * i;</span>
+<span class="fc" id="L1353">            int w = bit &gt;&gt;&gt; 5;</span>
+<span class="fc" id="L1354">            int b = bit &amp; 31;</span>
+<span class="fc" id="L1355">            long v = (kk[w] &amp; 0xffffffffL) &gt;&gt;&gt; b;</span>
+<span class="fc bfc" id="L1356" title="All 2 branches covered.">            if (b + GEN_BITS + 1 &gt; 32) {</span>
+<span class="fc" id="L1357">                v |= (kk[w + 1] &amp; 0xffffffffL) &lt;&lt; (32 - b);</span>
+            }
+<span class="fc" id="L1359">            int d = (((int) v &amp; digitMask) | 1) - (1 &lt;&lt; GEN_BITS);</span>
+<span class="fc" id="L1360">            int s = d &gt;&gt; 31;</span>
+<span class="fc" id="L1361">            int idx = (((d ^ s) - s) - 1) &gt;&gt; 1;</span>
+<span class="fc bfc" id="L1362" title="All 2 branches covered.">            for (int l = 0; l &lt; 10; l++) {</span>
+<span class="fc" id="L1363">                px[l] = 0;</span>
+<span class="fc" id="L1364">                py[l] = 0;</span>
+            }
+<span class="fc" id="L1366">            int base = i * GEN_ENTRIES;</span>
+<span class="fc bfc" id="L1367" title="All 2 branches covered.">            for (int j = 0; j &lt; GEN_ENTRIES; j++) {</span>
+<span class="fc" id="L1368">                int m = ((j ^ idx) - 1) &gt;&gt; 31;</span>
+<span class="fc" id="L1369">                int[] ex = GenTable.X[base + j];</span>
+<span class="fc" id="L1370">                int[] ey = GenTable.Y[base + j];</span>
+<span class="fc bfc" id="L1371" title="All 2 branches covered.">                for (int l = 0; l &lt; 10; l++) {</span>
+<span class="fc" id="L1372">                    px[l] |= ex[l] &amp; m;</span>
+<span class="fc" id="L1373">                    py[l] |= ey[l] &amp; m;</span>
+                }
+            }
+<span class="fc" id="L1376">            neg(ny, py, 1);</span>
+<span class="fc" id="L1377">            weak(ny);</span>
+<span class="fc bfc" id="L1378" title="All 2 branches covered.">            for (int l = 0; l &lt; 10; l++) {</span>
+<span class="fc" id="L1379">                py[l] = (ny[l] &amp; s) | (py[l] &amp; ~s);</span>
+            }
+<span class="fc" id="L1381">            addComplete(c, r, px, py);</span>
+        }
+<span class="fc" id="L1383">        int[] zi = new int[10];</span>
+<span class="fc" id="L1384">        inv(zi, r.z);</span>
+<span class="fc" id="L1385">        mul(x, r.x, zi);</span>
+<span class="fc" id="L1386">        mul(y, r.y, zi);</span>
+<span class="fc" id="L1387">        normalize(x);</span>
+<span class="fc" id="L1388">        normalize(y);</span>
+<span class="fc" id="L1389">        int[] yn = new int[10];</span>
+<span class="fc" id="L1390">        neg(yn, y, 1);</span>
+<span class="fc" id="L1391">        normalize(yn);</span>
+<span class="fc bfc" id="L1392" title="All 2 branches covered.">        for (int l = 0; l &lt; 10; l++) {</span>
+<span class="fc" id="L1393">            y[l] = (yn[l] &amp; mask) | (y[l] &amp; ~mask);</span>
+        }
+<span class="fc bfc" id="L1395" title="All 2 branches covered.">        for (int i = 0; i &lt; kk.length; i++) {</span>
+<span class="fc" id="L1396">            kk[i] = 0;</span>
+        }
+<span class="fc bfc" id="L1398" title="All 2 branches covered.">        for (int i = 0; i &lt; nk.length; i++) {</span>
+<span class="fc" id="L1399">            nk[i] = 0;</span>
+        }
+<span class="fc bfc" id="L1401" title="All 2 branches covered.">        for (int l = 0; l &lt; 10; l++) {</span>
+<span class="fc" id="L1402">            px[l] = 0;</span>
+<span class="fc" id="L1403">            py[l] = 0;</span>
+        }
+<span class="fc" id="L1405">    }</span>
+
+    /// n as eight little-endian 32-bit words.
+<span class="fc" id="L1408">    static final int[] N_WORDS = {</span>
+        0xD0364141, 0xBFD25E8C, 0xAF48A03B, 0xBAAEDCE6, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF
+    };
+
+    private static int[] sub32(int[] a, int[] b) {
+<span class="fc" id="L1413">        int[] out = new int[8];</span>
+<span class="fc" id="L1414">        long borrow = 0;</span>
+<span class="fc bfc" id="L1415" title="All 2 branches covered.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L1416">            long d = (a[i] &amp; 0xffffffffL) - (b[i] &amp; 0xffffffffL) - borrow;</span>
+<span class="fc" id="L1417">            out[i] = (int) d;</span>
+<span class="fc" id="L1418">            borrow = (d &gt;&gt; 63) &amp; 1;</span>
+        }
+<span class="fc" id="L1420">        return out;</span>
+    }
+
+    // ----------------------------------------------------------------
+    // variable-time double multiplication for verification
+
+    private static final int WINDOW_A = 5;
+    private static final int WINDOW_G = 12;
+
+    // the odd multiples (2j + 1) G, j &lt; 2^(WINDOW_G - 2), and the same
+    // points' images under the endomorphism (beta x, y)
+    private static final class VerifyTable {
+        static final int SIZE = 1 &lt;&lt; (WINDOW_G - 2);
+<span class="fc" id="L1433">        static final int[][] X = new int[SIZE][];</span>
+<span class="fc" id="L1434">        static final int[][] Y = new int[SIZE][];</span>
+<span class="fc" id="L1435">        static final int[][] XB = new int[SIZE][];</span>
+
+        static {
+<span class="fc" id="L1438">            Ctx c = new Ctx();</span>
+<span class="fc" id="L1439">            Gej g = Gej.affine(G_X, G_Y);</span>
+<span class="fc" id="L1440">            Gej twice = new Gej();</span>
+<span class="fc" id="L1441">            dbl(c, twice, g);</span>
+<span class="fc" id="L1442">            Gej[] pts = new Gej[SIZE];</span>
+<span class="fc" id="L1443">            Gej acc = new Gej();</span>
+<span class="fc" id="L1444">            acc.set(g);</span>
+<span class="fc bfc" id="L1445" title="All 2 branches covered.">            for (int j = 0; j &lt; SIZE; j++) {</span>
+<span class="fc" id="L1446">                pts[j] = new Gej();</span>
+<span class="fc" id="L1447">                pts[j].set(acc);</span>
+<span class="fc" id="L1448">                addGej(c, acc, acc, twice);</span>
+            }
+<span class="fc" id="L1450">            batchToAffine(c, pts, SIZE, X, Y, 0);</span>
+<span class="fc bfc" id="L1451" title="All 2 branches covered.">            for (int j = 0; j &lt; SIZE; j++) {</span>
+<span class="fc" id="L1452">                XB[j] = new int[10];</span>
+<span class="fc" id="L1453">                mul(XB[j], X[j], BETA);</span>
+<span class="fc" id="L1454">                normalize(XB[j]);</span>
+            }
+<span class="fc" id="L1456">        }</span>
+    }
+
+    /// The width-w non-adjacent form of a non-negative scalar below 2^129,
+    /// given as 32-bit little-endian words: digits odd and below 2^(w-1) in
+    /// absolute value, at most one nonzero in any w consecutive positions.
+    static int[] wnaf(int[] s, int w) {
+<span class="fc" id="L1463">        int len = 130;</span>
+<span class="fc" id="L1464">        int[] out = new int[len];</span>
+<span class="fc" id="L1465">        int bit = 0;</span>
+<span class="fc" id="L1466">        int carry = 0;</span>
+<span class="fc bfc" id="L1467" title="All 2 branches covered.">        while (bit &lt; len) {</span>
+<span class="fc bfc" id="L1468" title="All 2 branches covered.">            if (getBits(s, bit, 1) == carry) {</span>
+<span class="fc" id="L1469">                bit++;</span>
+<span class="fc" id="L1470">                continue;</span>
+            }
+<span class="fc" id="L1472">            int now = w;</span>
+<span class="fc bfc" id="L1473" title="All 2 branches covered.">            if (now &gt; len - bit) {</span>
+<span class="fc" id="L1474">                now = len - bit;</span>
+            }
+<span class="fc" id="L1476">            int word = getBits(s, bit, now) + carry;</span>
+<span class="fc" id="L1477">            carry = (word &gt;&gt; (w - 1)) &amp; 1;</span>
+<span class="fc" id="L1478">            word -= carry &lt;&lt; w;</span>
+<span class="fc" id="L1479">            out[bit] = word;</span>
+<span class="fc" id="L1480">            bit += now;</span>
+<span class="fc" id="L1481">        }</span>
+<span class="fc" id="L1482">        return out;</span>
+    }
+
+    private static int getBits(int[] s, int off, int count) {
+<span class="fc" id="L1486">        int w = off &gt;&gt;&gt; 5;</span>
+<span class="pc bpc" id="L1487" title="1 of 2 branches missed.">        if (w &gt;= s.length) {</span>
+<span class="nc" id="L1488">            return 0;</span>
+        }
+<span class="fc" id="L1490">        int b = off &amp; 31;</span>
+<span class="fc" id="L1491">        long v = (s[w] &amp; 0xffffffffL) &gt;&gt;&gt; b;</span>
+<span class="pc bpc" id="L1492" title="1 of 4 branches missed.">        if (b + count &gt; 32 &amp;&amp; w + 1 &lt; s.length) {</span>
+<span class="fc" id="L1493">            v |= (s[w + 1] &amp; 0xffffffffL) &lt;&lt; (32 - b);</span>
+        }
+<span class="fc" id="L1495">        return (int) (v &amp; ((1L &lt;&lt; count) - 1));</span>
+    }
+
+    /// r = (a1 + a2 lambda) A + (g1 + g2 lambda) G, where each half-scalar
+    /// is below 2^129 and its sign is passed separately (true = negative).
+    /// Strauss-Shamir over four wNAF expansions sharing one chain of
+    /// doublings. Variable time; public data only.
+    static void ecmult(Gej r, int[] ax, int[] ay, int[] a1, boolean negA1, int[] a2, boolean negA2,
+            int[] g1, boolean negG1, int[] g2, boolean negG2) {
+<span class="fc" id="L1504">        Ctx c = new Ctx();</span>
+<span class="fc" id="L1505">        int sizeA = 1 &lt;&lt; (WINDOW_A - 2);</span>
+<span class="fc" id="L1506">        Gej[] pre = new Gej[sizeA];</span>
+<span class="fc" id="L1507">        Gej a = Gej.affine(ax, ay);</span>
+<span class="fc" id="L1508">        Gej twice = new Gej();</span>
+<span class="fc" id="L1509">        dbl(c, twice, a);</span>
+<span class="fc" id="L1510">        Gej acc = new Gej();</span>
+<span class="fc" id="L1511">        acc.set(a);</span>
+<span class="fc bfc" id="L1512" title="All 2 branches covered.">        for (int j = 0; j &lt; sizeA; j++) {</span>
+<span class="fc" id="L1513">            pre[j] = new Gej();</span>
+<span class="fc" id="L1514">            pre[j].set(acc);</span>
+<span class="fc bfc" id="L1515" title="All 2 branches covered.">            if (j + 1 &lt; sizeA) {</span>
+<span class="fc" id="L1516">                addGej(c, acc, acc, twice);</span>
+            }
+        }
+<span class="fc" id="L1519">        int[][] tx = new int[sizeA][];</span>
+<span class="fc" id="L1520">        int[][] ty = new int[sizeA][];</span>
+<span class="fc" id="L1521">        batchToAffine(c, pre, sizeA, tx, ty, 0);</span>
+<span class="fc" id="L1522">        int[][] txb = new int[sizeA][];</span>
+<span class="fc bfc" id="L1523" title="All 2 branches covered.">        for (int j = 0; j &lt; sizeA; j++) {</span>
+<span class="fc" id="L1524">            txb[j] = new int[10];</span>
+<span class="fc" id="L1525">            mul(txb[j], tx[j], BETA);</span>
+        }
+<span class="fc" id="L1527">        int[] wa1 = wnaf(a1, WINDOW_A);</span>
+<span class="fc" id="L1528">        int[] wa2 = wnaf(a2, WINDOW_A);</span>
+<span class="fc" id="L1529">        int[] wg1 = wnaf(g1, WINDOW_G);</span>
+<span class="fc" id="L1530">        int[] wg2 = wnaf(g2, WINDOW_G);</span>
+<span class="fc" id="L1531">        int top = wa1.length - 1;</span>
+<span class="pc bpc" id="L1532" title="1 of 10 branches missed.">        while (top &gt;= 0 &amp;&amp; wa1[top] == 0 &amp;&amp; wa2[top] == 0 &amp;&amp; wg1[top] == 0 &amp;&amp; wg2[top] == 0) {</span>
+<span class="fc" id="L1533">            top--;</span>
+        }
+<span class="fc" id="L1535">        int[][] gx = VerifyTable.X;</span>
+<span class="fc" id="L1536">        int[][] gy = VerifyTable.Y;</span>
+<span class="fc" id="L1537">        int[][] gxb = VerifyTable.XB;</span>
+<span class="fc" id="L1538">        int[] ny = new int[10];</span>
+<span class="fc" id="L1539">        r.inf = true;</span>
+<span class="fc bfc" id="L1540" title="All 2 branches covered.">        for (int i = top; i &gt;= 0; i--) {</span>
+<span class="fc" id="L1541">            dbl(c, r, r);</span>
+<span class="fc" id="L1542">            int d = wa1[i];</span>
+<span class="fc bfc" id="L1543" title="All 2 branches covered.">            if (d != 0) {</span>
+<span class="fc" id="L1544">                addEntry(c, r, tx, ty, d, negA1, ny);</span>
+            }
+<span class="fc" id="L1546">            d = wa2[i];</span>
+<span class="fc bfc" id="L1547" title="All 2 branches covered.">            if (d != 0) {</span>
+<span class="fc" id="L1548">                addEntry(c, r, txb, ty, d, negA2, ny);</span>
+            }
+<span class="fc" id="L1550">            d = wg1[i];</span>
+<span class="fc bfc" id="L1551" title="All 2 branches covered.">            if (d != 0) {</span>
+<span class="fc" id="L1552">                addEntry(c, r, gx, gy, d, negG1, ny);</span>
+            }
+<span class="fc" id="L1554">            d = wg2[i];</span>
+<span class="fc bfc" id="L1555" title="All 2 branches covered.">            if (d != 0) {</span>
+<span class="fc" id="L1556">                addEntry(c, r, gxb, gy, d, negG2, ny);</span>
+            }
+        }
+<span class="fc" id="L1559">    }</span>
+
+    private static void addEntry(Ctx c, Gej r, int[][] xs, int[][] ys, int d, boolean negate, int[] ny) {
+<span class="fc bfc" id="L1562" title="All 2 branches covered.">        int idx = ((d &lt; 0 ? -d : d) - 1) &gt;&gt; 1;</span>
+<span class="fc" id="L1563">        int[] y = ys[idx];</span>
+<span class="fc bfc" id="L1564" title="All 4 branches covered.">        if ((d &lt; 0) != negate) {</span>
+<span class="fc" id="L1565">            neg(ny, y, 1);</span>
+<span class="fc" id="L1566">            y = ny;</span>
+        }
+<span class="fc" id="L1568">        addGe(c, r, r, xs[idx], y);</span>
+<span class="fc" id="L1569">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

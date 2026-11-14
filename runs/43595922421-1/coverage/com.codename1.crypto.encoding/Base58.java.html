@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Base58.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.encoding</a> &gt; <span class="el_source">Base58.java</span></div><h1>Base58.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.encoding;
+
+/// Base58 encoding with the Bitcoin alphabet. Each leading zero byte is written
+/// as a leading `1` and vice versa. The conversion works on an int array of
+/// limbs, so it is quadratic in the length but has no big-number allocation.
+@com.codename1.impl.SharedWithBackend
+public final class Base58 {
+
+    private static final String ALPHABET = &quot;123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz&quot;;
+<span class="fc" id="L32">    private static final int[] INDEXES = new int[128];</span>
+
+    static {
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        for (int i = 0; i &lt; INDEXES.length; i++) {</span>
+<span class="fc" id="L36">            INDEXES[i] = -1;</span>
+        }
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int i = 0; i &lt; ALPHABET.length(); i++) {</span>
+<span class="fc" id="L39">            INDEXES[ALPHABET.charAt(i)] = i;</span>
+        }
+<span class="fc" id="L41">    }</span>
+
+    private Base58() {
+    }
+
+    /// Encodes bytes as Base58 text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `input`: the bytes to encode
+    ///
+    /// #### Returns
+    ///
+    /// the Base58 string; empty input gives an empty string
+    public static String encode(byte[] input) {
+<span class="fc" id="L56">        int zeros = 0;</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">        while (zeros &lt; input.length &amp;&amp; input[zeros] == 0) {</span>
+<span class="fc" id="L58">            zeros++;</span>
+        }
+        // limbs are base 58^5 (656356768 &lt; 2^31), little endian
+<span class="fc" id="L61">        int[] limbs = new int[input.length / 3 + 2];</span>
+<span class="fc" id="L62">        int used = 0;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (int i = zeros; i &lt; input.length; i++) {</span>
+<span class="fc" id="L64">            long carry = input[i] &amp; 0xff;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            for (int j = 0; j &lt; used; j++) {</span>
+<span class="fc" id="L66">                carry += ((long) limbs[j]) &lt;&lt; 8;</span>
+<span class="fc" id="L67">                limbs[j] = (int) (carry % 656356768L);</span>
+<span class="fc" id="L68">                carry /= 656356768L;</span>
+            }
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            while (carry &gt; 0) {</span>
+<span class="fc" id="L71">                limbs[used++] = (int) (carry % 656356768L);</span>
+<span class="fc" id="L72">                carry /= 656356768L;</span>
+            }
+        }
+<span class="fc" id="L75">        char[] out = new char[zeros + used * 5];</span>
+<span class="fc" id="L76">        int pos = out.length;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (int j = 0; j &lt; used; j++) {</span>
+<span class="fc" id="L78">            int v = limbs[j];</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            for (int k = 0; k &lt; 5; k++) {</span>
+<span class="fc" id="L80">                out[--pos] = ALPHABET.charAt(v % 58);</span>
+<span class="fc" id="L81">                v /= 58;</span>
+            }
+        }
+        // strip padding zeros ('1') produced by the top limb, keep the real leading ones
+<span class="fc" id="L85">        int firstDigit = zeros;</span>
+<span class="fc" id="L86">        int end = out.length;</span>
+<span class="fc bfc" id="L87" title="All 4 branches covered.">        while (firstDigit &lt; end &amp;&amp; out[firstDigit] == '1') {</span>
+<span class="fc" id="L88">            firstDigit++;</span>
+        }
+<span class="fc" id="L90">        StringBuilder sb = new StringBuilder(zeros + end - firstDigit);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (int i = 0; i &lt; zeros; i++) {</span>
+<span class="fc" id="L92">            sb.append('1');</span>
+        }
+<span class="fc" id="L94">        sb.append(out, firstDigit, end - firstDigit);</span>
+<span class="fc" id="L95">        return sb.toString();</span>
+    }
+
+    /// Decodes Base58 text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `input`: the Base58 string
+    ///
+    /// #### Returns
+    ///
+    /// the decoded bytes
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the text holds a character outside the alphabet
+    public static byte[] decode(String input) {
+<span class="fc" id="L112">        int n = input.length();</span>
+<span class="fc" id="L113">        int[] digits = new int[n];</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L115">            char c = input.charAt(i);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            int d = c &lt; 128 ? INDEXES[c] : -1;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (d &lt; 0) {</span>
+<span class="fc" id="L118">                throw new IllegalArgumentException(&quot;Invalid Base58 character at &quot; + i);</span>
+            }
+<span class="fc" id="L120">            digits[i] = d;</span>
+        }
+<span class="fc" id="L122">        int zeros = 0;</span>
+<span class="fc bfc" id="L123" title="All 4 branches covered.">        while (zeros &lt; n &amp;&amp; digits[zeros] == 0) {</span>
+<span class="fc" id="L124">            zeros++;</span>
+        }
+        // limbs are base 2^32 held in longs, little endian
+<span class="fc" id="L127">        int[] limbs = new int[n * 733 / 1000 / 4 + 2];</span>
+<span class="fc" id="L128">        int used = 0;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (int i = zeros; i &lt; n; i++) {</span>
+<span class="fc" id="L130">            long carry = digits[i];</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            for (int j = 0; j &lt; used; j++) {</span>
+<span class="fc" id="L132">                carry += (limbs[j] &amp; 0xffffffffL) * 58L;</span>
+<span class="fc" id="L133">                limbs[j] = (int) carry;</span>
+<span class="fc" id="L134">                carry &gt;&gt;&gt;= 32;</span>
+            }
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            while (carry &gt; 0) {</span>
+<span class="fc" id="L137">                limbs[used++] = (int) carry;</span>
+<span class="fc" id="L138">                carry &gt;&gt;&gt;= 32;</span>
+            }
+        }
+<span class="fc" id="L141">        int byteLen = used * 4;</span>
+<span class="fc" id="L142">        byte[] tmp = new byte[byteLen];</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (int j = 0; j &lt; used; j++) {</span>
+<span class="fc" id="L144">            int v = limbs[j];</span>
+<span class="fc" id="L145">            tmp[byteLen - 1 - j * 4] = (byte) v;</span>
+<span class="fc" id="L146">            tmp[byteLen - 2 - j * 4] = (byte) (v &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L147">            tmp[byteLen - 3 - j * 4] = (byte) (v &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L148">            tmp[byteLen - 4 - j * 4] = (byte) (v &gt;&gt;&gt; 24);</span>
+        }
+<span class="fc" id="L150">        int skip = 0;</span>
+<span class="fc bfc" id="L151" title="All 4 branches covered.">        while (skip &lt; byteLen &amp;&amp; tmp[skip] == 0) {</span>
+<span class="fc" id="L152">            skip++;</span>
+        }
+<span class="fc" id="L154">        byte[] out = new byte[zeros + byteLen - skip];</span>
+<span class="fc" id="L155">        System.arraycopy(tmp, skip, out, zeros, byteLen - skip);</span>
+<span class="fc" id="L156">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

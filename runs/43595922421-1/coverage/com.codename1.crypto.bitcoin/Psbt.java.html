@@ -1,0 +1,725 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Psbt.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.bitcoin</a> &gt; <span class="el_source">Psbt.java</span></div><h1>Psbt.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.bitcoin;
+
+import com.codename1.crypto.hd.DerivationPath;
+import com.codename1.security.Hash;
+import com.codename1.security.Secp256k1;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+
+/// A Partially Signed Bitcoin Transaction (BIP-174, with the BIP-371 Taproot fields): the
+/// file hardware wallets, multisig coordinators and watch-only servers pass around until
+/// every signer has signed.
+///
+/// ```java
+/// String fromCoordinator = &quot;cHNidP8B...&quot;;     // the PSBT a coordinator sent
+/// byte[] privateKey = SecureRandom.bytes(32);
+/// Psbt psbt = Psbt.fromBase64(fromCoordinator);
+/// psbt.sign(0, privateKey);           // any input this key can sign
+/// psbt.finalizeAll();
+/// String hex = psbt.extract().toHex();
+/// ```
+///
+/// [#sign] handles P2PKH, P2WPKH, P2SH-P2WPKH, Taproot key-path, and P2SH/P2WSH multisig
+/// inputs; [#finalizeInput] builds the final scripts for the same kinds. Fields this class
+/// does not interpret are kept and written back unchanged.
+@com.codename1.impl.SharedWithBackend
+public final class Psbt {
+    static final int IN_NON_WITNESS_UTXO = 0x00;
+    static final int IN_WITNESS_UTXO = 0x01;
+    static final int IN_PARTIAL_SIG = 0x02;
+    static final int IN_SIGHASH_TYPE = 0x03;
+    static final int IN_REDEEM_SCRIPT = 0x04;
+    static final int IN_WITNESS_SCRIPT = 0x05;
+    static final int IN_BIP32_DERIVATION = 0x06;
+    static final int IN_FINAL_SCRIPTSIG = 0x07;
+    static final int IN_FINAL_SCRIPTWITNESS = 0x08;
+    static final int IN_TAP_KEY_SIG = 0x13;
+    static final int IN_TAP_BIP32_DERIVATION = 0x16;
+    static final int IN_TAP_INTERNAL_KEY = 0x17;
+    static final int IN_TAP_MERKLE_ROOT = 0x18;
+
+<span class="fc" id="L64">    private static final byte[] MAGIC = {0x70, 0x73, 0x62, 0x74, (byte) 0xff};</span>
+
+    private final BitcoinTransaction tx;
+<span class="fc" id="L67">    private final List&lt;byte[][]&gt; global = new ArrayList&lt;byte[][]&gt;();</span>
+<span class="fc" id="L68">    private final List&lt;List&lt;byte[][]&gt;&gt; inputMaps = new ArrayList&lt;List&lt;byte[][]&gt;&gt;();</span>
+<span class="fc" id="L69">    private final List&lt;List&lt;byte[][]&gt;&gt; outputMaps = new ArrayList&lt;List&lt;byte[][]&gt;&gt;();</span>
+
+<span class="fc" id="L71">    private Psbt(BitcoinTransaction tx) {</span>
+<span class="fc" id="L72">        this.tx = tx;</span>
+<span class="fc" id="L73">    }</span>
+
+    /// A PSBT for an unsigned transaction; its scripts and witnesses are cleared.
+    public static Psbt fromTransaction(BitcoinTransaction unsigned) {
+<span class="fc" id="L77">        BitcoinTransaction copy = BitcoinTransaction.parse(unsigned.serialize(false), false);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int iter = 0; iter &lt; copy.getInputs().size(); iter++) {</span>
+<span class="fc" id="L79">            copy.getInputs().get(iter).setScriptSig(Script.empty());</span>
+<span class="fc" id="L80">            copy.getInputs().get(iter).setWitness(null);</span>
+        }
+<span class="fc" id="L82">        Psbt p = new Psbt(copy);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (int iter = 0; iter &lt; copy.getInputs().size(); iter++) {</span>
+<span class="fc" id="L84">            p.inputMaps.add(new ArrayList&lt;byte[][]&gt;());</span>
+        }
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (int iter = 0; iter &lt; copy.getOutputs().size(); iter++) {</span>
+<span class="fc" id="L87">            p.outputMaps.add(new ArrayList&lt;byte[][]&gt;());</span>
+        }
+<span class="fc" id="L89">        return p;</span>
+    }
+
+    /// Reads a binary PSBT.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a malformed PSBT, a duplicate key, or a global
+    ///   transaction that is not unsigned
+    public static Psbt parse(byte[] data) {
+<span class="fc" id="L99">        Wire r = new Wire(data);</span>
+<span class="fc" id="L100">        byte[] magic = r.read(5);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (int iter = 0; iter &lt; 5; iter++) {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (magic[iter] != MAGIC[iter]) {</span>
+<span class="fc" id="L103">                throw new IllegalArgumentException(&quot;not a PSBT&quot;);</span>
+            }
+        }
+<span class="fc" id="L106">        List&lt;byte[][]&gt; global = checkKeys(readMap(r), GLOBAL_KEY_SHAPES);</span>
+<span class="fc" id="L107">        byte[] unsigned = null;</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (byte[][] kv : global) {</span>
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">            if (kv[0].length == 1 &amp;&amp; kv[0][0] == 0) {</span>
+<span class="fc" id="L110">                unsigned = kv[1];</span>
+            }
+<span class="fc" id="L112">        }</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (unsigned == null) {</span>
+<span class="fc" id="L114">            throw new IllegalArgumentException(&quot;PSBT without an unsigned transaction&quot;);</span>
+        }
+<span class="fc" id="L116">        BitcoinTransaction tx = BitcoinTransaction.parse(unsigned, false);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (int iter = 0; iter &lt; tx.getInputs().size(); iter++) {</span>
+<span class="fc" id="L118">            BitcoinTransaction.Input in = tx.getInputs().get(iter);</span>
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">            if (in.getScriptSig().length() != 0 || !in.getWitness().isEmpty()) {</span>
+<span class="fc" id="L120">                throw new IllegalArgumentException(&quot;the PSBT's transaction is not unsigned&quot;);</span>
+            }
+        }
+<span class="fc" id="L123">        Psbt p = new Psbt(tx);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (byte[][] globalItem : global) {</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">            if (!(globalItem[0].length == 1 &amp;&amp; globalItem[0][0] == 0)) {</span>
+<span class="fc" id="L126">                p.global.add(globalItem);</span>
+            }
+<span class="fc" id="L128">        }</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (int iter = 0; iter &lt; tx.getInputs().size(); iter++) {</span>
+<span class="fc" id="L130">            p.inputMaps.add(checkKeys(readMap(r), INPUT_KEY_SHAPES));</span>
+        }
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int iter = 0; iter &lt; tx.getOutputs().size(); iter++) {</span>
+<span class="fc" id="L133">            p.outputMaps.add(checkKeys(readMap(r), OUTPUT_KEY_SHAPES));</span>
+        }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (r.hasMore()) {</span>
+<span class="nc" id="L136">            throw new IllegalArgumentException(&quot;trailing data after the PSBT&quot;);</span>
+        }
+<span class="fc" id="L138">        return p;</span>
+    }
+
+    /// Reads a Base64 PSBT, the form wallets exchange.
+    public static Psbt fromBase64(String base64) {
+<span class="fc" id="L143">        return parse(Base64.getDecoder().decode(base64));</span>
+    }
+
+    // Key shapes of the typed keys BIP-174 and BIP-371 define, indexed by type: 1 means the
+    // key is the type byte alone, 2 a type byte followed by a 33 or 65 byte public key, 3 a
+    // type byte followed by a 32 byte x-only key, 0 a type this reader leaves unchecked.
+<span class="fc" id="L149">    private static final byte[] GLOBAL_KEY_SHAPES = {1, 0, 1, 0, 0, 0, 0, 0};</span>
+<span class="fc" id="L150">    private static final byte[] INPUT_KEY_SHAPES = {1, 1, 2, 1, 1, 1, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0,</span>
+        0, 0, 0, 1, 0, 0, 3, 1, 1};
+<span class="fc" id="L152">    private static final byte[] OUTPUT_KEY_SHAPES = {1, 1, 2, 0, 0, 1, 0, 3};</span>
+
+    // Rejects a known typed key whose length its type does not allow; an unknown type is kept
+    // as it is, which is what lets a newer PSBT pass through this reader unharmed.
+    private static List&lt;byte[][]&gt; checkKeys(List&lt;byte[][]&gt; map, byte[] shapes) {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (byte[][] mapElem : map) {</span>
+<span class="fc" id="L158">            byte[] key = mapElem[0];</span>
+<span class="fc" id="L159">            int type = key[0] &amp; 0xff;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            int shape = type &lt; shapes.length ? shapes[type] : 0;</span>
+            boolean ok;
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (shape == 1) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                ok = key.length == 1;</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            } else if (shape == 2) {</span>
+<span class="pc bpc" id="L165" title="4 of 10 branches missed.">                ok = (key.length == 34 &amp;&amp; (key[1] == 2 || key[1] == 3)) || (key.length == 66 &amp;&amp; key[1] == 4);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            } else if (shape == 3) {</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                ok = key.length == 33;</span>
+            } else {
+<span class="fc" id="L169">                ok = true;</span>
+            }
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (!ok) {</span>
+<span class="fc" id="L172">                throw new IllegalArgumentException(&quot;malformed PSBT key of type &quot; + type);</span>
+            }
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">        return map;</span>
+    }
+
+    private static List&lt;byte[][]&gt; readMap(Wire r) {
+<span class="fc" id="L179">        List&lt;byte[][]&gt; out = new ArrayList&lt;byte[][]&gt;();</span>
+        while (true) {
+<span class="fc" id="L181">            byte[] key = r.readVarBytes();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (key.length == 0) {</span>
+<span class="fc" id="L183">                return out;</span>
+            }
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            for (byte[][] outItem : out) {</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                if (java.util.Arrays.equals(outItem[0], key)) {</span>
+<span class="fc" id="L187">                    throw new IllegalArgumentException(&quot;duplicate PSBT key&quot;);</span>
+                }
+<span class="fc" id="L189">            }</span>
+<span class="fc" id="L190">            out.add(new byte[][] {key, r.readVarBytes()});</span>
+<span class="fc" id="L191">        }</span>
+    }
+
+    /// The binary PSBT.
+    public byte[] serialize() {
+<span class="fc" id="L196">        Wire w = new Wire().bytes(MAGIC);</span>
+<span class="fc" id="L197">        w.varBytes(new byte[] {0}).varBytes(tx.serialize(false));</span>
+<span class="fc" id="L198">        writeMap(w, global);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (List&lt;byte[][]&gt; inputMapsItem : inputMaps) {</span>
+<span class="fc" id="L200">            writeMap(w, inputMapsItem);</span>
+<span class="fc" id="L201">        }</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (List&lt;byte[][]&gt; outputMapsItem : outputMaps) {</span>
+<span class="fc" id="L203">            writeMap(w, outputMapsItem);</span>
+<span class="fc" id="L204">        }</span>
+<span class="fc" id="L205">        return w.toBytes();</span>
+    }
+
+    /// The Base64 PSBT.
+    public String toBase64() {
+<span class="fc" id="L210">        return Base64.getEncoder().encodeToString(serialize());</span>
+    }
+
+    private static void writeMap(Wire w, List&lt;byte[][]&gt; map) {
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (byte[][] mapElem : map) {</span>
+<span class="fc" id="L215">            w.varBytes(mapElem[0]).varBytes(mapElem[1]);</span>
+<span class="fc" id="L216">        }</span>
+<span class="fc" id="L217">        w.u8(0);</span>
+<span class="fc" id="L218">    }</span>
+
+    /// The unsigned transaction.
+    public BitcoinTransaction getTransaction() {
+<span class="fc" id="L222">        return BitcoinTransaction.parse(tx.serialize(false), false);</span>
+    }
+
+    // ---------------------------------------------------------------- input fields
+
+    /// Records the output a SegWit input spends.
+    public void setWitnessUtxo(int input, BitcoinTransaction.Output spent) {
+<span class="fc" id="L229">        Wire w = new Wire().u64(spent.getValue()).varBytes(spent.getScriptPubKey().raw());</span>
+<span class="fc" id="L230">        put(inputMaps.get(input), new byte[] {IN_WITNESS_UTXO}, w.toBytes());</span>
+<span class="fc" id="L231">    }</span>
+
+    /// Records the whole previous transaction of an input, which legacy inputs need.
+    public void setNonWitnessUtxo(int input, BitcoinTransaction previous) {
+<span class="nc" id="L235">        put(inputMaps.get(input), new byte[] {IN_NON_WITNESS_UTXO}, previous.serialize());</span>
+<span class="nc" id="L236">    }</span>
+
+    /// Records the redeem script of a P2SH input.
+    public void setRedeemScript(int input, Script redeem) {
+<span class="nc" id="L240">        put(inputMaps.get(input), new byte[] {IN_REDEEM_SCRIPT}, redeem.raw());</span>
+<span class="nc" id="L241">    }</span>
+
+    /// Records the witness script of a P2WSH input.
+    public void setWitnessScript(int input, Script witnessScript) {
+<span class="fc" id="L245">        put(inputMaps.get(input), new byte[] {IN_WITNESS_SCRIPT}, witnessScript.raw());</span>
+<span class="fc" id="L246">    }</span>
+
+    /// Records the x-only internal key of a Taproot input.
+    public void setTapInternalKey(int input, byte[] xOnly) {
+<span class="nc" id="L250">        put(inputMaps.get(input), new byte[] {IN_TAP_INTERNAL_KEY}, xOnly);</span>
+<span class="nc" id="L251">    }</span>
+
+    /// Records the BIP-32 origin of a key an input needs, so a hardware wallet can find it.
+    public void addBip32Derivation(int input, byte[] publicKey, int masterFingerprint, long[] path) {
+<span class="fc" id="L255">        Wire w = new Wire();</span>
+<span class="fc" id="L256">        w.u8(masterFingerprint &gt;&gt;&gt; 24).u8(masterFingerprint &gt;&gt;&gt; 16).u8(masterFingerprint &gt;&gt;&gt; 8).u8(masterFingerprint);</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        for (long pathElem : path) {</span>
+<span class="fc" id="L258">            w.u32(pathElem);</span>
+        }
+<span class="fc" id="L260">        put(inputMaps.get(input), Wire.concat(new byte[] {IN_BIP32_DERIVATION}, publicKey), w.toBytes());</span>
+<span class="fc" id="L261">    }</span>
+
+    /// The output an input spends, from its witness or non-witness UTXO, or `null`.
+    public BitcoinTransaction.Output getSpentOutput(int input) {
+<span class="fc" id="L265">        byte[] witnessUtxo = get(inputMaps.get(input), new byte[] {IN_WITNESS_UTXO});</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (witnessUtxo != null) {</span>
+<span class="fc" id="L267">            Wire r = new Wire(witnessUtxo);</span>
+<span class="fc" id="L268">            long value = r.readU64();</span>
+<span class="fc" id="L269">            return new BitcoinTransaction.Output(value, Script.of(r.readVarBytes()));</span>
+        }
+<span class="nc" id="L271">        byte[] full = get(inputMaps.get(input), new byte[] {IN_NON_WITNESS_UTXO});</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        if (full != null) {</span>
+<span class="nc" id="L273">            BitcoinTransaction prev = BitcoinTransaction.parse(full);</span>
+<span class="nc" id="L274">            BitcoinTransaction.Input in = tx.getInputs().get(input);</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            if (!prev.getTxid().equals(in.getPrevTxid())) {</span>
+<span class="nc" id="L276">                throw new IllegalArgumentException(&quot;non-witness UTXO does not match input &quot; + input);</span>
+            }
+<span class="nc" id="L278">            return prev.getOutputs().get((int) in.getPrevIndex());</span>
+        }
+<span class="nc" id="L280">        return null;</span>
+    }
+
+    /// The BIP-32 origins recorded for an input's keys, both the ECDSA kind and the Taproot
+    /// kind (BIP-371, whose public keys are 32-byte x-only). A wallet signs the inputs whose
+    /// master fingerprint is its own.
+    public List&lt;Derivation&gt; getBip32Derivations(int input) {
+<span class="fc" id="L287">        List&lt;Derivation&gt; out = new ArrayList&lt;Derivation&gt;();</span>
+<span class="fc" id="L288">        List&lt;byte[][]&gt; map = inputMaps.get(input);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        for (byte[][] mapElem : map) {</span>
+<span class="fc" id="L290">            byte[] k = mapElem[0];</span>
+<span class="fc" id="L291">            int type = k[0] &amp; 0xff;</span>
+<span class="fc bfc" id="L292" title="All 4 branches covered.">            if (type != IN_BIP32_DERIVATION &amp;&amp; type != IN_TAP_BIP32_DERIVATION) {</span>
+<span class="fc" id="L293">                continue;</span>
+            }
+<span class="fc" id="L295">            Wire r = new Wire(mapElem[1]);</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (type == IN_TAP_BIP32_DERIVATION) {</span>
+<span class="fc" id="L297">                long leaves = r.readVarInt();</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                if (leaves &gt; r.remaining() / 32) {</span>
+<span class="nc" id="L299">                    throw new IllegalArgumentException(&quot;malformed Taproot derivation&quot;);</span>
+                }
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">                for (long leaf = 0; leaf &lt; leaves; leaf++) {</span>
+<span class="nc" id="L302">                    r.read(32);</span>
+                }
+            }
+<span class="fc" id="L305">            byte[] fp = r.read(4);</span>
+<span class="fc" id="L306">            int fingerprint = ((fp[0] &amp; 0xff) &lt;&lt; 24) | ((fp[1] &amp; 0xff) &lt;&lt; 16) | ((fp[2] &amp; 0xff) &lt;&lt; 8) | (fp[3] &amp; 0xff);</span>
+<span class="fc" id="L307">            long[] path = new long[r.remaining() / 4];</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (r.remaining() % 4 != 0) {</span>
+<span class="nc" id="L309">                throw new IllegalArgumentException(&quot;malformed BIP-32 derivation&quot;);</span>
+            }
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            for (int iter = 0; iter &lt; path.length; iter++) {</span>
+<span class="fc" id="L312">                path[iter] = r.readU32();</span>
+            }
+<span class="fc" id="L314">            byte[] pub = new byte[k.length - 1];</span>
+<span class="fc" id="L315">            System.arraycopy(k, 1, pub, 0, pub.length);</span>
+<span class="fc" id="L316">            out.add(new Derivation(pub, fingerprint, DerivationPath.of(path)));</span>
+<span class="fc" id="L317">        }</span>
+<span class="fc" id="L318">        return out;</span>
+    }
+
+    /// Records the Taproot (BIP-371) origin of an input's x-only key, for a key-path spend.
+    public void addTapBip32Derivation(int input, byte[] xOnlyKey, int masterFingerprint, long[] path) {
+<span class="fc" id="L323">        Wire w = new Wire();</span>
+<span class="fc" id="L324">        w.varInt(0);</span>
+<span class="fc" id="L325">        w.u8(masterFingerprint &gt;&gt;&gt; 24).u8(masterFingerprint &gt;&gt;&gt; 16).u8(masterFingerprint &gt;&gt;&gt; 8).u8(masterFingerprint);</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        for (long pathItem : path) {</span>
+<span class="fc" id="L327">            w.u32(pathItem);</span>
+        }
+<span class="fc" id="L329">        put(inputMaps.get(input), Wire.concat(new byte[] {IN_TAP_BIP32_DERIVATION}, xOnlyKey), w.toBytes());</span>
+<span class="fc" id="L330">    }</span>
+
+    /// One key origin: a public key, the fingerprint of the master it descends from and the
+    /// path from that master.
+    public static final class Derivation {
+        private final byte[] publicKey;
+        private final int fingerprint;
+        private final DerivationPath path;
+
+<span class="fc" id="L339">        Derivation(byte[] publicKey, int fingerprint, DerivationPath path) {</span>
+<span class="fc" id="L340">            this.publicKey = publicKey;</span>
+<span class="fc" id="L341">            this.fingerprint = fingerprint;</span>
+<span class="fc" id="L342">            this.path = path;</span>
+<span class="fc" id="L343">        }</span>
+
+        /// The public key, 33 or 65 bytes, or 32 x-only bytes for a Taproot origin.
+        public byte[] getPublicKey() {
+<span class="fc" id="L347">            return Wire.copy(publicKey);</span>
+        }
+
+        /// The master key fingerprint.
+        public int getMasterFingerprint() {
+<span class="fc" id="L352">            return fingerprint;</span>
+        }
+
+        /// The derivation path from the master.
+        public DerivationPath getPath() {
+<span class="fc" id="L357">            return path;</span>
+        }
+    }
+
+    /// The signatures collected for an input: `{publicKey, signature}` pairs.
+    public List&lt;byte[][]&gt; getPartialSignatures(int input) {
+<span class="fc" id="L363">        List&lt;byte[][]&gt; out = new ArrayList&lt;byte[][]&gt;();</span>
+<span class="fc" id="L364">        List&lt;byte[][]&gt; map = inputMaps.get(input);</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        for (byte[][] mapElem : map) {</span>
+<span class="fc" id="L366">            byte[] key = mapElem[0];</span>
+<span class="pc bpc" id="L367" title="1 of 4 branches missed.">            if (key[0] == IN_PARTIAL_SIG &amp;&amp; key.length &gt; 1) {</span>
+<span class="fc" id="L368">                byte[] pub = new byte[key.length - 1];</span>
+<span class="fc" id="L369">                System.arraycopy(key, 1, pub, 0, pub.length);</span>
+<span class="fc" id="L370">                out.add(new byte[][] {pub, Wire.copy(mapElem[1])});</span>
+            }
+<span class="fc" id="L372">        }</span>
+<span class="fc" id="L373">        return out;</span>
+    }
+
+    // ---------------------------------------------------------------- signing
+
+    /// Signs one input with `privateKey` if the key belongs to it, answering whether it did.
+    /// The sighash type is the input's own, or `SIGHASH_ALL` (Taproot: `SIGHASH_DEFAULT`).
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when the input lacks the UTXO (or the scripts) it needs
+    public boolean sign(int input, byte[] privateKey) {
+<span class="fc" id="L385">        BitcoinKey key = BitcoinKey.fromPrivateKey(privateKey);</span>
+        try {
+<span class="fc" id="L387">            return sign(input, key);</span>
+        } finally {
+<span class="fc" id="L389">            key.destroy();</span>
+        }
+    }
+
+    /// Signs one input with a key that may live elsewhere, such as a wallet or a hardware
+    /// device; see [#sign(int, byte[])] for what is signed.
+    public boolean sign(int input, BitcoinKey key) {
+<span class="fc" id="L396">        List&lt;byte[][]&gt; map = inputMaps.get(input);</span>
+<span class="fc" id="L397">        BitcoinTransaction.Output spent = getSpentOutput(input);</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">        if (spent == null) {</span>
+<span class="nc" id="L399">            throw new IllegalStateException(&quot;input &quot; + input + &quot; has no UTXO&quot;);</span>
+        }
+<span class="fc" id="L401">        Script spk = spent.getScriptPubKey();</span>
+<span class="fc" id="L402">        byte[] typeBytes = get(map, new byte[] {IN_SIGHASH_TYPE});</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        int sighash = typeBytes == null ? -1 : (int) new Wire(typeBytes).readU32();</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (spk.isP2tr()) {</span>
+<span class="fc" id="L405">            byte[] merkle = get(map, new byte[] {IN_TAP_MERKLE_ROOT});</span>
+<span class="fc" id="L406">            byte[] internal = key.getInternalKey();</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            if (!java.util.Arrays.equals(Taproot.outputKey(internal, merkle), spk.getWitnessProgram())) {</span>
+<span class="nc" id="L408">                return false;</span>
+            }
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">            int type = sighash &lt; 0 ? BitcoinTransaction.SIGHASH_DEFAULT : sighash;</span>
+<span class="fc" id="L411">            List&lt;BitcoinTransaction.Output&gt; all = new ArrayList&lt;BitcoinTransaction.Output&gt;();</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">            for (int iter = 0; iter &lt; tx.getInputs().size(); iter++) {</span>
+<span class="fc" id="L413">                BitcoinTransaction.Output o = getSpentOutput(iter);</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                if (o == null) {</span>
+<span class="nc" id="L415">                    throw new IllegalStateException(&quot;Taproot signing needs the UTXO of every input&quot;);</span>
+                }
+<span class="fc" id="L417">                all.add(o);</span>
+            }
+<span class="fc" id="L419">            byte[] sig = key.signTaproot(tx.taprootSighash(input, all, type), merkle);</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">            if (type != BitcoinTransaction.SIGHASH_DEFAULT) {</span>
+<span class="nc" id="L421">                sig = Wire.concat(sig, new byte[] {(byte) type});</span>
+            }
+<span class="fc" id="L423">            put(map, new byte[] {IN_TAP_KEY_SIG}, sig);</span>
+<span class="fc" id="L424">            put(map, new byte[] {IN_TAP_INTERNAL_KEY}, internal);</span>
+<span class="fc" id="L425">            return true;</span>
+        }
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        int type = sighash &lt; 0 ? BitcoinTransaction.SIGHASH_ALL : sighash;</span>
+<span class="fc" id="L428">        byte[] compressed = key.getPublicKey();</span>
+<span class="fc" id="L429">        byte[] uncompressed = key.getUncompressedPublicKey();</span>
+<span class="fc" id="L430">        Script redeem = script(map, IN_REDEEM_SCRIPT);</span>
+<span class="fc" id="L431">        Script witnessScript = script(map, IN_WITNESS_SCRIPT);</span>
+<span class="fc" id="L432">        Script inner = spk;</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">        if (spk.isP2sh()) {</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">            if (redeem == null) {</span>
+<span class="nc" id="L435">                throw new IllegalStateException(&quot;P2SH input &quot; + input + &quot; has no redeem script&quot;);</span>
+            }
+<span class="nc" id="L437">            inner = redeem;</span>
+        }
+        byte[] pub;
+        byte[] sighashBytes;
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if (inner.isP2wpkh()) {</span>
+<span class="fc" id="L442">            pub = compressed;</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">            if (!java.util.Arrays.equals(inner.getWitnessProgram(), Hash.hash160(pub))) {</span>
+<span class="nc" id="L444">                return false;</span>
+            }
+<span class="fc" id="L446">            sighashBytes = tx.segwitV0Sighash(input, Script.p2pkh(Hash.hash160(pub)), spent.getValue(), type);</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        } else if (inner.isP2wsh()) {</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            if (witnessScript == null) {</span>
+<span class="nc" id="L449">                throw new IllegalStateException(&quot;P2WSH input &quot; + input + &quot; has no witness script&quot;);</span>
+            }
+<span class="fc" id="L451">            pub = keyIn(witnessScript, compressed, uncompressed);</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">            if (pub == null) {</span>
+<span class="nc" id="L453">                return false;</span>
+            }
+<span class="fc" id="L455">            sighashBytes = tx.segwitV0Sighash(input, witnessScript, spent.getValue(), type);</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">        } else if (inner.isP2pkh()) {</span>
+<span class="nc" id="L457">            byte[] hash = inner.getDestinationHash();</span>
+<span class="nc bnc" id="L458" title="All 2 branches missed.">            if (java.util.Arrays.equals(hash, Hash.hash160(compressed))) {</span>
+<span class="nc" id="L459">                pub = compressed;</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">            } else if (java.util.Arrays.equals(hash, Hash.hash160(uncompressed))) {</span>
+<span class="nc" id="L461">                pub = uncompressed;</span>
+            } else {
+<span class="nc" id="L463">                return false;</span>
+            }
+<span class="nc" id="L465">            sighashBytes = tx.legacySighash(input, inner, type);</span>
+<span class="nc" id="L466">        } else {</span>
+<span class="nc" id="L467">            pub = keyIn(inner, compressed, uncompressed);</span>
+<span class="nc bnc" id="L468" title="All 2 branches missed.">            if (pub == null) {</span>
+<span class="nc" id="L469">                return false;</span>
+            }
+<span class="nc" id="L471">            sighashBytes = tx.legacySighash(input, inner, type);</span>
+        }
+<span class="fc" id="L473">        Secp256k1.EcdsaSignature es = key.signEcdsa(sighashBytes);</span>
+<span class="fc" id="L474">        put(map, Wire.concat(new byte[] {IN_PARTIAL_SIG}, pub),</span>
+<span class="fc" id="L475">                Wire.concat(Der.encode(es.r(), es.s()), new byte[] {(byte) type}));</span>
+<span class="fc" id="L476">        return true;</span>
+    }
+
+    /// Signs every input the key belongs to, answering how many.
+    public int signAll(byte[] privateKey) {
+<span class="nc" id="L481">        BitcoinKey key = BitcoinKey.fromPrivateKey(privateKey);</span>
+        try {
+<span class="nc" id="L483">            return signAll(key);</span>
+        } finally {
+<span class="nc" id="L485">            key.destroy();</span>
+        }
+    }
+
+    /// Signs every input a key belongs to, answering how many.
+    public int signAll(BitcoinKey key) {
+<span class="nc" id="L491">        int n = 0;</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">        for (int iter = 0; iter &lt; inputMaps.size(); iter++) {</span>
+<span class="nc bnc" id="L493" title="All 4 branches missed.">            if (getSpentOutput(iter) != null &amp;&amp; sign(iter, key)) {</span>
+<span class="nc" id="L494">                n++;</span>
+            }
+        }
+<span class="nc" id="L497">        return n;</span>
+    }
+
+    // ---------------------------------------------------------------- finalizing
+
+    /// Builds the final `scriptSig` and witness of an input from its signatures, answering
+    /// whether it could. A multisig input finalizes once it holds `m` signatures.
+    public boolean finalizeInput(int input) {
+<span class="fc" id="L505">        List&lt;byte[][]&gt; map = inputMaps.get(input);</span>
+<span class="pc bpc" id="L506" title="2 of 4 branches missed.">        if (get(map, new byte[] {IN_FINAL_SCRIPTSIG}) != null || get(map, new byte[] {IN_FINAL_SCRIPTWITNESS}) != null) {</span>
+<span class="nc" id="L507">            return true;</span>
+        }
+<span class="fc" id="L509">        BitcoinTransaction.Output spent = getSpentOutput(input);</span>
+<span class="pc bpc" id="L510" title="1 of 2 branches missed.">        if (spent == null) {</span>
+<span class="nc" id="L511">            return false;</span>
+        }
+<span class="fc" id="L513">        Script spk = spent.getScriptPubKey();</span>
+<span class="fc" id="L514">        List&lt;byte[]&gt; witness = null;</span>
+<span class="fc" id="L515">        Script scriptSig = null;</span>
+<span class="fc bfc" id="L516" title="All 2 branches covered.">        if (spk.isP2tr()) {</span>
+<span class="fc" id="L517">            byte[] sig = get(map, new byte[] {IN_TAP_KEY_SIG});</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">            if (sig == null) {</span>
+<span class="nc" id="L519">                return false;</span>
+            }
+<span class="fc" id="L521">            witness = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc" id="L522">            witness.add(sig);</span>
+<span class="fc" id="L523">        } else {</span>
+<span class="fc" id="L524">            List&lt;byte[][]&gt; sigs = getPartialSignatures(input);</span>
+<span class="fc" id="L525">            Script redeem = script(map, IN_REDEEM_SCRIPT);</span>
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">            Script inner = spk.isP2sh() ? redeem : spk;</span>
+<span class="pc bpc" id="L527" title="2 of 4 branches missed.">            if (inner == null || sigs.isEmpty()) {</span>
+<span class="nc" id="L528">                return false;</span>
+            }
+<span class="fc bfc" id="L530" title="All 2 branches covered.">            if (inner.isP2wpkh()) {</span>
+<span class="fc" id="L531">                witness = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc" id="L532">                witness.add(sigs.get(0)[1]);</span>
+<span class="fc" id="L533">                witness.add(sigs.get(0)[0]);</span>
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">            } else if (inner.isP2wsh()) {</span>
+<span class="fc" id="L535">                Script ws = script(map, IN_WITNESS_SCRIPT);</span>
+<span class="fc" id="L536">                List&lt;byte[]&gt; stack = multisigStack(ws, sigs);</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">                if (stack == null) {</span>
+<span class="fc" id="L538">                    return false;</span>
+                }
+<span class="fc" id="L540">                stack.add(ws.raw());</span>
+<span class="fc" id="L541">                witness = stack;</span>
+<span class="pc bnc" id="L542" title="All 2 branches missed.">            } else if (inner.isP2pkh()) {</span>
+<span class="nc" id="L543">                scriptSig = Script.builder().push(sigs.get(0)[1]).push(sigs.get(0)[0]).build();</span>
+            } else {
+<span class="nc" id="L545">                List&lt;byte[]&gt; stack = multisigStack(inner, sigs);</span>
+<span class="nc bnc" id="L546" title="All 2 branches missed.">                if (stack == null) {</span>
+<span class="nc" id="L547">                    return false;</span>
+                }
+<span class="nc" id="L549">                Script.Builder b = Script.builder();</span>
+<span class="nc bnc" id="L550" title="All 2 branches missed.">                for (byte[] stackItem : stack) {</span>
+<span class="nc bnc" id="L551" title="All 2 branches missed.">                    if (stackItem.length == 0) {</span>
+<span class="nc" id="L552">                        b.op(Script.OP_0);</span>
+                    } else {
+<span class="nc" id="L554">                        b.push(stackItem);</span>
+                    }
+<span class="nc" id="L556">                }</span>
+<span class="nc" id="L557">                scriptSig = b.build();</span>
+            }
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">            if (spk.isP2sh()) {</span>
+<span class="nc" id="L560">                byte[] pushRedeem = Script.builder().push(redeem.raw()).build().raw();</span>
+<span class="nc bnc" id="L561" title="All 2 branches missed.">                scriptSig = Script.of(scriptSig == null ? pushRedeem : Wire.concat(scriptSig.raw(), pushRedeem));</span>
+            }
+        }
+<span class="fc" id="L564">        List&lt;byte[][]&gt; kept = new ArrayList&lt;byte[][]&gt;();</span>
+<span class="fc bfc" id="L565" title="All 2 branches covered.">        for (byte[][] mapElem : map) {</span>
+<span class="fc" id="L566">            int k = mapElem[0][0] &amp; 0xff;</span>
+<span class="pc bpc" id="L567" title="2 of 6 branches missed.">            if (k == IN_NON_WITNESS_UTXO || k == IN_WITNESS_UTXO || k &gt; IN_TAP_MERKLE_ROOT) {</span>
+<span class="fc" id="L568">                kept.add(mapElem);</span>
+            }
+<span class="fc" id="L570">        }</span>
+<span class="fc" id="L571">        map.clear();</span>
+<span class="fc" id="L572">        map.addAll(kept);</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">        if (scriptSig != null) {</span>
+<span class="nc" id="L574">            put(map, new byte[] {IN_FINAL_SCRIPTSIG}, scriptSig.raw());</span>
+        }
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">        if (witness != null) {</span>
+<span class="fc" id="L577">            Wire w = new Wire().varInt(witness.size());</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">            for (byte[] witnessItem : witness) {</span>
+<span class="fc" id="L579">                w.varBytes(witnessItem);</span>
+<span class="fc" id="L580">            }</span>
+<span class="fc" id="L581">            put(map, new byte[] {IN_FINAL_SCRIPTWITNESS}, w.toBytes());</span>
+        }
+<span class="fc" id="L583">        return true;</span>
+    }
+
+    /// Finalizes every input, answering whether all of them are final.
+    public boolean finalizeAll() {
+<span class="fc" id="L588">        boolean all = true;</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">        for (int iter = 0; iter &lt; inputMaps.size(); iter++) {</span>
+<span class="fc" id="L590">            all &amp;= finalizeInput(iter);</span>
+        }
+<span class="fc" id="L592">        return all;</span>
+    }
+
+    /// The signed network transaction.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when an input is not final
+    public BitcoinTransaction extract() {
+<span class="fc" id="L601">        BitcoinTransaction out = getTransaction();</span>
+<span class="fc bfc" id="L602" title="All 2 branches covered.">        for (int iter = 0; iter &lt; inputMaps.size(); iter++) {</span>
+<span class="fc" id="L603">            List&lt;byte[][]&gt; map = inputMaps.get(iter);</span>
+<span class="fc" id="L604">            byte[] sig = get(map, new byte[] {IN_FINAL_SCRIPTSIG});</span>
+<span class="fc" id="L605">            byte[] wit = get(map, new byte[] {IN_FINAL_SCRIPTWITNESS});</span>
+<span class="pc bpc" id="L606" title="2 of 4 branches missed.">            if (sig == null &amp;&amp; wit == null) {</span>
+<span class="nc" id="L607">                throw new IllegalStateException(&quot;input &quot; + iter + &quot; is not final&quot;);</span>
+            }
+<span class="fc" id="L609">            BitcoinTransaction.Input in = out.getInputs().get(iter);</span>
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">            if (sig != null) {</span>
+<span class="nc" id="L611">                in.setScriptSig(Script.of(sig));</span>
+            }
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">            if (wit != null) {</span>
+<span class="fc" id="L614">                Wire r = new Wire(wit);</span>
+<span class="fc" id="L615">                long n = r.readVarInt();</span>
+<span class="fc" id="L616">                List&lt;byte[]&gt; stack = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc bfc" id="L617" title="All 2 branches covered.">                for (long k = 0; k &lt; n; k++) {</span>
+<span class="fc" id="L618">                    stack.add(r.readVarBytes());</span>
+                }
+<span class="fc" id="L620">                in.setWitness(stack);</span>
+            }
+        }
+<span class="fc" id="L623">        return out;</span>
+    }
+
+    // ---------------------------------------------------------------- helpers
+
+    /// The signatures of a bare multisig script, in script key order, preceded by the
+    /// `CHECKMULTISIG` dummy; `null` while fewer than `m` are present.
+    private static List&lt;byte[]&gt; multisigStack(Script ms, List&lt;byte[][]&gt; sigs) {
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">        if (ms == null) {</span>
+<span class="nc" id="L632">            return null;</span>
+        }
+<span class="fc" id="L634">        List&lt;byte[]&gt; keys = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc" id="L635">        int m = parseMultisig(ms, keys);</span>
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">        if (m &lt; 0) {</span>
+<span class="nc" id="L637">            return null;</span>
+        }
+<span class="fc" id="L639">        List&lt;byte[]&gt; stack = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc" id="L640">        stack.add(new byte[0]);</span>
+<span class="pc bpc" id="L641" title="1 of 4 branches missed.">        for (int k = 0; k &lt; keys.size() &amp;&amp; stack.size() &lt;= m; k++) {</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">            for (byte[][] sigsItem : sigs) {</span>
+<span class="fc bfc" id="L643" title="All 2 branches covered.">                if (java.util.Arrays.equals(keys.get(k), sigsItem[0])) {</span>
+<span class="fc" id="L644">                    stack.add(sigsItem[1]);</span>
+<span class="fc" id="L645">                    break;</span>
+                }
+<span class="fc" id="L647">            }</span>
+        }
+<span class="fc bfc" id="L649" title="All 2 branches covered.">        return stack.size() == m + 1 ? stack : null;</span>
+    }
+
+    /// Reads `m &lt;key&gt;... n OP_CHECKMULTISIG`, answering m, or -1 for any other script.
+    static int parseMultisig(Script s, List&lt;byte[]&gt; keys) {
+<span class="fc" id="L654">        byte[] p = s.raw();</span>
+<span class="pc bpc" id="L655" title="2 of 4 branches missed.">        if (p.length &lt; 3 || (p[p.length - 1] &amp; 0xff) != Script.OP_CHECKMULTISIG) {</span>
+<span class="nc" id="L656">            return -1;</span>
+        }
+<span class="fc" id="L658">        int m = (p[0] &amp; 0xff) - Script.OP_1 + 1;</span>
+<span class="fc" id="L659">        int n = (p[p.length - 2] &amp; 0xff) - Script.OP_1 + 1;</span>
+<span class="pc bpc" id="L660" title="4 of 8 branches missed.">        if (m &lt; 1 || m &gt; 16 || n &lt; m || n &gt; 16) {</span>
+<span class="nc" id="L661">            return -1;</span>
+        }
+<span class="fc" id="L663">        int pos = 1;</span>
+<span class="fc bfc" id="L664" title="All 2 branches covered.">        while (pos &lt; p.length - 2) {</span>
+<span class="fc" id="L665">            int len = p[pos] &amp; 0xff;</span>
+<span class="pc bpc" id="L666" title="4 of 6 branches missed.">            if ((len != 33 &amp;&amp; len != 65) || pos + 1 + len &gt; p.length - 2) {</span>
+<span class="nc" id="L667">                return -1;</span>
+            }
+<span class="fc" id="L669">            byte[] key = new byte[len];</span>
+<span class="fc" id="L670">            System.arraycopy(p, pos + 1, key, 0, len);</span>
+<span class="fc" id="L671">            keys.add(key);</span>
+<span class="fc" id="L672">            pos += 1 + len;</span>
+<span class="fc" id="L673">        }</span>
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">        return keys.size() == n ? m : -1;</span>
+    }
+
+    private static byte[] keyIn(Script s, byte[] compressed, byte[] uncompressed) {
+<span class="fc" id="L678">        byte[] p = s.raw();</span>
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">        if (contains(p, compressed)) {</span>
+<span class="fc" id="L680">            return compressed;</span>
+        }
+<span class="nc bnc" id="L682" title="All 2 branches missed.">        if (contains(p, uncompressed)) {</span>
+<span class="nc" id="L683">            return uncompressed;</span>
+        }
+<span class="nc" id="L685">        return null;</span>
+    }
+
+    private static boolean contains(byte[] hay, byte[] needle) {
+<span class="pc bpc" id="L689" title="1 of 2 branches missed.">        for (int iter = 0; iter + needle.length &lt;= hay.length; iter++) {</span>
+<span class="fc" id="L690">            boolean match = true;</span>
+<span class="fc bfc" id="L691" title="All 4 branches covered.">            for (int k = 0; k &lt; needle.length &amp;&amp; match; k++) {</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">                match = hay[iter + k] == needle[k];</span>
+            }
+<span class="fc bfc" id="L694" title="All 2 branches covered.">            if (match) {</span>
+<span class="fc" id="L695">                return true;</span>
+            }
+        }
+<span class="nc" id="L698">        return false;</span>
+    }
+
+    private static Script script(List&lt;byte[][]&gt; map, int type) {
+<span class="fc" id="L702">        byte[] b = get(map, new byte[] {(byte) type});</span>
+<span class="fc bfc" id="L703" title="All 2 branches covered.">        return b == null ? null : Script.of(b);</span>
+    }
+
+    private static byte[] get(List&lt;byte[][]&gt; map, byte[] key) {
+<span class="fc bfc" id="L707" title="All 2 branches covered.">        for (byte[][] mapItem : map) {</span>
+<span class="fc bfc" id="L708" title="All 2 branches covered.">            if (java.util.Arrays.equals(mapItem[0], key)) {</span>
+<span class="fc" id="L709">                return mapItem[1];</span>
+            }
+<span class="fc" id="L711">        }</span>
+<span class="fc" id="L712">        return null;</span>
+    }
+
+    private static void put(List&lt;byte[][]&gt; map, byte[] key, byte[] value) {
+<span class="fc bfc" id="L716" title="All 2 branches covered.">        for (int iter = 0; iter &lt; map.size(); iter++) {</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">            if (java.util.Arrays.equals(map.get(iter)[0], key)) {</span>
+<span class="nc" id="L718">                map.set(iter, new byte[][] {key, Wire.copy(value)});</span>
+<span class="nc" id="L719">                return;</span>
+            }
+        }
+<span class="fc" id="L722">        map.add(new byte[][] {key, Wire.copy(value)});</span>
+<span class="fc" id="L723">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

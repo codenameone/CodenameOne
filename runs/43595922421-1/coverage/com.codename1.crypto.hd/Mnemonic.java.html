@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Mnemonic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.hd</a> &gt; <span class="el_source">Mnemonic.java</span></div><h1>Mnemonic.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.hd;
+
+import java.nio.charset.StandardCharsets;
+import com.codename1.security.Hash;
+import com.codename1.security.Pbkdf2;
+
+/// BIP-39 mnemonic sentences: the 12 to 24 English words a wallet shows as its backup, and
+/// the 64-byte seed [Bip32] and [Slip10] derive every key from.
+///
+/// ```java
+/// String words = Mnemonic.generate(128);           // 12 words
+/// byte[] seed = Mnemonic.toSeed(words, &quot;&quot;);        // the empty passphrase
+/// Bip32 account = Bip32.master(seed).derive(&quot;m/44'/60'/0'/0/0&quot;);
+/// ```
+///
+/// Only the English wordlist is built in, which is what every wallet exports by default.
+@com.codename1.impl.SharedWithBackend
+public final class Mnemonic {
+    /// The iteration count BIP-39 fixes for the seed.
+    private static final int SEED_ITERATIONS = 2048;
+
+    private Mnemonic() {
+    }
+
+    /// A new mnemonic over fresh entropy from the platform CSPRNG.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strengthBits`: 128, 160, 192, 224 or 256, for 12, 15, 18, 21 or 24 words
+    public static String generate(int strengthBits) {
+<span class="pc bpc" id="L53" title="2 of 6 branches missed.">        if (strengthBits &lt; 128 || strengthBits &gt; 256 || strengthBits % 32 != 0) {</span>
+<span class="fc" id="L54">            throw new IllegalArgumentException(&quot;strength is 128 to 256 bits, a multiple of 32&quot;);</span>
+        }
+<span class="fc" id="L56">        byte[] entropy = com.codename1.security.CryptoEngine.random(strengthBits / 8);</span>
+        try {
+<span class="fc" id="L58">            return fromEntropy(entropy);</span>
+        } finally {
+<span class="fc" id="L60">            wipe(entropy);</span>
+        }
+    }
+
+    /// The mnemonic that encodes `entropy` (16 to 32 bytes, a multiple of 4).
+    public static String fromEntropy(byte[] entropy) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        int len = entropy == null ? 0 : entropy.length;</span>
+<span class="pc bpc" id="L67" title="3 of 6 branches missed.">        if (len &lt; 16 || len &gt; 32 || len % 4 != 0) {</span>
+<span class="nc" id="L68">            throw new IllegalArgumentException(&quot;entropy is 16 to 32 bytes, a multiple of 4&quot;);</span>
+        }
+<span class="fc" id="L70">        byte[] sum = Hash.sha256(entropy);</span>
+<span class="fc" id="L71">        int bits = len * 8 + len / 4;</span>
+<span class="fc" id="L72">        String[] list = Bip39English.words();</span>
+<span class="fc" id="L73">        StringBuilder out = new StringBuilder();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (int word = 0; word &lt; bits / 11; word++) {</span>
+<span class="fc" id="L75">            int index = 0;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            for (int b = 0; b &lt; 11; b++) {</span>
+<span class="fc" id="L77">                int pos = word * 11 + b;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">                int bit = pos &lt; len * 8 ? bitAt(entropy, pos) : bitAt(sum, pos - len * 8);</span>
+<span class="fc" id="L79">                index = (index &lt;&lt; 1) | bit;</span>
+            }
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (word &gt; 0) {</span>
+<span class="fc" id="L82">                out.append(' ');</span>
+            }
+<span class="fc" id="L84">            out.append(list[index]);</span>
+        }
+<span class="fc" id="L86">        return out.toString();</span>
+    }
+
+    /// The entropy a mnemonic encodes, after checking every word and the checksum.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for an unknown word, a word count other than 12, 15,
+    ///   18, 21 or 24, or a checksum mismatch
+    public static byte[] toEntropy(String mnemonic) {
+<span class="fc" id="L96">        String[] words = split(mnemonic);</span>
+<span class="fc" id="L97">        int count = words.length;</span>
+<span class="pc bpc" id="L98" title="2 of 6 branches missed.">        if (count &lt; 12 || count &gt; 24 || count % 3 != 0) {</span>
+<span class="fc" id="L99">            throw new IllegalArgumentException(&quot;a mnemonic has 12, 15, 18, 21 or 24 words&quot;);</span>
+        }
+<span class="fc" id="L101">        int bits = count * 11;</span>
+<span class="fc" id="L102">        int checksumBits = bits / 33;</span>
+<span class="fc" id="L103">        int entropyBytes = (bits - checksumBits) / 8;</span>
+<span class="fc" id="L104">        byte[] all = new byte[(bits + 7) / 8];</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (int word = 0; word &lt; count; word++) {</span>
+<span class="fc" id="L106">            int index = indexOf(words[word]);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (index &lt; 0) {</span>
+<span class="fc" id="L108">                throw new IllegalArgumentException(&quot;not a BIP-39 word: &quot; + words[word]);</span>
+            }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            for (int b = 0; b &lt; 11; b++) {</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                if (((index &gt;&gt; (10 - b)) &amp; 1) != 0) {</span>
+<span class="fc" id="L112">                    int pos = word * 11 + b;</span>
+<span class="fc" id="L113">                    all[pos &gt;&gt; 3] |= (byte) (0x80 &gt;&gt; (pos &amp; 7));</span>
+                }
+            }
+        }
+<span class="fc" id="L117">        byte[] entropy = new byte[entropyBytes];</span>
+<span class="fc" id="L118">        System.arraycopy(all, 0, entropy, 0, entropyBytes);</span>
+<span class="fc" id="L119">        byte[] sum = Hash.sha256(entropy);</span>
+<span class="fc" id="L120">        int diff = 0;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (int b = 0; b &lt; checksumBits; b++) {</span>
+<span class="fc" id="L122">            diff |= bitAt(sum, b) ^ bitAt(all, entropyBytes * 8 + b);</span>
+        }
+<span class="fc" id="L124">        wipe(all);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (diff != 0) {</span>
+<span class="fc" id="L126">            wipe(entropy);</span>
+<span class="fc" id="L127">            throw new IllegalArgumentException(&quot;mnemonic checksum mismatch&quot;);</span>
+        }
+<span class="fc" id="L129">        return entropy;</span>
+    }
+
+    /// Tells whether the text is a mnemonic with known words and a correct checksum.
+    public static boolean isValid(String mnemonic) {
+        try {
+<span class="fc" id="L135">            wipe(toEntropy(mnemonic));</span>
+<span class="fc" id="L136">            return true;</span>
+<span class="fc" id="L137">        } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L138">            return false;</span>
+        }
+    }
+
+    /// The 64-byte BIP-39 seed: PBKDF2-HMAC-SHA512 over the words, salted with
+    /// `&quot;mnemonic&quot; + passphrase`, 2048 iterations. The words are not checked, as the
+    /// specification asks; call [#isValid] first to reject a mistyped backup.
+    ///
+    /// BIP-39 normalizes both strings to Unicode NFKD before encoding them as UTF-8. The
+    /// words always are ASCII and the device class library has no normalizer, so a
+    /// passphrase outside ASCII must be given already in NFKD form -- a precomposed accent
+    /// otherwise derives a different wallet than other software does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mnemonic`: the words, separated by whitespace
+    ///
+    /// - `passphrase`: the optional extra word (&quot;25th word&quot;); `null` or `&quot;&quot;` for none
+    public static byte[] toSeed(String mnemonic, String passphrase) {
+<span class="fc" id="L157">        String[] words = split(mnemonic);</span>
+<span class="fc" id="L158">        StringBuilder joined = new StringBuilder();</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (int iter = 0; iter &lt; words.length; iter++) {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (iter &gt; 0) {</span>
+<span class="fc" id="L161">                joined.append(' ');</span>
+            }
+<span class="fc" id="L163">            joined.append(words[iter]);</span>
+        }
+<span class="fc" id="L165">        byte[] password = joined.toString().getBytes(StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        byte[] salt = (&quot;mnemonic&quot; + (passphrase == null ? &quot;&quot; : passphrase)).getBytes(StandardCharsets.UTF_8);</span>
+        try {
+<span class="fc" id="L168">            return Pbkdf2.hmacSha512(password, salt, SEED_ITERATIONS, 64);</span>
+        } finally {
+<span class="fc" id="L170">            wipe(password);</span>
+<span class="fc" id="L171">            wipe(salt);</span>
+        }
+    }
+
+    /// The position of an English word in the BIP-39 list, or -1.
+    public static int indexOf(String word) {
+<span class="fc" id="L177">        String[] list = Bip39English.words();</span>
+<span class="fc" id="L178">        int lo = 0;</span>
+<span class="fc" id="L179">        int hi = list.length - 1;</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        while (lo &lt;= hi) {</span>
+<span class="fc" id="L181">            int mid = (lo + hi) &gt;&gt;&gt; 1;</span>
+<span class="fc" id="L182">            int c = list[mid].compareTo(word);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (c == 0) {</span>
+<span class="fc" id="L184">                return mid;</span>
+            }
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            if (c &lt; 0) {</span>
+<span class="fc" id="L187">                lo = mid + 1;</span>
+            } else {
+<span class="fc" id="L189">                hi = mid - 1;</span>
+            }
+<span class="fc" id="L191">        }</span>
+<span class="fc" id="L192">        return -1;</span>
+    }
+
+    /// The English word at `index` (0 to 2047).
+    public static String word(int index) {
+<span class="nc" id="L197">        return Bip39English.words()[index];</span>
+    }
+
+    private static String[] split(String text) {
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L202">            return new String[0];</span>
+        }
+<span class="fc" id="L204">        java.util.ArrayList&lt;String&gt; out = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L205">        int start = -1;</span>
+<span class="fc" id="L206">        int len = text.length();</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (int iter = 0; iter &lt;= len; iter++) {</span>
+<span class="pc bpc" id="L208" title="1 of 6 branches missed.">            boolean space = iter == len || text.charAt(iter) &lt;= ' ' || text.charAt(iter) == '\u3000';</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (space) {</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                if (start &gt;= 0) {</span>
+<span class="fc" id="L211">                    out.add(text.substring(start, iter));</span>
+<span class="fc" id="L212">                    start = -1;</span>
+                }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            } else if (start &lt; 0) {</span>
+<span class="fc" id="L215">                start = iter;</span>
+            }
+        }
+<span class="fc" id="L218">        return out.toArray(new String[out.size()]);</span>
+    }
+
+    private static int bitAt(byte[] data, int pos) {
+<span class="fc" id="L222">        return (data[pos &gt;&gt; 3] &gt;&gt; (7 - (pos &amp; 7))) &amp; 1;</span>
+    }
+
+
+    static void wipe(byte[] data) {
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (data != null) {</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            for (int iter = 0; iter &lt; data.length; iter++) {</span>
+<span class="fc" id="L229">                data[iter] = 0;</span>
+            }
+        }
+<span class="fc" id="L232">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

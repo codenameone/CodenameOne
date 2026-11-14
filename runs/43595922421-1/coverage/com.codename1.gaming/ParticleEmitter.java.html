@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParticleEmitter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">ParticleEmitter.java</span></div><h1>ParticleEmitter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.IndexBuffer;
+import com.codename1.gpu.Material;
+import com.codename1.gpu.Mesh;
+import com.codename1.gpu.PrimitiveType;
+import com.codename1.gpu.RenderState;
+import com.codename1.gpu.Texture;
+import com.codename1.gpu.VertexBuffer;
+import com.codename1.gpu.VertexFormat;
+
+import java.util.Random;
+
+/// Camera facing particles for 3D effects: explosions, sparks, dust, magic.
+/// Every particle of an emitter is drawn in one call as a soft round billboard
+/// that brightens in, fades out and changes size over its life.
+///
+/// An emitter is a pool of at most `maxParticles` live particles. `burst`
+/// spawns a batch at a point; `update` moves them and turns them toward the
+/// camera. Add it to a view with `addTo(GameView)` and keep it for the life of
+/// the scene -- an emitter with no live particles draws nothing visible.
+///
+/// ```java
+/// import com.codename1.gaming.*;
+/// import com.codename1.gpu.*;
+/// import com.codename1.ui.*;
+/// import com.codename1.ui.layouts.BorderLayout;
+///
+/// class Campfire extends GameView {
+///     private ParticleEmitter fire;
+///
+///     protected void onSetup(GraphicsDevice device) {
+///         fire = new ParticleEmitter(device, 64)
+///                 .setColor(0xffff8a2a).setAdditive(true)
+///                 .setSpeed(1.5f, 4f).setLifetime(0.3f, 0.7f).setSize(0.6f, 1.6f)
+///                 .setGravity(-2f);
+///         fire.addTo(this);
+///     }
+///
+///     protected void update(double deltaSeconds) {
+///         if (fire != null) {
+///             fire.burst(0f, 0.5f, 0f, 2);
+///             fire.update((float) deltaSeconds, getCamera());
+///         }
+///     }
+/// }
+///
+/// Form f = new Form(&quot;Campfire&quot;, new BorderLayout());
+/// f.add(BorderLayout.CENTER, new Campfire());
+/// f.show();
+/// ```
+///
+/// Additive emitters suit light (fire, sparks, magic); alpha blended ones suit
+/// matter (smoke, dust, debris).
+public class ParticleEmitter {
+    private static final int CELLS = 8;
+    private static final int CELL = 32;
+
+    private final int max;
+    private final float[] px;
+    private final float[] py;
+    private final float[] pz;
+    private final float[] vx;
+    private final float[] vy;
+    private final float[] vz;
+    private final float[] life;
+    private final float[] span;
+<span class="fc" id="L91">    private final int[] live = new int[1];</span>
+    private final Model model;
+    private final Material material;
+    private final RenderState state;
+<span class="fc" id="L95">    private final Random random = new Random();</span>
+
+<span class="fc" id="L97">    private float minSpeed = 1f;</span>
+<span class="fc" id="L98">    private float maxSpeed = 3f;</span>
+<span class="fc" id="L99">    private float minLife = 0.4f;</span>
+<span class="fc" id="L100">    private float maxLife = 0.9f;</span>
+<span class="fc" id="L101">    private float startSize = 0.3f;</span>
+<span class="fc" id="L102">    private float endSize = 0.1f;</span>
+<span class="fc" id="L103">    private float gravity = -9.8f;</span>
+<span class="fc" id="L104">    private float drag = 1.5f;</span>
+    private float dirX;
+<span class="fc" id="L106">    private float dirY = 1f;</span>
+    private float dirZ;
+<span class="fc" id="L108">    private float cone = 180f;</span>
+
+    /// Creates an emitter able to hold `maxParticles` live particles.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device that will draw it; uploads the particle texture
+    ///
+    /// - `maxParticles`: the pool size; a burst beyond it reuses the oldest
+<span class="fc" id="L117">    public ParticleEmitter(GraphicsDevice device, int maxParticles) {</span>
+<span class="fc" id="L118">        max = Math.max(1, maxParticles);</span>
+<span class="fc" id="L119">        px = new float[max];</span>
+<span class="fc" id="L120">        py = new float[max];</span>
+<span class="fc" id="L121">        pz = new float[max];</span>
+<span class="fc" id="L122">        vx = new float[max];</span>
+<span class="fc" id="L123">        vy = new float[max];</span>
+<span class="fc" id="L124">        vz = new float[max];</span>
+<span class="fc" id="L125">        life = new float[max];</span>
+<span class="fc" id="L126">        span = new float[max];</span>
+<span class="fc" id="L127">        VertexBuffer vb = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, max * 4);</span>
+<span class="fc" id="L128">        IndexBuffer ib = new IndexBuffer(max * 6);</span>
+<span class="fc" id="L129">        int[] idx = new int[max * 6];</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (int i = 0; i &lt; max; i++) {</span>
+<span class="fc" id="L131">            int v = i * 4;</span>
+<span class="fc" id="L132">            int o = i * 6;</span>
+<span class="fc" id="L133">            idx[o] = v;</span>
+<span class="fc" id="L134">            idx[o + 1] = v + 1;</span>
+<span class="fc" id="L135">            idx[o + 2] = v + 2;</span>
+<span class="fc" id="L136">            idx[o + 3] = v;</span>
+<span class="fc" id="L137">            idx[o + 4] = v + 2;</span>
+<span class="fc" id="L138">            idx[o + 5] = v + 3;</span>
+        }
+<span class="fc" id="L140">        ib.setData(idx);</span>
+<span class="fc" id="L141">        state = new RenderState().setDepthTest(true).setDepthWrite(false)</span>
+<span class="fc" id="L142">                .setCullMode(RenderState.CullMode.NONE).setBlendMode(RenderState.BlendMode.ADDITIVE);</span>
+<span class="fc" id="L143">        Texture t = device.createTexture(CELLS * CELL, CELL, dotStrip());</span>
+<span class="fc" id="L144">        t.setFilter(Texture.Filter.LINEAR);</span>
+<span class="fc" id="L145">        material = new Material(Material.Type.UNLIT).setTexture(t).setColor(0xffffffff).setRenderState(state);</span>
+<span class="fc" id="L146">        model = new Model(new Mesh(vb, ib, PrimitiveType.TRIANGLES), material);</span>
+<span class="fc" id="L147">    }</span>
+
+    /// A strip of soft dots, brightest on the left, so a particle fades by
+    /// sliding its texture coordinates rather than needing a color per vertex.
+    private static int[] dotStrip() {
+<span class="fc" id="L152">        int w = CELLS * CELL;</span>
+<span class="fc" id="L153">        int[] argb = new int[w * CELL];</span>
+<span class="fc" id="L154">        float r = CELL / 2f;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (int cell = 0; cell &lt; CELLS; cell++) {</span>
+<span class="fc" id="L156">            float intensity = 1f - cell / (float) CELLS;</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            for (int y = 0; y &lt; CELL; y++) {</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                for (int x = 0; x &lt; CELL; x++) {</span>
+<span class="fc" id="L159">                    float dx = (x + 0.5f - r) / r;</span>
+<span class="fc" id="L160">                    float dy = (y + 0.5f - r) / r;</span>
+<span class="fc" id="L161">                    float d = 1f - (float) Math.sqrt(dx * dx + dy * dy);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                    float a = d &lt;= 0f ? 0f : d * d * intensity;</span>
+<span class="fc" id="L163">                    int c = (int) (a * 255f + 0.5f);</span>
+<span class="fc" id="L164">                    argb[y * w + cell * CELL + x] = (c &lt;&lt; 24) | (c &lt;&lt; 16) | (c &lt;&lt; 8) | c;</span>
+                }
+            }
+        }
+<span class="fc" id="L168">        return argb;</span>
+    }
+
+    /// The model that draws the particles.
+    public Model getModel() {
+<span class="fc" id="L173">        return model;</span>
+    }
+
+    /// Adds the emitter to `view`.
+    public void addTo(GameView view) {
+<span class="nc" id="L178">        view.addModel(model);</span>
+<span class="nc" id="L179">    }</span>
+
+    /// Removes the emitter from `view`.
+    public void removeFrom(GameView view) {
+<span class="nc" id="L183">        view.removeModel(model);</span>
+<span class="nc" id="L184">    }</span>
+
+    /// Sets the particle color. The alpha channel scales the whole effect.
+    public ParticleEmitter setColor(int argb) {
+<span class="nc" id="L188">        material.setColor(argb);</span>
+<span class="nc" id="L189">        return this;</span>
+    }
+
+    /// True to add light (fire, sparks), false to alpha blend (smoke, dust).
+    public ParticleEmitter setAdditive(boolean additive) {
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        state.setBlendMode(additive ? RenderState.BlendMode.ADDITIVE : RenderState.BlendMode.ALPHA);</span>
+<span class="nc" id="L195">        return this;</span>
+    }
+
+    /// The initial speed range in world units per second.
+    public ParticleEmitter setSpeed(float min, float max) {
+<span class="nc" id="L200">        minSpeed = min;</span>
+<span class="nc" id="L201">        maxSpeed = max;</span>
+<span class="nc" id="L202">        return this;</span>
+    }
+
+    /// The lifetime range in seconds.
+    public ParticleEmitter setLifetime(float min, float max) {
+<span class="fc" id="L207">        minLife = min;</span>
+<span class="fc" id="L208">        maxLife = Math.max(min, max);</span>
+<span class="fc" id="L209">        return this;</span>
+    }
+
+    /// The billboard size at birth and at death, in world units.
+    public ParticleEmitter setSize(float start, float end) {
+<span class="nc" id="L214">        startSize = start;</span>
+<span class="nc" id="L215">        endSize = end;</span>
+<span class="nc" id="L216">        return this;</span>
+    }
+
+    /// Acceleration along y in units per second squared; negative falls,
+    /// positive rises (smoke, embers).
+    public ParticleEmitter setGravity(float gravity) {
+<span class="fc" id="L222">        this.gravity = gravity;</span>
+<span class="fc" id="L223">        return this;</span>
+    }
+
+    /// The fraction of velocity lost per second.
+    public ParticleEmitter setDrag(float drag) {
+<span class="nc" id="L228">        this.drag = drag;</span>
+<span class="nc" id="L229">        return this;</span>
+    }
+
+    /// Emits within `coneDegrees` of the direction `(x, y, z)`; 180 is every
+    /// direction, 0 a straight jet.
+    public ParticleEmitter setDirection(float x, float y, float z, float coneDegrees) {
+<span class="nc" id="L235">        float len = (float) Math.sqrt(x * x + y * y + z * z);</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (len &gt; 0f) {</span>
+<span class="nc" id="L237">            dirX = x / len;</span>
+<span class="nc" id="L238">            dirY = y / len;</span>
+<span class="nc" id="L239">            dirZ = z / len;</span>
+        }
+<span class="nc" id="L241">        cone = coneDegrees;</span>
+<span class="nc" id="L242">        return this;</span>
+    }
+
+    /// The number of live particles.
+    public int getLiveCount() {
+<span class="fc" id="L247">        return live[0];</span>
+    }
+
+    /// True while any particle is alive.
+    public boolean isActive() {
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        return live[0] &gt; 0;</span>
+    }
+
+    /// Removes every live particle.
+    public void clear() {
+<span class="nc" id="L257">        live[0] = 0;</span>
+<span class="nc" id="L258">    }</span>
+
+    /// Spawns `count` particles at `(x, y, z)`. When the pool is full the
+    /// oldest particles are replaced.
+    public void burst(float x, float y, float z, int count) {
+<span class="fc" id="L263">        double coneCos = Math.cos(Math.toRadians(Math.min(180f, Math.max(0f, cone))));</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        for (int n = 0; n &lt; count; n++) {</span>
+            int i;
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (live[0] &lt; max) {</span>
+<span class="fc" id="L267">                i = live[0]++;</span>
+            } else {
+<span class="fc" id="L269">                i = oldest();</span>
+            }
+            // a direction uniformly distributed over the cone around dir
+<span class="fc" id="L272">            float cz = (float) (coneCos + random.nextDouble() * (1.0 - coneCos));</span>
+<span class="fc" id="L273">            float sz = (float) Math.sqrt(Math.max(0f, 1f - cz * cz));</span>
+<span class="fc" id="L274">            float phi = (float) (random.nextDouble() * Math.PI * 2.0);</span>
+<span class="fc" id="L275">            float lx = sz * (float) Math.cos(phi);</span>
+<span class="fc" id="L276">            float ly = sz * (float) Math.sin(phi);</span>
+            // basis around dir
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            float ax = Math.abs(dirX) &lt; 0.9f ? 1f : 0f;</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">            float ay = ax == 1f ? 0f : 1f;</span>
+<span class="fc" id="L280">            float ux = -dirZ * ay;</span>
+<span class="fc" id="L281">            float uy = dirZ * ax;</span>
+<span class="fc" id="L282">            float uz = dirX * ay - dirY * ax;</span>
+<span class="fc" id="L283">            float ul = (float) Math.sqrt(ux * ux + uy * uy + uz * uz);</span>
+<span class="fc" id="L284">            ux /= ul;</span>
+<span class="fc" id="L285">            uy /= ul;</span>
+<span class="fc" id="L286">            uz /= ul;</span>
+<span class="fc" id="L287">            float wx = dirY * uz - dirZ * uy;</span>
+<span class="fc" id="L288">            float wy = dirZ * ux - dirX * uz;</span>
+<span class="fc" id="L289">            float wz = dirX * uy - dirY * ux;</span>
+<span class="fc" id="L290">            float speed = minSpeed + random.nextFloat() * (maxSpeed - minSpeed);</span>
+<span class="fc" id="L291">            vx[i] = (dirX * cz + ux * lx + wx * ly) * speed;</span>
+<span class="fc" id="L292">            vy[i] = (dirY * cz + uy * lx + wy * ly) * speed;</span>
+<span class="fc" id="L293">            vz[i] = (dirZ * cz + uz * lx + wz * ly) * speed;</span>
+<span class="fc" id="L294">            px[i] = x;</span>
+<span class="fc" id="L295">            py[i] = y;</span>
+<span class="fc" id="L296">            pz[i] = z;</span>
+<span class="fc" id="L297">            span[i] = minLife + random.nextFloat() * (maxLife - minLife);</span>
+<span class="fc" id="L298">            life[i] = 0f;</span>
+        }
+<span class="fc" id="L300">    }</span>
+
+    private int oldest() {
+<span class="fc" id="L303">        int best = 0;</span>
+<span class="fc" id="L304">        float most = -1f;</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        for (int i = 0; i &lt; max; i++) {</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            float f = span[i] &lt;= 0f ? 1f : life[i] / span[i];</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (f &gt; most) {</span>
+<span class="fc" id="L308">                most = f;</span>
+<span class="fc" id="L309">                best = i;</span>
+            }
+        }
+<span class="fc" id="L312">        return best;</span>
+    }
+
+    /// Moves the particles by `deltaSeconds`, retires the expired ones and
+    /// turns the rest toward `camera`.
+    public void update(float deltaSeconds, GameCamera camera) {
+<span class="fc" id="L318">        int n = live[0];</span>
+<span class="fc" id="L319">        float damp = Math.max(0f, 1f - drag * deltaSeconds);</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L321">            life[i] += deltaSeconds;</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">            if (life[i] &gt;= span[i]) {</span>
+<span class="fc" id="L323">                n--;</span>
+<span class="fc" id="L324">                copy(n, i);</span>
+<span class="fc" id="L325">                i--;</span>
+<span class="fc" id="L326">                continue;</span>
+            }
+<span class="fc" id="L328">            vy[i] += gravity * deltaSeconds;</span>
+<span class="fc" id="L329">            vx[i] *= damp;</span>
+<span class="fc" id="L330">            vy[i] *= damp;</span>
+<span class="fc" id="L331">            vz[i] *= damp;</span>
+<span class="fc" id="L332">            px[i] += vx[i] * deltaSeconds;</span>
+<span class="fc" id="L333">            py[i] += vy[i] * deltaSeconds;</span>
+<span class="fc" id="L334">            pz[i] += vz[i] * deltaSeconds;</span>
+        }
+<span class="fc" id="L336">        live[0] = n;</span>
+<span class="fc" id="L337">        build(camera);</span>
+<span class="fc" id="L338">    }</span>
+
+    private void copy(int from, int to) {
+<span class="fc" id="L341">        px[to] = px[from];</span>
+<span class="fc" id="L342">        py[to] = py[from];</span>
+<span class="fc" id="L343">        pz[to] = pz[from];</span>
+<span class="fc" id="L344">        vx[to] = vx[from];</span>
+<span class="fc" id="L345">        vy[to] = vy[from];</span>
+<span class="fc" id="L346">        vz[to] = vz[from];</span>
+<span class="fc" id="L347">        life[to] = life[from];</span>
+<span class="fc" id="L348">        span[to] = span[from];</span>
+<span class="fc" id="L349">    }</span>
+
+    private void build(GameCamera camera) {
+        // camera right and up from the view direction, world up = +y
+<span class="fc" id="L353">        float fx = camera.getTargetX() - camera.getEyeX();</span>
+<span class="fc" id="L354">        float fy = camera.getTargetY() - camera.getEyeY();</span>
+<span class="fc" id="L355">        float fz = camera.getTargetZ() - camera.getEyeZ();</span>
+<span class="fc" id="L356">        float rx = -fz;</span>
+<span class="fc" id="L357">        float rz = fx;</span>
+<span class="fc" id="L358">        float rl = (float) Math.sqrt(rx * rx + rz * rz);</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (rl == 0f) {</span>
+<span class="nc" id="L360">            rx = 1f;</span>
+<span class="nc" id="L361">            rz = 0f;</span>
+        } else {
+<span class="fc" id="L363">            rx /= rl;</span>
+<span class="fc" id="L364">            rz /= rl;</span>
+        }
+        // up = right x forward
+<span class="fc" id="L367">        float ux = -rz * fy;</span>
+<span class="fc" id="L368">        float uy = rz * fx - rx * fz;</span>
+<span class="fc" id="L369">        float uz = rx * fy;</span>
+<span class="fc" id="L370">        float ul = (float) Math.sqrt(ux * ux + uy * uy + uz * uz);</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">        if (ul &gt; 0f) {</span>
+<span class="fc" id="L372">            ux /= ul;</span>
+<span class="fc" id="L373">            uy /= ul;</span>
+<span class="fc" id="L374">            uz /= ul;</span>
+        }
+<span class="fc" id="L376">        float nx = -fx;</span>
+<span class="fc" id="L377">        float ny = -fy;</span>
+<span class="fc" id="L378">        float nz = -fz;</span>
+<span class="fc" id="L379">        VertexBuffer vb = model.getMesh().getVertices();</span>
+<span class="fc" id="L380">        float[] d = vb.getData();</span>
+<span class="fc" id="L381">        int n = live[0];</span>
+<span class="fc" id="L382">        float cellW = 1f / CELLS;</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        for (int i = 0; i &lt; max; i++) {</span>
+<span class="fc" id="L384">            int o = i * 32;</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            if (i &gt;= n) {</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">                for (int k = 0; k &lt; 32; k++) {</span>
+<span class="fc" id="L387">                    d[o + k] = 0f;</span>
+                }
+<span class="fc" id="L389">                continue;</span>
+            }
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">            float f = span[i] &lt;= 0f ? 1f : life[i] / span[i];</span>
+            // quick swell in the first 15% of life, then shrink toward endSize
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">            float size = f &lt; 0.15f ? startSize * (0.4f + 4f * f) : startSize + (endSize - startSize) * (f - 0.15f) / 0.85f;</span>
+<span class="fc" id="L394">            float h = size * 0.5f;</span>
+<span class="fc" id="L395">            int cell = Math.min(CELLS - 1, (int) (f * CELLS));</span>
+<span class="fc" id="L396">            float u0 = cell * cellW + 0.5f / (CELLS * CELL);</span>
+<span class="fc" id="L397">            float u1 = (cell + 1) * cellW - 0.5f / (CELLS * CELL);</span>
+<span class="fc" id="L398">            corner(d, o, px[i] - (rx + ux) * h, py[i] - uy * h, pz[i] - (rz + uz) * h, nx, ny, nz, u0, 1f);</span>
+<span class="fc" id="L399">            corner(d, o + 8, px[i] + (rx - ux) * h, py[i] - uy * h, pz[i] + (rz - uz) * h, nx, ny, nz, u1, 1f);</span>
+<span class="fc" id="L400">            corner(d, o + 16, px[i] + (rx + ux) * h, py[i] + uy * h, pz[i] + (rz + uz) * h, nx, ny, nz, u1, 0f);</span>
+<span class="fc" id="L401">            corner(d, o + 24, px[i] - (rx - ux) * h, py[i] + uy * h, pz[i] - (rz - uz) * h, nx, ny, nz, u0, 0f);</span>
+        }
+<span class="fc" id="L403">        vb.setDirty();</span>
+<span class="fc" id="L404">    }</span>
+
+    private static void corner(float[] d, int o, float x, float y, float z, float nx, float ny, float nz,
+                               float u, float v) {
+<span class="fc" id="L408">        d[o] = x;</span>
+<span class="fc" id="L409">        d[o + 1] = y;</span>
+<span class="fc" id="L410">        d[o + 2] = z;</span>
+<span class="fc" id="L411">        d[o + 3] = nx;</span>
+<span class="fc" id="L412">        d[o + 4] = ny;</span>
+<span class="fc" id="L413">        d[o + 5] = nz;</span>
+<span class="fc" id="L414">        d[o + 6] = u;</span>
+<span class="fc" id="L415">        d[o + 7] = v;</span>
+<span class="fc" id="L416">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

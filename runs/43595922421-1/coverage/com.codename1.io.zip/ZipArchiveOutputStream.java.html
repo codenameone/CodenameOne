@@ -1,0 +1,506 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZipArchiveOutputStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.zip</a> &gt; <span class="el_source">ZipArchiveOutputStream.java</span></div><h1>ZipArchiveOutputStream.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.zip;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashSet;
+import java.util.zip.CRC32;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
+
+/// Streaming ZIP writer with optional Unix permissions. Works on the JVM and
+/// ParparVM. Payloads are never buffered in full. Central-directory metadata is
+/// limited to 16 MiB and 65534 entries; ZIP64 is explicitly refused.
+/// finish() leaves the destination open; close() closes it even after a failure.
+/// Input streams are owned by the caller. This stream is not thread safe.
+@com.codename1.impl.SharedWithBackend
+public class ZipArchiveOutputStream extends DeflaterOutputStream {
+    public static final int STORED = 0;
+    public static final int DEFLATED = 8;
+    private static final long LIMIT = 0xffffffffL;
+    private static final int METADATA_LIMIT = 16 * 1024 * 1024;
+<span class="nc" id="L49">    private final ArrayList&lt;Record&gt; entries = new ArrayList&lt;Record&gt;();</span>
+<span class="nc" id="L50">    private final HashSet&lt;String&gt; names = new HashSet&lt;String&gt;();</span>
+<span class="nc" id="L51">    private final CRC32 crc = new CRC32();</span>
+    private final Charset encoding;
+    private final int encodingFlag;
+    private Record current;
+    private ZipEntry original;
+<span class="nc" id="L56">    private int method = DEFLATED;</span>
+    private int metadataSize;
+    private long written;
+    private long entryStart;
+    private long entrySize;
+    private boolean finished;
+    private boolean closed;
+    private IOException failure;
+<span class="nc" id="L64">    private byte[] comment = new byte[0];</span>
+<span class="nc" id="L65">    private final byte[] writeBuffer = new byte[4];</span>
+
+    private static final class Record {
+        ZipEntry entry;
+        byte[] name;
+        byte[] extra;
+        byte[] comment;
+        long offset;
+        long dosTime;
+        long attributes;
+        int flags;
+        int platform;
+    }
+
+    public ZipArchiveOutputStream(OutputStream out) {
+<span class="nc" id="L80">        this(out, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L81">    }</span>
+    public ZipArchiveOutputStream(OutputStream out, Charset charset) {
+<span class="nc" id="L83">        super(out, new Deflater(Deflater.DEFAULT_COMPRESSION, true), 8192);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (charset == null) {</span>
+<span class="nc" id="L85">            throw new NullPointerException();</span>
+        }
+<span class="nc" id="L87">        encoding = charset;</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        encodingFlag = &quot;UTF-8&quot;.equalsIgnoreCase(encoding.name()) ? 0x800 : 0;</span>
+<span class="nc" id="L89">    }</span>
+
+    public void setMethod(int method) {
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        if (method != STORED &amp;&amp; method != DEFLATED) {</span>
+<span class="nc" id="L93">            throw new IllegalArgumentException(&quot;Invalid method&quot;);</span>
+        }
+<span class="nc" id="L95">        this.method = method;</span>
+<span class="nc" id="L96">    }</span>
+    public void setLevel(int level) {
+<span class="nc" id="L98">        def.setLevel(level);</span>
+<span class="nc" id="L99">    }</span>
+    public void setComment(String comment) {
+        try {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            this.comment = encode(comment == null ? &quot;&quot; : comment);</span>
+<span class="nc" id="L103">        } catch (IOException ex) {</span>
+<span class="nc" id="L104">            throw new IllegalArgumentException(ex.getMessage(), ex);</span>
+<span class="nc" id="L105">        }</span>
+<span class="nc" id="L106">    }</span>
+    private byte[] encode(String value) throws IOException {
+<span class="nc" id="L108">        byte[] bytes = value.getBytes(encoding);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (!value.equals(new String(bytes, encoding))) {</span>
+<span class="nc" id="L110">            throw new ZipException(&quot;ZIP field cannot be represented in &quot; + encoding.name());</span>
+        }
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (bytes.length &gt; 65535) {</span>
+<span class="nc" id="L113">            throw new ZipException(&quot;Encoded ZIP field exceeds 65535 bytes&quot;);</span>
+        }
+<span class="nc" id="L115">        return bytes;</span>
+    }
+    private void writable() throws IOException {
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L119">            throw new IOException(&quot;ZIP stream closed&quot;);</span>
+        }
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (failure != null) {</span>
+<span class="nc" id="L122">            throw failure;</span>
+        }
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (finished) {</span>
+<span class="nc" id="L125">            throw new IOException(&quot;ZIP stream finished&quot;);</span>
+        }
+<span class="nc" id="L127">    }</span>
+    /// Writes an entry without Unix attributes, like java.util.zip.ZipOutputStream.
+    public void putNextEntry(ZipEntry entry) throws IOException {
+<span class="nc" id="L130">        putEntry(entry, 0, 0);</span>
+<span class="nc" id="L131">    }</span>
+
+    /// Writes an entry with Unix permission bits (for example 0755 or 0644).
+    /// File/directory type bits are inferred from the trailing slash. Symlinks
+    /// and special files are not created. Values outside 0000..0777 are refused.
+    public void putNextEntry(ZipEntry entry, int permissions) throws IOException {
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        if (permissions &lt; 0 || permissions &gt; 0x1ff) {</span>
+<span class="nc" id="L138">            throw new IllegalArgumentException(&quot;Invalid permissions&quot;);</span>
+        }
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        long mode = (entry.isDirectory() ? 0x4000 : 0x8000) | permissions;</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        putEntry(entry, 3, (mode &lt;&lt; 16) | (entry.isDirectory() ? 0x10 : 0));</span>
+<span class="nc" id="L142">    }</span>
+    private void putEntry(ZipEntry entry, int platform, long attributes) throws IOException {
+<span class="nc" id="L144">        writable();</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (entry == null) {</span>
+<span class="nc" id="L146">            throw new NullPointerException();</span>
+        }
+<span class="nc" id="L148">        closeEntry();</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (entries.size() &gt;= 65534) {</span>
+<span class="nc" id="L150">            throw new ZipException(&quot;ZIP64 entry count unsupported&quot;);</span>
+        }
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (names.contains(entry.getName())) {</span>
+<span class="nc" id="L153">            throw new ZipException(&quot;Duplicate entry: &quot; + entry.getName());</span>
+        }
+<span class="nc" id="L155">        Record r = new Record();</span>
+<span class="nc" id="L156">        r.entry = new ZipEntry(entry);</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (r.entry.getMethod() == -1) {</span>
+<span class="nc" id="L158">            r.entry.setMethod(method);</span>
+        }
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (r.entry.getTime() == -1) {</span>
+<span class="nc" id="L161">            r.entry.setTime(System.currentTimeMillis());</span>
+        }
+<span class="nc" id="L163">        r.name = encode(r.entry.getName());</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        r.comment = encode(r.entry.getComment() == null ? &quot;&quot; : r.entry.getComment());</span>
+<span class="nc" id="L165">        byte[] extra = r.entry.getExtra();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        r.extra = extra == null ? new byte[0] : extra.clone();</span>
+<span class="nc" id="L167">        validateExtra(r.extra);</span>
+<span class="nc" id="L168">        r.extra = timestampExtra(r.extra, r.entry.getTime());</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (r.name.length == 0) {</span>
+<span class="nc" id="L170">            throw new ZipException(&quot;Empty entry name&quot;);</span>
+        }
+<span class="nc" id="L172">        checkSize(r.entry.getSize());</span>
+<span class="nc" id="L173">        checkSize(r.entry.getCompressedSize());</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (r.entry.getMethod() == STORED) {</span>
+<span class="nc bnc" id="L175" title="All 4 branches missed.">            if (r.entry.getSize() &lt; 0 &amp;&amp; r.entry.getCompressedSize() &gt;= 0) {</span>
+<span class="nc" id="L176">                r.entry.setSize(r.entry.getCompressedSize());</span>
+            }
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            if (r.entry.getCompressedSize() &lt; 0) {</span>
+<span class="nc" id="L179">                r.entry.setCompressedSize(r.entry.getSize());</span>
+            }
+<span class="nc bnc" id="L181" title="All 6 branches missed.">            if (r.entry.getSize() &lt; 0 || r.entry.getCrc() &lt; 0 || r.entry.getSize() != r.entry.getCompressedSize()) {</span>
+<span class="nc" id="L182">                throw new ZipException(&quot;STORED entries require size and CRC before writing&quot;);</span>
+            }
+        }
+<span class="nc" id="L185">        int metadata = 46 + r.name.length + r.extra.length + r.comment.length;</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (metadataSize &gt; METADATA_LIMIT - metadata) {</span>
+<span class="nc" id="L187">            throw new ZipException(&quot;ZIP central directory exceeds 16 MiB&quot;);</span>
+        }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        r.flags = encodingFlag | (r.entry.getMethod() == DEFLATED ? 8 : 0);</span>
+<span class="nc" id="L190">        r.platform = platform;</span>
+<span class="nc" id="L191">        r.attributes = attributes;</span>
+<span class="nc" id="L192">        r.offset = written;</span>
+<span class="nc" id="L193">        r.dosTime = dosTime(r.entry.getTime());</span>
+<span class="nc" id="L194">        current = r;</span>
+<span class="nc" id="L195">        original = entry;</span>
+<span class="nc" id="L196">        entrySize = 0;</span>
+<span class="nc" id="L197">        crc.reset();</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        if (r.entry.getMethod() == DEFLATED) {</span>
+<span class="nc" id="L199">            def.reset();</span>
+        }
+        try {
+<span class="nc" id="L202">            word(0x04034b50L, 4);</span>
+<span class="nc" id="L203">            word(20, 2);</span>
+<span class="nc" id="L204">            word(r.flags, 2);</span>
+<span class="nc" id="L205">            word(r.entry.getMethod(), 2);</span>
+<span class="nc" id="L206">            word(r.dosTime, 4);</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            word(r.entry.getMethod() == STORED ? r.entry.getCrc() : 0, 4);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            word(r.entry.getMethod() == STORED ? r.entry.getSize() : 0, 4);</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            word(r.entry.getMethod() == STORED ? r.entry.getSize() : 0, 4);</span>
+<span class="nc" id="L210">            word(r.name.length, 2);</span>
+<span class="nc" id="L211">            word(r.extra.length, 2);</span>
+<span class="nc" id="L212">            raw(r.name);</span>
+<span class="nc" id="L213">            raw(r.extra);</span>
+<span class="nc" id="L214">            entryStart = written;</span>
+<span class="nc" id="L215">            entries.add(r);</span>
+<span class="nc" id="L216">            names.add(r.entry.getName());</span>
+<span class="nc" id="L217">            metadataSize += metadata;</span>
+<span class="nc" id="L218">        } catch (IOException ex) {</span>
+<span class="nc" id="L219">            failure = ex;</span>
+<span class="nc" id="L220">            throw ex;</span>
+<span class="nc" id="L221">        }</span>
+<span class="nc" id="L222">    }</span>
+    private static void validateExtra(byte[] extra) throws ZipException {
+<span class="nc" id="L224">        int at = 0;</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        while (at &lt; extra.length) {</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (extra.length - at &lt; 4) {</span>
+<span class="nc" id="L227">                throw new ZipException(&quot;Malformed ZIP extra field&quot;);</span>
+            }
+<span class="nc" id="L229">            int id = (extra[at] &amp; 255) | ((extra[at + 1] &amp; 255) &lt;&lt; 8);</span>
+<span class="nc" id="L230">            int size = (extra[at + 2] &amp; 255) | ((extra[at + 3] &amp; 255) &lt;&lt; 8);</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            if (id == 1) {</span>
+<span class="nc" id="L232">                throw new ZipException(&quot;ZIP64 extra field unsupported&quot;);</span>
+            }
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            if (size &gt; extra.length - at - 4) {</span>
+<span class="nc" id="L235">                throw new ZipException(&quot;Malformed ZIP extra field&quot;);</span>
+            }
+<span class="nc" id="L237">            at += 4 + size;</span>
+<span class="nc" id="L238">        }</span>
+<span class="nc" id="L239">    }</span>
+    private static void checkSize(long size) throws ZipException {
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (size &gt;= LIMIT) {</span>
+<span class="nc" id="L242">            throw new ZipException(&quot;ZIP64 size unsupported&quot;);</span>
+        }
+<span class="nc" id="L244">    }</span>
+    private static byte[] timestampExtra(byte[] extra, long millis) throws ZipException {
+<span class="nc" id="L246">        long seconds = millis / 1000;</span>
+<span class="nc bnc" id="L247" title="All 4 branches missed.">        if (millis &lt; 0 &amp;&amp; millis % 1000 != 0) {</span>
+<span class="nc" id="L248">            seconds--;</span>
+        }
+<span class="nc bnc" id="L250" title="All 4 branches missed.">        boolean timestamp = seconds &gt;= Integer.MIN_VALUE &amp;&amp; seconds &lt;= Integer.MAX_VALUE;</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        int added = timestamp ? 9 : 0;</span>
+        // Replace any caller-provided extended timestamp with the entry's time.
+<span class="nc" id="L253">        int kept = 0;</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        for (int at = 0; at &lt; extra.length;) {</span>
+<span class="nc" id="L255">            int size = 4 + (extra[at + 2] &amp; 255) + ((extra[at + 3] &amp; 255) &lt;&lt; 8);</span>
+<span class="nc bnc" id="L256" title="All 4 branches missed.">            if ((extra[at] &amp; 255) != 0x55 || (extra[at + 1] &amp; 255) != 0x54) {</span>
+<span class="nc" id="L257">                kept += size;</span>
+            }
+<span class="nc" id="L259">            at += size;</span>
+<span class="nc" id="L260">        }</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (kept &gt; 65535 - added) {</span>
+<span class="nc" id="L262">            throw new ZipException(&quot;No room for ZIP timestamp extra field&quot;);</span>
+        }
+<span class="nc" id="L264">        byte[] result = new byte[kept + added];</span>
+<span class="nc" id="L265">        int pos = 0;</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        for (int at = 0; at &lt; extra.length;) {</span>
+<span class="nc" id="L267">            int size = 4 + (extra[at + 2] &amp; 255) + ((extra[at + 3] &amp; 255) &lt;&lt; 8);</span>
+<span class="nc bnc" id="L268" title="All 4 branches missed.">            if ((extra[at] &amp; 255) != 0x55 || (extra[at + 1] &amp; 255) != 0x54) {</span>
+<span class="nc" id="L269">                System.arraycopy(extra, at, result, pos, size);</span>
+<span class="nc" id="L270">                pos += size;</span>
+            }
+<span class="nc" id="L272">            at += size;</span>
+<span class="nc" id="L273">        }</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (!timestamp) {</span>
+<span class="nc" id="L275">            return result;</span>
+        }
+<span class="nc" id="L277">        result[pos] = 0x55;</span>
+<span class="nc" id="L278">        result[pos + 1] = 0x54;</span>
+<span class="nc" id="L279">        result[pos + 2] = 5;</span>
+<span class="nc" id="L280">        result[pos + 4] = 1;</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        for (int i = 0; i &lt; 4; i++) {</span>
+<span class="nc" id="L282">            result[pos + 5 + i] = (byte) (seconds &gt;&gt;&gt; (8 * i));</span>
+        }
+<span class="nc" id="L284">        return result;</span>
+    }
+    private static long dosTime(long millis) {
+        // The deterministic epoch timestamp predates the DOS range in every
+        // timezone. Avoid calendar/timezone lookups for each such entry.
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (millis == 0) {</span>
+<span class="nc" id="L290">            return 0x00210000L;</span>
+        }
+<span class="nc" id="L292">        Calendar c = Calendar.getInstance();</span>
+<span class="nc" id="L293">        c.setTime(new java.util.Date(millis));</span>
+<span class="nc" id="L294">        int year = c.get(Calendar.YEAR);</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">        if (year &lt; 1980) {</span>
+<span class="nc" id="L296">            return 0x00210000L;</span>
+        }
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (year &gt; 2107) {</span>
+<span class="nc" id="L299">            return 0xff9fbf7dL;</span>
+        }
+<span class="nc" id="L301">        return ((long) (year - 1980) &lt;&lt; 25) | ((c.get(Calendar.MONTH) + 1) &lt;&lt; 21) | (c.get(Calendar.DAY_OF_MONTH) &lt;&lt; 16)</span>
+<span class="nc" id="L302">                | (c.get(Calendar.HOUR_OF_DAY) &lt;&lt; 11) | (c.get(Calendar.MINUTE) &lt;&lt; 5) | (c.get(Calendar.SECOND) &gt;&gt; 1);</span>
+    }
+    @Override
+    public void write(int value) throws IOException {
+<span class="nc" id="L306">        writeBuffer[0] = (byte) value;</span>
+<span class="nc" id="L307">        write(writeBuffer, 0, 1);</span>
+<span class="nc" id="L308">    }</span>
+    @Override
+    public void write(byte[] data, int off, int len) throws IOException {
+<span class="nc" id="L311">        writable();</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L313">            throw new NullPointerException();</span>
+        }
+<span class="nc bnc" id="L315" title="All 6 branches missed.">        if (off &lt; 0 || len &lt; 0 || off &gt; data.length - len) {</span>
+<span class="nc" id="L316">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (current == null) {</span>
+<span class="nc" id="L319">            throw new ZipException(&quot;No current ZIP entry&quot;);</span>
+        }
+        try {
+<span class="nc" id="L322">            checkSize(entrySize + len);</span>
+<span class="nc bnc" id="L323" title="All 4 branches missed.">            if (current.entry.getMethod() == STORED &amp;&amp; entrySize + len &gt; current.entry.getSize()) {</span>
+<span class="nc" id="L324">                throw new ZipException(&quot;STORED entry exceeds declared size&quot;);</span>
+            }
+<span class="nc" id="L326">            crc.update(data, off, len);</span>
+<span class="nc" id="L327">            entrySize += len;</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            if (current.entry.getMethod() == STORED) {</span>
+<span class="nc" id="L329">                raw(data, off, len);</span>
+            } else {
+<span class="nc" id="L331">                def.setInput(data, off, len);</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">                while (!def.needsInput()) {</span>
+<span class="nc" id="L333">                    deflate();</span>
+                }
+            }
+<span class="nc" id="L336">        } catch (IOException ex) {</span>
+<span class="nc" id="L337">            failure = ex;</span>
+<span class="nc" id="L338">            throw ex;</span>
+<span class="nc" id="L339">        }</span>
+<span class="nc" id="L340">    }</span>
+    @Override
+    protected void deflate() throws IOException {
+<span class="nc" id="L343">        int n = def.deflate(buf, 0, buf.length);</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">        if (n &gt; 0) {</span>
+<span class="nc" id="L345">            raw(buf, 0, n);</span>
+        }
+<span class="nc" id="L347">    }</span>
+    public void closeEntry() throws IOException {
+<span class="nc" id="L349">        writable();</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">        if (current == null) {</span>
+<span class="nc" id="L351">            return;</span>
+        }
+        try {
+<span class="nc" id="L354">            ZipEntry e = current.entry;</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">            if (e.getMethod() == DEFLATED) {</span>
+<span class="nc" id="L356">                def.finish();</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">                while (!def.finished()) {</span>
+<span class="nc" id="L358">                    deflate();</span>
+                }
+            }
+<span class="nc" id="L361">            long compressed = written - entryStart;</span>
+<span class="nc" id="L362">            checkSize(compressed);</span>
+<span class="nc bnc" id="L363" title="All 4 branches missed.">            if ((e.getSize() &gt;= 0 &amp;&amp; e.getSize() != entrySize)</span>
+<span class="nc bnc" id="L364" title="All 4 branches missed.">                    || (e.getCompressedSize() &gt;= 0 &amp;&amp; e.getCompressedSize() != compressed)</span>
+<span class="nc bnc" id="L365" title="All 4 branches missed.">                    || (e.getCrc() &gt;= 0 &amp;&amp; e.getCrc() != crc.getValue())) {</span>
+<span class="nc" id="L366">                throw new ZipException(&quot;ZIP entry size or CRC mismatch&quot;);</span>
+            }
+<span class="nc" id="L368">            e.setSize(entrySize);</span>
+<span class="nc" id="L369">            e.setCompressedSize(compressed);</span>
+<span class="nc" id="L370">            e.setCrc(crc.getValue());</span>
+<span class="nc" id="L371">            original.setSize(entrySize);</span>
+<span class="nc" id="L372">            original.setCompressedSize(compressed);</span>
+<span class="nc" id="L373">            original.setCrc(crc.getValue());</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">            if (e.getMethod() == DEFLATED) {</span>
+<span class="nc" id="L375">                word(0x08074b50L, 4);</span>
+<span class="nc" id="L376">                word(e.getCrc(), 4);</span>
+<span class="nc" id="L377">                word(compressed, 4);</span>
+<span class="nc" id="L378">                word(entrySize, 4);</span>
+            }
+<span class="nc" id="L380">            current = null;</span>
+<span class="nc" id="L381">            original = null;</span>
+<span class="nc" id="L382">        } catch (IOException ex) {</span>
+<span class="nc" id="L383">            failure = ex;</span>
+<span class="nc" id="L384">            throw ex;</span>
+<span class="nc" id="L385">        }</span>
+<span class="nc" id="L386">    }</span>
+    @Override
+    public void finish() throws IOException {
+<span class="nc bnc" id="L389" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L390">            throw new IOException(&quot;ZIP stream closed&quot;);</span>
+        }
+<span class="nc bnc" id="L392" title="All 2 branches missed.">        if (failure != null) {</span>
+<span class="nc" id="L393">            throw failure;</span>
+        }
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        if (finished) {</span>
+<span class="nc" id="L396">            return;</span>
+        }
+<span class="nc" id="L398">        closeEntry();</span>
+        try {
+<span class="nc" id="L400">            long start = written;</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">            for (Record r : entries) {</span>
+<span class="nc" id="L402">                ZipEntry e = r.entry;</span>
+<span class="nc" id="L403">                word(0x02014b50L, 4);</span>
+<span class="nc" id="L404">                word((r.platform &lt;&lt; 8) | 20, 2);</span>
+<span class="nc" id="L405">                word(20, 2);</span>
+<span class="nc" id="L406">                word(r.flags, 2);</span>
+<span class="nc" id="L407">                word(e.getMethod(), 2);</span>
+<span class="nc" id="L408">                word(r.dosTime, 4);</span>
+<span class="nc" id="L409">                word(e.getCrc(), 4);</span>
+<span class="nc" id="L410">                word(e.getCompressedSize(), 4);</span>
+<span class="nc" id="L411">                word(e.getSize(), 4);</span>
+<span class="nc" id="L412">                word(r.name.length, 2);</span>
+<span class="nc" id="L413">                word(r.extra.length, 2);</span>
+<span class="nc" id="L414">                word(r.comment.length, 2);</span>
+<span class="nc" id="L415">                word(0, 2);</span>
+<span class="nc" id="L416">                word(0, 2);</span>
+<span class="nc" id="L417">                word(r.attributes, 4);</span>
+<span class="nc" id="L418">                word(r.offset, 4);</span>
+<span class="nc" id="L419">                raw(r.name);</span>
+<span class="nc" id="L420">                raw(r.extra);</span>
+<span class="nc" id="L421">                raw(r.comment);</span>
+<span class="nc" id="L422">            }</span>
+<span class="nc" id="L423">            long length = written - start;</span>
+<span class="nc" id="L424">            word(0x06054b50L, 4);</span>
+<span class="nc" id="L425">            word(0, 2);</span>
+<span class="nc" id="L426">            word(0, 2);</span>
+<span class="nc" id="L427">            word(entries.size(), 2);</span>
+<span class="nc" id="L428">            word(entries.size(), 2);</span>
+<span class="nc" id="L429">            word(length, 4);</span>
+<span class="nc" id="L430">            word(start, 4);</span>
+<span class="nc" id="L431">            word(comment.length, 2);</span>
+<span class="nc" id="L432">            raw(comment);</span>
+<span class="nc" id="L433">            finished = true;</span>
+<span class="nc" id="L434">            entries.clear();</span>
+<span class="nc" id="L435">            names.clear();</span>
+<span class="nc" id="L436">        } catch (IOException ex) {</span>
+<span class="nc" id="L437">            failure = ex;</span>
+<span class="nc" id="L438">            throw ex;</span>
+<span class="nc" id="L439">        }</span>
+<span class="nc" id="L440">    }</span>
+    @Override
+    public void flush() throws IOException {
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L444">            throw new IOException(&quot;ZIP stream closed&quot;);</span>
+        }
+<span class="nc bnc" id="L446" title="All 2 branches missed.">        if (failure != null) {</span>
+<span class="nc" id="L447">            throw failure;</span>
+        }
+        try {
+<span class="nc" id="L450">            out.flush();</span>
+<span class="nc" id="L451">        } catch (IOException ex) {</span>
+<span class="nc" id="L452">            failure = ex;</span>
+<span class="nc" id="L453">            throw ex;</span>
+<span class="nc" id="L454">        }</span>
+<span class="nc" id="L455">    }</span>
+    @Override
+    public void close() throws IOException {
+<span class="nc bnc" id="L458" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L459">            return;</span>
+        }
+        // An earlier write already delivered failure to the caller. Throwing
+        // that same object again from close breaks try-with-resources through
+        // Throwable's self-suppression guard.
+<span class="nc" id="L464">        IOException error = null;</span>
+        try {
+<span class="nc bnc" id="L466" title="All 2 branches missed.">            if (failure == null) {</span>
+<span class="nc" id="L467">                finish();</span>
+            }
+<span class="nc" id="L469">        } catch (IOException ex) {</span>
+<span class="nc" id="L470">            error = ex;</span>
+        } finally {
+<span class="nc" id="L472">            closed = true;</span>
+<span class="nc" id="L473">            def.end();</span>
+<span class="nc" id="L474">            entries.clear();</span>
+<span class="nc" id="L475">            names.clear();</span>
+<span class="nc" id="L476">            current = null;</span>
+<span class="nc" id="L477">            original = null;</span>
+            try {
+<span class="nc" id="L479">                out.close();</span>
+<span class="nc" id="L480">            } catch (IOException ex) {</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">                if (error == null) {</span>
+<span class="nc" id="L482">                    error = ex;</span>
+                }
+<span class="nc" id="L484">            }</span>
+        }
+<span class="nc bnc" id="L486" title="All 2 branches missed.">        if (error != null) {</span>
+<span class="nc" id="L487">            throw error;</span>
+        }
+<span class="nc" id="L489">    }</span>
+    private void word(long value, int bytes) throws IOException {
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        for (int i = 0; i &lt; bytes; i++) {</span>
+<span class="nc" id="L492">            writeBuffer[i] = (byte) value;</span>
+<span class="nc" id="L493">            value &gt;&gt;&gt;= 8;</span>
+        }
+<span class="nc" id="L495">        raw(writeBuffer, 0, bytes);</span>
+<span class="nc" id="L496">    }</span>
+    private void raw(byte[] data) throws IOException {
+<span class="nc" id="L498">        raw(data, 0, data.length);</span>
+<span class="nc" id="L499">    }</span>
+    private void raw(byte[] data, int off, int len) throws IOException {
+<span class="nc" id="L501">        checkSize(written + len);</span>
+<span class="nc" id="L502">        out.write(data, off, len);</span>
+<span class="nc" id="L503">        written += len;</span>
+<span class="nc" id="L504">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

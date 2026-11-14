@@ -1,0 +1,745 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PhoneNumberField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">PhoneNumberField.java</span></div><h1>PhoneNumberField.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.l10n.L10NManager;
+import com.codename1.ui.Button;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A phone number entry field: a country selector holding the calling code and
+/// a field for the rest of the number, producing one E.164 string.
+///
+/// #### Example
+///
+/// ```java
+/// PhoneNumberField phone = new PhoneNumberField();
+/// form.add(phone);
+/// sendButton.addActionListener(e -&gt; requestCode(phone.getE164()));
+/// ```
+///
+/// The selector starts on the country the device is in and opens a searchable
+/// list of every calling code. The number field carries
+/// `TextArea#PHONENUMBER`, so it gets the phone keypad and the platform offers
+/// the device's own number where it knows it.
+///
+/// #### The value
+///
+/// `#getE164()` returns the number in the one format a server can act on --
+/// a leading &quot;+&quot;, the calling code, then the national number, digits only:
+///
+/// Everything that is not a digit is dropped, so the separators a user reaches
+/// for make no difference:
+///
+/// ```java
+/// phone.setCountry(PhoneNumberField.findCountry(&quot;IL&quot;));
+/// // user types 50-123-4567, or 50 123 4567, or (50) 1234567
+/// phone.getE164(); // &quot;+972501234567&quot;
+/// ```
+///
+/// A number that already carries its own calling code is used as it stands, and
+/// the selector is not applied to it. Pasting is one way that happens; platform
+/// autofill is the other, since it offers the device's own number in exactly
+/// that form:
+///
+/// ```java
+/// // Israel selected, the user pastes +1 415 555 0100
+/// phone.getE164(); // &quot;+14155550100&quot;, not the selection with that appended
+/// ```
+///
+/// A national trunk prefix is a digit, and it is kept:
+///
+/// ```java
+/// // the same user typing the number the way they say it out loud
+/// // user types 050-123-4567
+/// phone.getE164(); // &quot;+9720501234567&quot; -- the leading 0 is still there
+/// ```
+///
+/// That is not an oversight, and it is the one thing to handle before sending.
+/// &quot;0&quot; is a trunk prefix in Israel and part of the number in Italy, and telling
+/// them apart is a per-country rule this field does not carry, so stripping one
+/// here would corrupt numbers in the countries where it belongs. Normalizing is
+/// left to the service that sends the message, which has the rules and can
+/// refuse what it cannot make sense of.
+///
+/// What this field does carry is the shape of E.164 -- at most fifteen digits,
+/// and the calling code separated from the rest -- so `#isValid()` is a sanity
+/// check rather than a verdict.
+///
+/// #### Country names
+///
+/// Names are English, and each is looked up first as &quot;Country.&quot; plus the ISO
+/// code in the theme's resource bundle, so an application that ships
+/// translations gets them without replacing the list. An application with its
+/// own list entirely passes it to `#setCountries(Country[])`.
+///
+/// #### Styling
+///
+/// The field uses the UIID &quot;PhoneNumberField&quot;, the country selector
+/// &quot;PhoneNumberCountry&quot; and the number field &quot;PhoneNumberText&quot;.
+public class PhoneNumberField extends Container {
+
+    /// A country and its E.164 calling code.
+    public static final class Country {
+
+        private final String isoCode;
+        private final String dialCode;
+        private final String name;
+
+        /// Builds a country entry.
+        ///
+        /// #### Parameters
+        ///
+        /// - `isoCode`: the two letter ISO 3166 code, e.g. &quot;IL&quot;
+        ///
+        /// - `dialCode`: the calling code without the &quot;+&quot;, e.g. &quot;972&quot;
+        ///
+        /// - `name`: the display name
+<span class="fc" id="L128">        public Country(String isoCode, String dialCode, String name) {</span>
+<span class="fc" id="L129">            this.isoCode = isoCode;</span>
+<span class="fc" id="L130">            this.dialCode = dialCode;</span>
+<span class="fc" id="L131">            this.name = name;</span>
+<span class="fc" id="L132">        }</span>
+
+        /// The two letter ISO 3166 code.
+        public String getIsoCode() {
+<span class="fc" id="L136">            return isoCode;</span>
+        }
+
+        /// The calling code, digits only, without the &quot;+&quot;.
+        public String getDialCode() {
+<span class="fc" id="L141">            return dialCode;</span>
+        }
+
+        /// The English display name.
+        public String getName() {
+<span class="fc" id="L146">            return name;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L151">            return name + &quot; +&quot; + dialCode;</span>
+        }
+
+        @Override
+        public boolean equals(Object o) {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (this == o) {</span>
+<span class="fc" id="L157">                return true;</span>
+            }
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            if (!(o instanceof Country)) {</span>
+<span class="nc" id="L160">                return false;</span>
+            }
+<span class="fc" id="L162">            return isoCode.equals(((Country) o).isoCode);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="fc" id="L167">            return isoCode.hashCode();</span>
+        }
+    }
+
+    /// ISO code, calling code and English name for every region with a numbering
+    /// plan of its own, ordered by name. Parsed once, on first use.
+    ///
+    /// Generated from libphonenumber's region metadata rather than written out by
+    /// hand, and that is the point: two hundred and forty-five calling codes typed
+    /// from memory would contain mistakes nobody would find until somebody in that
+    /// country could not sign in.
+    ///
+    /// It follows that eight ISO 3166 codes are absent -- AN, AQ, BV, GS, HM, PN, TF
+    /// and UM -- and their absence is correct rather than an oversight. One of them
+    /// stopped being a country in 2010; most of the rest have no permanent
+    /// population; and none of them has a numbering plan of its own, which is why
+    /// the metadata carries none. Pitcairn's numbers, for instance, are reachable
+    /// through New Zealand's +64 rather than through anything assigned to PN.
+    ///
+    /// Do not add one by hand. A calling code invented for a territory is exactly
+    /// the error this table is generated to avoid, and adding the one that gets
+    /// noticed while leaving the seven that do not is worse than either. An
+    /// application that serves such a place passes its own list to
+    /// `#setCountries(Country[])`, which is what that method is for.
+    private static final String COUNTRY_TABLE =
+            &quot;AF|93|Afghanistan;AL|355|Albania;DZ|213|Algeria;AS|1|American Samoa;AD|376|Andorra;&quot;
+            + &quot;AO|244|Angola;AI|1|Anguilla;AG|1|Antigua &amp; Barbuda;AR|54|Argentina;AM|374|Armenia;AW|297|Aruba;&quot;
+            + &quot;AC|247|Ascension Island;AU|61|Australia;AT|43|Austria;AZ|994|Azerbaijan;BS|1|Bahamas;&quot;
+            + &quot;BH|973|Bahrain;BD|880|Bangladesh;BB|1|Barbados;BY|375|Belarus;BE|32|Belgium;BZ|501|Belize;&quot;
+            + &quot;BJ|229|Benin;BM|1|Bermuda;BT|975|Bhutan;BO|591|Bolivia;BA|387|Bosnia &amp; Herzegovina;&quot;
+            + &quot;BW|267|Botswana;BR|55|Brazil;IO|246|British Indian Ocean Territory;VG|1|British Virgin Islands;&quot;
+            + &quot;BN|673|Brunei;BG|359|Bulgaria;BF|226|Burkina Faso;BI|257|Burundi;KH|855|Cambodia;&quot;
+            + &quot;CM|237|Cameroon;CA|1|Canada;CV|238|Cape Verde;BQ|599|Caribbean Netherlands;KY|1|Cayman Islands;&quot;
+            + &quot;CF|236|Central African Republic;TD|235|Chad;CL|56|Chile;CN|86|China;CX|61|Christmas Island;&quot;
+            + &quot;CC|61|Cocos (Keeling) Islands;CO|57|Colombia;KM|269|Comoros;CG|242|Congo - Brazzaville;&quot;
+            + &quot;CD|243|Congo - Kinshasa;CK|682|Cook Islands;CR|506|Costa Rica;HR|385|Croatia;CU|53|Cuba;&quot;
+            + &quot;CW|599|Cura\u00e7ao;CY|357|Cyprus;CZ|420|Czechia;CI|225|C\u00f4te d'Ivoire;DK|45|Denmark;&quot;
+            + &quot;DJ|253|Djibouti;DM|1|Dominica;DO|1|Dominican Republic;EC|593|Ecuador;EG|20|Egypt;&quot;
+            + &quot;SV|503|El Salvador;GQ|240|Equatorial Guinea;ER|291|Eritrea;EE|372|Estonia;SZ|268|Eswatini;&quot;
+            + &quot;ET|251|Ethiopia;FK|500|Falkland Islands;FO|298|Faroe Islands;FJ|679|Fiji;FI|358|Finland;&quot;
+            + &quot;FR|33|France;GF|594|French Guiana;PF|689|French Polynesia;GA|241|Gabon;GM|220|Gambia;&quot;
+            + &quot;GE|995|Georgia;DE|49|Germany;GH|233|Ghana;GI|350|Gibraltar;GR|30|Greece;GL|299|Greenland;&quot;
+            + &quot;GD|1|Grenada;GP|590|Guadeloupe;GU|1|Guam;GT|502|Guatemala;GG|44|Guernsey;GN|224|Guinea;&quot;
+            + &quot;GW|245|Guinea-Bissau;GY|592|Guyana;HT|509|Haiti;HN|504|Honduras;HK|852|Hong Kong SAR China;&quot;
+            + &quot;HU|36|Hungary;IS|354|Iceland;IN|91|India;ID|62|Indonesia;IR|98|Iran;IQ|964|Iraq;IE|353|Ireland;&quot;
+            + &quot;IM|44|Isle of Man;IL|972|Israel;IT|39|Italy;JM|1|Jamaica;JP|81|Japan;JE|44|Jersey;&quot;
+            + &quot;JO|962|Jordan;KZ|7|Kazakhstan;KE|254|Kenya;KI|686|Kiribati;XK|383|Kosovo;KW|965|Kuwait;&quot;
+            + &quot;KG|996|Kyrgyzstan;LA|856|Laos;LV|371|Latvia;LB|961|Lebanon;LS|266|Lesotho;LR|231|Liberia;&quot;
+            + &quot;LY|218|Libya;LI|423|Liechtenstein;LT|370|Lithuania;LU|352|Luxembourg;MO|853|Macao SAR China;&quot;
+            + &quot;MG|261|Madagascar;MW|265|Malawi;MY|60|Malaysia;MV|960|Maldives;ML|223|Mali;MT|356|Malta;&quot;
+            + &quot;MH|692|Marshall Islands;MQ|596|Martinique;MR|222|Mauritania;MU|230|Mauritius;YT|262|Mayotte;&quot;
+            + &quot;MX|52|Mexico;FM|691|Micronesia;MD|373|Moldova;MC|377|Monaco;MN|976|Mongolia;ME|382|Montenegro;&quot;
+            + &quot;MS|1|Montserrat;MA|212|Morocco;MZ|258|Mozambique;MM|95|Myanmar (Burma);NA|264|Namibia;&quot;
+            + &quot;NR|674|Nauru;NP|977|Nepal;NL|31|Netherlands;NC|687|New Caledonia;NZ|64|New Zealand;&quot;
+            + &quot;NI|505|Nicaragua;NE|227|Niger;NG|234|Nigeria;NU|683|Niue;NF|672|Norfolk Island;&quot;
+            + &quot;KP|850|North Korea;MK|389|North Macedonia;MP|1|Northern Mariana Islands;NO|47|Norway;&quot;
+            + &quot;OM|968|Oman;PK|92|Pakistan;PW|680|Palau;PS|970|Palestinian Territories;PA|507|Panama;&quot;
+            + &quot;PG|675|Papua New Guinea;PY|595|Paraguay;PE|51|Peru;PH|63|Philippines;PL|48|Poland;&quot;
+            + &quot;PT|351|Portugal;PR|1|Puerto Rico;QA|974|Qatar;RO|40|Romania;RU|7|Russia;RW|250|Rwanda;&quot;
+            + &quot;RE|262|R\u00e9union;WS|685|Samoa;SM|378|San Marino;SA|966|Saudi Arabia;SN|221|Senegal;&quot;
+            + &quot;RS|381|Serbia;SC|248|Seychelles;SL|232|Sierra Leone;SG|65|Singapore;SX|1|Sint Maarten;&quot;
+            + &quot;SK|421|Slovakia;SI|386|Slovenia;SB|677|Solomon Islands;SO|252|Somalia;ZA|27|South Africa;&quot;
+            + &quot;KR|82|South Korea;SS|211|South Sudan;ES|34|Spain;LK|94|Sri Lanka;BL|590|St. Barth\u00e9lemy;&quot;
+            + &quot;SH|290|St. Helena;KN|1|St. Kitts &amp; Nevis;LC|1|St. Lucia;MF|590|St. Martin;&quot;
+            + &quot;PM|508|St. Pierre &amp; Miquelon;VC|1|St. Vincent &amp; Grenadines;SD|249|Sudan;SR|597|Suriname;&quot;
+            + &quot;SJ|47|Svalbard &amp; Jan Mayen;SE|46|Sweden;CH|41|Switzerland;SY|963|Syria;&quot;
+            + &quot;ST|239|S\u00e3o Tom\u00e9 &amp; Pr\u00edncipe;TW|886|Taiwan;TJ|992|Tajikistan;TZ|255|Tanzania;&quot;
+            + &quot;TH|66|Thailand;TL|670|Timor-Leste;TG|228|Togo;TK|690|Tokelau;TO|676|Tonga;&quot;
+            + &quot;TT|1|Trinidad &amp; Tobago;TA|290|Tristan da Cunha;TN|216|Tunisia;TR|90|Turkey;TM|993|Turkmenistan;&quot;
+            + &quot;TC|1|Turks &amp; Caicos Islands;TV|688|Tuvalu;VI|1|U.S. Virgin Islands;UG|256|Uganda;&quot;
+            + &quot;UA|380|Ukraine;AE|971|United Arab Emirates;GB|44|United Kingdom;US|1|United States;&quot;
+            + &quot;UY|598|Uruguay;UZ|998|Uzbekistan;VU|678|Vanuatu;VA|39|Vatican City;VE|58|Venezuela;&quot;
+            + &quot;VN|84|Vietnam;WF|681|Wallis &amp; Futuna;EH|212|Western Sahara;YE|967|Yemen;ZM|260|Zambia;&quot;
+            + &quot;ZW|263|Zimbabwe;AX|358|\u00c5land Islands&quot;;
+
+    private static Country[] allCountries;
+
+<span class="fc" id="L244">    private final Button countryButton = new Button();</span>
+<span class="fc" id="L245">    private final TextField number = new TextField();</span>
+    private Country[] countries;
+    private Country country;
+
+    /// Builds a field defaulting to the country the device reports, falling
+    /// back to the first entry when the device reports one that is not in the
+    /// list.
+    public PhoneNumberField() {
+<span class="fc" id="L253">        super(new BorderLayout());</span>
+<span class="fc" id="L254">        setUIID(&quot;PhoneNumberField&quot;);</span>
+<span class="fc" id="L255">        countryButton.setUIID(&quot;PhoneNumberCountry&quot;);</span>
+<span class="fc" id="L256">        number.setUIID(&quot;PhoneNumberText&quot;);</span>
+<span class="fc" id="L257">        number.setConstraint(TextArea.PHONENUMBER);</span>
+<span class="fc" id="L258">        number.setHint(getUIManager().localize(&quot;PhoneNumberField.Hint&quot;, &quot;Phone number&quot;));</span>
+<span class="fc" id="L259">        countryButton.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L262">                showCountryPicker();</span>
+<span class="nc" id="L263">            }</span>
+        });
+<span class="fc" id="L265">        add(BorderLayout.WEST, countryButton);</span>
+<span class="fc" id="L266">        add(BorderLayout.CENTER, number);</span>
+<span class="fc" id="L267">        setCountry(defaultCountry());</span>
+<span class="fc" id="L268">    }</span>
+
+    /// The list this field offers, defaulting to every known country.
+    ///
+    /// #### Returns
+    ///
+    /// the countries offered by the selector
+    public Country[] getCountries() {
+        // a copy either way: the full list is a single shared table, and handing
+        // it out is handing out every field's list at once
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        Country[] source = countries == null ? allCountries() : countries;</span>
+<span class="fc" id="L279">        Country[] copy = new Country[source.length];</span>
+<span class="fc" id="L280">        System.arraycopy(source, 0, copy, 0, source.length);</span>
+<span class="fc" id="L281">        return copy;</span>
+    }
+
+    /// Narrows or replaces the list this field offers. An application serving
+    /// three countries has no reason to show two hundred.
+    ///
+    /// #### Parameters
+    ///
+    /// - `countries`: the countries to offer, or null to restore the full list
+    public void setCountries(Country[] countries) {
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (countries == null) {</span>
+<span class="fc" id="L292">            this.countries = null;</span>
+            // The selection has to come from the list on offer, and a country that was
+            // only in a replaced list is not in this one. Not by taking the first entry
+            // of the full table, which is Afghanistan and has nothing to do with anyone:
+            // silently moving a user from +1 to +93 is worse than the inconsistency it
+            // tidies. The same code is preferred where the full list has it, and the
+            // device's own country is the fallback -- which is where the field started.
+<span class="fc" id="L299">            Country listed = findCountry(country.getIsoCode());</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            setCountry(listed != null ? listed : defaultCountry());</span>
+<span class="fc" id="L301">            return;</span>
+        }
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (countries.length == 0) {</span>
+<span class="fc" id="L304">            throw new IllegalArgumentException(&quot;At least one country is required&quot;);</span>
+        }
+<span class="fc" id="L306">        this.countries = new Country[countries.length];</span>
+<span class="fc" id="L307">        System.arraycopy(countries, 0, this.countries, 0, countries.length);</span>
+        // The entry from the new list, not merely the knowledge that one matches.
+        // Countries are equal when their ISO codes are, so a list can carry a different
+        // object for the same country -- the built-in United States beside an
+        // application's own -- and keeping the old one would leave the field dialling a
+        // code the selector no longer offers. Where nothing matches, the first entry of
+        // the list the application supplied is a defensible default in a way the first
+        // entry of the full table is not.
+<span class="fc" id="L315">        Country listed = null;</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        for (Country candidate : countries) {</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            if (candidate.equals(country)) {</span>
+<span class="fc" id="L318">                listed = candidate;</span>
+<span class="fc" id="L319">                break;</span>
+            }
+        }
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        setCountry(listed != null ? listed : countries[0]);</span>
+<span class="fc" id="L323">    }</span>
+
+    /// The selected country, never null.
+    public Country getCountry() {
+<span class="fc" id="L327">        return country;</span>
+    }
+
+    /// Selects a country, which changes the calling code the value is built
+    /// from without touching the number that was typed.
+    ///
+    /// The country has to be one this field offers. Selecting one that is not
+    /// leaves the selector showing a country the list it opens does not contain,
+    /// and the field submitting a calling code the user was never given the
+    /// chance to choose -- a mistake worth hearing about where it is made rather
+    /// than in a support ticket about numbers from the wrong country.
+    ///
+    /// The object itself is kept rather than replaced by the equal one from the
+    /// list. Countries are equal by ISO code, so an application that supplies its
+    /// own entry for a country -- a different name, or a calling code it has
+    /// reason to override -- keeps what it passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the country; ignored when null
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the country is not one this field
+    ///   offers; narrow or widen the list with `#setCountries(Country[])` first
+    public void setCountry(Country c) {
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L354">            return;</span>
+        }
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if (!isOffered(c)) {</span>
+<span class="fc" id="L357">            throw new IllegalArgumentException(&quot;Country &quot; + c.getIsoCode()</span>
+                    + &quot; is not one this field offers; pass it to setCountries first&quot;);
+        }
+<span class="fc" id="L360">        country = c;</span>
+<span class="fc" id="L361">        countryButton.setText(&quot;+&quot; + c.getDialCode());</span>
+<span class="fc" id="L362">    }</span>
+
+    /// True when the country is one the selector would list.
+    private boolean isOffered(Country c) {
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        Country[] list = countries == null ? allCountries() : countries;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        for (Country candidate : list) {</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">            if (candidate.equals(c)) {</span>
+<span class="fc" id="L369">                return true;</span>
+            }
+        }
+<span class="fc" id="L372">        return false;</span>
+    }
+
+    /// The national part as typed, digits only.
+    public String getNationalNumber() {
+<span class="fc" id="L377">        String digits = digitsOf(number.getText());</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        if (!isInternational()) {</span>
+<span class="fc" id="L379">            return digits;</span>
+        }
+        // The value already says which country it is for, so the national part is what
+        // follows that country's calling code rather than the whole thing. Resolved
+        // against the full table rather than the offered list: the number means what it
+        // means whichever countries this field happens to be offering.
+<span class="fc" id="L385">        Country match = longestMatch(allCountries(), digits);</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        return match == null ? digits : digits.substring(match.getDialCode().length());</span>
+    }
+
+    /// True when what has been typed is an international number rather than a national
+    /// one -- pasted, or handed over by the platform, which offers the device's own
+    /// number in exactly that form.
+    private boolean isInternational() {
+<span class="fc" id="L393">        String raw = number.getText();</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L395">            return false;</span>
+        }
+<span class="pc bfc" id="L397" title="All 2 branches covered.">        for (int i = 0; i &lt; raw.length(); i++) {</span>
+<span class="fc" id="L398">            char c = raw.charAt(i);</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">            if (c == '+') {</span>
+<span class="fc" id="L400">                return true;</span>
+            }
+<span class="pc bpc" id="L402" title="2 of 4 branches missed.">            if (c != ' ' &amp;&amp; c != '\t') {</span>
+<span class="fc" id="L403">                return false;</span>
+            }
+        }
+<span class="fc" id="L406">        return false;</span>
+    }
+
+    /// The country in `list` whose calling code the digits start with, longest first,
+    /// or null when none does.
+    private static Country longestMatch(Country[] list, String digits) {
+<span class="fc" id="L412">        Country match = null;</span>
+<span class="fc" id="L413">        int matchLength = 0;</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        for (Country candidate : list) {</span>
+<span class="fc" id="L415">            String dial = candidate.getDialCode();</span>
+<span class="pc bpc" id="L416" title="1 of 4 branches missed.">            if (digits.length() &gt; dial.length() &amp;&amp; digits.startsWith(dial)</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">                    &amp;&amp; dial.length() &gt; matchLength) {</span>
+<span class="fc" id="L418">                match = candidate;</span>
+<span class="fc" id="L419">                matchLength = dial.length();</span>
+            }
+        }
+<span class="fc" id="L422">        return match;</span>
+    }
+
+    /// The number in E.164 form -- &quot;+&quot;, the calling code, then the national
+    /// number -- or null when nothing has been typed.
+    ///
+    /// #### Returns
+    ///
+    /// the E.164 number, or null when the national part is empty
+    public String getE164() {
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        if (isInternational()) {</span>
+            // Used as typed. A value that already carries a calling code is a whole
+            // number, and prepending the selector's code to it would produce one that is
+            // neither the one that was pasted nor the one the selector shows -- pasting
+            // +972501234567 with Israel selected once produced +972972501234567.
+<span class="fc" id="L437">            String digits = digitsOf(number.getText());</span>
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">            return digits.length() == 0 ? null : &quot;+&quot; + digits;</span>
+        }
+<span class="fc" id="L440">        String national = getNationalNumber();</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if (national.length() == 0) {</span>
+<span class="fc" id="L442">            return null;</span>
+        }
+<span class="fc" id="L444">        return &quot;+&quot; + country.getDialCode() + national;</span>
+    }
+
+    /// Sets the field from an E.164 number, selecting the country whose calling
+    /// code the number starts with and putting the rest in the number field.
+    ///
+    /// Several countries share a calling code (+1 covers the United States,
+    /// Canada and much of the Caribbean, which the North American area code
+    /// tells apart and this field does not), and the number alone does not say
+    /// which. The currently selected country is kept when its code matches, and
+    /// otherwise the first country listed for that code is selected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e164`: the number, with or without the leading &quot;+&quot;; null clears the
+    ///   field
+    public void setE164(String e164) {
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        if (e164 == null) {</span>
+<span class="fc" id="L462">            number.setText(&quot;&quot;);</span>
+<span class="fc" id="L463">            return;</span>
+        }
+<span class="fc" id="L465">        String digits = digitsOf(e164);</span>
+<span class="fc" id="L466">        Country[] list = getCountries();</span>
+<span class="fc" id="L467">        Country match = null;</span>
+<span class="fc" id="L468">        int matchLength = 0;</span>
+        // Longest calling code wins. Assigned country codes are prefix-free, so
+        // at most one of them can match and the length never decides anything --
+        // but a list an application supplies is under no such discipline, and a
+        // shorter code would otherwise swallow a longer one's numbers.
+<span class="fc bfc" id="L473" title="All 2 branches covered.">        for (Country candidate : list) {</span>
+<span class="fc" id="L474">            String dial = candidate.getDialCode();</span>
+<span class="pc bpc" id="L475" title="1 of 4 branches missed.">            if (digits.length() &gt; dial.length() &amp;&amp; digits.startsWith(dial)) {</span>
+<span class="pc bpc" id="L476" title="1 of 6 branches missed.">                if (dial.length() &gt; matchLength || (dial.length() == matchLength &amp;&amp; candidate.equals(country))) {</span>
+<span class="fc" id="L477">                    match = candidate;</span>
+<span class="fc" id="L478">                    matchLength = dial.length();</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L482" title="All 2 branches covered.">        if (match == null) {</span>
+            // No country here can express it -- a narrowed list, or a calling code the
+            // table does not carry. Kept in international form so it survives unchanged
+            // rather than being read back as the selected country's code followed by all
+            // of it, which is a different number and a plausible looking one.
+<span class="fc" id="L487">            number.setText(&quot;+&quot; + digits);</span>
+<span class="fc" id="L488">            return;</span>
+        }
+<span class="fc" id="L490">        setCountry(match);</span>
+<span class="fc" id="L491">        number.setText(digits.substring(matchLength));</span>
+<span class="fc" id="L492">    }</span>
+
+    /// A sanity check on the shape of the number: a national part that is
+    /// present and short enough to leave the whole number inside E.164's
+    /// fifteen digit limit. It is not a check that the number exists, which
+    /// only the service that sends the message can answer.
+    ///
+    /// #### Returns
+    ///
+    /// true when the number could be an E.164 number
+    public boolean isValid() {
+<span class="fc" id="L503">        String e164 = getE164();</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">        if (e164 == null) {</span>
+<span class="fc" id="L505">            return false;</span>
+        }
+        // A calling code never starts with zero, so a number typed in international form
+        // that does is not one. The same rule as PhoneVerification.isPlausibleE164, which
+        // is the check the flow makes before sending. It applies only here: a leading zero
+        // in a NATIONAL number is a trunk prefix, which this field keeps on purpose.
+<span class="pc bpc" id="L511" title="1 of 4 branches missed.">        if (e164.length() &gt; 1 &amp;&amp; e164.charAt(1) == '0') {</span>
+<span class="fc" id="L512">            return false;</span>
+        }
+        // measured against what getE164 would actually send, which is not the selector's
+        // code plus the field when the field holds a whole number of its own
+<span class="fc bfc" id="L516" title="All 4 branches covered.">        return getNationalNumber().length() &gt;= 4 &amp;&amp; e164.length() - 1 &lt;= 15;</span>
+    }
+
+    /// The field holding the national part, exposed for theming and for
+    /// listening to what is typed.
+    public TextField getNumberField() {
+<span class="fc" id="L522">        return number;</span>
+    }
+
+    /// The button that opens the country list, exposed for theming.
+    public Button getCountryButton() {
+<span class="nc" id="L527">        return countryButton;</span>
+    }
+
+    /// Adds a listener notified as the number is typed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L536">        number.addDataChangedListener(l);</span>
+<span class="nc" id="L537">    }</span>
+
+    /// Removes a previously-registered listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L545">        number.removeDataChangedListener(l);</span>
+<span class="nc" id="L546">    }</span>
+
+    private void showCountryPicker() {
+<span class="nc" id="L549">        final Dialog dlg = new Dialog(getUIManager().localize(&quot;PhoneNumberField.CountryTitle&quot;, &quot;Country&quot;));</span>
+<span class="nc" id="L550">        dlg.setLayout(new BorderLayout());</span>
+<span class="nc" id="L551">        final Container list = new Container(BoxLayout.y());</span>
+<span class="nc" id="L552">        list.setScrollableY(true);</span>
+<span class="nc" id="L553">        final Country[] offered = getCountries();</span>
+<span class="nc" id="L554">        final TextField search = new TextField(&quot;&quot;,</span>
+<span class="nc" id="L555">                getUIManager().localize(&quot;PhoneNumberField.Search&quot;, &quot;Search&quot;), 20, TextArea.ANY);</span>
+<span class="nc" id="L556">        search.addDataChangedListener(new DataChangedListener() {</span>
+            @Override
+            public void dataChanged(int type, int index) {
+<span class="nc" id="L559">                fillCountryList(list, offered, search.getText(), dlg);</span>
+<span class="nc" id="L560">                list.animateLayout(100);</span>
+<span class="nc" id="L561">            }</span>
+        });
+<span class="nc" id="L563">        fillCountryList(list, offered, &quot;&quot;, dlg);</span>
+<span class="nc" id="L564">        dlg.add(BorderLayout.NORTH, search);</span>
+<span class="nc" id="L565">        dlg.add(BorderLayout.CENTER, list);</span>
+<span class="nc" id="L566">        dlg.show();</span>
+<span class="nc" id="L567">    }</span>
+
+    private void fillCountryList(Container list, Country[] offered, String filter, final Dialog dlg) {
+<span class="nc" id="L570">        list.removeAll();</span>
+<span class="nc" id="L571">        String needle = foldCase(filter);</span>
+<span class="nc bnc" id="L572" title="All 2 branches missed.">        for (final Country c : offered) {</span>
+<span class="nc" id="L573">            String label = displayName(c);</span>
+<span class="nc bnc" id="L574" title="All 2 branches missed.">            if (!matchesSearch(label, c, needle)) {</span>
+<span class="nc" id="L575">                continue;</span>
+            }
+<span class="nc" id="L577">            MultiButton entry = new MultiButton(label);</span>
+<span class="nc" id="L578">            entry.setTextLine2(&quot;+&quot; + c.getDialCode());</span>
+<span class="nc" id="L579">            entry.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L582">                    setCountry(c);</span>
+<span class="nc" id="L583">                    dlg.dispose();</span>
+<span class="nc" id="L584">                }</span>
+            });
+<span class="nc" id="L586">            list.add(entry);</span>
+        }
+<span class="nc" id="L588">    }</span>
+
+    /// True when a country should be offered for what has been typed into the
+    /// search field. The needle must already be folded.
+    ///
+    /// #### Parameters
+    ///
+    /// - `label`: the name being shown for the country
+    ///
+    /// - `c`: the country
+    ///
+    /// - `needle`: the folded search text, empty to match everything
+    ///
+    /// #### Returns
+    ///
+    /// true when the country matches
+    static boolean matchesSearch(String label, Country c, String needle) {
+<span class="fc bfc" id="L605" title="All 2 branches covered.">        if (needle.length() == 0) {</span>
+<span class="fc" id="L606">            return true;</span>
+        }
+<span class="fc bfc" id="L608" title="All 2 branches covered.">        return foldCase(label).indexOf(needle) &gt;= 0</span>
+<span class="fc bfc" id="L609" title="All 2 branches covered.">                || c.getDialCode().indexOf(needle) &gt;= 0</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">                || foldCase(c.getIsoCode()).indexOf(needle) &gt;= 0;</span>
+    }
+
+    /// Lower cases without asking the device what that means.
+    ///
+    /// `String.toLowerCase` folds with the default locale, and the two sides of a
+    /// search do not survive that: on a Turkish device the capital I of &quot;Israel&quot;
+    /// becomes a dotless i while the i the user typed stays dotted, so the country
+    /// cannot be found by typing its first letter. Folding character by character
+    /// uses the Unicode mapping instead, which is the same everywhere -- and unlike
+    /// an ASCII-only fold it still matches an accented name by its accented letter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the text to fold, or null
+    ///
+    /// #### Returns
+    ///
+    /// the folded text, empty for null
+    static String foldCase(String s) {
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L631">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L633">        StringBuilder b = new StringBuilder(s.length());</span>
+<span class="fc bfc" id="L634" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L635">            b.append(Character.toLowerCase(s.charAt(i)));</span>
+        }
+<span class="fc" id="L637">        return b.toString();</span>
+    }
+
+    /// The name shown for a country: its English name unless the theme's
+    /// resource bundle translates &quot;Country.&quot; plus its ISO code.
+    private String displayName(Country c) {
+<span class="nc" id="L643">        return getUIManager().localize(&quot;Country.&quot; + c.getIsoCode(), c.getName());</span>
+    }
+
+    private Country defaultCountry() {
+<span class="fc" id="L647">        Country[] list = getCountries();</span>
+<span class="fc" id="L648">        String iso = L10NManager.getInstance().getLocale();</span>
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">        if (iso != null) {</span>
+            // The locale is an ISO 3166 country code, but a device that reports
+            // a full locale (&quot;en_US&quot;) still names the country in its tail.
+            // Compared without folding either side, for the reason findCountry gives.
+<span class="fc" id="L653">            String tail = iso;</span>
+<span class="fc" id="L654">            int separator = Math.max(iso.lastIndexOf('_'), iso.lastIndexOf('-'));</span>
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">            if (separator &gt;= 0) {</span>
+<span class="nc" id="L656">                tail = iso.substring(separator + 1);</span>
+            }
+<span class="pc bpc" id="L658" title="1 of 2 branches missed.">            for (Country candidate : list) {</span>
+<span class="fc bfc" id="L659" title="All 2 branches covered.">                if (candidate.getIsoCode().equalsIgnoreCase(tail)) {</span>
+<span class="fc" id="L660">                    return candidate;</span>
+                }
+            }
+        }
+        // A device reporting a region the list does not carry -- one of the eight
+        // without a numbering plan, or a country the application has narrowed away --
+        // gets the first entry. Any choice here is arbitrary; this one is at least
+        // stable, and the user's own first act on this screen is to pick a country.
+<span class="nc" id="L668">        return list[0];</span>
+    }
+
+    private static String digitsOf(String s) {
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L673">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L675">        StringBuilder b = new StringBuilder(s.length());</span>
+<span class="fc bfc" id="L676" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L677">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L678" title="1 of 4 branches missed.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L679">                b.append(c);</span>
+            }
+        }
+<span class="fc" id="L682">        return b.toString();</span>
+    }
+
+    /// Every country with a numbering plan of its own, ordered by English name.
+    ///
+    /// A handful of ISO 3166 regions are deliberately absent -- see the note on the
+    /// table itself -- because they have no calling code assigned to them. An
+    /// application that needs one supplies its own list.
+    public static Country[] getAllCountries() {
+<span class="fc" id="L691">        Country[] all = allCountries();</span>
+<span class="fc" id="L692">        Country[] copy = new Country[all.length];</span>
+<span class="fc" id="L693">        System.arraycopy(all, 0, copy, 0, all.length);</span>
+<span class="fc" id="L694">        return copy;</span>
+    }
+
+    /// Looks a country up by its two letter ISO 3166 code.
+    ///
+    /// #### Parameters
+    ///
+    /// - `isoCode`: the code, case insensitive
+    ///
+    /// #### Returns
+    ///
+    /// the country, or null when the code is not one this list carries
+    public static Country findCountry(String isoCode) {
+<span class="fc bfc" id="L707" title="All 2 branches covered.">        if (isoCode == null) {</span>
+<span class="fc" id="L708">            return null;</span>
+        }
+<span class="fc" id="L710">        Country[] all = allCountries();</span>
+<span class="fc bfc" id="L711" title="All 2 branches covered.">        for (Country candidate : all) {</span>
+            // equalsIgnoreCase rather than folding the argument: String.toUpperCase folds
+            // with the device's locale, and a Turkish device turns &quot;il&quot; into a dotted
+            // capital I that matches no ISO 3166 code -- so this documented case
+            // insensitive lookup would find nothing at all there. Character-wise case
+            // comparison carries no locale.
+<span class="fc bfc" id="L717" title="All 2 branches covered.">            if (candidate.getIsoCode().equalsIgnoreCase(isoCode)) {</span>
+<span class="fc" id="L718">                return candidate;</span>
+            }
+        }
+<span class="fc" id="L721">        return null;</span>
+    }
+
+    private static synchronized Country[] allCountries() {
+<span class="fc bfc" id="L725" title="All 2 branches covered.">        if (allCountries == null) {</span>
+<span class="fc" id="L726">            List&lt;Country&gt; parsed = new ArrayList&lt;Country&gt;(256);</span>
+<span class="fc" id="L727">            int start = 0;</span>
+<span class="fc bfc" id="L728" title="All 2 branches covered.">            while (start &lt; COUNTRY_TABLE.length()) {</span>
+<span class="fc" id="L729">                int end = COUNTRY_TABLE.indexOf(';', start);</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">                if (end &lt; 0) {</span>
+<span class="fc" id="L731">                    end = COUNTRY_TABLE.length();</span>
+                }
+<span class="fc" id="L733">                String record = COUNTRY_TABLE.substring(start, end);</span>
+<span class="fc" id="L734">                int a = record.indexOf('|');</span>
+<span class="fc" id="L735">                int b = record.indexOf('|', a + 1);</span>
+<span class="fc" id="L736">                parsed.add(new Country(record.substring(0, a),</span>
+<span class="fc" id="L737">                        record.substring(a + 1, b), record.substring(b + 1)));</span>
+<span class="fc" id="L738">                start = end + 1;</span>
+<span class="fc" id="L739">            }</span>
+<span class="fc" id="L740">            allCountries = parsed.toArray(new Country[parsed.size()]);</span>
+        }
+<span class="fc" id="L742">        return allCountries;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

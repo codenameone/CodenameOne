@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TConversion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TConversion.java</span></div><h1>TConversion.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+/// Static library that provides `TBigInteger` base conversion from/to any
+/// integer represented in an `java.lang.String` Object.
+@com.codename1.impl.SharedWithBackend
+final class TConversion {
+
+    /// Holds the maximal exponent for each radix, so that radixdigitFitInInt[radix]
+    /// fit in an `int` (32 bits).
+<span class="fc" id="L27">    static final int[] digitFitInInt = {-1, -1, 31, 19, 15, 13, 11, 11, 10, 9, 9, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7,</span>
+            7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5};
+    /// bigRadices values are precomputed maximal powers of radices (integer
+    /// numbers from 2 to 36) that fit into unsigned int (32 bits). bigRadices[0] =
+    /// 2 ^ 31, bigRadices[8] = 10 ^ 9, etc.
+
+<span class="fc" id="L33">    static final int[] bigRadices = {-2147483648, 1162261467, 1073741824, 1220703125, 362797056, 1977326743,</span>
+            1073741824, 387420489, 1000000000, 214358881, 429981696, 815730721, 1475789056, 170859375, 268435456,
+            410338673, 612220032, 893871739, 1280000000, 1801088541, 113379904, 148035889, 191102976, 244140625,
+            308915776, 387420489, 481890304, 594823321, 729000000, 887503681, 1073741824, 1291467969, 1544804416,
+            1838265625, 60466176};
+
+    /// Just to denote that this class can't be instantiated
+    private TConversion() {
+    }
+
+    /// #### See also
+    ///
+    /// - TBigInteger#toString(int)
+    static String bigInteger2String(TBigInteger val, int radix) {
+<span class="fc" id="L47">        int sign = val.sign;</span>
+<span class="fc" id="L48">        int numberLength = val.numberLength;</span>
+<span class="fc" id="L49">        int[] digits = val.digits;</span>
+
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (sign == 0) {</span>
+<span class="fc" id="L52">            return &quot;0&quot;;</span>
+        }
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (numberLength == 1) {</span>
+<span class="fc" id="L55">            int highDigit = digits[numberLength - 1];</span>
+<span class="fc" id="L56">            long v = highDigit &amp; 0xFFFFFFFFL;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (sign &lt; 0) {</span>
+<span class="fc" id="L58">                v = -v;</span>
+            }
+<span class="fc" id="L60">            return Long.toString(v, radix);</span>
+        }
+<span class="pc bpc" id="L62" title="3 of 6 branches missed.">        if (radix == 10 || radix &lt; Character.MIN_RADIX || radix &gt; Character.MAX_RADIX) {</span>
+<span class="nc" id="L63">            return val.toString();</span>
+        }
+        double bitsForRadixDigit;
+<span class="fc" id="L66">        bitsForRadixDigit = MathUtil.log(radix) / MathUtil.log(2);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        int resLengthInChars = (int) (val.abs().bitLength() / bitsForRadixDigit + ((sign &lt; 0) ? 1 : 0)) + 1;</span>
+
+<span class="fc" id="L69">        char[] result = new char[resLengthInChars];</span>
+<span class="fc" id="L70">        int currentChar = resLengthInChars;</span>
+        int resDigit;
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (radix != 16) {</span>
+<span class="nc" id="L73">            int[] temp = new int[numberLength];</span>
+<span class="nc" id="L74">            System.arraycopy(digits, 0, temp, 0, numberLength);</span>
+<span class="nc" id="L75">            int tempLen = numberLength;</span>
+<span class="nc" id="L76">            int charsPerInt = digitFitInInt[radix];</span>
+            int i;
+            // get the maximal power of radix that fits in int
+<span class="nc" id="L79">            int bigRadix = bigRadices[radix - 2];</span>
+            while (true) {
+                // divide the array of digits by bigRadix and convert remainders
+                // to characters collecting them in the char array
+<span class="nc" id="L83">                resDigit = TDivision.divideArrayByInt(temp, temp, tempLen, bigRadix);</span>
+<span class="nc" id="L84">                int previous = currentChar;</span>
+                do {
+<span class="nc" id="L86">                    result[--currentChar] = TBitLevel.forDigit(resDigit % radix, radix);</span>
+<span class="nc bnc" id="L87" title="All 4 branches missed.">                } while (((resDigit /= radix) != 0) &amp;&amp; (currentChar != 0));</span>
+<span class="nc" id="L88">                int delta = charsPerInt - previous + currentChar;</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">                for (i = 0; i &lt; delta &amp;&amp; currentChar &gt; 0; i++) {</span>
+<span class="nc" id="L90">                    result[--currentChar] = '0';</span>
+                }
+<span class="nc bnc" id="L92" title="All 4 branches missed.">                for (i = tempLen - 1; (i &gt; 0) &amp;&amp; (temp[i] == 0); i--) { // NOPMD EmptyControlStatement</span>
+                }
+<span class="nc" id="L94">                tempLen = i + 1;</span>
+<span class="nc bnc" id="L95" title="All 4 branches missed.">                if ((tempLen == 1) &amp;&amp; (temp[0] == 0)) { // the quotient is 0</span>
+<span class="nc" id="L96">                    break;</span>
+                }
+<span class="nc" id="L98">            }</span>
+<span class="nc" id="L99">        } else {</span>
+            // radix == 16
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            for (int i = 0; i &lt; numberLength; i++) {</span>
+<span class="fc bfc" id="L102" title="All 4 branches covered.">                for (int j = 0; (j &lt; 8) &amp;&amp; (currentChar &gt; 0); j++) {</span>
+<span class="fc" id="L103">                    resDigit = digits[i] &gt;&gt; (j &lt;&lt; 2) &amp; 0xf;</span>
+<span class="fc" id="L104">                    result[--currentChar] = TBitLevel.forDigit(resDigit, 16);</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        while (result[currentChar] == '0') {</span>
+<span class="fc" id="L109">            currentChar++;</span>
+        }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (sign == -1) {</span>
+<span class="fc" id="L112">            result[--currentChar] = '-';</span>
+        }
+<span class="fc" id="L114">        return new String(result, currentChar, resLengthInChars - currentChar);</span>
+    }
+
+    /// Builds the correspondent `String` representation of `val`
+    /// being scaled by `scale`.
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#toString()
+    ///
+    /// - TBigDecimal#toString()
+    static String toDecimalScaledString(TBigInteger val, int scale) {
+<span class="fc" id="L126">        int sign = val.sign;</span>
+<span class="fc" id="L127">        int numberLength = val.numberLength;</span>
+<span class="fc" id="L128">        int[] digits = val.digits;</span>
+        int resLengthInChars;
+        int currentChar;
+        char[] result;
+
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (sign == 0) {</span>
+<span class="nc bnc" id="L134" title="All 8 branches missed.">            switch (scale) {</span>
+                case 0:
+<span class="nc" id="L136">                    return &quot;0&quot;;</span>
+                case 1:
+<span class="nc" id="L138">                    return &quot;0.0&quot;;</span>
+                case 2:
+<span class="nc" id="L140">                    return &quot;0.00&quot;;</span>
+                case 3:
+<span class="nc" id="L142">                    return &quot;0.000&quot;;</span>
+                case 4:
+<span class="nc" id="L144">                    return &quot;0.0000&quot;;</span>
+                case 5:
+<span class="nc" id="L146">                    return &quot;0.00000&quot;;</span>
+                case 6:
+<span class="nc" id="L148">                    return &quot;0.000000&quot;;</span>
+                default:
+<span class="nc" id="L150">                    StringBuilder result1 = new StringBuilder();</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                    if (scale &lt; 0) {</span>
+<span class="nc" id="L152">                        result1.append(&quot;0E+&quot;);</span>
+                    } else {
+<span class="nc" id="L154">                        result1.append(&quot;0E&quot;);</span>
+                    }
+<span class="nc" id="L156">                    result1.append(-scale);</span>
+<span class="nc" id="L157">                    return result1.toString();</span>
+            }
+        }
+        // one 32-bit unsigned value may contains 10 decimal digits
+<span class="fc" id="L161">        resLengthInChars = numberLength * 10 + 1 + 7;</span>
+        // Explanation why +1+7:
+        // +1 - one char for sign if needed.
+        // +7 - For &quot;special case 2&quot; (see below) we have 7 free chars for
+        // inserting necessary scaled digits.
+<span class="fc" id="L166">        result = new char[resLengthInChars + 1];</span>
+        // allocated [resLengthInChars+1] characters.
+        // a free latest character may be used for &quot;special case 1&quot; (see
+        // below)
+<span class="fc" id="L170">        currentChar = resLengthInChars;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (numberLength == 1) {</span>
+<span class="fc" id="L172">            int highDigit = digits[0];</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (highDigit &lt; 0) {</span>
+<span class="nc" id="L174">                long v = highDigit &amp; 0xFFFFFFFFL;</span>
+                do {
+<span class="nc" id="L176">                    long prev = v;</span>
+<span class="nc" id="L177">                    v /= 10;</span>
+<span class="nc" id="L178">                    result[--currentChar] = (char) (0x0030 + ((int) (prev - v * 10)));</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                } while (v != 0);</span>
+<span class="nc" id="L180">            } else {</span>
+<span class="fc" id="L181">                int v = highDigit;</span>
+                do {
+<span class="fc" id="L183">                    int prev = v;</span>
+<span class="fc" id="L184">                    v /= 10;</span>
+<span class="fc" id="L185">                    result[--currentChar] = (char) (0x0030 + (prev - v * 10));</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                } while (v != 0);</span>
+            }
+<span class="fc" id="L188">        } else {</span>
+<span class="fc" id="L189">            int[] temp = new int[numberLength];</span>
+<span class="fc" id="L190">            int tempLen = numberLength;</span>
+<span class="fc" id="L191">            System.arraycopy(digits, 0, temp, 0, tempLen);</span>
+            BIG_LOOP:
+            while (true) {
+                // divide the array of digits by bigRadix and convert
+                // remainders
+                // to characters collecting them in the char array
+<span class="fc" id="L197">                long result11 = 0;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                for (int i1 = tempLen - 1; i1 &gt;= 0; i1--) {</span>
+<span class="fc" id="L199">                    long temp1 = (result11 &lt;&lt; 32) + (temp[i1] &amp; 0xFFFFFFFFL);</span>
+<span class="fc" id="L200">                    long res = divideLongByBillion(temp1);</span>
+<span class="fc" id="L201">                    temp[i1] = (int) res;</span>
+<span class="fc" id="L202">                    result11 = (int) (res &gt;&gt; 32);</span>
+                }
+<span class="fc" id="L204">                int resDigit = (int) result11;</span>
+<span class="fc" id="L205">                int previous = currentChar;</span>
+                do {
+<span class="fc" id="L207">                    result[--currentChar] = (char) (0x0030 + (resDigit % 10));</span>
+<span class="pc bpc" id="L208" title="1 of 4 branches missed.">                } while ((resDigit /= 10) != 0 &amp;&amp; currentChar != 0);</span>
+<span class="fc" id="L209">                int delta = 9 - previous + currentChar;</span>
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">                for (int i = 0; (i &lt; delta) &amp;&amp; (currentChar &gt; 0); i++) {</span>
+<span class="fc" id="L211">                    result[--currentChar] = '0';</span>
+                }
+<span class="fc" id="L213">                int j = tempLen - 1;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                for (; temp[j] == 0; j--) {</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                    if (j == 0) { // means temp[0] == 0</span>
+<span class="fc" id="L216">                        break BIG_LOOP;</span>
+                    }
+                }
+<span class="fc" id="L219">                tempLen = j + 1;</span>
+<span class="fc" id="L220">            }</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            while (result[currentChar] == '0') {</span>
+<span class="fc" id="L222">                currentChar++;</span>
+            }
+        }
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        boolean negNumber = (sign &lt; 0);</span>
+<span class="fc" id="L226">        int exponent = resLengthInChars - currentChar - scale - 1;</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (scale == 0) {</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (negNumber) {</span>
+<span class="nc" id="L229">                result[--currentChar] = '-';</span>
+            }
+<span class="fc" id="L231">            return new String(result, currentChar, resLengthInChars - currentChar);</span>
+        }
+<span class="nc bnc" id="L233" title="All 4 branches missed.">        if ((scale &gt; 0) &amp;&amp; (exponent &gt;= -6)) {</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            if (exponent &gt;= 0) {</span>
+                // special case 1
+<span class="nc" id="L236">                int insertPoint = currentChar + exponent;</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                for (int j = resLengthInChars - 1; j &gt;= insertPoint; j--) {</span>
+<span class="nc" id="L238">                    result[j + 1] = result[j];</span>
+                }
+<span class="nc" id="L240">                result[++insertPoint] = '.';</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                if (negNumber) {</span>
+<span class="nc" id="L242">                    result[--currentChar] = '-';</span>
+                }
+<span class="nc" id="L244">                return new String(result, currentChar, resLengthInChars - currentChar + 1);</span>
+            }
+            // special case 2
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            for (int j = 2; j &lt; -exponent + 1; j++) {</span>
+<span class="nc" id="L248">                result[--currentChar] = '0';</span>
+            }
+<span class="nc" id="L250">            result[--currentChar] = '.';</span>
+<span class="nc" id="L251">            result[--currentChar] = '0';</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            if (negNumber) {</span>
+<span class="nc" id="L253">                result[--currentChar] = '-';</span>
+            }
+<span class="nc" id="L255">            return new String(result, currentChar, resLengthInChars - currentChar);</span>
+        }
+<span class="nc" id="L257">        int startPoint = currentChar + 1;</span>
+<span class="nc" id="L258">        int endPoint = resLengthInChars;</span>
+<span class="nc" id="L259">        StringBuilder result1 = new StringBuilder(16 + endPoint - startPoint);</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        if (negNumber) {</span>
+<span class="nc" id="L261">            result1.append('-');</span>
+        }
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        if (endPoint - startPoint &gt;= 1) {</span>
+<span class="nc" id="L264">            result1.append(result[currentChar]);</span>
+<span class="nc" id="L265">            result1.append('.');</span>
+<span class="nc" id="L266">            result1.append(result, currentChar + 1, resLengthInChars - currentChar - 1);</span>
+        } else {
+<span class="nc" id="L268">            result1.append(result, currentChar, resLengthInChars - currentChar);</span>
+        }
+<span class="nc" id="L270">        result1.append('E');</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (exponent &gt; 0) {</span>
+<span class="nc" id="L272">            result1.append('+');</span>
+        }
+<span class="nc" id="L274">        result1.append(exponent);</span>
+<span class="nc" id="L275">        return result1.toString();</span>
+    }
+
+    /* can process only 32-bit numbers */
+    static String toDecimalScaledString(long value, int scale) {
+        int resLengthInChars;
+        int currentChar;
+        char[] result;
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        boolean negNumber = value &lt; 0;</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (negNumber) {</span>
+<span class="nc" id="L285">            value = -value;</span>
+        }
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (value == 0) {</span>
+<span class="nc bnc" id="L288" title="All 8 branches missed.">            switch (scale) {</span>
+                case 0:
+<span class="nc" id="L290">                    return &quot;0&quot;;</span>
+                case 1:
+<span class="nc" id="L292">                    return &quot;0.0&quot;;</span>
+                case 2:
+<span class="nc" id="L294">                    return &quot;0.00&quot;;</span>
+                case 3:
+<span class="nc" id="L296">                    return &quot;0.000&quot;;</span>
+                case 4:
+<span class="nc" id="L298">                    return &quot;0.0000&quot;;</span>
+                case 5:
+<span class="nc" id="L300">                    return &quot;0.00000&quot;;</span>
+                case 6:
+<span class="nc" id="L302">                    return &quot;0.000000&quot;;</span>
+                default:
+<span class="nc" id="L304">                    StringBuilder result1 = new StringBuilder();</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">                    if (scale &lt; 0) {</span>
+<span class="nc" id="L306">                        result1.append(&quot;0E+&quot;);</span>
+                    } else {
+<span class="nc" id="L308">                        result1.append(&quot;0E&quot;);</span>
+                    }
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                    result1.append((scale == Integer.MIN_VALUE) ? &quot;2147483648&quot; : Integer.toString(-scale));</span>
+<span class="nc" id="L311">                    return result1.toString();</span>
+            }
+        }
+        // one 32-bit unsigned value may contains 10 decimal digits
+<span class="fc" id="L315">        resLengthInChars = 18;</span>
+        // Explanation why +1+7:
+        // +1 - one char for sign if needed.
+        // +7 - For &quot;special case 2&quot; (see below) we have 7 free chars for
+        //  inserting necessary scaled digits.
+<span class="fc" id="L320">        result = new char[resLengthInChars + 1];</span>
+        //  Allocated [resLengthInChars+1] characters.
+        // a free latest character may be used for &quot;special case 1&quot; (see below)
+<span class="fc" id="L323">        currentChar = resLengthInChars;</span>
+<span class="fc" id="L324">        long v = value;</span>
+        do {
+<span class="fc" id="L326">            long prev = v;</span>
+<span class="fc" id="L327">            v /= 10;</span>
+<span class="fc" id="L328">            result[--currentChar] = (char) (0x0030 + (prev - v * 10));</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        } while (v != 0);</span>
+
+<span class="fc" id="L331">        long exponent = (long) resLengthInChars - (long) currentChar - scale - 1L;</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">        if (scale == 0) {</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            if (negNumber) {</span>
+<span class="nc" id="L334">                result[--currentChar] = '-';</span>
+            }
+<span class="nc" id="L336">            return new String(result, currentChar, resLengthInChars - currentChar);</span>
+        }
+<span class="pc bpc" id="L338" title="2 of 4 branches missed.">        if (scale &gt; 0 &amp;&amp; exponent &gt;= -6) {</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">            if (exponent &gt;= 0) {</span>
+                // special case 1
+<span class="fc" id="L341">                int insertPoint = currentChar + (int) exponent;</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">                for (int j = resLengthInChars - 1; j &gt;= insertPoint; j--) {</span>
+<span class="fc" id="L343">                    result[j + 1] = result[j];</span>
+                }
+<span class="fc" id="L345">                result[++insertPoint] = '.';</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">                if (negNumber) {</span>
+<span class="nc" id="L347">                    result[--currentChar] = '-';</span>
+                }
+<span class="fc" id="L349">                return new String(result, currentChar, resLengthInChars - currentChar + 1);</span>
+            }
+            // special case 2
+<span class="nc bnc" id="L352" title="All 2 branches missed.">            for (int j = 2; j &lt; -exponent + 1; j++) {</span>
+<span class="nc" id="L353">                result[--currentChar] = '0';</span>
+            }
+<span class="nc" id="L355">            result[--currentChar] = '.';</span>
+<span class="nc" id="L356">            result[--currentChar] = '0';</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">            if (negNumber) {</span>
+<span class="nc" id="L358">                result[--currentChar] = '-';</span>
+            }
+<span class="nc" id="L360">            return new String(result, currentChar, resLengthInChars - currentChar);</span>
+        }
+<span class="nc" id="L362">        int startPoint = currentChar + 1;</span>
+<span class="nc" id="L363">        int endPoint = resLengthInChars;</span>
+<span class="nc" id="L364">        StringBuilder result1 = new StringBuilder(16 + endPoint - startPoint);</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        if (negNumber) {</span>
+<span class="nc" id="L366">            result1.append('-');</span>
+        }
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        if (endPoint - startPoint &gt;= 1) {</span>
+<span class="nc" id="L369">            result1.append(result[currentChar]);</span>
+<span class="nc" id="L370">            result1.append('.');</span>
+<span class="nc" id="L371">            result1.append(result, currentChar + 1, resLengthInChars - currentChar - 1);</span>
+        } else {
+<span class="nc" id="L373">            result1.append(result, currentChar, resLengthInChars - currentChar);</span>
+        }
+<span class="nc" id="L375">        result1.append('E');</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (exponent &gt; 0) {</span>
+<span class="nc" id="L377">            result1.append('+');</span>
+        }
+<span class="nc" id="L379">        result1.append(exponent);</span>
+<span class="nc" id="L380">        return result1.toString();</span>
+    }
+
+    static long divideLongByBillion(long a) {
+        long quot;
+        long rem;
+
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">        if (a &gt;= 0) {</span>
+<span class="fc" id="L388">            long bLong = 1000000000L;</span>
+<span class="fc" id="L389">            quot = (a / bLong);</span>
+<span class="fc" id="L390">            rem = (a % bLong);</span>
+<span class="fc" id="L391">        } else {</span>
+            /*
+             * Make the dividend positive shifting it right by 1 bit then get
+             * the quotient a remainder and correct them properly
+             */
+<span class="nc" id="L396">            long aPos = a &gt;&gt;&gt; 1;</span>
+<span class="nc" id="L397">            long bPos = 1000000000L &gt;&gt;&gt; 1;</span>
+<span class="nc" id="L398">            quot = aPos / bPos;</span>
+<span class="nc" id="L399">            rem = aPos % bPos;</span>
+            // double the remainder and add 1 if 'a' is odd
+<span class="nc" id="L401">            rem = (rem &lt;&lt; 1) + (a &amp; 1);</span>
+        }
+<span class="fc" id="L403">        return (rem &lt;&lt; 32) | (quot &amp; 0xFFFFFFFFL);</span>
+    }
+
+    /// #### See also
+    ///
+    /// - TBigInteger#doubleValue()
+    static double bigInteger2Double(TBigInteger val) {
+        // val.bitLength() &lt; 64
+<span class="nc bnc" id="L411" title="All 6 branches missed.">        if ((val.numberLength &lt; 2) || ((val.numberLength == 2) &amp;&amp; (val.digits[1] &gt; 0))) {</span>
+<span class="nc" id="L412">            return val.longValue();</span>
+        }
+        // val.bitLength() &gt;= 33 * 32 &gt; 1024
+<span class="nc bnc" id="L415" title="All 2 branches missed.">        if (val.numberLength &gt; 32) {</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">            return val.sign &gt; 0 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;</span>
+        }
+<span class="nc" id="L418">        int bitLen = val.abs().bitLength();</span>
+<span class="nc" id="L419">        long exponent = bitLen - 1;</span>
+<span class="nc" id="L420">        int delta = bitLen - 54;</span>
+        // We need 54 top bits from this, the 53th bit is always 1 in lVal.
+<span class="nc" id="L422">        long lVal = val.abs().shiftRight(delta).longValue();</span>
+        /*
+         * Take 53 bits from lVal to mantissa. The least significant bit is
+         * needed for rounding.
+         */
+<span class="nc" id="L427">        long mantissa = lVal &amp; 0x1FFFFFFFFFFFFFL;</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">        if (exponent == 1023) {</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">            if (mantissa == 0X1FFFFFFFFFFFFFL) {</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">                return val.sign &gt; 0 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;</span>
+            }
+<span class="nc bnc" id="L432" title="All 2 branches missed.">            if (mantissa == 0x1FFFFFFFFFFFFEL) {</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">                return val.sign &gt; 0 ? Double.MAX_VALUE : -Double.MAX_VALUE;</span>
+            }
+        }
+        // Round the mantissa
+<span class="nc bnc" id="L437" title="All 6 branches missed.">        if ((mantissa &amp; 1) == 1 &amp;&amp; (mantissa &amp; 2) == 2 || TBitLevel.nonZeroDroppedBits(delta, val.digits)) {</span>
+<span class="nc" id="L438">            mantissa += 2;</span>
+        }
+<span class="nc" id="L440">        mantissa &gt;&gt;= 1; // drop the rounding bit</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">        long resSign = (val.sign &lt; 0) ? 0x8000000000000000L : 0;</span>
+<span class="nc" id="L442">        exponent = ((1023 + exponent) &lt;&lt; 52) &amp; 0x7FF0000000000000L;</span>
+<span class="nc" id="L443">        long result = resSign | exponent | mantissa;</span>
+<span class="nc" id="L444">        return Double.longBitsToDouble(result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

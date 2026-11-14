@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResourceLoadView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">ResourceLoadView.java</span></div><h1>ResourceLoadView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.scheduling.ProjectModel;
+import com.codename1.scheduling.ResourceLeveler;
+import com.codename1.scheduling.ScheduleResource;
+import com.codename1.scheduling.TimeMath;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+
+import java.util.List;
+
+/// How much of each resource a project asks for over time, under the chart
+/// of a `Gantt` and on the same time axis: a row per resource, a bar per
+/// stretch of time as tall as the load in it, and the ones over the
+/// resource's capacity in another colour.
+final class ResourceLoadView extends ScrollSurface {
+    private final Gantt owner;
+    private final GanttChart chart;
+    private int rowH;
+    private boolean syncing;
+
+    // The profile last worked out, and what it was worked out for.
+    private float[][] profile;
+    private long profileFrom;
+    private long profileBucket;
+    private int profileCount;
+<span class="fc" id="L51">    private boolean stale = true;</span>
+
+<span class="fc" id="L53">    ResourceLoadView(Gantt owner, GanttChart chart) {</span>
+<span class="fc" id="L54">        this.owner = owner;</span>
+<span class="fc" id="L55">        this.chart = chart;</span>
+<span class="fc" id="L56">        setUIID(&quot;Gantt&quot;);</span>
+<span class="fc" id="L57">    }</span>
+
+    void modelChanged() {
+<span class="fc" id="L60">        stale = true;</span>
+<span class="fc" id="L61">        repaint();</span>
+<span class="fc" id="L62">    }</span>
+
+    /// The chart was laid out again or changed its scale.
+    void chartChanged() {
+<span class="fc" id="L66">        stale = true;</span>
+<span class="fc" id="L67">        chartScrolled();</span>
+<span class="fc" id="L68">    }</span>
+
+    void chartScrolled() {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (!syncing) {</span>
+<span class="fc" id="L72">            setOffsets(chart.getOffX(), getOffY());</span>
+<span class="fc" id="L73">            repaint();</span>
+        }
+<span class="fc" id="L75">    }</span>
+
+    int getRowHeight() {
+<span class="nc" id="L78">        return rowH;</span>
+    }
+
+    /// The load of a resource in the stretch of time at a point of the axis,
+    /// as last painted, or -1 when nothing was.
+    float loadAt(int resourceIndex, long time) {
+<span class="nc bnc" id="L84" title="All 6 branches missed.">        if (profile == null || resourceIndex &lt; 0 || resourceIndex &gt;= profile.length) {</span>
+<span class="nc" id="L85">            return -1;</span>
+        }
+<span class="nc" id="L87">        long i = (time - profileFrom) / profileBucket;</span>
+<span class="nc" id="L88">        float[] row = profile[resourceIndex];</span>
+<span class="nc bnc" id="L89" title="All 6 branches missed.">        return row == null || i &lt; 0 || i &gt;= profileCount ? -1 : row[(int) i];</span>
+    }
+
+    @Override
+    void prepare(int width, int height) {
+<span class="fc" id="L94">        Style row = Look.style(&quot;GanttRow&quot;);</span>
+<span class="fc" id="L95">        rowH = Math.max(Look.mm(7), row.getFont().getHeight() * 2 + Look.mm(1.5f));</span>
+<span class="fc" id="L96">        headerW = chart.headerW;</span>
+<span class="fc" id="L97">        headerH = 0;</span>
+        // The chart is the one that knows where time is.
+<span class="fc" id="L99">        setOffsets(chart.getOffX(), getOffY());</span>
+<span class="fc" id="L100">    }</span>
+
+    @Override
+    int contentWidth() {
+<span class="fc" id="L104">        return chart.axis().width();</span>
+    }
+
+    @Override
+    int contentHeight() {
+<span class="fc" id="L109">        ProjectModel model = owner.getModel();</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        return model == null ? 0 : model.getResources().size() * rowH;</span>
+    }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L115">        ProjectModel model = owner.getModel();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        int rows = model == null ? 0 : model.getResources().size();</span>
+<span class="fc" id="L117">        Style row = Look.style(&quot;GanttRow&quot;);</span>
+<span class="fc" id="L118">        int h = Math.max(Look.mm(7), row.getFont().getHeight() * 2 + Look.mm(1.5f));</span>
+        // Three rows and a part of the fourth, which says there are more.
+<span class="fc" id="L120">        return new Dimension(Look.mm(60), Math.min(rows * h, h * 7 / 2));</span>
+    }
+
+    @Override
+    void scrolled() {
+<span class="fc" id="L125">        syncing = true;</span>
+<span class="fc" id="L126">        chart.scrollTo(getOffX(), chart.getOffY());</span>
+<span class="fc" id="L127">        syncing = false;</span>
+<span class="fc" id="L128">    }</span>
+
+    @Override
+    boolean zoomBy(float factor, int x, int y) {
+<span class="nc" id="L132">        return chart.zoomBy(factor, x, y);</span>
+    }
+
+    // A bucket is a day while a day is wide enough to see, then a week, then
+    // four of them.
+    private long bucketSize() {
+<span class="nc" id="L138">        double mpp = chart.axis().getMillisPerPixel();</span>
+<span class="nc" id="L139">        int least = Math.max(3, Look.mm(0.9f));</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (TimeMath.DAY / mpp &gt;= least) {</span>
+<span class="nc" id="L141">            return TimeMath.DAY;</span>
+        }
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (7 * TimeMath.DAY / mpp &gt;= least) {</span>
+<span class="nc" id="L144">            return 7 * TimeMath.DAY;</span>
+        }
+<span class="nc" id="L146">        return 28 * TimeMath.DAY;</span>
+    }
+
+    private void profile(List&lt;ScheduleResource&gt; resources, int left, int right) {
+<span class="nc" id="L150">        TimeAxis axis = chart.axis();</span>
+<span class="nc" id="L151">        long bucket = bucketSize();</span>
+<span class="nc" id="L152">        long from = TimeMath.startOfDay(axis.time(Math.max(0, left)), axis.getZone());</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (bucket &gt; TimeMath.DAY) {</span>
+            // Whole buckets from the start of the axis, so that scrolling
+            // does not move their edges.
+<span class="nc" id="L156">            long first = TimeMath.startOfDay(axis.getStart(), axis.getZone());</span>
+<span class="nc" id="L157">            from = first + (from - first) / bucket * bucket;</span>
+        }
+<span class="nc" id="L159">        int count = (int) ((axis.time(right) - from) / bucket) + 1;</span>
+<span class="nc bnc" id="L160" title="All 12 branches missed.">        if (!stale &amp;&amp; profile != null &amp;&amp; profile.length == resources.size() &amp;&amp; from == profileFrom</span>
+                &amp;&amp; bucket == profileBucket &amp;&amp; count == profileCount) {
+<span class="nc" id="L162">            return;</span>
+        }
+        // A row's load is worked out when the row is first painted: a
+        // project has more resources than a screen has rows.
+<span class="nc" id="L166">        profile = new float[resources.size()][];</span>
+<span class="nc" id="L167">        profileFrom = from;</span>
+<span class="nc" id="L168">        profileBucket = bucket;</span>
+<span class="nc" id="L169">        profileCount = count;</span>
+<span class="nc" id="L170">        stale = false;</span>
+<span class="nc" id="L171">    }</span>
+
+    @Override
+    void paintBody(Graphics g, int x, int y) {
+<span class="nc" id="L175">        Style row = Look.style(&quot;GanttRow&quot;);</span>
+<span class="nc" id="L176">        Style loadStyle = Look.style(&quot;GanttLoad&quot;);</span>
+<span class="nc" id="L177">        Style over = Look.style(&quot;GanttOverload&quot;);</span>
+<span class="nc" id="L178">        int cx = g.getClipX();</span>
+<span class="nc" id="L179">        int cy = g.getClipY();</span>
+<span class="nc" id="L180">        int cw = g.getClipWidth();</span>
+<span class="nc" id="L181">        int ch = g.getClipHeight();</span>
+<span class="nc" id="L182">        Look.fill(g, row, cx, cy, cw, ch);</span>
+<span class="nc" id="L183">        ProjectModel model = owner.getModel();</span>
+<span class="nc bnc" id="L184" title="All 4 branches missed.">        if (model == null || rowH &lt;= 0) {</span>
+<span class="nc" id="L185">            return;</span>
+        }
+<span class="nc" id="L187">        List&lt;ScheduleResource&gt; resources = model.getResources();</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (resources.isEmpty()) {</span>
+<span class="nc" id="L189">            return;</span>
+        }
+<span class="nc" id="L191">        TimeAxis axis = chart.axis();</span>
+<span class="nc" id="L192">        axis.paintOffHours(g, model.getCalendar(), Look.style(&quot;SchedulerOffHours&quot;), x, cy, ch, cx, cx + cw);</span>
+<span class="nc" id="L193">        axis.paintGrid(g, Look.mix(row.getBgColor(), row.getFgColor(), 45), row.getBgColor(), x, cy, ch, cx, cx + cw);</span>
+<span class="nc" id="L194">        profile(resources, cx - x, cx + cw - x);</span>
+<span class="nc" id="L195">        int firstRow = Math.max(0, (cy - y) / rowH);</span>
+<span class="nc" id="L196">        int lastRow = Math.min(resources.size() - 1, (cy + ch - y) / rowH);</span>
+<span class="nc" id="L197">        int pad = Math.max(1, Look.mm(0.6f));</span>
+<span class="nc" id="L198">        int line = Look.mix(row.getBgColor(), row.getFgColor(), 25);</span>
+<span class="nc" id="L199">        int capColor = Look.mix(row.getBgColor(), row.getFgColor(), 110);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        for (int r = firstRow; r &lt;= lastRow; r++) {</span>
+<span class="nc" id="L201">            ScheduleResource res = resources.get(r);</span>
+<span class="nc" id="L202">            float capacity = res.getCapacity();</span>
+<span class="nc" id="L203">            float[] units = profile[r];</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            if (units == null) {</span>
+<span class="nc" id="L205">                units = ResourceLeveler.loadProfile(model, res.getId(), profileFrom,</span>
+                        profileFrom + profileCount * profileBucket, profileCount);
+<span class="nc" id="L207">                profile[r] = units;</span>
+            }
+<span class="nc" id="L209">            float peak = capacity;</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            for (float unit : units) {</span>
+<span class="nc" id="L211">                peak = Math.max(peak, unit);</span>
+            }
+            // The capacity is always at the same height unless the load
+            // goes over it by more than half, and then the row is the peak.
+<span class="nc" id="L215">            float top = Math.max(capacity * 1.5f, peak);</span>
+<span class="nc" id="L216">            int base = y + (r + 1) * rowH - 1;</span>
+<span class="nc" id="L217">            int room = rowH - 2 * pad - 1;</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            for (int i = 0; i &lt; units.length; i++) {</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                if (units[i] &lt;= 0) {</span>
+<span class="nc" id="L220">                    continue;</span>
+                }
+<span class="nc" id="L222">                int x0 = x + axis.x(profileFrom + i * profileBucket);</span>
+<span class="nc" id="L223">                int x1 = x + axis.x(profileFrom + (i + 1) * profileBucket);</span>
+<span class="nc" id="L224">                int h = Math.max(1, Math.round(room * units[i] / top));</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                boolean tooMuch = units[i] &gt; capacity + 0.001f;</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                Look.fill(g, tooMuch ? over : loadStyle, x0, base - h, Math.max(1, x1 - x0 - 1), h);</span>
+            }
+<span class="nc" id="L228">            int capY = base - Math.round(room * capacity / top);</span>
+<span class="nc" id="L229">            g.setColor(capColor);</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            for (int dx = cx - (cx - x) % 6; dx &lt; cx + cw; dx += 6) {</span>
+<span class="nc" id="L231">                g.drawLine(dx, capY, dx + 2, capY);</span>
+            }
+<span class="nc" id="L233">            g.setColor(line);</span>
+<span class="nc" id="L234">            g.drawLine(cx, base, cx + cw, base);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            if (headerW == 0) {</span>
+                // No table to name the row in.
+<span class="nc" id="L237">                Font f = row.getFont();</span>
+<span class="nc" id="L238">                g.setFont(f);</span>
+<span class="nc" id="L239">                g.setColor(row.getFgColor());</span>
+<span class="nc" id="L240">                g.drawString(res.getName(), cx + Look.mm(1), y + r * rowH + pad);</span>
+            }
+        }
+<span class="nc" id="L243">        long now = owner.now();</span>
+<span class="nc bnc" id="L244" title="All 4 branches missed.">        if (now &gt;= axis.getStart() &amp;&amp; now &lt; axis.getEnd()) {</span>
+<span class="nc" id="L245">            g.setColor(Look.style(&quot;SchedulerNow&quot;).getFgColor());</span>
+<span class="nc" id="L246">            g.fillRect(x + axis.x(now) - 1, cy, 2, ch);</span>
+        }
+<span class="nc" id="L248">    }</span>
+
+    @Override
+    void paintLeftHeader(Graphics g, int x, int y) {
+<span class="nc" id="L252">        Style row = Look.style(&quot;GanttRow&quot;);</span>
+<span class="nc" id="L253">        Style over = Look.style(&quot;GanttOverload&quot;);</span>
+<span class="nc" id="L254">        int cy = g.getClipY();</span>
+<span class="nc" id="L255">        int ch = g.getClipHeight();</span>
+<span class="nc" id="L256">        Look.fill(g, row, x, cy, headerW, ch);</span>
+<span class="nc" id="L257">        ProjectModel model = owner.getModel();</span>
+<span class="nc bnc" id="L258" title="All 4 branches missed.">        if (model == null || rowH &lt;= 0) {</span>
+<span class="nc" id="L259">            return;</span>
+        }
+<span class="nc" id="L261">        List&lt;ScheduleResource&gt; resources = model.getResources();</span>
+<span class="nc" id="L262">        Font f = row.getFont();</span>
+<span class="nc" id="L263">        int pad = Look.mm(1.2f);</span>
+<span class="nc" id="L264">        int firstRow = Math.max(0, (cy - y) / rowH);</span>
+<span class="nc" id="L265">        int lastRow = Math.min(resources.size() - 1, (cy + ch - y) / rowH);</span>
+<span class="nc" id="L266">        int line = Look.mix(row.getBgColor(), row.getFgColor(), 25);</span>
+<span class="nc" id="L267">        int alpha = g.getAlpha();</span>
+<span class="nc" id="L268">        g.setFont(f);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        for (int r = firstRow; r &lt;= lastRow; r++) {</span>
+<span class="nc" id="L270">            ScheduleResource res = resources.get(r);</span>
+<span class="nc" id="L271">            int top = y + r * rowH;</span>
+<span class="nc" id="L272">            boolean tooMuch = owner.isOverallocated(res.getId());</span>
+<span class="nc" id="L273">            String detail = res.getDetail();</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">            if (tooMuch) {</span>
+<span class="nc" id="L275">                detail = owner.localize(&quot;gantt.overallocated&quot;, &quot;Overallocated&quot;);</span>
+            }
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            int textH = detail == null ? f.getHeight() : 2 * f.getHeight();</span>
+<span class="nc" id="L278">            int ty = top + (rowH - textH) / 2;</span>
+<span class="nc" id="L279">            g.setColor(row.getFgColor());</span>
+<span class="nc" id="L280">            g.drawString(Look.fit(res.getName(), f, headerW - 2 * pad), x + pad, ty);</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">            if (detail != null) {</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                if (tooMuch) {</span>
+<span class="nc" id="L283">                    g.setColor(over.getBgColor());</span>
+                } else {
+<span class="nc" id="L285">                    g.setAlpha(alpha * 150 / 255);</span>
+                }
+<span class="nc" id="L287">                g.drawString(Look.fit(detail, f, headerW - 2 * pad), x + pad, ty + f.getHeight());</span>
+<span class="nc" id="L288">                g.setAlpha(alpha);</span>
+            }
+<span class="nc" id="L290">            g.setColor(line);</span>
+<span class="nc" id="L291">            g.drawLine(x, top + rowH - 1, x + headerW, top + rowH - 1);</span>
+        }
+<span class="nc" id="L293">        g.setColor(Look.mix(row.getBgColor(), row.getFgColor(), 60));</span>
+<span class="nc" id="L294">        g.drawLine(x + headerW - 1, cy, x + headerW - 1, cy + ch);</span>
+<span class="nc" id="L295">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

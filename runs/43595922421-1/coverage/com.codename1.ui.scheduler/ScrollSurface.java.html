@@ -1,0 +1,949 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScrollSurface.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">ScrollSurface.java</span></div><h1>ScrollSurface.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.WheelEvent;
+import com.codename1.ui.geom.Dimension;
+
+/// A painted surface that scrolls on two axes under a pinned header row and a
+/// pinned header column.
+///
+/// The scheduling views draw every item themselves, so a schedule of ten
+/// thousand items costs what is on screen and nothing more; a component per
+/// item would not scroll. That leaves this class to do what a scrollable
+/// `Container` does for components: panning, the fling after it, the wheel,
+/// pinch, and telling a tap from a drag from a long press.
+///
+/// A subclass says how big its content is, paints the four regions, and
+/// answers three questions about a pointer: is an edit starting here, where
+/// has it been dragged to, and has it ended.
+abstract class ScrollSurface extends Component {
+    private static final int NONE = 0;
+    private static final int PAN = 1;
+    private static final int EDIT = 2;
+    private static final int DOUBLE_TAP_MS = 350;
+
+    /// The width of the pinned column and the height of the pinned row. A
+    /// subclass sets them in `prepare`.
+    int headerW;
+    int headerH;
+
+    private int offX;
+    private int offY;
+    private Motion flingX;
+    private Motion flingY;
+    private boolean registered;
+    private int gesture;
+    private boolean pressed;
+    private int pressX;
+    private int pressY;
+    private int lastX;
+    private int lastY;
+    private long lastTapTime;
+    private int lastTapX;
+    private int lastTapY;
+    private int autoX;
+    private int autoY;
+    private boolean pinching;
+<span class="fc" id="L73">    private boolean dragEdits = Display.getInstance().isDesktop();</span>
+
+<span class="fc" id="L75">    ScrollSurface() {</span>
+<span class="fc" id="L76">        setFocusable(true);</span>
+<span class="fc" id="L77">        setGrabsPointerEvents(true);</span>
+<span class="fc" id="L78">    }</span>
+
+    // ------------------------------------------------------------ content
+
+    /// Lays the surface out for a size. Called before every paint and every
+    /// pointer event, so it has to return at once when nothing changed.
+    abstract void prepare(int width, int height);
+
+    /// The size of what scrolls, in pixels, without the headers.
+    abstract int contentWidth();
+
+    abstract int contentHeight();
+
+    /// Paints what scrolls. `x` and `y` are where the content's own origin is
+    /// on screen, which is off screen once it has scrolled.
+    abstract void paintBody(Graphics g, int x, int y);
+
+    /// Paints the pinned row. `x` is where the content's origin is; `y` is
+    /// the top of the row.
+    void paintTopHeader(Graphics g, int x, int y) {
+<span class="nc" id="L98">    }</span>
+
+    /// Paints the pinned column. `x` is its left; `y` is where the content's
+    /// origin is.
+    void paintLeftHeader(Graphics g, int x, int y) {
+<span class="nc" id="L103">    }</span>
+
+    void paintCorner(Graphics g, int x, int y) {
+<span class="nc" id="L106">    }</span>
+
+    /// Painted last, over everything, in the component's own bounds.
+    void paintOverlay(Graphics g, int x, int y) {
+<span class="fc" id="L110">    }</span>
+
+    /// Asked when a drag or a long press begins at a point, in the
+    /// component's coordinates. `handlesOnly` is true for a plain drag on a
+    /// touch screen, which pans unless it starts on something made to be
+    /// dragged, such as the resize handle of the selected item.
+    ///
+    /// #### Returns
+    ///
+    /// true when an edit has begun and the drag belongs to it
+    boolean beginEdit(int x, int y, boolean handlesOnly) {
+<span class="nc" id="L121">        return false;</span>
+    }
+
+    void editDragged(int x, int y) {
+<span class="nc" id="L125">    }</span>
+
+    /// The edit is over: `commit` is false when it was cancelled.
+    void endEdit(boolean commit) {
+<span class="nc" id="L129">    }</span>
+
+    void tapped(int x, int y, boolean doubleTap) {
+<span class="nc" id="L132">    }</span>
+
+    /// A long press that started no edit.
+    void longPressed(int x, int y) {
+<span class="nc" id="L136">    }</span>
+
+    /// The scroll position changed.
+    void scrolled() {
+<span class="fc" id="L140">    }</span>
+
+    /// Zooms by `factor` around a point. False when the surface has no zoom.
+    boolean zoomBy(float factor, int x, int y) {
+<span class="nc" id="L144">        return false;</span>
+    }
+
+    /// Whether a plain drag on an item or on empty space edits instead of
+    /// panning. On by default where there is a mouse, which has a wheel to
+    /// scroll with.
+    void setDragEdits(boolean v) {
+<span class="fc" id="L151">        dragEdits = v;</span>
+<span class="fc" id="L152">    }</span>
+
+    boolean isDragEdits() {
+<span class="fc" id="L155">        return dragEdits;</span>
+    }
+
+    // ------------------------------------------------------------- scroll
+
+    int bodyWidth() {
+<span class="fc" id="L161">        return Math.max(0, getWidth() - headerW);</span>
+    }
+
+    int bodyHeight() {
+<span class="fc" id="L165">        return Math.max(0, getHeight() - headerH);</span>
+    }
+
+    int maxOffX() {
+<span class="fc" id="L169">        return Math.max(0, contentWidth() - bodyWidth());</span>
+    }
+
+    int maxOffY() {
+<span class="fc" id="L173">        return Math.max(0, contentHeight() - bodyHeight());</span>
+    }
+
+    int getOffX() {
+<span class="fc" id="L177">        return offX;</span>
+    }
+
+    int getOffY() {
+<span class="fc" id="L181">        return offY;</span>
+    }
+
+    /// Scrolls to a position, held inside the content.
+    void scrollTo(int x, int y) {
+<span class="fc" id="L186">        int nx = Math.max(0, Math.min(maxOffX(), x));</span>
+<span class="fc" id="L187">        int ny = Math.max(0, Math.min(maxOffY(), y));</span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">        if (nx != offX || ny != offY) {</span>
+<span class="fc" id="L189">            offX = nx;</span>
+<span class="fc" id="L190">            offY = ny;</span>
+<span class="fc" id="L191">            scrolled();</span>
+<span class="fc" id="L192">            repaint();</span>
+<span class="pc bpc" id="L193" title="3 of 4 branches missed.">            if (hoverX &gt;= 0 &amp;&amp; !pressed) {</span>
+                // What is under a pointer that rests has changed.
+<span class="nc" id="L195">                hoverAt(hoverX, hoverY);</span>
+            }
+        }
+<span class="fc" id="L198">    }</span>
+
+    /// Sets the position without holding it inside the content, for a
+    /// subclass whose content moves under the scroll position.
+    void setOffsets(int x, int y) {
+<span class="fc" id="L203">        offX = x;</span>
+<span class="fc" id="L204">        offY = y;</span>
+<span class="fc" id="L205">    }</span>
+
+    /// Lays out for the current size and holds the scroll position inside the
+    /// content.
+    void layoutNow() {
+<span class="fc" id="L210">        prepare(getWidth(), getHeight());</span>
+<span class="fc" id="L211">        int nx = Math.max(0, Math.min(maxOffX(), offX));</span>
+<span class="fc" id="L212">        int ny = Math.max(0, Math.min(maxOffY(), offY));</span>
+<span class="fc bfc" id="L213" title="All 4 branches covered.">        if (nx != offX || ny != offY) {</span>
+<span class="fc" id="L214">            offX = nx;</span>
+<span class="fc" id="L215">            offY = ny;</span>
+<span class="fc" id="L216">            scrolled();</span>
+        }
+<span class="fc" id="L218">    }</span>
+
+    // ---- what the pointer is over, what is held, what was dropped ----
+
+    /// How long a hover takes to come up and to go, a held item to rise,
+    /// and a dropped one to reach its place.
+    static final int HOVER_MS = 140;
+    static final int LIFT_MS = 160;
+    static final int SETTLE_MS = 220;
+
+<span class="fc" id="L228">    private long fixedClock = -1;</span>
+    private Object hoverKey;
+    private long hoverSince;
+    private Object leftKey;
+    private long leftSince;
+<span class="fc" id="L233">    private int hoverX = -1;</span>
+<span class="fc" id="L234">    private int hoverY = -1;</span>
+    private long liftSince;
+    private Object settleKey;
+<span class="fc" id="L237">    private final int[] settleFrom = new int[4];</span>
+    private long settleSince;
+
+    /// The time the surface animates by: the clock, or the one it was
+    /// given to stand still at.
+    long tick() {
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        return fixedClock &gt;= 0 ? fixedClock : System.currentTimeMillis();</span>
+    }
+
+    void setFixedClock(long millis) {
+<span class="fc" id="L247">        fixedClock = millis;</span>
+<span class="fc" id="L248">        repaint();</span>
+<span class="fc" id="L249">    }</span>
+
+    /// The pointer rests at a point of the surface without being pressed.
+    /// A view answers with `hover`, naming what is there and the cursor
+    /// that says what a press would do.
+    void hoverAt(int x, int y) {
+<span class="nc" id="L255">        hover(null, DEFAULT_CURSOR);</span>
+<span class="nc" id="L256">    }</span>
+
+    /// The pointer left, or nothing is known of it any more.
+    void hoverGone() {
+<span class="fc" id="L260">        hoverX = -1;</span>
+<span class="fc" id="L261">        hoverY = -1;</span>
+<span class="fc" id="L262">        hover(null, DEFAULT_CURSOR);</span>
+<span class="fc" id="L263">    }</span>
+
+    final void hover(Object key, int cursor) {
+<span class="pc bpc" id="L266" title="1 of 6 branches missed.">        if (key == null ? hoverKey != null : !key.equals(hoverKey)) {</span>
+<span class="fc" id="L267">            long now = tick();</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            if (hoverKey != null) {</span>
+<span class="fc" id="L269">                leftKey = hoverKey;</span>
+<span class="fc" id="L270">                leftSince = now;</span>
+            }
+<span class="pc bpc" id="L272" title="1 of 4 branches missed.">            if (key != null &amp;&amp; key.equals(leftKey)) {</span>
+<span class="nc" id="L273">                leftKey = null;</span>
+            }
+<span class="fc" id="L275">            hoverKey = key;</span>
+<span class="fc" id="L276">            hoverSince = now;</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            if (key == null) {</span>
+<span class="fc" id="L278">                tip(null);</span>
+            }
+<span class="fc" id="L280">            requestAnimation();</span>
+<span class="fc" id="L281">            repaint();</span>
+        }
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (getCursor() != cursor) {</span>
+<span class="fc" id="L284">            setCursor(cursor);</span>
+        }
+<span class="fc" id="L286">    }</span>
+
+    /// What a tooltip says of the thing the pointer is on, for an
+    /// application that shows tooltips; null for nothing.
+    void tip(String text) {
+<span class="fc" id="L291">        String was = getTooltip();</span>
+<span class="fc bfc" id="L292" title="All 6 branches covered.">        if (text == null ? was != null : !text.equals(was)) {</span>
+<span class="fc" id="L293">            setTooltip(text);</span>
+        }
+<span class="fc" id="L295">    }</span>
+
+    /// What the pointer has just left, while its light goes out.
+    Object fading() {
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        return printing ? null : leftKey;</span>
+    }
+
+    /// What the pointer is over, as the view named it.
+    Object hovered() {
+<span class="fc" id="L304">        return hoverKey;</span>
+    }
+
+    /// Whether anything is lit by the pointer or still fading: a view
+    /// that paints many items asks once before asking for each.
+    boolean anyHover() {
+<span class="fc bfc" id="L310" title="All 6 branches covered.">        return !printing &amp;&amp; (hoverKey != null || leftKey != null);</span>
+    }
+
+    /// How far the hover of `key` has come up, from 0 to 1.
+    float hoverLevel(Object key) {
+<span class="pc bpc" id="L315" title="2 of 4 branches missed.">        if (key == null || printing) {</span>
+<span class="nc" id="L316">            return 0;</span>
+        }
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        if (key.equals(hoverKey)) {</span>
+<span class="fc" id="L319">            return ease(tick() - hoverSince, HOVER_MS);</span>
+        }
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (key.equals(leftKey)) {</span>
+<span class="fc" id="L322">            return 1 - ease(tick() - leftSince, HOVER_MS);</span>
+        }
+<span class="fc" id="L324">        return 0;</span>
+    }
+
+    /// How far the item that is being dragged has risen off the surface.
+    float liftLevel() {
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        return gesture == EDIT ? ease(tick() - liftSince, LIFT_MS) : 0;</span>
+    }
+
+    /// An item was let go at a rectangle of the content, which is not
+    /// where it belongs: it is drawn travelling from there to its place.
+    void settleFrom(Object key, int x, int y, int w, int h) {
+<span class="pc bpc" id="L335" title="2 of 4 branches missed.">        if (key == null || printing) {</span>
+<span class="nc" id="L336">            return;</span>
+        }
+<span class="fc" id="L338">        settleKey = key;</span>
+<span class="fc" id="L339">        settleFrom[0] = x;</span>
+<span class="fc" id="L340">        settleFrom[1] = y;</span>
+<span class="fc" id="L341">        settleFrom[2] = w;</span>
+<span class="fc" id="L342">        settleFrom[3] = h;</span>
+<span class="fc" id="L343">        settleSince = tick();</span>
+<span class="fc" id="L344">        requestAnimation();</span>
+<span class="fc" id="L345">    }</span>
+
+    /// Moves the rectangle of an item, in the content, to where it is on
+    /// its way from the place it was dropped. True while it travels.
+    boolean settle(Object key, int[] rect) {
+<span class="pc bpc" id="L350" title="1 of 6 branches missed.">        if (settleKey == null || printing || !settleKey.equals(key)) {</span>
+<span class="fc" id="L351">            return false;</span>
+        }
+<span class="fc" id="L353">        long t = tick() - settleSince;</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (t &gt;= SETTLE_MS) {</span>
+<span class="fc" id="L355">            return false;</span>
+        }
+        // Fast at first and slow into place, as a thing put down is.
+<span class="fc" id="L358">        float p = 1 - t / (float) SETTLE_MS;</span>
+<span class="fc" id="L359">        p = 1 - p * p * p;</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        for (int i = 0; i &lt; 4; i++) {</span>
+<span class="fc" id="L361">            rect[i] = settleFrom[i] + Math.round((rect[i] - settleFrom[i]) * p);</span>
+        }
+<span class="fc" id="L363">        return true;</span>
+    }
+
+    private static float ease(long elapsed, int duration) {
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (elapsed &gt;= duration) {</span>
+<span class="fc" id="L368">            return 1;</span>
+        }
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (elapsed &lt;= 0) {</span>
+<span class="fc" id="L371">            return 0;</span>
+        }
+<span class="fc" id="L373">        float p = elapsed / (float) duration;</span>
+<span class="fc" id="L374">        return p * p * (3 - 2 * p);</span>
+    }
+
+    // Whether any of the three is still on its way. Never with a clock
+    // that stands still: nothing would ever arrive.
+    private boolean feedbackBusy() {
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        if (fixedClock &gt;= 0) {</span>
+<span class="nc" id="L381">            return false;</span>
+        }
+<span class="fc" id="L383">        long now = System.currentTimeMillis();</span>
+<span class="fc" id="L384">        boolean busy = false;</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (leftKey != null) {</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            if (now - leftSince &gt;= HOVER_MS) {</span>
+<span class="fc" id="L387">                leftKey = null;</span>
+            } else {
+<span class="fc" id="L389">                busy = true;</span>
+            }
+        }
+<span class="pc bpc" id="L392" title="1 of 4 branches missed.">        if (hoverKey != null &amp;&amp; now - hoverSince &lt; HOVER_MS) {</span>
+<span class="nc" id="L393">            busy = true;</span>
+        }
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        if (settleKey != null) {</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            if (now - settleSince &gt;= SETTLE_MS) {</span>
+<span class="fc" id="L397">                settleKey = null;</span>
+            } else {
+<span class="fc" id="L399">                busy = true;</span>
+            }
+        }
+<span class="pc bpc" id="L402" title="3 of 4 branches missed.">        if (gesture == EDIT &amp;&amp; now - liftSince &lt; LIFT_MS) {</span>
+<span class="nc" id="L403">            busy = true;</span>
+        }
+<span class="fc" id="L405">        return busy;</span>
+    }
+
+    @Override
+    public void pointerHover(int[] x, int[] y) {
+<span class="pc bpc" id="L410" title="2 of 6 branches missed.">        if (pressed || x == null || x.length == 0) {</span>
+<span class="fc" id="L411">            return;</span>
+        }
+<span class="fc" id="L413">        layoutNow();</span>
+<span class="fc" id="L414">        hoverX = x[0] - getAbsoluteX();</span>
+<span class="fc" id="L415">        hoverY = y[0] - getAbsoluteY();</span>
+<span class="fc" id="L416">        hoverAt(hoverX, hoverY);</span>
+<span class="fc" id="L417">    }</span>
+
+    @Override
+    public void setHovered(boolean hovered) {
+<span class="fc" id="L421">        super.setHovered(hovered);</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        if (!hovered) {</span>
+<span class="fc" id="L423">            hoverGone();</span>
+        }
+<span class="fc" id="L425">    }</span>
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L429">        super.initComponent();</span>
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">        if (Display.getInstance().isDesktop()) {</span>
+            // The cursor says what a press would do: move, stretch, link.
+            // A form shows the cursors of its components only when asked.
+<span class="nc" id="L433">            Form f = getComponentForm();</span>
+<span class="nc bnc" id="L434" title="All 4 branches missed.">            if (f != null &amp;&amp; !f.isEnableCursors()) {</span>
+<span class="nc" id="L435">                f.setEnableCursors(true);</span>
+            }
+        }
+<span class="fc" id="L438">    }</span>
+
+    void stopFling() {
+<span class="fc" id="L441">        flingX = null;</span>
+<span class="fc" id="L442">        flingY = null;</span>
+<span class="fc" id="L443">    }</span>
+
+    private void animateNow() {
+<span class="fc bfc" id="L446" title="All 2 branches covered.">        if (!registered) {</span>
+<span class="fc" id="L447">            Form f = getComponentForm();</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="fc" id="L449">                f.registerAnimated(this);</span>
+<span class="fc" id="L450">                registered = true;</span>
+            }
+        }
+<span class="fc" id="L453">    }</span>
+
+    /// Asks for `animate` to be called on the next frames, for a subclass
+    /// with a motion of its own.
+    void requestAnimation() {
+<span class="fc" id="L458">        animateNow();</span>
+<span class="fc" id="L459">    }</span>
+
+    /// Whether the subclass still has something moving. Called every frame
+    /// while the surface animates.
+    boolean animateSurface() {
+<span class="fc" id="L464">        return false;</span>
+    }
+
+    @Override
+    public boolean animate() {
+<span class="fc" id="L469">        boolean busy = false;</span>
+<span class="fc" id="L470">        int nx = offX;</span>
+<span class="fc" id="L471">        int ny = offY;</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">        if (flingX != null) {</span>
+<span class="nc" id="L473">            nx = flingX.getValue();</span>
+<span class="nc bnc" id="L474" title="All 2 branches missed.">            if (flingX.isFinished()) {</span>
+<span class="nc" id="L475">                flingX = null;</span>
+            }
+<span class="nc" id="L477">            busy = true;</span>
+        }
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">        if (flingY != null) {</span>
+<span class="nc" id="L480">            ny = flingY.getValue();</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">            if (flingY.isFinished()) {</span>
+<span class="nc" id="L482">                flingY = null;</span>
+            }
+<span class="nc" id="L484">            busy = true;</span>
+        }
+<span class="pc bpc" id="L486" title="5 of 6 branches missed.">        if (gesture == EDIT &amp;&amp; (autoX != 0 || autoY != 0)) {</span>
+<span class="nc" id="L487">            nx += autoX;</span>
+<span class="nc" id="L488">            ny += autoY;</span>
+<span class="nc" id="L489">            busy = true;</span>
+        }
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">        if (busy) {</span>
+<span class="nc" id="L492">            int bx = offX;</span>
+<span class="nc" id="L493">            int by = offY;</span>
+<span class="nc" id="L494">            scrollTo(nx, ny);</span>
+<span class="nc bnc" id="L495" title="All 6 branches missed.">            if (gesture == EDIT &amp;&amp; (bx != offX || by != offY)) {</span>
+<span class="nc" id="L496">                editDragged(lastX, lastY);</span>
+            }
+        }
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        if (animateSurface()) {</span>
+<span class="fc" id="L500">            busy = true;</span>
+        }
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        if (feedbackBusy()) {</span>
+<span class="fc" id="L503">            busy = true;</span>
+<span class="fc" id="L504">            repaint();</span>
+        }
+<span class="pc bpc" id="L506" title="1 of 4 branches missed.">        if (!busy &amp;&amp; registered) {</span>
+<span class="fc" id="L507">            Form f = getComponentForm();</span>
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="fc" id="L509">                f.deregisterAnimated(this);</span>
+            }
+<span class="fc" id="L511">            registered = false;</span>
+        }
+<span class="fc" id="L513">        return busy;</span>
+    }
+
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L518">        stopFling();</span>
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">        if (gesture == EDIT) {</span>
+            // Taken off the form in the middle of a drag: nothing is
+            // committed, and the view does not keep drawing what was dragged.
+<span class="nc" id="L522">            endEdit(false);</span>
+        }
+<span class="fc" id="L524">        gesture = NONE;</span>
+<span class="fc" id="L525">        pressed = false;</span>
+<span class="fc" id="L526">        still = false;</span>
+<span class="fc" id="L527">        pinching = false;</span>
+<span class="fc" id="L528">        pinchBase = 0;</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        if (registered) {</span>
+<span class="fc" id="L530">            Form f = getComponentForm();</span>
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="fc" id="L532">                f.deregisterAnimated(this);</span>
+            }
+<span class="fc" id="L534">            registered = false;</span>
+        }
+<span class="fc" id="L536">        super.deinitialize();</span>
+<span class="fc" id="L537">    }</span>
+
+    // -------------------------------------------------------------- paint
+
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L543">        layoutNow();</span>
+<span class="fc" id="L544">        int x0 = getX();</span>
+<span class="fc" id="L545">        int y0 = getY();</span>
+<span class="fc" id="L546">        int cx = g.getClipX();</span>
+<span class="fc" id="L547">        int cy = g.getClipY();</span>
+<span class="fc" id="L548">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L549">        int ch = g.getClipHeight();</span>
+<span class="fc" id="L550">        int bx = x0 + headerW;</span>
+<span class="fc" id="L551">        int by = y0 + headerH;</span>
+<span class="fc" id="L552">        int bw = bodyWidth();</span>
+<span class="fc" id="L553">        int bh = bodyHeight();</span>
+<span class="fc" id="L554">        g.clipRect(bx, by, bw, bh);</span>
+<span class="fc" id="L555">        paintBody(g, bx - offX, by - offY);</span>
+<span class="fc" id="L556">        g.setClip(cx, cy, cw, ch);</span>
+<span class="fc bfc" id="L557" title="All 2 branches covered.">        if (headerH &gt; 0) {</span>
+<span class="fc" id="L558">            g.clipRect(bx, y0, bw, headerH);</span>
+<span class="fc" id="L559">            paintTopHeader(g, bx - offX, y0);</span>
+<span class="fc" id="L560">            g.setClip(cx, cy, cw, ch);</span>
+        }
+<span class="fc bfc" id="L562" title="All 2 branches covered.">        if (headerW &gt; 0) {</span>
+<span class="fc" id="L563">            g.clipRect(x0, by, headerW, bh);</span>
+<span class="fc" id="L564">            paintLeftHeader(g, x0, by - offY);</span>
+<span class="fc" id="L565">            g.setClip(cx, cy, cw, ch);</span>
+        }
+<span class="pc bpc" id="L567" title="1 of 4 branches missed.">        if (headerW &gt; 0 &amp;&amp; headerH &gt; 0) {</span>
+<span class="fc" id="L568">            g.clipRect(x0, y0, headerW, headerH);</span>
+<span class="fc" id="L569">            paintCorner(g, x0, y0);</span>
+<span class="fc" id="L570">            g.setClip(cx, cy, cw, ch);</span>
+        }
+<span class="fc" id="L572">        g.clipRect(x0, y0, getWidth(), getHeight());</span>
+<span class="fc" id="L573">        paintOverlay(g, x0, y0);</span>
+<span class="fc" id="L574">        g.setClip(cx, cy, cw, ch);</span>
+<span class="fc" id="L575">    }</span>
+
+    // -------------------------------------------------------------- pages
+
+    /// How the content divides into pages of `w` by `h` pixels, headers
+    /// included on each: columns of pages, rows of pages, and the width and
+    /// height of content one page holds.
+    ///
+    /// The view is laid out at the page's size for the count, as it is for
+    /// the painting, and put back as it was.
+    int[] pageGrid(int w, int h) {
+<span class="fc" id="L586">        int ow = getWidth();</span>
+<span class="fc" id="L587">        int oh = getHeight();</span>
+<span class="fc" id="L588">        int sx = offX;</span>
+<span class="fc" id="L589">        int sy = offY;</span>
+<span class="fc" id="L590">        double[] zoom = saveZoom();</span>
+<span class="fc" id="L591">        setWidth(w);</span>
+<span class="fc" id="L592">        setHeight(h);</span>
+        try {
+<span class="fc" id="L594">            prepare(w, h);</span>
+<span class="fc" id="L595">            int bw = Math.max(1, bodyWidth());</span>
+<span class="fc" id="L596">            int bh = Math.max(1, pageStep(bodyHeight()));</span>
+<span class="fc" id="L597">            int across = Math.max(1, (contentWidth() + bw - 1) / bw);</span>
+<span class="fc" id="L598">            int down = Math.max(1, (contentHeight() + bh - 1) / bh);</span>
+<span class="fc" id="L599">            return new int[]{across, down, bw, bh};</span>
+        } finally {
+<span class="fc" id="L601">            setWidth(ow);</span>
+<span class="fc" id="L602">            setHeight(oh);</span>
+<span class="fc" id="L603">            backToScreen(ow, oh, zoom);</span>
+<span class="fc" id="L604">            offX = sx;</span>
+<span class="fc" id="L605">            offY = sy;</span>
+        }
+    }
+
+    /// The zoom a layout at another size may change: a view holds its scale
+    /// inside limits that depend on the room it has, so laying it out for a
+    /// page can move the scale, and laying it out for the screen again does
+    /// not move it back. Null for a view with no zoom.
+    double[] saveZoom() {
+<span class="fc" id="L614">        return null;</span>
+    }
+
+    /// How far down a page of body height `bodyH` goes before the next one
+    /// starts. A view of rows answers a whole number of them, so that a page
+    /// does not end in the middle of one.
+    int pageStep(int bodyH) {
+<span class="fc" id="L621">        return bodyH;</span>
+    }
+
+    /// Whether this is a page being painted and not the screen.
+    boolean isPrinting() {
+<span class="fc" id="L626">        return printing;</span>
+    }
+
+    /// Puts back what `saveZoom` returned. Called with the view laid out at
+    /// its own size, so the limits are the screen's again.
+    void restoreZoom(double[] saved) {
+<span class="nc" id="L632">    }</span>
+
+    private void backToScreen(int w, int h, double[] zoom) {
+<span class="fc" id="L635">        prepare(w, h);</span>
+<span class="fc bfc" id="L636" title="All 2 branches covered.">        if (zoom != null) {</span>
+<span class="fc" id="L637">            restoreZoom(zoom);</span>
+<span class="fc" id="L638">            prepare(w, h);</span>
+        }
+<span class="fc" id="L640">    }</span>
+
+    /// Paints one page: the content from `contentX`, `contentY` on, under
+    /// the headers that belong to it, at `px`, `py` in a page of `w` by `h`.
+    ///
+    /// This is the screen's own painting at another size and another scroll
+    /// position, so what prints is what the view draws. The overlay is left
+    /// out: it holds what a drag in progress shows. The body is clipped to
+    /// the content, so the last page of a row or column ends where the
+    /// content does and is not filled out with empty grid.
+    void paintPage(Graphics g, int px, int py, int w, int h, int contentX, int contentY) {
+<span class="fc" id="L651">        int ox = getX();</span>
+<span class="fc" id="L652">        int oy = getY();</span>
+<span class="fc" id="L653">        int ow = getWidth();</span>
+<span class="fc" id="L654">        int oh = getHeight();</span>
+<span class="fc" id="L655">        int sx = offX;</span>
+<span class="fc" id="L656">        int sy = offY;</span>
+<span class="fc" id="L657">        int cx = g.getClipX();</span>
+<span class="fc" id="L658">        int cy = g.getClipY();</span>
+<span class="fc" id="L659">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L660">        int ch = g.getClipHeight();</span>
+<span class="fc" id="L661">        double[] zoom = saveZoom();</span>
+<span class="fc" id="L662">        setX(px);</span>
+<span class="fc" id="L663">        setY(py);</span>
+<span class="fc" id="L664">        setWidth(w);</span>
+<span class="fc" id="L665">        setHeight(h);</span>
+<span class="fc" id="L666">        printing = true;</span>
+        try {
+<span class="fc" id="L668">            prepare(w, h);</span>
+<span class="fc" id="L669">            offX = contentX;</span>
+<span class="fc" id="L670">            offY = contentY;</span>
+<span class="fc" id="L671">            int bx = px + headerW;</span>
+<span class="fc" id="L672">            int by = py + headerH;</span>
+<span class="fc" id="L673">            int bw = Math.min(bodyWidth(), Math.max(0, contentWidth() - contentX));</span>
+<span class="fc" id="L674">            int bh = Math.min(pageStep(bodyHeight()), Math.max(0, contentHeight() - contentY));</span>
+<span class="fc" id="L675">            g.clipRect(bx, by, bw, bh);</span>
+<span class="fc" id="L676">            paintBody(g, bx - contentX, by - contentY);</span>
+<span class="fc" id="L677">            g.setClip(cx, cy, cw, ch);</span>
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">            if (headerH &gt; 0) {</span>
+<span class="fc" id="L679">                g.clipRect(bx, py, bw, headerH);</span>
+<span class="fc" id="L680">                paintTopHeader(g, bx - contentX, py);</span>
+<span class="fc" id="L681">                g.setClip(cx, cy, cw, ch);</span>
+            }
+<span class="fc bfc" id="L683" title="All 2 branches covered.">            if (headerW &gt; 0) {</span>
+<span class="fc" id="L684">                g.clipRect(px, by, headerW, bh);</span>
+<span class="fc" id="L685">                paintLeftHeader(g, px, by - contentY);</span>
+<span class="fc" id="L686">                g.setClip(cx, cy, cw, ch);</span>
+            }
+<span class="pc bpc" id="L688" title="1 of 4 branches missed.">            if (headerW &gt; 0 &amp;&amp; headerH &gt; 0) {</span>
+<span class="fc" id="L689">                g.clipRect(px, py, headerW, headerH);</span>
+<span class="fc" id="L690">                paintCorner(g, px, py);</span>
+<span class="fc" id="L691">                g.setClip(cx, cy, cw, ch);</span>
+            }
+        } finally {
+<span class="fc" id="L694">            printing = false;</span>
+<span class="fc" id="L695">            g.setClip(cx, cy, cw, ch);</span>
+<span class="fc" id="L696">            setX(ox);</span>
+<span class="fc" id="L697">            setY(oy);</span>
+<span class="fc" id="L698">            setWidth(ow);</span>
+<span class="fc" id="L699">            setHeight(oh);</span>
+<span class="fc" id="L700">            backToScreen(ow, oh, zoom);</span>
+<span class="fc" id="L701">            offX = sx;</span>
+<span class="fc" id="L702">            offY = sy;</span>
+        }
+<span class="fc" id="L704">    }</span>
+
+    @Override
+    protected Dimension calcPreferredSize() {
+        // A view is given its size by the layout around it; this is what it
+        // asks for when nothing constrains it.
+<span class="nc" id="L710">        return new Dimension(Look.mm(60), Look.mm(60));</span>
+    }
+
+    // ------------------------------------------------------------ pointer
+
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="fc" id="L717">        super.pointerPressed(x, y);</span>
+<span class="pc bpc" id="L718" title="1 of 2 branches missed.">        if (gesture == EDIT) {</span>
+            // The release of the last drag went somewhere else: a listener
+            // showed a dialog over this while it was held.
+<span class="nc" id="L721">            endEdit(false);</span>
+        }
+        // A pinch whose end went elsewhere is over as well.
+<span class="fc" id="L724">        pinching = false;</span>
+<span class="fc" id="L725">        pinchBase = 0;</span>
+<span class="fc" id="L726">        still = false;</span>
+<span class="fc" id="L727">        layoutNow();</span>
+<span class="fc" id="L728">        stopFling();</span>
+<span class="fc" id="L729">        pressed = true;</span>
+<span class="fc" id="L730">        gesture = NONE;</span>
+<span class="fc" id="L731">        autoX = 0;</span>
+<span class="fc" id="L732">        autoY = 0;</span>
+<span class="fc" id="L733">        pressX = x - getAbsoluteX();</span>
+<span class="fc" id="L734">        pressY = y - getAbsoluteY();</span>
+<span class="fc" id="L735">        lastX = pressX;</span>
+<span class="fc" id="L736">        lastY = pressY;</span>
+<span class="fc" id="L737">    }</span>
+
+    @Override
+    public void pointerDragged(int x, int y) {
+<span class="pc bpc" id="L741" title="2 of 4 branches missed.">        if (!pressed || pinching) {</span>
+<span class="nc" id="L742">            return;</span>
+        }
+<span class="fc" id="L744">        int lx = x - getAbsoluteX();</span>
+<span class="fc" id="L745">        int ly = y - getAbsoluteY();</span>
+<span class="fc bfc" id="L746" title="All 2 branches covered.">        if (gesture == NONE) {</span>
+<span class="fc" id="L747">            int slop = Look.mm(1.5f);</span>
+<span class="pc bpc" id="L748" title="1 of 4 branches missed.">            if (Math.abs(lx - pressX) &lt; slop &amp;&amp; Math.abs(ly - pressY) &lt; slop) {</span>
+<span class="nc" id="L749">                return;</span>
+            }
+<span class="pc bpc" id="L751" title="1 of 4 branches missed.">            gesture = beginEdit(pressX, pressY, !dragEdits) ? EDIT : PAN;</span>
+<span class="fc bfc" id="L752" title="All 2 branches covered.">            if (gesture == EDIT) {</span>
+<span class="fc" id="L753">                liftSince = tick();</span>
+<span class="fc" id="L754">                requestAnimation();</span>
+            }
+        }
+<span class="fc bfc" id="L757" title="All 2 branches covered.">        if (gesture == EDIT) {</span>
+<span class="fc" id="L758">            editDragged(lx, ly);</span>
+<span class="fc" id="L759">            autoScroll(lx, ly);</span>
+<span class="fc" id="L760">            repaint();</span>
+        } else {
+<span class="fc" id="L762">            scrollTo(offX - (lx - lastX), offY - (ly - lastY));</span>
+        }
+<span class="fc" id="L764">        lastX = lx;</span>
+<span class="fc" id="L765">        lastY = ly;</span>
+<span class="fc" id="L766">    }</span>
+
+    @Override
+    public void longPointerPress(int x, int y) {
+<span class="nc bnc" id="L770" title="All 4 branches missed.">        if (!pressed || gesture != NONE) {</span>
+<span class="nc" id="L771">            return;</span>
+        }
+<span class="nc" id="L773">        int lx = x - getAbsoluteX();</span>
+<span class="nc" id="L774">        int ly = y - getAbsoluteY();</span>
+<span class="nc bnc" id="L775" title="All 2 branches missed.">        if (beginEdit(lx, ly, false)) {</span>
+<span class="nc" id="L776">            gesture = EDIT;</span>
+<span class="nc" id="L777">            liftSince = tick();</span>
+<span class="nc" id="L778">            requestAnimation();</span>
+<span class="nc" id="L779">            lastX = lx;</span>
+<span class="nc" id="L780">            lastY = ly;</span>
+<span class="nc" id="L781">            editDragged(lx, ly);</span>
+<span class="nc" id="L782">            repaint();</span>
+        } else {
+            // A press this long is not a tap, whatever follows.
+<span class="nc" id="L785">            gesture = PAN;</span>
+<span class="nc" id="L786">            longPressed(lx, ly);</span>
+        }
+<span class="nc" id="L788">    }</span>
+
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc" id="L792">        super.pointerReleased(x, y);</span>
+<span class="pc bpc" id="L793" title="1 of 2 branches missed.">        if (!pressed) {</span>
+<span class="nc" id="L794">            return;</span>
+        }
+<span class="fc" id="L796">        pressed = false;</span>
+<span class="fc" id="L797">        pinching = false;</span>
+<span class="fc" id="L798">        pinchBase = 0;</span>
+<span class="fc" id="L799">        autoX = 0;</span>
+<span class="fc" id="L800">        autoY = 0;</span>
+<span class="fc" id="L801">        int g = gesture;</span>
+<span class="fc" id="L802">        gesture = NONE;</span>
+<span class="fc" id="L803">        boolean rest = still;</span>
+<span class="fc" id="L804">        still = false;</span>
+<span class="fc bfc" id="L805" title="All 2 branches covered.">        if (g == EDIT) {</span>
+<span class="fc" id="L806">            endEdit(true);</span>
+<span class="fc" id="L807">            repaint();</span>
+<span class="fc bfc" id="L808" title="All 2 branches covered.">        } else if (g == PAN) {</span>
+            // A pinch or a cancelled edit ends where it is: the speed of the
+            // finger was not a scroll.
+<span class="fc bfc" id="L811" title="All 2 branches covered.">            if (!rest) {</span>
+<span class="fc" id="L812">                fling();</span>
+            }
+        } else {
+<span class="fc" id="L815">            int lx = x - getAbsoluteX();</span>
+<span class="fc" id="L816">            int ly = y - getAbsoluteY();</span>
+<span class="fc" id="L817">            long now = System.currentTimeMillis();</span>
+<span class="fc" id="L818">            int near = Look.mm(4);</span>
+<span class="pc bpc" id="L819" title="1 of 4 branches missed.">            boolean twice = now - lastTapTime &lt; DOUBLE_TAP_MS &amp;&amp; Math.abs(lx - lastTapX) &lt; near</span>
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">                    &amp;&amp; Math.abs(ly - lastTapY) &lt; near;</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">            lastTapTime = twice ? 0 : now;</span>
+<span class="fc" id="L822">            lastTapX = lx;</span>
+<span class="fc" id="L823">            lastTapY = ly;</span>
+<span class="fc" id="L824">            tapped(lx, ly, twice);</span>
+        }
+<span class="fc" id="L826">    }</span>
+
+    /// Cancels an edit in progress, as Escape does.
+    void cancelEdit() {
+<span class="fc bfc" id="L830" title="All 2 branches covered.">        if (gesture == EDIT) {</span>
+<span class="fc" id="L831">            gesture = PAN;</span>
+<span class="fc" id="L832">            still = true;</span>
+<span class="fc" id="L833">            autoX = 0;</span>
+<span class="fc" id="L834">            autoY = 0;</span>
+<span class="fc" id="L835">            endEdit(false);</span>
+<span class="fc" id="L836">            repaint();</span>
+        }
+<span class="fc" id="L838">    }</span>
+
+    boolean isDragEditing() {
+<span class="pc bpc" id="L841" title="1 of 2 branches missed.">        return gesture == EDIT;</span>
+    }
+
+    private void fling() {
+<span class="fc" id="L845">        float vx = Display.getInstance().getDragSpeed(false);</span>
+<span class="fc" id="L846">        float vy = Display.getInstance().getDragSpeed(true);</span>
+<span class="fc" id="L847">        boolean any = false;</span>
+<span class="pc bpc" id="L848" title="3 of 4 branches missed.">        if (Math.abs(vx) &gt; 0.1f &amp;&amp; maxOffX() &gt; 0) {</span>
+<span class="nc bnc" id="L849" title="All 2 branches missed.">            flingX = Motion.createFrictionMotion(offX, vx &lt; 0 ? 0 : maxOffX(), vx, 0.0007f);</span>
+<span class="nc" id="L850">            flingX.start();</span>
+<span class="nc" id="L851">            any = true;</span>
+        }
+<span class="pc bpc" id="L853" title="3 of 4 branches missed.">        if (Math.abs(vy) &gt; 0.1f &amp;&amp; maxOffY() &gt; 0) {</span>
+<span class="nc bnc" id="L854" title="All 2 branches missed.">            flingY = Motion.createFrictionMotion(offY, vy &lt; 0 ? 0 : maxOffY(), vy, 0.0007f);</span>
+<span class="nc" id="L855">            flingY.start();</span>
+<span class="nc" id="L856">            any = true;</span>
+        }
+<span class="pc bpc" id="L858" title="1 of 2 branches missed.">        if (any) {</span>
+<span class="nc" id="L859">            animateNow();</span>
+        }
+<span class="fc" id="L861">    }</span>
+
+    // While an edit is dragged near an edge the surface scrolls under it, and
+    // faster the nearer the edge.
+    private void autoScroll(int lx, int ly) {
+<span class="fc" id="L866">        int band = Look.mm(6);</span>
+<span class="fc" id="L867">        int step = Look.mm(2.5f);</span>
+<span class="fc" id="L868">        autoX = edgeSpeed(lx, headerW, getWidth(), band, step);</span>
+<span class="fc" id="L869">        autoY = edgeSpeed(ly, headerH, getHeight(), band, step);</span>
+<span class="fc bfc" id="L870" title="All 4 branches covered.">        if (autoX != 0 || autoY != 0) {</span>
+<span class="fc" id="L871">            animateNow();</span>
+        }
+<span class="fc" id="L873">    }</span>
+
+    private static int edgeSpeed(int p, int from, int to, int band, int step) {
+<span class="fc bfc" id="L876" title="All 2 branches covered.">        if (p &lt; from + band) {</span>
+<span class="fc" id="L877">            return -step * Math.min(band, from + band - p) / band;</span>
+        }
+<span class="pc bpc" id="L879" title="1 of 2 branches missed.">        if (p &gt; to - band) {</span>
+<span class="nc" id="L880">            return step * Math.min(band, p - (to - band)) / band;</span>
+        }
+<span class="fc" id="L882">        return 0;</span>
+    }
+
+    @Override
+    protected boolean mouseWheel(WheelEvent ev) {
+<span class="nc" id="L887">        layoutNow();</span>
+<span class="nc bnc" id="L888" title="All 4 branches missed.">        if (ev.isControlDown() || ev.isMetaDown()) {</span>
+<span class="nc bnc" id="L889" title="All 2 branches missed.">            int d = ev.getDeltaY() != 0 ? ev.getDeltaY() : ev.getDeltaX();</span>
+<span class="nc bnc" id="L890" title="All 6 branches missed.">            if (d != 0 &amp;&amp; zoomBy(d &lt; 0 ? 1.15f : 1 / 1.15f, ev.getX() - getAbsoluteX(), ev.getY() - getAbsoluteY())) {</span>
+<span class="nc" id="L891">                return true;</span>
+            }
+        }
+<span class="nc" id="L894">        int dx = ev.getDeltaX();</span>
+<span class="nc" id="L895">        int dy = ev.getDeltaY();</span>
+<span class="nc bnc" id="L896" title="All 4 branches missed.">        if (ev.isShiftDown() &amp;&amp; dx == 0) {</span>
+<span class="nc" id="L897">            dx = dy;</span>
+<span class="nc" id="L898">            dy = 0;</span>
+        }
+<span class="nc" id="L900">        int bx = offX;</span>
+<span class="nc" id="L901">        int by = offY;</span>
+<span class="nc" id="L902">        stopFling();</span>
+<span class="nc" id="L903">        scrollTo(offX + dx, offY + dy);</span>
+        // An event that moved nothing is left for whatever is around this.
+<span class="nc bnc" id="L905" title="All 4 branches missed.">        return bx != offX || by != offY;</span>
+    }
+
+    private float pinchBase;
+    // The gesture under way ends without a fling.
+    private boolean still;
+    private boolean printing;
+
+    @Override
+    protected boolean pinch(float scale) {
+        // The scale is the fingers' distance over what it was when the pinch
+        // began, so every call is applied as the change since the last one.
+<span class="nc bnc" id="L917" title="All 2 branches missed.">        if (pinchBase &lt;= 0) {</span>
+<span class="nc" id="L918">            pinchBase = 1f;</span>
+        }
+<span class="nc" id="L920">        float step = scale / pinchBase;</span>
+<span class="nc bnc" id="L921" title="All 2 branches missed.">        if (zoomBy(step, lastX, lastY)) {</span>
+<span class="nc" id="L922">            pinchBase = scale;</span>
+<span class="nc" id="L923">            pinching = true;</span>
+<span class="nc bnc" id="L924" title="All 2 branches missed.">            if (gesture == EDIT) {</span>
+                // A second finger on a drag makes it a zoom; the drag is
+                // dropped, not left half made.
+<span class="nc" id="L927">                autoX = 0;</span>
+<span class="nc" id="L928">                autoY = 0;</span>
+<span class="nc" id="L929">                endEdit(false);</span>
+            }
+<span class="nc" id="L931">            gesture = PAN;</span>
+<span class="nc" id="L932">            still = true;</span>
+<span class="nc" id="L933">            return true;</span>
+        }
+<span class="nc" id="L935">        return false;</span>
+    }
+
+    @Override
+    protected void pinchReleased(int x, int y) {
+<span class="nc" id="L940">        pinchBase = 0;</span>
+<span class="nc" id="L941">        pinching = false;</span>
+<span class="nc" id="L942">    }</span>
+
+    @Override
+    protected boolean shouldBlockSideSwipe() {
+<span class="nc" id="L946">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

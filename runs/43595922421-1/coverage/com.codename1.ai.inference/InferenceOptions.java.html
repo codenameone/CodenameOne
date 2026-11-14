@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InferenceOptions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.inference</a> &gt; <span class="el_source">InferenceOptions.java</span></div><h1>InferenceOptions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.inference;
+
+/// Configures how a reusable {@link InferenceSession} is created.
+///
+/// Accelerator requests are portable preferences rather than promises.
+/// With fallback enabled, a backend may execute on CPU when the requested
+/// delegate is unavailable. With fallback disabled, opening the session
+/// fails instead of silently changing the execution target. Android's NNAPI
+/// runtime can mix NPU and CPU operations without reporting full delegation,
+/// and the iOS Core ML delegate can schedule work across the Neural Engine,
+/// GPU, and CPU. Both mobile backends therefore reject
+/// {@link Accelerator#NPU} when fallback is disabled. iOS also rejects strict
+/// {@link Accelerator#CORE_ML} sessions because the delegate does not report
+/// whether unsupported model operations remained on LiteRT's CPU path.
+<span class="fc" id="L37">public final class InferenceOptions {</span>
+    /// Execution targets understood by the portable inference API.
+<span class="fc" id="L39">    public enum Accelerator {</span>
+<span class="fc" id="L40">        AUTO, CPU, GPU, NPU, CORE_ML</span>
+    }
+
+<span class="fc" id="L43">    private Accelerator accelerator = Accelerator.AUTO;</span>
+    private int threads;
+<span class="fc" id="L45">    private boolean allowFallback = true;</span>
+
+    /// Requests an execution target for the model.
+    ///
+    /// @param value requested target; {@code null} restores {@link Accelerator#AUTO}
+    /// @return this options object
+    public InferenceOptions accelerator(Accelerator value) {
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        accelerator = value == null ? Accelerator.AUTO : value;</span>
+<span class="fc" id="L53">        return this;</span>
+    }
+
+    /// Sets the CPU worker count. Non-positive values let the native runtime
+    /// choose its default.
+    ///
+    /// @param value requested worker count
+    /// @return this options object
+    public InferenceOptions threads(int value) {
+<span class="fc" id="L62">        threads = Math.max(0, value);</span>
+<span class="fc" id="L63">        return this;</span>
+    }
+
+    /// Controls whether opening may fall back from an unavailable accelerator
+    /// to CPU execution.
+    ///
+    /// On Android and iOS, setting this to {@code false} with
+    /// {@link Accelerator#NPU} rejects session creation. On iOS it also
+    /// rejects {@link Accelerator#CORE_ML}. Neither LiteRT's NNAPI delegate
+    /// nor its Core ML delegate can prove that every operation ran on the
+    /// requested accelerator instead of CPU or another processor.
+    ///
+    /// @param value {@code true} to permit CPU fallback
+    /// @return this options object
+    public InferenceOptions allowFallback(boolean value) {
+<span class="fc" id="L78">        allowFallback = value;</span>
+<span class="fc" id="L79">        return this;</span>
+    }
+
+    /// @return the requested accelerator, never {@code null}
+    public Accelerator getAccelerator() {
+<span class="fc" id="L84">        return accelerator;</span>
+    }
+
+    /// @return the requested CPU worker count, or a non-positive runtime default
+    public int getThreads() {
+<span class="fc" id="L89">        return threads;</span>
+    }
+
+    /// @return whether an unavailable accelerator may fall back to CPU
+    public boolean isFallbackAllowed() {
+<span class="fc" id="L94">        return allowFallback;</span>
+    }
+
+    InferenceOptions snapshot() {
+<span class="fc" id="L98">        return new InferenceOptions()</span>
+<span class="fc" id="L99">                .accelerator(accelerator)</span>
+<span class="fc" id="L100">                .threads(threads)</span>
+<span class="fc" id="L101">                .allowFallback(allowFallback);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

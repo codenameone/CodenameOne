@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolanaMessage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.solana</a> &gt; <span class="el_source">SolanaMessage.java</span></div><h1>SolanaMessage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.solana;
+
+import com.codename1.crypto.encoding.Base58;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// The part of a transaction that is signed: the accounts, a recent blockhash and the
+/// compiled instructions. Both wire versions are read and written: the legacy format and v0.
+/// [#compile] orders accounts the way the Solana SDK does: the fee payer first, then the
+/// writable signers, the read-only signers, the writable and the read-only non-signers, each
+/// group in order of first appearance, with every program after the accounts named before it.
+///
+/// A v0 message read from the wire may name accounts through address lookup tables; those
+/// are kept as they are so the message re-serializes unchanged, but only its static keys can be
+/// resolved here.
+@com.codename1.impl.SharedWithBackend
+public final class SolanaMessage {
+    /// The version of a legacy message.
+    public static final int LEGACY = -1;
+
+    private final int version;
+    private final int numRequiredSignatures;
+    private final int numReadonlySigned;
+    private final int numReadonlyUnsigned;
+    private final List&lt;SolanaAddress&gt; accountKeys;
+    private final byte[] recentBlockhash;
+    private final List&lt;Compiled&gt; instructions;
+    private final List&lt;Lookup&gt; lookups;
+
+    private SolanaMessage(int version, int numRequiredSignatures, int numReadonlySigned, int numReadonlyUnsigned,
+            List&lt;SolanaAddress&gt; accountKeys, byte[] recentBlockhash, List&lt;Compiled&gt; instructions,
+<span class="fc" id="L55">            List&lt;Lookup&gt; lookups) {</span>
+<span class="fc" id="L56">        this.version = version;</span>
+<span class="fc" id="L57">        this.numRequiredSignatures = numRequiredSignatures;</span>
+<span class="fc" id="L58">        this.numReadonlySigned = numReadonlySigned;</span>
+<span class="fc" id="L59">        this.numReadonlyUnsigned = numReadonlyUnsigned;</span>
+<span class="fc" id="L60">        this.accountKeys = Collections.unmodifiableList(accountKeys);</span>
+<span class="fc" id="L61">        this.recentBlockhash = recentBlockhash;</span>
+<span class="fc" id="L62">        this.instructions = instructions;</span>
+<span class="fc" id="L63">        this.lookups = lookups;</span>
+<span class="fc" id="L64">    }</span>
+
+    /// A legacy message.
+    ///
+    /// #### Parameters
+    ///
+    /// - `payer`: the fee payer, which signs
+    /// - `instructions`: the instructions, run in order
+    /// - `recentBlockhash`: a Base58 blockhash from `getLatestBlockhash`, or a durable nonce
+    public static SolanaMessage compile(SolanaAddress payer, List&lt;Instruction&gt; instructions, String recentBlockhash) {
+<span class="fc" id="L74">        return compile(LEGACY, payer, instructions, recentBlockhash);</span>
+    }
+
+    /// A v0 message with no address lookup tables.
+    public static SolanaMessage compileV0(SolanaAddress payer, List&lt;Instruction&gt; instructions,
+            String recentBlockhash) {
+<span class="fc" id="L80">        return compile(0, payer, instructions, recentBlockhash);</span>
+    }
+
+    private static SolanaMessage compile(int version, SolanaAddress payer, List&lt;Instruction&gt; instructions,
+            String recentBlockhash) {
+<span class="fc" id="L85">        byte[] hash = Base58.decode(recentBlockhash);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (hash.length != 32) {</span>
+<span class="nc" id="L87">            throw new IllegalArgumentException(&quot;a blockhash is 32 bytes&quot;);</span>
+        }
+<span class="fc" id="L89">        List&lt;SolanaAddress&gt; order = new ArrayList&lt;SolanaAddress&gt;();</span>
+<span class="fc" id="L90">        List&lt;boolean[]&gt; flags = new ArrayList&lt;boolean[]&gt;();</span>
+<span class="fc" id="L91">        note(order, flags, payer, true, true);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (Instruction ix : instructions) {</span>
+<span class="fc" id="L93">            note(order, flags, ix.getProgramId(), false, false);</span>
+<span class="fc" id="L94">            List&lt;AccountMeta&gt; metas = ix.getAccounts();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            for (AccountMeta m : metas) {</span>
+<span class="fc" id="L96">                note(order, flags, m.getAddress(), m.isSigner(), m.isWritable());</span>
+<span class="fc" id="L97">            }</span>
+<span class="fc" id="L98">        }</span>
+<span class="fc" id="L99">        List&lt;SolanaAddress&gt; keys = new ArrayList&lt;SolanaAddress&gt;();</span>
+<span class="fc" id="L100">        int[] counts = new int[4];</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (int group = 0; group &lt; 4; group++) {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            boolean signer = group &lt; 2;</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            boolean writable = group % 2 == 0;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            for (int i = 0; i &lt; order.size(); i++) {</span>
+<span class="fc" id="L105">                boolean[] f = flags.get(i);</span>
+<span class="fc bfc" id="L106" title="All 4 branches covered.">                if (f[0] == signer &amp;&amp; f[1] == writable) {</span>
+<span class="fc" id="L107">                    keys.add(order.get(i));</span>
+<span class="fc" id="L108">                    counts[group]++;</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (keys.size() &gt; 256) {</span>
+<span class="nc" id="L113">            throw new IllegalArgumentException(&quot;a message names at most 256 accounts&quot;);</span>
+        }
+<span class="fc" id="L115">        List&lt;Compiled&gt; compiled = new ArrayList&lt;Compiled&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (Instruction ix : instructions) {</span>
+<span class="fc" id="L117">            List&lt;AccountMeta&gt; metas = ix.getAccounts();</span>
+<span class="fc" id="L118">            int[] idx = new int[metas.size()];</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            for (int j = 0; j &lt; idx.length; j++) {</span>
+<span class="fc" id="L120">                idx[j] = keys.indexOf(metas.get(j).getAddress());</span>
+            }
+<span class="fc" id="L122">            compiled.add(new Compiled(keys.indexOf(ix.getProgramId()), idx, ix.rawData()));</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        return new SolanaMessage(version, counts[0] + counts[1], counts[1], counts[3], keys, hash, compiled,</span>
+                new ArrayList&lt;Lookup&gt;());
+    }
+
+    private static void note(List&lt;SolanaAddress&gt; order, List&lt;boolean[]&gt; flags, SolanaAddress a, boolean signer,
+            boolean writable) {
+<span class="fc" id="L130">        int i = order.indexOf(a);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (i &lt; 0) {</span>
+<span class="fc" id="L132">            order.add(a);</span>
+<span class="fc" id="L133">            flags.add(new boolean[] {signer, writable});</span>
+        } else {
+<span class="fc" id="L135">            boolean[] f = flags.get(i);</span>
+<span class="fc" id="L136">            f[0] |= signer;</span>
+<span class="fc" id="L137">            f[1] |= writable;</span>
+        }
+<span class="fc" id="L139">    }</span>
+
+    /// The wire form, the bytes every signer signs.
+    public byte[] serialize() {
+<span class="fc" id="L143">        ShortVec w = new ShortVec();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (version != LEGACY) {</span>
+<span class="fc" id="L145">            w.u8(0x80 | version);</span>
+        }
+<span class="fc" id="L147">        w.u8(numRequiredSignatures).u8(numReadonlySigned).u8(numReadonlyUnsigned);</span>
+<span class="fc" id="L148">        w.length(accountKeys.size());</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (SolanaAddress accountKeysItem : accountKeys) {</span>
+<span class="fc" id="L150">            w.bytes(accountKeysItem.raw());</span>
+<span class="fc" id="L151">        }</span>
+<span class="fc" id="L152">        w.bytes(recentBlockhash);</span>
+<span class="fc" id="L153">        w.length(instructions.size());</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (Compiled c : instructions) {</span>
+<span class="fc" id="L155">            w.u8(c.program).length(c.accounts.length);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            for (int account : c.accounts) {</span>
+<span class="fc" id="L157">                w.u8(account);</span>
+            }
+<span class="fc" id="L159">            w.length(c.data.length).bytes(c.data);</span>
+<span class="fc" id="L160">        }</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (version != LEGACY) {</span>
+<span class="fc" id="L162">            w.length(lookups.size());</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            for (Lookup l : lookups) {</span>
+<span class="nc" id="L164">                w.bytes(l.table);</span>
+<span class="nc" id="L165">                w.length(l.writable.length).bytes(l.writable);</span>
+<span class="nc" id="L166">                w.length(l.readonly.length).bytes(l.readonly);</span>
+<span class="nc" id="L167">            }</span>
+        }
+<span class="fc" id="L169">        return w.toBytes();</span>
+    }
+
+    /// Reads a message, legacy or v0.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for malformed data or an unknown version
+    public static SolanaMessage parse(byte[] data) {
+<span class="fc" id="L178">        ShortVec.Reader r = new ShortVec.Reader(data);</span>
+<span class="fc" id="L179">        SolanaMessage m = read(r);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (r.hasMore()) {</span>
+<span class="nc" id="L181">            throw new IllegalArgumentException(&quot;trailing data after the message&quot;);</span>
+        }
+<span class="fc" id="L183">        return m;</span>
+    }
+
+    static SolanaMessage read(ShortVec.Reader r) {
+<span class="fc" id="L187">        int version = LEGACY;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if ((r.peek() &amp; 0x80) != 0) {</span>
+<span class="fc" id="L189">            version = r.u8() &amp; 0x7f;</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (version != 0) {</span>
+<span class="nc" id="L191">                throw new IllegalArgumentException(&quot;unsupported message version &quot; + version);</span>
+            }
+        }
+<span class="fc" id="L194">        int sigs = r.u8();</span>
+<span class="fc" id="L195">        int roSigned = r.u8();</span>
+<span class="fc" id="L196">        int roUnsigned = r.u8();</span>
+<span class="fc" id="L197">        int n = r.length();</span>
+<span class="pc bpc" id="L198" title="3 of 6 branches missed.">        if (sigs &gt; n || roSigned &gt; sigs || roUnsigned &gt; n - sigs) {</span>
+<span class="nc" id="L199">            throw new IllegalArgumentException(&quot;inconsistent message header&quot;);</span>
+        }
+<span class="fc" id="L201">        List&lt;SolanaAddress&gt; keys = new ArrayList&lt;SolanaAddress&gt;();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L203">            keys.add(SolanaAddress.fromBytes(r.read(32)));</span>
+        }
+<span class="fc" id="L205">        byte[] hash = r.read(32);</span>
+<span class="fc" id="L206">        int nIx = r.length();</span>
+<span class="fc" id="L207">        List&lt;Compiled&gt; ixs = new ArrayList&lt;Compiled&gt;();</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (int i = 0; i &lt; nIx; i++) {</span>
+<span class="fc" id="L209">            int program = r.u8();</span>
+<span class="fc" id="L210">            int[] accounts = new int[r.length()];</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            for (int j = 0; j &lt; accounts.length; j++) {</span>
+<span class="fc" id="L212">                accounts[j] = r.u8();</span>
+            }
+<span class="fc" id="L214">            ixs.add(new Compiled(program, accounts, r.read(r.length())));</span>
+        }
+<span class="fc" id="L216">        List&lt;Lookup&gt; lookups = new ArrayList&lt;Lookup&gt;();</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (version != LEGACY) {</span>
+<span class="fc" id="L218">            int nl = r.length();</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            for (int i = 0; i &lt; nl; i++) {</span>
+<span class="nc" id="L220">                byte[] table = r.read(32);</span>
+<span class="nc" id="L221">                byte[] wr = r.read(r.length());</span>
+<span class="nc" id="L222">                lookups.add(new Lookup(table, wr, r.read(r.length())));</span>
+            }
+        }
+<span class="fc" id="L225">        return new SolanaMessage(version, sigs, roSigned, roUnsigned, keys, hash, ixs, lookups);</span>
+    }
+
+    /// [#LEGACY] or 0.
+    public int getVersion() {
+<span class="fc" id="L230">        return version;</span>
+    }
+
+    /// The accounts named directly in the message; signers come first.
+    public List&lt;SolanaAddress&gt; getAccountKeys() {
+<span class="fc" id="L235">        return accountKeys;</span>
+    }
+
+    /// The fee payer, the first account.
+    public SolanaAddress getFeePayer() {
+<span class="fc" id="L240">        return accountKeys.get(0);</span>
+    }
+
+    /// The Base58 recent blockhash.
+    public String getRecentBlockhash() {
+<span class="nc" id="L245">        return Base58.encode(recentBlockhash);</span>
+    }
+
+    /// How many signatures the transaction carries; the first this many accounts sign.
+    public int getNumRequiredSignatures() {
+<span class="fc" id="L250">        return numRequiredSignatures;</span>
+    }
+
+    /// Whether the account at an index signs.
+    public boolean isSigner(int index) {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        return index &lt; numRequiredSignatures;</span>
+    }
+
+    /// Whether the message marks the account at an index writable.
+    public boolean isWritable(int index) {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (index &lt; numRequiredSignatures) {</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            return index &lt; numRequiredSignatures - numReadonlySigned;</span>
+        }
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        return index &lt; accountKeys.size() - numReadonlyUnsigned;</span>
+    }
+
+    /// Whether the message loads accounts through address lookup tables.
+    public boolean hasAddressLookups() {
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        return !lookups.isEmpty();</span>
+    }
+
+    /// The instructions with their accounts resolved.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when an instruction names an account from a lookup table
+    public List&lt;Instruction&gt; getInstructions() {
+<span class="fc" id="L277">        List&lt;Instruction&gt; out = new ArrayList&lt;Instruction&gt;();</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (Compiled c : instructions) {</span>
+<span class="fc" id="L279">            List&lt;AccountMeta&gt; metas = new ArrayList&lt;AccountMeta&gt;();</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            for (int k : c.accounts) {</span>
+<span class="fc" id="L281">                metas.add(new AccountMeta(key(k), isSigner(k), isWritable(k)));</span>
+            }
+<span class="fc" id="L283">            out.add(new Instruction(key(c.program), metas, c.data));</span>
+<span class="fc" id="L284">        }</span>
+<span class="fc" id="L285">        return out;</span>
+    }
+
+    private SolanaAddress key(int index) {
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (index &gt;= accountKeys.size()) {</span>
+<span class="nc" id="L290">            throw new IllegalStateException(&quot;account &quot; + index + &quot; comes from an address lookup table&quot;);</span>
+        }
+<span class="fc" id="L292">        return accountKeys.get(index);</span>
+    }
+
+    private static final class Compiled {
+        final int program;
+        final int[] accounts;
+        final byte[] data;
+
+<span class="fc" id="L300">        Compiled(int program, int[] accounts, byte[] data) {</span>
+<span class="fc" id="L301">            this.program = program;</span>
+<span class="fc" id="L302">            this.accounts = accounts;</span>
+<span class="fc" id="L303">            this.data = data;</span>
+<span class="fc" id="L304">        }</span>
+    }
+
+    private static final class Lookup {
+        final byte[] table;
+        final byte[] writable;
+        final byte[] readonly;
+
+<span class="nc" id="L312">        Lookup(byte[] table, byte[] writable, byte[] readonly) {</span>
+<span class="nc" id="L313">            this.table = table;</span>
+<span class="nc" id="L314">            this.writable = writable;</span>
+<span class="nc" id="L315">            this.readonly = readonly;</span>
+<span class="nc" id="L316">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodeScanner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">CodeScanner.java</span></div><h1>CodeScanner.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+import com.codename1.camera.Camera;
+import com.codename1.camera.CameraInfo;
+import com.codename1.camera.CameraSession;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Toolbar;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.util.UITimer;
+import com.codename1.components.SpanLabel;
+import com.codename1.util.AsyncResource;
+
+/// A ready-made full-screen barcode and QR scanner.
+///
+/// This is the one-call entry point that {@link BarcodeScanner} deliberately
+/// is not. It shows a camera form, decodes codes from the live frames, returns
+/// the first accepted one, and restores the form the application was on. Use
+/// {@link BarcodeScanner} directly when scanning a still image or when the
+/// scanner has to look like the rest of a custom camera screen, and
+/// {@link VisionCameraView} when the preview belongs inside a form of your own.
+///
+/// ```java
+/// if (!CodeScanner.isSupported()) {
+///     ToastBar.showErrorMessage(&quot;This device cannot scan codes&quot;);
+///     return;
+/// }
+/// CodeScanner.scan().ready(code -&gt; {
+///     if (code == null) {
+///         return;                       // the user pressed back
+///     }
+///     urlField.setText(code.getValue());
+/// }).except(error -&gt; Log.e(error));
+/// ```
+///
+/// Restrict the symbologies, and reword the screen, through
+/// {@link CodeScannerOptions}:
+///
+/// ```java
+/// CodeScanner.scan(new CodeScannerOptions()
+///         .title(&quot;Boarding pass&quot;)
+///         .hint(&quot;Hold the pass flat inside the frame&quot;)
+///         .formats(BarcodeFormat.PDF417, BarcodeFormat.AZTEC))
+///     .ready(code -&gt; {
+///         if (code != null) {
+///             checkIn(code.getValue());
+///         }
+///     });
+/// ```
+///
+/// The result completes with {@code null} when the user backs out, which is
+/// how the old `CodeScanner` cn1lib's `scanCanceled()` maps onto an
+/// {@link AsyncResource}. A failure to open the camera or run the decoder
+/// arrives through {@link AsyncResource#except} instead, and closes the
+/// scanner form.
+///
+/// Referencing this class is what tells the build pipeline to package barcode
+/// scanning and the camera, exactly as referencing {@link BarcodeScanner}
+/// does. It adds no other vision model.
+///
+/// **Import the right one.** Two older classes share this simple name and this
+/// class replaces both: the {@code cn1-codescan} cn1lib's
+/// {@code com.codename1.ext.codescan.CodeScanner}, and the long-deprecated
+/// {@link com.codename1.codescan.CodeScanner} in core, whose
+/// {@code getInstance()} returns {@code null} on current targets. Make sure
+/// the import reads:
+///
+/// ```java
+/// import com.codename1.ai.vision.CodeScanner;
+/// ```
+///
+/// Migrating from either is mechanical. The cn1lib's three-method
+/// {@code ScanResult} callback becomes one asynchronous result:
+/// {@code scanCompleted} is {@link AsyncResource#ready}, {@code scanCanceled}
+/// is a {@code null} value, and {@code scanError} is
+/// {@link AsyncResource#except}.
+public final class CodeScanner {
+    private CodeScanner() {
+    }
+
+    /// Whether this device can run the scanner. This is the check to make
+    /// before offering a scan button: it covers both the camera and the
+    /// barcode backend, either of which a target may lack.
+    ///
+    /// @return {@code true} when {@link #scan()} can open a working scanner
+    public static boolean isSupported() {
+        // Camera.isSupported() only says the port has a backend; a device with
+        // no capture hardware enumerates nothing and the scan would fail
+        // immediately after this method promised it would not.
+<span class="fc bfc" id="L119" title="All 4 branches covered.">        if (!Camera.isSupported() || Camera.getCameras().length == 0) {</span>
+<span class="fc" id="L120">            return false;</span>
+        }
+<span class="fc" id="L122">        BarcodeScanner scanner = new BarcodeScanner();</span>
+        try {
+<span class="fc" id="L124">            return scanner.isSupported();</span>
+        } finally {
+<span class="fc" id="L126">            scanner.close();</span>
+        }
+    }
+
+    /// Shows the scanner with the default wording, accepting every symbology
+    /// the platform decodes.
+    ///
+    /// @return the first decoded code, or {@code null} if the user backed out
+    public static AsyncResource&lt;Barcode&gt; scan() {
+<span class="fc" id="L135">        return scan(null);</span>
+    }
+
+    /// Shows the scanner configured by {@code options}.
+    ///
+    /// @param options the scanner configuration, or {@code null} for the
+    ///        defaults
+    /// @return the first accepted code, or {@code null} if the user backed out
+    public static AsyncResource&lt;Barcode&gt; scan(CodeScannerOptions options) {
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        return new Session(options == null</span>
+<span class="fc" id="L145">                ? new CodeScannerOptions() : options).show();</span>
+    }
+
+    /// One showing of the scanner form. Holds the state that the camera view,
+    /// the back command, and the result callback all have to agree on, so that
+    /// a code arriving in the same frame the user pressed back cannot deliver
+    /// two results or restore the previous form twice.
+    private static final class Session
+            implements VisionPipelineListener&lt;Barcode[]&gt; {
+        private final CodeScannerOptions options;
+<span class="fc" id="L155">        private final AsyncResource&lt;Barcode&gt; result =</span>
+                new AsyncResource&lt;Barcode&gt;();
+        private final String[] formats;
+        private final VisionCameraView&lt;Barcode[]&gt; view;
+        private Form previous;
+        private Form scannerForm;
+        private boolean finished;
+        private UITimer focusTimer;
+        private int focusTicks;
+
+<span class="fc" id="L165">        Session(CodeScannerOptions options) {</span>
+<span class="fc" id="L166">            this.options = options;</span>
+<span class="fc" id="L167">            this.formats = options.getFormats();</span>
+<span class="fc" id="L168">            this.view = new VisionCameraView&lt;Barcode[]&gt;(</span>
+<span class="fc" id="L169">                    new BarcodeScanner(detectorOptions(options)));</span>
+<span class="fc" id="L170">            this.view.setFacing(options.getFacing());</span>
+<span class="fc" id="L171">        }</span>
+
+        /// The vision options the detector is built with: the caller's, plus
+        /// the accepted formats, so the platform detector looks for those
+        /// symbologies alone instead of every one it knows and filtering
+        /// afterwards. Formats set on the caller's own vision options win.
+        private static VisionOptions detectorOptions(CodeScannerOptions options) {
+<span class="fc" id="L178">            VisionOptions source = options.getVisionOptions();</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            VisionOptions out = source == null ? new VisionOptions() : source.snapshot();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (out.getBarcodeFormats().length == 0) {</span>
+<span class="fc" id="L181">                out.barcodeFormats(options.getFormats());</span>
+            }
+<span class="fc" id="L183">            return out;</span>
+        }
+
+        AsyncResource&lt;Barcode&gt; show() {
+            // Installed here rather than in the constructor so `this` does not
+            // escape before the session is fully built.
+<span class="fc" id="L189">            view.setListener(this);</span>
+
+<span class="fc" id="L191">            previous = Display.getInstance().getCurrent();</span>
+<span class="fc" id="L192">            scannerForm = new Form(new BorderLayout());</span>
+<span class="fc" id="L193">            Toolbar toolbar = scannerForm.getToolbar();</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (toolbar == null) {</span>
+<span class="fc" id="L195">                toolbar = new Toolbar();</span>
+<span class="fc" id="L196">                scannerForm.setToolbar(toolbar);</span>
+            }
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (options.getTitle() != null) {</span>
+<span class="fc" id="L199">                scannerForm.setTitle(options.getTitle());</span>
+            }
+<span class="fc" id="L201">            Command back = Command.create(&quot;&quot;, null,</span>
+<span class="fc" id="L202">                    new ActionListener&lt;ActionEvent&gt;() {</span>
+                        @Override
+                        public void actionPerformed(ActionEvent event) {
+<span class="fc" id="L205">                            finish(null, null);</span>
+<span class="fc" id="L206">                        }</span>
+                    });
+<span class="fc" id="L208">            toolbar.setBackCommand(back, Toolbar.BackCommandPolicy.ALWAYS);</span>
+<span class="fc" id="L209">            scannerForm.add(BorderLayout.CENTER, view);</span>
+<span class="fc" id="L210">            Container footer = buildFooter();</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (footer != null) {</span>
+<span class="fc" id="L212">                scannerForm.add(BorderLayout.SOUTH, footer);</span>
+            }
+<span class="fc" id="L214">            scannerForm.show();</span>
+            // Showing the form installs the toolbar's own menu bar, which
+            // drops a back command registered against the one the form had
+            // before. Re-register it so the Android hardware back button and
+            // the iOS edge swipe dismiss the scanner, not just the arrow.
+<span class="fc" id="L219">            scannerForm.setBackCommand(back);</span>
+<span class="fc" id="L220">            startCenterFocus();</span>
+<span class="fc" id="L221">            return result;</span>
+        }
+
+        /// Ticks of the focus timer between two focus requests.
+        private static final int REFOCUS_TICKS = 6;
+        private static final int FOCUS_TICK_MILLIS = 500;
+
+        /// Keeps the lens focused where the user aims the code: the center.
+        /// Continuous auto focus settles on whatever has the most contrast in
+        /// the whole field, which for a small, dense code held close (a PDF417
+        /// on a document) is often the table behind it, and a code out of
+        /// focus never decodes. So the scanner asks for focus at the center as
+        /// soon as the camera is open, and again every three seconds until a
+        /// code is read: each request ends in the camera's own continuous mode
+        /// again, so moving the phone is still followed between requests.
+        private void startCenterFocus() {
+<span class="fc" id="L237">            focusTimer = UITimer.timer(FOCUS_TICK_MILLIS, true, scannerForm,</span>
+<span class="fc" id="L238">                    new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                            if (finished) {</span>
+<span class="nc" id="L242">                                return;</span>
+                            }
+<span class="fc" id="L244">                            CameraSession session = view.getSession(); //NOPMD CloseResource - borrowed from the view, which owns and closes it</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                            if (session == null) {</span>
+<span class="nc" id="L246">                                return;</span>
+                            }
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                            if (focusTicks % REFOCUS_TICKS == 0) {</span>
+<span class="fc" id="L249">                                session.focus(0.5f, 0.5f);</span>
+                            }
+<span class="fc" id="L251">                            focusTicks++;</span>
+<span class="fc" id="L252">                        }</span>
+                    });
+<span class="fc" id="L254">        }</span>
+
+        private Container buildFooter() {
+<span class="fc" id="L257">            Container footer = new Container(new BorderLayout());</span>
+            // The footer sits on the bottom edge, which the system navigation
+            // bar (Android) or the home indicator (iOS) draws over on an
+            // edge-to-edge display. Without this the torch button is under
+            // the bar and cannot be tapped.
+<span class="fc" id="L262">            footer.setSafeArea(true);</span>
+<span class="fc" id="L263">            boolean populated = false;</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            if (options.getHint() != null) {</span>
+<span class="fc" id="L265">                footer.add(BorderLayout.CENTER, new SpanLabel(options.getHint()));</span>
+<span class="fc" id="L266">                populated = true;</span>
+            }
+<span class="pc bpc" id="L268" title="2 of 4 branches missed.">            if (options.isTorchButton() &amp;&amp; hasFlash()) {</span>
+<span class="fc" id="L269">                final Button torch = new Button(&quot;&quot;);</span>
+<span class="fc" id="L270">                FontImage.setMaterialIcon(torch, FontImage.MATERIAL_FLASH_ON);</span>
+<span class="fc" id="L271">                torch.addActionListener(new ActionListener() {</span>
+                    private boolean on;
+
+                    @Override
+                    public void actionPerformed(ActionEvent event) {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                        on = !on;</span>
+<span class="nc" id="L277">                        view.setTorchEnabled(on);</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                        FontImage.setMaterialIcon(torch, on</span>
+                                ? FontImage.MATERIAL_FLASH_OFF
+                                : FontImage.MATERIAL_FLASH_ON);
+<span class="nc" id="L281">                    }</span>
+                });
+<span class="fc" id="L283">                footer.add(BorderLayout.EAST,</span>
+<span class="fc" id="L284">                        FlowLayout.encloseCenterMiddle(torch));</span>
+<span class="fc" id="L285">                populated = true;</span>
+            }
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">            return populated ? footer : null;</span>
+        }
+
+        /// Whether the camera this scan will open has a flash. Asked of the
+        /// enumerated camera rather than the open session, because the footer
+        /// is built before the form is shown and the session does not exist
+        /// yet.
+        ///
+        /// @return {@code true} when a torch toggle is worth offering
+        private boolean hasFlash() {
+<span class="fc" id="L297">            CameraInfo info = Camera.getDefault(options.getFacing());</span>
+<span class="pc bpc" id="L298" title="2 of 4 branches missed.">            return info != null &amp;&amp; info.hasFlash();</span>
+        }
+
+        @Override
+        public void result(Barcode[] codes, VisionImage source) {
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            if (codes == null) {</span>
+<span class="nc" id="L304">                return;</span>
+            }
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            for (Barcode code : codes) {</span>
+<span class="pc bpc" id="L307" title="2 of 4 branches missed.">                if (code != null &amp;&amp; code.getValue() != null</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">                        &amp;&amp; BarcodeFormat.matches(code, formats)) {</span>
+<span class="fc" id="L309">                    finish(code, null);</span>
+<span class="fc" id="L310">                    return;</span>
+                }
+            }
+<span class="fc" id="L313">        }</span>
+
+        @Override
+        public void error(Throwable error) {
+<span class="fc" id="L317">            finish(null, error);</span>
+<span class="fc" id="L318">        }</span>
+
+        private void finish(Barcode code, Throwable error) {
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            if (finished) {</span>
+<span class="nc" id="L322">                return;</span>
+            }
+<span class="fc" id="L324">            finished = true;</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            if (focusTimer != null) {</span>
+<span class="fc" id="L326">                focusTimer.cancel();</span>
+<span class="fc" id="L327">                focusTimer = null;</span>
+            }
+<span class="fc" id="L329">            view.close();</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            if (previous != null) {</span>
+<span class="fc" id="L331">                previous.showBack();</span>
+            }
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            if (error != null) {</span>
+<span class="fc" id="L334">                result.error(error);</span>
+            } else {
+<span class="fc" id="L336">                result.complete(code);</span>
+            }
+<span class="fc" id="L338">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

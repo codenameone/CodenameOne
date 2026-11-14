@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Hkdf.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Hkdf.java</span></div><h1>Hkdf.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// HMAC-based key derivation (HKDF), per RFC 5869.
+///
+/// HKDF turns input keying material that is not uniformly random -- the
+/// shared secret of a `KeyAgreement`, say -- into one or more keys of any
+/// length. It runs in two steps: *extract* concentrates the input into a
+/// pseudorandom key, and *expand* stretches that into as many bytes as are
+/// asked for, bound to an `info` label so that keys derived for different
+/// purposes never coincide.
+///
+/// ```java
+/// KeyPair mine = KeyGenerator.ec(256);
+/// KeyPair theirs = KeyGenerator.ec(256);
+/// byte[] shared = KeyAgreement.ecdh(mine.getPrivateKey(), theirs.getPublicKey());
+/// byte[] keys = Hkdf.derive(&quot;SHA-256&quot;, null, shared, &quot;chat keys&quot;.getBytes(), 64);
+/// ```
+///
+/// It is pure Java over [Hmac], so it behaves identically on every port and on
+/// the server.
+@com.codename1.impl.SharedWithBackend
+public final class Hkdf {
+    private Hkdf() {}
+
+    /// The extract step: `HMAC(salt, ikm)`. A null or empty `salt` is
+    /// replaced by a string of zero bytes the length of the hash, as the RFC
+    /// specifies.
+    ///
+    /// #### Parameters
+    ///
+    /// - `algorithm`: the hash, any name [Hmac#create(String, byte[])] accepts
+    ///
+    /// - `salt`: optional salt
+    ///
+    /// - `ikm`: the input keying material
+    public static byte[] extract(String algorithm, byte[] salt, byte[] ikm) {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (ikm == null) {</span>
+<span class="nc" id="L60">            throw new CryptoException(&quot;HKDF input keying material must not be null&quot;);</span>
+        }
+<span class="fc" id="L62">        byte[] s = salt;</span>
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">        if (s == null || s.length == 0) {</span>
+<span class="fc" id="L64">            s = new byte[Hmac.create(algorithm, new byte[0]).tagLength()];</span>
+        }
+<span class="fc" id="L66">        return Hmac.create(algorithm, s).doFinal(ikm);</span>
+    }
+
+    /// The expand step: derives `length` bytes from a pseudorandom key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `algorithm`: the hash
+    ///
+    /// - `prk`: the pseudorandom key, usually the result of [#extract]
+    ///
+    /// - `info`: context label; may be null
+    ///
+    /// - `length`: bytes wanted, at most 255 times the hash length
+    public static byte[] expand(String algorithm, byte[] prk, byte[] info, int length) {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (prk == null) {</span>
+<span class="nc" id="L82">            throw new CryptoException(&quot;HKDF pseudorandom key must not be null&quot;);</span>
+        }
+<span class="fc" id="L84">        Hmac mac = Hmac.create(algorithm, prk);</span>
+<span class="fc" id="L85">        int hashLength = mac.tagLength();</span>
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">        if (length &lt; 0 || length &gt; 255 * hashLength) {</span>
+<span class="fc" id="L87">            throw new CryptoException(&quot;HKDF output length out of range: &quot; + length);</span>
+        }
+<span class="fc" id="L89">        byte[] out = new byte[length];</span>
+<span class="fc" id="L90">        byte[] previous = new byte[0];</span>
+<span class="fc" id="L91">        byte[] counter = new byte[1];</span>
+<span class="fc" id="L92">        int written = 0;</span>
+<span class="fc" id="L93">        int block = 1;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        while (written &lt; length) {</span>
+<span class="fc" id="L95">            mac.update(previous);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (info != null) {</span>
+<span class="fc" id="L97">                mac.update(info);</span>
+            }
+<span class="fc" id="L99">            counter[0] = (byte) block;</span>
+<span class="fc" id="L100">            mac.update(counter);</span>
+<span class="fc" id="L101">            previous = mac.doFinal();</span>
+<span class="fc" id="L102">            int n = Math.min(previous.length, length - written);</span>
+<span class="fc" id="L103">            System.arraycopy(previous, 0, out, written, n);</span>
+<span class="fc" id="L104">            written += n;</span>
+<span class="fc" id="L105">            block++;</span>
+<span class="fc" id="L106">        }</span>
+<span class="fc" id="L107">        return out;</span>
+    }
+
+    /// Extract then expand in one call.
+    ///
+    /// #### Parameters
+    ///
+    /// - `algorithm`: the hash, for example `&quot;SHA-256&quot;`
+    ///
+    /// - `salt`: optional salt
+    ///
+    /// - `ikm`: the input keying material
+    ///
+    /// - `info`: context label; may be null
+    ///
+    /// - `length`: bytes wanted
+    public static byte[] derive(String algorithm, byte[] salt, byte[] ikm, byte[] info, int length) {
+<span class="fc" id="L124">        return expand(algorithm, extract(algorithm, salt, ikm), info, length);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

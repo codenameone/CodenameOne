@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Bytes.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">Bytes.java</span></div><h1>Bytes.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+/// Byte-level primitives the envelope format is defined in terms of.
+///
+/// Package private and deliberately self-contained. Everything here is specified rather than
+/// inherited from a platform: a wire format that two ports must agree on byte for byte cannot be
+/// built on `String.getBytes(&quot;UTF-8&quot;)`, whose behaviour for an unpaired surrogate differs between
+/// runtimes -- some emit `?`, some emit U+FFFD, some throw -- which would make a password
+/// containing one derive a different key on Android than in the browser.
+final class Bytes {
+
+    private Bytes() {
+    }
+
+    /// UTF-8 encoding of a `String`, specified here rather than delegated.
+    ///
+    /// Code points are encoded in the standard 1 to 4 byte forms. A surrogate that is not part of
+    /// a valid pair -- high with no low following, or a low with no high before -- is encoded as
+    /// U+FFFD, the replacement character, in its three byte form. That is one of the behaviours a
+    /// platform might have picked; the point is that all of them now pick this one.
+    ///
+    /// No normalization is applied. Two strings that a user would call the same password but that
+    /// differ in code points (a precomposed `e` with an acute accent against the two code point
+    /// spelling) derive different keys, on every platform alike. Normalizing here would be worse
+    /// than not: the core has no Unicode tables, so it could only normalize approximately, and an
+    /// approximate normalization that differs between ports is the failure this avoids. An
+    /// application that needs to accept both spellings must normalize before it calls.
+    static byte[] utf8(String value) {
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L52">            return new byte[0];</span>
+        }
+<span class="fc" id="L54">        int length = value.length();</span>
+        // Worst case three bytes per char; a surrogate pair is two chars and four bytes, so this
+        // bound holds for them too.
+<span class="fc" id="L57">        byte[] out = new byte[length * 3];</span>
+<span class="fc" id="L58">        int at = 0;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (int iter = 0; iter &lt; length; iter++) {</span>
+<span class="fc" id="L60">            int cp = value.charAt(iter);</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">            if (cp &gt;= 0xd800 &amp;&amp; cp &lt;= 0xdbff) {</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                int next = iter + 1 &lt; length ? value.charAt(iter + 1) : -1;</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">                if (next &gt;= 0xdc00 &amp;&amp; next &lt;= 0xdfff) {</span>
+<span class="fc" id="L64">                    cp = 0x10000 + ((cp - 0xd800) &lt;&lt; 10) + (next - 0xdc00);</span>
+<span class="fc" id="L65">                    iter++;</span>
+                } else {
+<span class="nc" id="L67">                    cp = 0xfffd;</span>
+                }
+<span class="pc bpc" id="L69" title="3 of 4 branches missed.">            } else if (cp &gt;= 0xdc00 &amp;&amp; cp &lt;= 0xdfff) {</span>
+<span class="nc" id="L70">                cp = 0xfffd;</span>
+            }
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (cp &lt; 0x80) {</span>
+<span class="fc" id="L73">                out[at++] = (byte) cp;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            } else if (cp &lt; 0x800) {</span>
+<span class="fc" id="L75">                out[at++] = (byte) (0xc0 | (cp &gt;&gt; 6));</span>
+<span class="fc" id="L76">                out[at++] = (byte) (0x80 | (cp &amp; 0x3f));</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            } else if (cp &lt; 0x10000) {</span>
+<span class="fc" id="L78">                out[at++] = (byte) (0xe0 | (cp &gt;&gt; 12));</span>
+<span class="fc" id="L79">                out[at++] = (byte) (0x80 | ((cp &gt;&gt; 6) &amp; 0x3f));</span>
+<span class="fc" id="L80">                out[at++] = (byte) (0x80 | (cp &amp; 0x3f));</span>
+            } else {
+<span class="fc" id="L82">                out[at++] = (byte) (0xf0 | (cp &gt;&gt; 18));</span>
+<span class="fc" id="L83">                out[at++] = (byte) (0x80 | ((cp &gt;&gt; 12) &amp; 0x3f));</span>
+<span class="fc" id="L84">                out[at++] = (byte) (0x80 | ((cp &gt;&gt; 6) &amp; 0x3f));</span>
+<span class="fc" id="L85">                out[at++] = (byte) (0x80 | (cp &amp; 0x3f));</span>
+            }
+        }
+<span class="fc" id="L88">        byte[] exact = new byte[at];</span>
+<span class="fc" id="L89">        System.arraycopy(out, 0, exact, 0, at);</span>
+<span class="fc" id="L90">        zero(out);</span>
+<span class="fc" id="L91">        return exact;</span>
+    }
+
+    /// The same encoding for a `char[]`, so a password never has to become a `String`.
+    ///
+    /// A `String` cannot be cleared: it is immutable and lives until it is collected, which on
+    /// every port here means an unbounded window in which a heap dump contains the password. A
+    /// `char[]` can be overwritten, and [#zero(char[])] does. This is best effort and not proof
+    /// of erasure -- a managed runtime may have copied the array during a collection, and the
+    /// browser certainly may -- but it removes the copy the application controls.
+    static byte[] utf8(char[] value) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L103">            return new byte[0];</span>
+        }
+        // Routed through the String form would allocate exactly the String this exists to avoid,
+        // so the loop is repeated against a char[] source.
+<span class="fc" id="L107">        int length = value.length;</span>
+<span class="fc" id="L108">        byte[] out = new byte[length * 3];</span>
+<span class="fc" id="L109">        int at = 0;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (int iter = 0; iter &lt; length; iter++) {</span>
+<span class="fc" id="L111">            int cp = value[iter];</span>
+<span class="pc bpc" id="L112" title="1 of 4 branches missed.">            if (cp &gt;= 0xd800 &amp;&amp; cp &lt;= 0xdbff) {</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                int next = iter + 1 &lt; length ? value[iter + 1] : -1;</span>
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">                if (next &gt;= 0xdc00 &amp;&amp; next &lt;= 0xdfff) {</span>
+<span class="fc" id="L115">                    cp = 0x10000 + ((cp - 0xd800) &lt;&lt; 10) + (next - 0xdc00);</span>
+<span class="fc" id="L116">                    iter++;</span>
+                } else {
+<span class="nc" id="L118">                    cp = 0xfffd;</span>
+                }
+<span class="pc bpc" id="L120" title="3 of 4 branches missed.">            } else if (cp &gt;= 0xdc00 &amp;&amp; cp &lt;= 0xdfff) {</span>
+<span class="nc" id="L121">                cp = 0xfffd;</span>
+            }
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (cp &lt; 0x80) {</span>
+<span class="fc" id="L124">                out[at++] = (byte) cp;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            } else if (cp &lt; 0x800) {</span>
+<span class="fc" id="L126">                out[at++] = (byte) (0xc0 | (cp &gt;&gt; 6));</span>
+<span class="fc" id="L127">                out[at++] = (byte) (0x80 | (cp &amp; 0x3f));</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            } else if (cp &lt; 0x10000) {</span>
+<span class="fc" id="L129">                out[at++] = (byte) (0xe0 | (cp &gt;&gt; 12));</span>
+<span class="fc" id="L130">                out[at++] = (byte) (0x80 | ((cp &gt;&gt; 6) &amp; 0x3f));</span>
+<span class="fc" id="L131">                out[at++] = (byte) (0x80 | (cp &amp; 0x3f));</span>
+            } else {
+<span class="fc" id="L133">                out[at++] = (byte) (0xf0 | (cp &gt;&gt; 18));</span>
+<span class="fc" id="L134">                out[at++] = (byte) (0x80 | ((cp &gt;&gt; 12) &amp; 0x3f));</span>
+<span class="fc" id="L135">                out[at++] = (byte) (0x80 | ((cp &gt;&gt; 6) &amp; 0x3f));</span>
+<span class="fc" id="L136">                out[at++] = (byte) (0x80 | (cp &amp; 0x3f));</span>
+            }
+        }
+<span class="fc" id="L139">        byte[] exact = new byte[at];</span>
+<span class="fc" id="L140">        System.arraycopy(out, 0, exact, 0, at);</span>
+<span class="fc" id="L141">        zero(out);</span>
+<span class="fc" id="L142">        return exact;</span>
+    }
+
+    /// Decodes bytes this class produced back to a `String`. Malformed sequences become U+FFFD
+    /// rather than raising, because the caller has already authenticated the bytes: a decode
+    /// failure at this point means a bug, and throwing from inside a decrypt would leak where.
+    /// UTF-8 decoded straight into a clearable array, for anything that must not linger.
+    ///
+    /// The same decoder as [#fromUtf8], with the sink changed: a String is immutable and a
+    /// StringBuilder's buffer is unreachable, so a secret that passes through either survives in
+    /// the heap after every array the caller can reach has been zeroed -- which is exactly the
+    /// promise getSecret and createRecoveryCode make about the characters they hand back. The
+    /// encode side already avoids this and says so; this is the other half.
+    ///
+    /// One char per input byte is a safe ceiling: ASCII is the densest case at one char per byte,
+    /// and a four-byte sequence produces only a surrogate pair.
+    static char[] charsFromUtf8(byte[] data, int offset, int length) {
+<span class="fc bfc" id="L159" title="All 4 branches covered.">        if (data == null || length &lt;= 0) {</span>
+<span class="fc" id="L160">            return new char[0];</span>
+        }
+<span class="fc" id="L162">        char[] scratch = new char[length];</span>
+<span class="fc" id="L163">        int put = 0;</span>
+<span class="fc" id="L164">        int at = offset;</span>
+<span class="fc" id="L165">        int end = offset + length;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        while (at &lt; end) {</span>
+<span class="fc" id="L167">            int first = data[at++] &amp; 0xff;</span>
+            int cp;
+            int extra;
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (first &lt; 0x80) {</span>
+<span class="fc" id="L171">                cp = first;</span>
+<span class="fc" id="L172">                extra = 0;</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            } else if ((first &amp; 0xe0) == 0xc0) {</span>
+<span class="fc" id="L174">                cp = first &amp; 0x1f;</span>
+<span class="fc" id="L175">                extra = 1;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            } else if ((first &amp; 0xf0) == 0xe0) {</span>
+<span class="fc" id="L177">                cp = first &amp; 0x0f;</span>
+<span class="fc" id="L178">                extra = 2;</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            } else if ((first &amp; 0xf8) == 0xf0) {</span>
+<span class="fc" id="L180">                cp = first &amp; 0x07;</span>
+<span class="fc" id="L181">                extra = 3;</span>
+            } else {
+<span class="fc" id="L183">                scratch[put++] = REPLACEMENT;</span>
+<span class="fc" id="L184">                continue;</span>
+            }
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            if (at + extra &gt; end) {</span>
+<span class="fc" id="L187">                scratch[put++] = REPLACEMENT;</span>
+<span class="fc" id="L188">                break;</span>
+            }
+<span class="fc" id="L190">            boolean valid = true;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            for (int iter = 0; iter &lt; extra; iter++) {</span>
+<span class="fc" id="L192">                int next = data[at + iter] &amp; 0xff;</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                if ((next &amp; 0xc0) != 0x80) {</span>
+<span class="nc" id="L194">                    valid = false;</span>
+<span class="nc" id="L195">                    break;</span>
+                }
+<span class="fc" id="L197">                cp = (cp &lt;&lt; 6) | (next &amp; 0x3f);</span>
+            }
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (!valid) {</span>
+<span class="nc" id="L200">                scratch[put++] = REPLACEMENT;</span>
+<span class="nc" id="L201">                continue;</span>
+            }
+<span class="fc" id="L203">            at += extra;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (cp &gt; 0x10ffff) {</span>
+<span class="fc" id="L205">                scratch[put++] = REPLACEMENT;</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            } else if (cp &gt;= 0x10000) {</span>
+<span class="fc" id="L207">                cp -= 0x10000;</span>
+<span class="fc" id="L208">                scratch[put++] = (char) (0xd800 + (cp &gt;&gt; 10));</span>
+<span class="fc" id="L209">                scratch[put++] = (char) (0xdc00 + (cp &amp; 0x3ff));</span>
+            } else {
+<span class="fc" id="L211">                scratch[put++] = (char) cp;</span>
+            }
+<span class="fc" id="L213">        }</span>
+<span class="fc" id="L214">        char[] exact = new char[put];</span>
+<span class="fc" id="L215">        System.arraycopy(scratch, 0, exact, 0, put);</span>
+<span class="fc" id="L216">        zero(scratch);</span>
+<span class="fc" id="L217">        return exact;</span>
+    }
+
+    /// Base32, encoded straight into a clearable array.
+    ///
+    /// Byte for byte what [com.codename1.security.Base32#encode] produces -- BytesTest holds the
+    /// two against each other over random input, because a private copy of an encoding is only
+    /// safe while it cannot drift from the one the decoder expects. It exists at all because that
+    /// method returns a String, and a recovery code is the one credential that reopens the vault.
+    static char[] base32Chars(byte[] data) {
+<span class="fc bfc" id="L227" title="All 4 branches covered.">        if (data == null || data.length == 0) {</span>
+<span class="fc" id="L228">            return new char[0];</span>
+        }
+<span class="fc" id="L230">        char[] alphabet = BASE32_ALPHABET;</span>
+<span class="fc" id="L231">        int output = ((data.length + 4) / 5) * 8;</span>
+<span class="fc" id="L232">        char[] out = new char[output];</span>
+<span class="fc" id="L233">        int put = 0;</span>
+<span class="fc" id="L234">        int bits = 0;</span>
+<span class="fc" id="L235">        int value = 0;</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (byte one : data) {</span>
+<span class="fc" id="L237">            value = (value &lt;&lt; 8) | (one &amp; 0xff);</span>
+<span class="fc" id="L238">            bits += 8;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            while (bits &gt;= 5) {</span>
+<span class="fc" id="L240">                out[put++] = alphabet[(value &gt;&gt;&gt; (bits - 5)) &amp; 0x1f];</span>
+<span class="fc" id="L241">                bits -= 5;</span>
+            }
+        }
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (bits &gt; 0) {</span>
+<span class="fc" id="L245">            out[put++] = alphabet[(value &lt;&lt; (5 - bits)) &amp; 0x1f];</span>
+        }
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        while (put &lt; output) {</span>
+<span class="fc" id="L248">            out[put++] = '=';</span>
+        }
+<span class="fc" id="L250">        return out;</span>
+    }
+
+<span class="fc" id="L253">    private static final char[] BASE32_ALPHABET =</span>
+<span class="fc" id="L254">            &quot;ABCDEFGHIJKLMNOPQRSTUVWXYZ234567&quot;.toCharArray();</span>
+
+    static String fromUtf8(byte[] data, int offset, int length) {
+<span class="pc bpc" id="L257" title="1 of 4 branches missed.">        if (data == null || length &lt;= 0) {</span>
+<span class="fc" id="L258">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L260">        StringBuilder b = new StringBuilder(length);</span>
+<span class="fc" id="L261">        int at = offset;</span>
+<span class="fc" id="L262">        int end = offset + length;</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        while (at &lt; end) {</span>
+<span class="fc" id="L264">            int first = data[at++] &amp; 0xff;</span>
+            int cp;
+            int extra;
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (first &lt; 0x80) {</span>
+<span class="fc" id="L268">                cp = first;</span>
+<span class="fc" id="L269">                extra = 0;</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            } else if ((first &amp; 0xe0) == 0xc0) {</span>
+<span class="fc" id="L271">                cp = first &amp; 0x1f;</span>
+<span class="fc" id="L272">                extra = 1;</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            } else if ((first &amp; 0xf0) == 0xe0) {</span>
+<span class="fc" id="L274">                cp = first &amp; 0x0f;</span>
+<span class="fc" id="L275">                extra = 2;</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            } else if ((first &amp; 0xf8) == 0xf0) {</span>
+<span class="fc" id="L277">                cp = first &amp; 0x07;</span>
+<span class="fc" id="L278">                extra = 3;</span>
+            } else {
+<span class="fc" id="L280">                b.append(REPLACEMENT);</span>
+<span class="fc" id="L281">                continue;</span>
+            }
+<span class="fc bfc" id="L283" title="All 2 branches covered.">            if (at + extra &gt; end) {</span>
+<span class="fc" id="L284">                b.append(REPLACEMENT);</span>
+<span class="fc" id="L285">                break;</span>
+            }
+<span class="fc" id="L287">            boolean valid = true;</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            for (int iter = 0; iter &lt; extra; iter++) {</span>
+<span class="fc" id="L289">                int next = data[at + iter] &amp; 0xff;</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">                if ((next &amp; 0xc0) != 0x80) {</span>
+<span class="nc" id="L291">                    valid = false;</span>
+<span class="nc" id="L292">                    break;</span>
+                }
+<span class="fc" id="L294">                cp = (cp &lt;&lt; 6) | (next &amp; 0x3f);</span>
+            }
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">            if (!valid) {</span>
+<span class="nc" id="L297">                b.append(REPLACEMENT);</span>
+<span class="nc" id="L298">                continue;</span>
+            }
+<span class="fc" id="L300">            at += extra;</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">            if (cp &gt; 0x10ffff) {</span>
+<span class="fc" id="L302">                b.append(REPLACEMENT);</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            } else if (cp &gt;= 0x10000) {</span>
+<span class="fc" id="L304">                cp -= 0x10000;</span>
+<span class="fc" id="L305">                b.append((char) (0xd800 + (cp &gt;&gt; 10)));</span>
+<span class="fc" id="L306">                b.append((char) (0xdc00 + (cp &amp; 0x3ff)));</span>
+            } else {
+<span class="fc" id="L308">                b.append((char) cp);</span>
+            }
+<span class="fc" id="L310">        }</span>
+<span class="fc" id="L311">        return b.toString();</span>
+    }
+
+    /// Big-endian 32 bit write. Every multi-byte field in the envelope is big-endian, stated once
+    /// here so a port implementing the format elsewhere has one rule to follow.
+    static void putInt(byte[] out, int offset, int value) {
+<span class="fc" id="L317">        out[offset] = (byte) (value &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L318">        out[offset + 1] = (byte) (value &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L319">        out[offset + 2] = (byte) (value &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L320">        out[offset + 3] = (byte) value;</span>
+<span class="fc" id="L321">    }</span>
+
+    /// Big-endian 32 bit read.
+    static int getInt(byte[] in, int offset) {
+<span class="fc" id="L325">        return ((in[offset] &amp; 0xff) &lt;&lt; 24)</span>
+                | ((in[offset + 1] &amp; 0xff) &lt;&lt; 16)
+                | ((in[offset + 2] &amp; 0xff) &lt;&lt; 8)
+                | (in[offset + 3] &amp; 0xff);
+    }
+
+    /// A copy of a slice, or an empty array for a zero length.
+    static byte[] slice(byte[] in, int offset, int length) {
+<span class="fc" id="L333">        byte[] out = new byte[length];</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (length &gt; 0) {</span>
+<span class="fc" id="L335">            System.arraycopy(in, offset, out, 0, length);</span>
+        }
+<span class="fc" id="L337">        return out;</span>
+    }
+
+    /// Concatenates, skipping nulls.
+    static byte[] concat(byte[] a, byte[] b) {
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        int aLen = a == null ? 0 : a.length;</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        int bLen = b == null ? 0 : b.length;</span>
+<span class="fc" id="L344">        byte[] out = new byte[aLen + bLen];</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        if (aLen &gt; 0) {</span>
+<span class="fc" id="L346">            System.arraycopy(a, 0, out, 0, aLen);</span>
+        }
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">        if (bLen &gt; 0) {</span>
+<span class="fc" id="L349">            System.arraycopy(b, 0, out, aLen, bLen);</span>
+        }
+<span class="fc" id="L351">        return out;</span>
+    }
+
+    /// Comparison whose running time does not depend on where the first difference is.
+    ///
+    /// Used wherever a tag, a key id or a derived value is compared. `java.util.Arrays.equals`
+    /// returns at the first mismatching byte, which over enough attempts tells an attacker how
+    /// much of a guess was right.
+    static boolean constantTimeEquals(byte[] a, byte[] b) {
+<span class="pc bpc" id="L360" title="2 of 4 branches missed.">        if (a == null || b == null) {</span>
+            // Two nulls are equal, a null against an array is not. Written as two null tests
+            // rather than `a == b` so it is a comparison against null and not between two
+            // references -- equals() is not the alternative here, because Arrays.equals is
+            // exactly the early-returning comparison this method exists to avoid.
+<span class="nc bnc" id="L365" title="All 4 branches missed.">            return a == null &amp;&amp; b == null;</span>
+        }
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (a.length != b.length) {</span>
+<span class="nc" id="L368">            return false;</span>
+        }
+<span class="fc" id="L370">        int diff = 0;</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        for (int iter = 0; iter &lt; a.length; iter++) {</span>
+<span class="fc" id="L372">            diff |= a[iter] ^ b[iter];</span>
+        }
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        return diff == 0;</span>
+    }
+
+    /// Overwrites a buffer. Best effort: see the note on [#utf8(char[])].
+    static void zero(byte[] data) {
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        if (data != null) {</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            for (int iter = 0; iter &lt; data.length; iter++) {</span>
+<span class="fc" id="L381">                data[iter] = 0;</span>
+            }
+        }
+<span class="fc" id="L384">    }</span>
+
+    /// Overwrites a character buffer, for a password the caller is done with.
+    static void zero(char[] data) {
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        if (data != null) {</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            for (int iter = 0; iter &lt; data.length; iter++) {</span>
+<span class="fc" id="L390">                data[iter] = 0;</span>
+            }
+        }
+<span class="fc" id="L393">    }</span>
+
+    /// Lower case hex, for the few places a value has to become a `String` -- a storage key, a
+    /// key id in a log line. Never used for key material that has somewhere better to go.
+    static String toHex(byte[] data) {
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L399">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L401">        StringBuilder b = new StringBuilder(data.length * 2);</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        for (byte raw : data) {</span>
+<span class="fc" id="L403">            int v = raw &amp; 0xff;</span>
+<span class="fc" id="L404">            b.append(HEX.charAt(v &gt;&gt;&gt; 4));</span>
+<span class="fc" id="L405">            b.append(HEX.charAt(v &amp; 0x0f));</span>
+        }
+<span class="fc" id="L407">        return b.toString();</span>
+    }
+
+    /// Parses what [#toHex(byte[])] wrote. Returns null for anything that is not an even length
+    /// run of hex digits, so a caller can tell a corrupt entry from a short one without a throw.
+    static byte[] fromHex(String hex) {
+<span class="pc bpc" id="L413" title="1 of 4 branches missed.">        if (hex == null || (hex.length() &amp; 1) != 0) {</span>
+<span class="fc" id="L414">            return null;</span>
+        }
+<span class="fc" id="L416">        byte[] out = new byte[hex.length() / 2];</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        for (int iter = 0; iter &lt; out.length; iter++) {</span>
+<span class="fc" id="L418">            int hi = digit(hex.charAt(iter * 2));</span>
+<span class="fc" id="L419">            int lo = digit(hex.charAt(iter * 2 + 1));</span>
+<span class="pc bpc" id="L420" title="1 of 4 branches missed.">            if (hi &lt; 0 || lo &lt; 0) {</span>
+<span class="fc" id="L421">                return null;</span>
+            }
+<span class="fc" id="L423">            out[iter] = (byte) ((hi &lt;&lt; 4) | lo);</span>
+        }
+<span class="fc" id="L425">        return out;</span>
+    }
+
+    private static int digit(char c) {
+<span class="pc bpc" id="L429" title="1 of 4 branches missed.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L430">            return c - '0';</span>
+        }
+<span class="pc bpc" id="L432" title="1 of 4 branches missed.">        if (c &gt;= 'a' &amp;&amp; c &lt;= 'f') {</span>
+<span class="fc" id="L433">            return c - 'a' + 10;</span>
+        }
+<span class="pc bpc" id="L435" title="2 of 4 branches missed.">        if (c &gt;= 'A' &amp;&amp; c &lt;= 'F') {</span>
+<span class="nc" id="L436">            return c - 'A' + 10;</span>
+        }
+<span class="fc" id="L438">        return -1;</span>
+    }
+
+    private static final String HEX = &quot;0123456789abcdef&quot;;
+
+    /// U+FFFD, written as an escape because a Java source file in this tree must be ASCII.
+    private static final char REPLACEMENT = '\ufffd';
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

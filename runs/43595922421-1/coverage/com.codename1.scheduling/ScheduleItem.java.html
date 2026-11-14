@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScheduleItem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.scheduling</a> &gt; <span class="el_source">ScheduleItem.java</span></div><h1>ScheduleItem.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.scheduling;
+
+/// One thing on a schedule: an appointment, a shift, a block of busy time.
+///
+/// `start` and `end` are epoch milliseconds and `end` is exclusive. An all-day
+/// item runs from the start of its first day to the start of the day after its
+/// last, in the zone of the view that shows it.
+public final class ScheduleItem {
+    /// How an item is drawn, apart from its colour.
+<span class="fc" id="L32">    public enum Kind {</span>
+        /// An item of its own: a block with a title that can be selected.
+<span class="fc" id="L34">        EVENT,</span>
+        /// A band under the events, such as the hours somebody is available.
+        /// It cannot be selected or moved.
+<span class="fc" id="L37">        BACKGROUND,</span>
+        /// Time that is taken but is nobody's to edit here, such as busy time
+        /// read from another calendar. Drawn hatched.
+<span class="fc" id="L40">        BLOCKED</span>
+    }
+
+    private final String id;
+<span class="fc" id="L44">    private String title = &quot;&quot;;</span>
+    private String detail;
+    private long start;
+    private long end;
+    private boolean allDay;
+    private String resourceId;
+<span class="fc" id="L50">    private Kind kind = Kind.EVENT;</span>
+    private String uiid;
+<span class="fc" id="L52">    private int color = -1;</span>
+<span class="fc" id="L53">    private boolean movable = true;</span>
+<span class="fc" id="L54">    private boolean resizable = true;</span>
+    private boolean recurring;
+    private Object userObject;
+
+<span class="fc" id="L58">    public ScheduleItem(String id, String title, long start, long end) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;id&quot;);</span>
+        }
+<span class="fc" id="L62">        this.id = id;</span>
+<span class="fc" id="L63">        setTitle(title);</span>
+<span class="fc" id="L64">        setTime(start, end);</span>
+<span class="fc" id="L65">    }</span>
+
+    public String getId() {
+<span class="fc" id="L68">        return id;</span>
+    }
+
+    public String getTitle() {
+<span class="fc" id="L72">        return title;</span>
+    }
+
+    public ScheduleItem setTitle(String v) {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        title = v == null ? &quot;&quot; : v;</span>
+<span class="fc" id="L77">        return this;</span>
+    }
+
+    /// A second line: a place, a client's name.
+    public String getDetail() {
+<span class="fc" id="L82">        return detail;</span>
+    }
+
+    public ScheduleItem setDetail(String v) {
+<span class="fc" id="L86">        detail = v;</span>
+<span class="fc" id="L87">        return this;</span>
+    }
+
+    public long getStart() {
+<span class="fc" id="L91">        return start;</span>
+    }
+
+    public long getEnd() {
+<span class="fc" id="L95">        return end;</span>
+    }
+
+    public ScheduleItem setTime(long start, long end) {
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (end &lt; start) {</span>
+<span class="nc" id="L100">            throw new IllegalArgumentException(&quot;end before start&quot;);</span>
+        }
+<span class="fc" id="L102">        this.start = start;</span>
+<span class="fc" id="L103">        this.end = end;</span>
+<span class="fc" id="L104">        return this;</span>
+    }
+
+    public boolean isAllDay() {
+<span class="fc" id="L108">        return allDay;</span>
+    }
+
+    public ScheduleItem setAllDay(boolean v) {
+<span class="fc" id="L112">        allDay = v;</span>
+<span class="fc" id="L113">        return this;</span>
+    }
+
+    /// The resource the item belongs to, or null when the schedule has none.
+    public String getResourceId() {
+<span class="fc" id="L118">        return resourceId;</span>
+    }
+
+    public ScheduleItem setResourceId(String v) {
+<span class="fc" id="L122">        resourceId = v;</span>
+<span class="fc" id="L123">        return this;</span>
+    }
+
+    public Kind getKind() {
+<span class="fc" id="L127">        return kind;</span>
+    }
+
+    public ScheduleItem setKind(Kind v) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        kind = v == null ? Kind.EVENT : v;</span>
+<span class="fc" id="L132">        return this;</span>
+    }
+
+    /// The UIID the item is drawn with in place of `SchedulerItem`, or null.
+    /// Its background, foreground and font are used, and its selected style
+    /// while the item is selected.
+    public String getUIID() {
+<span class="fc" id="L139">        return uiid;</span>
+    }
+
+    public ScheduleItem setUIID(String v) {
+<span class="nc" id="L143">        uiid = v;</span>
+<span class="nc" id="L144">        return this;</span>
+    }
+
+    /// An RGB colour, or -1 for the resource's or the theme's.
+    public int getColor() {
+<span class="fc" id="L149">        return color;</span>
+    }
+
+    public ScheduleItem setColor(int v) {
+<span class="nc" id="L153">        color = v;</span>
+<span class="nc" id="L154">        return this;</span>
+    }
+
+    public boolean isMovable() {
+<span class="pc bpc" id="L158" title="1 of 4 branches missed.">        return movable &amp;&amp; kind == Kind.EVENT;</span>
+    }
+
+    public ScheduleItem setMovable(boolean v) {
+<span class="fc" id="L162">        movable = v;</span>
+<span class="fc" id="L163">        return this;</span>
+    }
+
+    public boolean isResizable() {
+<span class="pc bpc" id="L167" title="3 of 6 branches missed.">        return resizable &amp;&amp; kind == Kind.EVENT &amp;&amp; !allDay;</span>
+    }
+
+    public ScheduleItem setResizable(boolean v) {
+<span class="fc" id="L171">        resizable = v;</span>
+<span class="fc" id="L172">        return this;</span>
+    }
+
+    /// Whether the item is one occurrence of a series, which a view marks.
+    public boolean isRecurring() {
+<span class="fc" id="L177">        return recurring;</span>
+    }
+
+    public ScheduleItem setRecurring(boolean v) {
+<span class="fc" id="L181">        recurring = v;</span>
+<span class="fc" id="L182">        return this;</span>
+    }
+
+    public Object getUserObject() {
+<span class="fc" id="L186">        return userObject;</span>
+    }
+
+    public ScheduleItem setUserObject(Object v) {
+<span class="fc" id="L190">        userObject = v;</span>
+<span class="fc" id="L191">        return this;</span>
+    }
+
+    /// Whether any of the item is inside `[from, to)`.
+    public boolean intersects(long from, long to) {
+<span class="pc bpc" id="L196" title="3 of 8 branches missed.">        return start &lt; to &amp;&amp; (end &gt; from || (end == start &amp;&amp; start &gt;= from));</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L201">        return title;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

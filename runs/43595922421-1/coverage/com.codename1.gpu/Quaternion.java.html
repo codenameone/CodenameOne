@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Quaternion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Quaternion.java</span></div><h1>Quaternion.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.gpu;
+
+import com.codename1.util.MathUtil;
+
+/// Portable quaternion math used by the 3D, AR and VR APIs. Every operation
+/// works on plain `float[4]` arrays laid out as `{x, y, z, w}` so it behaves
+/// identically on every platform. A quaternion of this form represents a
+/// rotation; `{0, 0, 0, 1}` is the identity (no rotation). Rotation matrices
+/// produced by `toMatrix(float[], float[])` use the same column-major layout
+/// as `Matrix4`.
+public final class Quaternion {
+    private Quaternion() {
+    }
+
+    /// Allocates a new identity quaternion `{0, 0, 0, 1}`.
+    public static float[] identity() {
+<span class="fc" id="L26">        return new float[]{0.0f, 0.0f, 0.0f, 1.0f};</span>
+    }
+
+    /// Resets the supplied quaternion to the identity rotation.
+    public static void setIdentity(float[] q) {
+<span class="fc" id="L31">        q[0] = 0.0f;</span>
+<span class="fc" id="L32">        q[1] = 0.0f;</span>
+<span class="fc" id="L33">        q[2] = 0.0f;</span>
+<span class="fc" id="L34">        q[3] = 1.0f;</span>
+<span class="fc" id="L35">    }</span>
+
+    /// Copies the contents of `src` into `dst`. Both arrays must hold 4 floats.
+    public static void copy(float[] src, float[] dst) {
+<span class="fc" id="L39">        dst[0] = src[0];</span>
+<span class="fc" id="L40">        dst[1] = src[1];</span>
+<span class="fc" id="L41">        dst[2] = src[2];</span>
+<span class="fc" id="L42">        dst[3] = src[3];</span>
+<span class="fc" id="L43">    }</span>
+
+    /// Multiplies `a * b` (apply `b` first, then `a`) and stores the result in
+    /// `dst`. `dst` may alias `a` or `b`.
+    public static void multiply(float[] a, float[] b, float[] dst) {
+<span class="fc" id="L48">        float ax = a[0];</span>
+<span class="fc" id="L49">        float ay = a[1];</span>
+<span class="fc" id="L50">        float az = a[2];</span>
+<span class="fc" id="L51">        float aw = a[3];</span>
+<span class="fc" id="L52">        float bx = b[0];</span>
+<span class="fc" id="L53">        float by = b[1];</span>
+<span class="fc" id="L54">        float bz = b[2];</span>
+<span class="fc" id="L55">        float bw = b[3];</span>
+<span class="fc" id="L56">        dst[0] = aw * bx + ax * bw + ay * bz - az * by;</span>
+<span class="fc" id="L57">        dst[1] = aw * by - ax * bz + ay * bw + az * bx;</span>
+<span class="fc" id="L58">        dst[2] = aw * bz + ax * by - ay * bx + az * bw;</span>
+<span class="fc" id="L59">        dst[3] = aw * bw - ax * bx - ay * by - az * bz;</span>
+<span class="fc" id="L60">    }</span>
+
+    /// Returns a quaternion representing a rotation of `angleRadians` around the
+    /// axis `(x, y, z)`. The axis need not be normalized; a zero axis returns
+    /// the identity.
+    public static float[] fromAxisAngle(float angleRadians, float x, float y, float z) {
+<span class="fc" id="L66">        float[] q = identity();</span>
+<span class="fc" id="L67">        setAxisAngle(q, angleRadians, x, y, z);</span>
+<span class="fc" id="L68">        return q;</span>
+    }
+
+    /// Stores a rotation of `angleRadians` around the axis `(x, y, z)` into `q`.
+    /// The axis need not be normalized; a zero axis produces the identity.
+    public static void setAxisAngle(float[] q, float angleRadians, float x, float y, float z) {
+<span class="fc" id="L74">        float len = (float) Math.sqrt(x * x + y * y + z * z);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (len == 0.0f) {</span>
+<span class="fc" id="L76">            setIdentity(q);</span>
+<span class="fc" id="L77">            return;</span>
+        }
+<span class="fc" id="L79">        float half = angleRadians * 0.5f;</span>
+<span class="fc" id="L80">        float s = (float) Math.sin(half) / len;</span>
+<span class="fc" id="L81">        q[0] = x * s;</span>
+<span class="fc" id="L82">        q[1] = y * s;</span>
+<span class="fc" id="L83">        q[2] = z * s;</span>
+<span class="fc" id="L84">        q[3] = (float) Math.cos(half);</span>
+<span class="fc" id="L85">    }</span>
+
+    /// Normalizes `q` in place to unit length. A zero quaternion is reset to the
+    /// identity.
+    public static void normalize(float[] q) {
+<span class="fc" id="L90">        float len = (float) Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (len == 0.0f) {</span>
+<span class="fc" id="L92">            setIdentity(q);</span>
+<span class="fc" id="L93">            return;</span>
+        }
+<span class="fc" id="L95">        float inv = 1.0f / len;</span>
+<span class="fc" id="L96">        q[0] *= inv;</span>
+<span class="fc" id="L97">        q[1] *= inv;</span>
+<span class="fc" id="L98">        q[2] *= inv;</span>
+<span class="fc" id="L99">        q[3] *= inv;</span>
+<span class="fc" id="L100">    }</span>
+
+    /// Stores the conjugate of `q` (the inverse rotation for a unit quaternion)
+    /// into `dst`. `dst` may alias `q`.
+    public static void conjugate(float[] q, float[] dst) {
+<span class="fc" id="L105">        dst[0] = -q[0];</span>
+<span class="fc" id="L106">        dst[1] = -q[1];</span>
+<span class="fc" id="L107">        dst[2] = -q[2];</span>
+<span class="fc" id="L108">        dst[3] = q[3];</span>
+<span class="fc" id="L109">    }</span>
+
+    /// Writes the rotation matrix equivalent of the unit quaternion `q` into the
+    /// 16 element column-major matrix `dst16`. The result matches
+    /// `Matrix4.rotation(float, float, float, float)` for the same axis and
+    /// angle.
+    public static void toMatrix(float[] q, float[] dst16) {
+<span class="fc" id="L116">        float x = q[0];</span>
+<span class="fc" id="L117">        float y = q[1];</span>
+<span class="fc" id="L118">        float z = q[2];</span>
+<span class="fc" id="L119">        float w = q[3];</span>
+<span class="fc" id="L120">        float x2 = x + x;</span>
+<span class="fc" id="L121">        float y2 = y + y;</span>
+<span class="fc" id="L122">        float z2 = z + z;</span>
+<span class="fc" id="L123">        float xx = x * x2;</span>
+<span class="fc" id="L124">        float yy = y * y2;</span>
+<span class="fc" id="L125">        float zz = z * z2;</span>
+<span class="fc" id="L126">        float xy = x * y2;</span>
+<span class="fc" id="L127">        float xz = x * z2;</span>
+<span class="fc" id="L128">        float yz = y * z2;</span>
+<span class="fc" id="L129">        float wx = w * x2;</span>
+<span class="fc" id="L130">        float wy = w * y2;</span>
+<span class="fc" id="L131">        float wz = w * z2;</span>
+<span class="fc" id="L132">        dst16[0] = 1.0f - (yy + zz);</span>
+<span class="fc" id="L133">        dst16[1] = xy + wz;</span>
+<span class="fc" id="L134">        dst16[2] = xz - wy;</span>
+<span class="fc" id="L135">        dst16[3] = 0.0f;</span>
+<span class="fc" id="L136">        dst16[4] = xy - wz;</span>
+<span class="fc" id="L137">        dst16[5] = 1.0f - (xx + zz);</span>
+<span class="fc" id="L138">        dst16[6] = yz + wx;</span>
+<span class="fc" id="L139">        dst16[7] = 0.0f;</span>
+<span class="fc" id="L140">        dst16[8] = xz + wy;</span>
+<span class="fc" id="L141">        dst16[9] = yz - wx;</span>
+<span class="fc" id="L142">        dst16[10] = 1.0f - (xx + yy);</span>
+<span class="fc" id="L143">        dst16[11] = 0.0f;</span>
+<span class="fc" id="L144">        dst16[12] = 0.0f;</span>
+<span class="fc" id="L145">        dst16[13] = 0.0f;</span>
+<span class="fc" id="L146">        dst16[14] = 0.0f;</span>
+<span class="fc" id="L147">        dst16[15] = 1.0f;</span>
+<span class="fc" id="L148">    }</span>
+
+    /// Rotates the vector stored in `xyzInOut` (3 floats) by the unit quaternion
+    /// `q`, writing the result back in place.
+    public static void rotateVector(float[] q, float[] xyzInOut) {
+<span class="fc" id="L153">        float vx = xyzInOut[0];</span>
+<span class="fc" id="L154">        float vy = xyzInOut[1];</span>
+<span class="fc" id="L155">        float vz = xyzInOut[2];</span>
+<span class="fc" id="L156">        float qx = q[0];</span>
+<span class="fc" id="L157">        float qy = q[1];</span>
+<span class="fc" id="L158">        float qz = q[2];</span>
+<span class="fc" id="L159">        float qw = q[3];</span>
+        // t = 2 * cross(q.xyz, v); v' = v + qw * t + cross(q.xyz, t)
+<span class="fc" id="L161">        float tx = 2.0f * (qy * vz - qz * vy);</span>
+<span class="fc" id="L162">        float ty = 2.0f * (qz * vx - qx * vz);</span>
+<span class="fc" id="L163">        float tz = 2.0f * (qx * vy - qy * vx);</span>
+<span class="fc" id="L164">        xyzInOut[0] = vx + qw * tx + (qy * tz - qz * ty);</span>
+<span class="fc" id="L165">        xyzInOut[1] = vy + qw * ty + (qz * tx - qx * tz);</span>
+<span class="fc" id="L166">        xyzInOut[2] = vz + qw * tz + (qx * ty - qy * tx);</span>
+<span class="fc" id="L167">    }</span>
+
+    /// Spherically interpolates between the unit quaternions `a` and `b` by the
+    /// factor `t` in `[0, 1]`, storing the result in `dst`. Takes the shortest
+    /// arc; falls back to linear interpolation when the quaternions are nearly
+    /// parallel.
+    public static void slerp(float[] a, float[] b, float t, float[] dst) {
+<span class="fc" id="L174">        float ax = a[0];</span>
+<span class="fc" id="L175">        float ay = a[1];</span>
+<span class="fc" id="L176">        float az = a[2];</span>
+<span class="fc" id="L177">        float aw = a[3];</span>
+<span class="fc" id="L178">        float bx = b[0];</span>
+<span class="fc" id="L179">        float by = b[1];</span>
+<span class="fc" id="L180">        float bz = b[2];</span>
+<span class="fc" id="L181">        float bw = b[3];</span>
+<span class="fc" id="L182">        float dot = ax * bx + ay * by + az * bz + aw * bw;</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (dot &lt; 0.0f) {</span>
+<span class="fc" id="L184">            dot = -dot;</span>
+<span class="fc" id="L185">            bx = -bx;</span>
+<span class="fc" id="L186">            by = -by;</span>
+<span class="fc" id="L187">            bz = -bz;</span>
+<span class="fc" id="L188">            bw = -bw;</span>
+        }
+        float wa;
+        float wb;
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (dot &gt; 0.9995f) {</span>
+<span class="nc" id="L193">            wa = 1.0f - t;</span>
+<span class="nc" id="L194">            wb = t;</span>
+        } else {
+<span class="fc" id="L196">            float theta = (float) MathUtil.acos(dot);</span>
+<span class="fc" id="L197">            float invSin = 1.0f / (float) Math.sin(theta);</span>
+<span class="fc" id="L198">            wa = (float) Math.sin((1.0f - t) * theta) * invSin;</span>
+<span class="fc" id="L199">            wb = (float) Math.sin(t * theta) * invSin;</span>
+        }
+<span class="fc" id="L201">        dst[0] = wa * ax + wb * bx;</span>
+<span class="fc" id="L202">        dst[1] = wa * ay + wb * by;</span>
+<span class="fc" id="L203">        dst[2] = wa * az + wb * bz;</span>
+<span class="fc" id="L204">        dst[3] = wa * aw + wb * bw;</span>
+<span class="fc" id="L205">        normalize(dst);</span>
+<span class="fc" id="L206">    }</span>
+
+    /// Integrates a body-frame angular velocity into the orientation quaternion
+    /// `q`, storing the result in `dst`. `gx`, `gy` and `gz` are rotation rates
+    /// in radians per second around the body X, Y and Z axes (the convention
+    /// used by gyroscope sensors) and `dtSeconds` is the integration interval.
+    /// `dst` may alias `q`. The result is normalized.
+    public static void integrateGyro(float[] q, float gx, float gy, float gz,
+                                     float dtSeconds, float[] dst) {
+<span class="fc" id="L215">        float angle = (float) Math.sqrt(gx * gx + gy * gy + gz * gz) * dtSeconds;</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (angle == 0.0f) {</span>
+<span class="fc" id="L217">            copy(q, dst);</span>
+<span class="fc" id="L218">            return;</span>
+        }
+<span class="fc" id="L220">        float[] delta = fromAxisAngle(angle, gx, gy, gz);</span>
+        // Body-frame rates compose on the right of the current orientation.
+<span class="fc" id="L222">        multiply(q, delta, dst);</span>
+<span class="fc" id="L223">        normalize(dst);</span>
+<span class="fc" id="L224">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

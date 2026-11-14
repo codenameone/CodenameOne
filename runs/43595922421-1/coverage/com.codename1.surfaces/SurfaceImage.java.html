@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SurfaceImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">SurfaceImage.java</span></div><h1>SurfaceImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import com.codename1.ui.Image;
+
+import java.util.Map;
+
+/// An image node. Because surfaces render while the app process may be dead, images are shipped as
+/// named PNG blobs beside the descriptor rather than passed by reference: constructing the node
+/// from a `com.codename1.ui.Image` encodes it to PNG at publish time and names it by content hash
+/// (identical art re-published later ships no new bytes). A node can also reference a name that
+/// was already shipped with a previous publish.
+///
+/// Keep surface art small -- widget renderers run under tight memory budgets (about 30mb for the
+/// whole iOS widget extension) and Android parcels the rendered widget over a 1mb binder
+/// transaction.
+public class SurfaceImage extends SurfaceNode {
+    /// Scales the image to fit inside the node bounds, preserving aspect ratio.
+    public static final int SCALE_FIT = 0;
+
+    /// Scales the image to fill the node bounds, preserving aspect ratio and cropping overflow.
+    public static final int SCALE_FILL = 1;
+
+    /// Centers the image without scaling.
+    public static final int SCALE_CENTER = 2;
+
+    private final Image image;
+    private final String registeredName;
+<span class="pc" id="L50">    private int scaleMode = SCALE_FIT;</span>
+    private SurfaceColor tint;
+
+    /// Creates an image node from an image. The image is encoded to PNG when the descriptor is
+    /// published.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image to ship with the descriptor
+<span class="nc" id="L59">    public SurfaceImage(Image image) {</span>
+<span class="nc" id="L60">        this.image = image;</span>
+<span class="nc" id="L61">        this.registeredName = null;</span>
+<span class="nc" id="L62">    }</span>
+
+    /// Creates an image node referencing an image name shipped with an earlier publish to the same
+    /// surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `registeredName`: the previously registered image name
+<span class="fc" id="L70">    public SurfaceImage(String registeredName) {</span>
+<span class="fc" id="L71">        this.image = null;</span>
+<span class="fc" id="L72">        this.registeredName = registeredName;</span>
+<span class="fc" id="L73">    }</span>
+
+    /// Sets how the image scales within the node bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scaleMode`: one of `SCALE_FIT`, `SCALE_FILL`, `SCALE_CENTER`
+    ///
+    /// #### Returns
+    ///
+    /// this image node, for chaining
+    public SurfaceImage setScaleMode(int scaleMode) {
+<span class="nc" id="L85">        this.scaleMode = scaleMode;</span>
+<span class="nc" id="L86">        return this;</span>
+    }
+
+    /// Tints the image with the supplied color, template-image style: the image's alpha channel is
+    /// kept and its color replaced.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tint`: the tint color
+    ///
+    /// #### Returns
+    ///
+    /// this image node, for chaining
+    public SurfaceImage setTint(SurfaceColor tint) {
+<span class="nc" id="L100">        this.tint = tint;</span>
+<span class="nc" id="L101">        return this;</span>
+    }
+
+    /// Returns the source image, or null when this node references a registered name.
+    public Image getImage() {
+<span class="nc" id="L106">        return image;</span>
+    }
+
+    /// Returns the referenced registered name, or null when this node ships its own image.
+    public String getRegisteredName() {
+<span class="nc" id="L111">        return registeredName;</span>
+    }
+
+    /// Returns the scale mode, one of `SCALE_FIT`, `SCALE_FILL`, `SCALE_CENTER`.
+    public int getScaleMode() {
+<span class="nc" id="L116">        return scaleMode;</span>
+    }
+
+    /// Returns the tint color, or null.
+    public SurfaceColor getTint() {
+<span class="nc" id="L121">        return tint;</span>
+    }
+
+    @Override
+    public SurfaceImage setPadding(int all) {
+<span class="nc" id="L126">        super.setPadding(all);</span>
+<span class="nc" id="L127">        return this;</span>
+    }
+
+    @Override
+    public SurfaceImage setPadding(int top, int right, int bottom, int left) {
+<span class="nc" id="L132">        super.setPadding(top, right, bottom, left);</span>
+<span class="nc" id="L133">        return this;</span>
+    }
+
+    @Override
+    public SurfaceImage setBackground(SurfaceColor background) {
+<span class="nc" id="L138">        super.setBackground(background);</span>
+<span class="nc" id="L139">        return this;</span>
+    }
+
+    @Override
+    public SurfaceImage setCornerRadius(int radius) {
+<span class="nc" id="L144">        super.setCornerRadius(radius);</span>
+<span class="nc" id="L145">        return this;</span>
+    }
+
+    @Override
+    public SurfaceImage setAlignment(SurfaceAlignment alignment) {
+<span class="nc" id="L150">        super.setAlignment(alignment);</span>
+<span class="nc" id="L151">        return this;</span>
+    }
+
+    @Override
+    public SurfaceImage setWeight(int weight) {
+<span class="nc" id="L156">        super.setWeight(weight);</span>
+<span class="nc" id="L157">        return this;</span>
+    }
+
+    @Override
+    public SurfaceImage setSize(int widthDips, int heightDips) {
+<span class="fc" id="L162">        super.setSize(widthDips, heightDips);</span>
+<span class="fc" id="L163">        return this;</span>
+    }
+
+    @Override
+    public SurfaceImage setAction(String actionId) {
+<span class="nc" id="L168">        super.setAction(actionId);</span>
+<span class="nc" id="L169">        return this;</span>
+    }
+
+    @Override
+    public SurfaceImage setAction(String actionId, Map&lt;String, Object&gt; params) {
+<span class="nc" id="L174">        super.setAction(actionId, params);</span>
+<span class="nc" id="L175">        return this;</span>
+    }
+
+    @Override
+    String getType() {
+<span class="fc" id="L180">        return &quot;img&quot;;</span>
+    }
+
+    @Override
+    void serializeContent(Map&lt;String, Object&gt; out, Map&lt;String, byte[]&gt; images, int depth) {
+<span class="fc" id="L185">        String name = registeredName;</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L187">            name = SurfaceSerializer.registerImage(image, images);</span>
+        }
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        out.put(&quot;name&quot;, name == null ? &quot;&quot; : name);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (scaleMode == SCALE_FILL) {</span>
+<span class="nc" id="L191">            out.put(&quot;scale&quot;, &quot;fill&quot;);</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        } else if (scaleMode == SCALE_CENTER) {</span>
+<span class="nc" id="L193">            out.put(&quot;scale&quot;, &quot;center&quot;);</span>
+        }
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (tint != null) {</span>
+<span class="nc" id="L196">            out.put(&quot;tint&quot;, SurfaceSerializer.colorMap(tint));</span>
+        }
+<span class="fc" id="L198">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

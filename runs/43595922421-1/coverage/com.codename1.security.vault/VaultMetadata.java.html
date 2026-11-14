@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VaultMetadata.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">VaultMetadata.java</span></div><h1>VaultMetadata.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+/// The non-secret record describing one vault: which data key it uses, and the wrapped copies of
+/// that key that can be unwrapped back into it.
+///
+/// Everything here is safe to store in ordinary storage and safe to send to a sync server. The
+/// wraps are [SecureEnvelope]s of the data key -- ciphertext under a password-derived key or a
+/// recovery-code-derived key -- so a server holding this can neither read the vault nor help
+/// anyone else to. The device wrap is deliberately **not** here: it is local to one device, must
+/// never sync, and is kept in a separate record.
+///
+/// #### Wire format
+///
+/// A text record, because it has to be readable by a person debugging a sync problem and by an
+/// implementation in another language, and because it is small enough that the density of a
+/// binary format buys nothing. Lines are `key=value`, values are lower case hex or decimal, and
+/// the first line is a magic that a reader checks before anything else.
+///
+/// ```text
+/// CN1VAULT1
+/// vault=&lt;32 hex characters, the vault's random id&gt;
+/// key.id=&lt;name of the data key&gt;
+/// key.version=&lt;decimal&gt;
+/// counter=&lt;decimal, monotonic&gt;
+/// wrap.password=&lt;hex envelope&gt;
+/// wrap.recovery=&lt;hex envelope, optional&gt;
+/// retired.&lt;n&gt;=&lt;hex envelope of data key version n, sealed under data key version n+1&gt;
+/// ```
+///
+/// The `retired` lines are what makes rotation a real operation rather than a rename. Rotating
+/// generates a new data key and seals the outgoing one **under the new one**, so an envelope
+/// written months ago still opens: [Vault#open] reads the key version out of the envelope and
+/// walks the chain down from the current key one link at a time. Rewriting every record at
+/// rotation time is the alternative, and on a device holding a synced database it is not
+/// something that can be done atomically.
+///
+/// A chain rather than a flat set: rotating again re-seals only the outgoing key, so the cost of
+/// a rotation does not grow with the number of rotations already performed. Opening an old record
+/// costs one unwrap per rotation since it was written, which is the right place to pay.
+///
+/// Unknown lines are preserved on read and written back out. That is what lets an older client
+/// round-trip a record a newer one wrote without deleting the field it did not understand -- the
+/// alternative is a sync loop where two versions of an application take turns destroying each
+/// other's data.
+<span class="fc" id="L67">final class VaultMetadata {</span>
+
+    static final String MAGIC = &quot;CN1VAULT1&quot;;
+
+    String vaultId;
+<span class="fc" id="L72">    String dataKeyId = &quot;dk&quot;;</span>
+<span class="fc" id="L73">    int dataKeyVersion = 1;</span>
+    long counter;
+    byte[] passwordWrap;
+    byte[] recoveryWrap;
+
+    /// Authentication tag over [#serializeForMac()], keyed by this record's own data key.
+    ///
+    /// Keyed by the data key and not by anything derived from the password directly, because the
+    /// key is what a reader recovers by opening the password wrap -- so a reader can verify this
+    /// exactly when it is entitled to, and an attacker who can edit the record cannot recompute
+    /// it without the password.
+    byte[] mac;
+
+    /// Version to envelope, each holding data key version n sealed under version n+1.
+<span class="fc" id="L87">    final java.util.Hashtable&lt;Integer, byte[]&gt; retired = new java.util.Hashtable&lt;Integer, byte[]&gt;();</span>
+
+    /// Fingerprints of the records this one descends from, oldest first.
+    ///
+    /// Each is the first [#FINGERPRINT_BYTES] bytes of that record's own tag, in hex. This is what
+    /// makes ancestry decidable: the counter counts mutations on whichever device made them, so
+    /// two devices that diverge from the same base both raise it and neither is newer, and no
+    /// comparison of two integers can tell that apart from one device simply being ahead. A list
+    /// of what a record came from can.
+    ///
+    /// Bounded at [#MAX_ANCESTORS], so a record cannot grow without limit. Past that the oldest
+    /// entries are dropped and a device more than that many changes behind can no longer be shown
+    /// to be an ancestor -- the import is refused rather than guessed at, which is the safe
+    /// direction: the application resolves it, and nothing is silently overwritten.
+<span class="fc" id="L101">    final java.util.ArrayList&lt;String&gt; ancestors = new java.util.ArrayList&lt;String&gt;();</span>
+
+    /// How much of a record's tag identifies it. Eight bytes is far past any accidental collision
+    /// for a list this short, and a deliberate one is not available: the list is inside the tagged
+    /// body, so it cannot be edited without the data key.
+    static final int FINGERPRINT_BYTES = 8;
+
+    /// How many generations of ancestry a record carries.
+    static final int MAX_ANCESTORS = 64;
+
+    /// Lines this build did not recognise, kept so they survive a round trip.
+<span class="fc" id="L112">    String unknown = &quot;&quot;;</span>
+
+    /// A detached copy, for building the next state without touching the one in use.
+    ///
+    /// The wrap arrays are shared with the original rather than cloned, and that is safe for one
+    /// reason only: every write in this package **replaces** a wrap, never edits one in place. No
+    /// caller zeroes `passwordWrap`, `recoveryWrap` or a retired envelope -- they are ciphertext,
+    /// not key material, so there is nothing in them worth clearing. A change that started editing
+    /// a wrap's bytes would silently reach through every copy ever taken, so clone there rather
+    /// than here if that day comes.
+    ///
+    /// Mutating the live record in place and writing it afterwards means a failed write leaves the
+    /// vault holding a record it never persisted -- and, during a rotation, one whose key version
+    /// has advanced past the key actually in hand. Everything sealed after that is labelled with a
+    /// version it was not encrypted under.
+    VaultMetadata copy() {
+<span class="fc" id="L128">        VaultMetadata out = new VaultMetadata();</span>
+<span class="fc" id="L129">        out.vaultId = vaultId;</span>
+<span class="fc" id="L130">        out.dataKeyId = dataKeyId;</span>
+<span class="fc" id="L131">        out.dataKeyVersion = dataKeyVersion;</span>
+<span class="fc" id="L132">        out.counter = counter;</span>
+<span class="fc" id="L133">        out.passwordWrap = passwordWrap;</span>
+<span class="fc" id="L134">        out.recoveryWrap = recoveryWrap;</span>
+<span class="fc" id="L135">        out.retired.putAll(retired);</span>
+<span class="fc" id="L136">        out.unknown = unknown;</span>
+<span class="fc" id="L137">        out.mac = mac;</span>
+<span class="fc" id="L138">        out.ancestors.addAll(ancestors);</span>
+<span class="fc" id="L139">        return out;</span>
+    }
+
+    /// The record as it is authenticated: everything except the tag itself.
+    ///
+    /// Everything else in here is either ciphertext or is covered by a wrap's associated data --
+    /// the counter is neither. It is plaintext an attacker who serves sync state can edit, and
+    /// raising it on an OLD record makes that record look newer while its password wrap still
+    /// opens, so the newer key and retired chain are overwritten and everything sealed since
+    /// becomes unreadable. A tag over these bytes is what makes the counter unforgeable.
+    String serializeForMac() {
+<span class="fc" id="L150">        return serializeBody();</span>
+    }
+
+    String serialize() {
+<span class="fc" id="L154">        StringBuilder b = new StringBuilder(serializeBody());</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (mac != null) {</span>
+<span class="fc" id="L156">            b.append(&quot;mac=&quot;).append(Bytes.toHex(mac)).append('\n');</span>
+        }
+<span class="fc" id="L158">        return b.toString();</span>
+    }
+
+    private String serializeBody() {
+<span class="fc" id="L162">        StringBuilder b = new StringBuilder();</span>
+<span class="fc" id="L163">        b.append(MAGIC).append('\n');</span>
+<span class="fc" id="L164">        b.append(&quot;vault=&quot;).append(vaultId).append('\n');</span>
+<span class="fc" id="L165">        b.append(&quot;key.id=&quot;).append(dataKeyId).append('\n');</span>
+<span class="fc" id="L166">        b.append(&quot;key.version=&quot;).append(dataKeyVersion).append('\n');</span>
+<span class="fc" id="L167">        b.append(&quot;counter=&quot;).append(counter).append('\n');</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (passwordWrap != null) {</span>
+<span class="fc" id="L169">            b.append(&quot;wrap.password=&quot;).append(Bytes.toHex(passwordWrap)).append('\n');</span>
+        }
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (recoveryWrap != null) {</span>
+<span class="fc" id="L172">            b.append(&quot;wrap.recovery=&quot;).append(Bytes.toHex(recoveryWrap)).append('\n');</span>
+        }
+        // Ascending, so the record is stable and two clients that hold the same state serialize
+        // to the same bytes -- which is what lets a sync layer compare them at all.
+        //
+        // Over the entries that EXIST, not over the range the record claims. Counting up to
+        // dataKeyVersion made the cost of serializing a record a function of a number inside it,
+        // and importSyncState serializes an incoming record before it authenticates one -- the
+        // equal-counter fork check has to, because it is comparing bytes. So a sixty-byte record
+        // declaring `key.version=2147483647` and carrying nothing else span two billion lookups
+        // on the worker before anything rejected it, which on an off-EDT caller is its thread too.
+<span class="fc" id="L183">        int[] versions = new int[retired.size()];</span>
+<span class="fc" id="L184">        int count = 0;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (java.util.Enumeration&lt;Integer&gt; keys = retired.keys(); keys.hasMoreElements();) {</span>
+<span class="fc" id="L186">            int version = keys.nextElement().intValue();</span>
+<span class="pc bpc" id="L187" title="2 of 4 branches missed.">            if (version &gt;= 1 &amp;&amp; version &lt; dataKeyVersion) {</span>
+<span class="fc" id="L188">                versions[count++] = version;</span>
+            }
+<span class="fc" id="L190">        }</span>
+        // Insertion sort: a retired chain is one entry per rotation this vault has ever done, so
+        // it is a handful, and this avoids depending on a Collections method the device class
+        // libraries would also have to define.
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (int iter = 1; iter &lt; count; iter++) {</span>
+<span class="fc" id="L195">            int value = versions[iter];</span>
+<span class="fc" id="L196">            int at = iter - 1;</span>
+<span class="pc bpc" id="L197" title="1 of 4 branches missed.">            while (at &gt;= 0 &amp;&amp; versions[at] &gt; value) {</span>
+<span class="fc" id="L198">                versions[at + 1] = versions[at];</span>
+<span class="fc" id="L199">                at--;</span>
+            }
+<span class="fc" id="L201">            versions[at + 1] = value;</span>
+        }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L204">            byte[] envelope = retired.get(Integer.valueOf(versions[iter]));</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (envelope != null) {</span>
+<span class="fc" id="L206">                b.append(&quot;retired.&quot;).append(versions[iter]).append('=')</span>
+<span class="fc" id="L207">                        .append(Bytes.toHex(envelope)).append('\n');</span>
+            }
+        }
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (!ancestors.isEmpty()) {</span>
+<span class="fc" id="L211">            b.append(&quot;ancestors=&quot;);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            for (int iter = 0; iter &lt; ancestors.size(); iter++) {</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                if (iter &gt; 0) {</span>
+<span class="fc" id="L214">                    b.append(',');</span>
+                }
+<span class="fc" id="L216">                b.append(ancestors.get(iter));</span>
+            }
+<span class="fc" id="L218">            b.append('\n');</span>
+        }
+<span class="fc" id="L220">        b.append(unknown);</span>
+<span class="fc" id="L221">        return b.toString();</span>
+    }
+
+    static VaultMetadata parse(String text) {
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L226">            return null;</span>
+        }
+<span class="fc" id="L228">        VaultMetadata out = new VaultMetadata();</span>
+<span class="fc" id="L229">        StringBuilder unknown = new StringBuilder();</span>
+<span class="fc" id="L230">        int at = 0;</span>
+<span class="fc" id="L231">        boolean first = true;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        while (at &lt;= text.length()) {</span>
+<span class="fc" id="L233">            int end = text.indexOf('\n', at);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (end &lt; 0) {</span>
+<span class="fc" id="L235">                end = text.length();</span>
+            }
+<span class="fc" id="L237">            String line = text.substring(at, end);</span>
+<span class="fc" id="L238">            at = end + 1;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            if (first) {</span>
+<span class="fc" id="L240">                first = false;</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                if (!MAGIC.equals(line)) {</span>
+<span class="fc" id="L242">                    throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                            &quot;vault record is not in a format this build understands&quot;);
+                }
+                continue;
+            }
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (line.length() == 0) {</span>
+<span class="fc" id="L248">                continue;</span>
+            }
+<span class="fc" id="L250">            int eq = line.indexOf('=');</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (eq &lt; 0) {</span>
+<span class="nc" id="L252">                throw new VaultException(VaultError.CORRUPT, &quot;malformed line in the vault record&quot;);</span>
+            }
+<span class="fc" id="L254">            String key = line.substring(0, eq);</span>
+<span class="fc" id="L255">            String value = line.substring(eq + 1);</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (&quot;vault&quot;.equals(key)) {</span>
+<span class="fc" id="L257">                out.vaultId = value;</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            } else if (&quot;key.id&quot;.equals(key)) {</span>
+<span class="fc" id="L259">                out.dataKeyId = value;</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">            } else if (&quot;key.version&quot;.equals(key)) {</span>
+<span class="fc" id="L261">                out.dataKeyVersion = requireSaneVersion(parseInt(value));</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            } else if (&quot;mac&quot;.equals(key)) {</span>
+<span class="fc" id="L263">                out.mac = Bytes.fromHex(value);</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            } else if (&quot;counter&quot;.equals(key)) {</span>
+<span class="fc" id="L265">                out.counter = parseLong(value);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            } else if (&quot;wrap.password&quot;.equals(key)) {</span>
+<span class="fc" id="L267">                out.passwordWrap = hex(value);</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            } else if (&quot;wrap.recovery&quot;.equals(key)) {</span>
+<span class="fc" id="L269">                out.recoveryWrap = hex(value);</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            } else if (&quot;ancestors&quot;.equals(key)) {</span>
+<span class="fc" id="L271">                int from = 0;</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                while (from &lt; value.length()) {</span>
+<span class="fc" id="L273">                    int comma = value.indexOf(',', from);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                    if (comma &lt; 0) {</span>
+<span class="fc" id="L275">                        comma = value.length();</span>
+                    }
+<span class="fc" id="L277">                    String one = value.substring(from, comma);</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">                    if (one.length() &gt; 0) {</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">                        if (out.ancestors.size() &gt;= MAX_ANCESTORS) {</span>
+                            // Bounded on the way IN as well as on the way out. Stamping trims to
+                            // this, so a record carrying more was not written by any vault -- and
+                            // an import stores the incoming record verbatim, so enforcing the cap
+                            // only where we stamp let a sync server grow this device's record
+                            // without limit, one import at a time.
+<span class="fc" id="L285">                            throw new VaultException(VaultError.CORRUPT,</span>
+                                    &quot;vault record carries more than &quot; + MAX_ANCESTORS
+                                    + &quot; generations of ancestry&quot;);
+                        }
+<span class="fc" id="L289">                        out.ancestors.add(one);</span>
+                    }
+<span class="fc" id="L291">                    from = comma + 1;</span>
+<span class="fc" id="L292">                }</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            } else if (key.startsWith(&quot;retired.&quot;)) {</span>
+                // Through the same bound as key.version, so a retired entry cannot name a
+                // version the format says no vault reaches.
+<span class="fc" id="L296">                out.retired.put(Integer.valueOf(requireSaneVersion(parseInt(key.substring(8)))),</span>
+<span class="fc" id="L297">                        hex(value));</span>
+            } else {
+                // Kept rather than dropped: see the class note on round-tripping.
+<span class="nc" id="L300">                unknown.append(line).append('\n');</span>
+            }
+<span class="fc" id="L302">        }</span>
+<span class="fc" id="L303">        out.unknown = unknown.toString();</span>
+<span class="pc bpc" id="L304" title="2 of 4 branches missed.">        if (out.vaultId == null || out.vaultId.length() == 0) {</span>
+<span class="nc" id="L305">            throw new VaultException(VaultError.CORRUPT, &quot;vault record has no vault id&quot;);</span>
+        }
+<span class="fc" id="L307">        return out;</span>
+    }
+
+    /// A data key version a record could actually have reached.
+    ///
+    /// Every rotation retires the key it replaces into this record, so a genuine version N
+    /// carries N-1 envelopes and a record claiming a version it has no room for is malformed.
+    /// This does not try to enforce that exactly -- a future format that prunes old retired
+    /// entries would break it -- it just refuses the absurd, so that a number an attacker chose
+    /// cannot stand for an amount of work.
+    private static int requireSaneVersion(int version) {
+<span class="pc bpc" id="L318" title="1 of 4 branches missed.">        if (version &lt; 1 || version &gt; MAX_KEY_VERSION) {</span>
+<span class="fc" id="L319">            throw new VaultException(VaultError.CORRUPT,</span>
+                    &quot;vault record claims data key version &quot; + version
+                    + &quot;, which is not a version any vault could have reached&quot;);
+        }
+<span class="fc" id="L323">        return version;</span>
+    }
+
+    /// Far past any rotation count a real vault reaches, and small enough that no loop over it
+    /// is a denial of service.
+    static final int MAX_KEY_VERSION = 1000000;
+
+    private static byte[] hex(String value) {
+<span class="fc" id="L331">        byte[] out = Bytes.fromHex(value);</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">        if (out == null) {</span>
+<span class="nc" id="L333">            throw new VaultException(VaultError.CORRUPT, &quot;vault record holds a malformed wrap&quot;);</span>
+        }
+<span class="fc" id="L335">        return out;</span>
+    }
+
+    private static int parseInt(String value) {
+        try {
+<span class="fc" id="L340">            return Integer.parseInt(value);</span>
+<span class="nc" id="L341">        } catch (NumberFormatException bad) {</span>
+<span class="nc" id="L342">            throw new VaultException(VaultError.CORRUPT,</span>
+                    &quot;vault record holds a malformed number&quot;, bad);
+        }
+    }
+
+    private static long parseLong(String value) {
+        try {
+<span class="fc" id="L349">            return Long.parseLong(value);</span>
+<span class="nc" id="L350">        } catch (NumberFormatException bad) {</span>
+<span class="nc" id="L351">            throw new VaultException(VaultError.CORRUPT,</span>
+                    &quot;vault record holds a malformed number&quot;, bad);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

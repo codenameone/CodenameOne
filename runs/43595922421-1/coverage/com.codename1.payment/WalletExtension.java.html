@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WalletExtension.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment</a> &gt; <span class="el_source">WalletExtension.java</span></div><h1>WalletExtension.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.payment;
+
+import com.codename1.ui.Display;
+
+/// Publishes card data to the Apple Wallet issuer-provisioning extension so
+/// users can add the issuer's cards to Apple Wallet from inside the Wallet
+/// app (&quot;From apps on your iPhone&quot;). iOS only; on other platforms
+/// [#isSupported()] returns false and all methods are no-ops.
+///
+/// ### How it works
+///
+/// The Wallet extension runs in a separate process, launched by the Wallet
+/// app, usually while your app is not running. It cannot call into your Java
+/// code. Instead your app pre-publishes the list of available cards (and an
+/// auth token) with this class; the data is stored in the shared App Group
+/// container where the generated extension reads it. The final provisioning
+/// step - producing the encrypted pass payload - is performed by your issuer
+/// backend: the extension POSTs Apple's certificates/nonce plus the card
+/// identifier and auth token to the HTTPS endpoint configured in the
+/// `ios.wallet.issuerEndpoint` build hint, which must respond with JSON
+/// `{&quot;activationData&quot;, &quot;encryptedPassData&quot;, &quot;ephemeralPublicKey&quot;}` (base64).
+///
+/// Call [#setPassEntries(WalletPassEntry[])] whenever the user's card list
+/// changes (e.g. after login) and keep a fresh auth token published with
+/// [#setAuthToken(java.lang.String)]; call [#clear()] on logout.
+///
+/// ### Enabling the extension (no native code needed)
+///
+/// Add these build hints to the iOS build:
+///
+/// - `ios.wallet.extension=true` - generates the non-UI Wallet extension
+/// - `ios.wallet.appGroup=group.com.mycompany.myapp` - shared App Group id
+/// - `ios.wallet.issuerEndpoint=https://...` - issuer backend endpoint
+/// - `ios.wallet.includeUI=true` + `ios.wallet.authEndpoint=https://...` -
+///   optional in-Wallet login screen, only needed when you report
+///   [#setRequiresAuthentication(boolean)] true instead of keeping a token
+/// - `ios.wallet.*Inject` hints - inject custom Objective-C at key points
+///
+/// Each extension needs its own App ID and provisioning profile carrying the
+/// restricted `com.apple.developer.payment-pass-provisioning` entitlement,
+/// which Apple grants per-app on request. For cloud builds either place the
+/// `.mobileprovision` files in `src/main/resources` and name them in the
+/// `ios.wallet.nonuiProvisioningProfile` / `ios.wallet.uiProvisioningProfile`
+/// hints, or host them at the URLs given in the
+/// `ios.wallet.nonuiProvisioningURL` / `ios.wallet.uiProvisioningURL` hints.
+/// The card network must also list the extension App IDs in the pass
+/// metadata (`associatedApplicationIdentifiers`) or Wallet never invokes
+/// the extension.
+///
+/// ### Bringing your own extension
+///
+/// If you already have Xcode extension targets (e.g. from an issuer SDK
+/// vendor or an existing native app), skip the `ios.wallet.*` hints and copy
+/// each extension into `ios/app_extensions/&lt;Name&gt;/` in your project instead:
+/// its sources, `Info.plist`, `&lt;Name&gt;.entitlements`, an optional
+/// `buildSettings.properties` with Xcode build settings (set
+/// `IPHONEOS_DEPLOYMENT_TARGET=14.0` for Wallet extensions) and the
+/// extension's `.mobileprovision` for cloud device builds.
+public final class WalletExtension {
+
+    private WalletExtension() {
+    }
+
+    /// Returns true if the platform supports publishing Wallet extension
+    /// data: iOS 14 or newer with the `ios.wallet.extension` build hint
+    /// enabled. Returns false on all other platforms and in the simulator.
+    public static boolean isSupported() {
+<span class="nc" id="L90">        return Display.getInstance().isWalletExtensionSupported();</span>
+    }
+
+    /// Publishes the cards that the Wallet extension offers for provisioning
+    /// on the iPhone itself, replacing any previously published list. Cards
+    /// already present in Wallet are filtered out automatically by the
+    /// extension.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entries`: the available cards; an empty array or null clears the list
+    public static void setPassEntries(WalletPassEntry[] entries) {
+<span class="nc" id="L102">        Display.getInstance().walletExtensionSetPassEntries(false, entries);</span>
+<span class="nc" id="L103">    }</span>
+
+    /// Publishes the cards offered for provisioning on a paired Apple Watch,
+    /// replacing any previously published list. Typically the same list as
+    /// [#setPassEntries(WalletPassEntry[])].
+    ///
+    /// #### Parameters
+    ///
+    /// - `entries`: the available cards; an empty array or null clears the list
+    public static void setRemotePassEntries(WalletPassEntry[] entries) {
+<span class="nc" id="L113">        Display.getInstance().walletExtensionSetPassEntries(true, entries);</span>
+<span class="nc" id="L114">    }</span>
+
+    /// Sets whether Wallet should present the login UI extension before
+    /// provisioning. Keep this false and maintain a fresh token with
+    /// [#setAuthToken(java.lang.String)] to skip in-Wallet login entirely.
+    public static void setRequiresAuthentication(boolean requiresAuthentication) {
+<span class="nc" id="L120">        Display.getInstance().walletExtensionSetRequiresAuthentication(requiresAuthentication);</span>
+<span class="nc" id="L121">    }</span>
+
+    /// Publishes the auth token that the extension forwards to the issuer
+    /// endpoint (JSON `authToken` field and `Authorization: Bearer` header)
+    /// when the user adds a card.
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the token, or null to remove it
+    public static void setAuthToken(String token) {
+<span class="nc" id="L131">        Display.getInstance().walletExtensionSetAuthToken(token);</span>
+<span class="nc" id="L132">    }</span>
+
+    /// Clears everything previously published: pass entries, remote pass
+    /// entries, the auth token and the requires-authentication flag. Call
+    /// this when the user logs out.
+    public static void clear() {
+<span class="nc" id="L138">        Display.getInstance().walletExtensionClear();</span>
+<span class="nc" id="L139">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

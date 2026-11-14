@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Pbkdf2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Pbkdf2.java</span></div><h1>Pbkdf2.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// PBKDF2 (RFC 8018) with HMAC-SHA-256 or HMAC-SHA-512: the password hash of
+/// key stores and vaults, and with SHA-512 and 2048 iterations the seed of a
+/// BIP-39 mnemonic.
+///
+/// A [CryptoEngine] that derives natively is used when one is installed
+/// (every client port installs one). Otherwise the derivation runs in Java,
+/// and still costs two hash compressions per iteration: the HMAC key's inner
+/// and outer padded blocks are compressed once, up front, and each iteration
+/// resumes from those two states with the previous output as its only block.
+/// A straightforward HMAC loop re-hashes both padded keys every round, twice
+/// the work.
+///
+/// ```java
+/// byte[] mnemonicUtf8 = Mnemonic.generate(128).getBytes(&quot;UTF-8&quot;);
+/// byte[] saltUtf8 = &quot;mnemonic&quot;.getBytes(&quot;UTF-8&quot;);    // &quot;mnemonic&quot; + passphrase
+/// byte[] seed = Pbkdf2.hmacSha512(mnemonicUtf8, saltUtf8, 2048, 64);
+/// ```
+@com.codename1.impl.SharedWithBackend
+public final class Pbkdf2 {
+<span class="fc" id="L44">    private static final long[] IV512 = {</span>
+        0x6a09e667f3bcc908L, 0xbb67ae8584caa73bL, 0x3c6ef372fe94f82bL, 0xa54ff53a5f1d36f1L,
+        0x510e527fade682d1L, 0x9b05688c2b3e6c1fL, 0x1f83d9abfb41bd6bL, 0x5be0cd19137e2179L
+    };
+<span class="fc" id="L48">    private static final int[] IV256 = {</span>
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+    };
+
+    private Pbkdf2() {
+    }
+
+    /// PBKDF2 with HMAC-SHA-512.
+    ///
+    /// #### Parameters
+    ///
+    /// - `password`: the password bytes, used as they are (encode text as
+    ///   UTF-8, normalized as the protocol requires, before calling)
+    ///
+    /// - `salt`: the salt
+    ///
+    /// - `iterations`: at least 1
+    ///
+    /// - `length`: how many bytes to derive, at least 1
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: if an argument is null or out of range
+    public static byte[] hmacSha512(byte[] password, byte[] salt, int iterations, int length) {
+<span class="fc" id="L72">        return derive(Hash.SHA512, password, salt, iterations, length);</span>
+    }
+
+    /// PBKDF2 with HMAC-SHA-256; see [#hmacSha512] for the parameters.
+    public static byte[] hmacSha256(byte[] password, byte[] salt, int iterations, int length) {
+<span class="nc" id="L77">        return derive(Hash.SHA256, password, salt, iterations, length);</span>
+    }
+
+    private static byte[] derive(String hash, byte[] password, byte[] salt, int iterations, int length) {
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">        if (password == null || salt == null) {</span>
+<span class="nc" id="L82">            throw new CryptoException(&quot;password and salt must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">        if (iterations &lt; 1 || length &lt; 1) {</span>
+<span class="nc" id="L85">            throw new CryptoException(&quot;iterations and length must be positive&quot;);</span>
+        }
+<span class="fc" id="L87">        byte[] fast = CryptoEngine.get().pbkdf2(hash, password, salt, iterations, length);</span>
+<span class="pc bpc" id="L88" title="3 of 4 branches missed.">        if (fast != null &amp;&amp; fast.length == length) {</span>
+<span class="nc" id="L89">            return fast;</span>
+        }
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        return Hash.SHA512.equals(hash)</span>
+<span class="pc" id="L92">                ? portable512(password, salt, iterations, length)</span>
+<span class="nc" id="L93">                : portable256(password, salt, iterations, length);</span>
+    }
+
+    /// The Java derivation with HMAC-SHA-512, whatever engine is installed:
+    /// what an engine falls back to, and what the tests hold a native one to.
+    static byte[] portable512(byte[] password, byte[] salt, int iterations, int length) {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        byte[] key = password.length &gt; 128 ? Hash.sha512(password) : password;</span>
+<span class="fc" id="L100">        long[] w = new long[80];</span>
+<span class="fc" id="L101">        long[] inner = padState512(key, (byte) 0x36, w);</span>
+<span class="fc" id="L102">        long[] outer = padState512(key, (byte) 0x5c, w);</span>
+<span class="fc" id="L103">        int blocks = (length + 63) / 64;</span>
+<span class="fc" id="L104">        byte[] out = new byte[blocks * 64];</span>
+<span class="fc" id="L105">        byte[] msg = new byte[salt.length + 4];</span>
+<span class="fc" id="L106">        System.arraycopy(salt, 0, msg, 0, salt.length);</span>
+<span class="fc" id="L107">        long[] u = new long[8];</span>
+<span class="fc" id="L108">        long[] t = new long[8];</span>
+<span class="fc" id="L109">        long[] st = new long[8];</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (int index = 1; index &lt;= blocks; index++) {</span>
+<span class="fc" id="L111">            putInt(msg, salt.length, index);</span>
+<span class="fc" id="L112">            byte[] u1 = Hmac.sha512(password, msg);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L114">                u[i] = readLong(u1, i * 8);</span>
+<span class="fc" id="L115">                t[i] = u[i];</span>
+            }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (int round = 1; round &lt; iterations; round++) {</span>
+<span class="fc" id="L118">                hmacBlock512(inner, outer, u, st, w);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L120">                    t[i] ^= u[i];</span>
+                }
+            }
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L124">                writeLong(out, (index - 1) * 64 + i * 8, t[i]);</span>
+            }
+        }
+<span class="fc" id="L127">        byte[] exact = new byte[length];</span>
+<span class="fc" id="L128">        System.arraycopy(out, 0, exact, 0, length);</span>
+<span class="fc" id="L129">        zero(out);</span>
+<span class="fc" id="L130">        zero(u);</span>
+<span class="fc" id="L131">        zero(t);</span>
+<span class="fc" id="L132">        zero(st);</span>
+<span class="fc" id="L133">        zero(inner);</span>
+<span class="fc" id="L134">        zero(outer);</span>
+<span class="fc" id="L135">        return exact;</span>
+    }
+
+    // u = HMAC(u) from the two precomputed pad states: the message is one
+    // 64-byte block, so each half is a single compression with the padding
+    // and the length (128 + 64 bytes) written in directly
+    private static void hmacBlock512(long[] inner, long[] outer, long[] u, long[] st, long[] w) {
+<span class="fc" id="L142">        System.arraycopy(inner, 0, st, 0, 8);</span>
+<span class="fc" id="L143">        System.arraycopy(u, 0, w, 0, 8);</span>
+<span class="fc" id="L144">        w[8] = 0x8000000000000000L;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (int i = 9; i &lt; 15; i++) {</span>
+<span class="fc" id="L146">            w[i] = 0;</span>
+        }
+<span class="fc" id="L148">        w[15] = (128 + 64) * 8;</span>
+<span class="fc" id="L149">        MessageDigestImpl.Sha512Family.compress(st, w);</span>
+<span class="fc" id="L150">        System.arraycopy(outer, 0, u, 0, 8);</span>
+<span class="fc" id="L151">        System.arraycopy(st, 0, w, 0, 8);</span>
+<span class="fc" id="L152">        w[8] = 0x8000000000000000L;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (int i = 9; i &lt; 15; i++) {</span>
+<span class="fc" id="L154">            w[i] = 0;</span>
+        }
+<span class="fc" id="L156">        w[15] = (128 + 64) * 8;</span>
+<span class="fc" id="L157">        MessageDigestImpl.Sha512Family.compress(u, w);</span>
+<span class="fc" id="L158">    }</span>
+
+    private static long[] padState512(byte[] key, byte pad, long[] w) {
+<span class="fc" id="L161">        byte[] block = new byte[128];</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (int i = 0; i &lt; 128; i++) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            block[i] = (byte) ((i &lt; key.length ? key[i] : 0) ^ pad);</span>
+        }
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L166">            w[i] = readLong(block, i * 8);</span>
+        }
+<span class="fc" id="L168">        long[] st = new long[8];</span>
+<span class="fc" id="L169">        System.arraycopy(IV512, 0, st, 0, 8);</span>
+<span class="fc" id="L170">        MessageDigestImpl.Sha512Family.compress(st, w);</span>
+<span class="fc" id="L171">        zero(block);</span>
+<span class="fc" id="L172">        return st;</span>
+    }
+
+    /// The Java derivation with HMAC-SHA-256; see [#portable512].
+    static byte[] portable256(byte[] password, byte[] salt, int iterations, int length) {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        byte[] key = password.length &gt; 64 ? Hash.sha256(password) : password;</span>
+<span class="nc" id="L178">        int[] w = new int[64];</span>
+<span class="nc" id="L179">        int[] inner = padState256(key, (byte) 0x36, w);</span>
+<span class="nc" id="L180">        int[] outer = padState256(key, (byte) 0x5c, w);</span>
+<span class="nc" id="L181">        int blocks = (length + 31) / 32;</span>
+<span class="nc" id="L182">        byte[] out = new byte[blocks * 32];</span>
+<span class="nc" id="L183">        byte[] msg = new byte[salt.length + 4];</span>
+<span class="nc" id="L184">        System.arraycopy(salt, 0, msg, 0, salt.length);</span>
+<span class="nc" id="L185">        int[] u = new int[8];</span>
+<span class="nc" id="L186">        int[] t = new int[8];</span>
+<span class="nc" id="L187">        int[] st = new int[8];</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        for (int index = 1; index &lt;= blocks; index++) {</span>
+<span class="nc" id="L189">            putInt(msg, salt.length, index);</span>
+<span class="nc" id="L190">            byte[] u1 = Hmac.sha256(password, msg);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">            for (int i = 0; i &lt; 8; i++) {</span>
+<span class="nc" id="L192">                u[i] = readInt(u1, i * 4);</span>
+<span class="nc" id="L193">                t[i] = u[i];</span>
+            }
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            for (int round = 1; round &lt; iterations; round++) {</span>
+<span class="nc" id="L196">                System.arraycopy(inner, 0, st, 0, 8);</span>
+<span class="nc" id="L197">                System.arraycopy(u, 0, w, 0, 8);</span>
+<span class="nc" id="L198">                w[8] = 0x80000000;</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                for (int i = 9; i &lt; 15; i++) {</span>
+<span class="nc" id="L200">                    w[i] = 0;</span>
+                }
+<span class="nc" id="L202">                w[15] = (64 + 32) * 8;</span>
+<span class="nc" id="L203">                MessageDigestImpl.Sha256Family.compress(st, w);</span>
+<span class="nc" id="L204">                System.arraycopy(outer, 0, u, 0, 8);</span>
+<span class="nc" id="L205">                System.arraycopy(st, 0, w, 0, 8);</span>
+<span class="nc" id="L206">                w[8] = 0x80000000;</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">                for (int i = 9; i &lt; 15; i++) {</span>
+<span class="nc" id="L208">                    w[i] = 0;</span>
+                }
+<span class="nc" id="L210">                w[15] = (64 + 32) * 8;</span>
+<span class="nc" id="L211">                MessageDigestImpl.Sha256Family.compress(u, w);</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                for (int i = 0; i &lt; 8; i++) {</span>
+<span class="nc" id="L213">                    t[i] ^= u[i];</span>
+                }
+            }
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            for (int i = 0; i &lt; 8; i++) {</span>
+<span class="nc" id="L217">                putInt(out, (index - 1) * 32 + i * 4, t[i]);</span>
+            }
+        }
+<span class="nc" id="L220">        byte[] exact = new byte[length];</span>
+<span class="nc" id="L221">        System.arraycopy(out, 0, exact, 0, length);</span>
+<span class="nc" id="L222">        zero(out);</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="nc" id="L224">            u[i] = 0;</span>
+<span class="nc" id="L225">            t[i] = 0;</span>
+<span class="nc" id="L226">            st[i] = 0;</span>
+<span class="nc" id="L227">            inner[i] = 0;</span>
+<span class="nc" id="L228">            outer[i] = 0;</span>
+        }
+<span class="nc" id="L230">        return exact;</span>
+    }
+
+    private static int[] padState256(byte[] key, byte pad, int[] w) {
+<span class="nc" id="L234">        byte[] block = new byte[64];</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        for (int i = 0; i &lt; 64; i++) {</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            block[i] = (byte) ((i &lt; key.length ? key[i] : 0) ^ pad);</span>
+        }
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="nc" id="L239">            w[i] = readInt(block, i * 4);</span>
+        }
+<span class="nc" id="L241">        int[] st = new int[8];</span>
+<span class="nc" id="L242">        System.arraycopy(IV256, 0, st, 0, 8);</span>
+<span class="nc" id="L243">        MessageDigestImpl.Sha256Family.compress(st, w);</span>
+<span class="nc" id="L244">        zero(block);</span>
+<span class="nc" id="L245">        return st;</span>
+    }
+
+    private static long readLong(byte[] b, int o) {
+<span class="fc" id="L249">        return ((long) readInt(b, o) &lt;&lt; 32) | (readInt(b, o + 4) &amp; 0xffffffffL);</span>
+    }
+
+    private static int readInt(byte[] b, int o) {
+<span class="fc" id="L253">        return (b[o] &amp; 0xff) &lt;&lt; 24 | (b[o + 1] &amp; 0xff) &lt;&lt; 16 | (b[o + 2] &amp; 0xff) &lt;&lt; 8 | (b[o + 3] &amp; 0xff);</span>
+    }
+
+    private static void writeLong(byte[] b, int o, long v) {
+<span class="fc" id="L257">        putInt(b, o, (int) (v &gt;&gt;&gt; 32));</span>
+<span class="fc" id="L258">        putInt(b, o + 4, (int) v);</span>
+<span class="fc" id="L259">    }</span>
+
+    private static void putInt(byte[] b, int o, int v) {
+<span class="fc" id="L262">        b[o] = (byte) (v &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L263">        b[o + 1] = (byte) (v &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L264">        b[o + 2] = (byte) (v &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L265">        b[o + 3] = (byte) v;</span>
+<span class="fc" id="L266">    }</span>
+
+    private static void zero(byte[] b) {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (int i = 0; i &lt; b.length; i++) {</span>
+<span class="fc" id="L270">            b[i] = 0;</span>
+        }
+<span class="fc" id="L272">    }</span>
+
+    private static void zero(long[] b) {
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        for (int i = 0; i &lt; b.length; i++) {</span>
+<span class="fc" id="L276">            b[i] = 0;</span>
+        }
+<span class="fc" id="L278">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

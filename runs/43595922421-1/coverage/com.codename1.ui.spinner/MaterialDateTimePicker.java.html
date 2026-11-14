@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MaterialDateTimePicker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">MaterialDateTimePicker.java</span></div><h1>MaterialDateTimePicker.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.ButtonGroup;
+import com.codename1.ui.Container;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.GridLayout;
+
+import java.util.Calendar;
+import java.util.Date;
+
+/// A date and a time in one picker: the Material date picker and the
+/// Material time picker behind two tabs. The value is a `Date`.
+class MaterialDateTimePicker extends Container implements InternalPickerWidget {
+<span class="fc" id="L39">    private final MaterialDatePicker date = new MaterialDatePicker();</span>
+<span class="fc" id="L40">    private final MaterialTimePicker time = new MaterialTimePicker();</span>
+<span class="fc" id="L41">    private final RadioButton dateTab = new RadioButton(&quot;&quot;);</span>
+<span class="fc" id="L42">    private final RadioButton timeTab = new RadioButton(&quot;&quot;);</span>
+
+    MaterialDateTimePicker() {
+<span class="fc" id="L45">        super(new BorderLayout());</span>
+<span class="fc" id="L46">        dateTab.setText(getUIManager().localize(&quot;picker.date&quot;, &quot;Date&quot;));</span>
+<span class="fc" id="L47">        timeTab.setText(getUIManager().localize(&quot;picker.time&quot;, &quot;Time&quot;));</span>
+<span class="fc" id="L48">        ButtonGroup g = new ButtonGroup();</span>
+<span class="fc" id="L49">        tab(dateTab, g);</span>
+<span class="fc" id="L50">        tab(timeTab, g);</span>
+<span class="fc" id="L51">        dateTab.setSelected(true);</span>
+<span class="fc" id="L52">        dateTab.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L55">                showTime(false);</span>
+<span class="nc" id="L56">            }</span>
+        });
+<span class="fc" id="L58">        timeTab.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L61">                showTime(true);</span>
+<span class="nc" id="L62">            }</span>
+        });
+<span class="fc" id="L64">        add(BorderLayout.NORTH, GridLayout.encloseIn(2, dateTab, timeTab));</span>
+<span class="fc" id="L65">        add(BorderLayout.CENTER, date);</span>
+<span class="fc" id="L66">    }</span>
+
+    private static void tab(RadioButton b, ButtonGroup g) {
+<span class="fc" id="L69">        b.setToggle(true);</span>
+<span class="fc" id="L70">        b.setUIID(&quot;PickerMaterialTab&quot;);</span>
+<span class="fc" id="L71">        g.add(b);</span>
+<span class="fc" id="L72">    }</span>
+
+    MaterialDatePicker datePicker() {
+<span class="fc" id="L75">        return date;</span>
+    }
+
+    MaterialTimePicker timePicker() {
+<span class="fc" id="L79">        return time;</span>
+    }
+
+    void showTime(boolean v) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        dateTab.setSelected(!v);</span>
+<span class="fc" id="L84">        timeTab.setSelected(v);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (v == contains(time)) {</span>
+<span class="nc" id="L86">            return;</span>
+        }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (v) {</span>
+<span class="fc" id="L89">            date.remove();</span>
+<span class="fc" id="L90">            add(BorderLayout.CENTER, time);</span>
+        } else {
+<span class="nc" id="L92">            time.remove();</span>
+<span class="nc" id="L93">            add(BorderLayout.CENTER, date);</span>
+        }
+<span class="fc" id="L95">        revalidateLater();</span>
+<span class="fc" id="L96">    }</span>
+
+    /// Whether what is typed in the date and in the time can be confirmed;
+    /// the part that cannot is the one shown.
+    boolean acceptInput() {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!date.acceptInput()) {</span>
+<span class="nc" id="L102">            showTime(false);</span>
+<span class="nc" id="L103">            return false;</span>
+        }
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!time.acceptInput()) {</span>
+<span class="nc" id="L106">            showTime(true);</span>
+<span class="nc" id="L107">            return false;</span>
+        }
+<span class="fc" id="L109">        return true;</span>
+    }
+
+    // A wall-clock time that does not exist on the day, the hour a clock
+    // skips in spring, becomes the instant the platform's calendar makes of
+    // it. That is the platform's rule for every date in the application.
+    @Override
+    public Object getValue() {
+<span class="fc" id="L117">        Calendar c = Calendar.getInstance();</span>
+<span class="fc" id="L118">        c.setTime(date.getDate());</span>
+<span class="fc" id="L119">        c.set(Calendar.HOUR_OF_DAY, time.getHour());</span>
+<span class="fc" id="L120">        c.set(Calendar.MINUTE, time.getMinute());</span>
+<span class="fc" id="L121">        c.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L122">        c.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L123">        return c.getTime();</span>
+    }
+
+    @Override
+    public void setValue(Object value) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (value instanceof Date) {</span>
+<span class="fc" id="L129">            Calendar c = Calendar.getInstance();</span>
+<span class="fc" id="L130">            c.setTime((Date) value);</span>
+<span class="fc" id="L131">            date.setDate((Date) value);</span>
+<span class="fc" id="L132">            time.setTime(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE));</span>
+        }
+<span class="fc" id="L134">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GanttTask.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.scheduling</a> &gt; <span class="el_source">GanttTask.java</span></div><h1>GanttTask.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.scheduling;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// A task in a project: a piece of work, a milestone, or a summary of the
+/// tasks under it.
+///
+/// A task with children is a summary, and its dates are the span of its
+/// children. A task with no children and no duration is a milestone. For any
+/// other, `duration` is working time in the project's `WorkCalendar`, and
+/// `ProjectScheduler` works out `start` and `end` from the dependencies, the
+/// constraint and the leveling delay. A task that is scheduled manually keeps
+/// the dates it was given.
+///
+/// Add a task to a `ProjectModel` before using it; the model owns the tree.
+public final class GanttTask {
+    /// A limit on when a task may be scheduled, on top of its dependencies.
+<span class="fc" id="L42">    public enum Constraint {</span>
+        /// No limit: as early as the dependencies allow.
+<span class="fc" id="L44">        AS_SOON_AS_POSSIBLE,</span>
+<span class="fc" id="L45">        START_NO_EARLIER_THAN,</span>
+<span class="fc" id="L46">        START_NO_LATER_THAN,</span>
+<span class="fc" id="L47">        FINISH_NO_EARLIER_THAN,</span>
+<span class="fc" id="L48">        FINISH_NO_LATER_THAN,</span>
+        /// Starts on the date whatever the dependencies say.
+<span class="fc" id="L50">        MUST_START_ON,</span>
+        /// Finishes on the date whatever the dependencies say.
+<span class="fc" id="L52">        MUST_FINISH_ON</span>
+    }
+
+    private final String id;
+    private String name;
+    GanttTask parent;
+<span class="fc" id="L58">    final List&lt;GanttTask&gt; children = new ArrayList&lt;GanttTask&gt;();</span>
+<span class="fc" id="L59">    final List&lt;ResourceAssignment&gt; assignments = new ArrayList&lt;ResourceAssignment&gt;();</span>
+    private long duration;
+    private long start;
+    private long end;
+    private int percentComplete;
+<span class="fc" id="L64">    private Constraint constraint = Constraint.AS_SOON_AS_POSSIBLE;</span>
+    private long constraintDate;
+    private boolean manuallyScheduled;
+    private long levelingDelay;
+<span class="fc" id="L68">    private int priority = 500;</span>
+    private boolean hasBaseline;
+    private long baselineStart;
+    private long baselineEnd;
+<span class="fc" id="L72">    private int color = -1;</span>
+    private String uiid;
+    private Object userObject;
+
+    // What the scheduler worked out.
+    long earlyStart;
+    long earlyFinish;
+    long lateStart;
+    long lateFinish;
+    long totalSlack;
+    long freeSlack;
+    boolean critical;
+    boolean constraintViolated;
+    // The task's position in the scheduler's arrays during a pass.
+    int index;
+
+<span class="fc" id="L88">    public GanttTask(String id, String name) {</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L90">            throw new IllegalArgumentException(&quot;id&quot;);</span>
+        }
+<span class="fc" id="L92">        this.id = id;</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        this.name = name == null ? &quot;&quot; : name;</span>
+<span class="fc" id="L94">    }</span>
+
+    /// A task of `duration` milliseconds of working time.
+    public GanttTask(String id, String name, long duration) {
+<span class="fc" id="L98">        this(id, name);</span>
+<span class="fc" id="L99">        setDuration(duration);</span>
+<span class="fc" id="L100">    }</span>
+
+    public String getId() {
+<span class="fc" id="L103">        return id;</span>
+    }
+
+    public String getName() {
+<span class="fc" id="L107">        return name;</span>
+    }
+
+    public GanttTask setName(String v) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        name = v == null ? &quot;&quot; : v;</span>
+<span class="nc" id="L112">        return this;</span>
+    }
+
+    public GanttTask getParent() {
+<span class="fc" id="L116">        return parent;</span>
+    }
+
+    public List&lt;GanttTask&gt; getChildren() {
+<span class="fc" id="L120">        return Collections.unmodifiableList(children);</span>
+    }
+
+    public boolean isSummary() {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        return !children.isEmpty();</span>
+    }
+
+    public boolean isMilestone() {
+<span class="fc bfc" id="L128" title="All 6 branches covered.">        return children.isEmpty() &amp;&amp; duration == 0 &amp;&amp; !manuallyScheduled;</span>
+    }
+
+    /// How deep the task is in the tree; a top level task is at 0.
+    public int getLevel() {
+<span class="fc" id="L133">        int level = 0;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (GanttTask p = parent; p != null; p = p.parent) {</span>
+<span class="fc" id="L135">            level++;</span>
+        }
+<span class="fc" id="L137">        return level;</span>
+    }
+
+    /// Whether `other` is this task's parent, or its parent's, and so on.
+    public boolean isDescendantOf(GanttTask other) {
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (GanttTask p = parent; p != null; p = p.parent) {</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (p == other) { //NOPMD CompareObjectsWithEquals - identity is the point</span>
+<span class="fc" id="L144">                return true;</span>
+            }
+        }
+<span class="fc" id="L147">        return false;</span>
+    }
+
+    /// Working time the task takes, in milliseconds. Ignored for a summary.
+    public long getDuration() {
+<span class="fc" id="L152">        return duration;</span>
+    }
+
+    public GanttTask setDuration(long millis) {
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (millis &lt; 0) {</span>
+<span class="nc" id="L157">            throw new IllegalArgumentException(&quot;duration&quot;);</span>
+        }
+<span class="fc" id="L159">        duration = millis;</span>
+<span class="fc" id="L160">        return this;</span>
+    }
+
+    public long getStart() {
+<span class="fc" id="L164">        return start;</span>
+    }
+
+    public long getEnd() {
+<span class="fc" id="L168">        return end;</span>
+    }
+
+    /// Sets the dates directly. The scheduler overwrites them unless the task
+    /// is scheduled manually.
+    public GanttTask setDates(long start, long end) {
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (end &lt; start) {</span>
+<span class="nc" id="L175">            throw new IllegalArgumentException(&quot;end before start&quot;);</span>
+        }
+<span class="fc" id="L177">        this.start = start;</span>
+<span class="fc" id="L178">        this.end = end;</span>
+<span class="fc" id="L179">        return this;</span>
+    }
+
+    /// 0 to 100.
+    public int getPercentComplete() {
+<span class="fc" id="L184">        return percentComplete;</span>
+    }
+
+    public GanttTask setPercentComplete(int v) {
+<span class="fc" id="L188">        percentComplete = Math.max(0, Math.min(100, v));</span>
+<span class="fc" id="L189">        return this;</span>
+    }
+
+    public Constraint getConstraint() {
+<span class="fc" id="L193">        return constraint;</span>
+    }
+
+    public long getConstraintDate() {
+<span class="fc" id="L197">        return constraintDate;</span>
+    }
+
+    public GanttTask setConstraint(Constraint type, long date) {
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        constraint = type == null ? Constraint.AS_SOON_AS_POSSIBLE : type;</span>
+<span class="fc" id="L202">        constraintDate = date;</span>
+<span class="fc" id="L203">        return this;</span>
+    }
+
+    /// Whether the task keeps the dates it was given instead of being moved by
+    /// its dependencies. Its successors still follow it.
+    public boolean isManuallyScheduled() {
+<span class="fc" id="L209">        return manuallyScheduled;</span>
+    }
+
+    public GanttTask setManuallyScheduled(boolean v) {
+<span class="fc" id="L213">        manuallyScheduled = v;</span>
+<span class="fc" id="L214">        return this;</span>
+    }
+
+    /// Working time the task is held back by after its dependencies would let
+    /// it start. `ResourceLeveler` sets it; zero undoes leveling.
+    public long getLevelingDelay() {
+<span class="fc" id="L220">        return levelingDelay;</span>
+    }
+
+    public GanttTask setLevelingDelay(long millis) {
+<span class="fc" id="L224">        levelingDelay = Math.max(0, millis);</span>
+<span class="fc" id="L225">        return this;</span>
+    }
+
+    /// 0 to 1000; when two tasks want the same resource the higher keeps its
+    /// dates. 1000 is never delayed by leveling.
+    public int getPriority() {
+<span class="fc" id="L231">        return priority;</span>
+    }
+
+    public GanttTask setPriority(int v) {
+<span class="fc" id="L235">        priority = Math.max(0, Math.min(1000, v));</span>
+<span class="fc" id="L236">        return this;</span>
+    }
+
+    public boolean hasBaseline() {
+<span class="fc" id="L240">        return hasBaseline;</span>
+    }
+
+    public long getBaselineStart() {
+<span class="fc" id="L244">        return baselineStart;</span>
+    }
+
+    public long getBaselineEnd() {
+<span class="nc" id="L248">        return baselineEnd;</span>
+    }
+
+    /// Records the dates the task was planned at, to compare with later.
+    public GanttTask setBaseline(long start, long end) {
+<span class="fc" id="L253">        hasBaseline = true;</span>
+<span class="fc" id="L254">        baselineStart = start;</span>
+<span class="fc" id="L255">        baselineEnd = end;</span>
+<span class="fc" id="L256">        return this;</span>
+    }
+
+    public GanttTask clearBaseline() {
+<span class="nc" id="L260">        hasBaseline = false;</span>
+<span class="nc" id="L261">        return this;</span>
+    }
+
+    public List&lt;ResourceAssignment&gt; getAssignments() {
+<span class="fc" id="L265">        return Collections.unmodifiableList(assignments);</span>
+    }
+
+    /// Assigns a resource full time.
+    public GanttTask assign(String resourceId) {
+<span class="fc" id="L270">        return assign(resourceId, 1f);</span>
+    }
+
+    /// Assigns `units` of a resource: `0.5f` is half of somebody's time.
+    public GanttTask assign(String resourceId, float units) {
+<span class="fc" id="L275">        unassign(resourceId);</span>
+<span class="fc" id="L276">        assignments.add(new ResourceAssignment(resourceId, units));</span>
+<span class="fc" id="L277">        return this;</span>
+    }
+
+    public GanttTask unassign(String resourceId) {
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        for (int i = assignments.size() - 1; i &gt;= 0; i--) {</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">            if (assignments.get(i).getResourceId().equals(resourceId)) {</span>
+<span class="fc" id="L283">                assignments.remove(i);</span>
+            }
+        }
+<span class="fc" id="L286">        return this;</span>
+    }
+
+    /// The units of a resource the task uses, 0 when it is not assigned.
+    public float getUnits(String resourceId) {
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        for (ResourceAssignment assignment : assignments) {</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (assignment.getResourceId().equals(resourceId)) {</span>
+<span class="fc" id="L293">                return assignment.getUnits();</span>
+            }
+<span class="nc" id="L295">        }</span>
+<span class="nc" id="L296">        return 0f;</span>
+    }
+
+    /// An RGB colour for the bar, or -1 for the theme's.
+    public int getColor() {
+<span class="fc" id="L301">        return color;</span>
+    }
+
+    public GanttTask setColor(int v) {
+<span class="nc" id="L305">        color = v;</span>
+<span class="nc" id="L306">        return this;</span>
+    }
+
+    /// The UIID the bar is drawn with in place of `GanttBar`, or null.
+    public String getUIID() {
+<span class="fc" id="L311">        return uiid;</span>
+    }
+
+    public GanttTask setUIID(String v) {
+<span class="nc" id="L315">        uiid = v;</span>
+<span class="nc" id="L316">        return this;</span>
+    }
+
+    public Object getUserObject() {
+<span class="nc" id="L320">        return userObject;</span>
+    }
+
+    public GanttTask setUserObject(Object v) {
+<span class="nc" id="L324">        userObject = v;</span>
+<span class="nc" id="L325">        return this;</span>
+    }
+
+    /// The earliest the task can start, from the last scheduling pass.
+    public long getEarlyStart() {
+<span class="nc" id="L330">        return earlyStart;</span>
+    }
+
+    public long getEarlyFinish() {
+<span class="nc" id="L334">        return earlyFinish;</span>
+    }
+
+    /// The latest the task can start without delaying the project.
+    public long getLateStart() {
+<span class="fc" id="L339">        return lateStart;</span>
+    }
+
+    public long getLateFinish() {
+<span class="fc" id="L343">        return lateFinish;</span>
+    }
+
+    /// Working time the task can slip by without delaying the project.
+    /// Negative when a constraint or a deadline cannot be met.
+    public long getTotalSlack() {
+<span class="fc" id="L349">        return totalSlack;</span>
+    }
+
+    /// Working time the task can slip by without delaying any successor.
+    public long getFreeSlack() {
+<span class="fc" id="L354">        return freeSlack;</span>
+    }
+
+    /// Whether the task is on the critical path: any slip delays the project.
+    public boolean isCritical() {
+<span class="fc" id="L359">        return critical;</span>
+    }
+
+    /// Whether the dependencies pushed the task past a &quot;no later than&quot;
+    /// constraint, or a &quot;must&quot; constraint pulled it ahead of a predecessor.
+    public boolean isConstraintViolated() {
+<span class="fc" id="L365">        return constraintViolated;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L370">        return name;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

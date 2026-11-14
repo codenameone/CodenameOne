@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvmAddress.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.evm</a> &gt; <span class="el_source">EvmAddress.java</span></div><h1>EvmAddress.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.evm;
+
+import com.codename1.crypto.encoding.Rlp;
+import com.codename1.security.CryptoException;
+import com.codename1.security.Hash;
+import com.codename1.security.Secp256k1;
+
+/// A 20-byte address on Ethereum or any EVM chain (Polygon, Arbitrum, Base, BNB Chain...).
+///
+/// An address is the last 20 bytes of the Keccak-256 of the 64-byte public key. EIP-55
+/// spells it in mixed case so the case is a checksum: [#parse] rejects a mixed-case address
+/// whose case is wrong, which catches a mistyped character before funds go to an address
+/// nobody holds. An all-lowercase or all-uppercase address carries no checksum and is
+/// accepted as written, as every wallet does.
+@com.codename1.impl.SharedWithBackend
+public final class EvmAddress {
+    private final byte[] bytes;
+
+<span class="fc" id="L41">    private EvmAddress(byte[] bytes) {</span>
+<span class="fc" id="L42">        this.bytes = bytes;</span>
+<span class="fc" id="L43">    }</span>
+
+    /// Wraps 20 address bytes.
+    public static EvmAddress fromBytes(byte[] address) {
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">        if (address == null || address.length != 20) {</span>
+<span class="nc" id="L48">            throw new IllegalArgumentException(&quot;an address is 20 bytes&quot;);</span>
+        }
+<span class="fc" id="L50">        byte[] copy = new byte[20];</span>
+<span class="fc" id="L51">        System.arraycopy(address, 0, copy, 0, 20);</span>
+<span class="fc" id="L52">        return new EvmAddress(copy);</span>
+    }
+
+    /// The address of a secp256k1 public key in any SEC 1 form, or the raw 64 bytes.
+    public static EvmAddress fromPublicKey(byte[] publicKey) {
+        byte[] raw;
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (publicKey.length == 64) {</span>
+<span class="nc" id="L59">            raw = publicKey;</span>
+        } else {
+<span class="fc" id="L61">            byte[] full = Secp256k1.convertPublicKey(publicKey, false);</span>
+<span class="fc" id="L62">            raw = new byte[64];</span>
+<span class="fc" id="L63">            System.arraycopy(full, 1, raw, 0, 64);</span>
+        }
+<span class="fc" id="L65">        byte[] hash = Hash.keccak256(raw);</span>
+<span class="fc" id="L66">        byte[] out = new byte[20];</span>
+<span class="fc" id="L67">        System.arraycopy(hash, 12, out, 0, 20);</span>
+<span class="fc" id="L68">        return new EvmAddress(out);</span>
+    }
+
+    /// The address a private key controls.
+    public static EvmAddress fromPrivateKey(byte[] privateKey) {
+<span class="fc" id="L73">        return fromPublicKey(Secp256k1.publicKey(privateKey, false));</span>
+    }
+
+    /// The address of a contract deployed with `CREATE` by `deployer` at `nonce`.
+    public static EvmAddress contractAddress(EvmAddress deployer, long nonce) {
+<span class="fc" id="L78">        java.util.List&lt;Object&gt; fields = new java.util.ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L79">        fields.add(deployer.bytes);</span>
+<span class="fc" id="L80">        fields.add(Rlp.longBytes(nonce));</span>
+<span class="fc" id="L81">        byte[] hash = Hash.keccak256(Rlp.encode(fields));</span>
+<span class="fc" id="L82">        byte[] out = new byte[20];</span>
+<span class="fc" id="L83">        System.arraycopy(hash, 12, out, 0, 20);</span>
+<span class="fc" id="L84">        return new EvmAddress(out);</span>
+    }
+
+    /// The address of a contract deployed with `CREATE2`.
+    public static EvmAddress create2Address(EvmAddress deployer, byte[] salt32, byte[] initCodeHash) {
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">        if (salt32.length != 32 || initCodeHash.length != 32) {</span>
+<span class="nc" id="L90">            throw new IllegalArgumentException(&quot;salt and init code hash are 32 bytes&quot;);</span>
+        }
+<span class="fc" id="L92">        byte[] data = new byte[85];</span>
+<span class="fc" id="L93">        data[0] = (byte) 0xff;</span>
+<span class="fc" id="L94">        System.arraycopy(deployer.bytes, 0, data, 1, 20);</span>
+<span class="fc" id="L95">        System.arraycopy(salt32, 0, data, 21, 32);</span>
+<span class="fc" id="L96">        System.arraycopy(initCodeHash, 0, data, 53, 32);</span>
+<span class="fc" id="L97">        byte[] hash = Hash.keccak256(data);</span>
+<span class="fc" id="L98">        byte[] out = new byte[20];</span>
+<span class="fc" id="L99">        System.arraycopy(hash, 12, out, 0, 20);</span>
+<span class="fc" id="L100">        return new EvmAddress(out);</span>
+    }
+
+    /// Parses `0x` and 40 hex digits, checking the EIP-55 checksum when the text is in mixed
+    /// case.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a malformed address or a wrong checksum
+    public static EvmAddress parse(String text) {
+<span class="pc bpc" id="L110" title="2 of 6 branches missed.">        if (text == null || text.length() != 42 || text.charAt(0) != '0'</span>
+<span class="pc bpc" id="L111" title="3 of 4 branches missed.">                || (text.charAt(1) != 'x' &amp;&amp; text.charAt(1) != 'X')) {</span>
+<span class="fc" id="L112">            throw new IllegalArgumentException(&quot;an address is 0x and 40 hex digits&quot;);</span>
+        }
+<span class="fc" id="L114">        String hex = text.substring(2);</span>
+        EvmAddress out;
+        try {
+<span class="fc" id="L117">            out = new EvmAddress(Hash.fromHex(hex));</span>
+<span class="fc" id="L118">        } catch (CryptoException notHex) {</span>
+<span class="fc" id="L119">            throw new IllegalArgumentException(&quot;an address is 0x and 40 hex digits&quot;, notHex);</span>
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        boolean lower = false;</span>
+<span class="fc" id="L122">        boolean upper = false;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (int iter = 0; iter &lt; 40; iter++) {</span>
+<span class="fc" id="L124">            char c = hex.charAt(iter);</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">            if (c &gt;= 'a' &amp;&amp; c &lt;= 'f') {</span>
+<span class="fc" id="L126">                lower = true;</span>
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">            } else if (c &gt;= 'A' &amp;&amp; c &lt;= 'F') {</span>
+<span class="fc" id="L128">                upper = true;</span>
+            }
+        }
+<span class="fc bfc" id="L131" title="All 6 branches covered.">        if (lower &amp;&amp; upper &amp;&amp; !out.toChecksumString().substring(2).equals(hex)) {</span>
+<span class="fc" id="L132">            throw new IllegalArgumentException(&quot;EIP-55 checksum mismatch: &quot; + text);</span>
+        }
+<span class="fc" id="L134">        return out;</span>
+    }
+
+    /// Tells whether [#parse] accepts the text.
+    public static boolean isValid(String text) {
+        try {
+<span class="fc" id="L140">            parse(text);</span>
+<span class="fc" id="L141">            return true;</span>
+<span class="fc" id="L142">        } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L143">            return false;</span>
+        }
+    }
+
+    /// A copy of the 20 bytes.
+    public byte[] toBytes() {
+<span class="fc" id="L149">        byte[] out = new byte[20];</span>
+<span class="fc" id="L150">        System.arraycopy(bytes, 0, out, 0, 20);</span>
+<span class="fc" id="L151">        return out;</span>
+    }
+
+    /// The EIP-55 mixed-case form, which is how an address should be shown.
+    public String toChecksumString() {
+<span class="fc" id="L156">        String hex = Hash.toHex(bytes);</span>
+<span class="fc" id="L157">        byte[] hash = Hash.keccak256(ascii(hex));</span>
+<span class="fc" id="L158">        StringBuilder out = new StringBuilder(&quot;0x&quot;);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (int iter = 0; iter &lt; 40; iter++) {</span>
+<span class="fc" id="L160">            char c = hex.charAt(iter);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            int nibble = (hash[iter &gt;&gt; 1] &gt;&gt; ((iter &amp; 1) == 0 ? 4 : 0)) &amp; 0xf;</span>
+<span class="fc bfc" id="L162" title="All 4 branches covered.">            out.append(c &gt;= 'a' &amp;&amp; nibble &gt;= 8 ? (char) (c - 32) : c);</span>
+        }
+<span class="fc" id="L164">        return out.toString();</span>
+    }
+
+    /// The lowercase `0x` form.
+    public String toLowerCaseString() {
+<span class="fc" id="L169">        return &quot;0x&quot; + Hash.toHex(bytes);</span>
+    }
+
+    /// The EIP-55 form.
+    @Override
+    public String toString() {
+<span class="fc" id="L175">        return toChecksumString();</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (!(o instanceof EvmAddress)) {</span>
+<span class="nc" id="L181">            return false;</span>
+        }
+<span class="fc" id="L183">        byte[] other = ((EvmAddress) o).bytes;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (int iter = 0; iter &lt; 20; iter++) {</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (other[iter] != bytes[iter]) {</span>
+<span class="fc" id="L186">                return false;</span>
+            }
+        }
+<span class="fc" id="L189">        return true;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L194">        return ((bytes[16] &amp; 0xff) &lt;&lt; 24) | ((bytes[17] &amp; 0xff) &lt;&lt; 16) | ((bytes[18] &amp; 0xff) &lt;&lt; 8)</span>
+                | (bytes[19] &amp; 0xff);
+    }
+
+    static byte[] ascii(String text) {
+<span class="fc" id="L199">        byte[] out = new byte[text.length()];</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        for (int iter = 0; iter &lt; out.length; iter++) {</span>
+<span class="fc" id="L201">            out[iter] = (byte) text.charAt(iter);</span>
+        }
+<span class="fc" id="L203">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

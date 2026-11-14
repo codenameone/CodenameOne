@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GpioPin.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.hardware</a> &gt; <span class="el_source">GpioPin.java</span></div><h1>GpioPin.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.hardware;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/// A claimed GPIO line, opened through [Hardware#openGpioOutput(String, int, boolean)]
+/// or [Hardware#openGpioInput(String, int, int, int)].
+///
+/// The line stays claimed until [#close()]; another process cannot drive it in
+/// the meantime.
+@com.codename1.impl.SharedWithBackend
+public final class GpioPin {
+
+    /// Leave the line's bias as the board configured it.
+    public static final int BIAS_DEFAULT = 0;
+    /// Disable internal pull resistors.
+    public static final int BIAS_DISABLED = 1;
+    /// Enable the internal pull-up resistor.
+    public static final int BIAS_PULL_UP = 2;
+    /// Enable the internal pull-down resistor.
+    public static final int BIAS_PULL_DOWN = 3;
+
+    /// Report no edges.
+    public static final int EDGE_NONE = 0;
+    /// Report low-to-high transitions.
+    public static final int EDGE_RISING = 1;
+    /// Report high-to-low transitions.
+    public static final int EDGE_FALLING = 2;
+    /// Report both transitions.
+    public static final int EDGE_BOTH = 3;
+
+    private static final int WAIT_SLICE_MS = 250;
+
+    private final Hardware hw;
+    private final int handle;
+    private final String chip;
+    private final int line;
+    private final boolean output;
+    private boolean high;
+    private boolean closed;
+    private GpioListener listener;
+    // Read by the edge thread, written on the caller's thread.
+    private AtomicBoolean edgeThreadRunning;
+
+<span class="nc" id="L66">    GpioPin(Hardware hw, int handle, String chip, int line, boolean output, boolean initialHigh) {</span>
+<span class="nc" id="L67">        this.hw = hw;</span>
+<span class="nc" id="L68">        this.handle = handle;</span>
+<span class="nc" id="L69">        this.chip = chip;</span>
+<span class="nc" id="L70">        this.line = line;</span>
+<span class="nc" id="L71">        this.output = output;</span>
+<span class="nc" id="L72">        this.high = initialHigh;</span>
+<span class="nc" id="L73">    }</span>
+
+    /// The controller this line belongs to.
+    public String getChip() {
+<span class="nc" id="L77">        return chip;</span>
+    }
+
+    /// The line offset within its controller.
+    public int getLine() {
+<span class="nc" id="L82">        return line;</span>
+    }
+
+    /// `true` when the line was opened as an output.
+    public boolean isOutput() {
+<span class="nc" id="L87">        return output;</span>
+    }
+
+    /// Reads the line level. For an output this is the level it is driven to.
+    ///
+    /// #### Throws
+    ///
+    /// - `HardwareException`: when the read fails or the pin is closed
+    public boolean isHigh() throws HardwareException {
+<span class="nc" id="L96">        checkOpen();</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (output) {</span>
+<span class="nc" id="L98">            return high;</span>
+        }
+<span class="nc" id="L100">        return hw.gpioRead(handle);</span>
+    }
+
+    /// Drives an output line.
+    ///
+    /// #### Throws
+    ///
+    /// - `HardwareException`: when the line is an input, closed, or the write fails
+    public void setHigh(boolean value) throws HardwareException {
+<span class="nc" id="L109">        checkOpen();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (!output) {</span>
+<span class="nc" id="L111">            throw new HardwareException(&quot;GPIO line &quot; + line + &quot; is an input&quot;);</span>
+        }
+<span class="nc" id="L113">        hw.gpioWrite(handle, value);</span>
+<span class="nc" id="L114">        high = value;</span>
+<span class="nc" id="L115">    }</span>
+
+    /// Delivers the edges this input was opened for to `l` on the event
+    /// dispatch thread, or stops delivery when `l` is `null`. Edges are
+    /// waited for on a background thread owned by this pin.
+    ///
+    /// #### Throws
+    ///
+    /// - `HardwareException`: when the line is an output or closed
+    public void setListener(GpioListener l) throws HardwareException {
+<span class="nc" id="L125">        checkOpen();</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (output) {</span>
+<span class="nc" id="L127">            throw new HardwareException(&quot;GPIO line &quot; + line + &quot; is an output&quot;);</span>
+        }
+<span class="nc" id="L129">        stopEdgeThread();</span>
+<span class="nc" id="L130">        listener = l;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if (l != null) {</span>
+<span class="nc" id="L132">            final AtomicBoolean running = new AtomicBoolean(true);</span>
+<span class="nc" id="L133">            final GpioListener target = l;</span>
+<span class="nc" id="L134">            edgeThreadRunning = running;</span>
+<span class="nc" id="L135">            Thread t = new Thread(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L138">                    edgeLoop(running, target);</span>
+<span class="nc" id="L139">                }</span>
+            }, &quot;GPIO-&quot; + chip + &quot;-&quot; + line);
+<span class="nc" id="L141">            t.start();</span>
+        }
+<span class="nc" id="L143">    }</span>
+
+    /// The listener set with [#setListener(GpioListener)], or `null`.
+    public GpioListener getListener() {
+<span class="nc" id="L147">        return listener;</span>
+    }
+
+    private void edgeLoop(AtomicBoolean running, final GpioListener target) {
+<span class="nc" id="L151">        long[] ts = new long[1];</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        while (running.get()) {</span>
+            int r;
+            try {
+<span class="nc" id="L155">                r = hw.gpioWaitEdge(handle, WAIT_SLICE_MS, ts);</span>
+<span class="nc" id="L156">            } catch (HardwareException e) {</span>
+<span class="nc" id="L157">                return;</span>
+<span class="nc" id="L158">            }</span>
+<span class="nc bnc" id="L159" title="All 4 branches missed.">            if (r == Hardware.EDGE_TIMEOUT || !running.get()) {</span>
+<span class="nc" id="L160">                continue;</span>
+            }
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            final boolean rising = r == Hardware.EDGE_RESULT_RISING;</span>
+<span class="nc" id="L163">            final long when = ts[0];</span>
+<span class="nc" id="L164">            hw.deliver(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L167">                    target.edgeDetected(GpioPin.this, rising, when);</span>
+<span class="nc" id="L168">                }</span>
+            });
+<span class="nc" id="L170">        }</span>
+<span class="nc" id="L171">    }</span>
+
+    private void stopEdgeThread() {
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (edgeThreadRunning != null) {</span>
+<span class="nc" id="L175">            edgeThreadRunning.set(false);</span>
+<span class="nc" id="L176">            edgeThreadRunning = null;</span>
+        }
+<span class="nc" id="L178">    }</span>
+
+    /// Releases the line. Further calls on this pin throw; closing twice is
+    /// harmless.
+    public void close() {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L184">            return;</span>
+        }
+<span class="nc" id="L186">        closed = true;</span>
+<span class="nc" id="L187">        stopEdgeThread();</span>
+<span class="nc" id="L188">        listener = null;</span>
+<span class="nc" id="L189">        hw.close(handle, false);</span>
+<span class="nc" id="L190">    }</span>
+
+    private void checkOpen() throws HardwareException {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L194">            throw new HardwareException(&quot;GPIO line &quot; + line + &quot; is closed&quot;);</span>
+        }
+<span class="nc" id="L196">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

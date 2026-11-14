@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DirectoryEntry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.call.directory</a> &gt; <span class="el_source">DirectoryEntry.java</span></div><h1>DirectoryEntry.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.call.directory;
+
+/// One number the app can name or block.
+///
+/// #### Numbers must be sorted, and they are numbers
+///
+/// Both platforms require the identification and blocking lists to be handed
+/// over in **ascending numerical order**, and reject the whole list -- not
+/// the offending row -- when they are not. That is why the number here is a
+/// `long` rather than a string: a string list sorts lexicographically, which
+/// puts `+1999...` before `+12...`, and the resulting rejection names no row.
+///
+/// The number is the full international number without the leading `+`, so
+/// `+1 415 555 1212` is `14155551212`. [CallDirectory] sorts what it is
+/// given, so an app need not.
+public final class DirectoryEntry {
+    private final long number;
+    private final String label;
+    private final boolean blocked;
+
+    /// An entry that gives a number a name.
+    ///
+    /// @param number the full international number without `+`
+    /// @param label what to show when it calls
+    public DirectoryEntry(long number, String label) {
+<span class="fc" id="L48">        this(number, label, false);</span>
+<span class="fc" id="L49">    }</span>
+
+    /// An entry that names a number, blocks it, or both.
+    ///
+    /// @param number the full international number without `+`
+    /// @param label what to show when it calls, or null to only block
+    /// @param blocked whether the call should be rejected without ringing
+<span class="fc" id="L56">    public DirectoryEntry(long number, String label, boolean blocked) {</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (number &lt;= 0) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(&quot;A directory number is positive&quot;);</span>
+        }
+<span class="fc" id="L60">        this.number = number;</span>
+<span class="fc" id="L61">        this.label = label;</span>
+<span class="fc" id="L62">        this.blocked = blocked;</span>
+<span class="fc" id="L63">    }</span>
+
+    /// The full international number without `+`.
+    public long getNumber() {
+<span class="fc" id="L67">        return number;</span>
+    }
+
+    /// What to show when it calls, or null.
+    public String getLabel() {
+<span class="fc" id="L72">        return label;</span>
+    }
+
+    /// Whether calls from it are rejected without ringing.
+    public boolean isBlocked() {
+<span class="fc" id="L77">        return blocked;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

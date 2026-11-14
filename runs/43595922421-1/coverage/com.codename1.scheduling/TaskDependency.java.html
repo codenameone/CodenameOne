@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TaskDependency.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.scheduling</a> &gt; <span class="el_source">TaskDependency.java</span></div><h1>TaskDependency.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.scheduling;
+
+/// A link between two tasks: the successor waits for the predecessor.
+///
+/// `lag` is working time added to the wait, and a negative lag is a lead: a
+/// finish-to-start link with a lag of minus one day lets the successor start
+/// a day before the predecessor finishes.
+public final class TaskDependency {
+    /// Which end of the predecessor holds which end of the successor.
+<span class="fc" id="L32">    public enum Type {</span>
+        /// The successor starts after the predecessor finishes. The usual one.
+<span class="fc" id="L34">        FINISH_TO_START,</span>
+        /// The successor starts after the predecessor starts.
+<span class="fc" id="L36">        START_TO_START,</span>
+        /// The successor finishes after the predecessor finishes.
+<span class="fc" id="L38">        FINISH_TO_FINISH,</span>
+        /// The successor finishes after the predecessor starts.
+<span class="fc" id="L40">        START_TO_FINISH</span>
+    }
+
+    private final GanttTask predecessor;
+    private final GanttTask successor;
+    private Type type;
+    private long lag;
+
+<span class="fc" id="L48">    TaskDependency(GanttTask predecessor, GanttTask successor, Type type, long lag) {</span>
+<span class="fc" id="L49">        this.predecessor = predecessor;</span>
+<span class="fc" id="L50">        this.successor = successor;</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        this.type = type == null ? Type.FINISH_TO_START : type;</span>
+<span class="fc" id="L52">        this.lag = lag;</span>
+<span class="fc" id="L53">    }</span>
+
+    public GanttTask getPredecessor() {
+<span class="fc" id="L56">        return predecessor;</span>
+    }
+
+    public GanttTask getSuccessor() {
+<span class="fc" id="L60">        return successor;</span>
+    }
+
+    public Type getType() {
+<span class="nc" id="L64">        return type;</span>
+    }
+
+    public TaskDependency setType(Type v) {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        type = v == null ? Type.FINISH_TO_START : v;</span>
+<span class="nc" id="L69">        return this;</span>
+    }
+
+    /// Working time in milliseconds; negative for a lead.
+    public long getLag() {
+<span class="fc" id="L74">        return lag;</span>
+    }
+
+    public TaskDependency setLag(long millis) {
+<span class="fc" id="L78">        lag = millis;</span>
+<span class="fc" id="L79">        return this;</span>
+    }
+
+    /// Whether the link holds the successor's start (and not its finish).
+    public boolean constrainsStart() {
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        return type == Type.FINISH_TO_START || type == Type.START_TO_START;</span>
+    }
+
+    /// Whether the link is measured from the predecessor's finish.
+    public boolean fromFinish() {
+<span class="fc bfc" id="L89" title="All 4 branches covered.">        return type == Type.FINISH_TO_START || type == Type.FINISH_TO_FINISH;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

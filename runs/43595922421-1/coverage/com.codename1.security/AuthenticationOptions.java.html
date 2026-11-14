@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthenticationOptions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">AuthenticationOptions.java</span></div><h1>AuthenticationOptions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// Configures a single call to [Biometrics#authenticate(AuthenticationOptions)].
+/// Setters return `this` for fluent chaining; only [#setReason(String)] is
+/// required (it maps to the iOS `localizedReason` and the Android
+/// `BiometricPrompt` title fallback).
+///
+/// Not every option is honoured on every platform -- the docs on each
+/// setter note where the value is consulted. Unrecognised options are
+/// silently ignored, so callers can set the union without
+/// platform-checking. On platforms that don't support biometrics at all
+/// (desktop deploy, JavaScript), the entire prompt collapses into a
+/// [BiometricError#NOT_AVAILABLE] failure and none of these options matter.
+<span class="fc" id="L36">public final class AuthenticationOptions {</span>
+
+    private String reason;
+    private String title;
+    private String subtitle;
+    private String description;
+<span class="fc" id="L42">    private String negativeButtonText = &quot;Cancel&quot;;</span>
+    private boolean biometricOnly;
+    private boolean sensitiveTransaction;
+    private boolean stickyAuth;
+<span class="fc" id="L46">    private boolean showDialogOnAndroid = true;</span>
+
+    /// The current prompt reason, or `null` if unset. See
+    /// [#setReason(String)] for how it is rendered.
+    public String getReason() {
+<span class="fc" id="L51">        return reason;</span>
+    }
+
+    /// The user-facing reason for prompting. On iOS this is the
+    /// `localizedReason` passed to `LAContext.evaluatePolicy`; on Android
+    /// it is used as the `BiometricPrompt` title if [#setTitle(String)] is
+    /// unset. On JavaSE simulator it is shown in the modal prompt body.
+    /// Required for production use -- platforms typically reject an empty
+    /// reason.
+    public AuthenticationOptions setReason(String reason) {
+<span class="fc" id="L61">        this.reason = reason;</span>
+<span class="fc" id="L62">        return this;</span>
+    }
+
+    /// The current Android `BiometricPrompt` title, or `null` to fall back
+    /// to [#getReason()]. Always `null` on iOS where this property has no
+    /// effect.
+    public String getTitle() {
+<span class="fc" id="L69">        return title;</span>
+    }
+
+    /// Android `BiometricPrompt` title. Ignored on iOS (use [#setReason(String)]
+    /// there). Ignored on the fallback base class.
+    public AuthenticationOptions setTitle(String title) {
+<span class="fc" id="L75">        this.title = title;</span>
+<span class="fc" id="L76">        return this;</span>
+    }
+
+    /// The current Android `BiometricPrompt` subtitle, or `null` if unset.
+    /// Always `null` on iOS where this property has no effect.
+    public String getSubtitle() {
+<span class="fc" id="L82">        return subtitle;</span>
+    }
+
+    /// Android `BiometricPrompt` subtitle. Ignored on iOS and on the
+    /// fallback base class.
+    public AuthenticationOptions setSubtitle(String subtitle) {
+<span class="fc" id="L88">        this.subtitle = subtitle;</span>
+<span class="fc" id="L89">        return this;</span>
+    }
+
+    /// The current Android `BiometricPrompt` description body, or `null`
+    /// if unset. Always `null` on iOS where this property has no effect.
+    public String getDescription() {
+<span class="fc" id="L95">        return description;</span>
+    }
+
+    /// Android `BiometricPrompt` description body. Ignored on iOS and on
+    /// the fallback base class.
+    public AuthenticationOptions setDescription(String description) {
+<span class="fc" id="L101">        this.description = description;</span>
+<span class="fc" id="L102">        return this;</span>
+    }
+
+    /// The current Android `BiometricPrompt` negative button label.
+    /// Defaults to `&quot;Cancel&quot;`. Ignored on iOS (Apple's prompt has its own
+    /// system-defined cancel button).
+    public String getNegativeButtonText() {
+<span class="fc" id="L109">        return negativeButtonText;</span>
+    }
+
+    /// Android `BiometricPrompt` negative button label (defaults to
+    /// `&quot;Cancel&quot;`). Ignored on iOS and on the fallback base class.
+    public AuthenticationOptions setNegativeButtonText(String text) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        this.negativeButtonText = text == null ? &quot;Cancel&quot; : text;</span>
+<span class="fc" id="L116">        return this;</span>
+    }
+
+    /// `true` when the OS prompt is configured to reject device-credential
+    /// fallback. See [#setBiometricOnly(boolean)].
+    public boolean isBiometricOnly() {
+<span class="fc" id="L122">        return biometricOnly;</span>
+    }
+
+    /// If `true`, the OS prompt rejects device-credential fallback (PIN /
+    /// pattern / passcode). Honoured on both platforms; on Android this
+    /// maps to `setAllowedAuthenticators(BIOMETRIC_STRONG)` or its legacy
+    /// equivalent. Ignored on the fallback base class.
+    public AuthenticationOptions setBiometricOnly(boolean biometricOnly) {
+<span class="fc" id="L130">        this.biometricOnly = biometricOnly;</span>
+<span class="fc" id="L131">        return this;</span>
+    }
+
+    /// `true` when the caller has asked for a class-3 (&quot;strong&quot;) biometric.
+    /// See [#setSensitiveTransaction(boolean)].
+    public boolean isSensitiveTransaction() {
+<span class="fc" id="L137">        return sensitiveTransaction;</span>
+    }
+
+    /// Hints that the operation guards a sensitive action and a class-3
+    /// (&quot;strong&quot;) biometric should be required where the platform exposes
+    /// the distinction. Affects Android API 30+; advisory on iOS (where
+    /// Face ID / Touch ID are both considered strong). Ignored on the
+    /// fallback base class.
+    public AuthenticationOptions setSensitiveTransaction(boolean sensitive) {
+<span class="fc" id="L146">        this.sensitiveTransaction = sensitive;</span>
+<span class="fc" id="L147">        return this;</span>
+    }
+
+    /// `true` when the Android sticky-auth flag is set. See
+    /// [#setStickyAuth(boolean)].
+    public boolean isStickyAuth() {
+<span class="fc" id="L153">        return stickyAuth;</span>
+    }
+
+    /// If `true`, the in-progress authentication survives the app being
+    /// backgrounded and resumes on foreground (Android sticky-auth
+    /// semantics). No effect on iOS or on the fallback base class.
+    public AuthenticationOptions setStickyAuth(boolean stickyAuth) {
+<span class="fc" id="L160">        this.stickyAuth = stickyAuth;</span>
+<span class="fc" id="L161">        return this;</span>
+    }
+
+    /// `true` (the default) when Codename One should overlay its own dialog
+    /// on the legacy Android `FingerprintManager` path. See
+    /// [#setShowDialogOnAndroid(boolean)].
+    public boolean isShowDialogOnAndroid() {
+<span class="fc" id="L168">        return showDialogOnAndroid;</span>
+    }
+
+    /// Controls whether the legacy `FingerprintManager` path (Android 6-9)
+    /// draws a Codename One Dialog over the system prompt. The modern
+    /// `BiometricPrompt` path (Android 10+) provides its own UI and ignores
+    /// this flag. Ignored on iOS and on the fallback base class.
+    public AuthenticationOptions setShowDialogOnAndroid(boolean show) {
+<span class="fc" id="L176">        this.showDialogOnAndroid = show;</span>
+<span class="fc" id="L177">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

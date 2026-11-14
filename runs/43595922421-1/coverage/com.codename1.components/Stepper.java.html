@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Stepper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">Stepper.java</span></div><h1>Stepper.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.Container;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.util.EventDispatcher;
+
+/// A numeric field with increment and decrement controls: `NSStepper`, WinUI's `NumberBox`
+/// with its spin buttons, `GtkSpinButton`.
+///
+/// Codename One had no equivalent. The nearest thing is `Slider`, which is a different
+/// control for a different job -- a slider is for a value whose exact number does not
+/// matter, and a stepper is for one where it does. An application that needed a bounded
+/// number on the desktop had to build the composite by hand, and every hand-built one got
+/// the same two things wrong: it let the field hold text that is not a number, and it let
+/// the buttons walk past the bounds.
+///
+/// ```java
+/// Stepper copies = new Stepper(1, 1, 99);
+/// copies.addActionListener(e -&gt; print(copies.getValue()));
+/// ```
+///
+/// Three UIIDs: `Stepper` for the composite, `StepperField` for the text field and
+/// `StepperButton` for the two buttons. The buttons carry `-` and `+` by default; a theme
+/// or an application that wants arrows sets icons on `#getDecrementButton()` and
+/// `#getIncrementButton()`.
+///
+/// The value is an int. A stepper over a fractional quantity is a real control on some
+/// platforms, and it is deliberately not this one: doing it properly means a format, a
+/// locale and a parse policy, and guessing those is worse than not offering them.
+public class Stepper extends Container {
+    /// The editable field.
+    ///
+    /// A plain NUMERIC TextField would make a negative range untypable: TextField.validChar
+    /// answers `c &gt;= '0' &amp;&amp; c &lt;= '9'` for NUMERIC, so in a -10..10 stepper the decrement
+    /// button can reach -5 while the user cannot type it. DECIMAL is not the answer either --
+    /// it admits '.' and ',', which this control cannot represent.
+    ///
+    /// So the minus is permitted here, and only when the range actually contains a negative
+    /// value. validChar is asked about one character with no position, so it cannot insist the
+    /// sign is leading; it does not need to. Text that is not an integer simply fails
+    /// Integer.parseInt in commitTypedText, which returns without changing anything.
+<span class="fc" id="L69">    private final TextField field = new TextField() {</span>
+        @Override
+        public boolean validChar(String c) {
+<span class="pc bpc" id="L72" title="2 of 8 branches missed.">            if (c != null &amp;&amp; c.length() == 1 &amp;&amp; c.charAt(0) == '-' &amp;&amp; minValue &lt; 0) {</span>
+<span class="fc" id="L73">                return true;</span>
+            }
+<span class="fc" id="L75">            return super.validChar(c);</span>
+        }
+    };
+<span class="fc" id="L78">    private final Button decrement = new Button(&quot;-&quot;, &quot;StepperButton&quot;);</span>
+<span class="fc" id="L79">    private final Button increment = new Button(&quot;+&quot;, &quot;StepperButton&quot;);</span>
+<span class="fc" id="L80">    private final EventDispatcher listeners = new EventDispatcher();</span>
+
+    private int value;
+    private int minValue;
+    private int maxValue;
+<span class="fc" id="L85">    private int step = 1;</span>
+
+    /// A stepper over 0..100 starting at 0.
+    public Stepper() {
+<span class="nc" id="L89">        this(0, 0, 100);</span>
+<span class="nc" id="L90">    }</span>
+
+    /// A stepper over the given range.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the initial value, clamped into the range
+    ///
+    /// - `minValue`: the lowest value the control will produce
+    ///
+    /// - `maxValue`: the highest value the control will produce
+    public Stepper(int value, int minValue, int maxValue) {
+<span class="fc" id="L102">        super(new BorderLayout());</span>
+<span class="fc" id="L103">        setUIID(&quot;Stepper&quot;);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (maxValue &lt; minValue) {</span>
+<span class="fc" id="L105">            throw new IllegalArgumentException(&quot;maxValue &quot; + maxValue</span>
+                    + &quot; is below minValue &quot; + minValue);
+        }
+<span class="fc" id="L108">        this.minValue = minValue;</span>
+<span class="fc" id="L109">        this.maxValue = maxValue;</span>
+<span class="fc" id="L110">        this.value = clamp(value);</span>
+
+<span class="fc" id="L112">        field.setUIID(&quot;StepperField&quot;);</span>
+<span class="fc" id="L113">        field.setConstraint(TextField.NUMERIC);</span>
+<span class="fc" id="L114">        field.setText(String.valueOf(this.value));</span>
+<span class="fc" id="L115">        field.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                // Editing is over -- the field lost focus or the user confirmed. Text that is
+                // not a number cannot be left on screen now.
+<span class="fc" id="L120">                commitTypedText(true);</span>
+<span class="fc" id="L121">            }</span>
+        });
+<span class="fc" id="L123">        field.addDataChangedListener(new com.codename1.ui.events.DataChangedListener() {</span>
+            @Override
+            public void dataChanged(int type, int index) {
+                // Mid-edit. &quot;-&quot; and &quot;&quot; are legitimate things to be holding on the way to a
+                // number, so they are tolerated here and only settled above.
+<span class="fc" id="L128">                commitTypedText(false);</span>
+<span class="fc" id="L129">            }</span>
+        });
+
+<span class="fc" id="L132">        decrement.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L135">                setValue(saturate((long) Stepper.this.value - Stepper.this.step));</span>
+<span class="fc" id="L136">            }</span>
+        });
+<span class="fc" id="L138">        increment.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L141">                setValue(saturate((long) Stepper.this.value + Stepper.this.step));</span>
+<span class="fc" id="L142">            }</span>
+        });
+
+<span class="fc" id="L145">        Container buttons = new Container(BoxLayout.x());</span>
+<span class="fc" id="L146">        buttons.setUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L147">        buttons.add(decrement).add(increment);</span>
+<span class="fc" id="L148">        add(BorderLayout.CENTER, field);</span>
+<span class="fc" id="L149">        add(BorderLayout.EAST, buttons);</span>
+<span class="fc" id="L150">        updateButtonState();</span>
+<span class="fc" id="L151">    }</span>
+
+    /// The current value.
+    ///
+    /// #### Returns
+    ///
+    /// the value, always within `#getMinValue()`..`#getMaxValue()`
+    public int getValue() {
+<span class="fc" id="L159">        return value;</span>
+    }
+
+    /// Sets the value, clamped into the range. Fires the action listeners only when the
+    /// value actually moved, so a caller that sets the same value twice does not report a
+    /// change that did not happen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `newValue`: the requested value
+    public void setValue(int newValue) {
+<span class="fc" id="L170">        int clamped = clamp(newValue);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (clamped == value) {</span>
+            // Still refresh the text: the user may have typed something out of range, in
+            // which case the field and the value disagree and the field is the wrong one.
+<span class="fc" id="L174">            syncField();</span>
+<span class="fc" id="L175">            updateButtonState();</span>
+<span class="fc" id="L176">            return;</span>
+        }
+<span class="fc" id="L178">        value = clamped;</span>
+<span class="fc" id="L179">        syncField();</span>
+<span class="fc" id="L180">        updateButtonState();</span>
+<span class="fc" id="L181">        listeners.fireActionEvent(new ActionEvent(this));</span>
+<span class="fc" id="L182">    }</span>
+
+    /// The lowest value this control will produce.
+    ///
+    /// #### Returns
+    ///
+    /// the minimum
+    public int getMinValue() {
+<span class="nc" id="L190">        return minValue;</span>
+    }
+
+    /// The highest value this control will produce.
+    ///
+    /// #### Returns
+    ///
+    /// the maximum
+    public int getMaxValue() {
+<span class="nc" id="L199">        return maxValue;</span>
+    }
+
+    /// Sets the range. The current value is clamped into the new range, which fires the
+    /// listeners when that moves it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minValue`: the lowest value
+    ///
+    /// - `maxValue`: the highest value
+    public void setRange(int minValue, int maxValue) {
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (maxValue &lt; minValue) {</span>
+<span class="fc" id="L212">            throw new IllegalArgumentException(&quot;maxValue &quot; + maxValue</span>
+                    + &quot; is below minValue &quot; + minValue);
+        }
+<span class="nc" id="L215">        this.minValue = minValue;</span>
+<span class="nc" id="L216">        this.maxValue = maxValue;</span>
+<span class="nc" id="L217">        setValue(value);</span>
+<span class="nc" id="L218">    }</span>
+
+    /// How far one press of a button moves the value.
+    ///
+    /// #### Returns
+    ///
+    /// the step, at least 1
+    public int getStep() {
+<span class="nc" id="L226">        return step;</span>
+    }
+
+    /// Sets how far one press of a button moves the value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `step`: the step, which must be positive
+    public void setStep(int step) {
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (step &lt; 1) {</span>
+<span class="fc" id="L236">            throw new IllegalArgumentException(&quot;step must be positive: &quot; + step);</span>
+        }
+<span class="fc" id="L238">        this.step = step;</span>
+<span class="fc" id="L239">    }</span>
+
+    /// The decrement button, for a caller that wants to give it an icon.
+    ///
+    /// #### Returns
+    ///
+    /// the decrement button
+    public Button getDecrementButton() {
+<span class="fc" id="L247">        return decrement;</span>
+    }
+
+    /// The increment button, for a caller that wants to give it an icon.
+    ///
+    /// #### Returns
+    ///
+    /// the increment button
+    public Button getIncrementButton() {
+<span class="fc" id="L256">        return increment;</span>
+    }
+
+    /// The editable field, for a caller that wants to make it read-only.
+    ///
+    /// #### Returns
+    ///
+    /// the text field
+    public TextField getField() {
+<span class="fc" id="L265">        return field;</span>
+    }
+
+    /// Notified when the value changes, however it changed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L274">        listeners.addListener(l);</span>
+<span class="fc" id="L275">    }</span>
+
+    /// Stops notifying a listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeActionListener(ActionListener l) {
+<span class="nc" id="L283">        listeners.removeListener(l);</span>
+<span class="nc" id="L284">    }</span>
+
+    /// Takes whatever the user typed and turns it into a value.
+    ///
+    /// An empty field is left alone rather than treated as zero: a user clearing the field
+    /// to retype it would otherwise watch it fill itself in under the caret. Anything that
+    /// is not a number is ignored the same way -- the field is corrected when the value is
+    /// next set, which is what leaving the field does.
+    /// Reads the field and adopts it when it holds a usable number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `editingFinished`: true when the edit is over, in which case unusable text is
+    ///   replaced with the current value rather than left on screen. While editing is still in
+    ///   progress it is left alone: on a stepper whose range includes negatives, &quot;-&quot; is what
+    ///   the field holds after the first keystroke of &quot;-5&quot;, and correcting it there would undo
+    ///   the user's typing as they went.
+    private void commitTypedText(boolean editingFinished) {
+<span class="fc" id="L302">        String text = field.getText();</span>
+<span class="pc bpc" id="L303" title="1 of 4 branches missed.">        if (text == null || text.length() == 0) {</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">            if (editingFinished) {</span>
+<span class="nc" id="L305">                syncField();</span>
+            }
+<span class="fc" id="L307">            return;</span>
+        }
+        int typed;
+        try {
+<span class="fc" id="L311">            typed = Integer.parseInt(text.trim());</span>
+<span class="fc" id="L312">        } catch (NumberFormatException err) {</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            if (editingFinished) {</span>
+                // Left mid-edit on something like &quot;-&quot; or &quot;12x&quot;. getValue() still reports the
+                // last good number, so leaving the text as it is would show one value and
+                // report another for as long as the form is up.
+<span class="fc" id="L317">                syncField();</span>
+            }
+<span class="fc" id="L319">            return;</span>
+<span class="fc" id="L320">        }</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (typed == value) {</span>
+<span class="fc" id="L322">            return;</span>
+        }
+<span class="fc" id="L324">        int clamped = clamp(typed);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        boolean moved = clamped != value;</span>
+<span class="fc" id="L326">        value = clamped;</span>
+<span class="fc" id="L327">        updateButtonState();</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (clamped != typed) {</span>
+            // Out of range. Correct the field now rather than at focus loss, because the
+            // number under the caret is not one this control can produce.
+<span class="fc" id="L331">            syncField();</span>
+        }
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        if (!moved) {</span>
+            // The typed text differed but clamping put the value back where it already was --
+            // at 10 in a 1..10 stepper, typing 11 means 10. The documented value did not
+            // change, so no event, which is the rule setValue already follows. The field has
+            // still been corrected above.
+<span class="fc" id="L338">            return;</span>
+        }
+<span class="fc" id="L340">        listeners.fireActionEvent(new ActionEvent(this));</span>
+<span class="fc" id="L341">    }</span>
+
+    private void syncField() {
+<span class="fc" id="L344">        String text = String.valueOf(value);</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        if (!text.equals(field.getText())) {</span>
+<span class="fc" id="L346">            field.setText(text);</span>
+        }
+<span class="fc" id="L348">    }</span>
+
+    /// Disables the button that cannot move: a desktop stepper at its bound greys out the
+    /// half that would step past it rather than accepting a press that does nothing.
+    private void updateButtonState() {
+        // The bound AND the control's own enabled state. Taking only the bound meant a
+        // disabled Stepper re-enabled its buttons the moment anything called setValue, so a
+        // control the application had switched off became partly interactive again.
+<span class="fc" id="L356">        boolean on = isEnabled();</span>
+<span class="fc bfc" id="L357" title="All 4 branches covered.">        decrement.setEnabled(on &amp;&amp; value &gt; minValue);</span>
+<span class="fc bfc" id="L358" title="All 4 branches covered.">        increment.setEnabled(on &amp;&amp; value &lt; maxValue);</span>
+<span class="fc" id="L359">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    /// Re-applies the bound states afterwards. Enabling a Container enables its children, so
+    /// without this a Stepper re-enabled at one end of its range showed an active button that
+    /// could not move the value.
+    @Override
+    public void setEnabled(boolean enabled) {
+<span class="fc" id="L368">        super.setEnabled(enabled);</span>
+<span class="fc" id="L369">        updateButtonState();</span>
+<span class="fc" id="L370">    }</span>
+
+    /// Narrows a value computed in `long` back to `int` without wrapping.
+    ///
+    /// The step arithmetic has to happen in `long`. A Stepper may legitimately span
+    /// `Integer.MIN_VALUE`..`Integer.MAX_VALUE`, and in that range `value + step` overflows
+    /// in `int` before `#setValue(int)` ever sees it -- incrementing near the maximum wraps to
+    /// a negative number and the value jumps to the other end of the range instead of stopping
+    /// at the top. Saturating here means clamp() receives the number the user asked for, and
+    /// does its own job.
+    ///
+    /// #### Parameters
+    ///
+    /// - `candidate`: the value in long arithmetic
+    ///
+    /// #### Returns
+    ///
+    /// candidate, saturated to the int range
+    private static int saturate(long candidate) {
+<span class="fc bfc" id="L389" title="All 2 branches covered.">        if (candidate &gt; Integer.MAX_VALUE) {</span>
+<span class="fc" id="L390">            return Integer.MAX_VALUE;</span>
+        }
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        if (candidate &lt; Integer.MIN_VALUE) {</span>
+<span class="fc" id="L393">            return Integer.MIN_VALUE;</span>
+        }
+<span class="fc" id="L395">        return (int) candidate;</span>
+    }
+
+    private int clamp(int v) {
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        if (v &lt; minValue) {</span>
+<span class="fc" id="L400">            return minValue;</span>
+        }
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (v &gt; maxValue) {</span>
+<span class="fc" id="L403">            return maxValue;</span>
+        }
+<span class="fc" id="L405">        return v;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

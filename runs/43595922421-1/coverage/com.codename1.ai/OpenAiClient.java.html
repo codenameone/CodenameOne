@@ -1,0 +1,542 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenAiClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">OpenAiClient.java</span></div><h1>OpenAiClient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.NetworkManager;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// OpenAI-compatible chat / embeddings client. Drives Ollama,
+/// llama.cpp, vLLM, Together, and any other endpoint that speaks the
+/// `/v1/chat/completions` + `/v1/embeddings` shape.
+class OpenAiClient extends LlmClient {
+    private final String apiKey;
+<span class="fc" id="L44">    private String defaultModel = &quot;gpt-4o-mini&quot;;</span>
+
+    OpenAiClient(String apiKey, String baseUrl) {
+<span class="fc" id="L47">        super(baseUrl);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        this.apiKey = apiKey == null ? &quot;&quot; : apiKey;</span>
+<span class="fc" id="L49">    }</span>
+
+    void setDefaultModel(String m) {
+<span class="fc" id="L52">        this.defaultModel = m;</span>
+<span class="fc" id="L53">    }</span>
+
+    @Override
+    public String getProvider() {
+<span class="fc" id="L57">        return &quot;openai&quot;;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;ChatResponse&gt; chat(ChatRequest req) {
+<span class="fc" id="L62">        final AsyncResource&lt;ChatResponse&gt; result = new AsyncResource&lt;ChatResponse&gt;();</span>
+<span class="fc" id="L63">        String reject = runSafetyFilter(req);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (reject != null) {</span>
+<span class="fc" id="L65">            result.error(new LlmException(&quot;Blocked by safety filter: &quot; + reject,</span>
+                    400, &quot;safety_filter&quot;, null, null, LlmException.ErrorType.INVALID_REQUEST));
+<span class="fc" id="L67">            return result;</span>
+        }
+        final byte[] body;
+        try {
+<span class="fc" id="L71">            body = buildChatBody(req, false);</span>
+<span class="nc" id="L72">        } catch (IOException ioe) {</span>
+<span class="nc" id="L73">            result.error(ioe);</span>
+<span class="nc" id="L74">            return result;</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        ConnectionRequest cr = new ConnectionRequest() {</span>
+            @Override
+            protected void buildRequestBody(OutputStream os) throws IOException {
+<span class="fc" id="L79">                os.write(body);</span>
+<span class="fc" id="L80">            }</span>
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // Suppress framework's default dialog -- we'll deliver
+                // an exception through the AsyncResource instead.
+<span class="fc" id="L86">            }</span>
+
+            @Override
+            protected void postResponse() {
+                int code;
+                try {
+<span class="fc" id="L92">                    code = getResponseCode();</span>
+<span class="nc" id="L93">                } catch (Throwable t) {</span>
+<span class="nc" id="L94">                    code = 0;</span>
+<span class="fc" id="L95">                }</span>
+<span class="fc" id="L96">                final byte[] data = getResponseData();</span>
+<span class="fc" id="L97">                final LlmException httpErr = httpErrorOrNull(code, data);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (httpErr != null) {</span>
+<span class="fc" id="L99">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="fc" id="L102">                            result.error(httpErr);</span>
+<span class="fc" id="L103">                        }</span>
+                    });
+<span class="fc" id="L105">                    return;</span>
+                }
+                try {
+<span class="fc" id="L108">                    Map root = JSONParser.parseJSON(data);</span>
+<span class="fc" id="L109">                    final ChatResponse cr2 = OpenAiSseDecoder.parseNonStreaming(root);</span>
+<span class="fc" id="L110">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="fc" id="L113">                            result.complete(cr2);</span>
+<span class="fc" id="L114">                        }</span>
+                    });
+<span class="nc" id="L116">                } catch (IOException ex) {</span>
+<span class="nc" id="L117">                    failParse(result, ex, &quot;Failed to parse response&quot;);</span>
+<span class="nc" id="L118">                } catch (RuntimeException ex) {</span>
+<span class="nc" id="L119">                    failParse(result, ex, &quot;Failed to parse response&quot;);</span>
+<span class="pc" id="L120">                }</span>
+<span class="fc" id="L121">            }</span>
+
+            @Override
+            protected void handleException(Exception errIn) {
+<span class="nc" id="L125">                final Exception err = errIn;</span>
+                final int sc;
+                try {
+<span class="nc" id="L128">                    sc = getResponseCode();</span>
+<span class="nc" id="L129">                } catch (Throwable ignore) {</span>
+<span class="nc" id="L130">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc" id="L133">                            result.error(new LlmException(err.getMessage(), -1, null, null, err, LlmException.ErrorType.NETWORK));</span>
+<span class="nc" id="L134">                        }</span>
+                    });
+<span class="nc" id="L136">                    return;</span>
+<span class="nc" id="L137">                }</span>
+                final String bodyText;
+                try {
+<span class="nc" id="L140">                    byte[] d = getResponseData();</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                    bodyText = d == null ? &quot;&quot; : new String(d, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L142">                } catch (UnsupportedEncodingException ex) {</span>
+                    // UTF-8 is universally available; this branch is
+                    // theoretical, but it satisfies the strict-catch
+                    // static analyzer.
+<span class="nc" id="L146">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc" id="L149">                            result.error(new LlmException(err.getMessage(), -1, null, null, err, LlmException.ErrorType.NETWORK));</span>
+<span class="nc" id="L150">                        }</span>
+                    });
+<span class="nc" id="L152">                    return;</span>
+<span class="nc" id="L153">                }</span>
+<span class="nc" id="L154">                final LlmException mapped = OpenAiSseDecoder.mapErrorStatic(sc, bodyText);</span>
+<span class="nc" id="L155">                Display.getInstance().callSerially(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc" id="L158">                        result.error(mapped);</span>
+<span class="nc" id="L159">                    }</span>
+                });
+<span class="nc" id="L161">            }</span>
+        };
+<span class="fc" id="L163">        configureRequest(cr, &quot;/chat/completions&quot;);</span>
+<span class="fc" id="L164">        NetworkManager.getInstance().addToQueue(cr);</span>
+<span class="fc" id="L165">        return result;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;ChatResponse&gt; chatStream(ChatRequest req, StreamingListener listener) {
+<span class="nc" id="L170">        final AsyncResource&lt;ChatResponse&gt; result = new AsyncResource&lt;ChatResponse&gt;();</span>
+<span class="nc" id="L171">        String reject = runSafetyFilter(req);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (reject != null) {</span>
+<span class="nc" id="L173">            result.error(new LlmException(&quot;Blocked by safety filter: &quot; + reject,</span>
+                    400, &quot;safety_filter&quot;, null, null, LlmException.ErrorType.INVALID_REQUEST));
+<span class="nc" id="L175">            return result;</span>
+        }
+        final byte[] body;
+        try {
+<span class="nc" id="L179">            body = buildChatBody(req, true);</span>
+<span class="nc" id="L180">        } catch (IOException ioe) {</span>
+<span class="nc" id="L181">            result.error(ioe);</span>
+<span class="nc" id="L182">            return result;</span>
+<span class="nc" id="L183">        }</span>
+<span class="nc" id="L184">        final StreamingChatRequest scr = new StreamingChatRequest(</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                resolveUrl(&quot;/chat/completions&quot;), body,</span>
+                listener == null ? new StreamingListener.Adapter() : listener,
+                result,
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                new OpenAiSseDecoder(req.getModel() != null ? req.getModel() : defaultModel)) {</span>
+            // Inherit body / SSE plumbing.
+        };
+<span class="nc" id="L191">        configureRequest(scr, null);</span>
+<span class="nc" id="L192">        scr.addRequestHeader(&quot;Accept&quot;, &quot;text/event-stream&quot;);</span>
+<span class="nc" id="L193">        NetworkManager.getInstance().addToQueue(scr);</span>
+        // Bridge cancellation: when the caller cancels the AsyncResource
+        // we kill the underlying socket so no further deltas arrive.
+        // AsyncResource is Observable and fires `setChanged()` from
+        // cancel(), complete(), and error(); we only act on cancellation.
+<span class="nc" id="L198">        result.addObserver(new java.util.Observer() {</span>
+            @Override
+            public void update(java.util.Observable o, Object arg) {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                if (result.isCancelled()) {</span>
+<span class="nc" id="L202">                    scr.kill();</span>
+                }
+<span class="nc" id="L204">            }</span>
+        });
+<span class="nc" id="L206">        return result;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;EmbeddingResponse&gt; embed(EmbeddingRequest req) {
+<span class="fc" id="L211">        final AsyncResource&lt;EmbeddingResponse&gt; result = new AsyncResource&lt;EmbeddingResponse&gt;();</span>
+        final byte[] body;
+        try {
+<span class="fc" id="L214">            Map&lt;String, Object&gt; root = new HashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            root.put(&quot;model&quot;, req.getModel() != null ? req.getModel() : &quot;text-embedding-3-small&quot;);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            if (req.getInputs().size() == 1) {</span>
+<span class="fc" id="L217">                root.put(&quot;input&quot;, req.getInputs().get(0));</span>
+            } else {
+<span class="fc" id="L219">                root.put(&quot;input&quot;, req.getInputs());</span>
+            }
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            if (req.getDimensions() != null) {</span>
+<span class="fc" id="L222">                root.put(&quot;dimensions&quot;, req.getDimensions());</span>
+            }
+<span class="fc" id="L224">            body = JSONParser.toJson(root).getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L225">        } catch (IOException ioe) {</span>
+<span class="nc" id="L226">            result.error(ioe);</span>
+<span class="nc" id="L227">            return result;</span>
+<span class="fc" id="L228">        }</span>
+<span class="fc" id="L229">        ConnectionRequest cr = new ConnectionRequest() {</span>
+            @Override
+            protected void buildRequestBody(OutputStream os) throws IOException {
+<span class="fc" id="L232">                os.write(body);</span>
+<span class="fc" id="L233">            }</span>
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+<span class="fc" id="L237">            }</span>
+
+            @Override
+            protected void postResponse() {
+                int code;
+                try {
+<span class="fc" id="L243">                    code = getResponseCode();</span>
+<span class="nc" id="L244">                } catch (Throwable t) {</span>
+<span class="nc" id="L245">                    code = 0;</span>
+<span class="fc" id="L246">                }</span>
+<span class="fc" id="L247">                final byte[] data = getResponseData();</span>
+<span class="fc" id="L248">                final LlmException httpErr = httpErrorOrNull(code, data);</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                if (httpErr != null) {</span>
+<span class="fc" id="L250">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="fc" id="L253">                            result.error(httpErr);</span>
+<span class="fc" id="L254">                        }</span>
+                    });
+<span class="fc" id="L256">                    return;</span>
+                }
+                try {
+<span class="fc" id="L259">                    Map root = JSONParser.parseJSON(data);</span>
+<span class="fc" id="L260">                    List&lt;Object&gt; dataArr = JSONParser.asList(root.get(&quot;data&quot;));</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                    List&lt;Embedding&gt; out = new ArrayList&lt;Embedding&gt;(dataArr == null ? 0 : dataArr.size());</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                    if (dataArr != null) {</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">                        for (int i = 0; i &lt; dataArr.size(); i++) {</span>
+<span class="fc" id="L264">                            Map e = JSONParser.asMap(dataArr.get(i));</span>
+<span class="fc" id="L265">                            List&lt;Object&gt; v = JSONParser.asList(e.get(&quot;embedding&quot;));</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                            float[] vec = new float[v == null ? 0 : v.size()];</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                            for (int j = 0; j &lt; vec.length; j++) {</span>
+<span class="fc" id="L268">                                Object n = v.get(j);</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                                vec[j] = n instanceof Number ? ((Number) n).floatValue()</span>
+<span class="pc" id="L270">                                        : Float.parseFloat(n.toString());</span>
+                            }
+<span class="fc" id="L272">                            out.add(new Embedding(vec, JSONParser.getInt(e, &quot;index&quot;, i)));</span>
+                        }
+                    }
+<span class="fc" id="L275">                    Map usageMap = JSONParser.asMap(root.get(&quot;usage&quot;));</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                    Usage u = usageMap == null ? null</span>
+                            : new Usage(
+<span class="fc" id="L278">                                JSONParser.getInt(usageMap, &quot;prompt_tokens&quot;, -1),</span>
+                                -1,
+<span class="fc" id="L280">                                JSONParser.getInt(usageMap, &quot;total_tokens&quot;, -1));</span>
+<span class="fc" id="L281">                    final EmbeddingResponse er = new EmbeddingResponse(out, u,</span>
+<span class="fc" id="L282">                            JSONParser.getString(root, &quot;model&quot;));</span>
+<span class="fc" id="L283">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="fc" id="L286">                            result.complete(er);</span>
+<span class="fc" id="L287">                        }</span>
+                    });
+<span class="nc" id="L289">                } catch (IOException ex) {</span>
+<span class="nc" id="L290">                    failParse(result, ex, &quot;Failed to parse embedding response&quot;);</span>
+<span class="nc" id="L291">                } catch (RuntimeException ex) {</span>
+<span class="nc" id="L292">                    failParse(result, ex, &quot;Failed to parse embedding response&quot;);</span>
+<span class="pc" id="L293">                }</span>
+<span class="fc" id="L294">            }</span>
+
+            @Override
+            protected void handleException(Exception errIn) {
+<span class="nc" id="L298">                final Exception err = errIn;</span>
+<span class="nc" id="L299">                Display.getInstance().callSerially(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc" id="L302">                        result.error(new LlmException(err.getMessage(), -1, null, null, err, LlmException.ErrorType.NETWORK));</span>
+<span class="nc" id="L303">                    }</span>
+                });
+<span class="nc" id="L305">            }</span>
+        };
+<span class="fc" id="L307">        configureRequest(cr, &quot;/embeddings&quot;);</span>
+<span class="fc" id="L308">        NetworkManager.getInstance().addToQueue(cr);</span>
+<span class="fc" id="L309">        return result;</span>
+    }
+
+    /// Detects an error response in `postResponse()`. With
+    /// `setReadResponseForErrors(true)` the framework routes HTTP 4xx/5xx
+    /// through `postResponse()` (not `handleException`), so without this
+    /// check an OpenAI `{&quot;error&quot;:...}` envelope would be parsed as an empty
+    /// success. Returns the typed [LlmException] to surface, or `null` when
+    /// the response is a normal success that should be parsed as usual.
+    private static LlmException httpErrorOrNull(int code, byte[] data) {
+        String bodyText;
+        try {
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            bodyText = data == null ? &quot;&quot; : new String(data, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L322">        } catch (UnsupportedEncodingException uee) {</span>
+            // UTF-8 is universally available; this branch is theoretical.
+<span class="nc" id="L324">            bodyText = &quot;&quot;;</span>
+<span class="fc" id="L325">        }</span>
+<span class="fc" id="L326">        boolean envelopeError = false;</span>
+<span class="pc bpc" id="L327" title="1 of 4 branches missed.">        if (code &lt; 400 &amp;&amp; bodyText.length() &gt; 0) {</span>
+            // Some OpenAI-compatible servers answer 200 with an
+            // {&quot;error&quot;:...} body; honour that shape too.
+            try {
+<span class="fc" id="L331">                Map root = JSONParser.parseJSON(bodyText);</span>
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">                envelopeError = root != null &amp;&amp; root.get(&quot;error&quot;) != null;</span>
+<span class="nc" id="L333">            } catch (IOException ignored) {</span>
+                // Not JSON -&gt; treat as a normal (non-error) body.
+<span class="nc" id="L335">            } catch (RuntimeException ignored) {</span>
+                // Malformed structure -&gt; treat as a non-error body.
+<span class="pc" id="L337">            }</span>
+        }
+<span class="fc bfc" id="L339" title="All 4 branches covered.">        if (code &gt;= 400 || envelopeError) {</span>
+<span class="fc" id="L340">            return OpenAiSseDecoder.mapErrorStatic(code, bodyText);</span>
+        }
+<span class="fc" id="L342">        return null;</span>
+    }
+
+    private void configureRequest(ConnectionRequest cr, String pathOrNull) {
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">        if (pathOrNull != null) {</span>
+<span class="fc" id="L347">            cr.setUrl(resolveUrl(pathOrNull));</span>
+        }
+<span class="fc" id="L349">        cr.setPost(true);</span>
+<span class="fc" id="L350">        cr.setReadResponseForErrors(true);</span>
+<span class="fc" id="L351">        cr.setDuplicateSupported(true);</span>
+<span class="fc" id="L352">        cr.setContentType(&quot;application/json&quot;);</span>
+<span class="fc" id="L353">        cr.setTimeout(getHttpTimeoutMs());</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        if (apiKey.length() &gt; 0) {</span>
+<span class="fc" id="L355">            cr.addRequestHeader(&quot;Authorization&quot;, &quot;Bearer &quot; + apiKey);</span>
+        }
+<span class="fc" id="L357">    }</span>
+
+    private String resolveUrl(String path) {
+<span class="fc" id="L360">        String base = getBaseUrl();</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        if (base == null) {</span>
+<span class="nc" id="L362">            base = &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">        if (base.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L365">            base = base.substring(0, base.length() - 1);</span>
+        }
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (!path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L368">            path = &quot;/&quot; + path;</span>
+        }
+<span class="fc" id="L370">        return base + path;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private byte[] buildChatBody(ChatRequest req, boolean stream) throws IOException {
+<span class="fc" id="L375">        Map&lt;String, Object&gt; root = new HashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        root.put(&quot;model&quot;, req.getModel() != null ? req.getModel() : defaultModel);</span>
+<span class="fc" id="L377">        root.put(&quot;messages&quot;, encodeMessages(req));</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        root.put(&quot;stream&quot;, stream ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (stream) {</span>
+            // Ask for usage in the final SSE chunk; modern OpenAI
+            // endpoints only emit it when this option is set.
+<span class="nc" id="L382">            Map&lt;String, Object&gt; so = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L383">            so.put(&quot;include_usage&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L384">            root.put(&quot;stream_options&quot;, so);</span>
+        }
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">        if (req.getTemperature() != null) {</span>
+<span class="nc" id="L387">            root.put(&quot;temperature&quot;, req.getTemperature());</span>
+        }
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">        if (req.getMaxTokens() != null) {</span>
+<span class="nc" id="L390">            root.put(&quot;max_tokens&quot;, req.getMaxTokens());</span>
+        }
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">        if (req.getTopP() != null) {</span>
+<span class="nc" id="L393">            root.put(&quot;top_p&quot;, req.getTopP());</span>
+        }
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (req.getSeed() != null) {</span>
+<span class="nc" id="L396">            root.put(&quot;seed&quot;, req.getSeed());</span>
+        }
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">        if (!req.getStopSequences().isEmpty()) {</span>
+<span class="nc" id="L399">            root.put(&quot;stop&quot;, req.getStopSequences());</span>
+        }
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">        if (req.getResponseFormat() == ResponseFormat.JSON_OBJECT) {</span>
+<span class="nc" id="L402">            Map&lt;String, Object&gt; rf = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L403">            rf.put(&quot;type&quot;, &quot;json_object&quot;);</span>
+<span class="nc" id="L404">            root.put(&quot;response_format&quot;, rf);</span>
+        }
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">        if (!req.getTools().isEmpty()) {</span>
+<span class="nc" id="L407">            root.put(&quot;tools&quot;, encodeTools(req.getTools()));</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">            if (req.getToolChoice() != null) {</span>
+<span class="nc" id="L409">                root.put(&quot;tool_choice&quot;, encodeToolChoice(req.getToolChoice()));</span>
+            }
+        }
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">        if (!req.getMetadata().isEmpty()) {</span>
+<span class="nc" id="L413">            root.put(&quot;metadata&quot;, req.getMetadata());</span>
+        }
+<span class="fc" id="L415">        return JSONParser.toJson(root).getBytes(&quot;UTF-8&quot;);</span>
+    }
+
+    private List&lt;Object&gt; encodeMessages(ChatRequest req) {
+<span class="fc" id="L419">        List&lt;Object&gt; out = new ArrayList&lt;Object&gt;(req.getMessages().size());</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        for (int i = 0; i &lt; req.getMessages().size(); i++) {</span>
+<span class="fc" id="L421">            ChatMessage m = req.getMessages().get(i);</span>
+<span class="fc" id="L422">            Map&lt;String, Object&gt; jm = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L423">            jm.put(&quot;role&quot;, roleString(m.getRole()));</span>
+            // OpenAI accepts content as either a string (text-only)
+            // or a content-array (multi-modal). Prefer the string
+            // form when there's only one TextPart.
+<span class="pc bpc" id="L427" title="2 of 4 branches missed.">            if (m.getParts().size() == 1 &amp;&amp; m.getParts().get(0) instanceof TextPart) {</span>
+<span class="fc" id="L428">                jm.put(&quot;content&quot;, ((TextPart) m.getParts().get(0)).getText());</span>
+<span class="nc bnc" id="L429" title="All 4 branches missed.">            } else if (m.getRole() == Role.TOOL &amp;&amp; m.getToolCallId() != null) {</span>
+<span class="nc" id="L430">                jm.put(&quot;tool_call_id&quot;, m.getToolCallId());</span>
+<span class="nc" id="L431">                StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">                for (int p = 0; p &lt; m.getParts().size(); p++) {</span>
+<span class="nc" id="L433">                    MessagePart part = m.getParts().get(p);</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                    if (part instanceof TextPart) {</span>
+<span class="nc" id="L435">                        buf.append(((TextPart) part).getText());</span>
+<span class="nc bnc" id="L436" title="All 2 branches missed.">                    } else if (part instanceof ToolResultPart) {</span>
+<span class="nc" id="L437">                        buf.append(((ToolResultPart) part).getResultJson());</span>
+                    }
+                }
+<span class="nc" id="L440">                jm.put(&quot;content&quot;, buf.toString());</span>
+<span class="nc" id="L441">            } else {</span>
+<span class="nc" id="L442">                List&lt;Object&gt; parts = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                for (int p = 0; p &lt; m.getParts().size(); p++) {</span>
+<span class="nc" id="L444">                    MessagePart part = m.getParts().get(p);</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">                    if (part instanceof TextPart) {</span>
+<span class="nc" id="L446">                        Map&lt;String, Object&gt; jp = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L447">                        jp.put(&quot;type&quot;, &quot;text&quot;);</span>
+<span class="nc" id="L448">                        jp.put(&quot;text&quot;, ((TextPart) part).getText());</span>
+<span class="nc" id="L449">                        parts.add(jp);</span>
+<span class="nc bnc" id="L450" title="All 2 branches missed.">                    } else if (part instanceof ImagePart) {</span>
+<span class="nc" id="L451">                        ImagePart ip = (ImagePart) part;</span>
+<span class="nc" id="L452">                        Map&lt;String, Object&gt; jp = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L453">                        jp.put(&quot;type&quot;, &quot;image_url&quot;);</span>
+<span class="nc" id="L454">                        Map&lt;String, Object&gt; iu = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">                        if (ip.isUrl()) {</span>
+<span class="nc" id="L456">                            iu.put(&quot;url&quot;, ip.getUrl());</span>
+                        } else {
+<span class="nc" id="L458">                            iu.put(&quot;url&quot;, &quot;data:&quot; + ip.getMimeType() + &quot;;base64,&quot;</span>
+<span class="nc" id="L459">                                    + com.codename1.util.Base64.encodeNoNewline(ip.getData()));</span>
+                        }
+<span class="nc" id="L461">                        jp.put(&quot;image_url&quot;, iu);</span>
+<span class="nc" id="L462">                        parts.add(jp);</span>
+                    }
+                }
+<span class="nc" id="L465">                jm.put(&quot;content&quot;, parts);</span>
+            }
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">            if (m.getName() != null) {</span>
+<span class="nc" id="L468">                jm.put(&quot;name&quot;, m.getName());</span>
+            }
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">            if (!m.getToolCalls().isEmpty()) {</span>
+<span class="nc" id="L471">                List&lt;Object&gt; tcs = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L472" title="All 2 branches missed.">                for (ToolCall tc : m.getToolCalls()) {</span>
+<span class="nc" id="L473">                    Map&lt;String, Object&gt; jtc = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L474">                    jtc.put(&quot;id&quot;, tc.getId());</span>
+<span class="nc" id="L475">                    jtc.put(&quot;type&quot;, &quot;function&quot;);</span>
+<span class="nc" id="L476">                    Map&lt;String, Object&gt; fn = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L477">                    fn.put(&quot;name&quot;, tc.getName());</span>
+<span class="nc" id="L478">                    fn.put(&quot;arguments&quot;, tc.getArgumentsJson());</span>
+<span class="nc" id="L479">                    jtc.put(&quot;function&quot;, fn);</span>
+<span class="nc" id="L480">                    tcs.add(jtc);</span>
+<span class="nc" id="L481">                }</span>
+<span class="nc" id="L482">                jm.put(&quot;tool_calls&quot;, tcs);</span>
+            }
+<span class="fc" id="L484">            out.add(jm);</span>
+        }
+<span class="fc" id="L486">        return out;</span>
+    }
+
+    private static String roleString(Role r) {
+<span class="pc bpc" id="L490" title="4 of 5 branches missed.">        switch (r) {</span>
+<span class="nc" id="L491">            case SYSTEM: return &quot;system&quot;;</span>
+<span class="fc" id="L492">            case USER: return &quot;user&quot;;</span>
+<span class="nc" id="L493">            case ASSISTANT: return &quot;assistant&quot;;</span>
+<span class="nc" id="L494">            case TOOL: return &quot;tool&quot;;</span>
+<span class="nc" id="L495">            default: return &quot;user&quot;;</span>
+        }
+    }
+
+    private List&lt;Object&gt; encodeTools(List&lt;Tool&gt; tools) {
+<span class="nc" id="L500">        List&lt;Object&gt; out = new ArrayList&lt;Object&gt;(tools.size());</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">        for (Tool t : tools) {</span>
+<span class="nc" id="L502">            Map&lt;String, Object&gt; jt = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L503">            jt.put(&quot;type&quot;, &quot;function&quot;);</span>
+<span class="nc" id="L504">            Map&lt;String, Object&gt; fn = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L505">            fn.put(&quot;name&quot;, t.getName());</span>
+<span class="nc" id="L506">            fn.put(&quot;description&quot;, t.getDescription());</span>
+<span class="nc" id="L507">            fn.put(&quot;parameters&quot;, JSONParser.rawJson(t.getParametersJsonSchema()));</span>
+<span class="nc" id="L508">            jt.put(&quot;function&quot;, fn);</span>
+<span class="nc" id="L509">            out.add(jt);</span>
+<span class="nc" id="L510">        }</span>
+<span class="nc" id="L511">        return out;</span>
+    }
+
+    private Object encodeToolChoice(ToolChoice c) {
+<span class="nc bnc" id="L515" title="All 2 branches missed.">        if (&quot;named&quot;.equals(c.getMode())) {</span>
+<span class="nc" id="L516">            Map&lt;String, Object&gt; tc = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L517">            tc.put(&quot;type&quot;, &quot;function&quot;);</span>
+<span class="nc" id="L518">            Map&lt;String, Object&gt; fn = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L519">            fn.put(&quot;name&quot;, c.getForcedToolName());</span>
+<span class="nc" id="L520">            tc.put(&quot;function&quot;, fn);</span>
+<span class="nc" id="L521">            return tc;</span>
+        }
+<span class="nc" id="L523">        return c.getMode();</span>
+    }
+
+    /// Shared error-fan-out for the post-response JSON parsers.
+    /// Wraps `t` in an `LlmException` with the given message and
+    /// completes the result on the EDT. Reused by the two catch
+    /// blocks (IOException + RuntimeException) we need to keep
+    /// the strict-catch static analyzer happy.
+    private static void failParse(final AsyncResource&lt;?&gt; result,
+                                  final Throwable t,
+                                  final String message) {
+<span class="nc" id="L534">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L537">                ((AsyncResource) result).error(new LlmException(message, t));</span>
+<span class="nc" id="L538">            }</span>
+        });
+<span class="nc" id="L540">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

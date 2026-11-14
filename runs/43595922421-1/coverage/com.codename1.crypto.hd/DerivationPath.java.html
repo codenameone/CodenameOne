@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DerivationPath.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.hd</a> &gt; <span class="el_source">DerivationPath.java</span></div><h1>DerivationPath.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.hd;
+
+/// A BIP-32 derivation path such as `m/44'/60'/0'/0/0`: a list of child indices, each
+/// hardened when written with `'`, `h` or `H`.
+@com.codename1.impl.SharedWithBackend
+public final class DerivationPath {
+    /// The offset that marks a hardened index.
+    public static final long HARDENED = 0x80000000L;
+
+    private final long[] indices;
+
+<span class="fc" id="L34">    private DerivationPath(long[] indices) {</span>
+<span class="fc" id="L35">        this.indices = indices;</span>
+<span class="fc" id="L36">    }</span>
+
+    /// Parses a path. A leading `m` (or `m/`) is optional; an empty path or `m` alone is
+    /// the master key itself.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a component that is not a number below 2^31
+    public static DerivationPath parse(String path) {
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;null path&quot;);</span>
+        }
+<span class="fc" id="L48">        String p = path.trim();</span>
+<span class="pc bpc" id="L49" title="2 of 6 branches missed.">        if (&quot;m&quot;.equals(p) || &quot;M&quot;.equals(p) || p.length() == 0) {</span>
+<span class="fc" id="L50">            return new DerivationPath(new long[0]);</span>
+        }
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">        if (p.startsWith(&quot;m/&quot;) || p.startsWith(&quot;M/&quot;)) {</span>
+<span class="fc" id="L53">            p = p.substring(2);</span>
+        }
+<span class="fc" id="L55">        java.util.ArrayList&lt;String&gt; parts = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L56">        int start = 0;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (int iter = 0; iter &lt;= p.length(); iter++) {</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">            if (iter == p.length() || p.charAt(iter) == '/') {</span>
+<span class="fc" id="L59">                parts.add(p.substring(start, iter));</span>
+<span class="fc" id="L60">                start = iter + 1;</span>
+            }
+        }
+<span class="fc" id="L63">        long[] out = new long[parts.size()];</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (int iter = 0; iter &lt; out.length; iter++) {</span>
+<span class="fc" id="L65">            String part = parts.get(iter);</span>
+<span class="fc" id="L66">            boolean hardened = false;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (part.length() &gt; 0) {</span>
+<span class="fc" id="L68">                char last = part.charAt(part.length() - 1);</span>
+<span class="fc bfc" id="L69" title="All 6 branches covered.">                if (last == '\'' || last == 'h' || last == 'H') {</span>
+<span class="fc" id="L70">                    hardened = true;</span>
+<span class="fc" id="L71">                    part = part.substring(0, part.length() - 1);</span>
+                }
+            }
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">            if (part.length() == 0 || part.length() &gt; 10) {</span>
+<span class="fc" id="L75">                throw new IllegalArgumentException(&quot;bad path component in &quot; + path);</span>
+            }
+<span class="fc" id="L77">            long value = 0;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (int c = 0; c &lt; part.length(); c++) {</span>
+<span class="fc" id="L79">                char ch = part.charAt(c);</span>
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">                if (ch &lt; '0' || ch &gt; '9') {</span>
+<span class="fc" id="L81">                    throw new IllegalArgumentException(&quot;bad path component in &quot; + path);</span>
+                }
+<span class="fc" id="L83">                value = value * 10 + (ch - '0');</span>
+            }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (value &gt;= HARDENED) {</span>
+<span class="fc" id="L86">                throw new IllegalArgumentException(&quot;path index too large in &quot; + path);</span>
+            }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            out[iter] = hardened ? value + HARDENED : value;</span>
+        }
+<span class="fc" id="L90">        return new DerivationPath(out);</span>
+    }
+
+    /// A path from raw indices, each already including [#HARDENED] where wanted.
+    public static DerivationPath of(long[] indices) {
+<span class="fc" id="L95">        long[] copy = new long[indices.length];</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (int iter = 0; iter &lt; copy.length; iter++) {</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">            if (indices[iter] &lt; 0 || indices[iter] &gt; 0xffffffffL) {</span>
+<span class="nc" id="L98">                throw new IllegalArgumentException(&quot;index out of range&quot;);</span>
+            }
+<span class="fc" id="L100">            copy[iter] = indices[iter];</span>
+        }
+<span class="fc" id="L102">        return new DerivationPath(copy);</span>
+    }
+
+    /// The BIP-44 path `m/44'/coin'/account'/change/index`.
+    public static DerivationPath bip44(int coinType, int account, int change, long index) {
+<span class="fc" id="L107">        return of(new long[] {44 + HARDENED, coinType + HARDENED, account + HARDENED, change, index});</span>
+    }
+
+    /// This path with one more index.
+    public DerivationPath child(long index) {
+<span class="nc" id="L112">        long[] out = new long[indices.length + 1];</span>
+<span class="nc" id="L113">        System.arraycopy(indices, 0, out, 0, indices.length);</span>
+<span class="nc" id="L114">        out[indices.length] = index;</span>
+<span class="nc" id="L115">        return of(out);</span>
+    }
+
+    /// The number of indices.
+    public int length() {
+<span class="fc" id="L120">        return indices.length;</span>
+    }
+
+    /// The index at a position, including [#HARDENED] when hardened.
+    public long get(int position) {
+<span class="fc" id="L125">        return indices[position];</span>
+    }
+
+    /// Tells whether every index is hardened, which [Slip10] requires for Ed25519.
+    public boolean isFullyHardened() {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (long index : indices) {</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            if (index &lt; HARDENED) {</span>
+<span class="nc" id="L132">                return false;</span>
+            }
+        }
+<span class="fc" id="L135">        return true;</span>
+    }
+
+    /// The path in `m/44'/60'/0'` form.
+    @Override
+    public String toString() {
+<span class="fc" id="L141">        StringBuilder out = new StringBuilder(&quot;m&quot;);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (long index : indices) {</span>
+<span class="fc" id="L143">            out.append('/');</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (index &gt;= HARDENED) {</span>
+<span class="fc" id="L145">                out.append(index - HARDENED).append('\'');</span>
+            } else {
+<span class="fc" id="L147">                out.append(index);</span>
+            }
+        }
+<span class="fc" id="L150">        return out.toString();</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (!(o instanceof DerivationPath)) {</span>
+<span class="nc" id="L156">            return false;</span>
+        }
+<span class="fc" id="L158">        long[] other = ((DerivationPath) o).indices;</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (other.length != indices.length) {</span>
+<span class="nc" id="L160">            return false;</span>
+        }
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (int iter = 0; iter &lt; other.length; iter++) {</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (other[iter] != indices[iter]) {</span>
+<span class="nc" id="L164">                return false;</span>
+            }
+        }
+<span class="fc" id="L167">        return true;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L172">        int h = 17;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        for (long index : indices) {</span>
+<span class="nc" id="L174">            h = h * 31 + (int) (index ^ (index &gt;&gt;&gt; 32));</span>
+        }
+<span class="nc" id="L176">        return h;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

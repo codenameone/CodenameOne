@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PersonalSign.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.evm</a> &gt; <span class="el_source">PersonalSign.java</span></div><h1>PersonalSign.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.evm;
+
+import java.nio.charset.StandardCharsets;
+import com.codename1.security.Hash;
+import com.codename1.security.Secp256k1;
+
+/// EIP-191 `personal_sign` messages, the &quot;Sign in with Ethereum&quot; and wallet-ownership proof,
+/// and the 65-byte `r || s || v` signatures EVM wallets exchange.
+///
+/// `v` is written as 27 or 28, the form `personal_sign` and `eth_sign` return; the
+/// recovering methods also accept 0 and 1.
+@com.codename1.impl.SharedWithBackend
+public final class PersonalSign {
+    private PersonalSign() {
+    }
+
+    /// `keccak256(&quot;\x19Ethereum Signed Message:\n&quot; + len(message) + message)`.
+    public static byte[] hash(byte[] message) {
+<span class="fc" id="L41">        byte[] prefix = EvmAddress.ascii(&quot;\u0019Ethereum Signed Message:\n&quot; + message.length);</span>
+<span class="fc" id="L42">        byte[] all = new byte[prefix.length + message.length];</span>
+<span class="fc" id="L43">        System.arraycopy(prefix, 0, all, 0, prefix.length);</span>
+<span class="fc" id="L44">        System.arraycopy(message, 0, all, prefix.length, message.length);</span>
+<span class="fc" id="L45">        return Hash.keccak256(all);</span>
+    }
+
+    /// [#hash] of a text message, UTF-8 encoded.
+    public static byte[] hash(String message) {
+<span class="fc" id="L50">        return hash(message.getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    /// Signs a message as `personal_sign` does.
+    public static byte[] sign(byte[] message, byte[] privateKey) {
+<span class="fc" id="L55">        return signHash(hash(message), privateKey);</span>
+    }
+
+    /// Signs a text message as `personal_sign` does.
+    public static byte[] sign(String message, byte[] privateKey) {
+<span class="fc" id="L60">        return sign(message.getBytes(StandardCharsets.UTF_8), privateKey);</span>
+    }
+
+    /// The address that signed a message.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a malformed signature
+    ///
+    /// - `com.codename1.security.CryptoException`: when the signature recovers no key
+    public static EvmAddress recover(byte[] message, byte[] signature65) {
+<span class="fc" id="L71">        return recoverHash(hash(message), signature65);</span>
+    }
+
+    /// Tells whether `address` signed the text `message`.
+    public static boolean verify(String message, byte[] signature65, EvmAddress address) {
+        try {
+<span class="fc" id="L77">            return recover(message.getBytes(StandardCharsets.UTF_8), signature65).equals(address);</span>
+<span class="nc" id="L78">        } catch (RuntimeException invalid) {</span>
+<span class="nc" id="L79">            return false;</span>
+        }
+    }
+
+    /// Signs a 32-byte digest, answering `r || s || v` with `v` 27 or 28.
+    public static byte[] signHash(byte[] hash32, byte[] privateKey) {
+<span class="fc" id="L85">        Secp256k1.EcdsaSignature sig = Secp256k1.sign(hash32, privateKey);</span>
+<span class="fc" id="L86">        byte[] out = new byte[65];</span>
+<span class="fc" id="L87">        System.arraycopy(sig.r(), 0, out, 0, 32);</span>
+<span class="fc" id="L88">        System.arraycopy(sig.s(), 0, out, 32, 32);</span>
+<span class="fc" id="L89">        out[64] = (byte) (27 + sig.recoveryId());</span>
+<span class="fc" id="L90">        return out;</span>
+    }
+
+    /// The address whose key produced `signature65` over a 32-byte digest.
+    public static EvmAddress recoverHash(byte[] hash32, byte[] signature65) {
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">        if (signature65 == null || signature65.length != 65) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(&quot;a signature is 65 bytes&quot;);</span>
+        }
+<span class="fc" id="L98">        int v = signature65[64] &amp; 0xff;</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        int recId = v &gt;= 27 ? v - 27 : v;</span>
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">        if (recId &lt; 0 || recId &gt; 1) {</span>
+<span class="nc" id="L101">            throw new IllegalArgumentException(&quot;bad v &quot; + v);</span>
+        }
+<span class="fc" id="L103">        byte[] compact = new byte[64];</span>
+<span class="fc" id="L104">        System.arraycopy(signature65, 0, compact, 0, 64);</span>
+<span class="fc" id="L105">        byte[] pub = Secp256k1.recoverPublicKey(hash32, Secp256k1.EcdsaSignature.fromCompact(compact, recId), false);</span>
+<span class="fc" id="L106">        return EvmAddress.fromPublicKey(pub);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BitcoinKey.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.bitcoin</a> &gt; <span class="el_source">BitcoinKey.java</span></div><h1>BitcoinKey.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.bitcoin;
+
+import com.codename1.security.Secp256k1;
+
+/// A secp256k1 key that signs Bitcoin inputs without necessarily exposing its private key.
+/// [Psbt#sign(int, BitcoinKey)] takes one, so an input can be signed by a key held in memory
+/// ([#fromPrivateKey]), by a wallet that derives it per signature, or by a hardware device or
+/// key service that implements the two signing methods.
+@com.codename1.impl.SharedWithBackend
+<span class="fc" id="L32">public abstract class BitcoinKey {</span>
+    /// The compressed 33-byte public key.
+    public abstract byte[] getPublicKey();
+
+    /// An ECDSA signature over a 32-byte sighash, RFC 6979 deterministic and low-S.
+    public abstract Secp256k1.EcdsaSignature signEcdsa(byte[] sighash);
+
+    /// A BIP-340 signature over a 32-byte Taproot sighash, made with the key tweaked by
+    /// BIP-341 for `merkleRoot` (`null` for a key-path-only output, as BIP-86 derives).
+    public abstract byte[] signTaproot(byte[] sighash, byte[] merkleRoot);
+
+    /// The uncompressed 65-byte public key, which some legacy outputs pay to.
+    public byte[] getUncompressedPublicKey() {
+<span class="fc" id="L45">        return Secp256k1.convertPublicKey(getPublicKey(), false);</span>
+    }
+
+    /// The 32-byte x-only Taproot internal key.
+    public byte[] getInternalKey() {
+<span class="fc" id="L50">        byte[] pub = getPublicKey();</span>
+<span class="fc" id="L51">        byte[] x = new byte[32];</span>
+<span class="fc" id="L52">        System.arraycopy(pub, 1, x, 0, 32);</span>
+<span class="fc" id="L53">        return x;</span>
+    }
+
+    /// Wipes any key material the instance holds. The default holds none.
+    public void destroy() {
+<span class="nc" id="L58">    }</span>
+
+    /// A key over a 32-byte private key, which is copied; [#destroy] wipes the copy.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the bytes are not a valid private key
+    public static BitcoinKey fromPrivateKey(byte[] privateKey) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (!Secp256k1.isValidPrivateKey(privateKey)) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(&quot;not a secp256k1 private key&quot;);</span>
+        }
+<span class="fc" id="L69">        return new Local(Wire.copy(privateKey));</span>
+    }
+
+    private static final class Local extends BitcoinKey {
+        private final byte[] key;
+        private final byte[] pub;
+
+<span class="fc" id="L76">        Local(byte[] key) {</span>
+<span class="fc" id="L77">            this.key = key;</span>
+<span class="fc" id="L78">            this.pub = Secp256k1.publicKey(key, true);</span>
+<span class="fc" id="L79">        }</span>
+
+        @Override
+        public byte[] getPublicKey() {
+<span class="fc" id="L83">            return Wire.copy(pub);</span>
+        }
+
+        @Override
+        public Secp256k1.EcdsaSignature signEcdsa(byte[] sighash) {
+<span class="fc" id="L88">            return Secp256k1.sign(sighash, key);</span>
+        }
+
+        @Override
+        public byte[] signTaproot(byte[] sighash, byte[] merkleRoot) {
+<span class="nc" id="L93">            byte[] tweaked = Taproot.tweakPrivateKey(key, merkleRoot);</span>
+            try {
+<span class="nc" id="L95">                return com.codename1.security.Schnorr.sign(sighash, tweaked,</span>
+<span class="nc" id="L96">                        com.codename1.security.CryptoEngine.random(32));</span>
+            } finally {
+<span class="nc" id="L98">                Wif.wipe(tweaked);</span>
+            }
+        }
+
+        @Override
+        public void destroy() {
+<span class="fc" id="L104">            Wif.wipe(key);</span>
+<span class="fc" id="L105">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

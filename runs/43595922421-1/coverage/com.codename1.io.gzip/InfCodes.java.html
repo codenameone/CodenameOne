@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InfCodes.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">InfCodes.java</span></div><h1>InfCodes.java</h1><pre class="source lang-java linenums">/* -*-mode:java; c-basic-offset:2; -*- */
+/*
+Copyright (c) 2000,2001,2002,2003 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * This program is based on zlib-1.1.3, so all credit should go authors
+ * Jean-loup Gailly(jloup@gzip.org) and Mark Adler(madler@alumni.caltech.edu)
+ * and contributors of zlib.
+ */
+
+package com.codename1.io.gzip;
+
+@com.codename1.impl.SharedWithBackend
+final class InfCodes {
+
+<span class="fc" id="L40">    static final private int[] inflate_mask = {</span>
+            0x00000000, 0x00000001, 0x00000003, 0x00000007, 0x0000000f,
+            0x0000001f, 0x0000003f, 0x0000007f, 0x000000ff, 0x000001ff,
+            0x000003ff, 0x000007ff, 0x00000fff, 0x00001fff, 0x00003fff,
+            0x00007fff, 0x0000ffff
+    };
+
+    static final private int Z_OK = 0;
+    static final private int Z_STREAM_END = 1;
+    static final private int Z_STREAM_ERROR = -2;
+    static final private int Z_DATA_ERROR = -3;
+
+    // waiting for &quot;i:&quot;=input,
+    //             &quot;o:&quot;=output,
+    //             &quot;x:&quot;=nothing
+    static final private int START = 0;  // x: set up for LEN
+    static final private int LEN = 1;    // i: get length/literal/eob next
+    static final private int LENEXT = 2; // i: getting length extra (have base)
+    static final private int DIST = 3;   // i: get distance next
+    static final private int DISTEXT = 4; // i: getting distance extra
+    static final private int COPY = 5;   // o: copying bytes in window, waiting for space
+    static final private int LIT = 6;    // o: got literal, waiting for output space
+    static final private int WASH = 7;   // o: got eob, possibly still output waiting
+    static final private int END = 8;    // x: got eob and all data flushed
+    static final private int BADCODE = 9; // x: got error
+    private final ZStream z;
+    private final InfBlocks s;
+    int mode;      // current inflate_codes mode
+    // mode dependent information
+    int len;
+    int[] tree; // pointer into tree
+<span class="fc" id="L71">    int tree_index = 0;</span>
+    int need;   // bits needed
+    int lit;
+    // if EXT or COPY, where and how much
+    int get;              // bits to get for extra
+    int dist;             // distance back to copy from
+    byte lbits;           // ltree bits decoded per branch
+    byte dbits;           // dtree bits decoder per branch
+    int[] ltree;          // literal/length/eob tree
+    int ltree_index;      // literal/length/eob tree
+    int[] dtree;          // distance tree
+    int dtree_index;      // distance tree
+
+<span class="fc" id="L84">    InfCodes(ZStream z, InfBlocks s) {</span>
+<span class="fc" id="L85">        this.z = z;</span>
+<span class="fc" id="L86">        this.s = s;</span>
+<span class="fc" id="L87">    }</span>
+
+    void init(int bl, int bd,
+              int[] tl, int tlIndex,
+              int[] td, int tdIndex) {
+<span class="fc" id="L92">        mode = START;</span>
+<span class="fc" id="L93">        lbits = (byte) bl;</span>
+<span class="fc" id="L94">        dbits = (byte) bd;</span>
+<span class="fc" id="L95">        ltree = tl;</span>
+<span class="fc" id="L96">        ltree_index = tlIndex;</span>
+<span class="fc" id="L97">        dtree = td;</span>
+<span class="fc" id="L98">        dtree_index = tdIndex;</span>
+<span class="fc" id="L99">        tree = null;</span>
+<span class="fc" id="L100">    }</span>
+
+    int proc(int r) {
+        int j;              // temporary storage
+        int[] t;            // temporary pointer
+        int tindex;         // temporary pointer
+        int e;              // extra bits or operation
+<span class="fc" id="L107">        int b = 0;            // bit buffer</span>
+<span class="fc" id="L108">        int k = 0;            // bits in bit buffer</span>
+<span class="fc" id="L109">        int p = 0;            // input data pointer</span>
+        int n;              // bytes available there
+        int q;              // output window write pointer
+        int m;              // bytes to end of window or read pointer
+        int f;              // pointer to copy strings from
+
+        // copy input/output information to locals (UPDATE macro restores)
+<span class="fc" id="L116">        p = z.nextInIndex;</span>
+<span class="fc" id="L117">        n = z.availIn;</span>
+<span class="fc" id="L118">        b = s.bitb;</span>
+<span class="fc" id="L119">        k = s.bitk;</span>
+<span class="fc" id="L120">        q = s.write;</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        m = q &lt; s.read ? s.read - q - 1 : s.end - q;</span>
+
+        // process input and output based on current state
+        while (true) {
+<span class="pc bpc" id="L125" title="8 of 11 branches missed.">            switch (mode) {</span>
+                // waiting for &quot;i:&quot;=input, &quot;o:&quot;=output, &quot;x:&quot;=nothing
+                case START:         // x: set up for LEN
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">                    if (m &gt;= 258 &amp;&amp; n &gt;= 10) {</span>
+
+<span class="fc" id="L130">                        s.bitb = b;</span>
+<span class="fc" id="L131">                        s.bitk = k;</span>
+<span class="fc" id="L132">                        z.availIn = n;</span>
+<span class="fc" id="L133">                        z.totalIn += p - z.nextInIndex;</span>
+<span class="fc" id="L134">                        z.nextInIndex = p;</span>
+<span class="fc" id="L135">                        s.write = q;</span>
+<span class="fc" id="L136">                        r = inflateFast(lbits, dbits,</span>
+                                ltree, ltree_index,
+                                dtree, dtree_index,
+                                s, z);
+
+<span class="fc" id="L141">                        p = z.nextInIndex;</span>
+<span class="fc" id="L142">                        n = z.availIn;</span>
+<span class="fc" id="L143">                        b = s.bitb;</span>
+<span class="fc" id="L144">                        k = s.bitk;</span>
+<span class="fc" id="L145">                        q = s.write;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                        m = q &lt; s.read ? s.read - q - 1 : s.end - q;</span>
+
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                        if (r != Z_OK) {</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                            mode = r == Z_STREAM_END ? WASH : BADCODE;</span>
+<span class="nc" id="L150">                            break;</span>
+                        }
+                    }
+<span class="fc" id="L153">                    need = lbits;</span>
+<span class="fc" id="L154">                    tree = ltree;</span>
+<span class="fc" id="L155">                    tree_index = ltree_index;</span>
+
+<span class="fc" id="L157">                    mode = LEN;</span>
+                case LEN:           // i: get length/literal/eob next
+<span class="fc" id="L159">                    j = need;</span>
+
+<span class="fc bfc" id="L161" title="All 2 branches covered.">                    while (k &lt; (j)) {</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                        if (n != 0) {</span>
+<span class="fc" id="L163">                            r = Z_OK;</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                        } else if (tree[(tree_index + (b &amp; inflate_mask[j])) * 3 + 1] &lt;= k) {</span>
+                            // The input is exhausted but the bits held already
+                            // complete a code: every entry of the table is
+                            // replicated over the bits past its own length, so
+                            // the zero bits above k select the right one. A
+                            // stream's last code is usually shorter than the
+                            // table's index width; waiting for bytes that never
+                            // come made a complete raw stream answer
+                            // Z_BUF_ERROR under Z_FINISH (&quot;incomplete or
+                            // truncated stream&quot;), depending on how its final
+                            // bits fell. Modern zlib decodes the same way.
+<span class="fc" id="L175">                            break;</span>
+                        } else {
+
+<span class="nc" id="L178">                            s.bitb = b;</span>
+<span class="nc" id="L179">                            s.bitk = k;</span>
+<span class="nc" id="L180">                            z.availIn = n;</span>
+<span class="nc" id="L181">                            z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L182">                            z.nextInIndex = p;</span>
+<span class="nc" id="L183">                            s.write = q;</span>
+<span class="nc" id="L184">                            return s.inflateFlush(r);</span>
+                        }
+<span class="fc" id="L186">                        n--;</span>
+<span class="fc" id="L187">                        b |= (z.nextIn[p++] &amp; 0xff) &lt;&lt; k;</span>
+<span class="fc" id="L188">                        k += 8;</span>
+                    }
+
+<span class="fc" id="L191">                    tindex = (tree_index + (b &amp; inflate_mask[j])) * 3;</span>
+
+<span class="fc" id="L193">                    b &gt;&gt;&gt;= (tree[tindex + 1]);</span>
+<span class="fc" id="L194">                    k -= (tree[tindex + 1]);</span>
+
+<span class="fc" id="L196">                    e = tree[tindex];</span>
+
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                    if (e == 0) {               // literal</span>
+<span class="fc" id="L199">                        lit = tree[tindex + 2];</span>
+<span class="fc" id="L200">                        mode = LIT;</span>
+<span class="fc" id="L201">                        break;</span>
+                    }
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                    if ((e &amp; 16) != 0) {          // length</span>
+<span class="nc" id="L204">                        get = e &amp; 15;</span>
+<span class="nc" id="L205">                        len = tree[tindex + 2];</span>
+<span class="nc" id="L206">                        mode = LENEXT;</span>
+<span class="nc" id="L207">                        break;</span>
+                    }
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                    if ((e &amp; 64) == 0) {        // next table</span>
+<span class="nc" id="L210">                        need = e;</span>
+<span class="nc" id="L211">                        tree_index = tindex / 3 + tree[tindex + 2];</span>
+<span class="nc" id="L212">                        break;</span>
+                    }
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                    if ((e &amp; 32) != 0) {               // end of block</span>
+<span class="fc" id="L215">                        mode = WASH;</span>
+<span class="fc" id="L216">                        break;</span>
+                    }
+<span class="nc" id="L218">                    mode = BADCODE;        // invalid code</span>
+<span class="nc" id="L219">                    z.msg = &quot;invalid literal/length code&quot;;</span>
+<span class="nc" id="L220">                    r = Z_DATA_ERROR;</span>
+
+<span class="nc" id="L222">                    s.bitb = b;</span>
+<span class="nc" id="L223">                    s.bitk = k;</span>
+<span class="nc" id="L224">                    z.availIn = n;</span>
+<span class="nc" id="L225">                    z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L226">                    z.nextInIndex = p;</span>
+<span class="nc" id="L227">                    s.write = q;</span>
+<span class="nc" id="L228">                    return s.inflateFlush(r);</span>
+
+                case LENEXT:        // i: getting length extra (have base)
+<span class="nc" id="L231">                    j = get;</span>
+
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                    while (k &lt; (j)) {</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                        if (n != 0) {</span>
+<span class="nc" id="L235">                            r = Z_OK;</span>
+                        } else {
+
+<span class="nc" id="L238">                            s.bitb = b;</span>
+<span class="nc" id="L239">                            s.bitk = k;</span>
+<span class="nc" id="L240">                            z.availIn = n;</span>
+<span class="nc" id="L241">                            z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L242">                            z.nextInIndex = p;</span>
+<span class="nc" id="L243">                            s.write = q;</span>
+<span class="nc" id="L244">                            return s.inflateFlush(r);</span>
+                        }
+<span class="nc" id="L246">                        n--;</span>
+<span class="nc" id="L247">                        b |= (z.nextIn[p++] &amp; 0xff) &lt;&lt; k;</span>
+<span class="nc" id="L248">                        k += 8;</span>
+                    }
+
+<span class="nc" id="L251">                    len += (b &amp; inflate_mask[j]);</span>
+
+<span class="nc" id="L253">                    b &gt;&gt;= j;</span>
+<span class="nc" id="L254">                    k -= j;</span>
+
+<span class="nc" id="L256">                    need = dbits;</span>
+<span class="nc" id="L257">                    tree = dtree;</span>
+<span class="nc" id="L258">                    tree_index = dtree_index;</span>
+<span class="nc" id="L259">                    mode = DIST;</span>
+                case DIST:          // i: get distance next
+<span class="nc" id="L261">                    j = need;</span>
+
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                    while (k &lt; (j)) {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                        if (n != 0) {</span>
+<span class="nc" id="L265">                            r = Z_OK;</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                        } else if (tree[(tree_index + (b &amp; inflate_mask[j])) * 3 + 1] &lt;= k) {</span>
+                            // The input is exhausted but the bits held already
+                            // complete a code: every entry of the table is
+                            // replicated over the bits past its own length, so
+                            // the zero bits above k select the right one. A
+                            // stream's last code is usually shorter than the
+                            // table's index width; waiting for bytes that never
+                            // come made a complete raw stream answer
+                            // Z_BUF_ERROR under Z_FINISH (&quot;incomplete or
+                            // truncated stream&quot;), depending on how its final
+                            // bits fell. Modern zlib decodes the same way.
+<span class="nc" id="L277">                            break;</span>
+                        } else {
+
+<span class="nc" id="L280">                            s.bitb = b;</span>
+<span class="nc" id="L281">                            s.bitk = k;</span>
+<span class="nc" id="L282">                            z.availIn = n;</span>
+<span class="nc" id="L283">                            z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L284">                            z.nextInIndex = p;</span>
+<span class="nc" id="L285">                            s.write = q;</span>
+<span class="nc" id="L286">                            return s.inflateFlush(r);</span>
+                        }
+<span class="nc" id="L288">                        n--;</span>
+<span class="nc" id="L289">                        b |= (z.nextIn[p++] &amp; 0xff) &lt;&lt; k;</span>
+<span class="nc" id="L290">                        k += 8;</span>
+                    }
+
+<span class="nc" id="L293">                    tindex = (tree_index + (b &amp; inflate_mask[j])) * 3;</span>
+
+<span class="nc" id="L295">                    b &gt;&gt;= tree[tindex + 1];</span>
+<span class="nc" id="L296">                    k -= tree[tindex + 1];</span>
+
+<span class="nc" id="L298">                    e = (tree[tindex]);</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                    if ((e &amp; 16) != 0) {               // distance</span>
+<span class="nc" id="L300">                        get = e &amp; 15;</span>
+<span class="nc" id="L301">                        dist = tree[tindex + 2];</span>
+<span class="nc" id="L302">                        mode = DISTEXT;</span>
+<span class="nc" id="L303">                        break;</span>
+                    }
+<span class="nc bnc" id="L305" title="All 2 branches missed.">                    if ((e &amp; 64) == 0) {        // next table</span>
+<span class="nc" id="L306">                        need = e;</span>
+<span class="nc" id="L307">                        tree_index = tindex / 3 + tree[tindex + 2];</span>
+<span class="nc" id="L308">                        break;</span>
+                    }
+<span class="nc" id="L310">                    mode = BADCODE;        // invalid code</span>
+<span class="nc" id="L311">                    z.msg = &quot;invalid distance code&quot;;</span>
+<span class="nc" id="L312">                    r = Z_DATA_ERROR;</span>
+
+<span class="nc" id="L314">                    s.bitb = b;</span>
+<span class="nc" id="L315">                    s.bitk = k;</span>
+<span class="nc" id="L316">                    z.availIn = n;</span>
+<span class="nc" id="L317">                    z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L318">                    z.nextInIndex = p;</span>
+<span class="nc" id="L319">                    s.write = q;</span>
+<span class="nc" id="L320">                    return s.inflateFlush(r);</span>
+
+                case DISTEXT:       // i: getting distance extra
+<span class="nc" id="L323">                    j = get;</span>
+
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                    while (k &lt; (j)) {</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">                        if (n != 0) {</span>
+<span class="nc" id="L327">                            r = Z_OK;</span>
+                        } else {
+
+<span class="nc" id="L330">                            s.bitb = b;</span>
+<span class="nc" id="L331">                            s.bitk = k;</span>
+<span class="nc" id="L332">                            z.availIn = n;</span>
+<span class="nc" id="L333">                            z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L334">                            z.nextInIndex = p;</span>
+<span class="nc" id="L335">                            s.write = q;</span>
+<span class="nc" id="L336">                            return s.inflateFlush(r);</span>
+                        }
+<span class="nc" id="L338">                        n--;</span>
+<span class="nc" id="L339">                        b |= (z.nextIn[p++] &amp; 0xff) &lt;&lt; k;</span>
+<span class="nc" id="L340">                        k += 8;</span>
+                    }
+
+<span class="nc" id="L343">                    dist += (b &amp; inflate_mask[j]);</span>
+
+<span class="nc" id="L345">                    b &gt;&gt;= j;</span>
+<span class="nc" id="L346">                    k -= j;</span>
+
+<span class="nc" id="L348">                    mode = COPY;</span>
+                case COPY:          // o: copying bytes in window, waiting for space
+<span class="nc" id="L350">                    f = q - dist;</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">                    while (f &lt; 0) {     // modulo window size-&quot;while&quot; instead</span>
+<span class="nc" id="L352">                        f += s.end;     // of &quot;if&quot; handles invalid distances</span>
+                    }
+<span class="nc bnc" id="L354" title="All 2 branches missed.">                    while (len != 0) {</span>
+
+<span class="nc bnc" id="L356" title="All 2 branches missed.">                        if (m == 0) {</span>
+<span class="nc bnc" id="L357" title="All 4 branches missed.">                            if (q == s.end &amp;&amp; s.read != 0) {</span>
+<span class="nc" id="L358">                                q = 0;</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                                m = q &lt; s.read ? s.read - q - 1 : s.end - q;</span>
+                            }
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                            if (m == 0) {</span>
+<span class="nc" id="L362">                                s.write = q;</span>
+<span class="nc" id="L363">                                r = s.inflateFlush(r);</span>
+<span class="nc" id="L364">                                q = s.write;</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                                m = q &lt; s.read ? s.read - q - 1 : s.end - q;</span>
+
+<span class="nc bnc" id="L367" title="All 4 branches missed.">                                if (q == s.end &amp;&amp; s.read != 0) {</span>
+<span class="nc" id="L368">                                    q = 0;</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                                    m = q &lt; s.read ? s.read - q - 1 : s.end - q;</span>
+                                }
+
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                                if (m == 0) {</span>
+<span class="nc" id="L373">                                    s.bitb = b;</span>
+<span class="nc" id="L374">                                    s.bitk = k;</span>
+<span class="nc" id="L375">                                    z.availIn = n;</span>
+<span class="nc" id="L376">                                    z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L377">                                    z.nextInIndex = p;</span>
+<span class="nc" id="L378">                                    s.write = q;</span>
+<span class="nc" id="L379">                                    return s.inflateFlush(r);</span>
+                                }
+                            }
+                        }
+
+<span class="nc" id="L384">                        s.window[q++] = s.window[f++];</span>
+<span class="nc" id="L385">                        m--;</span>
+
+<span class="nc bnc" id="L387" title="All 2 branches missed.">                        if (f == s.end) {</span>
+<span class="nc" id="L388">                            f = 0;</span>
+                        }
+<span class="nc" id="L390">                        len--;</span>
+                    }
+<span class="nc" id="L392">                    mode = START;</span>
+<span class="nc" id="L393">                    break;</span>
+                case LIT:           // o: got literal, waiting for output space
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">                    if (m == 0) {</span>
+<span class="nc bnc" id="L396" title="All 4 branches missed.">                        if (q == s.end &amp;&amp; s.read != 0) {</span>
+<span class="nc" id="L397">                            q = 0;</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                            m = q &lt; s.read ? s.read - q - 1 : s.end - q;</span>
+                        }
+<span class="nc bnc" id="L400" title="All 2 branches missed.">                        if (m == 0) {</span>
+<span class="nc" id="L401">                            s.write = q;</span>
+<span class="nc" id="L402">                            r = s.inflateFlush(r);</span>
+<span class="nc" id="L403">                            q = s.write;</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                            m = q &lt; s.read ? s.read - q - 1 : s.end - q;</span>
+
+<span class="nc bnc" id="L406" title="All 4 branches missed.">                            if (q == s.end &amp;&amp; s.read != 0) {</span>
+<span class="nc" id="L407">                                q = 0;</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">                                m = q &lt; s.read ? s.read - q - 1 : s.end - q;</span>
+                            }
+<span class="nc bnc" id="L410" title="All 2 branches missed.">                            if (m == 0) {</span>
+<span class="nc" id="L411">                                s.bitb = b;</span>
+<span class="nc" id="L412">                                s.bitk = k;</span>
+<span class="nc" id="L413">                                z.availIn = n;</span>
+<span class="nc" id="L414">                                z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L415">                                z.nextInIndex = p;</span>
+<span class="nc" id="L416">                                s.write = q;</span>
+<span class="nc" id="L417">                                return s.inflateFlush(r);</span>
+                            }
+                        }
+                    }
+<span class="fc" id="L421">                    r = Z_OK;</span>
+
+<span class="fc" id="L423">                    s.window[q++] = (byte) lit;</span>
+<span class="fc" id="L424">                    m--;</span>
+
+<span class="fc" id="L426">                    mode = START;</span>
+<span class="fc" id="L427">                    break;</span>
+                case WASH:           // o: got eob, possibly more output
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">                    if (k &gt; 7) {        // return unused byte, if any</span>
+<span class="nc" id="L430">                        k -= 8;</span>
+<span class="nc" id="L431">                        n++;</span>
+<span class="nc" id="L432">                        p--;             // can always return one</span>
+                    }
+
+<span class="fc" id="L435">                    s.write = q;</span>
+<span class="fc" id="L436">                    r = s.inflateFlush(r);</span>
+<span class="fc" id="L437">                    q = s.write;</span>
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">                    if (s.read != s.write) {</span>
+<span class="nc" id="L439">                        s.bitb = b;</span>
+<span class="nc" id="L440">                        s.bitk = k;</span>
+<span class="nc" id="L441">                        z.availIn = n;</span>
+<span class="nc" id="L442">                        z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L443">                        z.nextInIndex = p;</span>
+<span class="nc" id="L444">                        s.write = q;</span>
+<span class="nc" id="L445">                        return s.inflateFlush(r);</span>
+                    }
+<span class="fc" id="L447">                    mode = END;</span>
+                case END:
+<span class="fc" id="L449">                    r = Z_STREAM_END;</span>
+<span class="fc" id="L450">                    s.bitb = b;</span>
+<span class="fc" id="L451">                    s.bitk = k;</span>
+<span class="fc" id="L452">                    z.availIn = n;</span>
+<span class="fc" id="L453">                    z.totalIn += p - z.nextInIndex;</span>
+<span class="fc" id="L454">                    z.nextInIndex = p;</span>
+<span class="fc" id="L455">                    s.write = q;</span>
+<span class="fc" id="L456">                    return s.inflateFlush(r);</span>
+
+                case BADCODE:       // x: got error
+
+<span class="nc" id="L460">                    r = Z_DATA_ERROR;</span>
+
+<span class="nc" id="L462">                    s.bitb = b;</span>
+<span class="nc" id="L463">                    s.bitk = k;</span>
+<span class="nc" id="L464">                    z.availIn = n;</span>
+<span class="nc" id="L465">                    z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L466">                    z.nextInIndex = p;</span>
+<span class="nc" id="L467">                    s.write = q;</span>
+<span class="nc" id="L468">                    return s.inflateFlush(r);</span>
+
+                default:
+<span class="nc" id="L471">                    r = Z_STREAM_ERROR;</span>
+
+<span class="nc" id="L473">                    s.bitb = b;</span>
+<span class="nc" id="L474">                    s.bitk = k;</span>
+<span class="nc" id="L475">                    z.availIn = n;</span>
+<span class="nc" id="L476">                    z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L477">                    z.nextInIndex = p;</span>
+<span class="nc" id="L478">                    s.write = q;</span>
+<span class="nc" id="L479">                    return s.inflateFlush(r);</span>
+            }
+        }
+    }
+
+    void free(ZStream z) {
+        //  ZFREE(z, c);
+<span class="fc" id="L486">    }</span>
+
+    // Called with number of bytes left to write in window at least 258
+    // (the maximum string length) and number of input bytes available
+    // at least ten.  The ten bytes are six bytes for the longest length/
+    // distance pair plus four bytes for overloading the bit buffer.
+
+    int inflateFast(int bl, int bd,
+                    int[] tl, int tlIndex,
+                    int[] td, int tdIndex,
+                    InfBlocks s, ZStream z) {
+        int t;                // temporary pointer
+        int[] tp;             // temporary pointer
+        int tpIndex;         // temporary pointer
+        int e;                // extra bits or operation
+        int b;                // bit buffer
+        int k;                // bits in bit buffer
+        int p;                // input data pointer
+        int n;                // bytes available there
+        int q;                // output window write pointer
+        int m;                // bytes to end of window or read pointer
+        int ml;               // mask for literal/length tree
+        int md;               // mask for distance tree
+        int c;                // bytes to copy
+        int d;                // distance back to copy from
+        int r;                // copy source pointer
+
+        int tpIndexT3;     // (tpIndex+t)*3
+
+        // load input, output, bit values
+<span class="fc" id="L516">        p = z.nextInIndex;</span>
+<span class="fc" id="L517">        n = z.availIn;</span>
+<span class="fc" id="L518">        b = s.bitb;</span>
+<span class="fc" id="L519">        k = s.bitk;</span>
+<span class="fc" id="L520">        q = s.write;</span>
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">        m = q &lt; s.read ? s.read - q - 1 : s.end - q;</span>
+
+        // initialize masks
+<span class="fc" id="L524">        ml = inflate_mask[bl];</span>
+<span class="fc" id="L525">        md = inflate_mask[bd];</span>
+
+        // do until not enough input or output space for fast loop
+        do {                          // assume called with m &gt;= 258 &amp;&amp; n &gt;= 10
+            // get literal/length code
+<span class="fc bfc" id="L530" title="All 2 branches covered.">            while (k &lt; (20)) {              // max bits for literal/length code</span>
+<span class="fc" id="L531">                n--;</span>
+<span class="fc" id="L532">                b |= (z.nextIn[p++] &amp; 0xff) &lt;&lt; k;</span>
+<span class="fc" id="L533">                k += 8;</span>
+            }
+
+<span class="fc" id="L536">            t = b &amp; ml;</span>
+<span class="fc" id="L537">            tp = tl;</span>
+<span class="fc" id="L538">            tpIndex = tlIndex;</span>
+<span class="fc" id="L539">            tpIndexT3 = (tpIndex + t) * 3;</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">            if ((e = tp[tpIndexT3]) == 0) { //NOPMD AssignmentInOperand</span>
+<span class="fc" id="L541">                b &gt;&gt;= (tp[tpIndexT3 + 1]);</span>
+<span class="fc" id="L542">                k -= (tp[tpIndexT3 + 1]);</span>
+
+<span class="fc" id="L544">                s.window[q++] = (byte) tp[tpIndexT3 + 2];</span>
+<span class="fc" id="L545">                m--;</span>
+<span class="fc" id="L546">                continue;</span>
+            }
+            do {
+
+<span class="nc" id="L550">                b &gt;&gt;= (tp[tpIndexT3 + 1]);</span>
+<span class="nc" id="L551">                k -= (tp[tpIndexT3 + 1]);</span>
+
+<span class="nc bnc" id="L553" title="All 2 branches missed.">                if ((e &amp; 16) != 0) {</span>
+<span class="nc" id="L554">                    e &amp;= 15;</span>
+<span class="nc" id="L555">                    c = tp[tpIndexT3 + 2] + (b &amp; inflate_mask[e]);</span>
+
+<span class="nc" id="L557">                    b &gt;&gt;= e;</span>
+<span class="nc" id="L558">                    k -= e;</span>
+
+                    // decode distance base of block to copy
+<span class="nc bnc" id="L561" title="All 2 branches missed.">                    while (k &lt; (15)) {           // max bits for distance code</span>
+<span class="nc" id="L562">                        n--;</span>
+<span class="nc" id="L563">                        b |= (z.nextIn[p++] &amp; 0xff) &lt;&lt; k;</span>
+<span class="nc" id="L564">                        k += 8;</span>
+                    }
+
+<span class="nc" id="L567">                    t = b &amp; md;</span>
+<span class="nc" id="L568">                    tp = td;</span>
+<span class="nc" id="L569">                    tpIndex = tdIndex;</span>
+<span class="nc" id="L570">                    tpIndexT3 = (tpIndex + t) * 3;</span>
+<span class="nc" id="L571">                    e = tp[tpIndexT3];</span>
+
+                    do {
+
+<span class="nc" id="L575">                        b &gt;&gt;= (tp[tpIndexT3 + 1]);</span>
+<span class="nc" id="L576">                        k -= (tp[tpIndexT3 + 1]);</span>
+
+<span class="nc bnc" id="L578" title="All 2 branches missed.">                        if ((e &amp; 16) != 0) {</span>
+                            // get extra bits to add to distance base
+<span class="nc" id="L580">                            e &amp;= 15;</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">                            while (k &lt; (e)) {         // get extra bits (up to 13)</span>
+<span class="nc" id="L582">                                n--;</span>
+<span class="nc" id="L583">                                b |= (z.nextIn[p++] &amp; 0xff) &lt;&lt; k;</span>
+<span class="nc" id="L584">                                k += 8;</span>
+                            }
+
+<span class="nc" id="L587">                            d = tp[tpIndexT3 + 2] + (b &amp; inflate_mask[e]);</span>
+
+<span class="nc" id="L589">                            b &gt;&gt;= (e);</span>
+<span class="nc" id="L590">                            k -= (e);</span>
+
+                            // do the copy
+<span class="nc" id="L593">                            m -= c;</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">                            if (q &gt;= d) {                // offset before dest</span>
+                                //  just copy
+<span class="nc" id="L596">                                r = q - d;</span>
+<span class="nc bnc" id="L597" title="All 4 branches missed.">                                if (q - r &gt; 0 &amp;&amp; 2 &gt; (q - r)) {</span>
+<span class="nc" id="L598">                                    s.window[q++] = s.window[r++]; // minimum count is three,</span>
+<span class="nc" id="L599">                                    s.window[q++] = s.window[r++]; // so unroll loop a little</span>
+<span class="nc" id="L600">                                    c -= 2;</span>
+                                } else {
+<span class="nc" id="L602">                                    System.arraycopy(s.window, r, s.window, q, 2);</span>
+<span class="nc" id="L603">                                    q += 2;</span>
+<span class="nc" id="L604">                                    r += 2;</span>
+<span class="nc" id="L605">                                    c -= 2;</span>
+                                }
+                            } else {                  // else offset after destination
+<span class="nc" id="L608">                                r = q - d;</span>
+                                do {
+<span class="nc" id="L610">                                    r += s.end;          // force pointer in window</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">                                } while (r &lt; 0);         // covers invalid distances</span>
+<span class="nc" id="L612">                                e = s.end - r;</span>
+<span class="nc bnc" id="L613" title="All 2 branches missed.">                                if (c &gt; e) {             // if source crosses,</span>
+<span class="nc" id="L614">                                    c -= e;              // wrapped copy</span>
+<span class="nc bnc" id="L615" title="All 4 branches missed.">                                    if (q - r &gt; 0 &amp;&amp; e &gt; (q - r)) {</span>
+                                        do {
+<span class="nc" id="L617">                                            s.window[q++] = s.window[r++];</span>
+                                        }
+<span class="nc bnc" id="L619" title="All 2 branches missed.">                                        while (--e != 0);</span>
+                                    } else {
+<span class="nc" id="L621">                                        System.arraycopy(s.window, r, s.window, q, e);</span>
+<span class="nc" id="L622">                                        q += e;</span>
+<span class="nc" id="L623">                                        r += e;</span>
+<span class="nc" id="L624">                                        e = 0;</span>
+                                    }
+<span class="nc" id="L626">                                    r = 0;                  // copy rest from start of window</span>
+                                }
+
+                            }
+
+                            // copy all or what's left
+<span class="nc bnc" id="L632" title="All 4 branches missed.">                            if (q - r &gt; 0 &amp;&amp; c &gt; (q - r)) {</span>
+                                do {
+<span class="nc" id="L634">                                    s.window[q++] = s.window[r++];</span>
+                                }
+<span class="nc bnc" id="L636" title="All 2 branches missed.">                                while (--c != 0);</span>
+                            } else {
+<span class="nc" id="L638">                                System.arraycopy(s.window, r, s.window, q, c);</span>
+<span class="nc" id="L639">                                q += c;</span>
+<span class="nc" id="L640">                                r += c;</span>
+<span class="nc" id="L641">                                c = 0;</span>
+                            }
+<span class="nc" id="L643">                            break;</span>
+<span class="nc bnc" id="L644" title="All 2 branches missed.">                        } else if ((e &amp; 64) == 0) {</span>
+<span class="nc" id="L645">                            t += tp[tpIndexT3 + 2];</span>
+<span class="nc" id="L646">                            t += (b &amp; inflate_mask[e]);</span>
+<span class="nc" id="L647">                            tpIndexT3 = (tpIndex + t) * 3;</span>
+<span class="nc" id="L648">                            e = tp[tpIndexT3];</span>
+                        } else {
+<span class="nc" id="L650">                            z.msg = &quot;invalid distance code&quot;;</span>
+
+<span class="nc" id="L652">                            c = z.availIn - n;</span>
+<span class="nc bnc" id="L653" title="All 2 branches missed.">                            c = (k &gt;&gt; 3) &lt; c ? k &gt;&gt; 3 : c;</span>
+<span class="nc" id="L654">                            n += c;</span>
+<span class="nc" id="L655">                            p -= c;</span>
+<span class="nc" id="L656">                            k -= c &lt;&lt; 3;</span>
+
+<span class="nc" id="L658">                            s.bitb = b;</span>
+<span class="nc" id="L659">                            s.bitk = k;</span>
+<span class="nc" id="L660">                            z.availIn = n;</span>
+<span class="nc" id="L661">                            z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L662">                            z.nextInIndex = p;</span>
+<span class="nc" id="L663">                            s.write = q;</span>
+
+<span class="nc" id="L665">                            return Z_DATA_ERROR;</span>
+                        }
+                    }
+                    while (true);
+                    break;
+                }
+
+<span class="nc bnc" id="L672" title="All 2 branches missed.">                if ((e &amp; 64) == 0) {</span>
+<span class="nc" id="L673">                    t += tp[tpIndexT3 + 2];</span>
+<span class="nc" id="L674">                    t += (b &amp; inflate_mask[e]);</span>
+<span class="nc" id="L675">                    tpIndexT3 = (tpIndex + t) * 3;</span>
+<span class="nc bnc" id="L676" title="All 2 branches missed.">                    if ((e = tp[tpIndexT3]) == 0) { //NOPMD AssignmentInOperand</span>
+
+<span class="nc" id="L678">                        b &gt;&gt;= (tp[tpIndexT3 + 1]);</span>
+<span class="nc" id="L679">                        k -= (tp[tpIndexT3 + 1]);</span>
+
+<span class="nc" id="L681">                        s.window[q++] = (byte) tp[tpIndexT3 + 2];</span>
+<span class="nc" id="L682">                        m--;</span>
+<span class="nc" id="L683">                        break;</span>
+                    }
+<span class="nc bnc" id="L685" title="All 2 branches missed.">                } else if ((e &amp; 32) != 0) {</span>
+
+<span class="nc" id="L687">                    c = z.availIn - n;</span>
+<span class="nc bnc" id="L688" title="All 2 branches missed.">                    c = (k &gt;&gt; 3) &lt; c ? k &gt;&gt; 3 : c;</span>
+<span class="nc" id="L689">                    n += c;</span>
+<span class="nc" id="L690">                    p -= c;</span>
+<span class="nc" id="L691">                    k -= c &lt;&lt; 3;</span>
+
+<span class="nc" id="L693">                    s.bitb = b;</span>
+<span class="nc" id="L694">                    s.bitk = k;</span>
+<span class="nc" id="L695">                    z.availIn = n;</span>
+<span class="nc" id="L696">                    z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L697">                    z.nextInIndex = p;</span>
+<span class="nc" id="L698">                    s.write = q;</span>
+
+<span class="nc" id="L700">                    return Z_STREAM_END;</span>
+                } else {
+<span class="nc" id="L702">                    z.msg = &quot;invalid literal/length code&quot;;</span>
+
+<span class="nc" id="L704">                    c = z.availIn - n;</span>
+<span class="nc bnc" id="L705" title="All 2 branches missed.">                    c = (k &gt;&gt; 3) &lt; c ? k &gt;&gt; 3 : c;</span>
+<span class="nc" id="L706">                    n += c;</span>
+<span class="nc" id="L707">                    p -= c;</span>
+<span class="nc" id="L708">                    k -= c &lt;&lt; 3;</span>
+
+<span class="nc" id="L710">                    s.bitb = b;</span>
+<span class="nc" id="L711">                    s.bitk = k;</span>
+<span class="nc" id="L712">                    z.availIn = n;</span>
+<span class="nc" id="L713">                    z.totalIn += p - z.nextInIndex;</span>
+<span class="nc" id="L714">                    z.nextInIndex = p;</span>
+<span class="nc" id="L715">                    s.write = q;</span>
+
+<span class="nc" id="L717">                    return Z_DATA_ERROR;</span>
+                }
+            }
+            while (true);
+        }
+<span class="pc bpc" id="L722" title="1 of 4 branches missed.">        while (m &gt;= 258 &amp;&amp; n &gt;= 10);</span>
+
+        // not enough input or output--restore pointers and return
+<span class="fc" id="L725">        c = z.availIn - n;</span>
+<span class="pc bpc" id="L726" title="1 of 2 branches missed.">        c = (k &gt;&gt; 3) &lt; c ? k &gt;&gt; 3 : c;</span>
+<span class="fc" id="L727">        n += c;</span>
+<span class="fc" id="L728">        p -= c;</span>
+<span class="fc" id="L729">        k -= c &lt;&lt; 3;</span>
+
+<span class="fc" id="L731">        s.bitb = b;</span>
+<span class="fc" id="L732">        s.bitk = k;</span>
+<span class="fc" id="L733">        z.availIn = n;</span>
+<span class="fc" id="L734">        z.totalIn += p - z.nextInIndex;</span>
+<span class="fc" id="L735">        z.nextInIndex = p;</span>
+<span class="fc" id="L736">        s.write = q;</span>
+
+<span class="fc" id="L738">        return Z_OK;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

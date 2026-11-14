@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StorageCalendarCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">StorageCalendarCache.java</span></div><h1>StorageCalendarCache.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import com.codename1.io.Storage;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Opt-in persistent cache backed by application `Storage`.
+public class StorageCalendarCache implements CalendarCache {
+
+    private final String prefix;
+
+<span class="nc" id="L34">    public StorageCalendarCache(String namespace) {</span>
+<span class="nc bnc" id="L35" title="All 4 branches missed.">        if (namespace == null || namespace.length() == 0) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(&quot;namespace required&quot;);</span>
+        }
+<span class="nc" id="L38">        prefix = &quot;cn1-calendar-&quot; + namespace + &quot;-&quot;;</span>
+<span class="nc" id="L39">    }</span>
+
+    @Override
+    public Map&lt;String, Object&gt; load(String sourceId) throws CalendarException {
+<span class="nc" id="L43">        Object first = Storage.getInstance().readObject(key(sourceId, 0));</span>
+<span class="nc" id="L44">        Object second = Storage.getInstance().readObject(key(sourceId, 1));</span>
+<span class="nc" id="L45">        Map wrapper = newer(first, second);</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        Object value = wrapper == null ? Storage.getInstance().readObject(prefix + sourceId) : wrapper.get(&quot;state&quot;);</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L48">            return new HashMap&lt;String, Object&gt;();</span>
+        }
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (!(value instanceof Map)) {</span>
+<span class="nc" id="L51">            throw new CalendarException(CalendarError.STORAGE, &quot;Invalid calendar cache data&quot;);</span>
+        }
+<span class="nc" id="L53">        return new HashMap&lt;String, Object&gt;((Map) value);</span>
+    }
+
+    @Override
+    public void store(String sourceId, Map&lt;String, Object&gt; state) throws CalendarException {
+<span class="nc" id="L58">        Storage storage = Storage.getInstance();</span>
+<span class="nc" id="L59">        Object first = storage.readObject(key(sourceId, 0));</span>
+<span class="nc" id="L60">        Object second = storage.readObject(key(sourceId, 1));</span>
+<span class="nc" id="L61">        Map newest = newer(first, second);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        long generation = newest == null ? 1L : number(newest.get(&quot;generation&quot;)) + 1L;</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        int slot = newest == first ? 1 : 0; //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L64">        Map&lt;String, Object&gt; wrapper = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L65">        wrapper.put(&quot;generation&quot;, Long.valueOf(generation));</span>
+<span class="nc" id="L66">        wrapper.put(&quot;state&quot;, new HashMap&lt;String, Object&gt;(state));</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (!storage.writeObject(key(sourceId, slot), wrapper)) {</span>
+<span class="nc" id="L68">            storage.clearCache();</span>
+<span class="nc" id="L69">            throw new CalendarException(CalendarError.STORAGE, &quot;Unable to write calendar cache&quot;);</span>
+        }
+<span class="nc" id="L71">    }</span>
+
+    @Override
+    public void clear(String sourceId) {
+<span class="nc" id="L75">        Storage.getInstance().deleteStorageFile(prefix + sourceId);</span>
+<span class="nc" id="L76">        Storage.getInstance().deleteStorageFile(key(sourceId, 0));</span>
+<span class="nc" id="L77">        Storage.getInstance().deleteStorageFile(key(sourceId, 1));</span>
+<span class="nc" id="L78">    }</span>
+
+    private String key(String sourceId, int slot) {
+<span class="nc" id="L81">        return prefix + sourceId + &quot;-&quot; + slot;</span>
+    }
+
+    private static Map newer(Object first, Object second) {
+<span class="nc" id="L85">        Map a = wrapper(first);</span>
+<span class="nc" id="L86">        Map b = wrapper(second);</span>
+<span class="nc bnc" id="L87" title="All 4 branches missed.">        return a == null ? b : b == null ? a</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                : number(a.get(&quot;generation&quot;)) &gt;= number(b.get(&quot;generation&quot;)) ? a : b;</span>
+    }
+
+    private static Map wrapper(Object value) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (!(value instanceof Map)) {</span>
+<span class="nc" id="L93">            return null;</span>
+        }
+<span class="nc" id="L95">        Map map = (Map) value;</span>
+<span class="nc bnc" id="L96" title="All 4 branches missed.">        return map.get(&quot;state&quot;) instanceof Map &amp;&amp; map.get(&quot;generation&quot;) instanceof Number ? map : null;</span>
+    }
+
+    private static long number(Object value) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        return value instanceof Number ? ((Number) value).longValue() : 0L;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

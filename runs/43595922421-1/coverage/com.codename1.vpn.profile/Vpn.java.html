@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Vpn.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.vpn.profile</a> &gt; <span class="el_source">Vpn.java</span></div><h1>Vpn.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.vpn.profile;
+
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.vpn.VpnRequests;
+import com.codename1.impl.vpn.VpnWire;
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.vpn.VpnError;
+import com.codename1.vpn.VpnException;
+import com.codename1.vpn.VpnStatus;
+import com.codename1.vpn.spi.VpnBridge;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Installing and controlling a VPN configuration the operating system runs
+/// for you.
+///
+/// ```java
+/// if (Vpn.isSupported()) {
+///     Vpn.install(new VpnProfile(&quot;vpn.example.com&quot;)
+///             .usernamePassword(&quot;alice&quot;, secret))
+///        .ready(v -&gt; Vpn.start());
+/// }
+/// ```
+///
+/// #### The tunnel is the platform's, not this app's
+///
+/// Nothing here carries packets. The configuration is handed to the operating
+/// system, which runs its own IKEv2 or IPsec client; the app starts it, stops
+/// it and watches it. Implementing the tunnel itself is a different and much
+/// larger undertaking -- see the note in the `com.codename1.vpn` package
+/// documentation -- and this API stays useful around it either way, for the
+/// install, the status and the control.
+///
+/// #### The user may be asked, and the app cannot skip the asking
+///
+/// [#install] shows a system prompt when the platform wants consent, and
+/// there is no way around it: a declined prompt fails with
+/// [VpnError#USER_DECLINED], which is an ordinary outcome and not an error to
+/// report to the user again.
+///
+/// It is NOT a prompt on every install. Android asks once and remembers, so
+/// replacing a profile in an app the user has already approved provisions
+/// and answers with nothing shown -- the port takes that path whenever
+/// `provisionVpnProfile` returns no consent intent. An app that treated each
+/// install as a fresh checkpoint, or that told the user a dialog was coming,
+/// was wrong in that case.
+///
+/// So: be ready for the prompt, and do not depend on it appearing.
+///
+/// #### One configuration per app
+///
+/// Both platforms give an app a single managed configuration, so [#install]
+/// replaces whatever was there rather than adding to it.
+public final class Vpn {
+
+<span class="fc" id="L81">    private static final List&lt;VpnStatusListener&gt; LISTENERS =</span>
+            new ArrayList&lt;VpnStatusListener&gt;();
+
+    private Vpn() {
+    }
+
+    /// Whether this platform can install and control a VPN configuration.
+    ///
+    /// False on Android below API 30, and on every port with no VPN
+    /// machinery. Note this is a different question from whether a VPN is
+    /// *running* -- `com.codename1.io.NetworkManager#isVPNActive()` answers
+    /// that one, on many more platforms and with no entitlement.
+    public static boolean isSupported() {
+<span class="fc" id="L94">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">        return b != null &amp;&amp; b.isVpnSupported();</span>
+    }
+
+    /// The `VpnBridge.CAPABILITY_*` mask this platform supports.
+    public static int getCapabilities() {
+<span class="fc" id="L100">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        return b == null ? 0 : b.getVpnCapabilities();</span>
+    }
+
+    /// Where the tunnel is right now.
+    public static VpnStatus getStatus() {
+<span class="fc" id="L106">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L108">            return VpnStatus.NOT_CONFIGURED;</span>
+        }
+<span class="fc" id="L110">        return VpnWire.status(b.getVpnStatus());</span>
+    }
+
+    /// Installs or replaces this app's configuration, after asking the user.
+    public static AsyncResource&lt;Boolean&gt; install(VpnProfile profile) {
+<span class="fc" id="L115">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L117">            return failed(VpnError.NOT_SUPPORTED, null);</span>
+        }
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (profile == null) {</span>
+<span class="fc" id="L120">            return failed(VpnError.INVALID_CONFIGURATION,</span>
+                    &quot;A profile is required&quot;);
+        }
+        // A profile that came back from load() has its username but NEITHER
+        // secret: iOS leaves both the password and the shared-secret field
+        // empty, because the platform keeps them in the keychain and never
+        // hands them over.
+        // Loading one, changing the display name or the on-demand flag and
+        // installing it back is the obvious thing to try, and it used to
+        // succeed -- iOS saved a configuration with a nil password reference,
+        // or a pre-shared-key profile with authenticationMethod None, and
+        // retired the keychain generation the working profile was using. A
+        // VPN that had authenticated for months stopped being able to, with a
+        // successful acknowledgement to say it had all gone well.
+        //
+        // Testing the password alone missed the PSK case entirely, which is
+        // why this asks whether the description came from the platform rather
+        // than trying to name every secret it might be missing.
+        //
+        // Refused rather than papered over. The alternative -- carrying the
+        // previous credential references forward -- would silently reinstall
+        // a secret the app cannot see and did not ask for, and there is no
+        // portable way to know it is still the right one.
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (profile.areSecretsWithheld()) {</span>
+<span class="fc" id="L144">            return failed(VpnError.INVALID_CONFIGURATION,</span>
+                    &quot;This profile came from load(), which never carries its&quot;
+                    + &quot; secrets -- the platform keeps them. Call&quot;
+                    + &quot; usernamePassword() or sharedSecret() with the&quot;
+                    + &quot; credentials before installing it back.&quot;);
+        }
+        // The password half again, for a profile the app built itself with a
+        // username and a null password. That is not a loaded description, so
+        // the marker above does not cover it, and it is just as unusable.
+<span class="fc bfc" id="L153" title="All 4 branches covered.">        if (profile.getUsername() != null &amp;&amp; !profile.isPasswordKnown()) {</span>
+<span class="fc" id="L154">            return failed(VpnError.INVALID_CONFIGURATION,</span>
+                    &quot;This profile has a username but no password.&quot;);
+        }
+        // And a profile carrying NEITHER credential, which the two checks
+        // above both let through: the first only fires for a description
+        // that came from load(), the second only when a username is present.
+        //
+        // There is no third way to authenticate. This API deliberately
+        // exposes no certificate credential -- see the note in VpnProfile --
+        // so a profile with no usable username/password pair and no shared
+        // secret cannot authenticate at all. iOS selected
+        // NEVPNIKEAuthenticationMethodNone, disabled extended authentication,
+        // and saved and acknowledged it; Android reached the
+        // username/password builder with a pair of nulls. The pair is
+        // required together because a password without a username is ignored
+        // just as completely: the iOS branch that stores it keys off the
+        // username.
+<span class="fc" id="L171">        String psk = profile.getSharedSecret();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        boolean pair = profile.getUsername() != null</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                &amp;&amp; profile.getUsername().length() &gt; 0</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                &amp;&amp; profile.isPasswordKnown();</span>
+<span class="pc bpc" id="L175" title="1 of 6 branches missed.">        if (!pair &amp;&amp; (psk == null || psk.length() == 0)) {</span>
+<span class="fc" id="L176">            return failed(VpnError.INVALID_CONFIGURATION,</span>
+                    &quot;This profile has no credentials: call usernamePassword()&quot;
+                    + &quot; with both a username and a password, or&quot;
+                    + &quot; sharedSecret(), before installing it.&quot;);
+        }
+<span class="fc" id="L181">        int id = VpnRequests.nextId();</span>
+<span class="fc" id="L182">        EdtResult&lt;Boolean&gt; r = VpnRequests.openAck(id);</span>
+<span class="fc" id="L183">        b.installProfile(id, VpnWire.encodeProfile(profile));</span>
+<span class="fc" id="L184">        return r;</span>
+    }
+
+    /// Removes this app's configuration.
+    public static AsyncResource&lt;Boolean&gt; remove() {
+<span class="fc" id="L189">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L191">            return failed(VpnError.NOT_SUPPORTED, null);</span>
+        }
+<span class="fc" id="L193">        int id = VpnRequests.nextId();</span>
+<span class="fc" id="L194">        EdtResult&lt;Boolean&gt; r = VpnRequests.openAck(id);</span>
+<span class="fc" id="L195">        b.removeProfile(id);</span>
+<span class="fc" id="L196">        return r;</span>
+    }
+
+    /// Reads back the installed configuration, resolving null when none is
+    /// installed.
+    ///
+    /// The result never carries the password -- the platform keeps it. See
+    /// [VpnProfile#getPassword()].
+    ///
+    /// #### On Android this is this app's RECORD, not a platform read
+    ///
+    /// `VpnManager` provisions, deletes, starts and stops; it has no call
+    /// that hands a profile back. So the description here is the one this
+    /// app kept when it installed, and it can outlive the real thing -- the
+    /// user removing the VPN in Settings, or app data restored onto a device
+    /// that never had it, both leave the record saying a profile exists.
+    ///
+    /// It corrects itself the first time the platform contradicts it: a
+    /// start or a stop that comes back &quot;nothing is provisioned&quot; drops the
+    /// record and moves the status to NOT_CONFIGURED. An app that must be
+    /// certain should [#start] rather than trust a description, and watch
+    /// the status. iOS reads the real configuration and has no such gap.
+    public static AsyncResource&lt;VpnProfile&gt; load() {
+<span class="fc" id="L219">        final EdtResult&lt;VpnProfile&gt; out = new EdtResult&lt;VpnProfile&gt;();</span>
+<span class="fc" id="L220">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L222">            out.error(new VpnException(VpnError.NOT_SUPPORTED));</span>
+<span class="fc" id="L223">            return out;</span>
+        }
+<span class="fc" id="L225">        int id = VpnRequests.nextId();</span>
+<span class="fc" id="L226">        EdtResult&lt;String&gt; raw = VpnRequests.openString(id);</span>
+<span class="fc" id="L227">        raw.onResult(new ProfileDecoder(out));</span>
+<span class="fc" id="L228">        b.loadProfile(id);</span>
+<span class="fc" id="L229">        return out;</span>
+    }
+
+    /// Brings the tunnel up.
+    public static AsyncResource&lt;Boolean&gt; start() {
+<span class="fc" id="L234">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L236">            return failed(VpnError.NOT_SUPPORTED, null);</span>
+        }
+<span class="fc" id="L238">        int id = VpnRequests.nextId();</span>
+<span class="fc" id="L239">        EdtResult&lt;Boolean&gt; r = VpnRequests.openAck(id);</span>
+<span class="fc" id="L240">        b.startVpn(id);</span>
+<span class="fc" id="L241">        return r;</span>
+    }
+
+    /// Takes the tunnel down.
+    public static AsyncResource&lt;Boolean&gt; stop() {
+<span class="fc" id="L246">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L248">            return failed(VpnError.NOT_SUPPORTED, null);</span>
+        }
+<span class="fc" id="L250">        int id = VpnRequests.nextId();</span>
+<span class="fc" id="L251">        EdtResult&lt;Boolean&gt; r = VpnRequests.openAck(id);</span>
+<span class="fc" id="L252">        b.stopVpn(id);</span>
+<span class="fc" id="L253">        return r;</span>
+    }
+
+    /// Adds a status listener. Arrives on the EDT.
+    public static void addStatusListener(VpnStatusListener l) {
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (l == null) {</span>
+<span class="fc" id="L259">            return;</span>
+        }
+<span class="fc" id="L261">        synchronized (LISTENERS) {</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            if (LISTENERS.contains(l)) {</span>
+<span class="nc" id="L263">                return;</span>
+            }
+<span class="fc" id="L265">            LISTENERS.add(l);</span>
+            // Inside the lock, with the mutation that decided it. Told
+            // afterwards, a replacement listener could turn delivery ON
+            // before a departing one -- whose emptiness was computed
+            // earlier -- turned it OFF, leaving a registered listener that
+            // never heard another transition.
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">            applyListening(!LISTENERS.isEmpty());</span>
+<span class="fc" id="L272">        }</span>
+<span class="fc" id="L273">    }</span>
+
+    /// Removes a status listener, stopping delivery when the last one goes.
+    public static void removeStatusListener(VpnStatusListener l) {
+<span class="fc" id="L277">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L278">            LISTENERS.remove(l);</span>
+            // Inside the lock; see addStatusListener.
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            applyListening(!LISTENERS.isEmpty());</span>
+<span class="fc" id="L281">        }</span>
+<span class="fc" id="L282">    }</span>
+
+    /// What the port was last told about delivery, or null when it has not
+    /// been told.
+    private static Boolean deliveredListening;
+
+    /// The bridge deliveredListening was told, so a replacement is told
+    /// again even when the value has not changed.
+    private static VpnBridge deliveredTo;
+
+    /// Tells the port whether anyone is listening, remembering the answer.
+    ///
+    /// A first listener added before Display.init found no bridge, and every
+    /// later addition then saw a non-empty list and said nothing -- so iOS
+    /// never installed its status observer and Android never set its
+    /// listening flag. The wanted state is kept and applied by
+    /// [#publishListening] the moment a port appears.
+    ///
+    /// Caller holds LISTENERS.
+    private static void applyListening(boolean wanted) {
+        // The monitor is taken here as well as by the callers -- it is
+        // reentrant, and stating it is what lets an analyser see that this
+        // static is guarded rather than lazily initialised in the open.
+<span class="fc" id="L305">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L306">            VpnBridge b = VpnRequests.bridge();</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (b == null) {</span>
+<span class="fc" id="L308">                deliveredListening = null;</span>
+<span class="fc" id="L309">                deliveredTo = null;</span>
+<span class="fc" id="L310">                return;</span>
+            }
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">            if (deliveredListening != null</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">                    &amp;&amp; deliveredListening.booleanValue() == wanted) {</span>
+<span class="fc" id="L314">                return;</span>
+            }
+<span class="nc" id="L316">            deliveredListening = Boolean.valueOf(wanted);</span>
+<span class="nc" id="L317">            b.setStatusListening(wanted);</span>
+<span class="nc" id="L318">        }</span>
+<span class="nc" id="L319">    }</span>
+
+    /// Delivers the listening state the port has not been told about.
+    ///
+    /// Called when a bridge is resolved, which is the first moment there is
+    /// anywhere to send it.
+    ///
+    /// @hidden not part of the public API.
+    public static void publishListening(VpnBridge b) {
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L329">            return;</span>
+        }
+<span class="fc" id="L331">        synchronized (LISTENERS) {</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">            boolean wanted = !LISTENERS.isEmpty();</span>
+            // The BRIDGE as well as the value. A Display re-init builds a new
+            // bridge whose own listening flag starts false, and a value-only
+            // cache said &quot;already told it true&quot; about the bridge that is
+            // gone -- so the replacement was never asked to watch, and no
+            // status change reached a listener that had been registered the
+            // whole time.
+<span class="pc bpc" id="L339" title="1 of 4 branches missed.">            if (deliveredTo == b //NOPMD CompareObjectsWithEquals</span>
+                    &amp;&amp; deliveredListening != null
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                    &amp;&amp; deliveredListening.booleanValue() == wanted) {</span>
+<span class="fc" id="L342">                return;</span>
+            }
+<span class="fc" id="L344">            deliveredListening = Boolean.valueOf(wanted);</span>
+<span class="fc" id="L345">            deliveredTo = b;</span>
+<span class="fc" id="L346">            b.setStatusListening(wanted);</span>
+<span class="fc" id="L347">        }</span>
+<span class="fc" id="L348">    }</span>
+
+    // ------------------------------------------------------------------
+    // Entry points the ports call up into.
+    // ------------------------------------------------------------------
+
+    /// Answers an acknowledged operation.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverAck(int requestId, boolean ok, int errorOrdinal,
+            String message) {
+<span class="fc" id="L359">        EdtResult&lt;Boolean&gt; r = VpnRequests.takeAck(requestId);</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">        if (r == null) {</span>
+<span class="nc" id="L361">            return;</span>
+        }
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (ok) {</span>
+<span class="fc" id="L364">            r.complete(Boolean.TRUE);</span>
+        } else {
+<span class="fc" id="L366">            r.error(VpnWire.decodeError(errorOrdinal, message));</span>
+        }
+<span class="fc" id="L368">    }</span>
+
+    /// Answers [#load] with a wire record, or the empty string for none.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverProfile(int requestId, String profileWire) {
+<span class="fc" id="L374">        EdtResult&lt;String&gt; r = VpnRequests.takeString(requestId);</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        if (r != null) {</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">            r.complete(profileWire == null ? &quot;&quot; : profileWire);</span>
+        }
+<span class="fc" id="L378">    }</span>
+
+    /// Fails a load.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverProfileFailed(int requestId, int errorOrdinal,
+            String message) {
+<span class="nc" id="L385">        EdtResult&lt;String&gt; r = VpnRequests.takeString(requestId);</span>
+<span class="nc bnc" id="L386" title="All 2 branches missed.">        if (r != null) {</span>
+<span class="nc" id="L387">            r.error(VpnWire.decodeError(errorOrdinal, message));</span>
+        }
+<span class="nc" id="L389">    }</span>
+
+    /// The tunnel changed state.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverStatusChanged(int statusOrdinal) {
+<span class="fc" id="L395">        StatusEvent e = new StatusEvent(VpnWire.status(statusOrdinal));</span>
+<span class="pc bpc" id="L396" title="3 of 4 branches missed.">        if (Display.isInitialized() &amp;&amp; !Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L397">            Display.getInstance().callSerially(e);</span>
+        } else {
+<span class="fc" id="L399">            e.run();</span>
+        }
+<span class="fc" id="L401">    }</span>
+
+    private static AsyncResource&lt;Boolean&gt; failed(VpnError e, String message) {
+<span class="fc" id="L404">        EdtResult&lt;Boolean&gt; r = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        r.error(message == null ? new VpnException(e)</span>
+                : new VpnException(e, message));
+<span class="fc" id="L407">        return r;</span>
+    }
+
+    private static VpnStatusListener[] listeners() {
+<span class="fc" id="L411">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L412">            return LISTENERS.toArray(new VpnStatusListener[LISTENERS.size()]);</span>
+        }
+    }
+
+    /// Carries a status change to the EDT. A static class so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class StatusEvent implements Runnable {
+        private final VpnStatus status;
+
+<span class="fc" id="L421">        StatusEvent(VpnStatus status) {</span>
+<span class="fc" id="L422">            this.status = status;</span>
+<span class="fc" id="L423">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L427">            VpnStatusListener[] ls = listeners();</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">            for (VpnStatusListener l : ls) {</span>
+<span class="fc" id="L429">                tell(l, status);</span>
+            }
+<span class="fc" id="L431">        }</span>
+
+        /// Tells one listener, without letting it stop the others.
+        ///
+        /// A status change is a notification: nobody is waiting on an answer
+        /// and every listener is entitled to hear it, so one that throws must
+        /// not leave the rest showing the previous state. The call facade's
+        /// notification arms are handled the same way.
+        private void tell(VpnStatusListener l, VpnStatus s) {
+            try {
+<span class="fc" id="L441">                l.vpnStatusChanged(s);</span>
+<span class="nc" id="L442">            } catch (Throwable t) {</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                if (Display.isInitialized()) {</span>
+<span class="nc" id="L444">                    Log.e(t);</span>
+                } else {
+                    // Log.e goes through the platform implementation, which
+                    // is null before Display.init.
+<span class="nc" id="L448">                    t.printStackTrace(); //NOPMD AvoidPrintStackTrace</span>
+                }
+<span class="fc" id="L450">            }</span>
+<span class="fc" id="L451">        }</span>
+    }
+
+    /// Turns the port's record into a [VpnProfile], or null for none.
+    private static final class ProfileDecoder
+            implements com.codename1.util.AsyncResult&lt;String&gt; {
+        private final EdtResult&lt;VpnProfile&gt; out;
+
+<span class="fc" id="L459">        ProfileDecoder(EdtResult&lt;VpnProfile&gt; out) {</span>
+<span class="fc" id="L460">            this.out = out;</span>
+<span class="fc" id="L461">        }</span>
+
+        @Override
+        public void onReady(String value, Throwable error) {
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">            if (error != null) {</span>
+<span class="nc" id="L466">                out.error(error);</span>
+            } else {
+<span class="fc" id="L468">                VpnProfile p = VpnWire.decodeProfile(value);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">                if (p != null) {</span>
+                    // Marked at the ONE place that produces a description
+                    // from the platform. decodeProfile itself must not do
+                    // this -- the ports decode an install wire with the same
+                    // method, and that one carries its secrets.
+<span class="fc" id="L474">                    p.markSecretsWithheld();</span>
+                }
+<span class="fc" id="L476">                out.complete(p);</span>
+            }
+<span class="fc" id="L478">        }</span>
+    }
+
+    /// Clears every listener.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public static void resetForTest() {
+<span class="fc" id="L485">        synchronized (LISTENERS) {</span>
+<span class="fc" id="L486">            LISTENERS.clear();</span>
+<span class="fc" id="L487">        }</span>
+<span class="fc" id="L488">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

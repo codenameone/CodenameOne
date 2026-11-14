@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CertificateRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">CertificateRequest.java</span></div><h1>CertificateRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+
+/// A PKCS#10 certificate signing request (RFC 2986): what a device sends a
+/// certificate authority to get the client certificate it then presents over
+/// mutual TLS.
+///
+/// The key pair never leaves the device. The request carries the public key and
+/// the names the certificate is for, signed with the private key to prove the
+/// device holds it:
+///
+/// ```java
+/// KeyPair keys = KeyGenerator.ec(256);
+/// byte[] csr = new CertificateRequest(keys.getPublicKey().getEncoded(), &quot;EC&quot;)
+///         .commonName(&quot;thermostat-42&quot;)
+///         .organization(&quot;Example Devices&quot;)
+///         .dnsName(&quot;thermostat-42.local&quot;)
+///         .sign(data -&gt; Signature.sign(Signature.SHA256_WITH_ECDSA, keys.getPrivateKey(), data));
+/// String pem = CertificateRequest.toPem(csr);
+/// ```
+///
+/// The class only encodes. The signature comes from whatever holds the key: a
+/// hardware key store signs with its own call, and a headless device on the
+/// backend with `com.codename1.backend.Crypto`:
+///
+/// ```java {class=&quot;cn1-no-try&quot;}
+/// byte[] key = Crypto.generateEcKey(Crypto.P256);
+/// byte[] csr = new CertificateRequest(Der.publicKeyOf(key), &quot;EC&quot;)
+///         .commonName(deviceId)
+///         .sign(data -&gt; Crypto.sign(Crypto.ES256, key, data));
+/// ```
+///
+/// Requests are signed with SHA-256: ECDSA for an `EC` key, PKCS#1
+/// v1.5 for an `RSA` key.
+@com.codename1.impl.SharedWithBackend
+public final class CertificateRequest {
+    /// Signs the encoded request body with the private key matching the request's
+    /// public key, using [#getSignatureAlgorithm()].
+    public interface Signer {
+        /// Signs `data`.
+        ///
+        /// @param data the DER CertificationRequestInfo
+        /// @return the signature; for ECDSA the DER `SEQUENCE { r, s }` the
+        /// platform's `SHA256withECDSA` produces
+        /// @throws IOException when the key cannot sign
+        byte[] sign(byte[] data) throws IOException;
+    }
+
+<span class="nc" id="L76">    private static final int[] OID_COMMON_NAME = {2, 5, 4, 3};</span>
+<span class="nc" id="L77">    private static final int[] OID_COUNTRY = {2, 5, 4, 6};</span>
+<span class="nc" id="L78">    private static final int[] OID_ORGANIZATION = {2, 5, 4, 10};</span>
+<span class="nc" id="L79">    private static final int[] OID_UNIT = {2, 5, 4, 11};</span>
+<span class="nc" id="L80">    private static final int[] OID_EXTENSION_REQUEST = {1, 2, 840, 113549, 1, 9, 14};</span>
+<span class="nc" id="L81">    private static final int[] OID_SUBJECT_ALT_NAME = {2, 5, 29, 17};</span>
+<span class="nc" id="L82">    private static final int[] OID_ECDSA_SHA256 = {1, 2, 840, 10045, 4, 3, 2};</span>
+<span class="nc" id="L83">    private static final int[] OID_RSA_SHA256 = {1, 2, 840, 113549, 1, 1, 11};</span>
+
+    private final byte[] publicKey;
+    private final boolean ec;
+<span class="nc" id="L87">    private final List&lt;byte[]&gt; subject = new ArrayList&lt;byte[]&gt;();</span>
+<span class="nc" id="L88">    private final List&lt;byte[]&gt; altNames = new ArrayList&lt;byte[]&gt;();</span>
+
+    /// Starts a request for a public key.
+    ///
+    /// @param subjectPublicKeyInfo the X.509 DER public key, as
+    /// `PublicKey.getEncoded()` returns it
+    /// @param keyAlgorithm `EC` or `RSA`
+<span class="nc" id="L95">    public CertificateRequest(byte[] subjectPublicKeyInfo, String keyAlgorithm) {</span>
+<span class="nc bnc" id="L96" title="All 4 branches missed.">        if (subjectPublicKeyInfo == null || subjectPublicKeyInfo.length == 0) {</span>
+<span class="nc" id="L97">            throw new IllegalArgumentException(&quot;No public key&quot;);</span>
+        }
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (&quot;EC&quot;.equals(keyAlgorithm)) {</span>
+<span class="nc" id="L100">            ec = true;</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        } else if (&quot;RSA&quot;.equals(keyAlgorithm)) {</span>
+<span class="nc" id="L102">            ec = false;</span>
+        } else {
+<span class="nc" id="L104">            throw new IllegalArgumentException(&quot;Key algorithm must be EC or RSA: &quot; + keyAlgorithm);</span>
+        }
+<span class="nc" id="L106">        publicKey = new byte[subjectPublicKeyInfo.length];</span>
+<span class="nc" id="L107">        System.arraycopy(subjectPublicKeyInfo, 0, publicKey, 0, publicKey.length);</span>
+<span class="nc" id="L108">    }</span>
+
+    /// The signature algorithm the [Signer] has to use: `SHA256withECDSA` or
+    /// `SHA256withRSA`.
+    ///
+    /// @return the JCA name of the algorithm
+    public String getSignatureAlgorithm() {
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        return ec ? &quot;SHA256withECDSA&quot; : &quot;SHA256withRSA&quot;;</span>
+    }
+
+    /// Adds the subject's common name (CN), typically the device identity.
+    ///
+    /// @param name the name
+    /// @return this request
+    public CertificateRequest commonName(String name) {
+<span class="nc" id="L123">        return attribute(OID_COMMON_NAME, utf8(name));</span>
+    }
+
+    /// Adds the subject's organization (O).
+    ///
+    /// @param name the organization
+    /// @return this request
+    public CertificateRequest organization(String name) {
+<span class="nc" id="L131">        return attribute(OID_ORGANIZATION, utf8(name));</span>
+    }
+
+    /// Adds the subject's organizational unit (OU).
+    ///
+    /// @param name the unit
+    /// @return this request
+    public CertificateRequest organizationalUnit(String name) {
+<span class="nc" id="L139">        return attribute(OID_UNIT, utf8(name));</span>
+    }
+
+    /// Adds the subject's country (C).
+    ///
+    /// @param code the two-letter ISO 3166 code
+    /// @return this request
+    public CertificateRequest country(String code) {
+<span class="nc bnc" id="L147" title="All 6 branches missed.">        if (code == null || code.length() != 2 || !printable(code)) {</span>
+<span class="nc" id="L148">            throw new IllegalArgumentException(&quot;A country is a two-letter code: &quot; + code);</span>
+        }
+<span class="nc" id="L150">        return attribute(OID_COUNTRY, tlv(0x13, ascii(code)));</span>
+    }
+
+    /// Asks for a DNS name in the certificate's subject alternative names, which
+    /// is what a TLS client checks when the device is the server.
+    ///
+    /// @param name the host name, ASCII
+    /// @return this request
+    public CertificateRequest dnsName(String name) {
+<span class="nc bnc" id="L159" title="All 6 branches missed.">        if (name == null || name.length() == 0 || !printable(name)) {</span>
+<span class="nc" id="L160">            throw new IllegalArgumentException(&quot;Not an ASCII host name: &quot; + name);</span>
+        }
+<span class="nc" id="L162">        altNames.add(tlv(0x82, ascii(name)));</span>
+<span class="nc" id="L163">        return this;</span>
+    }
+
+    /// Asks for an IPv4 address in the subject alternative names.
+    ///
+    /// @param address dotted decimal, such as `192.168.1.20`
+    /// @return this request
+    public CertificateRequest ipAddress(String address) {
+<span class="nc" id="L171">        byte[] octets = new byte[4];</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        String[] parts = address == null ? new String[0] : split(address);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (parts.length != 4) {</span>
+<span class="nc" id="L174">            throw new IllegalArgumentException(&quot;Not an IPv4 address: &quot; + address);</span>
+        }
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        for (int i = 0; i &lt; 4; i++) {</span>
+<span class="nc" id="L177">            int v = -1;</span>
+<span class="nc bnc" id="L178" title="All 4 branches missed.">            if (parts[i].length() &gt; 0 &amp;&amp; parts[i].length() &lt;= 3) {</span>
+<span class="nc" id="L179">                v = 0;</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                for (int j = 0; j &lt; parts[i].length(); j++) {</span>
+<span class="nc" id="L181">                    char c = parts[i].charAt(j);</span>
+<span class="nc bnc" id="L182" title="All 4 branches missed.">                    v = c &gt;= '0' &amp;&amp; c &lt;= '9' ? v * 10 + c - '0' : 256;</span>
+                }
+            }
+<span class="nc bnc" id="L185" title="All 4 branches missed.">            if (v &lt; 0 || v &gt; 255) {</span>
+<span class="nc" id="L186">                throw new IllegalArgumentException(&quot;Not an IPv4 address: &quot; + address);</span>
+            }
+<span class="nc" id="L188">            octets[i] = (byte) v;</span>
+        }
+<span class="nc" id="L190">        altNames.add(tlv(0x87, octets));</span>
+<span class="nc" id="L191">        return this;</span>
+    }
+
+    /// The DER CertificationRequestInfo: the part of the request that is signed.
+    ///
+    /// @return the encoded bytes
+    public byte[] getInfo() {
+        byte[] attributes;
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (altNames.isEmpty()) {</span>
+<span class="nc" id="L200">            attributes = tlv(0xa0, new byte[0]);</span>
+        } else {
+<span class="nc" id="L202">            byte[] san = sequence(altNames);</span>
+<span class="nc" id="L203">            byte[] extension = seq(oid(OID_SUBJECT_ALT_NAME), tlv(0x04, san));</span>
+<span class="nc" id="L204">            byte[] extensions = seq(extension);</span>
+<span class="nc" id="L205">            byte[] attribute = seq(oid(OID_EXTENSION_REQUEST), tlv(0x31, extensions));</span>
+<span class="nc" id="L206">            attributes = tlv(0xa0, attribute);</span>
+        }
+<span class="nc" id="L208">        List&lt;byte[]&gt; rdns = new ArrayList&lt;byte[]&gt;();</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        for (byte[] atv : subject) {</span>
+<span class="nc" id="L210">            rdns.add(tlv(0x31, atv));</span>
+<span class="nc" id="L211">        }</span>
+<span class="nc" id="L212">        return seq(tlv(0x02, new byte[]{0}), sequence(rdns), publicKey, attributes);</span>
+    }
+
+    /// Encodes the request with a signature made elsewhere over [#getInfo()].
+    ///
+    /// @param signature the signature bytes
+    /// @return the DER request
+    public byte[] encode(byte[] signature) {
+<span class="nc bnc" id="L220" title="All 4 branches missed.">        if (signature == null || signature.length == 0) {</span>
+<span class="nc" id="L221">            throw new IllegalArgumentException(&quot;No signature&quot;);</span>
+        }
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        byte[] algorithm = ec ? seq(oid(OID_ECDSA_SHA256)) : seq(oid(OID_RSA_SHA256), new byte[]{0x05, 0});</span>
+<span class="nc" id="L224">        byte[] bits = new byte[signature.length + 1];</span>
+<span class="nc" id="L225">        System.arraycopy(signature, 0, bits, 1, signature.length);</span>
+<span class="nc" id="L226">        return seq(getInfo(), algorithm, tlv(0x03, bits));</span>
+    }
+
+    /// Signs and encodes the request.
+    ///
+    /// @param signer signs with the private key
+    /// @return the DER request
+    /// @throws IOException when the signer fails
+    public byte[] sign(Signer signer) throws IOException {
+<span class="nc" id="L235">        return encode(signer.sign(getInfo()));</span>
+    }
+
+    /// Wraps a DER request in the PEM form most certificate authorities take.
+    ///
+    /// @param der the encoded request
+    /// @return `-----BEGIN CERTIFICATE REQUEST-----` and the base64 body
+    public static String toPem(byte[] der) {
+<span class="nc" id="L243">        String body = Base64.getEncoder().encodeToString(der);</span>
+<span class="nc" id="L244">        StringBuilder out = new StringBuilder(&quot;-----BEGIN CERTIFICATE REQUEST-----\n&quot;);</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        for (int i = 0; i &lt; body.length(); i += 64) {</span>
+<span class="nc" id="L246">            out.append(body.substring(i, Math.min(body.length(), i + 64))).append('\n');</span>
+        }
+<span class="nc" id="L248">        return out.append(&quot;-----END CERTIFICATE REQUEST-----\n&quot;).toString();</span>
+    }
+
+    private CertificateRequest attribute(int[] type, byte[] value) {
+<span class="nc" id="L252">        subject.add(seq(oid(type), value));</span>
+<span class="nc" id="L253">        return this;</span>
+    }
+
+    private static byte[] utf8(String value) {
+<span class="nc bnc" id="L257" title="All 4 branches missed.">        if (value == null || value.length() == 0) {</span>
+<span class="nc" id="L258">            throw new IllegalArgumentException(&quot;Empty name&quot;);</span>
+        }
+        try {
+<span class="nc" id="L261">            return tlv(0x0c, value.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L262">        } catch (java.io.UnsupportedEncodingException e) {</span>
+<span class="nc" id="L263">            throw new IllegalStateException(&quot;UTF-8&quot;, e);</span>
+        }
+    }
+
+    private static boolean printable(String value) {
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="nc" id="L269">            char c = value.charAt(i);</span>
+<span class="nc bnc" id="L270" title="All 4 branches missed.">            if (c &lt; 0x21 || c &gt; 0x7e) {</span>
+<span class="nc" id="L271">                return false;</span>
+            }
+        }
+<span class="nc" id="L274">        return true;</span>
+    }
+
+    private static byte[] ascii(String value) {
+<span class="nc" id="L278">        byte[] out = new byte[value.length()];</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="nc" id="L280">            out[i] = (byte) value.charAt(i);</span>
+        }
+<span class="nc" id="L282">        return out;</span>
+    }
+
+    private static String[] split(String address) {
+<span class="nc" id="L286">        List&lt;String&gt; parts = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L287">        int start = 0;</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        for (int i = 0; i &lt;= address.length(); i++) {</span>
+<span class="nc bnc" id="L289" title="All 4 branches missed.">            if (i == address.length() || address.charAt(i) == '.') {</span>
+<span class="nc" id="L290">                parts.add(address.substring(start, i));</span>
+<span class="nc" id="L291">                start = i + 1;</span>
+            }
+        }
+<span class="nc" id="L294">        return parts.toArray(new String[parts.size()]);</span>
+    }
+
+    static byte[] oid(int[] arcs) {
+<span class="nc" id="L298">        ByteArrayOutputStream out = new ByteArrayOutputStream();</span>
+<span class="nc" id="L299">        out.write(arcs[0] * 40 + arcs[1]);</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        for (int i = 2; i &lt; arcs.length; i++) {</span>
+<span class="nc" id="L301">            int v = arcs[i];</span>
+<span class="nc" id="L302">            int shift = 28;</span>
+<span class="nc bnc" id="L303" title="All 4 branches missed.">            while (shift &gt; 0 &amp;&amp; (v &gt;&gt;&gt; shift) == 0) {</span>
+<span class="nc" id="L304">                shift -= 7;</span>
+            }
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            for (; shift &gt; 0; shift -= 7) {</span>
+<span class="nc" id="L307">                out.write(0x80 | ((v &gt;&gt;&gt; shift) &amp; 0x7f));</span>
+            }
+<span class="nc" id="L309">            out.write(v &amp; 0x7f);</span>
+        }
+<span class="nc" id="L311">        return tlv(0x06, out.toByteArray());</span>
+    }
+
+    private static byte[] seq(byte[]... parts) {
+<span class="nc" id="L315">        List&lt;byte[]&gt; list = new ArrayList&lt;byte[]&gt;();</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        for (byte[] p : parts) {</span>
+<span class="nc" id="L317">            list.add(p);</span>
+        }
+<span class="nc" id="L319">        return sequence(list);</span>
+    }
+
+    private static byte[] sequence(List&lt;byte[]&gt; parts) {
+<span class="nc" id="L323">        ByteArrayOutputStream out = new ByteArrayOutputStream();</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        for (byte[] p : parts) {</span>
+<span class="nc" id="L325">            out.write(p, 0, p.length);</span>
+<span class="nc" id="L326">        }</span>
+<span class="nc" id="L327">        return tlv(0x30, out.toByteArray());</span>
+    }
+
+    static byte[] tlv(int tag, byte[] value) {
+<span class="nc" id="L331">        int n = value.length;</span>
+<span class="nc bnc" id="L332" title="All 8 branches missed.">        int lengthBytes = n &lt; 0x80 ? 0 : n &lt; 0x100 ? 1 : n &lt; 0x10000 ? 2 : n &lt; 0x1000000 ? 3 : 4;</span>
+<span class="nc" id="L333">        byte[] out = new byte[2 + lengthBytes + n];</span>
+<span class="nc" id="L334">        out[0] = (byte) tag;</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">        if (lengthBytes == 0) {</span>
+<span class="nc" id="L336">            out[1] = (byte) n;</span>
+        } else {
+<span class="nc" id="L338">            out[1] = (byte) (0x80 | lengthBytes);</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">            for (int i = 0; i &lt; lengthBytes; i++) {</span>
+<span class="nc" id="L340">                out[2 + i] = (byte) (n &gt;&gt;&gt; (8 * (lengthBytes - 1 - i)));</span>
+            }
+        }
+<span class="nc" id="L343">        System.arraycopy(value, 0, out, 2 + lengthBytes, n);</span>
+<span class="nc" id="L344">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

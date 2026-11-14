@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SocketMqttTransport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.mqtt</a> &gt; <span class="el_source">SocketMqttTransport.java</span></div><h1>SocketMqttTransport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.mqtt;
+
+import com.codename1.io.Socket;
+import com.codename1.io.SocketConnection;
+import com.codename1.ui.CN;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/// Plain TCP through [Socket]. A thread of the socket layer blocks in `read`
+/// and hands each chunk to the EDT; writes are made on the caller's thread.
+final class SocketMqttTransport implements MqttTransport {
+    private final String host;
+    private final int port;
+    private final int timeout;
+<span class="nc" id="L39">    private final AtomicBoolean closed = new AtomicBoolean();</span>
+    private OutputStream out;
+    private InputStream in;
+
+<span class="nc" id="L43">    SocketMqttTransport(String host, int port, int timeout) {</span>
+<span class="nc" id="L44">        this.host = host;</span>
+<span class="nc" id="L45">        this.port = port;</span>
+<span class="nc" id="L46">        this.timeout = timeout;</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public void open(final Handler h) {
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (!Socket.isSupported()) {</span>
+<span class="nc" id="L52">            h.closed(&quot;Sockets are not supported on this platform&quot;);</span>
+<span class="nc" id="L53">            return;</span>
+        }
+<span class="nc" id="L55">        Socket.connect(host, port, new SocketConnection(timeout) {</span>
+            @Override
+            public void connectionError(int errorCode, String message) {
+<span class="nc" id="L58">                post(h, null, 0, &quot;Connect failed: &quot; + message);</span>
+<span class="nc" id="L59">            }</span>
+
+            @Override
+            public void connectionEstablished(InputStream is, OutputStream os) {
+<span class="nc" id="L63">                in = is;</span>
+<span class="nc" id="L64">                out = os;</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                if (closed.get()) {</span>
+<span class="nc" id="L66">                    closeStreams();</span>
+<span class="nc" id="L67">                    return;</span>
+                }
+<span class="nc" id="L69">                CN.callSerially(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                        if (!closed.get()) {</span>
+<span class="nc" id="L73">                            h.opened();</span>
+                        }
+<span class="nc" id="L75">                    }</span>
+                });
+<span class="nc" id="L77">                byte[] chunk = new byte[4096];</span>
+<span class="nc" id="L78">                String reason = &quot;Connection closed by the broker&quot;;</span>
+                try {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                    while (!closed.get()) {</span>
+<span class="nc" id="L81">                        int n = is.read(chunk);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                        if (n &lt; 0) {</span>
+<span class="nc" id="L83">                            break;</span>
+                        }
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                        if (n &gt; 0) {</span>
+<span class="nc" id="L86">                            byte[] copy = new byte[n];</span>
+<span class="nc" id="L87">                            System.arraycopy(chunk, 0, copy, 0, n);</span>
+<span class="nc" id="L88">                            post(h, copy, n, null);</span>
+                        }
+<span class="nc" id="L90">                    }</span>
+<span class="nc" id="L91">                } catch (IOException e) {</span>
+<span class="nc" id="L92">                    reason = &quot;Read failed: &quot; + e.getMessage();</span>
+<span class="nc" id="L93">                }</span>
+<span class="nc" id="L94">                post(h, null, 0, reason);</span>
+<span class="nc" id="L95">            }</span>
+        });
+<span class="nc" id="L97">    }</span>
+
+    private void post(final Handler h, final byte[] data, final int len, final String reason) {
+<span class="nc" id="L100">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                if (closed.get()) {</span>
+<span class="nc" id="L104">                    return;</span>
+                }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                if (reason != null) {</span>
+<span class="nc" id="L107">                    h.closed(reason);</span>
+                } else {
+<span class="nc" id="L109">                    h.received(data, len);</span>
+                }
+<span class="nc" id="L111">            }</span>
+        });
+<span class="nc" id="L113">    }</span>
+
+    @Override
+    public void send(byte[] data) throws IOException {
+        // The connection's own stream, closed by close(); send only borrows it.
+<span class="nc" id="L118">        OutputStream o = out; // NOPMD CloseResource</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L120">            throw new IOException(&quot;Not connected&quot;);</span>
+        }
+<span class="nc" id="L122">        o.write(data);</span>
+<span class="nc" id="L123">        o.flush();</span>
+<span class="nc" id="L124">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc" id="L128">        closed.set(true);</span>
+<span class="nc" id="L129">        closeStreams();</span>
+<span class="nc" id="L130">    }</span>
+
+    private void closeStreams() {
+        try {
+<span class="nc bnc" id="L134" title="All 2 branches missed.">            if (out != null) {</span>
+<span class="nc" id="L135">                out.close();</span>
+            }
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (in != null) {</span>
+<span class="nc" id="L138">                in.close();</span>
+            }
+<span class="nc" id="L140">        } catch (IOException e) {</span>
+            // closing; nothing left to report
+<span class="nc" id="L142">            out = null;</span>
+<span class="nc" id="L143">        }</span>
+<span class="nc" id="L144">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

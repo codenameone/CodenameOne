@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Schnorr.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Schnorr.java</span></div><h1>Schnorr.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// BIP-340 Schnorr signatures over secp256k1: the signatures of Bitcoin's
+/// Taproot (key-path spends, P2TR) and of Nostr events.
+///
+/// Keys are the 32-byte x coordinate alone (&quot;x-only&quot;); the point with the
+/// even y is meant. A private key is the same 32 bytes as for [Secp256k1].
+///
+/// ```java
+/// byte[] privateKey = SecureRandom.bytes(32);
+/// byte[] messageHash = Hash.sha256(&quot;hello&quot;.getBytes());
+/// byte[] pub = Schnorr.publicKey(privateKey);
+/// byte[] sig = Schnorr.sign(messageHash, privateKey, SecureRandom.bytes(32));
+/// boolean ok = Schnorr.verify(messageHash, sig, pub);
+/// ```
+///
+/// Signing is deterministic given the auxiliary randomness; passing fresh
+/// random bytes there, as BIP-340 recommends, protects against fault and
+/// side-channel attacks that a purely deterministic nonce does not.
+///
+/// [#sign(byte[], byte[], byte[])] derives the public key on every call,
+/// which BIP-340 signing needs, and that is half the work of a signature. A
+/// [KeyPair] derives it once:
+///
+/// ```java
+/// byte[] privateKey = SecureRandom.bytes(32);
+/// Schnorr.KeyPair keys = new Schnorr.KeyPair(privateKey);
+/// byte[] first = keys.sign(Hash.sha256(&quot;first&quot;.getBytes()), SecureRandom.bytes(32));
+/// byte[] second = keys.sign(Hash.sha256(&quot;second&quot;.getBytes()), SecureRandom.bytes(32));
+/// keys.destroy();
+/// ```
+@com.codename1.impl.SharedWithBackend
+public final class Schnorr {
+    /// Length of an x-only public key.
+    public static final int PUBLIC_KEY_LENGTH = 32;
+
+    /// Length of a signature.
+    public static final int SIGNATURE_LENGTH = 64;
+
+    private Schnorr() {
+    }
+
+    /// The x-only public key of a private key.
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: if the private key is not valid
+    public static byte[] publicKey(byte[] privateKey) {
+<span class="fc" id="L71">        return Secp256k1.xOnlyPublicKey(privateKey);</span>
+    }
+
+    /// Signs a message, normally a 32-byte hash.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: the message; BIP-340 signs it as given
+    ///
+    /// - `privateKey`: 32 bytes in `[1, n-1]`
+    ///
+    /// - `auxRand`: 32 random bytes, or `null` for the all-zero value the
+    ///   standard's test vectors use
+    ///
+    /// #### Returns
+    ///
+    /// the 64-byte signature
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: if the key or the randomness is malformed
+    public static byte[] sign(byte[] message, byte[] privateKey, byte[] auxRand) {
+<span class="fc" id="L93">        return Secp256k1.schnorrSign(message, privateKey, auxRand);</span>
+    }
+
+    /// A private key with its x-only public key, derived once, for signing
+    /// many messages; the counterpart of libsecp256k1's `secp256k1_keypair`.
+    /// The two cannot be supplied separately: signing with a public key that
+    /// is not the private key's own reveals the private key.
+    ///
+    /// The object holds the private key until [#destroy()] wipes it. Use it
+    /// from one thread at a time: a `destroy` racing a `sign` signs with a
+    /// half-wiped key. Where a native engine signs, it derives the public key
+    /// itself and the saving is the engine's to make.
+    public static final class KeyPair {
+        private final byte[] privateKey;
+<span class="fc" id="L107">        private final byte[] publicKey = new byte[PUBLIC_KEY_LENGTH];</span>
+        private final int[] scalar;
+        private boolean destroyed;
+
+        /// Derives the public key of `privateKey`, which is copied.
+        ///
+        /// #### Throws
+        ///
+        /// - `CryptoException`: if the private key is not valid
+<span class="fc" id="L116">        public KeyPair(byte[] privateKey) {</span>
+<span class="fc" id="L117">            scalar = Secp256k1.schnorrScalar(privateKey, publicKey);</span>
+<span class="fc" id="L118">            this.privateKey = new byte[privateKey.length];</span>
+<span class="fc" id="L119">            System.arraycopy(privateKey, 0, this.privateKey, 0, privateKey.length);</span>
+<span class="fc" id="L120">        }</span>
+
+        /// The x-only public key, as [Schnorr#publicKey(byte[])] returns it.
+        public byte[] getPublicKey() {
+<span class="fc" id="L124">            byte[] out = new byte[PUBLIC_KEY_LENGTH];</span>
+<span class="fc" id="L125">            System.arraycopy(publicKey, 0, out, 0, PUBLIC_KEY_LENGTH);</span>
+<span class="fc" id="L126">            return out;</span>
+        }
+
+        /// Signs a message, giving the signature
+        /// [Schnorr#sign(byte[], byte[], byte[])] gives.
+        ///
+        /// #### Throws
+        ///
+        /// - `CryptoException`: if the randomness is malformed, or the key
+        ///   has been destroyed
+        public byte[] sign(byte[] message, byte[] auxRand) {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            if (destroyed) {</span>
+<span class="fc" id="L138">                throw new CryptoException(&quot;the key pair has been destroyed&quot;);</span>
+            }
+<span class="pc bpc" id="L140" title="2 of 6 branches missed.">            if (message != null &amp;&amp; (auxRand == null || auxRand.length == 32)) {</span>
+<span class="fc" id="L141">                byte[] fast = CryptoEngine.get().schnorrSign(message, privateKey, auxRand);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                if (fast != null) {</span>
+<span class="nc" id="L143">                    return fast;</span>
+                }
+            }
+<span class="fc" id="L146">            return Secp256k1.schnorrSignPrepared(message, scalar, publicKey, auxRand);</span>
+        }
+
+        /// Wipes the private key; later calls to [#sign(byte[], byte[])] throw.
+        public void destroy() {
+<span class="fc" id="L151">            destroyed = true;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            for (int i = 0; i &lt; privateKey.length; i++) {</span>
+<span class="fc" id="L153">                privateKey[i] = 0;</span>
+            }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            for (int i = 0; i &lt; scalar.length; i++) {</span>
+<span class="fc" id="L156">                scalar[i] = 0;</span>
+            }
+<span class="fc" id="L158">        }</span>
+    }
+
+    /// Verifies a signature.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if `signature` was made over `message` by the key behind
+    /// `publicKey`; `false` for any malformed or wrong signature
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: if the message is null or the public key is not
+    ///   32 bytes
+    public static boolean verify(byte[] message, byte[] signature, byte[] publicKey) {
+<span class="fc" id="L173">        return Secp256k1.schnorrVerify(message, signature, publicKey);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

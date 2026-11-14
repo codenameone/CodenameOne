@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RevoluteJointDef.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">RevoluteJointDef.java</span></div><h1>RevoluteJointDef.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+/*
+ * JBox2D - A Java Port of Erin Catto's Box2D
+ * 
+ * JBox2D homepage: http://jbox2d.sourceforge.net/
+ * Box2D homepage: http://www.box2d.org
+ * 
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ * 
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ * 
+ * 1. The origin of this software must not be misrepresented; you must not
+ * claim that you wrote the original software. If you use this software
+ * in a product, an acknowledgment in the product documentation would be
+ * appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ * misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.Body;
+
+///  Revolute joint definition. This requires defining an
+///  anchor point where the bodies are joined. The definition
+///  uses local anchor points so that the initial configuration
+///  can violate the constraint slightly. You also need to
+///  specify the initial relative angle for joint limits. This
+///  helps when saving and loading a game.
+///  The local anchor points are measured from the body's origin
+///  rather than the center of mass because:&lt;br/&gt;
+///  &lt;ul&gt;
+///  &lt;li&gt;you might not know where the center of mass will be.&lt;/li&gt;
+///  &lt;li&gt;if you add/remove shapes from a body and recompute the mass,
+///     the joints will be broken.&lt;/li&gt;&lt;/ul&gt;
+public class RevoluteJointDef extends JointDef {
+	
+
+	///  The local anchor point relative to body1's origin.
+	public Vec2 localAnchorA;
+
+	///  The local anchor point relative to body2's origin.
+	public Vec2 localAnchorB;
+
+	///  The body2 angle minus body1 angle in the reference state (radians).
+	public float referenceAngle;
+
+	///  A flag to enable joint limits.
+	public boolean enableLimit;
+
+	///  The lower angle for the joint limit (radians).
+	public float lowerAngle;
+
+	///  The upper angle for the joint limit (radians).
+	public float upperAngle;
+
+	///  A flag to enable the joint motor.
+	public boolean enableMotor;
+
+	///  The desired motor speed. Usually in radians per second.
+	public float motorSpeed;
+
+	///  The maximum motor torque used to achieve the desired motor speed.
+	///  Usually in N-m.
+	public float maxMotorTorque;
+	
+<span class="fc" id="L95">	public RevoluteJointDef() {</span>
+<span class="fc" id="L96">		type = JointType.REVOLUTE;</span>
+<span class="fc" id="L97">		localAnchorA = new Vec2(0.0f, 0.0f);</span>
+<span class="fc" id="L98">		localAnchorB = new Vec2(0.0f, 0.0f);</span>
+<span class="fc" id="L99">		referenceAngle = 0.0f;</span>
+<span class="fc" id="L100">		lowerAngle = 0.0f;</span>
+<span class="fc" id="L101">		upperAngle = 0.0f;</span>
+<span class="fc" id="L102">		maxMotorTorque = 0.0f;</span>
+<span class="fc" id="L103">		motorSpeed = 0.0f;</span>
+<span class="fc" id="L104">		enableLimit = false;</span>
+<span class="fc" id="L105">		enableMotor = false;</span>
+<span class="fc" id="L106">	}</span>
+
+	/// Initialize the bodies, anchors, and reference angle using the world
+	/// anchor.
+	/// @param b1
+	/// @param b2
+	/// @param anchor
+	public void initialize(final Body b1, final Body b2, final Vec2 anchor) {
+<span class="fc" id="L114">		bodyA = b1;</span>
+<span class="fc" id="L115">		bodyB = b2;</span>
+<span class="fc" id="L116">		bodyA.getLocalPointToOut(anchor, localAnchorA);</span>
+<span class="fc" id="L117">		bodyB.getLocalPointToOut(anchor, localAnchorB);</span>
+<span class="fc" id="L118">		referenceAngle = bodyB.getAngle() - bodyA.getAngle();</span>
+<span class="fc" id="L119">	}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

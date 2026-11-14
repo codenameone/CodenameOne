@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AgendaList.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">AgendaList.java</span></div><h1>AgendaList.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.scheduling.ScheduleItem;
+import com.codename1.scheduling.ScheduleResource;
+import com.codename1.scheduling.TimeMath;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+/// What is scheduled as a list, day by day, with the days that have nothing
+/// left out.
+final class AgendaList extends ScrollSurface {
+    /// A line of the list: a day's heading when `item` is null.
+<span class="fc" id="L43">    static final class Row {</span>
+        long day;
+        ScheduleItem item;
+        int top;
+        int height;
+    }
+
+<span class="fc" id="L50">    private static final Comparator&lt;ScheduleItem&gt; ORDER = new Comparator&lt;ScheduleItem&gt;() {</span>
+        @Override
+        public int compare(ScheduleItem a, ScheduleItem b) {
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (a.isAllDay() != b.isAllDay()) {</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                return a.isAllDay() ? -1 : 1;</span>
+            }
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            if (a.getStart() != b.getStart()) {</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                return a.getStart() &lt; b.getStart() ? -1 : 1;</span>
+            }
+<span class="nc" id="L59">            return a.getId().compareTo(b.getId());</span>
+        }
+    };
+
+    private final Scheduler owner;
+    private long firstDay;
+<span class="fc" id="L65">    private int count = 30;</span>
+<span class="fc" id="L66">    private boolean dirty = true;</span>
+<span class="fc" id="L67">    private int laidW = -1;</span>
+<span class="fc" id="L68">    private int laidGen = -1;</span>
+    private int total;
+    private int timeW;
+<span class="fc" id="L71">    private final ArrayList&lt;Row&gt; rows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc" id="L72">    private final ArrayList&lt;ScheduleItem&gt; loaded = new ArrayList&lt;ScheduleItem&gt;();</span>
+
+<span class="fc" id="L74">    AgendaList(Scheduler owner) {</span>
+<span class="fc" id="L75">        this.owner = owner;</span>
+<span class="fc" id="L76">        setUIID(&quot;Scheduler&quot;);</span>
+<span class="fc" id="L77">    }</span>
+
+    void show(long day, int days) {
+<span class="fc" id="L80">        firstDay = day;</span>
+<span class="fc" id="L81">        count = days;</span>
+<span class="fc" id="L82">        dirty = true;</span>
+<span class="fc" id="L83">        setOffsets(0, 0);</span>
+<span class="fc" id="L84">        repaint();</span>
+<span class="fc" id="L85">    }</span>
+
+    void modelChanged() {
+<span class="nc" id="L88">        dirty = true;</span>
+<span class="nc" id="L89">        repaint();</span>
+<span class="nc" id="L90">    }</span>
+
+    List&lt;Row&gt; rows() {
+<span class="fc" id="L93">        return rows;</span>
+    }
+
+    @Override
+    void prepare(int width, int height) {
+<span class="fc" id="L98">        int gen = UIManager.getThemeGeneration();</span>
+<span class="pc bpc" id="L99" title="2 of 6 branches missed.">        if (!dirty &amp;&amp; width == laidW &amp;&amp; gen == laidGen) {</span>
+<span class="fc" id="L100">            return;</span>
+        }
+<span class="fc" id="L102">        dirty = false;</span>
+<span class="fc" id="L103">        laidW = width;</span>
+<span class="fc" id="L104">        laidGen = gen;</span>
+<span class="fc" id="L105">        headerW = 0;</span>
+<span class="fc" id="L106">        headerH = 0;</span>
+<span class="fc" id="L107">        Font hf = Look.style(&quot;SchedulerHeader&quot;).getFont();</span>
+<span class="fc" id="L108">        Font f = Look.style(&quot;SchedulerAgendaItem&quot;).getFont();</span>
+<span class="fc" id="L109">        int headH = hf.getHeight() + Look.mm(3);</span>
+<span class="fc" id="L110">        int itemH = f.getHeight() * 2 + Look.mm(3);</span>
+<span class="fc" id="L111">        boolean h24 = owner.is24Hours();</span>
+<span class="fc" id="L112">        timeW = Math.max(f.stringWidth(Dates.time(22 * 60 + 30, h24, false)),</span>
+<span class="fc" id="L113">                f.stringWidth(owner.localize(&quot;scheduler.allDay&quot;, &quot;All day&quot;))) + Look.mm(3);</span>
+<span class="fc" id="L114">        rows.clear();</span>
+<span class="fc" id="L115">        loaded.clear();</span>
+<span class="fc" id="L116">        total = 0;</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (owner.getModel() == null) {</span>
+<span class="nc" id="L118">            return;</span>
+        }
+<span class="fc" id="L120">        ZoneId zone = owner.getZone();</span>
+<span class="fc" id="L121">        owner.getModel().getItems(TimeMath.startOfEpochDay(firstDay, zone),</span>
+<span class="fc" id="L122">                TimeMath.startOfEpochDay(firstDay + count, zone), loaded);</span>
+<span class="fc" id="L123">        Collections.sort(loaded, ORDER);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int d = 0; d &lt; count; d++) {</span>
+<span class="fc" id="L125">            long day = firstDay + d;</span>
+<span class="fc" id="L126">            long ds = TimeMath.startOfEpochDay(day, zone);</span>
+<span class="fc" id="L127">            long de = TimeMath.startOfEpochDay(day + 1, zone);</span>
+<span class="fc" id="L128">            boolean headed = false;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            for (ScheduleItem item : loaded) {</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                if (item.getKind() != ScheduleItem.Kind.EVENT) {</span>
+<span class="nc" id="L131">                    continue;</span>
+                }
+<span class="pc bpc" id="L133" title="5 of 6 branches missed.">                boolean instant = item.getStart() == item.getEnd() &amp;&amp; item.getStart() &gt;= ds &amp;&amp; item.getStart() &lt; de;</span>
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">                if (!instant &amp;&amp; !item.intersects(ds, de)) {</span>
+<span class="fc" id="L135">                    continue;</span>
+                }
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                if (!headed) {</span>
+<span class="fc" id="L138">                    headed = true;</span>
+<span class="fc" id="L139">                    add(day, null, headH);</span>
+                }
+<span class="fc" id="L141">                add(day, item, itemH);</span>
+<span class="fc" id="L142">            }</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    private void add(long day, ScheduleItem item, int height) {
+<span class="fc" id="L147">        Row r = new Row();</span>
+<span class="fc" id="L148">        r.day = day;</span>
+<span class="fc" id="L149">        r.item = item;</span>
+<span class="fc" id="L150">        r.top = total;</span>
+<span class="fc" id="L151">        r.height = height;</span>
+<span class="fc" id="L152">        total += height;</span>
+<span class="fc" id="L153">        rows.add(r);</span>
+<span class="fc" id="L154">    }</span>
+
+    @Override
+    int contentWidth() {
+<span class="fc" id="L158">        return bodyWidth();</span>
+    }
+
+    @Override
+    int contentHeight() {
+<span class="fc" id="L163">        return total;</span>
+    }
+
+    @Override
+    void paintBody(Graphics g, int x, int y) {
+<span class="fc" id="L168">        Style grid = Look.style(&quot;SchedulerGrid&quot;);</span>
+<span class="fc" id="L169">        Style header = Look.style(&quot;SchedulerHeader&quot;);</span>
+<span class="fc" id="L170">        Style st = Look.style(&quot;SchedulerAgendaItem&quot;);</span>
+<span class="fc" id="L171">        Style sel = Look.style(&quot;SchedulerSelection&quot;);</span>
+<span class="fc" id="L172">        Font hf = header.getFont();</span>
+<span class="fc" id="L173">        Font f = st.getFont();</span>
+<span class="fc" id="L174">        int fh = f.getHeight();</span>
+<span class="fc" id="L175">        int cy = g.getClipY();</span>
+<span class="fc" id="L176">        int ch = g.getClipHeight();</span>
+<span class="fc" id="L177">        int w = bodyWidth();</span>
+<span class="fc" id="L178">        Look.fill(g, grid, g.getClipX(), cy, g.getClipWidth(), ch);</span>
+<span class="fc" id="L179">        ZoneId zone = owner.getZone();</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (rows.isEmpty()) {</span>
+<span class="nc" id="L181">            String none = owner.localize(&quot;scheduler.empty&quot;, &quot;Nothing scheduled&quot;);</span>
+<span class="nc" id="L182">            g.setFont(f);</span>
+<span class="nc" id="L183">            g.setColor(st.getFgColor());</span>
+<span class="nc" id="L184">            g.drawString(none, x + (w - f.stringWidth(none)) / 2, y + Look.mm(8));</span>
+<span class="nc" id="L185">            return;</span>
+        }
+<span class="fc" id="L187">        long today = TimeMath.epochDay(owner.now(), zone);</span>
+<span class="fc" id="L188">        boolean h24 = owner.is24Hours();</span>
+<span class="fc" id="L189">        ScheduleItem selected = owner.getSelectedItem();</span>
+<span class="fc" id="L190">        int line = Look.line(grid, 200);</span>
+<span class="fc" id="L191">        int pad = Look.mm(1.5f);</span>
+<span class="fc" id="L192">        int alpha = g.getAlpha();</span>
+<span class="fc" id="L193">        boolean lit = anyHover();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (Row r : rows) {</span>
+<span class="fc" id="L195">            int top = y + r.top;</span>
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">            if (top &gt; cy + ch || top + r.height &lt; cy) {</span>
+<span class="nc" id="L197">                continue;</span>
+            }
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (lit) {</span>
+<span class="nc" id="L200">                Look.wash(g, grid.getFgColor(), x, top, w, r.height, hoverLevel(Integer.valueOf(r.top)));</span>
+            }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (r.item == null) {</span>
+<span class="fc" id="L203">                Look.fill(g, header, x, top, w, r.height);</span>
+<span class="fc" id="L204">                g.setFont(hf);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                g.setColor(r.day == today ? Look.style(&quot;SchedulerNow&quot;).getFgColor() : header.getFgColor());</span>
+<span class="fc" id="L206">                String title = Dates.dayTitle(r.day, TimeMath.dayOfWeek(r.day));</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                if (r.day == today) {</span>
+<span class="fc" id="L208">                    title = owner.localize(&quot;scheduler.today&quot;, &quot;Today&quot;) + &quot; - &quot; + title;</span>
+                }
+<span class="fc" id="L210">                g.drawString(Look.fit(title, hf, w - 2 * pad), x + pad, top + (r.height - hf.getHeight()) / 2);</span>
+<span class="fc" id="L211">                continue;</span>
+            }
+<span class="fc" id="L213">            ScheduleItem item = r.item;</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            if (item == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="nc" id="L215">                Look.fill(g, sel, x, top, w, r.height);</span>
+            }
+<span class="fc" id="L217">            long ds = TimeMath.startOfEpochDay(r.day, zone);</span>
+<span class="fc" id="L218">            long de = TimeMath.startOfEpochDay(r.day + 1, zone);</span>
+<span class="fc" id="L219">            int ty = top + (r.height - 2 * fh) / 2;</span>
+<span class="fc" id="L220">            g.setFont(f);</span>
+<span class="fc" id="L221">            g.setColor(st.getFgColor());</span>
+<span class="pc bpc" id="L222" title="4 of 6 branches missed.">            if (item.isAllDay() || (item.getStart() &lt;= ds &amp;&amp; item.getEnd() &gt;= de)) {</span>
+<span class="nc" id="L223">                g.drawString(owner.localize(&quot;scheduler.allDay&quot;, &quot;All day&quot;), x + pad, ty + fh / 2);</span>
+            } else {
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">                g.drawString(Dates.time(item.getStart() &lt; ds ? 0 : TimeMath.minuteOfDay(item.getStart(), zone), h24,</span>
+                        false), x + pad, ty);
+<span class="fc" id="L227">                g.setAlpha(alpha * 160 / 255);</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                g.drawString(Dates.time(item.getEnd() &gt; de ? 0 : TimeMath.minuteOfDay(item.getEnd(), zone), h24,</span>
+                        false), x + pad, ty + fh);
+<span class="fc" id="L230">                g.setAlpha(alpha);</span>
+            }
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            int own = item.getColor() &gt;= 0 ? item.getColor() : owner.resourceColor(item.getResourceId());</span>
+<span class="fc" id="L233">            int bx = x + pad + timeW;</span>
+<span class="fc" id="L234">            int bar = Look.mm(1);</span>
+<span class="fc" id="L235">            boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L236">            g.setAntiAliased(true);</span>
+<span class="pc bpc" id="L237" title="2 of 4 branches missed.">            g.setColor(own &gt;= 0 ? own : Look.style(item.getUIID() != null ? item.getUIID() : &quot;SchedulerItem&quot;)</span>
+<span class="fc" id="L238">                    .getBgColor());</span>
+<span class="fc" id="L239">            g.fillRoundRect(bx, top + pad, bar, r.height - 2 * pad, bar, bar);</span>
+<span class="fc" id="L240">            g.setAntiAliased(aa);</span>
+<span class="fc" id="L241">            int tx = bx + bar + pad;</span>
+<span class="fc" id="L242">            int tw = x + w - pad - tx;</span>
+<span class="fc" id="L243">            g.setColor(st.getFgColor());</span>
+<span class="fc" id="L244">            String second = item.getDetail();</span>
+<span class="pc bpc" id="L245" title="3 of 4 branches missed.">            if (second == null || second.length() == 0) {</span>
+<span class="fc" id="L246">                ScheduleResource res = owner.getResource(item.getResourceId());</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                second = res == null ? null : res.getName();</span>
+            }
+<span class="pc bpc" id="L249" title="3 of 4 branches missed.">            if (second == null || second.length() == 0) {</span>
+<span class="fc" id="L250">                g.drawString(Look.fit(item.getTitle(), f, tw), tx, ty + fh / 2);</span>
+            } else {
+<span class="nc" id="L252">                g.drawString(Look.fit(item.getTitle(), f, tw), tx, ty);</span>
+<span class="nc" id="L253">                g.setAlpha(alpha * 160 / 255);</span>
+<span class="nc" id="L254">                g.drawString(Look.fit(second, f, tw), tx, ty + fh);</span>
+<span class="nc" id="L255">                g.setAlpha(alpha);</span>
+            }
+<span class="fc" id="L257">            g.setColor(line);</span>
+<span class="fc" id="L258">            g.drawLine(tx, top + r.height - 1, x + w, top + r.height - 1);</span>
+<span class="fc" id="L259">        }</span>
+<span class="fc" id="L260">    }</span>
+
+    Row rowAt(int py) {
+<span class="nc" id="L263">        int cy = py + getOffY();</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        for (Row r : rows) {</span>
+<span class="nc bnc" id="L265" title="All 4 branches missed.">            if (cy &gt;= r.top &amp;&amp; cy &lt; r.top + r.height) {</span>
+<span class="nc" id="L266">                return r;</span>
+            }
+<span class="nc" id="L268">        }</span>
+<span class="nc" id="L269">        return null;</span>
+    }
+
+    @Override
+    void hoverAt(int x, int y) {
+        // Every row answers a click: an item opens, a day is gone to.
+<span class="nc bnc" id="L275" title="All 8 branches missed.">        Row r = x &lt; 0 || x &gt;= getWidth() || y &lt; 0 || y &gt;= getHeight() ? null : rowAt(y);</span>
+<span class="nc bnc" id="L276" title="All 4 branches missed.">        hover(r == null ? null : Integer.valueOf(r.top), r == null ? DEFAULT_CURSOR : HAND_CURSOR);</span>
+<span class="nc" id="L277">    }</span>
+
+    @Override
+    void tapped(int x, int y, boolean doubleTap) {
+<span class="nc" id="L281">        Row r = rowAt(y);</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (r == null) {</span>
+<span class="nc" id="L283">            return;</span>
+        }
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        if (r.item == null) {</span>
+<span class="nc" id="L286">            owner.viewDrill(r.day);</span>
+<span class="nc" id="L287">            return;</span>
+        }
+<span class="nc" id="L289">        owner.viewSelected(r.item);</span>
+<span class="nc bnc" id="L290" title="All 4 branches missed.">        if (doubleTap || owner.isOpenOnTap()) {</span>
+<span class="nc" id="L291">            owner.viewOpened(r.item);</span>
+        }
+<span class="nc" id="L293">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

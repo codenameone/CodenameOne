@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Environment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Environment.java</span></div><h1>Environment.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu;
+
+/// The atmosphere every draw is shaded in: fog, the sky and ground colours that
+/// light a surface from above and below, and how the result is exposed and
+/// tone mapped to the display.
+///
+/// A default environment changes nothing: no fog, the light's own ambient
+/// colour and no tone mapping, so a scene that never sets one renders exactly
+/// as before. Set it with `GraphicsDevice.setEnvironment`, or
+/// `GameView.getEnvironment()` in a game.
+///
+/// ```java
+/// GameView view = new GameView() {
+///     protected void update(double deltaSeconds) {
+///     }
+/// };
+/// view.getEnvironment()
+///         .setFog(0xffa9b3ba, 0.035f, 0.08f)
+///         .setHemisphere(0xff9fb4c8, 0xff4a4036)
+///         .setToneMapping(true)
+///         .setExposure(1.1f);
+/// ```
+///
+/// Fog is exponential squared in distance from the eye, thinned with height by
+/// `heightFalloff`, so a valley fills with haze while a rooftop stays clear. It
+/// applies to every material type except `Material.Type.SKYBOX`.
+<span class="fc" id="L49">public final class Environment {</span>
+<span class="fc" id="L50">    private int fogColor = 0xff808080;</span>
+    private float fogDensity;
+    private float fogHeightFalloff;
+    private float fogBaseHeight;
+    private int skyColor;
+    private int groundColor;
+    private boolean hemisphere;
+    private boolean toneMapping;
+<span class="fc" id="L58">    private float exposure = 1f;</span>
+    private boolean sky;
+    private int zenithColor;
+    private int horizonColor;
+    private int sunColor;
+    private float cloudCover;
+    private int version;
+
+    /// Turns fog on. A density of 0 turns it off.
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: the colour of the fog, as ARGB
+    ///
+    /// - `density`: how thick it is, per world unit; a surface `1 / density`
+    ///   units away is about 63% fog
+    ///
+    /// - `heightFalloff`: how quickly it thins with height above
+    ///   `setFogBaseHeight`, per world unit; 0 is the same thickness everywhere
+    ///
+    /// #### Returns
+    ///
+    /// this environment for chaining
+    public Environment setFog(int color, float density, float heightFalloff) {
+<span class="fc" id="L82">        this.fogColor = color;</span>
+<span class="fc" id="L83">        this.fogDensity = Math.max(0f, density);</span>
+<span class="fc" id="L84">        this.fogHeightFalloff = Math.max(0f, heightFalloff);</span>
+<span class="fc" id="L85">        version++;</span>
+<span class="fc" id="L86">        return this;</span>
+    }
+
+    /// Sets the height at which fog is at its full density; it thins above it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `y`: the world height
+    ///
+    /// #### Returns
+    ///
+    /// this environment for chaining
+    public Environment setFogBaseHeight(float y) {
+<span class="nc" id="L99">        this.fogBaseHeight = y;</span>
+<span class="nc" id="L100">        version++;</span>
+<span class="nc" id="L101">        return this;</span>
+    }
+
+    /// Lights surfaces with a sky colour from above and a ground colour from
+    /// below, blended by the surface normal, in place of the light's flat
+    /// ambient colour. It is what gives an outdoor scene its shape in shadow.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sky`: the colour that lights upward facing surfaces, as ARGB
+    ///
+    /// - `ground`: the colour that lights downward facing surfaces, as ARGB
+    ///
+    /// #### Returns
+    ///
+    /// this environment for chaining
+    public Environment setHemisphere(int sky, int ground) {
+<span class="fc" id="L118">        this.skyColor = sky;</span>
+<span class="fc" id="L119">        this.groundColor = ground;</span>
+<span class="fc" id="L120">        this.hemisphere = true;</span>
+<span class="fc" id="L121">        version++;</span>
+<span class="fc" id="L122">        return this;</span>
+    }
+
+    /// Goes back to the light's own flat ambient colour.
+    ///
+    /// #### Returns
+    ///
+    /// this environment for chaining
+    public Environment clearHemisphere() {
+<span class="fc" id="L131">        this.hemisphere = false;</span>
+<span class="fc" id="L132">        version++;</span>
+<span class="fc" id="L133">        return this;</span>
+    }
+
+    /// Maps shaded colours through a filmic (ACES) curve, so bright light rolls
+    /// off instead of clipping to white. Lit and physically based materials
+    /// are affected; unlit ones, sprites and the sky are not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `toneMapping`: true to tone map
+    ///
+    /// #### Returns
+    ///
+    /// this environment for chaining
+    public Environment setToneMapping(boolean toneMapping) {
+<span class="fc" id="L148">        this.toneMapping = toneMapping;</span>
+<span class="fc" id="L149">        version++;</span>
+<span class="fc" id="L150">        return this;</span>
+    }
+
+    /// Scales the light reaching the camera before it is tone mapped.
+    ///
+    /// #### Parameters
+    ///
+    /// - `exposure`: the multiplier, 1 for none
+    ///
+    /// #### Returns
+    ///
+    /// this environment for chaining
+    public Environment setExposure(float exposure) {
+<span class="nc" id="L163">        this.exposure = Math.max(0f, exposure);</span>
+<span class="nc" id="L164">        version++;</span>
+<span class="nc" id="L165">        return this;</span>
+    }
+
+    /// Paints `Material.Type.SKYBOX` surfaces as an open sky: a gradient from
+    /// the horizon to the zenith, the sun where the light comes from with a
+    /// glow around it, and soft clouds. Draw it on a large sphere around the
+    /// camera, seen from inside; it is computed per pixel from the view
+    /// direction, so it needs no texture and has no seams.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zenith`: the colour straight up, as ARGB
+    ///
+    /// - `horizon`: the colour at the horizon, as ARGB; match it to the fog
+    ///   colour so distant geometry melts into the sky
+    ///
+    /// - `sun`: the colour of the sun disc and its glow, as ARGB; black for none
+    ///
+    /// - `clouds`: how much of the sky is cloud, from 0 to 1
+    ///
+    /// #### Returns
+    ///
+    /// this environment for chaining
+    public Environment setSky(int zenith, int horizon, int sun, float clouds) {
+<span class="fc" id="L189">        this.zenithColor = zenith;</span>
+<span class="fc" id="L190">        this.horizonColor = horizon;</span>
+<span class="fc" id="L191">        this.sunColor = sun;</span>
+<span class="fc" id="L192">        this.cloudCover = Math.max(0f, Math.min(1f, clouds));</span>
+<span class="fc" id="L193">        this.sky = true;</span>
+<span class="fc" id="L194">        version++;</span>
+<span class="fc" id="L195">        return this;</span>
+    }
+
+    /// Goes back to drawing `Material.Type.SKYBOX` surfaces in their own colour
+    /// and texture.
+    ///
+    /// #### Returns
+    ///
+    /// this environment for chaining
+    public Environment clearSky() {
+<span class="fc" id="L205">        this.sky = false;</span>
+<span class="fc" id="L206">        version++;</span>
+<span class="fc" id="L207">        return this;</span>
+    }
+
+    /// Returns true if skybox surfaces are painted as an open sky.
+    public boolean isSky() {
+<span class="fc" id="L212">        return sky;</span>
+    }
+
+    /// Returns the sky colour straight up, as ARGB.
+    public int getZenithColor() {
+<span class="nc" id="L217">        return zenithColor;</span>
+    }
+
+    /// Returns the sky colour at the horizon, as ARGB.
+    public int getHorizonColor() {
+<span class="nc" id="L222">        return horizonColor;</span>
+    }
+
+    /// Returns the colour of the sun in the sky, as ARGB.
+    public int getSunColor() {
+<span class="nc" id="L227">        return sunColor;</span>
+    }
+
+    /// Returns how much of the sky is cloud, from 0 to 1.
+    public float getCloudCover() {
+<span class="fc" id="L232">        return cloudCover;</span>
+    }
+
+    /// Returns the fog colour as ARGB.
+    public int getFogColor() {
+<span class="nc" id="L237">        return fogColor;</span>
+    }
+
+    /// Returns the fog density per world unit, 0 when there is no fog.
+    public float getFogDensity() {
+<span class="nc" id="L242">        return fogDensity;</span>
+    }
+
+    /// Returns how quickly fog thins with height, per world unit.
+    public float getFogHeightFalloff() {
+<span class="fc" id="L247">        return fogHeightFalloff;</span>
+    }
+
+    /// Returns the height at which fog is at its full density.
+    public float getFogBaseHeight() {
+<span class="nc" id="L252">        return fogBaseHeight;</span>
+    }
+
+    /// Returns true if fog is on.
+    public boolean isFog() {
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        return fogDensity &gt; 0f;</span>
+    }
+
+    /// Returns true if surfaces are lit by the sky and ground colours.
+    public boolean isHemisphere() {
+<span class="fc" id="L262">        return hemisphere;</span>
+    }
+
+    /// Returns the sky colour as ARGB.
+    public int getSkyColor() {
+<span class="nc" id="L267">        return skyColor;</span>
+    }
+
+    /// Returns the ground colour as ARGB.
+    public int getGroundColor() {
+<span class="nc" id="L272">        return groundColor;</span>
+    }
+
+    /// Returns true if shaded colours are tone mapped.
+    public boolean isToneMapping() {
+<span class="fc" id="L277">        return toneMapping;</span>
+    }
+
+    /// Returns the exposure multiplier.
+    public float getExposure() {
+<span class="fc" id="L282">        return exposure;</span>
+    }
+
+    /// Returns a number that changes whenever a setting does, so a backend can
+    /// tell that a shader variant or a uniform it cached is stale.
+    public int getVersion() {
+<span class="fc" id="L288">        return version;</span>
+    }
+
+    /// Returns the part of the shader variant key that depends on this
+    /// environment: whether fog, hemisphere lighting, tone mapping and the
+    /// open sky are on.
+    /// Values such as the fog colour are uniforms and are not part of it.
+    public String getShaderKey() {
+<span class="fc bfc" id="L296" title="All 8 branches covered.">        return (isFog() ? &quot;F&quot; : &quot;f&quot;) + (hemisphere ? &quot;H&quot; : &quot;h&quot;) + (toneMapping ? &quot;T&quot; : &quot;t&quot;)</span>
+                + (sky ? &quot;K&quot; : &quot;k&quot;);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

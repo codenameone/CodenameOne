@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchedulePrinter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">SchedulePrinter.java</span></div><h1>SchedulePrinter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.printing.PrintResult;
+import com.codename1.printing.PrintResultListener;
+import com.codename1.printing.Printer;
+import com.codename1.scheduling.TimeMath;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.ImageIO;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+
+/// Prints a `Scheduler` or a `Gantt` chart, or exports it as images or a PDF.
+///
+/// What is on screen is a window onto the view: a week scrolls under its
+/// header, a project runs off the right edge. A printer lays the whole of it
+/// out on pages instead. The view is painted off screen at the page's size,
+/// one page of content at a time, and every page gets the headers that
+/// belong to its part: the days or the time scale across the top, the hours,
+/// the resources or the task table down the side.
+///
+/// ```java
+/// Scheduler scheduler = new Scheduler();
+/// SchedulePrinter printer = new SchedulePrinter(scheduler);
+/// printer.setTitle(&quot;This week&quot;);
+/// printer.print(new PrintResultListener() {
+///     public void onResult(PrintResult result) {
+///         if (result.isFailed()) {
+///             ToastBar.showErrorMessage(result.getError());
+///         }
+///     }
+/// });
+/// ```
+///
+/// Pages run left to right, then top to bottom. `getPageCount`, `renderPage`
+/// and `renderImage` give the pages to an application that would sooner
+/// share or store them, and `writePdf` writes them as one document.
+///
+/// A scheduler prints the view and the dates it is showing; a Gantt chart
+/// prints the whole project at the zoom it is showing, so zooming out before
+/// printing is how a long project is fitted to fewer pages. The resource
+/// load under a chart is not printed.
+///
+/// A page is an image as large as the page, so rendering is done a page at a
+/// time and the pages are not kept. Everything here runs on the EDT.
+public final class SchedulePrinter {
+    /// The most pages one print makes. A chart zoomed to hours over a year
+    /// is thousands of pages nobody asked for.
+    private static final int MAX_PAGES = 400;
+    private static final String TEMP_PREFIX = &quot;cn1-schedule-print-&quot;;
+    private int[] held;
+
+    private final Scheduler scheduler;
+    private final Gantt gantt;
+    private int pageWidth;
+    private int pageHeight;
+    private String title;
+    private boolean titleSet;
+<span class="fc" id="L89">    private boolean pageNumbers = true;</span>
+
+    /// A printer of the view and the dates `scheduler` is showing.
+<span class="fc" id="L92">    public SchedulePrinter(Scheduler scheduler) {</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (scheduler == null) {</span>
+<span class="nc" id="L94">            throw new IllegalArgumentException(&quot;scheduler&quot;);</span>
+        }
+<span class="fc" id="L96">        this.scheduler = scheduler;</span>
+<span class="fc" id="L97">        this.gantt = null;</span>
+<span class="fc" id="L98">        defaultPage();</span>
+<span class="fc" id="L99">    }</span>
+
+    /// A printer of the whole of the project `gantt` shows.
+<span class="fc" id="L102">    public SchedulePrinter(Gantt gantt) {</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (gantt == null) {</span>
+<span class="nc" id="L104">            throw new IllegalArgumentException(&quot;gantt&quot;);</span>
+        }
+<span class="fc" id="L106">        this.scheduler = null;</span>
+<span class="fc" id="L107">        this.gantt = gantt;</span>
+<span class="fc" id="L108">        defaultPage();</span>
+<span class="fc" id="L109">    }</span>
+
+    // A landscape sheet about 250 mm of screen wide: text the size it is on
+    // screen stays readable on paper, and a page stays a few megabytes.
+    private void defaultPage() {
+<span class="fc" id="L114">        int w = Display.getInstance().convertToPixels(250f);</span>
+<span class="fc" id="L115">        pageWidth = Math.max(1000, Math.min(2400, w));</span>
+<span class="fc" id="L116">        pageHeight = pageWidth * 210 / 297;</span>
+<span class="fc" id="L117">    }</span>
+
+    /// Sets the size of a page in pixels. The default is a landscape sheet
+    /// in the proportions of A4. Text and rows keep the size they have on
+    /// screen, so a larger page holds more of the view and prints it
+    /// smaller.
+    public void setPageSize(int widthPixels, int heightPixels) {
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">        if (widthPixels &lt; 100 || heightPixels &lt; 100) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(&quot;page size&quot;);</span>
+        }
+<span class="fc" id="L127">        pageWidth = widthPixels;</span>
+<span class="fc" id="L128">        pageHeight = heightPixels;</span>
+<span class="fc" id="L129">    }</span>
+
+    public int getPageWidth() {
+<span class="fc" id="L132">        return pageWidth;</span>
+    }
+
+    public int getPageHeight() {
+<span class="fc" id="L136">        return pageHeight;</span>
+    }
+
+    /// The line at the top of every page. Unless one is set, a scheduler
+    /// prints the range its toolbar names and a chart prints none.
+    public String getTitle() {
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (titleSet) {</span>
+<span class="fc" id="L143">            return title;</span>
+        }
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        return scheduler != null ? scheduler.titleText() : null;</span>
+    }
+
+    /// Sets the line at the top of every page; null or empty prints none.
+    public void setTitle(String title) {
+<span class="fc" id="L150">        this.title = title;</span>
+<span class="fc" id="L151">        titleSet = true;</span>
+<span class="fc" id="L152">    }</span>
+
+    /// Whether every page says which page of how many it is. On by default;
+    /// a single page is never numbered.
+    public boolean isPageNumbers() {
+<span class="nc" id="L157">        return pageNumbers;</span>
+    }
+
+    public void setPageNumbers(boolean pageNumbers) {
+<span class="nc" id="L161">        this.pageNumbers = pageNumbers;</span>
+<span class="nc" id="L162">    }</span>
+
+    private ScrollSurface surface() {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        Component c = scheduler != null ? scheduler.surface() : gantt.surface();</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        return c instanceof ScrollSurface ? (ScrollSurface) c : null;</span>
+    }
+
+    private static Style headingStyle() {
+<span class="fc" id="L170">        return Look.style(&quot;SchedulerTitle&quot;);</span>
+    }
+
+    // The height of the band the title and the page number are printed in.
+    private int bandHeight(int pages) {
+<span class="fc" id="L175">        String t = getTitle();</span>
+<span class="fc bfc" id="L176" title="All 4 branches covered.">        boolean hasTitle = t != null &amp;&amp; t.length() &gt; 0;</span>
+<span class="pc bpc" id="L177" title="1 of 6 branches missed.">        if (!hasTitle &amp;&amp; !(pageNumbers &amp;&amp; pages &gt; 1)) {</span>
+<span class="fc" id="L178">            return 0;</span>
+        }
+<span class="fc" id="L180">        return headingStyle().getFont().getHeight() + Look.mm(2);</span>
+    }
+
+    // Columns and rows of pages, and the content one page holds. The band
+    // depends on whether pages are numbered, which depends on the count, so
+    // the count is taken with a band and taken again without one only when a
+    // single untitled page turns out not to need it.
+    private int[] grid() {
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (held != null) {</span>
+<span class="nc" id="L189">            return held;</span>
+        }
+<span class="fc" id="L191">        ScrollSurface s = surface();</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L193">            return new int[]{0, 0, 0, 0, 0};</span>
+        }
+<span class="fc" id="L195">        int band = bandHeight(2);</span>
+<span class="fc" id="L196">        int[] g = s.pageGrid(pageWidth, Math.max(1, pageHeight - band));</span>
+<span class="pc bpc" id="L197" title="1 of 6 branches missed.">        if (band &gt; 0 &amp;&amp; g[0] * g[1] == 1 &amp;&amp; bandHeight(1) == 0) {</span>
+<span class="fc" id="L198">            band = 0;</span>
+<span class="fc" id="L199">            g = s.pageGrid(pageWidth, pageHeight);</span>
+        }
+<span class="fc" id="L201">        return new int[]{g[0], g[1], g[2], g[3], band};</span>
+    }
+
+    /// The number of pages the view takes at this page size.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if it is more than a print can sensibly
+    ///   be; zoom the view out or set a larger page
+    public int getPageCount() {
+<span class="fc" id="L211">        int[] g = grid();</span>
+<span class="fc" id="L212">        long n = (long) g[0] * g[1];</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (n &gt; MAX_PAGES) {</span>
+<span class="nc" id="L214">            throw new IllegalStateException(&quot;The view is &quot; + n + &quot; pages; zoom out or use a larger page&quot;);</span>
+        }
+<span class="fc" id="L216">        return (int) n;</span>
+    }
+
+    /// Renders one page, counted from 0, left to right and then top to
+    /// bottom.
+    public Image renderPage(int page) {
+<span class="fc" id="L222">        int[] g = grid();</span>
+<span class="fc" id="L223">        long count = (long) g[0] * g[1];</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (count &gt; MAX_PAGES) {</span>
+<span class="nc" id="L225">            throw new IllegalStateException(&quot;The view is &quot; + count + &quot; pages; zoom out or use a larger page&quot;);</span>
+        }
+<span class="pc bpc" id="L227" title="1 of 4 branches missed.">        if (page &lt; 0 || page &gt;= count) {</span>
+<span class="fc" id="L228">            throw new IllegalArgumentException(&quot;page &quot; + page + &quot; of &quot; + count);</span>
+        }
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        Style paper = Look.style(scheduler != null ? &quot;Scheduler&quot; : &quot;Gantt&quot;);</span>
+<span class="fc" id="L231">        Image img = Image.createImage(pageWidth, pageHeight, 0xff000000 | paper.getBgColor());</span>
+<span class="fc" id="L232">        Graphics gr = img.getGraphics();</span>
+<span class="fc" id="L233">        int band = g[4];</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (band &gt; 0) {</span>
+<span class="fc" id="L235">            Style st = headingStyle();</span>
+<span class="fc" id="L236">            Font f = st.getFont();</span>
+<span class="fc" id="L237">            gr.setFont(f);</span>
+<span class="fc" id="L238">            gr.setColor(st.getFgColor());</span>
+<span class="fc" id="L239">            int ty = (band - f.getHeight()) / 2;</span>
+<span class="pc bpc" id="L240" title="1 of 4 branches missed.">            String number = pageNumbers &amp;&amp; count &gt; 1 ? (page + 1) + &quot; / &quot; + count : null;</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            int numberW = number == null ? 0 : f.stringWidth(number) + Look.mm(2);</span>
+<span class="fc" id="L242">            String t = getTitle();</span>
+<span class="pc bpc" id="L243" title="1 of 4 branches missed.">            if (t != null &amp;&amp; t.length() &gt; 0) {</span>
+<span class="fc" id="L244">                gr.drawString(Look.fit(t, f, pageWidth - numberW - Look.mm(2)), Look.mm(1), ty);</span>
+            }
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            if (number != null) {</span>
+<span class="fc" id="L247">                gr.drawString(number, pageWidth - numberW, ty);</span>
+            }
+        }
+<span class="fc" id="L250">        int col = page % g[0];</span>
+<span class="fc" id="L251">        int row = page / g[0];</span>
+<span class="fc" id="L252">        surface().paintPage(gr, 0, band, pageWidth, pageHeight - band, col * g[2], row * g[3]);</span>
+<span class="fc" id="L253">        return img;</span>
+    }
+
+    /// Renders the whole view as one image, its headers once: the picture
+    /// to share or to put in a report. It is as large as the content, so a
+    /// long project at a close zoom is a very large image; `renderPage` is
+    /// the one for those.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if either side would pass `maxSide` pixels
+    public Image renderImage(int maxSide) {
+<span class="fc" id="L265">        ScrollSurface s = surface();</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L267">            throw new IllegalStateException(&quot;nothing to render&quot;);</span>
+        }
+        // Lay out at the page's size to learn how much content there is,
+        // then at the size that holds all of it.
+<span class="fc" id="L271">        int[] g = s.pageGrid(pageWidth, pageHeight);</span>
+<span class="fc" id="L272">        int w = pageWidth - g[2] + g[0] * g[2];</span>
+<span class="fc" id="L273">        int h = pageHeight - g[3] + g[1] * g[3];</span>
+<span class="pc bpc" id="L274" title="2 of 4 branches missed.">        if (w &gt; maxSide || h &gt; maxSide) {</span>
+<span class="nc" id="L275">            throw new IllegalStateException(&quot;The view is &quot; + w + &quot; by &quot; + h + &quot; pixels; zoom out or render it in pages&quot;);</span>
+        }
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        Style paper = Look.style(scheduler != null ? &quot;Scheduler&quot; : &quot;Gantt&quot;);</span>
+<span class="fc" id="L278">        Image img = Image.createImage(w, h, 0xff000000 | paper.getBgColor());</span>
+<span class="fc" id="L279">        s.paintPage(img.getGraphics(), 0, 0, w, h, 0, 0);</span>
+<span class="fc" id="L280">        return img;</span>
+    }
+
+    /// Whether `writePdf` works here: it needs the platform to encode JPEG.
+    public static boolean isPdfSupported() {
+<span class="nc" id="L285">        ImageIO io = ImageIO.getImageIO();</span>
+<span class="nc bnc" id="L286" title="All 4 branches missed.">        return io != null &amp;&amp; io.isFormatSupported(ImageIO.FORMAT_JPEG);</span>
+    }
+
+    /// Writes every page into one PDF document at `path`, a path of
+    /// `FileSystemStorage`. Each page of the document is a picture of the
+    /// page, so its text cannot be selected or searched.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the file cannot be written, or the platform
+    ///   cannot encode JPEG (see `isPdfSupported`)
+    public void writePdf(String path) throws IOException {
+<span class="nc" id="L298">        ImageIO io = ImageIO.getImageIO();</span>
+<span class="nc bnc" id="L299" title="All 4 branches missed.">        if (io == null || !io.isFormatSupported(ImageIO.FORMAT_JPEG)) {</span>
+<span class="nc" id="L300">            throw new IOException(&quot;JPEG encoding is not available on this platform&quot;);</span>
+        }
+<span class="nc" id="L302">        int count = getPageCount();</span>
+        // The view does not change between one page and the next, so the
+        // pages are counted once for the document and not once for each.
+<span class="nc" id="L305">        int[] counted = grid();</span>
+<span class="nc" id="L306">        OutputStream out = FileSystemStorage.getInstance().openOutputStream(path);</span>
+<span class="nc" id="L307">        held = counted;</span>
+        try {
+<span class="nc" id="L309">            PdfPages pdf = new PdfPages(out, count);</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="nc" id="L311">                Image page = renderPage(i);</span>
+<span class="nc" id="L312">                ByteArrayOutputStream jpeg = new ByteArrayOutputStream();</span>
+<span class="nc" id="L313">                io.save(page, jpeg, ImageIO.FORMAT_JPEG, 0.92f);</span>
+<span class="nc" id="L314">                pdf.page(jpeg.toByteArray(), page.getWidth(), page.getHeight());</span>
+            }
+<span class="nc" id="L316">            pdf.finish();</span>
+        } finally {
+<span class="nc" id="L318">            held = null;</span>
+<span class="nc" id="L319">            out.close();</span>
+        }
+<span class="nc" id="L321">    }</span>
+
+    /// Prints every page through the platform's print dialog.
+    ///
+    /// The pages go to the printer as one PDF document. On a platform that
+    /// cannot write one, a single page is printed as an image, and more
+    /// than one is reported as a failure, since the platform prints one
+    /// image at a time and a dialog per page is not a print.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: told how it ended, on the EDT; may be null
+    public void print(final PrintResultListener listener) {
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (!Printer.isPrintingSupported()) {</span>
+<span class="fc" id="L335">            report(listener, PrintResult.failed(&quot;Printing is not supported on this platform&quot;));</span>
+<span class="fc" id="L336">            return;</span>
+        }
+        int count;
+        try {
+<span class="nc" id="L340">            count = getPageCount();</span>
+<span class="nc" id="L341">        } catch (IllegalStateException tooMany) {</span>
+<span class="nc" id="L342">            report(listener, PrintResult.failed(tooMany.getMessage()));</span>
+<span class="nc" id="L343">            return;</span>
+<span class="nc" id="L344">        }</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if (count == 0) {</span>
+<span class="nc" id="L346">            report(listener, PrintResult.failed(&quot;Nothing to print&quot;));</span>
+<span class="nc" id="L347">            return;</span>
+        }
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (!isPdfSupported()) {</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">            if (count == 1) {</span>
+<span class="nc" id="L351">                Printer.printImage(renderPage(0), listener);</span>
+            } else {
+<span class="nc" id="L353">                report(listener, PrintResult.failed(&quot;This platform prints one page at a time and the view is &quot;</span>
+                        + count + &quot; pages; zoom out or use a larger page&quot;));
+            }
+<span class="nc" id="L356">            return;</span>
+        }
+<span class="nc" id="L358">        final FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+        // A name of its own: a document that is still at the printer is not
+        // written over, or deleted, by the next one.
+<span class="nc" id="L361">        sweep(fs);</span>
+<span class="nc" id="L362">        final String path = fs.getAppHomePath() + TEMP_PREFIX + System.currentTimeMillis() + &quot;.pdf&quot;;</span>
+<span class="nc" id="L363">        boolean written = false;</span>
+        try {
+<span class="nc" id="L365">            writePdf(path);</span>
+<span class="nc" id="L366">            written = true;</span>
+<span class="nc" id="L367">        } catch (IOException err) {</span>
+<span class="nc" id="L368">            report(listener, PrintResult.failed(err.toString()));</span>
+        } finally {
+            // Half a document is nobody's: whatever stopped the writing,
+            // the file does not stay behind in the application's home.
+<span class="nc bnc" id="L372" title="All 4 branches missed.">            if (!written &amp;&amp; fs.exists(path)) {</span>
+<span class="nc" id="L373">                fs.delete(path);</span>
+            }
+        }
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (!written) {</span>
+<span class="nc" id="L377">            return;</span>
+        }
+<span class="nc" id="L379">        Printer.printPDF(path, new DeleteThenReport(fs, path, listener));</span>
+<span class="nc" id="L380">    }</span>
+
+    // A document whose print never reported back, because the application
+    // was closed with the dialog up, is taken away by a later print. One
+    // from the last day is left: it may be at the printer now.
+    private static void sweep(FileSystemStorage fs) {
+<span class="nc" id="L386">        String home = fs.getAppHomePath();</span>
+<span class="nc" id="L387">        long now = System.currentTimeMillis();</span>
+        try {
+<span class="nc" id="L389">            String[] names = fs.listFiles(home);</span>
+<span class="nc bnc" id="L390" title="All 4 branches missed.">            for (int i = 0; names != null &amp;&amp; i &lt; names.length; i++) {</span>
+<span class="nc" id="L391">                String name = names[i];</span>
+<span class="nc bnc" id="L392" title="All 6 branches missed.">                if (name == null || !name.startsWith(TEMP_PREFIX) || !name.endsWith(&quot;.pdf&quot;)) {</span>
+<span class="nc" id="L393">                    continue;</span>
+                }
+<span class="nc" id="L395">                long made = 0;</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">                boolean number = name.length() &gt; TEMP_PREFIX.length() + 4;</span>
+<span class="nc bnc" id="L397" title="All 4 branches missed.">                for (int c = TEMP_PREFIX.length(); number &amp;&amp; c &lt; name.length() - 4; c++) {</span>
+<span class="nc" id="L398">                    char ch = name.charAt(c);</span>
+<span class="nc bnc" id="L399" title="All 6 branches missed.">                    number = ch &gt;= '0' &amp;&amp; ch &lt;= '9' &amp;&amp; made &lt; Long.MAX_VALUE / 100;</span>
+<span class="nc" id="L400">                    made = made * 10 + (ch - '0');</span>
+                }
+<span class="nc bnc" id="L402" title="All 4 branches missed.">                if (number &amp;&amp; now - made &gt; TimeMath.DAY) {</span>
+<span class="nc" id="L403">                    fs.delete(home + name);</span>
+                }
+            }
+<span class="nc" id="L406">        } catch (IOException err) {</span>
+            // Nothing to clean, or no way to look; the print goes on.
+<span class="nc" id="L408">            Log.e(err);</span>
+<span class="nc" id="L409">        }</span>
+<span class="nc" id="L410">    }</span>
+
+    // The file is the printer's for as long as it prints, and nobody's after.
+    private static final class DeleteThenReport implements PrintResultListener {
+        private final FileSystemStorage fs;
+        private final String path;
+        private final PrintResultListener listener;
+
+<span class="nc" id="L418">        DeleteThenReport(FileSystemStorage fs, String path, PrintResultListener listener) {</span>
+<span class="nc" id="L419">            this.fs = fs;</span>
+<span class="nc" id="L420">            this.path = path;</span>
+<span class="nc" id="L421">            this.listener = listener;</span>
+<span class="nc" id="L422">        }</span>
+
+        @Override
+        public void onResult(PrintResult result) {
+<span class="nc" id="L426">            fs.delete(path);</span>
+<span class="nc" id="L427">            report(listener, result);</span>
+<span class="nc" id="L428">        }</span>
+    }
+
+    private static void report(PrintResultListener listener, PrintResult result) {
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        if (listener != null) {</span>
+<span class="fc" id="L433">            listener.onResult(result);</span>
+        }
+<span class="fc" id="L435">    }</span>
+
+    /// The smallest PDF that holds a JPEG per page: a catalog, the page
+    /// tree, and for each page the page, a content stream that draws its
+    /// image over the whole of it, and the image. Objects are written as
+    /// they come, so a document of many pages holds one page in memory.
+    static final class PdfPages {
+        // A landscape A4 sheet in points; a page of other proportions is
+        // fitted to the long side.
+        private static final int SHEET = 842;
+        private final OutputStream out;
+        private final int count;
+        private final int[] offsets;
+        private int written;
+        private int position;
+
+<span class="fc" id="L451">        PdfPages(OutputStream out, int count) throws IOException {</span>
+<span class="fc" id="L452">            this.out = out;</span>
+<span class="fc" id="L453">            this.count = count;</span>
+            // 1 catalog, 2 page tree, then page, content and image per page
+<span class="fc" id="L455">            offsets = new int[3 + count * 3];</span>
+<span class="fc" id="L456">            text(&quot;%PDF-1.4\n&quot;);</span>
+<span class="fc" id="L457">            object(1, &quot;&lt;&lt; /Type /Catalog /Pages 2 0 R &gt;&gt;&quot;);</span>
+<span class="fc" id="L458">            StringBuilder kids = new StringBuilder();</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L460">                kids.append(3 + i * 3).append(&quot; 0 R &quot;);</span>
+            }
+<span class="fc" id="L462">            object(2, &quot;&lt;&lt; /Type /Pages /Count &quot; + count + &quot; /Kids [ &quot; + kids + &quot;] &gt;&gt;&quot;);</span>
+<span class="fc" id="L463">        }</span>
+
+        void page(byte[] jpeg, int width, int height) throws IOException {
+<span class="fc" id="L466">            int id = 3 + written * 3;</span>
+            int w;
+            int h;
+<span class="fc bfc" id="L469" title="All 2 branches covered.">            if (width &gt;= height) {</span>
+<span class="fc" id="L470">                w = SHEET;</span>
+<span class="fc" id="L471">                h = Math.max(1, SHEET * height / width);</span>
+            } else {
+<span class="fc" id="L473">                h = SHEET;</span>
+<span class="fc" id="L474">                w = Math.max(1, SHEET * width / height);</span>
+            }
+<span class="fc" id="L476">            object(id, &quot;&lt;&lt; /Type /Page /Parent 2 0 R /MediaBox [0 0 &quot; + w + &quot; &quot; + h + &quot;] /Resources &lt;&lt; /XObject &lt;&lt; /Im0 &quot;</span>
+                    + (id + 2) + &quot; 0 R &gt;&gt; &gt;&gt; /Contents &quot; + (id + 1) + &quot; 0 R &gt;&gt;&quot;);
+<span class="fc" id="L478">            String draw = &quot;q &quot; + w + &quot; 0 0 &quot; + h + &quot; 0 0 cm /Im0 Do Q\n&quot;;</span>
+<span class="fc" id="L479">            offsets[id + 1] = position;</span>
+<span class="fc" id="L480">            text((id + 1) + &quot; 0 obj\n&lt;&lt; /Length &quot; + draw.length() + &quot; &gt;&gt;\nstream\n&quot; + draw + &quot;endstream\nendobj\n&quot;);</span>
+<span class="fc" id="L481">            offsets[id + 2] = position;</span>
+<span class="fc" id="L482">            text((id + 2) + &quot; 0 obj\n&lt;&lt; /Type /XObject /Subtype /Image /Width &quot; + width + &quot; /Height &quot; + height</span>
+                    + &quot; /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length &quot; + jpeg.length
+                    + &quot; &gt;&gt;\nstream\n&quot;);
+<span class="fc" id="L485">            out.write(jpeg);</span>
+<span class="fc" id="L486">            position += jpeg.length;</span>
+<span class="fc" id="L487">            text(&quot;\nendstream\nendobj\n&quot;);</span>
+<span class="fc" id="L488">            written++;</span>
+<span class="fc" id="L489">        }</span>
+
+        void finish() throws IOException {
+<span class="fc bfc" id="L492" title="All 2 branches covered.">            if (written != count) {</span>
+<span class="fc" id="L493">                throw new IOException(&quot;PDF has &quot; + written + &quot; of &quot; + count + &quot; pages&quot;);</span>
+            }
+<span class="fc" id="L495">            int xref = position;</span>
+<span class="fc" id="L496">            StringBuilder b = new StringBuilder();</span>
+<span class="fc" id="L497">            b.append(&quot;xref\n0 &quot;).append(offsets.length).append(&quot;\n0000000000 65535 f \n&quot;);</span>
+<span class="fc bfc" id="L498" title="All 2 branches covered.">            for (int i = 1; i &lt; offsets.length; i++) {</span>
+<span class="fc" id="L499">                String n = String.valueOf(offsets[i]);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">                for (int pad = n.length(); pad &lt; 10; pad++) {</span>
+<span class="fc" id="L501">                    b.append('0');</span>
+                }
+<span class="fc" id="L503">                b.append(n).append(&quot; 00000 n \n&quot;);</span>
+            }
+<span class="fc" id="L505">            b.append(&quot;trailer\n&lt;&lt; /Size &quot;).append(offsets.length).append(&quot; /Root 1 0 R &gt;&gt;\nstartxref\n&quot;)</span>
+<span class="fc" id="L506">                    .append(xref).append(&quot;\n%%EOF\n&quot;);</span>
+<span class="fc" id="L507">            text(b.toString());</span>
+<span class="fc" id="L508">            out.flush();</span>
+<span class="fc" id="L509">        }</span>
+
+        private void object(int id, String body) throws IOException {
+<span class="fc" id="L512">            offsets[id] = position;</span>
+<span class="fc" id="L513">            text(id + &quot; 0 obj\n&quot; + body + &quot;\nendobj\n&quot;);</span>
+<span class="fc" id="L514">        }</span>
+
+        // Everything but the image data is ASCII, so a character is a byte.
+        private void text(String s) throws IOException {
+<span class="fc" id="L518">            int n = s.length();</span>
+<span class="fc" id="L519">            byte[] b = new byte[n];</span>
+<span class="fc bfc" id="L520" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L521">                b[i] = (byte) s.charAt(i);</span>
+            }
+<span class="fc" id="L523">            out.write(b);</span>
+<span class="fc" id="L524">            position += n;</span>
+<span class="fc" id="L525">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

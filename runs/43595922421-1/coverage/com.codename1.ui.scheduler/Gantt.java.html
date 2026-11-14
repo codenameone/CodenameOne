@@ -1,0 +1,670 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Gantt.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">Gantt.java</span></div><h1>Gantt.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.scheduling.GanttTask;
+import com.codename1.scheduling.LevelingResult;
+import com.codename1.scheduling.ProjectChangeListener;
+import com.codename1.scheduling.ProjectModel;
+import com.codename1.scheduling.ResourceLeveler;
+import com.codename1.scheduling.ResourceOverallocation;
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
+/// A Gantt chart of a `ProjectModel`: the tree of tasks in a table on the
+/// left, a bar for each against a time axis on the right, the links between
+/// them, and under them how much of every resource the plan asks for.
+///
+/// ```java
+/// WorkCalendar calendar = new WorkCalendar();
+/// // A duration is working time: a day of it is the calendar's hours.
+/// long day = calendar.getMillisPerDay();
+/// ProjectModel project = new ProjectModel(calendar, System.currentTimeMillis());
+/// GanttTask design = new GanttTask(&quot;design&quot;, &quot;Design&quot;, 5 * day);
+/// GanttTask build = new GanttTask(&quot;build&quot;, &quot;Build&quot;, 10 * day);
+/// project.addTask(design).addTask(build);
+/// project.link(design, build);
+/// project.update();
+///
+/// Form form = new Form(&quot;Plan&quot;, new BorderLayout());
+/// form.add(BorderLayout.CENTER, new Gantt(project));
+/// form.show();
+/// ```
+///
+/// ![A Gantt chart with its critical path](https://www.codenameone.com/developer-guide/img/generated/gantt-critical-path.png)
+///
+/// The chart draws its rows and keeps no component for each, so a plan of
+/// thousands of tasks scrolls as one of ten does. Time zooms with a pinch,
+/// with the wheel and the control key held, or with `zoomIn`, `zoomOut` and
+/// `zoomToFit`.
+///
+/// #### Editing
+///
+/// A bar is dragged to move it and by its end to change its duration. With
+/// a mouse that is a plain drag; on a touch screen a drag scrolls, so a long
+/// press picks the bar up. The selected task shows a marker under its bar,
+/// dragged to set how much of it is done, and a dot after its end, dragged
+/// onto another bar to make that one depend on it.
+///
+/// A task the project schedules is not placed by a drag: the drag sets a
+/// &quot;start no earlier than&quot; constraint, and the task then starts there or
+/// later if its predecessors say so. A manually scheduled task is given the
+/// dates as they are. Every change is offered to the listeners first, which
+/// may refuse it, and then the project is scheduled again and the bars slide
+/// to where they now are. A summary task follows its children and is not
+/// dragged. The table is not edited in place: a double tap is reported to
+/// `GanttListener#taskOpened`, for an application's own editor.
+///
+/// Under a mouse the bar the pointer is over lights up together with the
+/// links into and out of it, the row is marked in the table and in the
+/// chart, the cursor says what a drag would do and a tooltip gives the
+/// task's dates and progress. A bar that is picked up lifts over a shadow.
+///
+/// ![A bar moved and the tasks after it following, as four stopped frames](https://www.codenameone.com/developer-guide/img/generated/gantt-drag-stages.png)
+///
+/// `setAnimationTime` stops the clock these run by, for a screenshot or a
+/// test of a moment in the middle of one.
+///
+/// #### Resources
+///
+/// `setLoadVisible(true)` shows the load of every resource under the chart.
+/// A stretch over the resource's capacity is drawn in `GanttOverload`.
+/// `level()` delays tasks until no resource is asked for more than it has,
+/// as far as that can be done.
+///
+/// ![The load of each resource under the chart](https://www.codenameone.com/developer-guide/img/generated/gantt-load.png)
+///
+/// #### Styling
+///
+/// `GanttRow` is a row, with its selected style the selected one, and
+/// `GanttSummaryRow` the row of a summary task; `GanttHeader` the time
+/// axis and the titles of the table. The bars are `GanttBar`, with
+/// `GanttBarProgress` the part done, `GanttBarCritical`, `GanttSummaryBar`
+/// and `GanttMilestone`; `GanttBaseline` is the plan as it was captured.
+/// `GanttLink` and `GanttLinkCritical` give the links their foreground
+/// colour, `GanttLoad` and `GanttOverload` the resource load. A task that
+/// names a UIID or a colour of its own is painted with that.
+public class Gantt extends Container {
+    /// The columns the table can show after the name of a task. Those that
+    /// do not fit in less than half of the width are left out, last first.
+<span class="fc" id="L121">    public enum Column {</span>
+        /// The day the task starts.
+<span class="fc" id="L123">        START,</span>
+        /// The day the task ends.
+<span class="fc" id="L125">        END,</span>
+        /// The working days the task takes.
+<span class="fc" id="L127">        DURATION,</span>
+        /// How much of the task is done.
+<span class="fc" id="L129">        PROGRESS</span>
+    }
+
+    private ProjectModel model;
+    private final GanttChart chart;
+    private final ResourceLoadView load;
+<span class="fc" id="L135">    private final BarLayout bar = new BarLayout();</span>
+<span class="fc" id="L136">    private final Container toolbar = new Container(bar);</span>
+<span class="fc" id="L137">    private final HashSet&lt;GanttTask&gt; collapsed = new HashSet&lt;GanttTask&gt;();</span>
+<span class="fc" id="L138">    private final ArrayList&lt;GanttListener&gt; listeners = new ArrayList&lt;GanttListener&gt;();</span>
+<span class="fc" id="L139">    private Column[] columns = {Column.START, Column.END};</span>
+    private GanttTask selected;
+<span class="fc" id="L141">    private GanttBarRenderer renderer = new DefaultGanttBarRenderer();</span>
+    private boolean showCritical;
+    private boolean showBaseline;
+<span class="fc" id="L144">    private boolean showLinks = true;</span>
+<span class="fc" id="L145">    private boolean editable = true;</span>
+    private boolean loadVisible;
+<span class="fc" id="L147">    private boolean tableVisible = true;</span>
+    private Boolean hours24;
+<span class="fc" id="L149">    private int firstDayOfWeek = 1;</span>
+<span class="fc" id="L150">    private long fixedNow = -1;</span>
+    private List&lt;ResourceOverallocation&gt; overallocations;
+    private CheckBox criticalToggle;
+    private CheckBox baselineToggle;
+    private boolean listening;
+
+<span class="fc" id="L156">    private final ProjectChangeListener modelListener = new ProjectChangeListener() {</span>
+        @Override
+        public void projectChanged(ProjectModel m) {
+<span class="fc" id="L159">            changed();</span>
+<span class="fc" id="L160">        }</span>
+    };
+
+    /// A chart with no project yet.
+    public Gantt() {
+<span class="nc" id="L165">        this(null);</span>
+<span class="nc" id="L166">    }</span>
+
+    public Gantt(ProjectModel model) {
+<span class="fc" id="L169">        super(new BorderLayout());</span>
+<span class="fc" id="L170">        setUIID(&quot;Gantt&quot;);</span>
+<span class="fc" id="L171">        chart = new GanttChart(this);</span>
+<span class="fc" id="L172">        load = new ResourceLoadView(this, chart);</span>
+<span class="fc" id="L173">        chart.setLoadView(load);</span>
+<span class="fc" id="L174">        toolbar.setUIID(&quot;SchedulerToolbar&quot;);</span>
+<span class="fc" id="L175">        buildToolbar();</span>
+<span class="fc" id="L176">        add(BorderLayout.NORTH, toolbar);</span>
+<span class="fc" id="L177">        add(BorderLayout.CENTER, chart);</span>
+<span class="fc" id="L178">        add(BorderLayout.SOUTH, load);</span>
+<span class="fc" id="L179">        load.setHidden(true);</span>
+<span class="fc" id="L180">        this.model = model;</span>
+<span class="fc" id="L181">    }</span>
+
+    // ------------------------------------------------------------ toolbar
+
+    private Button toolButton(String text, char icon, ActionListener action) {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        Button b = new Button(text == null ? &quot;&quot; : text, &quot;SchedulerViewButton&quot;);</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (icon != 0) {</span>
+<span class="fc" id="L188">            FontImage.setMaterialIcon(b, icon);</span>
+        }
+<span class="fc" id="L190">        b.addActionListener(action);</span>
+<span class="fc" id="L191">        return b;</span>
+    }
+
+    private CheckBox toggle(String text, ActionListener action) {
+<span class="fc" id="L195">        CheckBox c = new CheckBox(text);</span>
+<span class="fc" id="L196">        c.setToggle(true);</span>
+<span class="fc" id="L197">        c.setUIID(&quot;SchedulerViewButton&quot;);</span>
+<span class="fc" id="L198">        c.addActionListener(action);</span>
+<span class="fc" id="L199">        return c;</span>
+    }
+
+    private void buildToolbar() {
+<span class="fc" id="L203">        Container zoom = new Container(BoxLayout.x());</span>
+<span class="fc" id="L204">        zoom.add(toolButton(null, FontImage.MATERIAL_ZOOM_OUT, new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L207">                zoomOut();</span>
+<span class="nc" id="L208">            }</span>
+        }));
+<span class="fc" id="L210">        zoom.add(toolButton(null, FontImage.MATERIAL_ZOOM_IN, new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L213">                zoomIn();</span>
+<span class="nc" id="L214">            }</span>
+        }));
+<span class="fc" id="L216">        zoom.add(toolButton(null, FontImage.MATERIAL_FIT_SCREEN, new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L219">                zoomToFit();</span>
+<span class="nc" id="L220">            }</span>
+        }));
+<span class="fc" id="L222">        Container options = new Container(BoxLayout.x());</span>
+<span class="fc" id="L223">        criticalToggle = toggle(localize(&quot;gantt.critical&quot;, &quot;Critical path&quot;), new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L226">                setShowCriticalPath(criticalToggle.isSelected());</span>
+<span class="nc" id="L227">            }</span>
+        });
+<span class="fc" id="L229">        baselineToggle = toggle(localize(&quot;gantt.baseline&quot;, &quot;Baseline&quot;), new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L232">                setShowBaseline(baselineToggle.isSelected());</span>
+<span class="nc" id="L233">            }</span>
+        });
+<span class="fc" id="L235">        options.add(criticalToggle);</span>
+<span class="fc" id="L236">        options.add(baselineToggle);</span>
+<span class="fc" id="L237">        options.add(toolButton(localize(&quot;gantt.level&quot;, &quot;Level&quot;), (char) 0, new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L240">                level();</span>
+<span class="nc" id="L241">            }</span>
+        }));
+<span class="fc" id="L243">        toolbar.add(zoom);</span>
+<span class="fc" id="L244">        toolbar.add(options);</span>
+<span class="fc" id="L245">    }</span>
+
+    /// The bar is a row where there is room for one, and two rows on a
+    /// screen as narrow as a phone's. It is decided here because this is
+    /// the first place the width is known.
+    @Override
+    public void layoutContainer() {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (bar.fit(toolbar, getWidth() - getStyle().getHorizontalPadding())) {</span>
+<span class="nc" id="L253">            toolbar.setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L255">        super.layoutContainer();</span>
+<span class="fc" id="L256">    }</span>
+
+    /// Whether the bar of zoom buttons and options is shown above the chart.
+    public boolean isToolbarVisible() {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        return !toolbar.isHidden();</span>
+    }
+
+    public void setToolbarVisible(boolean v) {
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        toolbar.setHidden(!v);</span>
+<span class="nc" id="L265">        revalidateLater();</span>
+<span class="nc" id="L266">    }</span>
+
+    // -------------------------------------------------------------- model
+
+    public ProjectModel getModel() {
+<span class="fc" id="L271">        return model;</span>
+    }
+
+    /// Shows another project, or none when `m` is null.
+    public void setModel(ProjectModel m) {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (model == m) { //NOPMD CompareObjectsWithEquals - the same model object, not an equal one</span>
+<span class="nc" id="L277">            return;</span>
+        }
+        // A bar that is held belongs to the project that is leaving.
+<span class="nc" id="L280">        chart.cancelEdit();</span>
+<span class="nc bnc" id="L281" title="All 4 branches missed.">        if (model != null &amp;&amp; listening) {</span>
+<span class="nc" id="L282">            model.removeChangeListener(modelListener);</span>
+        }
+<span class="nc" id="L284">        model = m;</span>
+<span class="nc bnc" id="L285" title="All 4 branches missed.">        if (model != null &amp;&amp; listening) {</span>
+<span class="nc" id="L286">            model.addChangeListener(modelListener);</span>
+        }
+<span class="nc" id="L288">        selected = null;</span>
+<span class="nc" id="L289">        collapsed.clear();</span>
+<span class="nc" id="L290">        changed();</span>
+<span class="nc" id="L291">    }</span>
+
+    /// Draws the project again, for a model changed in a way it could not
+    /// report itself.
+    public void refresh() {
+<span class="nc" id="L296">        changed();</span>
+<span class="nc" id="L297">    }</span>
+
+    private void changed() {
+<span class="fc" id="L300">        overallocations = null;</span>
+<span class="pc bpc" id="L301" title="1 of 6 branches missed.">        if (selected != null &amp;&amp; (model == null || !model.getTasks().contains(selected))) {</span>
+<span class="fc" id="L302">            selected = null;</span>
+        }
+<span class="fc" id="L304">        chart.modelChanged();</span>
+<span class="fc" id="L305">        load.modelChanged();</span>
+<span class="fc" id="L306">        syncLoad();</span>
+<span class="fc" id="L307">    }</span>
+
+    // The load is given no room while there is no resource to show in it.
+    private void syncLoad() {
+<span class="pc bpc" id="L311" title="1 of 6 branches missed.">        boolean show = loadVisible &amp;&amp; model != null &amp;&amp; !model.getResources().isEmpty();</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (load.isHidden() == show) {</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            load.setHidden(!show);</span>
+<span class="fc" id="L314">            load.setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L315">            revalidateLater();</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        } else if (show) {</span>
+<span class="nc" id="L317">            load.setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L319">    }</span>
+
+    // The listener is held only while the chart is on a form, so that a
+    // chart no longer shown is not kept alive by its project.
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L325">        super.initComponent();</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (!listening) {</span>
+<span class="fc" id="L327">            listening = true;</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            if (model != null) {</span>
+<span class="fc" id="L329">                model.addChangeListener(modelListener);</span>
+            }
+<span class="fc" id="L331">            changed();</span>
+        }
+<span class="fc" id="L333">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (listening) {</span>
+<span class="fc" id="L338">            listening = false;</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">            if (model != null) {</span>
+<span class="fc" id="L340">                model.removeChangeListener(modelListener);</span>
+            }
+        }
+<span class="fc" id="L343">        super.deinitialize();</span>
+<span class="fc" id="L344">    }</span>
+
+    boolean isOverallocated(String resourceId) {
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        if (model == null) {</span>
+<span class="nc" id="L348">            return false;</span>
+        }
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">        if (overallocations == null) {</span>
+<span class="fc" id="L351">            overallocations = ResourceLeveler.findOverallocations(model);</span>
+        }
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        for (ResourceOverallocation over : overallocations) {</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            if (over.getResourceId().equals(resourceId)) {</span>
+<span class="fc" id="L355">                return true;</span>
+            }
+<span class="nc" id="L357">        }</span>
+<span class="fc" id="L358">        return false;</span>
+    }
+
+    /// Delays tasks until no resource is asked for more than its capacity,
+    /// as far as the plan allows, and schedules the project again. What
+    /// could not be resolved is in the result, as is the finish of the
+    /// project before and after. Returns null when there is no project.
+    public LevelingResult level() {
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">        if (model == null) {</span>
+<span class="nc" id="L367">            return null;</span>
+        }
+<span class="fc" id="L369">        LevelingResult result = ResourceLeveler.level(model);</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (result.isChanged()) {</span>
+<span class="fc" id="L371">            chart.layoutNow();</span>
+<span class="fc" id="L372">            chart.beginReflow();</span>
+<span class="fc" id="L373">            result.apply();</span>
+        }
+<span class="fc" id="L375">        return result;</span>
+    }
+
+    // ------------------------------------------------------------ options
+
+    /// Whether the tasks and links with no slack are drawn as critical.
+    public boolean isShowCriticalPath() {
+<span class="fc" id="L382">        return showCritical;</span>
+    }
+
+    public void setShowCriticalPath(boolean v) {
+<span class="nc" id="L386">        showCritical = v;</span>
+<span class="nc" id="L387">        criticalToggle.setSelected(v);</span>
+<span class="nc" id="L388">        chart.repaint();</span>
+<span class="nc" id="L389">    }</span>
+
+    /// Whether the captured baseline of every task is drawn under its bar.
+    public boolean isShowBaseline() {
+<span class="fc" id="L393">        return showBaseline;</span>
+    }
+
+    public void setShowBaseline(boolean v) {
+<span class="nc" id="L397">        showBaseline = v;</span>
+<span class="nc" id="L398">        baselineToggle.setSelected(v);</span>
+<span class="nc" id="L399">        chart.repaint();</span>
+<span class="nc" id="L400">    }</span>
+
+    /// Whether the links between tasks are drawn. They are by default.
+    public boolean isShowLinks() {
+<span class="fc" id="L404">        return showLinks;</span>
+    }
+
+    public void setShowLinks(boolean v) {
+<span class="nc" id="L408">        showLinks = v;</span>
+<span class="nc" id="L409">        chart.repaint();</span>
+<span class="nc" id="L410">    }</span>
+
+    /// Whether bars can be dragged, progress set and links made.
+    @Override
+    public boolean isEditable() {
+<span class="fc" id="L415">        return editable;</span>
+    }
+
+    public void setEditable(boolean v) {
+<span class="fc" id="L419">        editable = v;</span>
+<span class="fc" id="L420">        chart.cancelEdit();</span>
+<span class="fc" id="L421">        chart.repaint();</span>
+<span class="fc" id="L422">    }</span>
+
+    /// Whether a bar is moved by a plain drag, as with a mouse, or only
+    /// after a long press, which leaves a plain drag to scroll. The default
+    /// follows the device.
+    public void setDragEdits(boolean v) {
+<span class="fc" id="L428">        chart.setDragEdits(v);</span>
+<span class="fc" id="L429">    }</span>
+
+    /// Whether the load of the resources is shown under the chart.
+    public boolean isLoadVisible() {
+<span class="nc" id="L433">        return loadVisible;</span>
+    }
+
+    public void setLoadVisible(boolean v) {
+<span class="fc" id="L437">        loadVisible = v;</span>
+<span class="fc" id="L438">        syncLoad();</span>
+<span class="fc" id="L439">    }</span>
+
+    /// Whether the table of tasks is shown beside the chart.
+    public boolean isTableVisible() {
+<span class="fc" id="L443">        return tableVisible;</span>
+    }
+
+    public void setTableVisible(boolean v) {
+<span class="nc" id="L447">        tableVisible = v;</span>
+<span class="nc" id="L448">        chart.modelChanged();</span>
+<span class="nc" id="L449">        load.modelChanged();</span>
+<span class="nc" id="L450">    }</span>
+
+    /// The columns of the table after the name, in order.
+    public void setColumns(Column... c) {
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        columns = new Column[c == null ? 0 : c.length];</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">        if (c != null) {</span>
+<span class="nc" id="L456">            System.arraycopy(c, 0, columns, 0, c.length);</span>
+        }
+<span class="nc" id="L458">        chart.modelChanged();</span>
+<span class="nc" id="L459">    }</span>
+
+    Column[] columns() {
+<span class="fc" id="L462">        return columns;</span>
+    }
+
+    public boolean is24Hours() {
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        return hours24 == null ? Dates.deviceUses24Hours() : hours24.booleanValue();</span>
+    }
+
+    public void set24Hours(boolean v) {
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">        hours24 = v ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="fc" id="L471">        chart.modelChanged();</span>
+<span class="fc" id="L472">    }</span>
+
+    /// The ISO day weeks start on in the time axis: 1 is Monday.
+    public int getFirstDayOfWeek() {
+<span class="fc" id="L476">        return firstDayOfWeek;</span>
+    }
+
+    public void setFirstDayOfWeek(int isoDay) {
+<span class="nc bnc" id="L480" title="All 4 branches missed.">        if (isoDay &lt; 1 || isoDay &gt; 7) {</span>
+<span class="nc" id="L481">            throw new IllegalArgumentException(&quot;isoDay&quot;);</span>
+        }
+<span class="nc" id="L483">        firstDayOfWeek = isoDay;</span>
+<span class="nc" id="L484">        chart.modelChanged();</span>
+<span class="nc" id="L485">    }</span>
+
+    public GanttBarRenderer getBarRenderer() {
+<span class="fc" id="L488">        return renderer;</span>
+    }
+
+    public void setBarRenderer(GanttBarRenderer r) {
+<span class="nc bnc" id="L492" title="All 2 branches missed.">        if (r == null) {</span>
+<span class="nc" id="L493">            throw new IllegalArgumentException(&quot;renderer&quot;);</span>
+        }
+<span class="nc" id="L495">        renderer = r;</span>
+<span class="nc" id="L496">        chart.repaint();</span>
+<span class="nc" id="L497">    }</span>
+
+    /// Fixes what the chart takes the current time to be, for a screenshot
+    /// or a test. A negative value returns to the clock.
+    public void setCurrentTime(long millis) {
+<span class="fc" id="L502">        fixedNow = millis;</span>
+<span class="fc" id="L503">        chart.modelChanged();</span>
+<span class="fc" id="L504">    }</span>
+
+    /// Stops the clock the chart animates by at a time, for a screenshot of
+    /// an animation or a test of one: the light of a hover, the rise of
+    /// an item that is picked up and the slide of
+    /// the bars to their new dates are drawn as far along as that time
+    /// makes them. A negative value returns to the clock.
+    ///
+    /// ```java
+    /// Gantt gantt = new Gantt();
+    /// gantt.setAnimationTime(1000);  // nothing has started
+    /// // ... press, drag, release ...
+    /// gantt.setAnimationTime(1100);  // 100 milliseconds into what followed
+    /// ```
+    public void setAnimationTime(long millis) {
+<span class="fc" id="L519">        chart.setFixedClock(millis);</span>
+<span class="fc" id="L520">        load.setFixedClock(millis);</span>
+<span class="fc" id="L521">    }</span>
+
+    long now() {
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">        return fixedNow &gt;= 0 ? fixedNow : System.currentTimeMillis();</span>
+    }
+
+    String localize(String key, String value) {
+<span class="fc" id="L528">        return UIManager.getInstance().localize(key, value);</span>
+    }
+
+    // --------------------------------------------------------------- tree
+
+    /// Whether the children of a summary task are hidden.
+    public boolean isCollapsed(GanttTask task) {
+<span class="fc" id="L535">        return collapsed.contains(task);</span>
+    }
+
+    public void setCollapsed(GanttTask task, boolean v) {
+<span class="pc bpc" id="L539" title="1 of 2 branches missed.">        boolean did = v ? collapsed.add(task) : collapsed.remove(task);</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">        if (did) {</span>
+<span class="fc" id="L541">            chart.modelChanged();</span>
+        }
+<span class="fc" id="L543">    }</span>
+
+    public void expandAll() {
+<span class="fc" id="L546">        collapsed.clear();</span>
+<span class="fc" id="L547">        chart.modelChanged();</span>
+<span class="fc" id="L548">    }</span>
+
+    public void collapseAll() {
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">        if (model == null) {</span>
+<span class="nc" id="L552">            return;</span>
+        }
+<span class="fc" id="L554">        List&lt;GanttTask&gt; all = model.getTasks();</span>
+<span class="fc bfc" id="L555" title="All 2 branches covered.">        for (GanttTask each : all) {</span>
+<span class="fc bfc" id="L556" title="All 2 branches covered.">            if (each.isSummary()) {</span>
+<span class="fc" id="L557">                collapsed.add(each);</span>
+            }
+<span class="fc" id="L559">        }</span>
+<span class="fc" id="L560">        chart.modelChanged();</span>
+<span class="fc" id="L561">    }</span>
+
+    // --------------------------------------------------------------- view
+
+    public void zoomIn() {
+<span class="nc" id="L566">        chart.zoom(1.5f);</span>
+<span class="nc" id="L567">    }</span>
+
+    public void zoomOut() {
+<span class="nc" id="L570">        chart.zoom(1 / 1.5f);</span>
+<span class="nc" id="L571">    }</span>
+
+    /// Shows the whole project in the width there is.
+    public void zoomToFit() {
+<span class="fc" id="L575">        chart.zoomToFit();</span>
+<span class="fc" id="L576">    }</span>
+
+    /// Brings a task's row and the start of its bar into view, opening the
+    /// summary tasks it is under.
+    public void scrollToTask(GanttTask task) {
+<span class="fc bfc" id="L581" title="All 2 branches covered.">        for (GanttTask p = task.getParent(); p != null; p = p.getParent()) {</span>
+<span class="fc" id="L582">            collapsed.remove(p);</span>
+        }
+<span class="fc" id="L584">        chart.modelChanged();</span>
+<span class="fc" id="L585">        chart.scrollToTask(task);</span>
+<span class="fc" id="L586">    }</span>
+
+    public void scrollToDate(long time) {
+<span class="nc" id="L589">        chart.scrollToTime(time);</span>
+<span class="nc" id="L590">    }</span>
+
+    // ---------------------------------------------------------- selection
+
+    public GanttTask getSelectedTask() {
+<span class="fc" id="L595">        return selected;</span>
+    }
+
+    /// Selects a task, or nothing when `task` is null. The listeners are
+    /// not told: this is the application's own doing.
+    public void setSelectedTask(GanttTask task) {
+<span class="fc" id="L601">        selected = task;</span>
+<span class="fc" id="L602">        chart.repaint();</span>
+<span class="fc" id="L603">    }</span>
+
+    public void addGanttListener(GanttListener l) {
+<span class="pc bpc" id="L606" title="2 of 4 branches missed.">        if (l != null &amp;&amp; !listeners.contains(l)) {</span>
+<span class="fc" id="L607">            listeners.add(l);</span>
+        }
+<span class="fc" id="L609">    }</span>
+
+    public void removeGanttListener(GanttListener l) {
+<span class="fc" id="L612">        listeners.remove(l);</span>
+<span class="fc" id="L613">    }</span>
+
+    // The listeners as they are now: one that removes itself while it is
+    // told must not make the next one miss the event, or its say on it.
+    private GanttListener[] told() {
+<span class="fc" id="L618">        return listeners.toArray(new GanttListener[listeners.size()]);</span>
+    }
+
+    void viewSelected(GanttTask task) {
+<span class="fc bfc" id="L622" title="All 2 branches covered.">        if (selected == task) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="fc" id="L623">            return;</span>
+        }
+<span class="fc" id="L625">        selected = task;</span>
+<span class="fc bfc" id="L626" title="All 2 branches covered.">        for (GanttListener l : told()) {</span>
+<span class="fc" id="L627">            l.taskSelected(this, task);</span>
+        }
+<span class="fc" id="L629">        chart.repaint();</span>
+<span class="fc" id="L630">    }</span>
+
+    void viewOpened(GanttTask task) {
+<span class="fc bfc" id="L633" title="All 2 branches covered.">        for (GanttListener l : told()) {</span>
+<span class="fc" id="L634">            l.taskOpened(this, task);</span>
+        }
+<span class="fc" id="L636">    }</span>
+
+    boolean viewChanging(GanttTask task, long start, long end) {
+<span class="fc bfc" id="L639" title="All 2 branches covered.">        for (GanttListener l : told()) {</span>
+<span class="fc bfc" id="L640" title="All 2 branches covered.">            if (!l.taskChanging(this, task, start, end)) {</span>
+<span class="fc" id="L641">                return false;</span>
+            }
+        }
+<span class="fc" id="L644">        return true;</span>
+    }
+
+    void viewChanged(GanttTask task) {
+<span class="fc bfc" id="L648" title="All 2 branches covered.">        for (GanttListener l : told()) {</span>
+<span class="fc" id="L649">            l.taskChanged(this, task);</span>
+        }
+<span class="fc" id="L651">    }</span>
+
+    boolean viewLinking(GanttTask predecessor, GanttTask successor) {
+<span class="fc bfc" id="L654" title="All 2 branches covered.">        for (GanttListener l : told()) {</span>
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">            if (!l.linkCreating(this, predecessor, successor)) {</span>
+<span class="nc" id="L656">                return false;</span>
+            }
+        }
+<span class="fc" id="L659">        return true;</span>
+    }
+
+    GanttChart surface() {
+<span class="fc" id="L663">        return chart;</span>
+    }
+
+    ResourceLoadView loadSurface() {
+<span class="fc" id="L667">        return load;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

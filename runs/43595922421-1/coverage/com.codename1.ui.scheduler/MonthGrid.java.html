@@ -1,0 +1,430 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MonthGrid.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">MonthGrid.java</span></div><h1>MonthGrid.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.scheduling.ScheduleItem;
+import com.codename1.scheduling.TimeMath;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+/// A month as weeks of day cells, each listing what is on that day and
+/// counting what does not fit.
+final class MonthGrid extends ScrollSurface {
+    private static final int MOVE = 1;
+    private static final int RANGE = 4;
+
+<span class="fc" id="L44">    private static final Comparator&lt;ScheduleItem&gt; ORDER = new Comparator&lt;ScheduleItem&gt;() {</span>
+        @Override
+        public int compare(ScheduleItem a, ScheduleItem b) {
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">            boolean la = a.isAllDay() || a.getEnd() - a.getStart() &gt;= TimeMath.DAY;</span>
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">            boolean lb = b.isAllDay() || b.getEnd() - b.getStart() &gt;= TimeMath.DAY;</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (la != lb) {</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">                return la ? -1 : 1;</span>
+            }
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (a.getStart() != b.getStart()) {</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                return a.getStart() &lt; b.getStart() ? -1 : 1;</span>
+            }
+<span class="nc" id="L55">            return a.getId().compareTo(b.getId());</span>
+        }
+    };
+
+    private final Scheduler owner;
+    private long firstDay;
+    private long monthStart;
+    private long monthEnd;
+<span class="fc" id="L63">    private int weeks = 5;</span>
+<span class="fc" id="L64">    private boolean dirty = true;</span>
+<span class="fc" id="L65">    private int laidW = -1;</span>
+<span class="fc" id="L66">    private int laidH = -1;</span>
+<span class="fc" id="L67">    private int laidGen = -1;</span>
+    private int numberH;
+    private int chipH;
+    private int capacity;
+    private ArrayList&lt;ScheduleItem&gt;[] cells;
+<span class="fc" id="L72">    private final ArrayList&lt;ScheduleItem&gt; loaded = new ArrayList&lt;ScheduleItem&gt;();</span>
+
+    private int mode;
+    private ScheduleItem editItem;
+    private int grabCell;
+    private int anchorCell;
+    private int editCell;
+
+<span class="fc" id="L80">    MonthGrid(Scheduler owner) {</span>
+<span class="fc" id="L81">        this.owner = owner;</span>
+<span class="fc" id="L82">        setUIID(&quot;Scheduler&quot;);</span>
+<span class="fc" id="L83">    }</span>
+
+    /// Shows the month `day` is in.
+    void show(long day) {
+<span class="fc" id="L87">        monthStart = TimeMath.startOfMonth(day);</span>
+<span class="fc" id="L88">        monthEnd = TimeMath.plusMonths(monthStart, 1);</span>
+<span class="fc" id="L89">        firstDay = TimeMath.startOfWeek(monthStart, owner.getFirstDayOfWeek());</span>
+<span class="fc" id="L90">        weeks = (int) ((monthEnd - firstDay + 6) / 7);</span>
+<span class="fc" id="L91">        dirty = true;</span>
+<span class="fc" id="L92">        repaint();</span>
+<span class="fc" id="L93">    }</span>
+
+    long firstDay() {
+<span class="fc" id="L96">        return firstDay;</span>
+    }
+
+    int dayCount() {
+<span class="fc" id="L100">        return weeks * 7;</span>
+    }
+
+    void modelChanged() {
+<span class="nc" id="L104">        dirty = true;</span>
+<span class="nc" id="L105">        repaint();</span>
+<span class="nc" id="L106">    }</span>
+
+    List&lt;ScheduleItem&gt; itemsOn(long day) {
+<span class="fc" id="L109">        int i = (int) (day - firstDay);</span>
+<span class="pc bpc" id="L110" title="3 of 6 branches missed.">        return cells == null || i &lt; 0 || i &gt;= cells.length ? null : cells[i];</span>
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    void prepare(int width, int height) {
+<span class="fc" id="L116">        int gen = UIManager.getThemeGeneration();</span>
+<span class="pc bpc" id="L117" title="2 of 8 branches missed.">        if (!dirty &amp;&amp; width == laidW &amp;&amp; height == laidH &amp;&amp; gen == laidGen) {</span>
+<span class="fc" id="L118">            return;</span>
+        }
+<span class="fc" id="L120">        laidW = width;</span>
+<span class="fc" id="L121">        laidH = height;</span>
+<span class="fc" id="L122">        laidGen = gen;</span>
+<span class="fc" id="L123">        Style header = Look.style(&quot;SchedulerHeader&quot;);</span>
+<span class="fc" id="L124">        Font nf = Look.style(&quot;SchedulerMonthDay&quot;).getFont();</span>
+<span class="fc" id="L125">        headerW = 0;</span>
+<span class="fc" id="L126">        headerH = header.getFont().getHeight() + Look.mm(2);</span>
+<span class="fc" id="L127">        numberH = nf.getHeight() + Look.mm(1.6f);</span>
+<span class="fc" id="L128">        chipH = Look.style(&quot;SchedulerItem&quot;).getFont().getHeight() + Look.mm(0.8f);</span>
+<span class="fc" id="L129">        int cellH = Math.max(1, (height - headerH) / weeks);</span>
+<span class="fc" id="L130">        capacity = Math.max(0, (cellH - numberH) / chipH);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (dirty) {</span>
+<span class="fc" id="L132">            dirty = false;</span>
+<span class="fc" id="L133">            int n = weeks * 7;</span>
+<span class="fc" id="L134">            cells = new ArrayList[n];</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L136">                cells[i] = new ArrayList&lt;ScheduleItem&gt;();</span>
+            }
+<span class="fc" id="L138">            loaded.clear();</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (owner.getModel() != null) {</span>
+<span class="fc" id="L140">                ZoneId zone = owner.getZone();</span>
+<span class="fc" id="L141">                owner.getModel().getItems(TimeMath.startOfEpochDay(firstDay, zone),</span>
+<span class="fc" id="L142">                        TimeMath.startOfEpochDay(firstDay + n, zone), loaded);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                for (ScheduleItem item : loaded) {</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                    if (item.getKind() != ScheduleItem.Kind.EVENT) {</span>
+<span class="nc" id="L145">                        continue;</span>
+                    }
+<span class="fc" id="L147">                    long s = TimeMath.epochDay(item.getStart(), zone);</span>
+<span class="fc" id="L148">                    long e = TimeMath.epochDay(Math.max(item.getStart(), item.getEnd() - 1), zone);</span>
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">                    for (long d = Math.max(s, firstDay); d &lt;= e &amp;&amp; d &lt; firstDay + n; d++) {</span>
+<span class="fc" id="L150">                        cells[(int) (d - firstDay)].add(item);</span>
+                    }
+<span class="fc" id="L152">                }</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L154">                    Collections.sort(cells[i], ORDER);</span>
+                }
+            }
+        }
+<span class="fc" id="L158">    }</span>
+
+    @Override
+    int contentWidth() {
+<span class="fc" id="L162">        return bodyWidth();</span>
+    }
+
+    @Override
+    int contentHeight() {
+<span class="fc" id="L167">        return bodyHeight();</span>
+    }
+
+    private int colX(int col) {
+<span class="fc" id="L171">        return col * bodyWidth() / 7;</span>
+    }
+
+    private int rowY(int row) {
+<span class="fc" id="L175">        return row * bodyHeight() / weeks;</span>
+    }
+
+    private int cellAt(int px, int py) {
+<span class="nc" id="L179">        int col = Math.max(0, Math.min(6, px * 7 / Math.max(1, bodyWidth())));</span>
+<span class="nc" id="L180">        int row = Math.max(0, Math.min(weeks - 1, (py - headerH) * weeks / Math.max(1, bodyHeight())));</span>
+<span class="nc" id="L181">        return row * 7 + col;</span>
+    }
+
+    // How many items of a cell are drawn as chips; the rest are counted.
+    private int shown(int cell) {
+<span class="fc" id="L186">        int n = cells[cell].size();</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        return n &lt;= capacity ? n : Math.max(0, capacity - 1);</span>
+    }
+
+    private ScheduleItem itemAt(int px, int py) {
+<span class="nc bnc" id="L191" title="All 4 branches missed.">        if (py &lt; headerH || cells == null) {</span>
+<span class="nc" id="L192">            return null;</span>
+        }
+<span class="nc" id="L194">        int cell = cellAt(px, py);</span>
+<span class="nc" id="L195">        int top = headerH + rowY(cell / 7) + numberH;</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (py &lt; top) {</span>
+<span class="nc" id="L197">            return null;</span>
+        }
+<span class="nc" id="L199">        int i = (py - top) / chipH;</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        return i &lt; shown(cell) ? cells[cell].get(i) : null;</span>
+    }
+
+    @Override
+    void paintBody(Graphics g, int x, int y) {
+<span class="fc" id="L205">        Style grid = Look.style(&quot;SchedulerGrid&quot;);</span>
+<span class="fc" id="L206">        Style dayStyle = Look.style(&quot;SchedulerMonthDay&quot;);</span>
+<span class="fc" id="L207">        Style other = Look.style(&quot;SchedulerMonthOther&quot;);</span>
+<span class="fc" id="L208">        Style todaySt = Look.style(&quot;SchedulerHeaderToday&quot;);</span>
+<span class="fc" id="L209">        Style sel = Look.style(&quot;SchedulerSelection&quot;);</span>
+<span class="fc" id="L210">        Font nf = dayStyle.getFont();</span>
+<span class="fc" id="L211">        int bw = bodyWidth();</span>
+<span class="fc" id="L212">        int bh = bodyHeight();</span>
+<span class="fc" id="L213">        Look.fill(g, grid, x, y, bw, bh);</span>
+<span class="fc" id="L214">        ZoneId zone = owner.getZone();</span>
+<span class="fc" id="L215">        long today = TimeMath.epochDay(owner.now(), zone);</span>
+<span class="fc" id="L216">        ScheduleItemRenderer renderer = owner.getItemRenderer();</span>
+<span class="fc" id="L217">        ScheduleItem selected = owner.getSelectedItem();</span>
+<span class="fc" id="L218">        int line = Look.line(grid, 255);</span>
+<span class="fc" id="L219">        int lo = Math.min(anchorCell, editCell);</span>
+<span class="fc" id="L220">        int hi = Math.max(anchorCell, editCell);</span>
+<span class="fc" id="L221">        Object over = hovered();</span>
+<span class="fc" id="L222">        Object left = fading();</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        float lift = mode == MOVE ? liftLevel() : 0;</span>
+<span class="fc" id="L224">        int alpha = g.getAlpha();</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        for (int cell = 0; cell &lt; weeks * 7; cell++) {</span>
+<span class="fc" id="L226">            long day = firstDay + cell;</span>
+<span class="fc" id="L227">            int x0 = x + colX(cell % 7);</span>
+<span class="fc" id="L228">            int x1 = x + colX(cell % 7 + 1);</span>
+<span class="fc" id="L229">            int y0 = y + rowY(cell / 7);</span>
+<span class="fc" id="L230">            int y1 = y + rowY(cell / 7 + 1);</span>
+<span class="fc bfc" id="L231" title="All 4 branches covered.">            boolean inMonth = day &gt;= monthStart &amp;&amp; day &lt; monthEnd;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (!inMonth) {</span>
+<span class="fc" id="L233">                Look.fill(g, other, x0, y0, x1 - x0, y1 - y0);</span>
+            }
+<span class="pc bpc" id="L235" title="8 of 10 branches missed.">            if ((mode == MOVE &amp;&amp; cell == editCell) || (mode == RANGE &amp;&amp; cell &gt;= lo &amp;&amp; cell &lt;= hi)) {</span>
+<span class="nc" id="L236">                Look.fill(g, sel, x0, y0, x1 - x0, y1 - y0);</span>
+            }
+<span class="pc bpc" id="L238" title="3 of 4 branches missed.">            if (over instanceof Integer &amp;&amp; ((Integer) over).intValue() == cell) {</span>
+<span class="nc" id="L239">                Look.wash(g, grid.getFgColor(), x0, y0, x1 - x0, y1 - y0, hoverLevel(over));</span>
+<span class="pc bpc" id="L240" title="3 of 4 branches missed.">            } else if (left instanceof Integer &amp;&amp; ((Integer) left).intValue() == cell) {</span>
+<span class="nc" id="L241">                Look.wash(g, grid.getFgColor(), x0, y0, x1 - x0, y1 - y0, hoverLevel(left));</span>
+            }
+<span class="fc" id="L243">            String num = String.valueOf(Dates.dayOfMonth(day));</span>
+<span class="fc" id="L244">            int nw = nf.stringWidth(num);</span>
+<span class="fc" id="L245">            int nx = x0 + Look.mm(1.2f);</span>
+<span class="fc" id="L246">            int ny = y0 + Look.mm(0.8f);</span>
+<span class="fc" id="L247">            g.setFont(nf);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (day == today) {</span>
+<span class="fc" id="L249">                int d = nf.getHeight() + Look.mm(1);</span>
+<span class="fc" id="L250">                boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L251">                g.setAntiAliased(true);</span>
+<span class="fc" id="L252">                g.setColor(todaySt.getBgColor());</span>
+<span class="fc" id="L253">                g.fillArc(nx + nw / 2 - d / 2, ny + nf.getHeight() / 2 - d / 2, d, d, 0, 360);</span>
+<span class="fc" id="L254">                g.setAntiAliased(aa);</span>
+<span class="fc" id="L255">                g.setColor(todaySt.getFgColor());</span>
+<span class="fc" id="L256">            } else {</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">                g.setColor(inMonth ? dayStyle.getFgColor() : other.getFgColor());</span>
+            }
+<span class="fc" id="L259">            g.drawString(num, nx, ny);</span>
+<span class="fc" id="L260">            List&lt;ScheduleItem&gt; list = cells[cell];</span>
+<span class="fc" id="L261">            int n = shown(cell);</span>
+<span class="fc" id="L262">            int cy = y0 + numberH;</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L264">                ScheduleItem item = list.get(i);</span>
+<span class="fc" id="L265">                int state = ScheduleItemRenderer.COMPACT;</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                if (item == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="nc" id="L267">                    state |= ScheduleItemRenderer.SELECTED;</span>
+                }
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                if (TimeMath.epochDay(item.getStart(), zone) &lt; day) {</span>
+<span class="fc" id="L270">                    state |= ScheduleItemRenderer.STARTS_BEFORE;</span>
+                }
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                if (TimeMath.epochDay(Math.max(item.getStart(), item.getEnd() - 1), zone) &gt; day) {</span>
+<span class="fc" id="L273">                    state |= ScheduleItemRenderer.ENDS_AFTER;</span>
+                }
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">                float lit = over != null || left != null ? hoverLevel(item.getId()) : 0;</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                if (lit &gt; 0) {</span>
+<span class="nc" id="L277">                    state |= ScheduleItemRenderer.HOVERED;</span>
+                }
+<span class="pc bpc" id="L279" title="3 of 4 branches missed.">                boolean held = lift &gt; 0 &amp;&amp; item == editItem; //NOPMD CompareObjectsWithEquals - the very item that is held</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                if (held) {</span>
+                    // What is left behind while the item is carried.
+<span class="nc" id="L282">                    g.setAlpha(Math.round(alpha * (1 - 0.6f * lift)));</span>
+                }
+<span class="fc" id="L284">                renderer.paintItem(g, owner, item, x0 + 1, cy, x1 - x0 - 2, chipH - 1, state);</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                if (held) {</span>
+<span class="nc" id="L286">                    g.setAlpha(alpha);</span>
+                } else {
+<span class="fc" id="L288">                    Look.glow(g, grid.getFgColor(), x0 + 1, cy, x1 - x0 - 2, chipH - 1, lit);</span>
+                }
+<span class="fc" id="L290">                cy += chipH;</span>
+            }
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (list.size() &gt; n) {</span>
+<span class="nc" id="L293">                g.setFont(nf);</span>
+<span class="nc" id="L294">                g.setColor(dayStyle.getFgColor());</span>
+<span class="nc" id="L295">                String more = &quot;+&quot; + (list.size() - n);</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">                if (capacity == 0) {</span>
+<span class="nc" id="L297">                    g.drawString(more, x1 - nf.stringWidth(more) - Look.mm(1), ny);</span>
+                } else {
+<span class="nc" id="L299">                    g.drawString(more, x0 + Look.mm(1.2f), cy + (chipH - nf.getHeight()) / 2);</span>
+                }
+            }
+        }
+<span class="fc" id="L303">        g.setColor(line);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (int c = 1; c &lt; 7; c++) {</span>
+<span class="fc" id="L305">            g.drawLine(x + colX(c), y, x + colX(c), y + bh);</span>
+        }
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        for (int r = 1; r &lt; weeks; r++) {</span>
+<span class="fc" id="L308">            g.drawLine(x, y + rowY(r), x + bw, y + rowY(r));</span>
+        }
+<span class="pc bpc" id="L310" title="7 of 8 branches missed.">        if (mode == MOVE &amp;&amp; editItem != null &amp;&amp; editCell != grabCell &amp;&amp; capacity &gt; 0) {</span>
+            // The item itself, carried to the day it would land on.
+<span class="nc" id="L312">            int x0 = x + colX(editCell % 7) + 1;</span>
+<span class="nc" id="L313">            int w = colX(editCell % 7 + 1) - colX(editCell % 7) - 2;</span>
+<span class="nc" id="L314">            int top = y + rowY(editCell / 7) + numberH;</span>
+<span class="nc" id="L315">            Look.shadow(g, x0, top, w, chipH - 1, lift);</span>
+<span class="nc" id="L316">            renderer.paintItem(g, owner, editItem, x0, top, w, chipH - 1,</span>
+                    ScheduleItemRenderer.COMPACT | ScheduleItemRenderer.DRAGGED | ScheduleItemRenderer.SELECTED);
+        }
+<span class="fc" id="L319">    }</span>
+
+    @Override
+    void hoverAt(int x, int y) {
+<span class="nc bnc" id="L323" title="All 10 branches missed.">        if (y &lt; headerH || cells == null || x &lt; 0 || x &gt;= getWidth() || y &gt;= getHeight()) {</span>
+<span class="nc" id="L324">            hover(null, DEFAULT_CURSOR);</span>
+<span class="nc" id="L325">            return;</span>
+        }
+<span class="nc" id="L327">        ScheduleItem item = itemAt(x, y);</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        if (item != null) {</span>
+<span class="nc bnc" id="L329" title="All 6 branches missed.">            hover(item.getId(), owner.isEditable() &amp;&amp; isDragEdits() &amp;&amp; item.isMovable() ? MOVE_CURSOR : HAND_CURSOR);</span>
+<span class="nc" id="L330">            tip(item.getTitle());</span>
+        } else {
+            // The day a click opens and a drag starts a range from.
+<span class="nc" id="L333">            hover(Integer.valueOf(cellAt(x, y)), HAND_CURSOR);</span>
+<span class="nc" id="L334">            tip(null);</span>
+        }
+<span class="nc" id="L336">    }</span>
+
+    @Override
+    void paintTopHeader(Graphics g, int x, int y) {
+<span class="fc" id="L340">        Style header = Look.style(&quot;SchedulerHeader&quot;);</span>
+<span class="fc" id="L341">        Font f = header.getFont();</span>
+<span class="fc" id="L342">        Look.fill(g, header, x, y, bodyWidth(), headerH);</span>
+<span class="fc" id="L343">        g.setFont(f);</span>
+<span class="fc" id="L344">        g.setColor(header.getFgColor());</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        for (int c = 0; c &lt; 7; c++) {</span>
+<span class="fc" id="L346">            int w = colX(c + 1) - colX(c);</span>
+<span class="fc" id="L347">            String s = Look.fit(Dates.weekdayShort(TimeMath.dayOfWeek(firstDay + c)), f, w);</span>
+<span class="fc" id="L348">            g.drawString(s, x + colX(c) + (w - f.stringWidth(s)) / 2, y + (headerH - f.getHeight()) / 2);</span>
+        }
+<span class="fc" id="L350">        g.setColor(Look.mix(header.getBgColor(), header.getFgColor(), 50));</span>
+<span class="fc" id="L351">        g.drawLine(x, y + headerH - 1, x + bodyWidth(), y + headerH - 1);</span>
+<span class="fc" id="L352">    }</span>
+
+    @Override
+    boolean beginEdit(int x, int y, boolean handlesOnly) {
+<span class="nc bnc" id="L356" title="All 8 branches missed.">        if (handlesOnly || !owner.isEditable() || y &lt; headerH || cells == null) {</span>
+<span class="nc" id="L357">            return false;</span>
+        }
+<span class="nc" id="L359">        ScheduleItem item = itemAt(x, y);</span>
+<span class="nc" id="L360">        int cell = cellAt(x, y);</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (item != null) {</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">            if (!item.isMovable()) {</span>
+<span class="nc" id="L363">                return false;</span>
+            }
+<span class="nc" id="L365">            mode = MOVE;</span>
+<span class="nc" id="L366">            editItem = item;</span>
+<span class="nc" id="L367">            grabCell = cell;</span>
+<span class="nc" id="L368">            editCell = cell;</span>
+<span class="nc" id="L369">            owner.viewSelected(item);</span>
+<span class="nc" id="L370">            return true;</span>
+        }
+<span class="nc" id="L372">        mode = RANGE;</span>
+<span class="nc" id="L373">        anchorCell = cell;</span>
+<span class="nc" id="L374">        editCell = cell;</span>
+<span class="nc" id="L375">        return true;</span>
+    }
+
+    @Override
+    void editDragged(int x, int y) {
+<span class="nc bnc" id="L380" title="All 2 branches missed.">        if (mode != 0) {</span>
+<span class="nc" id="L381">            editCell = cellAt(Math.max(0, Math.min(getWidth() - 1, x)), Math.max(headerH, Math.min(getHeight() - 1, y)));</span>
+        }
+<span class="nc" id="L383">    }</span>
+
+    @Override
+    void endEdit(boolean commit) {
+<span class="nc" id="L387">        int m = mode;</span>
+<span class="nc" id="L388">        ScheduleItem item = editItem;</span>
+<span class="nc" id="L389">        mode = 0;</span>
+<span class="nc" id="L390">        editItem = null;</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        if (!commit) {</span>
+<span class="nc" id="L392">            return;</span>
+        }
+<span class="nc" id="L394">        ZoneId zone = owner.getZone();</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        if (m == RANGE) {</span>
+<span class="nc" id="L396">            long a = firstDay + Math.min(anchorCell, editCell);</span>
+<span class="nc" id="L397">            long b = firstDay + Math.max(anchorCell, editCell) + 1;</span>
+<span class="nc" id="L398">            owner.viewRange(TimeMath.startOfEpochDay(a, zone), TimeMath.startOfEpochDay(b, zone), null);</span>
+<span class="nc bnc" id="L399" title="All 4 branches missed.">        } else if (item != null &amp;&amp; editCell != grabCell) {</span>
+            // Both ends keep their time of day and move the same number of
+            // dates. Adding the length in milliseconds would end an all-day
+            // item an hour into the next day when a clock change is crossed.
+<span class="nc" id="L403">            int by = editCell - grabCell;</span>
+<span class="nc" id="L404">            long start = TimeMath.at(TimeMath.epochDay(item.getStart(), zone) + by,</span>
+<span class="nc" id="L405">                    TimeMath.minuteOfDay(item.getStart(), zone), zone);</span>
+<span class="nc" id="L406">            long end = TimeMath.at(TimeMath.epochDay(item.getEnd(), zone) + by,</span>
+<span class="nc" id="L407">                    TimeMath.minuteOfDay(item.getEnd(), zone), zone);</span>
+<span class="nc" id="L408">            owner.viewChanged(item, start, Math.max(end, start), item.getResourceId());</span>
+        }
+<span class="nc" id="L410">    }</span>
+
+    @Override
+    void tapped(int x, int y, boolean doubleTap) {
+<span class="nc bnc" id="L414" title="All 4 branches missed.">        if (y &lt; headerH || cells == null) {</span>
+<span class="nc" id="L415">            return;</span>
+        }
+<span class="nc" id="L417">        ScheduleItem item = itemAt(x, y);</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">        if (item != null) {</span>
+<span class="nc" id="L419">            owner.viewSelected(item);</span>
+<span class="nc bnc" id="L420" title="All 4 branches missed.">            if (doubleTap || owner.isOpenOnTap()) {</span>
+<span class="nc" id="L421">                owner.viewOpened(item);</span>
+            }
+<span class="nc bnc" id="L423" title="All 2 branches missed.">        } else if (owner.getSelectedItem() != null) {</span>
+<span class="nc" id="L424">            owner.viewSelected(null);</span>
+        } else {
+<span class="nc" id="L426">            owner.viewDrill(firstDay + cellAt(x, y));</span>
+        }
+<span class="nc" id="L428">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TimeAxis.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">TimeAxis.java</span></div><h1>TimeAxis.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.scheduling.TimeMath;
+import com.codename1.scheduling.WorkCalendar;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+
+import java.time.ZoneId;
+
+/// Time laid out across: which pixel an instant is at, what the ticks are at
+/// the current zoom, and the two rows of labels above them.
+///
+/// The resource timeline and the Gantt chart share it. It holds a stretch of
+/// time and a scale in milliseconds per pixel, and picks the units of its
+/// ticks from the scale: hours under days when zoomed in, through days under
+/// months, to quarters under years.
+final class TimeAxis {
+    static final int HOUR = 0;
+    static final int DAY = 1;
+    static final int WEEK = 2;
+    static final int MONTH = 3;
+    static final int QUARTER = 4;
+    static final int YEAR = 5;
+
+    // The ladder of minor ticks, finest first: a unit and how many of it.
+<span class="fc" id="L49">    private static final int[] LADDER_UNIT = {HOUR, HOUR, HOUR, HOUR, HOUR, DAY, WEEK, MONTH, QUARTER, YEAR};</span>
+<span class="fc" id="L50">    private static final int[] LADDER_COUNT = {1, 2, 3, 6, 12, 1, 1, 1, 1, 1};</span>
+<span class="fc" id="L51">    private static final long[] LADDER_MILLIS = {TimeMath.HOUR, 2 * TimeMath.HOUR, 3 * TimeMath.HOUR,</span>
+        6 * TimeMath.HOUR, 12 * TimeMath.HOUR, TimeMath.DAY, 7 * TimeMath.DAY, 30 * TimeMath.DAY,
+        91 * TimeMath.DAY, 365 * TimeMath.DAY};
+
+    private ZoneId zone;
+<span class="fc" id="L56">    private int firstDayOfWeek = 1;</span>
+    private boolean h24;
+    private long start;
+    private long end;
+<span class="fc" id="L60">    private double millisPerPixel = TimeMath.HOUR / 40.0;</span>
+<span class="fc" id="L61">    private double minMillisPerPixel = TimeMath.MINUTE / 2.0;</span>
+<span class="fc" id="L62">    private double maxMillisPerPixel = TimeMath.DAY;</span>
+<span class="fc" id="L63">    private int minorUnit = HOUR;</span>
+<span class="fc" id="L64">    private int minorCount = 1;</span>
+<span class="fc" id="L65">    private int majorUnit = DAY;</span>
+<span class="fc" id="L66">    private int tickPixels = -1;</span>
+
+<span class="fc" id="L68">    TimeAxis(ZoneId zone) {</span>
+<span class="fc" id="L69">        this.zone = zone;</span>
+<span class="fc" id="L70">    }</span>
+
+    void setZone(ZoneId z) {
+<span class="fc" id="L73">        zone = z;</span>
+<span class="fc" id="L74">    }</span>
+
+    ZoneId getZone() {
+<span class="fc" id="L77">        return zone;</span>
+    }
+
+    void setFirstDayOfWeek(int isoDay) {
+<span class="fc" id="L81">        firstDayOfWeek = isoDay;</span>
+<span class="fc" id="L82">    }</span>
+
+    void set24Hours(boolean v) {
+<span class="fc" id="L85">        h24 = v;</span>
+<span class="fc" id="L86">    }</span>
+
+    void setRange(long from, long to) {
+<span class="fc" id="L89">        start = from;</span>
+<span class="fc" id="L90">        end = Math.max(from + TimeMath.HOUR, to);</span>
+<span class="fc" id="L91">    }</span>
+
+    long getStart() {
+<span class="fc" id="L94">        return start;</span>
+    }
+
+    long getEnd() {
+<span class="fc" id="L98">        return end;</span>
+    }
+
+    double getMillisPerPixel() {
+<span class="fc" id="L102">        return millisPerPixel;</span>
+    }
+
+    /// Sets the scale, held between the limits.
+    void setMillisPerPixel(double v) {
+<span class="fc" id="L107">        millisPerPixel = Math.max(minMillisPerPixel, Math.min(maxMillisPerPixel, v));</span>
+<span class="fc" id="L108">        tickPixels = -1;</span>
+<span class="fc" id="L109">    }</span>
+
+    /// The limits of zooming: the finest and the coarsest scale.
+    void setScaleLimits(double finest, double coarsest) {
+<span class="fc" id="L113">        minMillisPerPixel = finest;</span>
+<span class="fc" id="L114">        maxMillisPerPixel = Math.max(finest, coarsest);</span>
+<span class="fc" id="L115">        setMillisPerPixel(millisPerPixel);</span>
+<span class="fc" id="L116">    }</span>
+
+    /// The width of the whole range in pixels.
+    int width() {
+<span class="fc" id="L120">        return (int) Math.ceil((end - start) / millisPerPixel);</span>
+    }
+
+    /// The pixel an instant is at, from the start of the range.
+    int x(long time) {
+<span class="fc" id="L125">        return (int) Math.floor((time - start) / millisPerPixel);</span>
+    }
+
+    long time(int x) {
+<span class="fc" id="L129">        return start + (long) (x * millisPerPixel);</span>
+    }
+
+    /// Picks the units of the ticks for the scale. `minTick` is the least
+    /// width a minor tick needs for its label.
+    void pickUnits(int minTick) {
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (tickPixels == minTick) {</span>
+<span class="nc" id="L136">            return;</span>
+        }
+<span class="fc" id="L138">        tickPixels = minTick;</span>
+<span class="fc" id="L139">        int pick = LADDER_UNIT.length - 1;</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        for (int i = 0; i &lt; LADDER_UNIT.length; i++) {</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (LADDER_MILLIS[i] / millisPerPixel &gt;= minTick) {</span>
+<span class="fc" id="L142">                pick = i;</span>
+<span class="fc" id="L143">                break;</span>
+            }
+        }
+<span class="fc" id="L146">        minorUnit = LADDER_UNIT[pick];</span>
+<span class="fc" id="L147">        minorCount = LADDER_COUNT[pick];</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (minorUnit == HOUR) {</span>
+<span class="fc" id="L149">            majorUnit = DAY;</span>
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">        } else if (minorUnit == DAY || minorUnit == WEEK) {</span>
+<span class="fc" id="L151">            majorUnit = MONTH;</span>
+        } else {
+<span class="nc" id="L153">            majorUnit = YEAR;</span>
+        }
+<span class="fc" id="L155">    }</span>
+
+    int getMinorUnit() {
+<span class="fc" id="L158">        return minorUnit;</span>
+    }
+
+    /// What a drag snaps to at this scale when the application's own step is
+    /// finer than a pixel: the start of a day once ticks are days or more.
+    boolean snapsToDays() {
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        return minorUnit != HOUR;</span>
+    }
+
+    /// The start of the tick of a unit that `t` is in.
+    long floor(long t, int unit, int count) {
+<span class="fc" id="L169">        long day = TimeMath.epochDay(t, zone);</span>
+<span class="pc bpc" id="L170" title="1 of 6 branches missed.">        switch (unit) {</span>
+            case HOUR: {
+<span class="fc" id="L172">                int step = count * 60;</span>
+<span class="fc" id="L173">                int m = TimeMath.minuteOfDay(t, zone) / step * step;</span>
+<span class="fc" id="L174">                return TimeMath.at(day, m, zone);</span>
+            }
+            case DAY:
+<span class="fc" id="L177">                return TimeMath.startOfEpochDay(day, zone);</span>
+            case WEEK:
+<span class="fc" id="L179">                return TimeMath.startOfEpochDay(TimeMath.startOfWeek(day, firstDayOfWeek), zone);</span>
+            case MONTH:
+<span class="fc" id="L181">                return TimeMath.startOfEpochDay(TimeMath.startOfMonth(day), zone);</span>
+            case QUARTER: {
+<span class="fc" id="L183">                long ms = TimeMath.startOfMonth(day);</span>
+<span class="fc" id="L184">                int back = (Dates.month(ms) - 1) % 3;</span>
+<span class="fc" id="L185">                return TimeMath.startOfEpochDay(TimeMath.plusMonths(ms, -back), zone);</span>
+            }
+            default: {
+<span class="nc" id="L188">                long ms = TimeMath.startOfMonth(day);</span>
+<span class="nc" id="L189">                return TimeMath.startOfEpochDay(TimeMath.plusMonths(ms, 1 - Dates.month(ms)), zone);</span>
+            }
+        }
+    }
+
+    /// The start of the tick after the one that starts at `tick`.
+    long next(long tick, int unit, int count) {
+<span class="fc" id="L196">        long day = TimeMath.epochDay(tick, zone);</span>
+<span class="pc bpc" id="L197" title="1 of 6 branches missed.">        switch (unit) {</span>
+            case HOUR: {
+<span class="fc" id="L199">                int m = TimeMath.minuteOfDay(tick, zone) + count * 60;</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                long n = m &gt;= TimeMath.MINUTES_PER_DAY ? TimeMath.startOfEpochDay(day + 1, zone)</span>
+<span class="fc" id="L201">                        : TimeMath.at(day, m, zone);</span>
+                // A day that loses an hour to daylight saving has a minute of
+                // the day that maps back to where it started.
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                return n &gt; tick ? n : tick + count * TimeMath.HOUR;</span>
+            }
+            case DAY:
+<span class="fc" id="L207">                return TimeMath.startOfEpochDay(day + 1, zone);</span>
+            case WEEK:
+<span class="fc" id="L209">                return TimeMath.startOfEpochDay(day + 7, zone);</span>
+            case MONTH:
+<span class="fc" id="L211">                return TimeMath.startOfEpochDay(TimeMath.plusMonths(day, 1), zone);</span>
+            case QUARTER:
+<span class="fc" id="L213">                return TimeMath.startOfEpochDay(TimeMath.plusMonths(day, 3), zone);</span>
+            default:
+<span class="nc" id="L215">                return TimeMath.startOfEpochDay(TimeMath.plusMonths(day, 12), zone);</span>
+        }
+    }
+
+    String label(long tick, int unit, int width, Font f) {
+<span class="fc" id="L220">        long day = TimeMath.epochDay(tick, zone);</span>
+<span class="pc bpc" id="L221" title="3 of 6 branches missed.">        switch (unit) {</span>
+            case HOUR:
+<span class="fc" id="L223">                return Dates.time(TimeMath.minuteOfDay(tick, zone), h24, true);</span>
+            case DAY: {
+<span class="fc" id="L225">                String wide = Dates.weekdayShort(TimeMath.dayOfWeek(day)) + &quot; &quot; + Dates.dayOfMonth(day);</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">                return f.stringWidth(wide) + Look.mm(1.5f) &lt;= width ? wide : String.valueOf(Dates.dayOfMonth(day));</span>
+            }
+            case WEEK:
+<span class="fc" id="L229">                return Dates.monthDay(day);</span>
+            case MONTH:
+<span class="nc" id="L231">                return Dates.monthShort(Dates.month(day));</span>
+            case QUARTER:
+<span class="nc" id="L233">                return &quot;Q&quot; + ((Dates.month(day) - 1) / 3 + 1);</span>
+            default:
+<span class="nc" id="L235">                return String.valueOf(Dates.year(day));</span>
+        }
+    }
+
+    private String majorLabel(long tick) {
+<span class="fc" id="L240">        long day = TimeMath.epochDay(tick, zone);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (majorUnit == DAY) {</span>
+<span class="fc" id="L242">            return Dates.dayTitle(day, TimeMath.dayOfWeek(day));</span>
+        }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (majorUnit == MONTH) {</span>
+<span class="fc" id="L245">            return Dates.monthTitle(day);</span>
+        }
+<span class="nc" id="L247">        return String.valueOf(Dates.year(day));</span>
+    }
+
+    /// The height of the two rows of labels.
+    int headerHeight(Style header) {
+<span class="fc" id="L252">        return 2 * (header.getFont().getHeight() + Look.mm(1.4f));</span>
+    }
+
+    /// Paints the two rows of labels. `x0` is where the start of the range
+    /// is on screen, and `left` to `right` the part of the screen to paint.
+    void paintHeader(Graphics g, Style header, int x0, int y, int left, int right) {
+<span class="fc" id="L258">        Font f = header.getFont();</span>
+<span class="fc" id="L259">        int rowH = f.getHeight() + Look.mm(1.4f);</span>
+<span class="fc" id="L260">        int pad = Look.mm(1);</span>
+<span class="fc" id="L261">        Look.fill(g, header, left, y, right - left, 2 * rowH);</span>
+<span class="fc" id="L262">        g.setFont(f);</span>
+<span class="fc" id="L263">        int line = Look.mix(header.getBgColor(), header.getFgColor(), 50);</span>
+<span class="fc" id="L264">        long from = time(left - x0);</span>
+<span class="fc" id="L265">        long to = time(right - x0);</span>
+
+        // The upper row. A label stays in view for as long as its tick does.
+<span class="fc" id="L268">        long t = floor(from, majorUnit, 1);</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        while (t &lt; to) {</span>
+<span class="fc" id="L270">            long n = next(t, majorUnit, 1);</span>
+<span class="fc" id="L271">            int tx = x0 + x(t);</span>
+<span class="fc" id="L272">            int nx = x0 + x(n);</span>
+<span class="fc" id="L273">            String s = majorLabel(t);</span>
+<span class="fc" id="L274">            int lx = Math.max(tx, left) + pad;</span>
+<span class="fc" id="L275">            int room = nx - lx - pad;</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            if (room &gt; 0) {</span>
+<span class="fc" id="L277">                g.setColor(header.getFgColor());</span>
+<span class="fc" id="L278">                g.drawString(Look.fit(s, f, room), lx, y + (rowH - f.getHeight()) / 2);</span>
+            }
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (tx &gt;= left) {</span>
+<span class="fc" id="L281">                g.setColor(line);</span>
+<span class="fc" id="L282">                g.drawLine(tx, y, tx, y + rowH);</span>
+            }
+<span class="fc" id="L284">            t = n;</span>
+<span class="fc" id="L285">        }</span>
+
+<span class="fc" id="L287">        t = floor(from, minorUnit, minorCount);</span>
+<span class="fc" id="L288">        int alpha = g.getAlpha();</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        while (t &lt; to) {</span>
+<span class="fc" id="L290">            long n = next(t, minorUnit, minorCount);</span>
+<span class="fc" id="L291">            int tx = x0 + x(t);</span>
+<span class="fc" id="L292">            int nx = x0 + x(n);</span>
+<span class="fc" id="L293">            String s = label(t, minorUnit, nx - tx, f);</span>
+<span class="fc" id="L294">            int sw = f.stringWidth(s);</span>
+<span class="fc" id="L295">            g.setColor(header.getFgColor());</span>
+<span class="fc" id="L296">            g.setAlpha(alpha * 190 / 255);</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            if (minorUnit == HOUR) {</span>
+<span class="fc" id="L298">                g.drawString(s, tx + pad, y + rowH + (rowH - f.getHeight()) / 2);</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            } else if (sw &lt;= nx - tx) {</span>
+<span class="fc" id="L300">                g.drawString(s, tx + (nx - tx - sw) / 2, y + rowH + (rowH - f.getHeight()) / 2);</span>
+            }
+<span class="fc" id="L302">            g.setAlpha(alpha);</span>
+<span class="fc" id="L303">            g.setColor(line);</span>
+<span class="fc" id="L304">            g.drawLine(tx, y + rowH, tx, y + 2 * rowH);</span>
+<span class="fc" id="L305">            t = n;</span>
+<span class="fc" id="L306">        }</span>
+<span class="fc" id="L307">        g.setColor(line);</span>
+<span class="fc" id="L308">        g.drawLine(left, y + 2 * rowH - 1, right, y + 2 * rowH - 1);</span>
+<span class="fc" id="L309">    }</span>
+
+    /// Paints a line down every tick: fainter for the minor ones.
+    void paintGrid(Graphics g, int color, int background, int x0, int y, int height, int left, int right) {
+<span class="fc" id="L313">        long from = time(left - x0);</span>
+<span class="fc" id="L314">        long to = time(right - x0);</span>
+<span class="fc" id="L315">        long t = floor(from, minorUnit, minorCount);</span>
+<span class="fc" id="L316">        int faint = Look.mix(background, color, 110);</span>
+<span class="fc" id="L317">        long major = floor(from, majorUnit, 1);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        while (t &lt; to) {</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            while (major &lt; t) {</span>
+<span class="fc" id="L320">                major = next(major, majorUnit, 1);</span>
+            }
+<span class="fc bfc" id="L322" title="All 2 branches covered.">            g.setColor(major == t ? color : faint);</span>
+<span class="fc" id="L323">            int tx = x0 + x(t);</span>
+<span class="fc" id="L324">            g.drawLine(tx, y, tx, y + height);</span>
+<span class="fc" id="L325">            t = next(t, minorUnit, minorCount);</span>
+<span class="fc" id="L326">        }</span>
+<span class="fc" id="L327">    }</span>
+
+    /// Shades the time a calendar does not work: the hours while ticks are
+    /// hours, whole days off while a day is still wide enough to see.
+    void paintOffHours(Graphics g, WorkCalendar cal, Style off, int x0, int y, int height, int left, int right) {
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">        if (cal == null || (off.getBgTransparency() &amp; 0xff) == 0) {</span>
+<span class="fc" id="L333">            return;</span>
+        }
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">        if (TimeMath.DAY / millisPerPixel &lt; 3) {</span>
+<span class="nc" id="L336">            return;</span>
+        }
+<span class="fc" id="L338">        ZoneId z = cal.getZone();</span>
+<span class="fc" id="L339">        long first = TimeMath.epochDay(time(left - x0), z);</span>
+<span class="fc" id="L340">        long last = TimeMath.epochDay(time(right - x0), z);</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">        for (long day = first; day &lt;= last; day++) {</span>
+<span class="fc" id="L342">            int[] iv = cal.getWorkingHours(day);</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">            if (minorUnit != HOUR) {</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">                if (iv.length == 0) {</span>
+<span class="fc" id="L345">                    shade(g, off, x0, y, height, TimeMath.startOfEpochDay(day, z),</span>
+<span class="fc" id="L346">                            TimeMath.startOfEpochDay(day + 1, z));</span>
+                }
+                continue;
+            }
+<span class="nc" id="L350">            int cursor = 0;</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">            for (int i = 0; i &lt; iv.length; i += 2) {</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                if (iv[i] &gt; cursor) {</span>
+<span class="nc" id="L353">                    shade(g, off, x0, y, height, TimeMath.at(day, cursor, z), TimeMath.at(day, iv[i], z));</span>
+                }
+<span class="nc" id="L355">                cursor = iv[i + 1];</span>
+            }
+<span class="nc bnc" id="L357" title="All 2 branches missed.">            if (cursor &lt; TimeMath.MINUTES_PER_DAY) {</span>
+<span class="nc" id="L358">                shade(g, off, x0, y, height, TimeMath.at(day, cursor, z), TimeMath.startOfEpochDay(day + 1, z));</span>
+            }
+        }
+<span class="fc" id="L361">    }</span>
+
+    private void shade(Graphics g, Style off, int x0, int y, int height, long from, long to) {
+<span class="fc" id="L364">        int a = x0 + x(from);</span>
+<span class="fc" id="L365">        int b = x0 + x(to);</span>
+<span class="fc" id="L366">        Look.fill(g, off, a, y, b - a, height);</span>
+<span class="fc" id="L367">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

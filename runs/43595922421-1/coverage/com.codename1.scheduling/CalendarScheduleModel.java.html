@@ -1,0 +1,646 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarScheduleModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.scheduling</a> &gt; <span class="el_source">CalendarScheduleModel.java</span></div><h1>CalendarScheduleModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.scheduling;
+
+import com.codename1.calendar.CalendarChange;
+import com.codename1.calendar.CalendarChangeListener;
+import com.codename1.calendar.CalendarDateTime;
+import com.codename1.calendar.CalendarEvent;
+import com.codename1.calendar.CalendarInfo;
+import com.codename1.calendar.CalendarMutationScope;
+import com.codename1.calendar.CalendarPage;
+import com.codename1.calendar.CalendarQuery;
+import com.codename1.calendar.CalendarSource;
+import com.codename1.calendar.FreeBusyInterval;
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+import com.codename1.util.SuccessCallback;
+
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A schedule read from a `CalendarSource`: the device's calendars, CalDAV,
+/// Google or Microsoft.
+///
+/// Every calendar added is a resource, so a resource view shows calendars
+/// side by side and dragging an event to another column moves it to that
+/// calendar. The model loads the events around the range a view shows,
+/// with recurring events expanded into their occurrences, and loads again
+/// when the view moves outside what it has or the source reports a change.
+///
+/// ```java
+/// LocalCalendarSource source = LocalCalendarSource.getInstance();
+/// CalendarScheduleModel model = new CalendarScheduleModel(source, ZoneId.systemDefault());
+/// source.listCalendars(CalendarInfo.ContentType.EVENTS, null).ready(page -&gt; {
+///     for (CalendarInfo calendar : page.getItems()) {
+///         model.addCalendar(calendar);
+///     }
+/// });
+/// Scheduler scheduler = new Scheduler(model);
+/// ```
+///
+/// An edit is shown at once and saved in the background; if the source
+/// refuses it, the item goes back and `getLastError` says why.
+public class CalendarScheduleModel extends AbstractScheduleModel {
+    private final CalendarSource source;
+    private final ZoneId zone;
+<span class="fc" id="L72">    private final List&lt;ScheduleResource&gt; resources = new ArrayList&lt;ScheduleResource&gt;();</span>
+<span class="fc" id="L73">    private final Map&lt;String, CalendarInfo&gt; calendars = new HashMap&lt;String, CalendarInfo&gt;();</span>
+<span class="fc" id="L74">    private final Map&lt;String, List&lt;ScheduleItem&gt;&gt; items = new HashMap&lt;String, List&lt;ScheduleItem&gt;&gt;();</span>
+<span class="fc" id="L75">    private final Map&lt;String, List&lt;ScheduleItem&gt;&gt; busy = new HashMap&lt;String, List&lt;ScheduleItem&gt;&gt;();</span>
+<span class="fc" id="L76">    private final List&lt;String&gt; freeBusyOnly = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L77">    private CalendarMutationScope mutationScope = CalendarMutationScope.THIS_INSTANCE;</span>
+    private int created;
+    private int loads;
+    private int pending;
+    private boolean creationEnabled;
+<span class="fc" id="L82">    private String newEventTitle = &quot;&quot;;</span>
+    private long loadedFrom;
+    private long loadedTo;
+    private long wantedFrom;
+    private long wantedTo;
+    // Raised by every reload, so an answer to an older question is dropped.
+    private int generation;
+    private Throwable lastError;
+<span class="fc" id="L90">    private final CalendarChangeListener sourceListener = new CalendarChangeListener() {</span>
+        @Override
+        public void calendarChanged(CalendarChange change) {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L94">                reload();</span>
+            } else {
+<span class="nc" id="L96">                Display.getInstance().callSerially(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc" id="L99">                        reload();</span>
+<span class="nc" id="L100">                    }</span>
+                });
+            }
+<span class="nc" id="L103">        }</span>
+    };
+
+    /// A model over `source`. `zone` decides where an all-day event's days
+    /// start; use the zone of the view.
+<span class="fc" id="L108">    public CalendarScheduleModel(CalendarSource source, ZoneId zone) {</span>
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">        if (source == null || zone == null) {</span>
+<span class="nc" id="L110">            throw new IllegalArgumentException(&quot;source and zone are required&quot;);</span>
+        }
+<span class="fc" id="L112">        this.source = source;</span>
+<span class="fc" id="L113">        this.zone = zone;</span>
+<span class="fc" id="L114">        source.addChangeListener(sourceListener);</span>
+<span class="fc" id="L115">    }</span>
+
+    /// Stops listening to the source. Call it when the model is discarded.
+    public void dispose() {
+<span class="fc" id="L119">        source.removeChangeListener(sourceListener);</span>
+<span class="fc" id="L120">        generation++;</span>
+<span class="fc" id="L121">    }</span>
+
+    public CalendarSource getSource() {
+<span class="nc" id="L124">        return source;</span>
+    }
+
+    /// Shows a calendar's events, as a resource of its own.
+    public CalendarScheduleModel addCalendar(CalendarInfo info) {
+<span class="fc" id="L129">        return add(info, false);</span>
+    }
+
+    /// Shows only when a calendar is busy, hatched, without any detail: the
+    /// way somebody else's calendar is shown.
+    public CalendarScheduleModel addFreeBusyCalendar(CalendarInfo info) {
+<span class="fc" id="L135">        return add(info, true);</span>
+    }
+
+    private CalendarScheduleModel add(CalendarInfo info, boolean freeBusy) {
+<span class="pc bpc" id="L139" title="3 of 6 branches missed.">        if (info == null || info.getId() == null || calendars.containsKey(info.getId())) {</span>
+<span class="nc" id="L140">            return this;</span>
+        }
+<span class="fc" id="L142">        calendars.put(info.getId(), info);</span>
+<span class="fc" id="L143">        ScheduleResource r = new ScheduleResource(info.getId(), info.getName());</span>
+<span class="fc" id="L144">        r.setDetail(info.getOwner());</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (info.getColor() != 0) {</span>
+<span class="fc" id="L146">            r.setColor(info.getColor() &amp; 0xffffff);</span>
+        }
+<span class="fc" id="L148">        r.setUserObject(info);</span>
+<span class="fc" id="L149">        resources.add(r);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (freeBusy) {</span>
+<span class="fc" id="L151">            freeBusyOnly.add(info.getId());</span>
+        }
+<span class="fc" id="L153">        reload();</span>
+<span class="fc" id="L154">        return this;</span>
+    }
+
+    public CalendarScheduleModel removeCalendar(String calendarId) {
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (calendars.remove(calendarId) != null) {</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            for (int i = resources.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                if (resources.get(i).getId().equals(calendarId)) {</span>
+<span class="fc" id="L161">                    resources.remove(i);</span>
+                }
+            }
+<span class="fc" id="L164">            items.remove(calendarId);</span>
+<span class="fc" id="L165">            busy.remove(calendarId);</span>
+<span class="fc" id="L166">            freeBusyOnly.remove(calendarId);</span>
+<span class="fc" id="L167">            fireChanged();</span>
+        }
+<span class="fc" id="L169">        return this;</span>
+    }
+
+    /// Which occurrences an edit of a recurring event changes. A view asks the
+    /// user and sets this before it commits the edit. One occurrence by default.
+    public CalendarScheduleModel setMutationScope(CalendarMutationScope scope) {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        mutationScope = scope == null ? CalendarMutationScope.THIS_INSTANCE : scope;</span>
+<span class="nc" id="L176">        return this;</span>
+    }
+
+    public CalendarMutationScope getMutationScope() {
+<span class="nc" id="L180">        return mutationScope;</span>
+    }
+
+    /// Whether dragging on empty space saves a new event with `title`. Off by
+    /// default: an application usually opens its own editor from the
+    /// scheduler's range listener instead.
+    public CalendarScheduleModel setCreationEnabled(boolean enabled, String title) {
+<span class="fc" id="L187">        creationEnabled = enabled;</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        newEventTitle = title == null ? &quot;&quot; : title;</span>
+<span class="fc" id="L189">        return this;</span>
+    }
+
+    /// The last failure of a load, a save or a delete, or null. It stays
+    /// until `reload` is called or a later save or delete works: one
+    /// calendar that loads says nothing of another that did not.
+    public Throwable getLastError() {
+<span class="fc" id="L196">        return lastError;</span>
+    }
+
+    /// The calendar event an item was made from, or null for busy time.
+    public static CalendarEvent eventOf(ScheduleItem item) {
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        Object o = item == null ? null : item.getUserObject();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        return o instanceof CalendarEvent ? (CalendarEvent) o : null;</span>
+    }
+
+    @Override
+    public List&lt;ScheduleResource&gt; getResources() {
+<span class="fc" id="L207">        return Collections.unmodifiableList(resources);</span>
+    }
+
+    @Override
+    public void getItems(long from, long to, List&lt;ScheduleItem&gt; out) {
+<span class="fc" id="L212">        collect(items, from, to, out);</span>
+<span class="fc" id="L213">        collect(busy, from, to, out);</span>
+<span class="fc" id="L214">    }</span>
+
+    private void collect(Map&lt;String, List&lt;ScheduleItem&gt;&gt; map, long from, long to, List&lt;ScheduleItem&gt; out) {
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (ScheduleResource resource : resources) {</span>
+<span class="fc" id="L218">            List&lt;ScheduleItem&gt; list = map.get(resource.getId());</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (list == null) {</span>
+<span class="fc" id="L220">                continue;</span>
+            }
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            for (ScheduleItem item : list) {</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                if (item.intersects(from, to)) {</span>
+<span class="fc" id="L224">                    out.add(item);</span>
+                }
+<span class="fc" id="L226">            }</span>
+<span class="fc" id="L227">        }</span>
+<span class="fc" id="L228">    }</span>
+
+    @Override
+    public void setVisibleRange(long from, long to) {
+<span class="fc" id="L232">        wantedFrom = from;</span>
+<span class="fc" id="L233">        wantedTo = to;</span>
+<span class="pc bpc" id="L234" title="1 of 4 branches missed.">        if (from &lt; loadedFrom || to &gt; loadedTo) {</span>
+<span class="fc" id="L235">            reload();</span>
+        }
+<span class="fc" id="L237">    }</span>
+
+    /// Loads the events around the visible range again.
+    public void reload() {
+        // A failure is reported until something is asked for again.
+<span class="fc" id="L242">        lastError = null;</span>
+<span class="fc" id="L243">        load();</span>
+<span class="fc" id="L244">    }</span>
+
+    private void load() {
+<span class="pc bpc" id="L247" title="1 of 4 branches missed.">        if (wantedTo &lt;= wantedFrom || calendars.isEmpty()) {</span>
+<span class="fc" id="L248">            return;</span>
+        }
+        // A window three times the range, so scrolling one screen either way
+        // asks for nothing.
+<span class="fc" id="L252">        long span = wantedTo - wantedFrom;</span>
+<span class="fc" id="L253">        final long from = wantedFrom - span;</span>
+<span class="fc" id="L254">        final long to = wantedTo + span;</span>
+<span class="fc" id="L255">        loadedFrom = from;</span>
+<span class="fc" id="L256">        loadedTo = to;</span>
+<span class="fc" id="L257">        final int asked = ++generation;</span>
+<span class="fc" id="L258">        pending = resources.size();</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        for (ScheduleResource resource : resources) {</span>
+<span class="fc" id="L260">            String id = resource.getId();</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            if (freeBusyOnly.contains(id)) {</span>
+<span class="fc" id="L262">                loadBusy(id, from, to, asked);</span>
+            } else {
+<span class="fc" id="L264">                loadPage(id, from, to, null, new ArrayList&lt;ScheduleItem&gt;(), asked);</span>
+            }
+<span class="fc" id="L266">        }</span>
+<span class="fc" id="L267">    }</span>
+
+    private void loadPage(final String calendarId, final long from, final long to, String pageToken,
+                          final List&lt;ScheduleItem&gt; into, final int asked) {
+<span class="fc" id="L271">        CalendarQuery q = new CalendarQuery().setCalendarId(calendarId)</span>
+<span class="fc" id="L272">                .setStartTime(Instant.ofEpochMilli(from)).setEndTime(Instant.ofEpochMilli(to))</span>
+<span class="fc" id="L273">                .setExpandRecurrences(true);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (pageToken != null) {</span>
+<span class="fc" id="L275">            q.setPageToken(pageToken);</span>
+        }
+<span class="fc" id="L277">        source.queryEvents(q).ready(new SuccessCallback&lt;CalendarPage&lt;CalendarEvent&gt;&gt;() {</span>
+            @Override
+            public void onSucess(CalendarPage&lt;CalendarEvent&gt; page) {
+<span class="pc bpc" id="L280" title="2 of 4 branches missed.">                if (asked != generation || !calendars.containsKey(calendarId)) {</span>
+                    // Answered after a newer question, or for a calendar
+                    // that was taken away while it was asked.
+<span class="nc" id="L283">                    answered(asked);</span>
+<span class="nc" id="L284">                    return;</span>
+                }
+<span class="fc" id="L286">                List&lt;CalendarEvent&gt; events = page.getItems();</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                for (CalendarEvent event : events) {</span>
+<span class="fc" id="L288">                    ScheduleItem item = toItem(event, calendarId);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                    if (item != null) {</span>
+<span class="fc" id="L290">                        into.add(item);</span>
+                    }
+<span class="fc" id="L292">                }</span>
+<span class="fc" id="L293">                String next = page.getNextPageToken();</span>
+<span class="pc bpc" id="L294" title="1 of 4 branches missed.">                if (next != null &amp;&amp; next.length() &gt; 0) {</span>
+<span class="fc" id="L295">                    loadPage(calendarId, from, to, next, into, asked);</span>
+<span class="fc" id="L296">                    return;</span>
+                }
+                // One calendar that answered says nothing about another that
+                // failed in the same load, so the error is left as it is.
+<span class="fc" id="L300">                items.put(calendarId, into);</span>
+<span class="fc" id="L301">                answered(asked);</span>
+<span class="fc" id="L302">                loads++;</span>
+<span class="fc" id="L303">                fireChanged();</span>
+<span class="fc" id="L304">            }</span>
+<span class="fc" id="L305">        }).except(failed(asked, calendarId));</span>
+<span class="fc" id="L306">    }</span>
+
+    private void loadBusy(final String calendarId, long from, long to, final int asked) {
+<span class="fc" id="L309">        List&lt;String&gt; ids = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L310">        ids.add(calendarId);</span>
+<span class="fc" id="L311">        source.queryFreeBusy(ids, Instant.ofEpochMilli(from), Instant.ofEpochMilli(to))</span>
+<span class="fc" id="L312">                .ready(new SuccessCallback&lt;List&lt;FreeBusyInterval&gt;&gt;() {</span>
+                    @Override
+                    public void onSucess(List&lt;FreeBusyInterval&gt; intervals) {
+<span class="fc" id="L315">                        answered(asked);</span>
+<span class="pc bpc" id="L316" title="2 of 4 branches missed.">                        if (asked != generation || !calendars.containsKey(calendarId)) {</span>
+<span class="nc" id="L317">                            return;</span>
+                        }
+<span class="fc" id="L319">                        List&lt;ScheduleItem&gt; list = new ArrayList&lt;ScheduleItem&gt;();</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">                        for (FreeBusyInterval f : intervals) {</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">                            if (f.getAvailability() == CalendarEvent.Availability.FREE) {</span>
+<span class="fc" id="L322">                                continue;</span>
+                            }
+<span class="fc" id="L324">                            long s = f.getStartTime().toEpochMilli();</span>
+<span class="fc" id="L325">                            list.add(new ScheduleItem(calendarId + &quot;-busy-&quot; + s, &quot;&quot;, s, f.getEndTime().toEpochMilli())</span>
+<span class="fc" id="L326">                                    .setKind(ScheduleItem.Kind.BLOCKED).setResourceId(calendarId));</span>
+<span class="fc" id="L327">                        }</span>
+<span class="fc" id="L328">                        busy.put(calendarId, list);</span>
+<span class="fc" id="L329">                        fireChanged();</span>
+<span class="fc" id="L330">                    }</span>
+<span class="fc" id="L331">                }).except(failed(asked, calendarId));</span>
+<span class="fc" id="L332">    }</span>
+
+    private SuccessCallback&lt;Throwable&gt; failed(final int asked, final String calendarId) {
+<span class="fc" id="L335">        return new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="nc" id="L338">                answered(asked);</span>
+<span class="nc bnc" id="L339" title="All 4 branches missed.">                if (asked == generation &amp;&amp; calendars.containsKey(calendarId)) {</span>
+<span class="nc" id="L340">                    lastError = err;</span>
+<span class="nc" id="L341">                    Log.e(err);</span>
+                    // Nothing is loaded for this window, so the next range
+                    // asked for, even the same one, asks the source again.
+<span class="nc" id="L344">                    loadedFrom = 0;</span>
+<span class="nc" id="L345">                    loadedTo = 0;</span>
+<span class="nc" id="L346">                    fireChanged();</span>
+                }
+<span class="nc" id="L348">            }</span>
+        };
+    }
+
+    private ScheduleItem toItem(CalendarEvent e, String calendarId) {
+<span class="fc" id="L353">        CalendarDateTime s = e.getStart();</span>
+<span class="pc bpc" id="L354" title="1 of 4 branches missed.">        if (s == null || e.getStatus() == CalendarEvent.Status.CANCELED) {</span>
+<span class="fc" id="L355">            return null;</span>
+        }
+<span class="fc" id="L357">        CalendarDateTime en = e.getEnd();</span>
+        long start;
+        long end;
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (s.isAllDay()) {</span>
+<span class="fc" id="L361">            long first = s.getDate().toEpochDay();</span>
+            // An all-day end is the day after the last one; a source that
+            // leaves it out or repeats the start means a single day.
+<span class="pc bpc" id="L364" title="2 of 4 branches missed.">            long after = en != null &amp;&amp; en.isAllDay() ? en.getDate().toEpochDay() : first + 1;</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (after &lt;= first) {</span>
+<span class="nc" id="L366">                after = first + 1;</span>
+            }
+<span class="fc" id="L368">            start = TimeMath.startOfEpochDay(first, zone);</span>
+<span class="fc" id="L369">            end = TimeMath.startOfEpochDay(after, zone);</span>
+<span class="fc" id="L370">        } else {</span>
+<span class="fc" id="L371">            start = s.getDateTime().toInstant().toEpochMilli();</span>
+<span class="pc bpc" id="L372" title="2 of 4 branches missed.">            end = en == null || en.isAllDay() ? start : en.getDateTime().toInstant().toEpochMilli();</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            if (end &lt; start) {</span>
+<span class="nc" id="L374">                end = start;</span>
+            }
+        }
+<span class="pc bpc" id="L377" title="1 of 4 branches missed.">        boolean series = e.getRecurrence() != null || e.getRecurringEventId() != null;</span>
+        // Every occurrence of an expanded series carries the series' id.
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        String id = series ? e.getId() + &quot;@&quot; + start : e.getId();</span>
+<span class="fc" id="L380">        CalendarInfo info = calendars.get(calendarId);</span>
+<span class="pc bpc" id="L381" title="1 of 4 branches missed.">        boolean editable = info == null || !info.isReadOnly();</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        return new ScheduleItem(id == null ? calendarId + &quot;@&quot; + start : id, e.getTitle(), start, end)</span>
+<span class="fc" id="L383">                .setAllDay(s.isAllDay()).setDetail(e.getLocation()).setResourceId(calendarId)</span>
+<span class="fc" id="L384">                .setRecurring(series).setMovable(editable).setResizable(editable).setUserObject(e);</span>
+    }
+
+    @Override
+    public boolean updateItem(ScheduleItem given, long start, long end, String resourceId) {
+        // A load since the caller was given its item made another object
+        // for the same event, and that one is what the views draw.
+<span class="fc" id="L391">        final ScheduleItem item = held(given);</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">        final CalendarEvent e = item == null ? null : eventOf(item);</span>
+<span class="pc bpc" id="L393" title="2 of 4 branches missed.">        if (e == null || !item.isMovable()) {</span>
+<span class="nc" id="L394">            return false;</span>
+        }
+<span class="fc" id="L396">        final int seen = loads;</span>
+<span class="fc" id="L397">        final long oldStart = item.getStart();</span>
+<span class="fc" id="L398">        final long oldEnd = item.getEnd();</span>
+<span class="fc" id="L399">        final String oldResource = item.getResourceId();</span>
+<span class="fc" id="L400">        final CalendarDateTime oldS = e.getStart();</span>
+<span class="fc" id="L401">        final CalendarDateTime oldE = e.getEnd();</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">        final String target = resourceId == null ? oldResource : resourceId;</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (item.isAllDay()) {</span>
+<span class="nc" id="L404">            e.setStart(CalendarDateTime.allDay(java.time.LocalDate.ofEpochDay(TimeMath.epochDay(start, zone))));</span>
+<span class="nc" id="L405">            e.setEnd(CalendarDateTime.allDay(java.time.LocalDate.ofEpochDay(TimeMath.epochDay(end, zone))));</span>
+        } else {
+<span class="fc" id="L407">            ZoneId z = oldS.getDateTime().getZone();</span>
+<span class="fc" id="L408">            e.setStart(CalendarDateTime.instant(Instant.ofEpochMilli(start), z));</span>
+<span class="fc" id="L409">            e.setEnd(CalendarDateTime.instant(Instant.ofEpochMilli(end), z));</span>
+        }
+<span class="fc" id="L411">        e.setCalendarId(target);</span>
+<span class="fc" id="L412">        final CalendarDateTime newS = e.getStart();</span>
+<span class="fc" id="L413">        item.setTime(start, end);</span>
+<span class="fc" id="L414">        move(item, oldResource, target);</span>
+<span class="fc" id="L415">        fireChanged();</span>
+<span class="fc" id="L416">        source.saveEvent(e, mutationScope).ready(new SuccessCallback&lt;CalendarEvent&gt;() {</span>
+            @Override
+            public void onSucess(CalendarEvent saved) {
+<span class="fc" id="L419">                lastError = null;</span>
+                // Changing a series moves occurrences that are not this item.
+<span class="pc bpc" id="L421" title="3 of 4 branches missed.">                if (item.isRecurring() &amp;&amp; mutationScope != CalendarMutationScope.THIS_INSTANCE) {</span>
+<span class="nc" id="L422">                    reload();</span>
+                } else {
+<span class="fc" id="L424">                    loadIfOvertaken(seen);</span>
+                }
+<span class="fc" id="L426">            }</span>
+<span class="fc" id="L427">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="fc" id="L430">                lastError = err;</span>
+<span class="fc" id="L431">                Log.e(err);</span>
+                // The item goes back at once, but only if this was the last
+                // edit of it and it is still what the model shows: a later
+                // edit has its own answer coming, and after a reload the
+                // item is a copy nobody draws. Either way the source is then
+                // asked what it has, which is the only thing known for sure.
+<span class="fc" id="L437">                List&lt;ScheduleItem&gt; shown = items.get(target);</span>
+<span class="pc bpc" id="L438" title="3 of 6 branches missed.">                if (e.getStart() == newS &amp;&amp; shown != null &amp;&amp; shown.contains(item)) { //NOPMD CompareObjectsWithEquals - this edit's own value</span>
+<span class="fc" id="L439">                    e.setStart(oldS).setEnd(oldE).setCalendarId(oldResource);</span>
+<span class="fc" id="L440">                    item.setTime(oldStart, oldEnd);</span>
+<span class="fc" id="L441">                    move(item, target, oldResource);</span>
+                }
+<span class="fc" id="L443">                fireChanged();</span>
+<span class="fc" id="L444">                load();</span>
+<span class="fc" id="L445">            }</span>
+        });
+<span class="fc" id="L447">        return true;</span>
+    }
+
+    // The item the model holds for the event of `item`: the same object,
+    // or the one a later load made for the same id. Null when it is gone.
+    private ScheduleItem held(ScheduleItem item) {
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        if (item == null) {</span>
+<span class="nc" id="L454">            return null;</span>
+        }
+        // In its own calendar first: a source may give one meeting the same
+        // id in two calendars that are both shown, and the copy that was
+        // dragged is the one to change, not whichever comes first.
+<span class="fc" id="L459">        ScheduleItem own = sameId(items.get(item.getResourceId()), item);</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">        if (own != null) {</span>
+<span class="fc" id="L461">            return own;</span>
+        }
+        // Then in every other, since the event may have been moved to
+        // another since; and failing its id by the event behind it: an item
+        // that was created here has an id of its own making, and the load
+        // after it was saved has the source's.
+<span class="nc" id="L467">        CalendarEvent e = eventOf(item);</span>
+<span class="nc bnc" id="L468" title="All 2 branches missed.">        String eventId = e == null ? null : e.getId();</span>
+        // Its own calendar first here too, for the same reason.
+<span class="nc" id="L470">        ScheduleItem sameEvent = sameEvent(items.get(item.getResourceId()), eventId);</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">        for (List&lt;ScheduleItem&gt; list : items.values()) {</span>
+<span class="nc" id="L472">            ScheduleItem found = sameId(list, item);</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">            if (found != null) {</span>
+<span class="nc" id="L474">                return found;</span>
+            }
+<span class="nc bnc" id="L476" title="All 2 branches missed.">            if (sameEvent == null) {</span>
+<span class="nc" id="L477">                sameEvent = sameEvent(list, eventId);</span>
+            }
+<span class="nc" id="L479">        }</span>
+<span class="nc" id="L480">        return sameEvent;</span>
+    }
+
+    // The item of the list that is the event with this id, and not one
+    // occurrence of many.
+    private static ScheduleItem sameEvent(List&lt;ScheduleItem&gt; list, String eventId) {
+<span class="nc bnc" id="L486" title="All 4 branches missed.">        if (list == null || eventId == null) {</span>
+<span class="nc" id="L487">            return null;</span>
+        }
+<span class="nc bnc" id="L489" title="All 2 branches missed.">        for (ScheduleItem each : list) {</span>
+<span class="nc bnc" id="L490" title="All 2 branches missed.">            if (!each.isRecurring()) {</span>
+<span class="nc" id="L491">                CalendarEvent other = eventOf(each);</span>
+<span class="nc bnc" id="L492" title="All 4 branches missed.">                if (other != null &amp;&amp; eventId.equals(other.getId())) {</span>
+<span class="nc" id="L493">                    return each;</span>
+                }
+            }
+<span class="nc" id="L496">        }</span>
+<span class="nc" id="L497">        return null;</span>
+    }
+
+    // The item itself when the list has it, or else the one with its id.
+    private static ScheduleItem sameId(List&lt;ScheduleItem&gt; list, ScheduleItem item) {
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L503">            return null;</span>
+        }
+<span class="fc" id="L505">        ScheduleItem byId = null;</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        for (ScheduleItem each : list) {</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">            if (each == item) { //NOPMD CompareObjectsWithEquals - the very item is the common case</span>
+<span class="fc" id="L508">                return each;</span>
+            }
+<span class="pc bpc" id="L510" title="2 of 4 branches missed.">            if (byId == null &amp;&amp; each.getId().equals(item.getId())) {</span>
+<span class="fc" id="L511">                byId = each;</span>
+            }
+<span class="fc" id="L513">        }</span>
+<span class="fc" id="L514">        return byId;</span>
+    }
+
+    // An answer to a load that was asked before an edit was made, and came
+    // after it, drew the event where it was. The edit has now been saved,
+    // so what the source holds is asked for once more.
+    private void loadIfOvertaken(int seen) {
+        // One that has answered, or one that is still to answer: either
+        // way what it says was read before the edit.
+<span class="pc bpc" id="L523" title="2 of 4 branches missed.">        if (loads != seen || pending &gt; 0) {</span>
+<span class="nc" id="L524">            load();</span>
+        }
+<span class="fc" id="L526">    }</span>
+
+    // One calendar of the load that is under way has given its last answer.
+    private void answered(int asked) {
+<span class="pc bpc" id="L530" title="2 of 4 branches missed.">        if (asked == generation &amp;&amp; pending &gt; 0) {</span>
+<span class="fc" id="L531">            pending--;</span>
+        }
+<span class="fc" id="L533">    }</span>
+
+    private void move(ScheduleItem item, String from, String to) {
+<span class="fc" id="L536">        item.setResourceId(to);</span>
+<span class="pc bpc" id="L537" title="1 of 6 branches missed.">        if (from == null ? to == null : from.equals(to)) {</span>
+<span class="fc" id="L538">            return;</span>
+        }
+<span class="fc" id="L540">        List&lt;ScheduleItem&gt; a = items.get(from);</span>
+<span class="fc bfc" id="L541" title="All 2 branches covered.">        if (a != null) {</span>
+<span class="fc" id="L542">            a.remove(item);</span>
+        }
+<span class="fc" id="L544">        List&lt;ScheduleItem&gt; b = items.get(to);</span>
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L546">            b = new ArrayList&lt;ScheduleItem&gt;();</span>
+<span class="nc" id="L547">            items.put(to, b);</span>
+        }
+<span class="fc" id="L549">        b.add(item);</span>
+<span class="fc" id="L550">    }</span>
+
+    @Override
+    public ScheduleItem createItem(long start, long end, String resourceId) {
+<span class="fc" id="L554">        String calendarId = resourceId;</span>
+<span class="pc bpc" id="L555" title="3 of 4 branches missed.">        if (calendarId == null &amp;&amp; !resources.isEmpty()) {</span>
+<span class="nc" id="L556">            calendarId = resources.get(0).getId();</span>
+        }
+<span class="fc" id="L558">        CalendarInfo info = calendars.get(calendarId);</span>
+<span class="pc bpc" id="L559" title="4 of 10 branches missed.">        if (!creationEnabled || info == null || info.isReadOnly() || freeBusyOnly.contains(calendarId) || end &lt;= start) {</span>
+<span class="fc" id="L560">            return null;</span>
+        }
+<span class="fc" id="L562">        final CalendarEvent e = new CalendarEvent().setCalendarId(calendarId).setTitle(newEventTitle)</span>
+<span class="fc" id="L563">                .setStart(CalendarDateTime.instant(Instant.ofEpochMilli(start), zone))</span>
+<span class="fc" id="L564">                .setEnd(CalendarDateTime.instant(Instant.ofEpochMilli(end), zone));</span>
+<span class="fc" id="L565">        final ScheduleItem item = new ScheduleItem(&quot;new-&quot; + (++created) + &quot;-&quot; + start, newEventTitle, start, end)</span>
+<span class="fc" id="L566">                .setResourceId(calendarId).setUserObject(e);</span>
+<span class="fc" id="L567">        move(item, null, calendarId);</span>
+<span class="fc" id="L568">        fireChanged();</span>
+<span class="fc" id="L569">        final String cal = calendarId;</span>
+<span class="fc" id="L570">        final int seen = loads;</span>
+<span class="fc" id="L571">        source.saveEvent(e, CalendarMutationScope.ALL).ready(new SuccessCallback&lt;CalendarEvent&gt;() {</span>
+            @Override
+            public void onSucess(CalendarEvent saved) {
+<span class="fc" id="L574">                lastError = null;</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">                if (saved != null) {</span>
+<span class="fc" id="L576">                    item.setUserObject(saved);</span>
+                }
+<span class="fc" id="L578">                loadIfOvertaken(seen);</span>
+<span class="fc" id="L579">            }</span>
+<span class="fc" id="L580">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="fc" id="L583">                lastError = err;</span>
+<span class="fc" id="L584">                Log.e(err);</span>
+<span class="fc" id="L585">                List&lt;ScheduleItem&gt; list = items.get(cal);</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">                if (list != null) {</span>
+<span class="fc" id="L587">                    list.remove(item);</span>
+                }
+<span class="fc" id="L589">                fireChanged();</span>
+<span class="fc" id="L590">            }</span>
+        });
+<span class="fc" id="L592">        return item;</span>
+    }
+
+    @Override
+    public boolean removeItem(ScheduleItem given) {
+        // The held item has the version the source gave last.
+<span class="fc" id="L598">        final ScheduleItem found = held(given);</span>
+<span class="pc bpc" id="L599" title="1 of 2 branches missed.">        final ScheduleItem item = found == null ? given : found;</span>
+<span class="fc" id="L600">        final CalendarEvent e = eventOf(item);</span>
+<span class="pc bpc" id="L601" title="2 of 4 branches missed.">        if (e == null || !item.isMovable()) {</span>
+<span class="nc" id="L602">            return false;</span>
+        }
+<span class="fc" id="L604">        final int seen = loads;</span>
+<span class="fc" id="L605">        final String cal = item.getResourceId();</span>
+<span class="fc" id="L606">        final List&lt;ScheduleItem&gt; list = items.get(cal);</span>
+        // A load since the caller was given this item made another object
+        // for the same event, so the one to take out is found by its id.
+<span class="fc" id="L609">        ScheduleItem held = null;</span>
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">        if (list != null) {</span>
+<span class="pc bpc" id="L611" title="1 of 2 branches missed.">            for (ScheduleItem each : list) {</span>
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">                if (each.getId().equals(item.getId())) {</span>
+<span class="fc" id="L613">                    held = each;</span>
+<span class="fc" id="L614">                    break;</span>
+                }
+<span class="nc" id="L616">            }</span>
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">            if (held != null) {</span>
+<span class="fc" id="L618">                list.remove(held);</span>
+            }
+        }
+<span class="fc" id="L621">        final ScheduleItem taken = held;</span>
+<span class="fc" id="L622">        fireChanged();</span>
+<span class="fc" id="L623">        source.deleteEvent(cal, e.getId(), mutationScope, e.getVersion()).ready(new SuccessCallback&lt;Boolean&gt;() {</span>
+            @Override
+            public void onSucess(Boolean done) {
+<span class="fc" id="L626">                lastError = null;</span>
+<span class="fc" id="L627">                loadIfOvertaken(seen);</span>
+<span class="fc" id="L628">            }</span>
+<span class="fc" id="L629">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="fc" id="L632">                lastError = err;</span>
+<span class="fc" id="L633">                Log.e(err);</span>
+                // Back at once if nothing was loaded in between, and then
+                // whatever the source really holds.
+<span class="pc bpc" id="L636" title="3 of 6 branches missed.">                if (taken != null &amp;&amp; items.get(cal) == list &amp;&amp; !list.contains(taken)) { //NOPMD CompareObjectsWithEquals - the same list, not an equal one</span>
+<span class="fc" id="L637">                    list.add(taken);</span>
+                }
+<span class="fc" id="L639">                fireChanged();</span>
+<span class="fc" id="L640">                load();</span>
+<span class="fc" id="L641">            }</span>
+        });
+<span class="fc" id="L643">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

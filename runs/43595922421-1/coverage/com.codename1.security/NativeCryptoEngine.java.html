@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeCryptoEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">NativeCryptoEngine.java</span></div><h1>NativeCryptoEngine.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// The [CryptoEngine] of the ParparVM targets (iOS, macOS, native Windows and
+/// Linux, and the backend): secp256k1, Schnorr, Ed25519 and Keccak run in
+/// the linked C kernels, everything else goes to the engine it wraps.
+///
+/// The kernels are linked only into a build whose classes use these APIs,
+/// so a port creates this engine through [#create(CryptoEngine)], which
+/// answers the wrapped engine when they are absent.
+@com.codename1.impl.SharedWithBackend
+public class NativeCryptoEngine extends CryptoEngine {
+    private static final int PUB_COMPRESSED = 33;
+    private static final int PUB_UNCOMPRESSED = 65;
+
+    private final CryptoEngine next;
+
+    /// Creates the engine over the one that handles what the kernels do not.
+<span class="nc" id="L40">    protected NativeCryptoEngine(CryptoEngine next) {</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        this.next = next == null ? new CryptoEngine() : next;</span>
+<span class="nc" id="L42">    }</span>
+
+    /// This engine over `next` when the kernels are linked, otherwise
+    /// `next` itself. Call it only on a ParparVM target: elsewhere the
+    /// native methods have no implementation.
+    public static CryptoEngine create(CryptoEngine next) {
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (NativeCryptoKernels.available()) {</span>
+<span class="nc" id="L49">            return new NativeCryptoEngine(next);</span>
+        }
+<span class="nc" id="L51">        return next;</span>
+    }
+
+    @Override
+    public boolean randomBytes(byte[] out) {
+<span class="nc" id="L56">        return next.randomBytes(out);</span>
+    }
+
+    @Override
+    public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+<span class="nc" id="L61">        int bits = bits(hashAlgorithm);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (bits == 0) {</span>
+<span class="nc" id="L63">            return next.pbkdf2(hashAlgorithm, password, salt, iterations, length);</span>
+        }
+<span class="nc" id="L65">        byte[] out = new byte[length];</span>
+<span class="nc" id="L66">        NativeCryptoKernels.pbkdf2(bits, password, salt, iterations, out);</span>
+<span class="nc" id="L67">        return out;</span>
+    }
+
+    @Override
+    public byte[] secpPublicKey(byte[] privateKey, boolean compressed) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (!is(privateKey, 32)) {</span>
+<span class="nc" id="L73">            return null;</span>
+        }
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        byte[] out = new byte[compressed ? PUB_COMPRESSED : PUB_UNCOMPRESSED];</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        return NativeCryptoKernels.secpPublicKey(privateKey, out) ? out : null;</span>
+    }
+
+    @Override
+    public byte[] secpSign(byte[] hash, byte[] privateKey) {
+<span class="nc bnc" id="L81" title="All 4 branches missed.">        if (!is(hash, 32) || !is(privateKey, 32)) {</span>
+<span class="nc" id="L82">            return null;</span>
+        }
+<span class="nc" id="L84">        byte[] out = new byte[65];</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        return NativeCryptoKernels.secpSign(hash, privateKey, out) ? out : null;</span>
+    }
+
+    @Override
+    public int secpVerify(byte[] hash, byte[] compactSignature, byte[] publicKey) {
+<span class="nc bnc" id="L90" title="All 6 branches missed.">        if (!is(hash, 32) || !is(compactSignature, 64) || !isPublicKeyLength(publicKey)) {</span>
+<span class="nc" id="L91">            return -1;</span>
+        }
+<span class="nc" id="L93">        return NativeCryptoKernels.secpVerify(hash, compactSignature, publicKey);</span>
+    }
+
+    @Override
+    public byte[] secpRecover(byte[] hash, byte[] compactSignature, int recoveryId, boolean compressed) {
+<span class="nc bnc" id="L98" title="All 8 branches missed.">        if (!is(hash, 32) || !is(compactSignature, 64) || recoveryId &lt; 0 || recoveryId &gt; 3) {</span>
+<span class="nc" id="L99">            return null;</span>
+        }
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        byte[] out = new byte[compressed ? PUB_COMPRESSED : PUB_UNCOMPRESSED];</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        return NativeCryptoKernels.secpRecover(hash, compactSignature, recoveryId, out) ? out : null;</span>
+    }
+
+    @Override
+    public byte[] secpPrivateKeyTweakAdd(byte[] privateKey, byte[] tweak) {
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        if (!is(privateKey, 32) || !is(tweak, 32)) {</span>
+<span class="nc" id="L108">            return null;</span>
+        }
+<span class="nc" id="L110">        byte[] out = new byte[32];</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        return NativeCryptoKernels.secpPrivateTweakAdd(privateKey, tweak, out) ? out : null;</span>
+    }
+
+    @Override
+    public byte[] secpPublicKeyTweakAdd(byte[] publicKey, byte[] tweak, boolean compressed) {
+<span class="nc bnc" id="L116" title="All 4 branches missed.">        if (!isPublicKeyLength(publicKey) || !is(tweak, 32)) {</span>
+<span class="nc" id="L117">            return null;</span>
+        }
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        byte[] out = new byte[compressed ? PUB_COMPRESSED : PUB_UNCOMPRESSED];</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        return NativeCryptoKernels.secpPublicTweakAdd(publicKey, tweak, out) ? out : null;</span>
+    }
+
+    @Override
+    public byte[] schnorrPublicKey(byte[] privateKey) {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (!is(privateKey, 32)) {</span>
+<span class="nc" id="L126">            return null;</span>
+        }
+<span class="nc" id="L128">        byte[] out = new byte[32];</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        return NativeCryptoKernels.xOnlyPublicKey(privateKey, out) ? out : null;</span>
+    }
+
+    @Override
+    public byte[] schnorrSign(byte[] message, byte[] privateKey, byte[] auxRand) {
+<span class="nc bnc" id="L134" title="All 8 branches missed.">        if (message == null || !is(privateKey, 32) || (auxRand != null &amp;&amp; auxRand.length != 32)) {</span>
+<span class="nc" id="L135">            return null;</span>
+        }
+<span class="nc" id="L137">        byte[] out = new byte[64];</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        return NativeCryptoKernels.schnorrSign(message, privateKey, auxRand, out) ? out : null;</span>
+    }
+
+    @Override
+    public int schnorrVerify(byte[] message, byte[] signature, byte[] publicKey) {
+<span class="nc bnc" id="L143" title="All 6 branches missed.">        if (message == null || !is(signature, 64) || !is(publicKey, 32)) {</span>
+<span class="nc" id="L144">            return -1;</span>
+        }
+<span class="nc" id="L146">        return NativeCryptoKernels.schnorrVerify(message, signature, publicKey);</span>
+    }
+
+    @Override
+    public byte[] ed25519PublicKey(byte[] privateKey) {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (!is(privateKey, 32)) {</span>
+<span class="nc" id="L152">            return null;</span>
+        }
+<span class="nc" id="L154">        byte[] out = new byte[32];</span>
+<span class="nc" id="L155">        NativeCryptoKernels.ed25519PublicKey(privateKey, out);</span>
+<span class="nc" id="L156">        return out;</span>
+    }
+
+    @Override
+    public byte[] ed25519Sign(byte[] privateKey, byte[] publicKey, byte[] message) {
+<span class="nc bnc" id="L161" title="All 6 branches missed.">        if (!is(privateKey, 32) || !is(publicKey, 32) || message == null) {</span>
+<span class="nc" id="L162">            return null;</span>
+        }
+<span class="nc" id="L164">        byte[] out = new byte[64];</span>
+<span class="nc" id="L165">        NativeCryptoKernels.ed25519Sign(privateKey, publicKey, message, out);</span>
+<span class="nc" id="L166">        return out;</span>
+    }
+
+    @Override
+    public int ed25519Verify(byte[] message, byte[] signature, byte[] publicKey) {
+<span class="nc bnc" id="L171" title="All 6 branches missed.">        if (message == null || !is(signature, 64) || !is(publicKey, 32)) {</span>
+<span class="nc" id="L172">            return -1;</span>
+        }
+        // ed25519-donna checks only the top bits of S and accepts a
+        // non-canonical key; RFC 8032 rejects both, as the Java verifier
+        // does. Refuse S &gt;= L here, and leave the rare key encodings donna
+        // reads differently (y &gt;= p, and x = 0 with the sign bit set) to Java.
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (!Ed25519Math.isCanonicalScalar(signature, 32)) {</span>
+<span class="nc" id="L179">            return 0;</span>
+        }
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (!isOrdinaryEdwardsKey(publicKey)) {</span>
+<span class="nc" id="L182">            return -1;</span>
+        }
+<span class="nc" id="L184">        return NativeCryptoKernels.ed25519Verify(message, signature, publicKey);</span>
+    }
+
+    @Override
+    public byte[] keccak256(byte[] data) {
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L190">            return null;</span>
+        }
+<span class="nc" id="L192">        byte[] out = new byte[32];</span>
+<span class="nc" id="L193">        NativeCryptoKernels.keccak256(data, 0, data.length, out);</span>
+<span class="nc" id="L194">        return out;</span>
+    }
+
+    @Override
+    public byte[] sha256(byte[] data, int offset, int length) {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (!inRange(data, offset, length)) {</span>
+<span class="nc" id="L200">            return null;</span>
+        }
+<span class="nc" id="L202">        byte[] out = new byte[32];</span>
+<span class="nc" id="L203">        NativeCryptoKernels.sha256(data, offset, length, out);</span>
+<span class="nc" id="L204">        return out;</span>
+    }
+
+    @Override
+    public byte[] sha512(byte[] data, int offset, int length) {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (!inRange(data, offset, length)) {</span>
+<span class="nc" id="L210">            return null;</span>
+        }
+<span class="nc" id="L212">        byte[] out = new byte[64];</span>
+<span class="nc" id="L213">        NativeCryptoKernels.sha512(data, offset, length, out);</span>
+<span class="nc" id="L214">        return out;</span>
+    }
+
+    @Override
+    public byte[] ripemd160(byte[] data, int offset, int length) {
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (!inRange(data, offset, length)) {</span>
+<span class="nc" id="L220">            return null;</span>
+        }
+<span class="nc" id="L222">        byte[] out = new byte[20];</span>
+<span class="nc" id="L223">        NativeCryptoKernels.ripemd160(data, offset, length, out);</span>
+<span class="nc" id="L224">        return out;</span>
+    }
+
+    @Override
+    public byte[] hmac(String hashAlgorithm, byte[] key, byte[] data) {
+<span class="nc" id="L229">        int bits = bits(hashAlgorithm);</span>
+<span class="nc bnc" id="L230" title="All 6 branches missed.">        if (bits == 0 || key == null || data == null) {</span>
+<span class="nc" id="L231">            return null;</span>
+        }
+<span class="nc" id="L233">        byte[] out = new byte[bits / 8];</span>
+<span class="nc" id="L234">        NativeCryptoKernels.hmac(bits, key, data, 0, data.length, out);</span>
+<span class="nc" id="L235">        return out;</span>
+    }
+
+    @Override
+    public void verifyBatch(int algorithm, byte[][] messages, byte[][] signatures, byte[][] publicKeys,
+            byte[] results) {
+<span class="nc" id="L241">        int n = results.length;</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        boolean ecdsa = algorithm == BATCH_SECP256K1;</span>
+<span class="nc" id="L243">        long messageBytes = 0;</span>
+<span class="nc" id="L244">        long keyBytes = 0;</span>
+<span class="nc" id="L245">        int todo = 0;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            if (results[i] != CryptoBatch.TODO) {</span>
+<span class="nc" id="L248">                continue;</span>
+            }
+<span class="nc bnc" id="L250" title="All 6 branches missed.">            if (ecdsa &amp;&amp; (messages[i].length != 32 || !isPublicKeyLength(publicKeys[i]))) {</span>
+<span class="nc" id="L251">                results[i] = CryptoBatch.JAVA;</span>
+<span class="nc" id="L252">                continue;</span>
+            }
+<span class="nc bnc" id="L254" title="All 2 branches missed.">            if (algorithm == BATCH_ED25519) {</span>
+                // the same refusals as ed25519Verify, entry by entry
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                if (!Ed25519Math.isCanonicalScalar(signatures[i], 32)) {</span>
+<span class="nc" id="L257">                    results[i] = 0;</span>
+<span class="nc" id="L258">                    continue;</span>
+                }
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                if (!isOrdinaryEdwardsKey(publicKeys[i])) {</span>
+<span class="nc" id="L261">                    results[i] = CryptoBatch.JAVA;</span>
+<span class="nc" id="L262">                    continue;</span>
+                }
+            }
+<span class="nc" id="L265">            messageBytes += messages[i].length;</span>
+<span class="nc" id="L266">            keyBytes += publicKeys[i].length;</span>
+<span class="nc" id="L267">            todo++;</span>
+        }
+<span class="nc bnc" id="L269" title="All 6 branches missed.">        if (todo == 0 || messageBytes &gt; Integer.MAX_VALUE / 2 || keyBytes &gt; Integer.MAX_VALUE / 2) {</span>
+<span class="nc" id="L270">            return;</span>
+        }
+        // every entry keeps its slot; one the engine is not to verify is an empty slice
+<span class="nc" id="L273">        byte[] msgs = new byte[(int) messageBytes];</span>
+<span class="nc" id="L274">        int[] msgOff = new int[n + 1];</span>
+<span class="nc" id="L275">        byte[] sigs = new byte[64 * n];</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        byte[] keys = new byte[ecdsa ? (int) keyBytes : 32 * n];</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        int[] keyOff = ecdsa ? new int[n + 1] : null;</span>
+<span class="nc" id="L278">        int mo = 0;</span>
+<span class="nc" id="L279">        int ko = 0;</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L281">            msgOff[i] = mo;</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            if (ecdsa) {</span>
+<span class="nc" id="L283">                keyOff[i] = ko;</span>
+            }
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            if (results[i] != CryptoBatch.TODO) {</span>
+<span class="nc" id="L286">                continue;</span>
+            }
+<span class="nc" id="L288">            System.arraycopy(messages[i], 0, msgs, mo, messages[i].length);</span>
+<span class="nc" id="L289">            mo += messages[i].length;</span>
+<span class="nc" id="L290">            System.arraycopy(signatures[i], 0, sigs, 64 * i, 64);</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">            if (ecdsa) {</span>
+<span class="nc" id="L292">                System.arraycopy(publicKeys[i], 0, keys, ko, publicKeys[i].length);</span>
+<span class="nc" id="L293">                ko += publicKeys[i].length;</span>
+            } else {
+<span class="nc" id="L295">                System.arraycopy(publicKeys[i], 0, keys, 32 * i, 32);</span>
+            }
+        }
+<span class="nc" id="L298">        msgOff[n] = mo;</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">        if (ecdsa) {</span>
+<span class="nc" id="L300">            keyOff[n] = ko;</span>
+        }
+<span class="nc" id="L302">        NativeCryptoKernels.batch(algorithm, msgs, msgOff, sigs, keys, keyOff, results, n);</span>
+<span class="nc" id="L303">    }</span>
+
+    @Override
+    public void verifyPacked(int algorithm, byte[] messages, int messageLength, byte[] signatures, byte[] keys,
+            int keyLength, byte[] results, int count) {
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        if (algorithm == BATCH_ED25519) {</span>
+            // the same refusals as ed25519Verify, entry by entry, read in place
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                if (!Ed25519Math.isCanonicalScalar(signatures, 64 * i + 32)) {</span>
+<span class="nc" id="L312">                    results[i] = 0;</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">                } else if (!isOrdinaryEdwardsKey(keys, 32 * i)) {</span>
+<span class="nc" id="L314">                    results[i] = CryptoBatch.JAVA;</span>
+                }
+            }
+        }
+<span class="nc" id="L318">        NativeCryptoKernels.batchPacked(algorithm, messages, messageLength, signatures, keys, keyLength, results,</span>
+                count);
+<span class="nc" id="L320">    }</span>
+
+    @Override
+    public boolean hashPacked(String algorithm, byte[] inputs, int inputLength, int count, byte[] digests) {
+<span class="nc bnc" id="L324" title="All 4 branches missed.">        int kind = Hash.SHA256.equals(algorithm) ? 11 : Hash.KECCAK256.equals(algorithm) ? 12 : 0;</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        if (kind == 0) {</span>
+<span class="nc" id="L326">            return false;</span>
+        }
+<span class="nc" id="L328">        NativeCryptoKernels.batchPacked(kind, inputs, inputLength, null, null, 0, digests, count);</span>
+<span class="nc" id="L329">        return true;</span>
+    }
+
+    @Override
+    public byte[][] hashBatch(String algorithm, byte[][] inputs) {
+<span class="nc bnc" id="L334" title="All 4 branches missed.">        int kind = Hash.SHA256.equals(algorithm) ? 11 : Hash.KECCAK256.equals(algorithm) ? 12 : 0;</span>
+<span class="nc" id="L335">        int n = inputs.length;</span>
+<span class="nc" id="L336">        long total = 0;</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">            total += inputs[i] == null ? 0 : inputs[i].length;</span>
+        }
+<span class="nc bnc" id="L340" title="All 8 branches missed.">        if (kind == 0 || n == 0 || total &gt; Integer.MAX_VALUE / 2 || 32L * n &gt; Integer.MAX_VALUE / 2) {</span>
+<span class="nc" id="L341">            return null;</span>
+        }
+<span class="nc" id="L343">        byte[] msgs = new byte[(int) total];</span>
+<span class="nc" id="L344">        int[] off = new int[n + 1];</span>
+<span class="nc" id="L345">        int o = 0;</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L347">            off[i] = o;</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">            if (inputs[i] != null) {</span>
+<span class="nc" id="L349">                System.arraycopy(inputs[i], 0, msgs, o, inputs[i].length);</span>
+<span class="nc" id="L350">                o += inputs[i].length;</span>
+            }
+        }
+<span class="nc" id="L353">        off[n] = o;</span>
+<span class="nc" id="L354">        byte[] digests = new byte[32 * n];</span>
+<span class="nc" id="L355">        NativeCryptoKernels.batch(kind, msgs, off, null, null, null, digests, n);</span>
+<span class="nc" id="L356">        byte[][] out = new byte[n][];</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">            if (inputs[i] != null) {</span>
+<span class="nc" id="L359">                out[i] = new byte[32];</span>
+<span class="nc" id="L360">                System.arraycopy(digests, 32 * i, out[i], 0, 32);</span>
+            }
+        }
+<span class="nc" id="L363">        return out;</span>
+    }
+
+    /// 256 or 512 for the SHA-2 hashes the kernels implement, 0 for anything
+    /// else.
+    private static int bits(String hashAlgorithm) {
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        if (Hash.SHA512.equals(hashAlgorithm)) {</span>
+<span class="nc" id="L370">            return 512;</span>
+        }
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        return Hash.SHA256.equals(hashAlgorithm) ? 256 : 0;</span>
+    }
+
+    private static boolean inRange(byte[] data, int offset, int length) {
+<span class="nc bnc" id="L376" title="All 8 branches missed.">        return data != null &amp;&amp; offset &gt;= 0 &amp;&amp; length &gt;= 0 &amp;&amp; length &lt;= data.length - offset;</span>
+    }
+
+    /// Whether `y` (the low 255 bits, little endian) is below
+    /// `p - 1 = 2^255 - 20`. That excludes every non-canonical `y`, and the
+    /// two values `y = 1` and `y = -1` aside, every point with `x = 0`;
+    /// `y = 1` is checked separately.
+    private static boolean isOrdinaryEdwardsKey(byte[] key) {
+<span class="nc" id="L384">        return isOrdinaryEdwardsKey(key, 0);</span>
+    }
+
+    private static boolean isOrdinaryEdwardsKey(byte[] key, int o) {
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        if ((key[o + 31] &amp; 0x7f) == 0x7f) {</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">            for (int i = 30; i &gt; 0; i--) {</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">                if ((key[o + i] &amp; 0xff) != 0xff) {</span>
+<span class="nc" id="L391">                    return true;</span>
+                }
+            }
+            // y &gt;= 2^255 - 256: only y &lt; 2^255 - 20 is ordinary
+<span class="nc bnc" id="L395" title="All 2 branches missed.">            return (key[o] &amp; 0xff) &lt; 0xec;</span>
+        }
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        if ((key[o + 31] &amp; 0x80) == 0) {</span>
+<span class="nc" id="L398">            return true;</span>
+        }
+        // sign bit set: y = 1 would make x = 0 with a negative sign
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        if (key[o] != 1) {</span>
+<span class="nc" id="L402">            return true;</span>
+        }
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        for (int i = 1; i &lt; 31; i++) {</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">            if (key[o + i] != 0) {</span>
+<span class="nc" id="L406">                return true;</span>
+            }
+        }
+<span class="nc bnc" id="L409" title="All 2 branches missed.">        return (key[o + 31] &amp; 0x7f) != 0;</span>
+    }
+
+    private static boolean is(byte[] a, int length) {
+<span class="nc bnc" id="L413" title="All 4 branches missed.">        return a != null &amp;&amp; a.length == length;</span>
+    }
+
+    private static boolean isPublicKeyLength(byte[] key) {
+<span class="nc bnc" id="L417" title="All 6 branches missed.">        return key != null &amp;&amp; (key.length == PUB_COMPRESSED || key.length == PUB_UNCOMPRESSED);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

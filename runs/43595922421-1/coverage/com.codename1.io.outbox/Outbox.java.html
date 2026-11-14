@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Outbox.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.outbox</a> &gt; <span class="el_source">Outbox.java</span></div><h1>Outbox.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.outbox;
+
+import com.codename1.impl.orm.Attribute;
+import com.codename1.impl.orm.SessionImpl;
+import com.codename1.impl.orm.SqlAccess;
+import com.codename1.orm.session.PersistenceException;
+import com.codename1.orm.session.Session;
+import java.io.IOException;
+import java.util.List;
+
+/// A durable queue of outgoing messages, kept in the application's own database,
+/// for a device whose link to the server comes and goes.
+///
+/// The device records what it has to say with [#enqueue(String, byte[])] and
+/// sends it with [#flush(Transport)] whenever the link might be up. Messages
+/// survive a restart or a power cut, leave in the order they were enqueued, and
+/// are removed only once the transport reports them delivered.
+///
+/// The table lives in the database of the [Session] the outbox was opened on,
+/// and an `enqueue` inside one of that session's transactions belongs to the
+/// transaction: a reading saved through the ORM and the message announcing it
+/// commit together or not at all. That is the point of keeping the queue there
+/// rather than in a file of its own.
+///
+/// ```java {class=&quot;cn1-no-try&quot;}
+/// Outbox outbox = Outbox.open(session, &quot;readings@&quot; + deviceId);
+/// session.beginTransaction();
+/// session.persist(reading);
+/// outbox.enqueue(&quot;/v1/readings&quot;, body);
+/// session.commitTransaction();
+///
+/// // Later, from a timer or when the network comes back. postToServer is the
+/// // application's own call: Rest on a client, Web on the backend.
+/// outbox.flush(message -&gt; {
+///     int status = postToServer(message.getTopic(), message.getKey(), message.getPayload());
+///     return status &lt; 300 ? Outbox.DELIVERED : status &lt; 500 ? Outbox.REJECTED : Outbox.RETRY;
+/// });
+/// ```
+///
+/// Delivery is at least once. A message is removed after the transport answers
+/// [#DELIVERED]; if the answer never arrives the same message, with the same
+/// [OutboxMessage#getKey()], is sent again, and the receiver drops the copy.
+/// Several devices feeding one server should put their identity in the outbox
+/// name, which is the first half of the key.
+///
+/// Like its session, an outbox is used from one thread at a time. The outbox
+/// works on the client and on the backend alike.
+@com.codename1.impl.SharedWithBackend
+public final class Outbox {
+    /// The receiver has the message; it is removed.
+    public static final int DELIVERED = 0;
+    /// Try again later. The message stays at the head, and the flush stops so
+    /// that nothing overtakes it.
+    public static final int RETRY = 1;
+    /// The receiver will never take this message; it is dropped and counted in
+    /// [#getRejected()], and the flush moves on to the next one.
+    public static final int REJECTED = 2;
+
+    /// Sends one message and says what became of it.
+    public interface Transport {
+        /// Delivers a message.
+        ///
+        /// @param message the message at the head of the outbox
+        /// @return [#DELIVERED], [#RETRY] or [#REJECTED]
+        /// @throws IOException when the link failed, which is read as [#RETRY]
+        int deliver(OutboxMessage message) throws IOException;
+    }
+
+    private static final String TABLE = &quot;cn1_outbox&quot;;
+<span class="nc" id="L92">    private static final int[] HEAD_KINDS = {Attribute.BIGINT, Attribute.TEXT, Attribute.BLOB, Attribute.INTEGER,</span>
+        Attribute.BIGINT, Attribute.BIGINT};
+<span class="nc" id="L94">    private static final int[] COUNT_KINDS = {Attribute.BIGINT};</span>
+
+    private final Session session;
+    private final SqlAccess sql;
+    private final String name;
+    private final String table;
+<span class="nc" id="L100">    private long minBackoff = 1000L;</span>
+<span class="nc" id="L101">    private long maxBackoff = 300000L;</span>
+    private int maxAttempts;
+    private int capacity;
+    private boolean dropOldest;
+    private long rejected;
+
+<span class="nc" id="L107">    private Outbox(Session session, SqlAccess sql, String name) {</span>
+<span class="nc" id="L108">        this.session = session;</span>
+<span class="nc" id="L109">        this.sql = sql;</span>
+<span class="nc" id="L110">        this.name = name;</span>
+<span class="nc" id="L111">        this.table = sql.quote(TABLE);</span>
+<span class="nc" id="L112">    }</span>
+
+    /// Opens an outbox, creating its table on first use. Outboxes of different
+    /// names share the table and never see each other's messages.
+    ///
+    /// @param session a session from `EntityManager.openSession()`
+    /// @param name the outbox name, which also starts every message key
+    /// @return the outbox
+    /// @throws PersistenceException if the table cannot be created
+    public static Outbox open(Session session, String name) {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (!(session instanceof SessionImpl)) {</span>
+<span class="nc" id="L123">            throw new IllegalArgumentException(&quot;An outbox needs a session from EntityManager.openSession()&quot;);</span>
+        }
+<span class="nc bnc" id="L125" title="All 4 branches missed.">        if (name == null || name.length() == 0) {</span>
+<span class="nc" id="L126">            throw new IllegalArgumentException(&quot;An outbox needs a name&quot;);</span>
+        }
+<span class="nc" id="L128">        Outbox outbox = new Outbox(session, ((SessionImpl) session).sqlAccess(), name);</span>
+<span class="nc" id="L129">        outbox.createTable();</span>
+<span class="nc" id="L130">        return outbox;</span>
+    }
+
+    private String q(String column) {
+<span class="nc" id="L134">        return sql.quote(column);</span>
+    }
+
+    private void createTable() {
+        try {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (!sql.describe(TABLE).isEmpty()) {</span>
+<span class="nc" id="L140">                return;</span>
+            }
+<span class="nc" id="L142">            sql.execute(&quot;CREATE TABLE &quot; + table + &quot; (&quot;</span>
+<span class="nc" id="L143">                    + q(&quot;id&quot;) + &quot; &quot; + sql.generatedKeyColumn(Attribute.BIGINT, q(&quot;id&quot;)) + &quot;, &quot;</span>
+<span class="nc" id="L144">                    + q(&quot;box&quot;) + &quot; &quot; + sql.columnType(Attribute.TEXT) + &quot; NOT NULL, &quot;</span>
+<span class="nc" id="L145">                    + q(&quot;topic&quot;) + &quot; &quot; + sql.columnType(Attribute.TEXT) + &quot; NOT NULL, &quot;</span>
+<span class="nc" id="L146">                    + q(&quot;payload&quot;) + &quot; &quot; + sql.columnType(Attribute.BLOB) + &quot; NOT NULL, &quot;</span>
+<span class="nc" id="L147">                    + q(&quot;attempts&quot;) + &quot; &quot; + sql.columnType(Attribute.INTEGER) + &quot; NOT NULL, &quot;</span>
+<span class="nc" id="L148">                    + q(&quot;created&quot;) + &quot; &quot; + sql.columnType(Attribute.BIGINT) + &quot; NOT NULL, &quot;</span>
+<span class="nc" id="L149">                    + q(&quot;due&quot;) + &quot; &quot; + sql.columnType(Attribute.BIGINT) + &quot; NOT NULL)&quot;, new Object[0]);</span>
+<span class="nc" id="L150">        } catch (IOException e) {</span>
+            // Another outbox (another process, on a server) may have created it
+            // between the two statements; only a table that is still missing is
+            // a failure.
+            try {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                if (!sql.describe(TABLE).isEmpty()) {</span>
+<span class="nc" id="L156">                    return;</span>
+                }
+<span class="nc" id="L158">            } catch (IOException ignored) {</span>
+                // Reported below with the first error.
+<span class="nc" id="L160">            }</span>
+<span class="nc" id="L161">            throw new PersistenceException(&quot;Cannot create the outbox table: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L162">        }</span>
+<span class="nc" id="L163">    }</span>
+
+    /// Sets how long a message waits after a failed delivery: `min` after the
+    /// first, doubling with each further failure up to `max`. The defaults are
+    /// one second and five minutes.
+    ///
+    /// @param min the first delay in milliseconds, 0 or more
+    /// @param max the longest delay in milliseconds, at least `min`
+    public void setBackoff(long min, long max) {
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        if (min &lt; 0 || max &lt; min) {</span>
+<span class="nc" id="L173">            throw new IllegalArgumentException(&quot;Backoff needs 0 &lt;= min &lt;= max&quot;);</span>
+        }
+<span class="nc" id="L175">        minBackoff = min;</span>
+<span class="nc" id="L176">        maxBackoff = max;</span>
+<span class="nc" id="L177">    }</span>
+
+    /// Sets how many deliveries a message gets before it is treated as
+    /// [#REJECTED]. 0, the default, retries forever.
+    ///
+    /// @param attempts the limit, or 0 for none
+    public void setMaxAttempts(int attempts) {
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (attempts &lt; 0) {</span>
+<span class="nc" id="L185">            throw new IllegalArgumentException(&quot;attempts &lt; 0&quot;);</span>
+        }
+<span class="nc" id="L187">        maxAttempts = attempts;</span>
+<span class="nc" id="L188">    }</span>
+
+    /// Bounds the outbox. When it is full, `dropOldest` makes room by discarding
+    /// the oldest messages, which suits telemetry where the newest reading
+    /// matters most; otherwise [#enqueue(String, byte[])] refuses the message.
+    /// 0, the default, is unbounded.
+    ///
+    /// @param messages the most messages kept, or 0 for no bound
+    /// @param dropOldest discard the oldest instead of refusing the newest
+    public void setCapacity(int messages, boolean dropOldest) {
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        if (messages &lt; 0) {</span>
+<span class="nc" id="L199">            throw new IllegalArgumentException(&quot;messages &lt; 0&quot;);</span>
+        }
+<span class="nc" id="L201">        capacity = messages;</span>
+<span class="nc" id="L202">        this.dropOldest = dropOldest;</span>
+<span class="nc" id="L203">    }</span>
+
+    /// Adds a message to the end of the outbox. Inside a transaction of the
+    /// outbox's session the message commits or rolls back with it; otherwise it
+    /// is committed before this returns.
+    ///
+    /// @param topic what the transport routes on, never null
+    /// @param payload the message body, copied
+    /// @return the message as it was stored
+    /// @throws PersistenceException if it cannot be stored, or the outbox is full
+    /// and set to refuse
+    public OutboxMessage enqueue(String topic, byte[] payload) {
+<span class="nc bnc" id="L215" title="All 4 branches missed.">        if (topic == null || payload == null) {</span>
+<span class="nc" id="L216">            throw new IllegalArgumentException(&quot;topic/payload is null&quot;);</span>
+        }
+<span class="nc" id="L218">        byte[] copy = new byte[payload.length];</span>
+<span class="nc" id="L219">        System.arraycopy(payload, 0, copy, 0, payload.length);</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        boolean own = !session.isTransactionActive();</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        if (own) {</span>
+<span class="nc" id="L222">            session.beginTransaction();</span>
+        }
+<span class="nc" id="L224">        boolean committed = false;</span>
+        try {
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (capacity &gt; 0) {</span>
+<span class="nc" id="L227">                makeRoom();</span>
+            }
+<span class="nc" id="L229">            long now = System.currentTimeMillis();</span>
+<span class="nc" id="L230">            long id = sql.insert(&quot;INSERT INTO &quot; + table + &quot; (&quot; + q(&quot;box&quot;) + &quot;, &quot; + q(&quot;topic&quot;) + &quot;, &quot; + q(&quot;payload&quot;)</span>
+<span class="nc" id="L231">                    + &quot;, &quot; + q(&quot;attempts&quot;) + &quot;, &quot; + q(&quot;created&quot;) + &quot;, &quot; + q(&quot;due&quot;) + &quot;) VALUES (?, ?, ?, ?, ?, ?)&quot;,</span>
+<span class="nc" id="L232">                    new Object[]{name, topic, copy, Integer.valueOf(0), Long.valueOf(now), Long.valueOf(now)}, &quot;id&quot;);</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (own) {</span>
+<span class="nc" id="L234">                session.commitTransaction();</span>
+            }
+<span class="nc" id="L236">            committed = true;</span>
+<span class="nc" id="L237">            return new OutboxMessage(id, name + &quot;/&quot; + id, topic, copy, 0, now);</span>
+<span class="nc" id="L238">        } catch (IOException e) {</span>
+<span class="nc" id="L239">            throw new PersistenceException(&quot;Outbox &quot; + name + &quot;: &quot; + e.getMessage(), e);</span>
+        } finally {
+<span class="nc bnc" id="L241" title="All 6 branches missed.">            if (own &amp;&amp; !committed &amp;&amp; session.isTransactionActive()) {</span>
+<span class="nc" id="L242">                session.rollbackTransaction();</span>
+            }
+        }
+    }
+
+    private void makeRoom() throws IOException {
+<span class="nc" id="L248">        long count = countRows();</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        if (count &lt; capacity) {</span>
+<span class="nc" id="L250">            return;</span>
+        }
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (!dropOldest) {</span>
+<span class="nc" id="L253">            throw new PersistenceException(&quot;Outbox &quot; + name + &quot; is full (&quot; + capacity + &quot; messages)&quot;);</span>
+        }
+        // The id of the newest message that has to go; everything up to it is dropped.
+<span class="nc" id="L256">        List&lt;Object[]&gt; rows = sql.query(&quot;SELECT &quot; + q(&quot;id&quot;) + &quot; FROM &quot; + table + &quot; WHERE &quot; + q(&quot;box&quot;) + &quot; = ? ORDER BY &quot;</span>
+<span class="nc" id="L257">                + q(&quot;id&quot;) + sql.limit(1, (int) (count - capacity)), new Object[]{name}, COUNT_KINDS);</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (!rows.isEmpty()) {</span>
+<span class="nc" id="L259">            rejected += sql.execute(&quot;DELETE FROM &quot; + table + &quot; WHERE &quot; + q(&quot;box&quot;) + &quot; = ? AND &quot; + q(&quot;id&quot;) + &quot; &lt;= ?&quot;,</span>
+<span class="nc" id="L260">                    new Object[]{name, Long.valueOf(number(rows.get(0)[0]))});</span>
+        }
+<span class="nc" id="L262">    }</span>
+
+    private long countRows() throws IOException {
+<span class="nc" id="L265">        List&lt;Object[]&gt; rows = sql.query(&quot;SELECT COUNT(*) FROM &quot; + table + &quot; WHERE &quot; + q(&quot;box&quot;) + &quot; = ?&quot;,</span>
+                new Object[]{name}, COUNT_KINDS);
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        return rows.isEmpty() ? 0 : number(rows.get(0)[0]);</span>
+    }
+
+    /// The number of messages waiting.
+    ///
+    /// @return the count
+    public int size() {
+        try {
+<span class="nc" id="L275">            return (int) countRows();</span>
+<span class="nc" id="L276">        } catch (IOException e) {</span>
+<span class="nc" id="L277">            throw new PersistenceException(&quot;Outbox &quot; + name + &quot;: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    /// When the head of the outbox may next be sent, in milliseconds since the
+    /// epoch, so a device can sleep until then; -1 when the outbox is empty.
+    ///
+    /// @return the time, or -1
+    public long nextAttemptTime() {
+        try {
+<span class="nc" id="L287">            Object[] head = head();</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            return head == null ? -1 : number(head[5]);</span>
+<span class="nc" id="L289">        } catch (IOException e) {</span>
+<span class="nc" id="L290">            throw new PersistenceException(&quot;Outbox &quot; + name + &quot;: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    /// Messages discarded so far by this outbox object: rejected by the
+    /// transport, out of attempts, or dropped to make room.
+    ///
+    /// @return the count since [#open(Session, String)]
+    public long getRejected() {
+<span class="nc" id="L299">        return rejected;</span>
+    }
+
+    private Object[] head() throws IOException {
+<span class="nc" id="L303">        List&lt;Object[]&gt; rows = sql.query(&quot;SELECT &quot; + q(&quot;id&quot;) + &quot;, &quot; + q(&quot;topic&quot;) + &quot;, &quot; + q(&quot;payload&quot;) + &quot;, &quot;</span>
+<span class="nc" id="L304">                + q(&quot;attempts&quot;) + &quot;, &quot; + q(&quot;created&quot;) + &quot;, &quot; + q(&quot;due&quot;) + &quot; FROM &quot; + table + &quot; WHERE &quot; + q(&quot;box&quot;)</span>
+<span class="nc" id="L305">                + &quot; = ? ORDER BY &quot; + q(&quot;id&quot;) + sql.limit(1, 0), new Object[]{name}, HEAD_KINDS);</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        return rows.isEmpty() ? null : rows.get(0);</span>
+    }
+
+    /// Sends what is due, oldest first, until the outbox is empty, the head is
+    /// waiting out a backoff, or a delivery has to be retried. Call it whenever
+    /// the link may be up; a flush that cannot send costs one query.
+    ///
+    /// Not inside a transaction: each delivery is network I/O, and each removal
+    /// commits by itself so that a crash mid-flush repeats at most one message.
+    ///
+    /// @param transport sends one message
+    /// @return how many messages were delivered
+    /// @throws IllegalStateException inside a transaction of the session
+    public int flush(Transport transport) {
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        if (session.isTransactionActive()) {</span>
+<span class="nc" id="L321">            throw new IllegalStateException(&quot;Outbox.flush runs outside a transaction&quot;);</span>
+        }
+<span class="nc" id="L323">        int delivered = 0;</span>
+        try {
+            for (;;) {
+<span class="nc" id="L326">                Object[] head = head();</span>
+<span class="nc bnc" id="L327" title="All 4 branches missed.">                if (head == null || number(head[5]) &gt; System.currentTimeMillis()) {</span>
+<span class="nc" id="L328">                    return delivered;</span>
+                }
+<span class="nc" id="L330">                long id = number(head[0]);</span>
+<span class="nc" id="L331">                int attempts = (int) number(head[3]);</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">                OutboxMessage message = new OutboxMessage(id, name + &quot;/&quot; + id,</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">                        head[1] instanceof String ? (String) head[1] : String.valueOf(head[1]),</span>
+<span class="nc" id="L334">                        head[2] instanceof byte[] ? (byte[]) head[2] : new byte[0], attempts, number(head[4]));</span>
+                int result;
+                try {
+<span class="nc" id="L337">                    result = transport.deliver(message);</span>
+<span class="nc" id="L338">                } catch (IOException e) {</span>
+<span class="nc" id="L339">                    result = RETRY;</span>
+<span class="nc" id="L340">                }</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">                if (result == DELIVERED) {</span>
+<span class="nc" id="L342">                    remove(id);</span>
+<span class="nc" id="L343">                    delivered++;</span>
+<span class="nc bnc" id="L344" title="All 6 branches missed.">                } else if (result == REJECTED || maxAttempts &gt; 0 &amp;&amp; attempts + 1 &gt;= maxAttempts) {</span>
+<span class="nc" id="L345">                    remove(id);</span>
+<span class="nc" id="L346">                    rejected++;</span>
+                } else {
+<span class="nc" id="L348">                    sql.execute(&quot;UPDATE &quot; + table + &quot; SET &quot; + q(&quot;attempts&quot;) + &quot; = ?, &quot; + q(&quot;due&quot;) + &quot; = ? WHERE &quot;</span>
+<span class="nc" id="L349">                            + q(&quot;id&quot;) + &quot; = ?&quot;, new Object[]{Integer.valueOf(attempts + 1),</span>
+<span class="nc" id="L350">                                Long.valueOf(System.currentTimeMillis() + backoff(attempts)), Long.valueOf(id)});</span>
+<span class="nc" id="L351">                    return delivered;</span>
+                }
+<span class="nc" id="L353">            }</span>
+<span class="nc" id="L354">        } catch (IOException e) {</span>
+<span class="nc" id="L355">            throw new PersistenceException(&quot;Outbox &quot; + name + &quot;: &quot; + e.getMessage(), e);</span>
+        }
+    }
+
+    private void remove(long id) throws IOException {
+<span class="nc" id="L360">        sql.execute(&quot;DELETE FROM &quot; + table + &quot; WHERE &quot; + q(&quot;id&quot;) + &quot; = ?&quot;, new Object[]{Long.valueOf(id)});</span>
+<span class="nc" id="L361">    }</span>
+
+    private long backoff(int failures) {
+<span class="nc" id="L364">        long delay = minBackoff;</span>
+<span class="nc bnc" id="L365" title="All 4 branches missed.">        for (int i = 0; i &lt; failures &amp;&amp; delay &lt; maxBackoff; i++) {</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">            delay = delay == 0 ? 0 : delay * 2;</span>
+        }
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        return delay &lt; maxBackoff ? delay : maxBackoff;</span>
+    }
+
+    private static long number(Object value) {
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        return value instanceof Number ? ((Number) value).longValue() : 0L;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

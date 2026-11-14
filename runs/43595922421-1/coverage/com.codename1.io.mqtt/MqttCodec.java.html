@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MqttCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.mqtt</a> &gt; <span class="el_source">MqttCodec.java</span></div><h1>MqttCodec.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.mqtt;
+
+import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/// Encodes and decodes MQTT 3.1.1 control packets on plain streams, so it is
+/// independent of the transport. QoS 2 packets (PUBREC, PUBREL, PUBCOMP) and a
+/// PUBLISH at QoS 2 are rejected with an [MqttException].
+public final class MqttCodec {
+    /// The largest remaining length the protocol can express, 268435455.
+    public static final int MAX_REMAINING_LENGTH = 268435455;
+
+    private MqttCodec() {
+    }
+
+    /// Encodes a remaining length as the protocol's variable length integer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: 0 to 268435455
+    ///
+    /// #### Returns
+    ///
+    /// one to four bytes
+    public static byte[] encodeRemainingLength(int value) {
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (value &lt; 0 || value &gt; MAX_REMAINING_LENGTH) {</span>
+<span class="fc" id="L52">            throw new IllegalArgumentException(&quot;remaining length out of range: &quot; + value);</span>
+        }
+<span class="fc" id="L54">        byte[] tmp = new byte[4];</span>
+<span class="fc" id="L55">        int n = 0;</span>
+        do {
+<span class="fc" id="L57">            int digit = value % 128;</span>
+<span class="fc" id="L58">            value = value / 128;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (value &gt; 0) {</span>
+<span class="fc" id="L60">                digit |= 0x80;</span>
+            }
+<span class="fc" id="L62">            tmp[n++] = (byte) digit;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        } while (value &gt; 0);</span>
+<span class="fc" id="L64">        byte[] out = new byte[n];</span>
+<span class="fc" id="L65">        System.arraycopy(tmp, 0, out, 0, n);</span>
+<span class="fc" id="L66">        return out;</span>
+    }
+
+    /// Encodes a packet to its wire form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the packet
+    ///
+    /// #### Returns
+    ///
+    /// the fixed header followed by the variable header and payload
+    ///
+    /// #### Throws
+    ///
+    /// `MqttException` when the packet cannot be represented
+    public static byte[] encode(MqttPacket p) throws IOException {
+<span class="fc" id="L83">        ByteArrayOutputStream body = new ByteArrayOutputStream();</span>
+<span class="fc" id="L84">        int flags = 0;</span>
+<span class="pc bpc" id="L85" title="1 of 9 branches missed.">        switch (p.getType()) {</span>
+            case MqttPacket.CONNECT:
+<span class="fc" id="L87">                writeConnect(p, body);</span>
+<span class="fc" id="L88">                break;</span>
+            case MqttPacket.CONNACK:
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                body.write(p.isSessionPresent() ? 1 : 0);</span>
+<span class="fc" id="L91">                body.write(p.getReturnCode());</span>
+<span class="fc" id="L92">                break;</span>
+            case MqttPacket.PUBLISH:
+<span class="fc bfc" id="L94" title="All 4 branches covered.">                flags = (p.isDup() ? 8 : 0) | (p.getQos() &lt;&lt; 1) | (p.isRetain() ? 1 : 0);</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">                if (p.getQos() &lt; 0 || p.getQos() &gt; 1) {</span>
+<span class="nc" id="L96">                    throw new MqttException(&quot;Only QoS 0 and 1 are supported&quot;);</span>
+                }
+<span class="fc" id="L98">                writeString(body, p.getTopic());</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                if (p.getQos() &gt; 0) {</span>
+<span class="fc" id="L100">                    writeId(body, p.getPacketId());</span>
+                }
+<span class="fc" id="L102">                body.write(p.getPayload(), 0, p.getPayload().length);</span>
+<span class="fc" id="L103">                break;</span>
+            case MqttPacket.PUBACK:
+            case MqttPacket.UNSUBACK:
+<span class="fc" id="L106">                writeId(body, p.getPacketId());</span>
+<span class="fc" id="L107">                break;</span>
+            case MqttPacket.SUBSCRIBE:
+<span class="fc" id="L109">                flags = 2;</span>
+<span class="fc" id="L110">                writeId(body, p.getPacketId());</span>
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">                if (p.getFilters().length == 0 || p.getFilters().length != p.getQosList().length) {</span>
+<span class="nc" id="L112">                    throw new MqttException(&quot;SUBSCRIBE needs matching, non empty filters and QoS lists&quot;);</span>
+                }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                for (int i = 0; i &lt; p.getFilters().length; i++) {</span>
+<span class="fc" id="L115">                    writeString(body, p.getFilters()[i]);</span>
+<span class="fc" id="L116">                    int q = p.getQosList()[i];</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">                    if (q &lt; 0 || q &gt; 1) {</span>
+<span class="nc" id="L118">                        throw new MqttException(&quot;Only QoS 0 and 1 are supported&quot;);</span>
+                    }
+<span class="fc" id="L120">                    body.write(q);</span>
+                }
+<span class="fc" id="L122">                break;</span>
+            case MqttPacket.SUBACK:
+<span class="fc" id="L124">                writeId(body, p.getPacketId());</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                for (int i = 0; i &lt; p.getQosList().length; i++) {</span>
+<span class="fc" id="L126">                    body.write(p.getQosList()[i]);</span>
+                }
+<span class="fc" id="L128">                break;</span>
+            case MqttPacket.UNSUBSCRIBE:
+<span class="fc" id="L130">                flags = 2;</span>
+<span class="fc" id="L131">                writeId(body, p.getPacketId());</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                if (p.getFilters().length == 0) {</span>
+<span class="nc" id="L133">                    throw new MqttException(&quot;UNSUBSCRIBE needs at least one filter&quot;);</span>
+                }
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                for (int i = 0; i &lt; p.getFilters().length; i++) {</span>
+<span class="fc" id="L136">                    writeString(body, p.getFilters()[i]);</span>
+                }
+<span class="fc" id="L138">                break;</span>
+            case MqttPacket.PINGREQ:
+            case MqttPacket.PINGRESP:
+            case MqttPacket.DISCONNECT:
+<span class="fc" id="L142">                break;</span>
+            default:
+<span class="nc" id="L144">                throw new MqttException(&quot;Unsupported packet type &quot; + p.getType());</span>
+        }
+<span class="fc" id="L146">        byte[] b = body.toByteArray();</span>
+<span class="fc" id="L147">        byte[] rl = encodeRemainingLength(b.length);</span>
+<span class="fc" id="L148">        byte[] out = new byte[1 + rl.length + b.length];</span>
+<span class="fc" id="L149">        out[0] = (byte) ((p.getType() &lt;&lt; 4) | flags);</span>
+<span class="fc" id="L150">        System.arraycopy(rl, 0, out, 1, rl.length);</span>
+<span class="fc" id="L151">        System.arraycopy(b, 0, out, 1 + rl.length, b.length);</span>
+<span class="fc" id="L152">        return out;</span>
+    }
+
+    /// Encodes a packet and writes it to a stream, without flushing it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the packet
+    ///
+    /// - `out`: the destination
+    public static void write(MqttPacket p, OutputStream out) throws IOException {
+<span class="fc" id="L163">        out.write(encode(p));</span>
+<span class="fc" id="L164">    }</span>
+
+    private static void writeConnect(MqttPacket p, ByteArrayOutputStream b) throws IOException {
+<span class="fc" id="L167">        writeString(b, &quot;MQTT&quot;);</span>
+<span class="fc" id="L168">        b.write(4);</span>
+<span class="fc" id="L169">        int f = 0;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (p.getUsername() != null) {</span>
+<span class="fc" id="L171">            f |= 0x80;</span>
+        }
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (p.getPassword() != null) {</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (p.getUsername() == null) {</span>
+<span class="nc" id="L175">                throw new MqttException(&quot;A password needs a user name&quot;);</span>
+            }
+<span class="fc" id="L177">            f |= 0x40;</span>
+        }
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (p.getWillTopic() != null) {</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            f |= 0x04 | (p.getWillQos() &lt;&lt; 3) | (p.isWillRetain() ? 0x20 : 0);</span>
+        }
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (p.isCleanSession()) {</span>
+<span class="fc" id="L183">            f |= 0x02;</span>
+        }
+<span class="fc" id="L185">        b.write(f);</span>
+<span class="fc" id="L186">        b.write(p.getKeepAlive() &gt;&gt; 8);</span>
+<span class="fc" id="L187">        b.write(p.getKeepAlive());</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        String id = p.getClientId() == null ? &quot;&quot; : p.getClientId();</span>
+<span class="pc bpc" id="L189" title="3 of 4 branches missed.">        if (id.length() == 0 &amp;&amp; !p.isCleanSession()) {</span>
+<span class="nc" id="L190">            throw new MqttException(&quot;An empty client id needs a clean session&quot;);</span>
+        }
+<span class="fc" id="L192">        writeString(b, id);</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (p.getWillTopic() != null) {</span>
+<span class="fc" id="L194">            writeString(b, p.getWillTopic());</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">            writeBytes(b, p.getWillPayload() == null ? new byte[0] : p.getWillPayload());</span>
+        }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (p.getUsername() != null) {</span>
+<span class="fc" id="L198">            writeString(b, p.getUsername());</span>
+        }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (p.getPassword() != null) {</span>
+<span class="fc" id="L201">            writeBytes(b, p.getPassword());</span>
+        }
+<span class="fc" id="L203">    }</span>
+
+    private static void writeId(ByteArrayOutputStream b, int id) throws IOException {
+<span class="pc bpc" id="L206" title="1 of 4 branches missed.">        if (id &lt; 1 || id &gt; 65535) {</span>
+<span class="fc" id="L207">            throw new MqttException(&quot;Packet id out of range: &quot; + id);</span>
+        }
+<span class="fc" id="L209">        b.write(id &gt;&gt; 8);</span>
+<span class="fc" id="L210">        b.write(id);</span>
+<span class="fc" id="L211">    }</span>
+
+    private static void writeString(ByteArrayOutputStream b, String s) throws IOException {
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L215">            throw new MqttException(&quot;Missing string&quot;);</span>
+        }
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (s.indexOf('\0') &gt;= 0) {</span>
+<span class="fc" id="L218">            throw new MqttException(&quot;MQTT strings must not contain U+0000&quot;);</span>
+        }
+<span class="fc" id="L220">        writeBytes(b, s.getBytes(&quot;UTF-8&quot;));</span>
+<span class="fc" id="L221">    }</span>
+
+    private static void writeBytes(ByteArrayOutputStream b, byte[] data) throws IOException {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (data.length &gt; 65535) {</span>
+<span class="nc" id="L225">            throw new MqttException(&quot;Field longer than 65535 bytes&quot;);</span>
+        }
+<span class="fc" id="L227">        b.write(data.length &gt;&gt; 8);</span>
+<span class="fc" id="L228">        b.write(data.length);</span>
+<span class="fc" id="L229">        b.write(data, 0, data.length);</span>
+<span class="fc" id="L230">    }</span>
+
+    /// Measures the first packet in a buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `buf`: received bytes
+    ///
+    /// - `off`: where the packet starts
+    ///
+    /// - `len`: how many bytes are available from `off`
+    ///
+    /// - `maxRemaining`: the largest remaining length to accept
+    ///
+    /// #### Returns
+    ///
+    /// the total size of the packet, fixed header included, or -1 when more
+    /// bytes are needed
+    ///
+    /// #### Throws
+    ///
+    /// `MqttException` when the length is malformed or above the limit
+    public static int packetLength(byte[] buf, int off, int len, int maxRemaining) throws IOException {
+<span class="fc" id="L253">        int remaining = 0;</span>
+<span class="fc" id="L254">        int mult = 1;</span>
+<span class="fc" id="L255">        int i = 1;</span>
+        while (true) {
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (i &gt;= len) {</span>
+<span class="fc" id="L258">                return -1;</span>
+            }
+<span class="fc" id="L260">            int d = buf[off + i] &amp; 0xff;</span>
+<span class="fc" id="L261">            remaining += (d &amp; 0x7f) * mult;</span>
+<span class="fc" id="L262">            i++;</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            if ((d &amp; 0x80) == 0) {</span>
+<span class="fc" id="L264">                break;</span>
+            }
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (i &gt; 4) {</span>
+<span class="fc" id="L267">                throw new MqttException(&quot;Malformed remaining length&quot;);</span>
+            }
+<span class="fc" id="L269">            mult *= 128;</span>
+<span class="fc" id="L270">        }</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (remaining &gt; maxRemaining) {</span>
+<span class="fc" id="L272">            throw new MqttException(&quot;Packet of &quot; + remaining + &quot; bytes exceeds the limit of &quot; + maxRemaining);</span>
+        }
+<span class="fc" id="L274">        int total = i + remaining;</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        return len &gt;= total ? total : -1;</span>
+    }
+
+    /// Reads one packet from a stream, blocking until it is complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the source
+    ///
+    /// - `maxRemaining`: the largest remaining length to accept
+    ///
+    /// #### Returns
+    ///
+    /// the packet
+    ///
+    /// #### Throws
+    ///
+    /// `EOFException` when the stream ends, `MqttException` for a malformed or
+    /// oversized packet
+    public static MqttPacket read(InputStream in, int maxRemaining) throws IOException {
+<span class="fc" id="L295">        int first = in.read();</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (first &lt; 0) {</span>
+<span class="fc" id="L297">            throw new EOFException(&quot;End of stream before a packet&quot;);</span>
+        }
+<span class="fc" id="L299">        int remaining = 0;</span>
+<span class="fc" id="L300">        int mult = 1;</span>
+<span class="fc" id="L301">        for (int i = 0; ; i++) {</span>
+<span class="fc" id="L302">            int d = in.read();</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            if (d &lt; 0) {</span>
+<span class="nc" id="L304">                throw new EOFException(&quot;End of stream in a packet header&quot;);</span>
+            }
+<span class="fc" id="L306">            remaining += (d &amp; 0x7f) * mult;</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if ((d &amp; 0x80) == 0) {</span>
+<span class="fc" id="L308">                break;</span>
+            }
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            if (i == 3) {</span>
+<span class="fc" id="L311">                throw new MqttException(&quot;Malformed remaining length&quot;);</span>
+            }
+<span class="fc" id="L313">            mult *= 128;</span>
+        }
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        if (remaining &gt; maxRemaining) {</span>
+<span class="fc" id="L316">            throw new MqttException(&quot;Packet of &quot; + remaining + &quot; bytes exceeds the limit of &quot; + maxRemaining);</span>
+        }
+<span class="fc" id="L318">        byte[] body = new byte[remaining];</span>
+<span class="fc" id="L319">        int got = 0;</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        while (got &lt; remaining) {</span>
+<span class="fc" id="L321">            int r = in.read(body, got, remaining - got);</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            if (r &lt; 0) {</span>
+<span class="nc" id="L323">                throw new EOFException(&quot;End of stream in a packet body&quot;);</span>
+            }
+<span class="fc" id="L325">            got += r;</span>
+<span class="fc" id="L326">        }</span>
+<span class="fc" id="L327">        return decode(first, body);</span>
+    }
+
+    /// Decodes a packet from its first byte and its body.
+    ///
+    /// #### Parameters
+    ///
+    /// - `first`: the fixed header's first byte (type and flags)
+    ///
+    /// - `body`: the bytes after the remaining length
+    ///
+    /// #### Returns
+    ///
+    /// the packet
+    public static MqttPacket decode(int first, byte[] body) throws IOException {
+<span class="fc" id="L342">        int type = (first &gt;&gt; 4) &amp; 0x0f;</span>
+<span class="fc" id="L343">        int flags = first &amp; 0x0f;</span>
+<span class="fc" id="L344">        int[] pos = new int[] {0};</span>
+<span class="pc bpc" id="L345" title="1 of 11 branches missed.">        switch (type) {</span>
+            case MqttPacket.CONNECT:
+<span class="fc" id="L347">                expectFlags(flags, 0, type);</span>
+<span class="fc" id="L348">                return decodeConnect(body, pos);</span>
+            case MqttPacket.CONNACK:
+<span class="fc" id="L350">                expectFlags(flags, 0, type);</span>
+<span class="pc bpc" id="L351" title="2 of 4 branches missed.">                if (body.length != 2 || (body[0] &amp; 0xfe) != 0) {</span>
+<span class="nc" id="L352">                    throw new MqttException(&quot;Malformed CONNACK&quot;);</span>
+                }
+<span class="fc bfc" id="L354" title="All 2 branches covered.">                return MqttPacket.connack(body[0] == 1, body[1] &amp; 0xff);</span>
+            case MqttPacket.PUBLISH:
+<span class="fc" id="L356">                return decodePublish(flags, body, pos);</span>
+            case MqttPacket.PUBACK:
+<span class="fc" id="L358">                expectFlags(flags, 0, type);</span>
+<span class="fc" id="L359">                return MqttPacket.puback(readOnlyId(body));</span>
+            case MqttPacket.UNSUBACK:
+<span class="nc" id="L361">                expectFlags(flags, 0, type);</span>
+<span class="nc" id="L362">                return MqttPacket.unsuback(readOnlyId(body));</span>
+            case MqttPacket.SUBSCRIBE:
+<span class="fc" id="L364">                expectFlags(flags, 2, type);</span>
+<span class="fc" id="L365">                return decodeSubscribe(body, pos);</span>
+            case MqttPacket.SUBACK:
+<span class="fc" id="L367">                expectFlags(flags, 0, type);</span>
+<span class="fc" id="L368">                int id = readId(body, pos);</span>
+<span class="fc" id="L369">                int[] codes = new int[body.length - 2];</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">                if (codes.length == 0) {</span>
+<span class="nc" id="L371">                    throw new MqttException(&quot;SUBACK without return codes&quot;);</span>
+                }
+<span class="fc bfc" id="L373" title="All 2 branches covered.">                for (int i = 0; i &lt; codes.length; i++) {</span>
+<span class="fc" id="L374">                    codes[i] = body[2 + i] &amp; 0xff;</span>
+<span class="pc bpc" id="L375" title="1 of 4 branches missed.">                    if (codes[i] &gt; 2 &amp;&amp; codes[i] != 0x80) {</span>
+<span class="nc" id="L376">                        throw new MqttException(&quot;Bad SUBACK return code &quot; + codes[i]);</span>
+                    }
+                }
+<span class="fc" id="L379">                return MqttPacket.suback(id, codes);</span>
+            case MqttPacket.UNSUBSCRIBE:
+<span class="fc" id="L381">                expectFlags(flags, 2, type);</span>
+<span class="fc" id="L382">                int uid = readId(body, pos);</span>
+<span class="fc" id="L383">                java.util.ArrayList&lt;String&gt; fl = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">                while (pos[0] &lt; body.length) {</span>
+<span class="fc" id="L385">                    fl.add(readString(body, pos));</span>
+                }
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">                if (fl.isEmpty()) {</span>
+<span class="nc" id="L388">                    throw new MqttException(&quot;UNSUBSCRIBE without filters&quot;);</span>
+                }
+<span class="fc" id="L390">                return MqttPacket.unsubscribe(uid, fl.toArray(new String[fl.size()]));</span>
+            case MqttPacket.PINGREQ:
+            case MqttPacket.PINGRESP:
+            case MqttPacket.DISCONNECT:
+<span class="fc" id="L394">                expectFlags(flags, 0, type);</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">                if (body.length != 0) {</span>
+<span class="fc" id="L396">                    throw new MqttException(&quot;Packet type &quot; + type + &quot; must have no body&quot;);</span>
+                }
+<span class="fc bfc" id="L398" title="All 4 branches covered.">                return type == MqttPacket.PINGREQ ? MqttPacket.pingreq()</span>
+<span class="fc" id="L399">                        : type == MqttPacket.PINGRESP ? MqttPacket.pingresp() : MqttPacket.disconnect();</span>
+            case 5:
+            case 6:
+            case 7:
+<span class="fc" id="L403">                throw new MqttException(&quot;QoS 2 packets are not supported (type &quot; + type + &quot;)&quot;);</span>
+            default:
+<span class="fc" id="L405">                throw new MqttException(&quot;Unknown packet type &quot; + type);</span>
+        }
+    }
+
+    private static void expectFlags(int flags, int expected, int type) throws MqttException {
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        if (flags != expected) {</span>
+<span class="fc" id="L411">            throw new MqttException(&quot;Bad fixed header flags &quot; + flags + &quot; for packet type &quot; + type);</span>
+        }
+<span class="fc" id="L413">    }</span>
+
+    private static MqttPacket decodePublish(int flags, byte[] body, int[] pos) throws IOException {
+<span class="fc" id="L416">        int qos = (flags &gt;&gt; 1) &amp; 3;</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (qos == 2) {</span>
+<span class="fc" id="L418">            throw new MqttException(&quot;QoS 2 is not supported&quot;);</span>
+        }
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        if (qos == 3) {</span>
+<span class="fc" id="L421">            throw new MqttException(&quot;Invalid QoS 3&quot;);</span>
+        }
+<span class="fc" id="L423">        String topic = readString(body, pos);</span>
+<span class="fc" id="L424">        int id = 0;</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (qos &gt; 0) {</span>
+<span class="fc" id="L426">            id = readId(body, pos);</span>
+        }
+<span class="fc" id="L428">        byte[] payload = new byte[body.length - pos[0]];</span>
+<span class="fc" id="L429">        System.arraycopy(body, pos[0], payload, 0, payload.length);</span>
+<span class="fc bfc" id="L430" title="All 4 branches covered.">        return MqttPacket.publish(topic, payload, qos, (flags &amp; 1) != 0, (flags &amp; 8) != 0, id);</span>
+    }
+
+    private static MqttPacket decodeSubscribe(byte[] body, int[] pos) throws IOException {
+<span class="fc" id="L434">        int id = readId(body, pos);</span>
+<span class="fc" id="L435">        java.util.ArrayList&lt;String&gt; filters = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L436">        java.util.ArrayList&lt;Integer&gt; qos = new java.util.ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        while (pos[0] &lt; body.length) {</span>
+<span class="fc" id="L438">            filters.add(readString(body, pos));</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">            if (pos[0] &gt;= body.length) {</span>
+<span class="nc" id="L440">                throw new MqttException(&quot;SUBSCRIBE filter without QoS&quot;);</span>
+            }
+<span class="fc" id="L442">            int q = body[pos[0]++] &amp; 0xff;</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">            if (q &gt; 1) {</span>
+<span class="nc" id="L444">                throw new MqttException(&quot;QoS &quot; + q + &quot; is not supported&quot;);</span>
+            }
+<span class="fc" id="L446">            qos.add(Integer.valueOf(q));</span>
+<span class="fc" id="L447">        }</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">        if (filters.isEmpty()) {</span>
+<span class="nc" id="L449">            throw new MqttException(&quot;SUBSCRIBE without filters&quot;);</span>
+        }
+<span class="fc" id="L451">        int[] q = new int[qos.size()];</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        for (int i = 0; i &lt; q.length; i++) {</span>
+<span class="fc" id="L453">            q[i] = qos.get(i).intValue();</span>
+        }
+<span class="fc" id="L455">        return MqttPacket.subscribe(id, filters.toArray(new String[filters.size()]), q);</span>
+    }
+
+    private static MqttPacket decodeConnect(byte[] body, int[] pos) throws IOException {
+<span class="fc" id="L459">        String proto = readString(body, pos);</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">        if (!&quot;MQTT&quot;.equals(proto)) {</span>
+<span class="nc" id="L461">            throw new MqttException(&quot;Unsupported protocol name &quot; + proto);</span>
+        }
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">        if (pos[0] + 4 &gt; body.length) {</span>
+<span class="nc" id="L464">            throw new MqttException(&quot;Truncated CONNECT&quot;);</span>
+        }
+<span class="fc" id="L466">        int level = body[pos[0]++] &amp; 0xff;</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">        if (level != 4) {</span>
+<span class="nc" id="L468">            throw new MqttException(&quot;Unsupported protocol level &quot; + level);</span>
+        }
+<span class="fc" id="L470">        int f = body[pos[0]++] &amp; 0xff;</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">        if ((f &amp; 1) != 0) {</span>
+<span class="nc" id="L472">            throw new MqttException(&quot;Reserved CONNECT flag set&quot;);</span>
+        }
+<span class="fc" id="L474">        int keepAlive = ((body[pos[0]] &amp; 0xff) &lt;&lt; 8) | (body[pos[0] + 1] &amp; 0xff);</span>
+<span class="fc" id="L475">        pos[0] += 2;</span>
+<span class="fc" id="L476">        String clientId = readString(body, pos);</span>
+<span class="fc" id="L477">        String willTopic = null;</span>
+<span class="fc" id="L478">        byte[] willPayload = null;</span>
+<span class="fc" id="L479">        int willQos = (f &gt;&gt; 3) &amp; 3;</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        boolean will = (f &amp; 0x04) != 0;</span>
+<span class="pc bpc" id="L481" title="2 of 6 branches missed.">        if (!will &amp;&amp; (willQos != 0 || (f &amp; 0x20) != 0)) {</span>
+<span class="nc" id="L482">            throw new MqttException(&quot;Will flags without a will&quot;);</span>
+        }
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (willQos &gt; 1) {</span>
+<span class="nc" id="L485">            throw new MqttException(&quot;QoS 2 is not supported&quot;);</span>
+        }
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        if (will) {</span>
+<span class="fc" id="L488">            willTopic = readString(body, pos);</span>
+<span class="fc" id="L489">            willPayload = readBytes(body, pos);</span>
+        }
+<span class="fc" id="L491">        String user = null;</span>
+<span class="fc" id="L492">        byte[] pass = null;</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        if ((f &amp; 0x80) != 0) {</span>
+<span class="fc" id="L494">            user = readString(body, pos);</span>
+        }
+<span class="fc bfc" id="L496" title="All 2 branches covered.">        if ((f &amp; 0x40) != 0) {</span>
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">            if (user == null) {</span>
+<span class="nc" id="L498">                throw new MqttException(&quot;Password flag without user name flag&quot;);</span>
+            }
+<span class="fc" id="L500">            pass = readBytes(body, pos);</span>
+        }
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        if (pos[0] != body.length) {</span>
+<span class="nc" id="L503">            throw new MqttException(&quot;Trailing bytes in CONNECT&quot;);</span>
+        }
+<span class="fc" id="L505">        MqttPacket p = new MqttPacket(MqttPacket.CONNECT);</span>
+<span class="fc bfc" id="L506" title="All 4 branches covered.">        p.setConnectFields(clientId, (f &amp; 0x02) != 0, keepAlive, user, pass, willTopic, willPayload,</span>
+                willQos, (f &amp; 0x20) != 0);
+<span class="fc" id="L508">        return p;</span>
+    }
+
+    private static int readOnlyId(byte[] body) throws IOException {
+<span class="fc" id="L512">        int[] pos = new int[] {0};</span>
+<span class="fc" id="L513">        int id = readId(body, pos);</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        if (pos[0] != body.length) {</span>
+<span class="nc" id="L515">            throw new MqttException(&quot;Trailing bytes after packet id&quot;);</span>
+        }
+<span class="fc" id="L517">        return id;</span>
+    }
+
+    private static int readId(byte[] body, int[] pos) throws IOException {
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">        if (pos[0] + 2 &gt; body.length) {</span>
+<span class="nc" id="L522">            throw new MqttException(&quot;Truncated packet id&quot;);</span>
+        }
+<span class="fc" id="L524">        int id = ((body[pos[0]] &amp; 0xff) &lt;&lt; 8) | (body[pos[0] + 1] &amp; 0xff);</span>
+<span class="fc" id="L525">        pos[0] += 2;</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        if (id == 0) {</span>
+<span class="fc" id="L527">            throw new MqttException(&quot;Packet id 0&quot;);</span>
+        }
+<span class="fc" id="L529">        return id;</span>
+    }
+
+    private static byte[] readBytes(byte[] body, int[] pos) throws IOException {
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">        if (pos[0] + 2 &gt; body.length) {</span>
+<span class="nc" id="L534">            throw new MqttException(&quot;Truncated length prefix&quot;);</span>
+        }
+<span class="fc" id="L536">        int n = ((body[pos[0]] &amp; 0xff) &lt;&lt; 8) | (body[pos[0] + 1] &amp; 0xff);</span>
+<span class="fc" id="L537">        pos[0] += 2;</span>
+<span class="fc bfc" id="L538" title="All 2 branches covered.">        if (pos[0] + n &gt; body.length) {</span>
+<span class="fc" id="L539">            throw new MqttException(&quot;Truncated field&quot;);</span>
+        }
+<span class="fc" id="L541">        byte[] out = new byte[n];</span>
+<span class="fc" id="L542">        System.arraycopy(body, pos[0], out, 0, n);</span>
+<span class="fc" id="L543">        pos[0] += n;</span>
+<span class="fc" id="L544">        return out;</span>
+    }
+
+    private static String readString(byte[] body, int[] pos) throws IOException {
+<span class="fc" id="L548">        String s = new String(readBytes(body, pos), &quot;UTF-8&quot;);</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">        if (s.indexOf('\0') &gt;= 0) {</span>
+<span class="nc" id="L550">            throw new MqttException(&quot;MQTT strings must not contain U+0000&quot;);</span>
+        }
+<span class="fc" id="L552">        return s;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

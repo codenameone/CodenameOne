@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CryptoBatch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">CryptoBatch.java</span></div><h1>CryptoBatch.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// Many signature verifications or hashes in one call: the deposits of a
+/// block an exchange scans, the transactions an indexer checks, the leaves of
+/// a Merkle tree.
+///
+/// Where the platform has native kernels the whole batch crosses into native
+/// code once and is spread over every CPU core, so a batch of thousands runs
+/// several times faster than the same calls one at a time. Elsewhere it is
+/// the same loop over [Secp256k1#verify], [Schnorr#verify],
+/// [Ed25519#verify] or [Hash] that a caller would write.
+///
+/// Every entry gets exactly the answer the single call gives it; nothing here
+/// uses a batch equation that could accept a signature a single verify
+/// rejects. A malformed entry -- a `null`, a key that does not parse, a
+/// wrong length -- is simply invalid, so one bad entry never aborts the rest.
+///
+/// Every method has an asynchronous form, named with `Async` and taking a
+/// [Callback], which runs the same batch off the calling thread. In the app the
+/// callback runs on the EDT, so a screen can start a batch and show its result
+/// without blocking; in a backend it runs on the thread that did the work. In a
+/// browser the asynchronous forms are the ones to use: there a large batch goes
+/// to the GPU through WebGPU, which answers only asynchronously, and the
+/// synchronous form holds its thread for that long. The arguments are checked
+/// before the call returns, so a malformed batch throws right away rather than
+/// reaching the callback. The batch reads the arrays it was given, not a copy,
+/// so they belong to it until the callback runs: changing one before then
+/// changes the entries being verified. The callback runs exactly once, with the
+/// result or with whatever was thrown, an `Error` included.
+@com.codename1.impl.SharedWithBackend
+public final class CryptoBatch {
+    private CryptoBatch() {
+    }
+
+    /// ECDSA over secp256k1, entry by entry as [Secp256k1#verify]: each
+    /// 32-byte hash, signature and SEC1 public key.
+    public static boolean[] verifySecp256k1(byte[][] hashes, Secp256k1.EcdsaSignature[] signatures,
+            byte[][] publicKeys) {
+<span class="fc" id="L61">        int n = count(hashes, signatures, publicKeys);</span>
+<span class="fc" id="L62">        byte[][] compact = new byte[n][];</span>
+<span class="fc" id="L63">        byte[] results = new byte[n];</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L65">            Secp256k1.EcdsaSignature s = signatures[i];</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            compact[i] = s == null ? null : s.toCompact();</span>
+<span class="fc bfc" id="L67" title="All 6 branches covered.">            results[i] = is(hashes[i], 32) &amp;&amp; compact[i] != null &amp;&amp; publicKeys[i] != null ? TODO : 0;</span>
+        }
+<span class="fc" id="L69">        CryptoEngine.get().verifyBatch(CryptoEngine.BATCH_SECP256K1, hashes, compact, publicKeys, results);</span>
+<span class="fc" id="L70">        boolean[] out = new boolean[n];</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L72" title="All 4 branches covered.">            if (results[i] == TODO || results[i] == JAVA) {</span>
+                try {
+<span class="fc" id="L74">                    out[i] = Secp256k1.verify(hashes[i], signatures[i], publicKeys[i]);</span>
+<span class="fc" id="L75">                } catch (CryptoException e) {</span>
+<span class="fc" id="L76">                    out[i] = false;</span>
+<span class="fc" id="L77">                }</span>
+            } else {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                out[i] = results[i] == 1;</span>
+            }
+        }
+<span class="fc" id="L82">        return out;</span>
+    }
+
+    /// BIP-340 Schnorr, entry by entry as [Schnorr#verify]: each message, 64-byte
+    /// signature and 32-byte x-only public key.
+    public static boolean[] verifySchnorr(byte[][] messages, byte[][] signatures, byte[][] publicKeys) {
+<span class="fc" id="L88">        return verify(CryptoEngine.BATCH_SCHNORR, messages, signatures, publicKeys);</span>
+    }
+
+    /// Ed25519, entry by entry as [Ed25519#verify]: each message, 64-byte
+    /// signature and 32-byte public key.
+    public static boolean[] verifyEd25519(byte[][] messages, byte[][] signatures, byte[][] publicKeys) {
+<span class="fc" id="L94">        return verify(CryptoEngine.BATCH_ED25519, messages, signatures, publicKeys);</span>
+    }
+
+    /// The SHA-256 of each input. A `null` input has a `null` digest.
+    public static byte[][] sha256(byte[][] inputs) {
+<span class="fc" id="L99">        return hash(Hash.SHA256, inputs);</span>
+    }
+
+    /// The Keccak-256 of each input (Ethereum's hash). A `null` input has a
+    /// `null` digest.
+    public static byte[][] keccak256(byte[][] inputs) {
+<span class="fc" id="L105">        return hash(Hash.KECCAK256, inputs);</span>
+    }
+
+    /// The packed form of
+    /// [#verifySecp256k1(byte[][], Secp256k1.EcdsaSignature[], byte[][])], for
+    /// batches large enough that an object per entry matters. Entry `i` is the
+    /// 32-byte hash at `32 * i` of `hashes`, the 64-byte compact signature
+    /// (`r || s`) at `64 * i` of `signatures`, and the SEC1 public key of
+    /// `publicKeyLength` bytes (33 or 65) at `publicKeyLength * i` of
+    /// `publicKeys`. Writes 1 (valid) or 0 to each of the first `count` bytes
+    /// of `results`; a malformed entry is 0.
+    ///
+    /// On a native target the kernels read and write these arrays where they
+    /// are, without copying them, so a pipeline that fills them in place pays
+    /// nothing per entry outside the verification itself. Allocating them with
+    /// `Simd.get().allocByte(int)` in an app aligns them for the vector
+    /// units and the GPU.
+    public static void verifySecp256k1(byte[] hashes, byte[] signatures, byte[] publicKeys, int publicKeyLength,
+            byte[] results, int count) {
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">        if (publicKeyLength != 33 &amp;&amp; publicKeyLength != 65) {</span>
+<span class="fc" id="L125">            throw new CryptoException(&quot;publicKeyLength must be 33 or 65&quot;);</span>
+        }
+<span class="fc" id="L127">        packed(hashes, 32, signatures, publicKeys, publicKeyLength, results, count);</span>
+<span class="fc" id="L128">        prime(results, count);</span>
+<span class="fc" id="L129">        CryptoEngine.get().verifyPacked(CryptoEngine.BATCH_SECP256K1, hashes, 32, signatures, publicKeys,</span>
+                publicKeyLength, results, count);
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="pc bpc" id="L132" title="3 of 4 branches missed.">            if (results[i] == TODO || results[i] == JAVA) {</span>
+                try {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                    results[i] = Secp256k1.verify(slice(hashes, 32, i),</span>
+<span class="fc" id="L135">                            Secp256k1.EcdsaSignature.fromCompact(slice(signatures, 64, i), 0),</span>
+<span class="fc" id="L136">                            slice(publicKeys, publicKeyLength, i)) ? (byte) 1 : 0;</span>
+<span class="fc" id="L137">                } catch (CryptoException e) {</span>
+<span class="fc" id="L138">                    results[i] = 0;</span>
+<span class="fc" id="L139">                }</span>
+            }
+        }
+<span class="fc" id="L142">    }</span>
+
+    /// The packed form of [#verifySchnorr(byte[][], byte[][], byte[][])]:
+    /// entry `i` is the message of `messageLength` bytes at
+    /// `messageLength * i` of `messages`, the 64-byte signature at `64 * i` of
+    /// `signatures` and the 32-byte x-only key at `32 * i` of `publicKeys`.
+    /// Writes 1 or 0 to each of the first `count` bytes of `results`. See
+    /// [#verifySecp256k1(byte[], byte[], byte[], int, byte[], int)] on
+    /// allocating the arrays.
+    public static void verifySchnorr(byte[] messages, int messageLength, byte[] signatures, byte[] publicKeys,
+            byte[] results, int count) {
+<span class="fc" id="L153">        verifyPacked(CryptoEngine.BATCH_SCHNORR, messages, messageLength, signatures, publicKeys, results, count);</span>
+<span class="fc" id="L154">    }</span>
+
+    /// The packed form of [#verifyEd25519(byte[][], byte[][], byte[][])], laid
+    /// out as [#verifySchnorr(byte[], int, byte[], byte[], byte[], int)].
+    public static void verifyEd25519(byte[] messages, int messageLength, byte[] signatures, byte[] publicKeys,
+            byte[] results, int count) {
+<span class="fc" id="L160">        verifyPacked(CryptoEngine.BATCH_ED25519, messages, messageLength, signatures, publicKeys, results, count);</span>
+<span class="fc" id="L161">    }</span>
+
+    /// The SHA-256 of `count` inputs of `inputLength` bytes each, input `i` at
+    /// `inputLength * i` of `inputs` and its digest written at `32 * i` of
+    /// `digests`. A level of a Merkle tree is `inputLength` 64 over the level
+    /// below; `digests` may then be the next level's `inputs`.
+    public static void sha256(byte[] inputs, int inputLength, int count, byte[] digests) {
+<span class="fc" id="L168">        hashPacked(Hash.SHA256, inputs, inputLength, count, digests);</span>
+<span class="fc" id="L169">    }</span>
+
+    /// The Keccak-256 of `count` packed inputs, laid out as
+    /// [#sha256(byte[], int, int, byte[])].
+    public static void keccak256(byte[] inputs, int inputLength, int count, byte[] digests) {
+<span class="fc" id="L174">        hashPacked(Hash.KECCAK256, inputs, inputLength, count, digests);</span>
+<span class="fc" id="L175">    }</span>
+
+    /// The answer of an asynchronous batch.
+    ///
+    /// #### Parameters
+    ///
+    /// - `&lt;T&gt;`: what the batch answers
+    public interface Callback&lt;T&gt; {
+        /// Called once when the batch finishes, on the EDT in the app.
+        ///
+        /// #### Parameters
+        ///
+        /// - `result`: what the synchronous form would have returned (for a packed form, the
+        ///   array it wrote into), or `null` on an error
+        ///
+        /// - `error`: `null`, or what the synchronous form would have thrown
+        void done(T result, Throwable error);
+    }
+
+    /// [#verifySecp256k1(byte[][], Secp256k1.EcdsaSignature[], byte[][])] off the calling
+    /// thread.
+    public static void verifySecp256k1Async(final byte[][] hashes, final Secp256k1.EcdsaSignature[] signatures,
+            final byte[][] publicKeys, Callback&lt;boolean[]&gt; callback) {
+<span class="nc" id="L198">        count(hashes, signatures, publicKeys);</span>
+<span class="nc" id="L199">        start(new Job&lt;boolean[]&gt;(callback) {</span>
+            @Override
+            boolean[] compute() {
+<span class="nc" id="L202">                return verifySecp256k1(hashes, signatures, publicKeys);</span>
+            }
+        });
+<span class="nc" id="L205">    }</span>
+
+    /// [#verifySchnorr(byte[][], byte[][], byte[][])] off the calling thread.
+    public static void verifySchnorrAsync(final byte[][] messages, final byte[][] signatures,
+            final byte[][] publicKeys, Callback&lt;boolean[]&gt; callback) {
+<span class="nc" id="L210">        count(messages, signatures, publicKeys);</span>
+<span class="nc" id="L211">        start(new Job&lt;boolean[]&gt;(callback) {</span>
+            @Override
+            boolean[] compute() {
+<span class="nc" id="L214">                return verifySchnorr(messages, signatures, publicKeys);</span>
+            }
+        });
+<span class="nc" id="L217">    }</span>
+
+    /// [#verifyEd25519(byte[][], byte[][], byte[][])] off the calling thread.
+    public static void verifyEd25519Async(final byte[][] messages, final byte[][] signatures,
+            final byte[][] publicKeys, Callback&lt;boolean[]&gt; callback) {
+<span class="fc" id="L222">        count(messages, signatures, publicKeys);</span>
+<span class="fc" id="L223">        start(new Job&lt;boolean[]&gt;(callback) {</span>
+            @Override
+            boolean[] compute() {
+<span class="fc" id="L226">                return verifyEd25519(messages, signatures, publicKeys);</span>
+            }
+        });
+<span class="fc" id="L229">    }</span>
+
+    /// [#sha256(byte[][])] off the calling thread.
+    public static void sha256Async(final byte[][] inputs, Callback&lt;byte[][]&gt; callback) {
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        if (inputs == null) {</span>
+<span class="nc" id="L234">            throw new CryptoException(&quot;inputs must not be null&quot;);</span>
+        }
+<span class="nc" id="L236">        start(new Job&lt;byte[][]&gt;(callback) {</span>
+            @Override
+            byte[][] compute() {
+<span class="nc" id="L239">                return sha256(inputs);</span>
+            }
+        });
+<span class="nc" id="L242">    }</span>
+
+    /// [#keccak256(byte[][])] off the calling thread.
+    public static void keccak256Async(final byte[][] inputs, Callback&lt;byte[][]&gt; callback) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (inputs == null) {</span>
+<span class="nc" id="L247">            throw new CryptoException(&quot;inputs must not be null&quot;);</span>
+        }
+<span class="nc" id="L249">        start(new Job&lt;byte[][]&gt;(callback) {</span>
+            @Override
+            byte[][] compute() {
+<span class="nc" id="L252">                return keccak256(inputs);</span>
+            }
+        });
+<span class="nc" id="L255">    }</span>
+
+    /// [#verifySecp256k1(byte[], byte[], byte[], int, byte[], int)] off the calling thread. The
+    /// callback gets `results` once every entry is written; until then the arrays belong to
+    /// the batch and must not be changed.
+    public static void verifySecp256k1Async(final byte[] hashes, final byte[] signatures, final byte[] publicKeys,
+            final int publicKeyLength, final byte[] results, final int count, Callback&lt;byte[]&gt; callback) {
+<span class="pc bpc" id="L262" title="2 of 4 branches missed.">        if (publicKeyLength != 33 &amp;&amp; publicKeyLength != 65) {</span>
+<span class="fc" id="L263">            throw new CryptoException(&quot;publicKeyLength must be 33 or 65&quot;);</span>
+        }
+<span class="nc" id="L265">        packed(hashes, 32, signatures, publicKeys, publicKeyLength, results, count);</span>
+<span class="nc" id="L266">        start(new Job&lt;byte[]&gt;(callback) {</span>
+            @Override
+            byte[] compute() {
+<span class="nc" id="L269">                verifySecp256k1(hashes, signatures, publicKeys, publicKeyLength, results, count);</span>
+<span class="nc" id="L270">                return results;</span>
+            }
+        });
+<span class="nc" id="L273">    }</span>
+
+    /// [#verifySchnorr(byte[], int, byte[], byte[], byte[], int)] off the calling thread, as
+    /// [#verifySecp256k1Async(byte[], byte[], byte[], int, byte[], int, Callback)].
+    public static void verifySchnorrAsync(final byte[] messages, final int messageLength, final byte[] signatures,
+            final byte[] publicKeys, final byte[] results, final int count, Callback&lt;byte[]&gt; callback) {
+<span class="nc" id="L279">        packed(messages, messageLength, signatures, publicKeys, 32, results, count);</span>
+<span class="nc" id="L280">        start(new Job&lt;byte[]&gt;(callback) {</span>
+            @Override
+            byte[] compute() {
+<span class="nc" id="L283">                verifySchnorr(messages, messageLength, signatures, publicKeys, results, count);</span>
+<span class="nc" id="L284">                return results;</span>
+            }
+        });
+<span class="nc" id="L287">    }</span>
+
+    /// [#verifyEd25519(byte[], int, byte[], byte[], byte[], int)] off the calling thread, as
+    /// [#verifySecp256k1Async(byte[], byte[], byte[], int, byte[], int, Callback)].
+    public static void verifyEd25519Async(final byte[] messages, final int messageLength, final byte[] signatures,
+            final byte[] publicKeys, final byte[] results, final int count, Callback&lt;byte[]&gt; callback) {
+<span class="fc" id="L293">        packed(messages, messageLength, signatures, publicKeys, 32, results, count);</span>
+<span class="fc" id="L294">        start(new Job&lt;byte[]&gt;(callback) {</span>
+            @Override
+            byte[] compute() {
+<span class="fc" id="L297">                verifyEd25519(messages, messageLength, signatures, publicKeys, results, count);</span>
+<span class="fc" id="L298">                return results;</span>
+            }
+        });
+<span class="fc" id="L301">    }</span>
+
+    /// [#sha256(byte[], int, int, byte[])] off the calling thread; the callback gets `digests`.
+    public static void sha256Async(final byte[] inputs, final int inputLength, final int count,
+            final byte[] digests, Callback&lt;byte[]&gt; callback) {
+<span class="fc" id="L306">        checkHashPacked(inputs, inputLength, count, digests);</span>
+<span class="fc" id="L307">        start(new Job&lt;byte[]&gt;(callback) {</span>
+            @Override
+            byte[] compute() {
+<span class="nc" id="L310">                sha256(inputs, inputLength, count, digests);</span>
+<span class="nc" id="L311">                return digests;</span>
+            }
+        });
+<span class="fc" id="L314">    }</span>
+
+    /// [#keccak256(byte[], int, int, byte[])] off the calling thread; the callback gets
+    /// `digests`.
+    public static void keccak256Async(final byte[] inputs, final int inputLength, final int count,
+            final byte[] digests, Callback&lt;byte[]&gt; callback) {
+<span class="fc" id="L320">        checkHashPacked(inputs, inputLength, count, digests);</span>
+<span class="fc" id="L321">        start(new Job&lt;byte[]&gt;(callback) {</span>
+            @Override
+            byte[] compute() {
+<span class="fc" id="L324">                keccak256(inputs, inputLength, count, digests);</span>
+<span class="fc" id="L325">                return digests;</span>
+            }
+        });
+<span class="fc" id="L328">    }</span>
+
+    // one asynchronous call: the batch on the engine's background runner, the answer through
+    // the engine's delivery
+    private abstract static class Job&lt;T&gt; implements Runnable {
+        private final Callback&lt;T&gt; callback;
+
+<span class="fc" id="L335">        Job(Callback&lt;T&gt; callback) {</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            if (callback == null) {</span>
+<span class="fc" id="L337">                throw new CryptoException(&quot;callback must not be null&quot;);</span>
+            }
+<span class="fc" id="L339">            this.callback = callback;</span>
+<span class="fc" id="L340">        }</span>
+
+        abstract T compute();
+
+        @Override
+
+        public void run() {
+<span class="fc" id="L347">            T result = null;</span>
+<span class="fc" id="L348">            Throwable error = null;</span>
+            try {
+<span class="fc" id="L350">                result = compute();</span>
+<span class="fc" id="L351">            } catch (Throwable e) {</span>
+                // an Error too (an OutOfMemoryError from a large batch, one thrown in a native):
+                // the callback is the only place the caller hears anything, so it hears everything
+<span class="fc" id="L354">                error = e;</span>
+<span class="fc" id="L355">            }</span>
+<span class="fc" id="L356">            final T r = result;</span>
+<span class="fc" id="L357">            final Throwable err = error;</span>
+<span class="fc" id="L358">            CryptoEngine.get().deliver(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L361">                    callback.done(r, err);</span>
+<span class="fc" id="L362">                }</span>
+            });
+<span class="fc" id="L364">        }</span>
+    }
+
+    private static void start(Job&lt;?&gt; job) {
+<span class="fc" id="L368">        CryptoEngine.get().runInBackground(job);</span>
+<span class="fc" id="L369">    }</span>
+
+    private static void verifyPacked(int algorithm, byte[] messages, int messageLength, byte[] signatures,
+            byte[] publicKeys, byte[] results, int count) {
+<span class="fc" id="L373">        packed(messages, messageLength, signatures, publicKeys, 32, results, count);</span>
+<span class="fc" id="L374">        prime(results, count);</span>
+<span class="fc" id="L375">        CryptoEngine.get().verifyPacked(algorithm, messages, messageLength, signatures, publicKeys, 32,</span>
+                results, count);
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="pc bpc" id="L378" title="3 of 4 branches missed.">            if (results[i] == TODO || results[i] == JAVA) {</span>
+<span class="fc" id="L379">                byte[] m = slice(messages, messageLength, i);</span>
+<span class="fc" id="L380">                byte[] s = slice(signatures, 64, i);</span>
+<span class="fc" id="L381">                byte[] k = slice(publicKeys, 32, i);</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">                boolean ok = algorithm == CryptoEngine.BATCH_ED25519 ? Ed25519.verify(m, s, k) : schnorr(m, s, k);</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">                results[i] = ok ? (byte) 1 : 0;</span>
+            }
+        }
+<span class="fc" id="L386">    }</span>
+
+    private static void hashPacked(String algorithm, byte[] inputs, int inputLength, int count, byte[] digests) {
+<span class="fc" id="L389">        checkHashPacked(inputs, inputLength, count, digests);</span>
+<span class="pc bpc" id="L390" title="2 of 4 branches missed.">        if (count == 0 || CryptoEngine.get().hashPacked(algorithm, inputs, inputLength, count, digests)) {</span>
+<span class="nc" id="L391">            return;</span>
+        }
+<span class="fc" id="L393">        boolean sha = Hash.SHA256.equals(algorithm);</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L395">            byte[] in = slice(inputs, inputLength, i);</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            System.arraycopy(sha ? Hash.sha256(in) : Hash.keccak256(in), 0, digests, 32 * i, 32);</span>
+        }
+<span class="fc" id="L398">    }</span>
+
+    private static void checkHashPacked(byte[] inputs, int inputLength, int count, byte[] digests) {
+<span class="pc bpc" id="L401" title="2 of 4 branches missed.">        if (inputs == null || digests == null) {</span>
+<span class="nc" id="L402">            throw new CryptoException(&quot;the batch arrays must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L404" title="3 of 8 branches missed.">        if (count &lt; 0 || inputLength &lt; 0 || (long) inputLength * count &gt; inputs.length</span>
+                || 32L * count &gt; digests.length) {
+<span class="fc" id="L406">            throw new CryptoException(&quot;the batch arrays are too short for count entries&quot;);</span>
+        }
+<span class="fc" id="L408">    }</span>
+
+    private static void packed(byte[] messages, int messageLength, byte[] signatures, byte[] publicKeys,
+            int keyLength, byte[] results, int count) {
+<span class="pc bpc" id="L412" title="4 of 8 branches missed.">        if (messages == null || signatures == null || publicKeys == null || results == null) {</span>
+<span class="nc" id="L413">            throw new CryptoException(&quot;the batch arrays must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L415" title="4 of 12 branches missed.">        if (count &lt; 0 || messageLength &lt; 0 || (long) messageLength * count &gt; messages.length</span>
+                || 64L * count &gt; signatures.length || (long) keyLength * count &gt; publicKeys.length
+                || count &gt; results.length) {
+<span class="fc" id="L418">            throw new CryptoException(&quot;the batch arrays are too short for count entries&quot;);</span>
+        }
+<span class="fc" id="L420">    }</span>
+
+    private static void prime(byte[] results, int count) {
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L424">            results[i] = TODO;</span>
+        }
+<span class="fc" id="L426">    }</span>
+
+    private static byte[] slice(byte[] packed, int length, int i) {
+<span class="fc" id="L429">        byte[] out = new byte[length];</span>
+<span class="fc" id="L430">        System.arraycopy(packed, length * i, out, 0, length);</span>
+<span class="fc" id="L431">        return out;</span>
+    }
+
+    /// A result byte the engine has still to decide.
+    static final byte TODO = 2;
+
+    /// A result byte the engine leaves to the Java implementation.
+    static final byte JAVA = (byte) 0xff;
+
+    private static boolean[] verify(int algorithm, byte[][] messages, byte[][] signatures, byte[][] publicKeys) {
+<span class="fc" id="L441">        int n = count(messages, signatures, publicKeys);</span>
+<span class="fc" id="L442">        byte[] results = new byte[n];</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L444" title="All 6 branches covered.">            results[i] = messages[i] != null &amp;&amp; is(signatures[i], 64) &amp;&amp; is(publicKeys[i], 32) ? TODO : 0;</span>
+        }
+<span class="fc" id="L446">        CryptoEngine.get().verifyBatch(algorithm, messages, signatures, publicKeys, results);</span>
+<span class="fc" id="L447">        boolean[] out = new boolean[n];</span>
+<span class="fc bfc" id="L448" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="pc bpc" id="L449" title="1 of 4 branches missed.">            if (results[i] == TODO || results[i] == JAVA) {</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">                out[i] = algorithm == CryptoEngine.BATCH_ED25519</span>
+<span class="fc" id="L451">                        ? Ed25519.verify(messages[i], signatures[i], publicKeys[i])</span>
+<span class="fc" id="L452">                        : schnorr(messages[i], signatures[i], publicKeys[i]);</span>
+            } else {
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">                out[i] = results[i] == 1;</span>
+            }
+        }
+<span class="fc" id="L457">        return out;</span>
+    }
+
+    private static boolean schnorr(byte[] message, byte[] signature, byte[] publicKey) {
+        try {
+<span class="fc" id="L462">            return Schnorr.verify(message, signature, publicKey);</span>
+<span class="nc" id="L463">        } catch (CryptoException e) {</span>
+<span class="nc" id="L464">            return false;</span>
+        }
+    }
+
+    private static byte[][] hash(String algorithm, byte[][] inputs) {
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        if (inputs == null) {</span>
+<span class="fc" id="L470">            throw new CryptoException(&quot;inputs must not be null&quot;);</span>
+        }
+<span class="fc" id="L472">        byte[][] fast = CryptoEngine.get().hashBatch(algorithm, inputs);</span>
+<span class="pc bpc" id="L473" title="3 of 4 branches missed.">        if (fast != null &amp;&amp; fast.length == inputs.length) {</span>
+<span class="nc" id="L474">            return fast;</span>
+        }
+<span class="fc" id="L476">        byte[][] out = new byte[inputs.length][];</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        for (int i = 0; i &lt; inputs.length; i++) {</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">            if (inputs[i] != null) {</span>
+<span class="fc bfc" id="L479" title="All 2 branches covered.">                out[i] = Hash.SHA256.equals(algorithm) ? Hash.sha256(inputs[i]) : Hash.keccak256(inputs[i]);</span>
+            }
+        }
+<span class="fc" id="L482">        return out;</span>
+    }
+
+    private static int count(byte[][] a, Object[] b, byte[][] c) {
+<span class="pc bpc" id="L486" title="3 of 6 branches missed.">        if (a == null || b == null || c == null) {</span>
+<span class="nc" id="L487">            throw new CryptoException(&quot;the batch arrays must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L489" title="1 of 4 branches missed.">        if (a.length != b.length || a.length != c.length) {</span>
+<span class="fc" id="L490">            throw new CryptoException(&quot;the batch arrays differ in length&quot;);</span>
+        }
+<span class="fc" id="L492">        return a.length;</span>
+    }
+
+    private static boolean is(byte[] a, int length) {
+<span class="fc bfc" id="L496" title="All 4 branches covered.">        return a != null &amp;&amp; a.length == length;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

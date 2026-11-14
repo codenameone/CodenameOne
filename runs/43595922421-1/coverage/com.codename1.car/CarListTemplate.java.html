@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CarListTemplate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.car</a> &gt; <span class="el_source">CarListTemplate.java</span></div><h1>CarListTemplate.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.car;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A scrolling list of selectable rows, optionally grouped into `CarSection`s, with an optional
+/// header `CarActionStrip`. The most common in-car template -- audio browse, POI lists, settings.
+/// Maps to `androidx.car.app.model.ListTemplate` and `CPListTemplate`.
+///
+/// Head units enforce a hard row cap (see `com.codename1.car.spi.CarBridge#getListRowLimit()` /
+/// `CarContext#getListRowLimit()`); rows beyond the cap are dropped by the platform.
+///
+/// ```java
+/// CarListTemplate t = new CarListTemplate().setTitle(&quot;Library&quot;);
+/// t.addRow(new CarRow(&quot;Songs&quot;).setBrowsable(true).setOnAction(ctx -&gt; ctx.pushScreen(new SongsScreen())));
+/// t.addRow(new CarRow(&quot;Albums&quot;).setBrowsable(true).setOnAction(ctx -&gt; ctx.pushScreen(new AlbumsScreen())));
+/// ```
+<span class="fc" id="L40">public class CarListTemplate extends CarTemplate {</span>
+<span class="fc" id="L41">    private final List&lt;CarSection&gt; sections = new ArrayList&lt;CarSection&gt;();</span>
+    private CarSection defaultSection;
+    private CarActionStrip headerActions;
+    private boolean loading;
+
+    /// Sets the header title.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the header title
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarListTemplate setTitle(String title) {
+<span class="fc" id="L56">        setTitleInternal(title);</span>
+<span class="fc" id="L57">        return this;</span>
+    }
+
+    /// Adds a row to the template's default (untitled) section, creating it on first use. Use
+    /// [#addSection(CarSection)] when you need grouped rows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row to add
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarListTemplate addRow(CarRow row) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (defaultSection == null) {</span>
+<span class="fc" id="L72">            defaultSection = new CarSection();</span>
+<span class="fc" id="L73">            sections.add(defaultSection);</span>
+        }
+<span class="fc" id="L75">        defaultSection.addRow(row);</span>
+<span class="fc" id="L76">        return this;</span>
+    }
+
+    /// Adds a titled section of rows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `section`: the section to add
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarListTemplate addSection(CarSection section) {
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (section != null) {</span>
+<span class="fc" id="L90">            sections.add(section);</span>
+        }
+<span class="fc" id="L92">        return this;</span>
+    }
+
+    /// Returns the sections of this list, in order.
+    public List&lt;CarSection&gt; getSections() {
+<span class="fc" id="L97">        return sections;</span>
+    }
+
+    /// Returns the header action strip, or null.
+    public CarActionStrip getHeaderActions() {
+<span class="nc" id="L102">        return headerActions;</span>
+    }
+
+    /// Sets the header action strip (e.g. a refresh or search action).
+    ///
+    /// #### Parameters
+    ///
+    /// - `headerActions`: the action strip
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarListTemplate setHeaderActions(CarActionStrip headerActions) {
+<span class="nc" id="L115">        this.headerActions = headerActions;</span>
+<span class="nc" id="L116">        return this;</span>
+    }
+
+    /// Returns true when the list should render a loading spinner instead of content.
+    public boolean isLoading() {
+<span class="nc" id="L121">        return loading;</span>
+    }
+
+    /// Marks the template as loading; the head unit renders a spinner and ignores any rows. Set this
+    /// while fetching content, then `CarScreen#invalidate()` once the rows are ready.
+    ///
+    /// #### Parameters
+    ///
+    /// - `loading`: true to show a spinner
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarListTemplate setLoading(boolean loading) {
+<span class="nc" id="L135">        this.loading = loading;</span>
+<span class="nc" id="L136">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

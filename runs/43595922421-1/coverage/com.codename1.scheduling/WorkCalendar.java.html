@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkCalendar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.scheduling</a> &gt; <span class="el_source">WorkCalendar.java</span></div><h1>WorkCalendar.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.scheduling;
+
+import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.Map;
+
+/// The hours work happens in: a weekly pattern, and the days that differ from
+/// it.
+///
+/// A duration in a project is working time. Two days of work that start on a
+/// Friday afternoon end on Tuesday, and this is the class that says so. A
+/// `Scheduler` reads the same object to shade the hours nobody works.
+///
+/// The default is Monday to Friday, 09:00 to 17:00, in the device's zone.
+public final class WorkCalendar {
+<span class="fc" id="L38">    private static final int[] NONE = new int[0];</span>
+    // A stretch of days with no working time longer than this is a calendar
+    // that never works again, not a holiday.
+    private static final int MAX_IDLE_DAYS = 3700;
+
+    private final ZoneId zone;
+<span class="fc" id="L44">    private final boolean[] workingDays = new boolean[8];</span>
+<span class="fc" id="L45">    private int[] hours = new int[]{9 * 60, 17 * 60};</span>
+<span class="fc" id="L46">    private final int[][] dayHours = new int[8][];</span>
+<span class="fc" id="L47">    private final Map&lt;Long, int[]&gt; exceptions = new HashMap&lt;Long, int[]&gt;();</span>
+
+    /// A Monday to Friday, 09:00 to 17:00 calendar in the device's zone.
+    public WorkCalendar() {
+<span class="nc" id="L51">        this(ZoneId.systemDefault());</span>
+<span class="nc" id="L52">    }</span>
+
+    /// A Monday to Friday, 09:00 to 17:00 calendar in `zone`.
+<span class="fc" id="L55">    public WorkCalendar(ZoneId zone) {</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (zone == null) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;zone&quot;);</span>
+        }
+<span class="fc" id="L59">        this.zone = zone;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (int d = 1; d &lt;= 5; d++) {</span>
+<span class="fc" id="L61">            workingDays[d] = true;</span>
+        }
+<span class="fc" id="L63">    }</span>
+
+    /// A calendar in which every minute of every day is working time, for
+    /// durations that are elapsed time.
+    public static WorkCalendar continuous(ZoneId zone) {
+<span class="fc" id="L68">        WorkCalendar c = new WorkCalendar(zone);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (int d = 1; d &lt;= 7; d++) {</span>
+<span class="fc" id="L70">            c.workingDays[d] = true;</span>
+        }
+<span class="fc" id="L72">        c.hours = new int[]{0, TimeMath.MINUTES_PER_DAY};</span>
+<span class="fc" id="L73">        return c;</span>
+    }
+
+    public ZoneId getZone() {
+<span class="fc" id="L77">        return zone;</span>
+    }
+
+    /// Whether a day of the week is worked. `isoDay` is 1 for Monday to 7 for
+    /// Sunday.
+    public WorkCalendar setWorkingDay(int isoDay, boolean working) {
+<span class="fc" id="L83">        checkDay(isoDay);</span>
+<span class="fc" id="L84">        workingDays[isoDay] = working;</span>
+<span class="fc" id="L85">        return this;</span>
+    }
+
+    public boolean isWorkingWeekday(int isoDay) {
+<span class="nc" id="L89">        checkDay(isoDay);</span>
+<span class="nc" id="L90">        return workingDays[isoDay];</span>
+    }
+
+    /// The hours of every working day that has none of its own, as pairs of
+    /// minutes since midnight: `setWorkingHours(8 * 60, 12 * 60, 13 * 60, 17 * 60)`
+    /// is a day with a lunch break. An end of `1440` is midnight.
+    public WorkCalendar setWorkingHours(int... startEndMinutes) {
+<span class="fc" id="L97">        hours = checked(startEndMinutes);</span>
+<span class="fc" id="L98">        return this;</span>
+    }
+
+    /// The hours of one day of the week, which also makes it a working day.
+    public WorkCalendar setWorkingHours(int isoDay, int[] startEndMinutes) {
+<span class="fc" id="L103">        checkDay(isoDay);</span>
+<span class="fc" id="L104">        int[] own = checked(startEndMinutes);</span>
+        // No hours is a day off and not a day with hours of its own, so the
+        // day takes the default hours if it is made a working day again.
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        dayHours[isoDay] = own.length &gt; 0 ? own : null;</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        workingDays[isoDay] = own.length &gt; 0;</span>
+<span class="fc" id="L109">        return this;</span>
+    }
+
+    /// Makes one date a day off, whatever the week says.
+    public WorkCalendar addHoliday(long epochDay) {
+<span class="fc" id="L114">        exceptions.put(Long.valueOf(epochDay), NONE);</span>
+<span class="fc" id="L115">        return this;</span>
+    }
+
+    /// Gives one date hours of its own, whatever the week says.
+    public WorkCalendar setException(long epochDay, int... startEndMinutes) {
+<span class="fc" id="L120">        exceptions.put(Long.valueOf(epochDay), checked(startEndMinutes));</span>
+<span class="fc" id="L121">        return this;</span>
+    }
+
+    /// Returns a date to the weekly pattern.
+    public WorkCalendar removeException(long epochDay) {
+<span class="fc" id="L126">        exceptions.remove(Long.valueOf(epochDay));</span>
+<span class="fc" id="L127">        return this;</span>
+    }
+
+    /// The working hours of a date, as pairs of minutes since midnight. Empty
+    /// for a day off. The array is the calendar's own: read it, do not change it.
+    public int[] getWorkingHours(long epochDay) {
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (!exceptions.isEmpty()) {</span>
+<span class="fc" id="L134">            int[] ex = exceptions.get(Long.valueOf(epochDay));</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (ex != null) {</span>
+<span class="fc" id="L136">                return ex;</span>
+            }
+        }
+<span class="fc" id="L139">        int dow = TimeMath.dayOfWeek(epochDay);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (!workingDays[dow]) {</span>
+<span class="fc" id="L141">            return NONE;</span>
+        }
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        return dayHours[dow] != null ? dayHours[dow] : hours;</span>
+    }
+
+    public boolean isWorkingDay(long epochDay) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        return getWorkingHours(epochDay).length &gt; 0;</span>
+    }
+
+    /// Whether `millis` is inside working hours.
+    public boolean isWorkingTime(long millis) {
+<span class="fc" id="L152">        long day = TimeMath.epochDay(millis, zone);</span>
+<span class="fc" id="L153">        int[] iv = getWorkingHours(day);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (int i = 0; i &lt; iv.length; i += 2) {</span>
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">            if (millis &gt;= TimeMath.at(day, iv[i], zone) &amp;&amp; millis &lt; TimeMath.at(day, iv[i + 1], zone)) {</span>
+<span class="fc" id="L156">                return true;</span>
+            }
+        }
+<span class="fc" id="L159">        return false;</span>
+    }
+
+    /// The first working instant at or after `millis`.
+    public long nextWorkingTime(long millis) {
+<span class="fc" id="L164">        return addWorkingTime(millis, 0);</span>
+    }
+
+    /// The last instant at or before `millis` that work can end at: `millis`
+    /// itself when it is inside working hours or closes them.
+    public long previousWorkingTime(long millis) {
+<span class="fc" id="L170">        return subtractWorkingTime(millis, 0);</span>
+    }
+
+    /// The instant `duration` milliseconds of working time after `from`. A
+    /// duration that ends exactly as a working period closes ends there, not
+    /// at the opening of the next one. A negative duration goes backwards.
+    public long addWorkingTime(long from, long duration) {
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (duration &lt; 0) {</span>
+<span class="fc" id="L178">            return subtractWorkingTime(from, -duration);</span>
+        }
+<span class="fc" id="L180">        long day = TimeMath.epochDay(from, zone);</span>
+<span class="fc" id="L181">        long remaining = duration;</span>
+<span class="fc" id="L182">        long cursor = from;</span>
+<span class="fc" id="L183">        int idle = 0;</span>
+        while (true) {
+<span class="fc" id="L185">            int[] iv = getWorkingHours(day);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            idle = iv.length == 0 ? idle + 1 : 0;</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (idle &gt; MAX_IDLE_DAYS) {</span>
+<span class="fc" id="L188">                throw new IllegalStateException(&quot;The calendar has no working time&quot;);</span>
+            }
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            for (int i = 0; i &lt; iv.length; i += 2) {</span>
+<span class="fc" id="L191">                long e = TimeMath.at(day, iv[i + 1], zone);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                if (e &lt;= cursor) {</span>
+<span class="fc" id="L193">                    continue;</span>
+                }
+<span class="fc" id="L195">                long begin = Math.max(TimeMath.at(day, iv[i], zone), cursor);</span>
+<span class="fc" id="L196">                long avail = e - begin;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                if (remaining &lt;= avail) {</span>
+<span class="fc" id="L198">                    return begin + remaining;</span>
+                }
+<span class="fc" id="L200">                remaining -= avail;</span>
+<span class="fc" id="L201">                cursor = e;</span>
+            }
+<span class="fc" id="L203">            day++;</span>
+<span class="fc" id="L204">        }</span>
+    }
+
+    /// The instant `duration` milliseconds of working time before `from`.
+    public long subtractWorkingTime(long from, long duration) {
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (duration &lt; 0) {</span>
+<span class="fc" id="L210">            return addWorkingTime(from, -duration);</span>
+        }
+<span class="fc" id="L212">        long day = TimeMath.epochDay(from, zone);</span>
+<span class="fc" id="L213">        long remaining = duration;</span>
+<span class="fc" id="L214">        long cursor = from;</span>
+<span class="fc" id="L215">        int idle = 0;</span>
+        while (true) {
+<span class="fc" id="L217">            int[] iv = getWorkingHours(day);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            idle = iv.length == 0 ? idle + 1 : 0;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (idle &gt; MAX_IDLE_DAYS) {</span>
+<span class="fc" id="L220">                throw new IllegalStateException(&quot;The calendar has no working time&quot;);</span>
+            }
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            for (int i = iv.length - 2; i &gt;= 0; i -= 2) {</span>
+<span class="fc" id="L223">                long s = TimeMath.at(day, iv[i], zone);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                if (s &gt;= cursor) {</span>
+<span class="fc" id="L225">                    continue;</span>
+                }
+<span class="fc" id="L227">                long end = Math.min(TimeMath.at(day, iv[i + 1], zone), cursor);</span>
+<span class="fc" id="L228">                long avail = end - s;</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                if (remaining &lt;= avail) {</span>
+<span class="fc" id="L230">                    return end - remaining;</span>
+                }
+<span class="fc" id="L232">                remaining -= avail;</span>
+<span class="fc" id="L233">                cursor = s;</span>
+            }
+<span class="fc" id="L235">            day--;</span>
+<span class="fc" id="L236">        }</span>
+    }
+
+    /// The working time between two instants, negative when `to` is before
+    /// `from`.
+    public long workingTimeBetween(long from, long to) {
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (to &lt; from) {</span>
+<span class="fc" id="L243">            return -workingTimeBetween(to, from);</span>
+        }
+<span class="fc" id="L245">        long first = TimeMath.epochDay(from, zone);</span>
+<span class="fc" id="L246">        long last = TimeMath.epochDay(to, zone);</span>
+<span class="fc" id="L247">        long total = 0;</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        for (long day = first; day &lt;= last; day++) {</span>
+<span class="fc" id="L249">            int[] iv = getWorkingHours(day);</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">            for (int i = 0; i &lt; iv.length; i += 2) {</span>
+<span class="fc" id="L251">                long s = Math.max(TimeMath.at(day, iv[i], zone), from);</span>
+<span class="fc" id="L252">                long e = Math.min(TimeMath.at(day, iv[i + 1], zone), to);</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">                if (e &gt; s) {</span>
+<span class="fc" id="L254">                    total += e - s;</span>
+                }
+            }
+        }
+<span class="fc" id="L258">        return total;</span>
+    }
+
+    /// The working time in a full day of the weekly pattern, which is what &quot;a
+    /// day&quot; of duration means in this calendar.
+    public long getMillisPerDay() {
+<span class="fc" id="L264">        long total = 0;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        for (int i = 0; i &lt; hours.length; i += 2) {</span>
+<span class="fc" id="L266">            total += (hours[i + 1] - hours[i]) * TimeMath.MINUTE;</span>
+        }
+<span class="fc" id="L268">        return total;</span>
+    }
+
+    private static void checkDay(int isoDay) {
+<span class="pc bpc" id="L272" title="2 of 4 branches missed.">        if (isoDay &lt; 1 || isoDay &gt; 7) {</span>
+<span class="nc" id="L273">            throw new IllegalArgumentException(&quot;isoDay &quot; + isoDay);</span>
+        }
+<span class="fc" id="L275">    }</span>
+
+    private static int[] checked(int[] v) {
+<span class="pc bpc" id="L278" title="1 of 4 branches missed.">        if (v == null || v.length % 2 != 0) {</span>
+<span class="fc" id="L279">            throw new IllegalArgumentException(&quot;Working hours are pairs of start and end minutes&quot;);</span>
+        }
+<span class="fc" id="L281">        int[] out = new int[v.length];</span>
+<span class="fc" id="L282">        int last = 0;</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        for (int i = 0; i &lt; v.length; i += 2) {</span>
+<span class="pc bpc" id="L284" title="2 of 6 branches missed.">            if (v[i] &lt; last || v[i + 1] &lt;= v[i] || v[i + 1] &gt; TimeMath.MINUTES_PER_DAY) {</span>
+<span class="fc" id="L285">                throw new IllegalArgumentException(&quot;Working hours must be ascending and inside one day&quot;);</span>
+            }
+<span class="fc" id="L287">            out[i] = v[i];</span>
+<span class="fc" id="L288">            out[i + 1] = v[i + 1];</span>
+<span class="fc" id="L289">            last = v[i + 1];</span>
+        }
+<span class="fc" id="L291">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

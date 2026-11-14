@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecureStorageTokenStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.oidc</a> &gt; <span class="el_source">SecureStorageTokenStore.java</span></div><h1>SecureStorageTokenStore.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.oidc;
+
+import com.codename1.io.Preferences;
+import com.codename1.security.BiometricError;
+import com.codename1.security.BiometricException;
+import com.codename1.security.SecureStorage;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+/// A [TokenStore] that keeps an [OidcClient]'s tokens in the platform's secure storage -- the
+/// iOS keychain, the Android keystore, and what each desktop and browser port provides -- instead
+/// of the application's ordinary [com.codename1.io.Storage].
+///
+/// ```java
+/// client.setTokenStore(new SecureStorageTokenStore());
+/// ```
+///
+/// A refresh token is a long-lived credential: whoever reads it can keep a session alive without
+/// the user. That is the reason to prefer this store over the default one for any application
+/// that signs in to something that matters.
+///
+/// #### Quiet and gated
+///
+/// By default the store uses the non-prompting half of [SecureStorage]: entries are encrypted by
+/// the operating system and read without asking the user, which is what a token attached to
+/// every request needs. [#requireBiometrics(String)] switches to the gated half, where reading
+/// (and on Android writing) shows a biometric prompt. An application that does this should load
+/// its tokens once, when it starts, and keep them in memory -- [OidcRequestAuthorizer] does.
+/// Loading prompts only when this store saved something to read: before the first sign-in, and
+/// after [#clear(String)], it completes with null without asking the user anything.
+///
+/// #### A platform with no secure storage
+///
+/// Nothing is downgraded silently. On a port with no secure storage every operation fails with
+/// an [OidcException] whose code is [OidcException#STORAGE_UNAVAILABLE], so the application
+/// finds out the first time it runs there rather than discovering later where its refresh tokens
+/// went. [#allowPlainStorageFallback(boolean)] is the explicit opt-in: with it, such a platform
+/// gets [TokenStore.DefaultStorageTokenStore] instead. The fallback is only used where secure
+/// storage cannot be reached at all, never because one write failed.
+///
+/// Both stores write the same document, so an entry can be copied from one to the other as is.
+public final class SecureStorageTokenStore implements TokenStore {
+
+    private static final String PREFIX = &quot;cn1.oidc.&quot;;
+    /// The preference under which the store notes that it holds a gated entry for a key.
+    private static final String HELD = &quot;cn1.oidc.held.&quot;;
+
+    private final SecureStorage fixedStorage;
+<span class="fc" id="L72">    private final TokenStore plain = new TokenStore.DefaultStorageTokenStore();</span>
+    private String biometricReason;
+    private boolean plainFallback;
+
+    /// A store over the platform's [SecureStorage#getInstance()].
+    public SecureStorageTokenStore() {
+<span class="nc" id="L78">        this(null);</span>
+<span class="nc" id="L79">    }</span>
+
+    /// A store over a particular [SecureStorage].
+    ///
+    /// #### Parameters
+    ///
+    /// - `storage`: the storage to keep entries in, or null for the platform's own, looked up
+    ///   on each use
+<span class="fc" id="L87">    public SecureStorageTokenStore(SecureStorage storage) {</span>
+<span class="fc" id="L88">        this.fixedStorage = storage;</span>
+<span class="fc" id="L89">    }</span>
+
+    /// Keeps the tokens behind a biometric prompt.
+    ///
+    /// Reading then asks the user to authenticate, and on Android so does writing. Entries are
+    /// bound to the enrolled biometrics: after the user enrolls a new finger or face the stored
+    /// entry is gone for good, [#load(String)] completes with null, and the user signs in again.
+    ///
+    /// An entry written quietly is not visible to the gated half and the other way around, so
+    /// decide once per application.
+    ///
+    /// #### Parameters
+    ///
+    /// - `reason`: the text of the prompt, or null to go back to quiet storage
+    ///
+    /// #### Returns
+    ///
+    /// this store
+    public SecureStorageTokenStore requireBiometrics(String reason) {
+<span class="fc" id="L108">        this.biometricReason = reason;</span>
+<span class="fc" id="L109">        return this;</span>
+    }
+
+    /// Whether a platform with no secure storage may keep the tokens in ordinary
+    /// [com.codename1.io.Storage] instead. Off by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `allow`: true to fall back on such a platform, false to fail there
+    ///
+    /// #### Returns
+    ///
+    /// this store
+    public SecureStorageTokenStore allowPlainStorageFallback(boolean allow) {
+<span class="fc" id="L123">        this.plainFallback = allow;</span>
+<span class="fc" id="L124">        return this;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;OidcTokens&gt; load(final String key) {
+<span class="fc" id="L129">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc" id="L130">        final SecureStorage storage = storage();</span>
+<span class="fc" id="L131">        final String account = PREFIX + key;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (biometricReason != null) {</span>
+            // Nothing was ever saved here: signed out, and no prompt to find that out.
+            // The gated half of SecureStorage cannot be asked whether an entry exists.
+            // Reading one that does not is a failure on every port, and the same failure
+            // as a keychain that could not answer -- so the first launch of an application
+            // that asked for biometrics failed with &quot;storage unavailable&quot; before anyone
+            // had signed in. The store therefore notes for itself, in the application's
+            // preferences, that it saved an entry; the note says that and nothing else.
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (!Preferences.get(HELD + key, false)) {</span>
+<span class="fc" id="L141">                out.complete(null);</span>
+<span class="fc" id="L142">                return out;</span>
+            }
+<span class="fc" id="L144">            storage.get(biometricReason, account)</span>
+<span class="fc" id="L145">                    .ready(new SuccessCallback&lt;String&gt;() {</span>
+                        @Override
+                        public void onSucess(String stored) {
+<span class="fc" id="L148">                            completeLoad(out, stored);</span>
+<span class="fc" id="L149">                        }</span>
+                    })
+<span class="fc" id="L151">                    .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                        @Override
+                        public void onSucess(Throwable err) {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                            if (isRevoked(err)) {</span>
+                                // The entry was bound to biometrics that have since changed.
+                                // It cannot be read again by anyone, which for the caller is
+                                // the same as not being signed in.
+<span class="fc" id="L158">                                Preferences.delete(HELD + key);</span>
+<span class="fc" id="L159">                                out.complete(null);</span>
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">                            } else if (isUnavailable(err) &amp;&amp; plainFallback) {</span>
+<span class="fc" id="L161">                                forward(plain.load(key), out);</span>
+                            } else {
+<span class="fc" id="L163">                                out.error(failure(err, &quot;read&quot;));</span>
+                            }
+<span class="fc" id="L165">                        }</span>
+                    });
+<span class="fc" id="L167">            return out;</span>
+        }
+        try {
+<span class="fc" id="L170">            String stored = storage.get(account);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (stored != null) {</span>
+<span class="fc" id="L172">                completeLoad(out, stored);</span>
+<span class="fc" id="L173">                return out;</span>
+            }
+<span class="fc" id="L175">            int state = storage.entryState(account);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (state == SecureStorage.ENTRY_ABSENT) {</span>
+<span class="fc" id="L177">                out.complete(null);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            } else if (state == SecureStorage.ENTRY_PRESENT) {</span>
+                // There, and unreadable. Answering null would tell the application it is
+                // signed out and invite it to overwrite an entry that may only be locked.
+<span class="nc" id="L181">                out.error(new OidcException(OidcException.STORAGE_UNAVAILABLE,</span>
+                        &quot;The stored tokens exist but could not be read from secure storage&quot;));
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            } else if (plainFallback) {</span>
+<span class="fc" id="L184">                forward(plain.load(key), out);</span>
+            } else {
+<span class="fc" id="L186">                out.error(unavailable(&quot;read&quot;));</span>
+            }
+<span class="nc" id="L188">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L189">            out.error(failure(err, &quot;read&quot;));</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; save(final String key, OidcTokens tokens) {
+<span class="fc" id="L196">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L197">        final SecureStorage storage = storage();</span>
+<span class="fc" id="L198">        final String account = PREFIX + key;</span>
+<span class="fc" id="L199">        final OidcTokens toSave = tokens;</span>
+<span class="fc" id="L200">        final String json = TokenJson.toJson(tokens);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (biometricReason != null) {</span>
+<span class="fc" id="L202">            storage.set(biometricReason, account, json)</span>
+<span class="fc" id="L203">                    .ready(new SuccessCallback&lt;Boolean&gt;() {</span>
+                        @Override
+                        public void onSucess(Boolean stored) {
+<span class="fc" id="L206">                            noteHeld(key, stored);</span>
+<span class="fc" id="L207">                            out.complete(stored);</span>
+<span class="fc" id="L208">                        }</span>
+                    })
+<span class="fc" id="L210">                    .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                        @Override
+                        public void onSucess(Throwable err) {
+<span class="pc bpc" id="L213" title="1 of 4 branches missed.">                            if (isUnavailable(err) &amp;&amp; plainFallback) {</span>
+<span class="fc" id="L214">                                plain.save(key, toSave).ready(new SuccessCallback&lt;Boolean&gt;() {</span>
+                                    @Override
+                                    public void onSucess(Boolean stored) {
+<span class="fc" id="L217">                                        noteHeld(key, stored);</span>
+<span class="fc" id="L218">                                        out.complete(stored);</span>
+<span class="fc" id="L219">                                    }</span>
+<span class="fc" id="L220">                                }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                                    @Override
+                                    public void onSucess(Throwable failed) {
+<span class="nc" id="L223">                                        out.error(failed);</span>
+<span class="nc" id="L224">                                    }</span>
+                                });
+                            } else {
+<span class="fc" id="L227">                                out.error(failure(err, &quot;write&quot;));</span>
+                            }
+<span class="fc" id="L229">                        }</span>
+                    });
+<span class="fc" id="L231">            return out;</span>
+        }
+        try {
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (storage.set(account, json)) {</span>
+<span class="fc" id="L235">                out.complete(Boolean.TRUE);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            } else if (storage.entryState(account) != SecureStorage.ENTRY_UNKNOWN) {</span>
+                // A store that answers about its entries is there; this write failed. That is
+                // not what the fallback is for -- the next write may well succeed, and the
+                // tokens would then live in two places.
+<span class="fc" id="L240">                out.error(new OidcException(OidcException.STORAGE_UNAVAILABLE,</span>
+                        &quot;Secure storage refused to store the tokens&quot;));
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            } else if (plainFallback) {</span>
+<span class="fc" id="L243">                forward(plain.save(key, toSave), out);</span>
+            } else {
+<span class="fc" id="L245">                out.error(unavailable(&quot;write&quot;));</span>
+            }
+<span class="nc" id="L247">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L248">            out.error(failure(err, &quot;write&quot;));</span>
+<span class="fc" id="L249">        }</span>
+<span class="fc" id="L250">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; clear(final String key) {
+<span class="fc" id="L255">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L256">        final SecureStorage storage = storage();</span>
+<span class="fc" id="L257">        final String account = PREFIX + key;</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (biometricReason != null) {</span>
+            // Forgotten first: whatever the removal answers, the caller asked to be
+            // signed out, and the next load must not prompt for an entry it gave up.
+<span class="fc" id="L261">            Preferences.delete(HELD + key);</span>
+<span class="fc" id="L262">            storage.remove(biometricReason, account)</span>
+<span class="fc" id="L263">                    .ready(new SuccessCallback&lt;Boolean&gt;() {</span>
+                        @Override
+                        public void onSucess(Boolean removed) {
+<span class="fc" id="L266">                            out.complete(removed);</span>
+<span class="fc" id="L267">                        }</span>
+                    })
+<span class="fc" id="L269">                    .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                        @Override
+                        public void onSucess(Throwable err) {
+<span class="nc bnc" id="L272" title="All 4 branches missed.">                            if (isUnavailable(err) &amp;&amp; plainFallback) {</span>
+<span class="nc" id="L273">                                forward(plain.clear(key), out);</span>
+                            } else {
+<span class="nc" id="L275">                                out.error(failure(err, &quot;remove&quot;));</span>
+                            }
+<span class="nc" id="L277">                        }</span>
+                    });
+<span class="fc" id="L279">            return out;</span>
+        }
+        try {
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            if (storage.remove(account)) {</span>
+<span class="fc" id="L283">                out.complete(Boolean.TRUE);</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            } else if (storage.entryState(account) != SecureStorage.ENTRY_UNKNOWN) {</span>
+                // Nothing was stored, which is what the caller wanted to end up with.
+<span class="fc" id="L286">                out.complete(Boolean.FALSE);</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            } else if (plainFallback) {</span>
+<span class="fc" id="L288">                forward(plain.clear(key), out);</span>
+            } else {
+<span class="fc" id="L290">                out.error(unavailable(&quot;remove&quot;));</span>
+            }
+<span class="nc" id="L292">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L293">            out.error(failure(err, &quot;remove&quot;));</span>
+<span class="fc" id="L294">        }</span>
+<span class="fc" id="L295">        return out;</span>
+    }
+
+    /// Notes that a gated entry was saved for `key`; see [#load(String)].
+    private static void noteHeld(String key, Boolean stored) {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (Boolean.TRUE.equals(stored)) {</span>
+<span class="fc" id="L301">            Preferences.set(HELD + key, true);</span>
+        }
+<span class="fc" id="L303">    }</span>
+
+    private SecureStorage storage() {
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">        return fixedStorage != null ? fixedStorage : SecureStorage.getInstance();</span>
+    }
+
+    private static void completeLoad(AsyncResource&lt;OidcTokens&gt; out, String stored) {
+        try {
+<span class="fc" id="L311">            out.complete(TokenJson.fromJson(stored));</span>
+<span class="nc" id="L312">        } catch (Exception err) {</span>
+<span class="nc" id="L313">            out.error(new OidcException(OidcException.STORAGE_UNAVAILABLE,</span>
+                    &quot;The stored tokens could not be parsed&quot;, err));
+<span class="fc" id="L315">        }</span>
+<span class="fc" id="L316">    }</span>
+
+    private static &lt;T&gt; void forward(AsyncResource&lt;T&gt; from, final AsyncResource&lt;T&gt; to) {
+<span class="fc" id="L319">        from.ready(new SuccessCallback&lt;T&gt;() {</span>
+            @Override
+            public void onSucess(T value) {
+<span class="fc" id="L322">                to.complete(value);</span>
+<span class="fc" id="L323">            }</span>
+<span class="fc" id="L324">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="nc" id="L327">                to.error(err);</span>
+<span class="nc" id="L328">            }</span>
+        });
+<span class="fc" id="L330">    }</span>
+
+    private static boolean isUnavailable(Throwable err) {
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        return err instanceof BiometricException</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">                &amp;&amp; ((BiometricException) err).getError() == BiometricError.NOT_AVAILABLE;</span>
+    }
+
+    private static boolean isRevoked(Throwable err) {
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        return err instanceof BiometricException</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">                &amp;&amp; ((BiometricException) err).getError() == BiometricError.KEY_REVOKED;</span>
+    }
+
+    private static OidcException unavailable(String operation) {
+<span class="fc" id="L343">        return new OidcException(OidcException.STORAGE_UNAVAILABLE,</span>
+                &quot;Cannot &quot; + operation + &quot; tokens: this platform has no secure storage. &quot;
+                + &quot;Call allowPlainStorageFallback(true) to keep them in ordinary storage here, &quot;
+                + &quot;or use another TokenStore&quot;);
+    }
+
+    private static OidcException failure(Throwable err, String operation) {
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        if (isUnavailable(err)) {</span>
+<span class="fc" id="L351">            return unavailable(operation);</span>
+        }
+<span class="fc" id="L353">        return new OidcException(OidcException.STORAGE_UNAVAILABLE,</span>
+<span class="fc" id="L354">                &quot;Secure storage failed to &quot; + operation + &quot; the tokens: &quot; + err.getMessage(), err);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

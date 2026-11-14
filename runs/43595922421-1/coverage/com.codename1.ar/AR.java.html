@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AR.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ar</a> &gt; <span class="el_source">AR.java</span></div><h1>AR.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ar;
+
+import com.codename1.impl.ARImpl;
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+import java.io.IOException;
+
+/// Entry point for the cross-platform augmented reality API.
+///
+/// AR sessions track the device's pose in the real world through the camera,
+/// detect surfaces, and composite virtual 3D content into the camera image.
+/// The typical flow: check `#isSupported()`, `#open(ARSessionOptions)` a
+/// session, add its `ARSession#createView()` to a form, then place content by
+/// hit testing taps against detected planes and hanging `ARNode`s on the
+/// resulting anchors.
+///
+/// **Permissions and dependencies**: simply referencing classes in this
+/// package causes the build pipeline to inject the camera permission, the
+/// `NSCameraUsageDescription` plist entry (iOS, override via the
+/// `ios.NSCameraUsageDescription` build hint) and the ARCore dependency
+/// (Android). Devices without AR support report `#isSupported()` false;
+/// always guard AR functionality behind that check.
+///
+/// ```java
+/// if (AR.isSupported()) {
+///     ARSession s = AR.open(new ARSessionOptions());
+///     Form f = new Form(&quot;AR&quot;, new BorderLayout());
+///     f.add(BorderLayout.CENTER, s.createView());
+///     f.show();
+///     // on tap: hit test and place a model
+///     s.hitTest(xNorm, yNorm).ready(hits -&gt; {
+///         if (hits.length &gt; 0) {
+///             ARAnchor a = hits[0].createAnchor();
+///             a.setNode(new ARNode(ARModel.fromGltf(modelBytes)));
+///         }
+///     });
+/// }
+/// ```
+public final class AR {
+<span class="fc" id="L65">    private static final Object ACTIVE_LOCK = new Object();</span>
+    private static ARSession active;
+
+    private AR() {
+    }
+
+    /// True when the running platform has a working AR implementation. False
+    /// on platforms and devices without AR support.
+    public static boolean isSupported() {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        return Display.getInstance().getARBackend() != null;</span>
+    }
+
+    /// Returns which AR features this device supports. On unsupported
+    /// platforms every capability reads false.
+    public static ARCapabilities getCapabilities() {
+<span class="fc" id="L80">        ARImpl probe = newImpl();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (probe == null) {</span>
+<span class="fc" id="L82">            return ARCapabilities.UNSUPPORTED;</span>
+        }
+        try {
+<span class="fc" id="L85">            ARCapabilities caps = probe.getCapabilities();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            return caps == null ? ARCapabilities.UNSUPPORTED : caps;</span>
+        } finally {
+<span class="fc" id="L88">            closeQuietly(probe);</span>
+        }
+    }
+
+    /// Opens an AR session. Throws `IllegalStateException` when AR is
+    /// unsupported or a session is already open; close the old session first.
+    ///
+    /// #### Parameters
+    ///
+    /// - `opts`: the session configuration; null uses the defaults
+    ///
+    /// #### Returns
+    ///
+    /// the running session
+    public static ARSession open(ARSessionOptions opts) {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (opts == null) {</span>
+<span class="fc" id="L104">            opts = new ARSessionOptions();</span>
+        }
+        // The check-and-set is atomic so the &quot;one open session at a time&quot;
+        // contract holds under concurrent open() calls; contention is
+        // essentially zero since opening AR is a foreground user action.
+<span class="fc" id="L109">        synchronized (ACTIVE_LOCK) {</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">            if (active != null &amp;&amp; !active.isClosed()) {</span>
+<span class="fc" id="L111">                throw new IllegalStateException(</span>
+                        &quot;Only one ARSession may be open at a time. Close the existing session first.&quot;);
+            }
+<span class="fc" id="L114">            ARImpl impl = newImpl();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (impl == null) {</span>
+<span class="fc" id="L116">                throw new IllegalStateException(&quot;AR is not supported on this platform.&quot;);</span>
+            }
+<span class="fc" id="L118">            ARSession session = new ARSession(impl, opts);</span>
+            try {
+<span class="fc" id="L120">                impl.open(opts);</span>
+<span class="fc" id="L121">            } catch (IOException e) {</span>
+<span class="fc" id="L122">                session.close();</span>
+<span class="fc" id="L123">                throw new RuntimeException(&quot;Could not open the AR session&quot;, e);</span>
+<span class="fc" id="L124">            }</span>
+<span class="fc" id="L125">            active = session;</span>
+<span class="fc" id="L126">            return session;</span>
+        }
+    }
+
+    /// Requests the camera permission needed for AR. The callback receives
+    /// true when granted; it is invoked on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: receives the grant result; may be null
+    public static void requestPermissions(final SuccessCallback&lt;Boolean&gt; callback) {
+<span class="fc" id="L137">        final ARImpl impl = newImpl();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (impl == null) {</span>
+<span class="fc" id="L139">            fireLater(callback, Boolean.FALSE);</span>
+<span class="fc" id="L140">            return;</span>
+        }
+<span class="fc" id="L142">        AsyncResource&lt;Boolean&gt; result = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L143">        result.ready(new SuccessCallback&lt;Boolean&gt;() {</span>
+            @Override public void onSucess(Boolean value) {
+<span class="fc" id="L145">                closeQuietly(impl);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                if (callback != null) {</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">                    callback.onSucess(Boolean.valueOf(value != null &amp;&amp; value.booleanValue()));</span>
+                }
+<span class="fc" id="L149">            }</span>
+        });
+<span class="fc" id="L151">        result.except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override public void onSucess(Throwable t) {
+<span class="fc" id="L153">                closeQuietly(impl);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                if (callback != null) {</span>
+<span class="fc" id="L155">                    callback.onSucess(Boolean.FALSE);</span>
+                }
+<span class="fc" id="L157">            }</span>
+        });
+<span class="fc" id="L159">        impl.requestPermissions(result);</span>
+<span class="fc" id="L160">    }</span>
+
+    private static void fireLater(final SuccessCallback&lt;Boolean&gt; callback, final Boolean value) {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (callback == null) {</span>
+<span class="nc" id="L164">            return;</span>
+        }
+<span class="fc" id="L166">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override public void run() {
+<span class="fc" id="L168">                callback.onSucess(value);</span>
+<span class="fc" id="L169">            }</span>
+        });
+<span class="fc" id="L171">    }</span>
+
+    private static void closeQuietly(ARImpl impl) {
+        try {
+<span class="fc" id="L175">            impl.close();</span>
+<span class="nc" id="L176">        } catch (Throwable t) {</span>
+<span class="nc" id="L177">            Log.e(t);</span>
+<span class="fc" id="L178">        }</span>
+<span class="fc" id="L179">    }</span>
+
+    private static ARImpl newImpl() {
+<span class="fc" id="L182">        return Display.getInstance().getARBackend();</span>
+    }
+
+    // Identity comparison is intentional: only the exact ARSession instance
+    // returned from open() may clear the active slot.
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    static void clearActive(ARSession s) {
+<span class="fc" id="L189">        synchronized (ACTIVE_LOCK) {</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (active == s) {</span>
+<span class="fc" id="L191">                active = null;</span>
+            }
+<span class="fc" id="L193">        }</span>
+<span class="fc" id="L194">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

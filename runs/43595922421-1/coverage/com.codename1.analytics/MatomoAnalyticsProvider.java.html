@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatomoAnalyticsProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics</a> &gt; <span class="el_source">MatomoAnalyticsProvider.java</span></div><h1>MatomoAnalyticsProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+
+import java.util.Map;
+
+/// A privacy-first provider targeting Matomo (formerly Piwik)
+/// through its HTTP Tracking API. Matomo can be self-hosted and offers IP
+/// anonymisation and consent-aware tracking, which makes it a natural fit for
+/// GDPR-sensitive deployments. The same SPI shape applies to comparable
+/// privacy-focused backends (PostHog, Plausible), so swapping is trivial.
+///
+/// ```java
+/// Analytics.addProvider(new MatomoAnalyticsProvider(&quot;https://matomo.example.com&quot;, 1));
+/// ```
+///
+/// Screen views map to Matomo actions; events use Matomo's `e_c`/`e_a`/`e_n`
+/// event parameters; crashes are reported as an event in the `crash` category.
+/// The pseudonymous client id is truncated to Matomo's 16-character visitor id.
+public class MatomoAnalyticsProvider extends AbstractAnalyticsProvider {
+    private final String trackerUrl;
+    private final String idSite;
+    private String userId;
+
+    /// Creates a Matomo provider.
+    ///
+    /// #### Parameters
+    ///
+    /// - `matomoBaseUrl`: the Matomo base URL or full `matomo.php` tracker URL
+    ///
+    /// - `idSite`: the Matomo site id
+<span class="fc" id="L55">    public MatomoAnalyticsProvider(String matomoBaseUrl, int idSite) {</span>
+<span class="fc" id="L56">        this.trackerUrl = normalize(matomoBaseUrl);</span>
+<span class="fc" id="L57">        this.idSite = Integer.toString(idSite);</span>
+<span class="fc" id="L58">    }</span>
+
+    @Override
+    public String getName() {
+<span class="nc" id="L62">        return &quot;matomo&quot;;</span>
+    }
+
+    @Override
+    public void setUserId(String id) {
+<span class="nc" id="L67">        this.userId = id;</span>
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    public void trackScreen(String name, String referrer) {
+<span class="fc" id="L72">        ConnectionRequest r = base();</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        String safeName = name == null ? &quot;&quot; : name;</span>
+<span class="fc" id="L74">        r.addArgument(&quot;action_name&quot;, safeName);</span>
+<span class="fc" id="L75">        r.addArgument(&quot;url&quot;, pseudoUrl(safeName));</span>
+<span class="pc bpc" id="L76" title="3 of 4 branches missed.">        if (referrer != null &amp;&amp; referrer.length() &gt; 0) {</span>
+<span class="nc" id="L77">            r.addArgument(&quot;urlref&quot;, pseudoUrl(referrer));</span>
+        }
+<span class="fc" id="L79">        NetworkManager.getInstance().addToQueue(r);</span>
+<span class="fc" id="L80">    }</span>
+
+    @Override
+    public void trackEvent(AnalyticsEvent event) {
+<span class="fc" id="L84">        ConnectionRequest r = base();</span>
+<span class="fc" id="L85">        r.addArgument(&quot;url&quot;, pseudoUrl(event.getName()));</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        r.addArgument(&quot;e_c&quot;, event.getCategory() == null ? &quot;event&quot; : event.getCategory());</span>
+<span class="fc" id="L87">        r.addArgument(&quot;e_a&quot;, event.getName());</span>
+<span class="fc" id="L88">        Map&lt;String, Object&gt; params = event.getParameters();</span>
+<span class="fc" id="L89">        Object label = params.get(&quot;label&quot;);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (label != null) {</span>
+<span class="nc" id="L91">            r.addArgument(&quot;e_n&quot;, label.toString());</span>
+        }
+<span class="fc" id="L93">        Object value = params.get(&quot;value&quot;);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (value instanceof Number) {</span>
+<span class="fc" id="L95">            r.addArgument(&quot;e_v&quot;, value.toString());</span>
+        }
+<span class="fc" id="L97">        NetworkManager.getInstance().addToQueue(r);</span>
+<span class="fc" id="L98">    }</span>
+
+    @Override
+    public void reportCrash(AnalyticsCrashReport report) {
+<span class="nc" id="L102">        String description = report.getMessage();</span>
+<span class="nc bnc" id="L103" title="All 6 branches missed.">        if ((description == null || description.length() == 0) &amp;&amp; report.getThrowable() != null) {</span>
+<span class="nc" id="L104">            description = report.getThrowable().getClass().getName();</span>
+        }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (description == null) {</span>
+<span class="nc" id="L107">            description = &quot;&quot;;</span>
+        }
+<span class="nc" id="L109">        ConnectionRequest r = base();</span>
+<span class="nc" id="L110">        r.addArgument(&quot;url&quot;, pseudoUrl(&quot;crash&quot;));</span>
+<span class="nc" id="L111">        r.addArgument(&quot;e_c&quot;, &quot;crash&quot;);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        r.addArgument(&quot;e_a&quot;, report.isFatal() ? &quot;fatal&quot; : &quot;handled&quot;);</span>
+<span class="nc" id="L113">        r.addArgument(&quot;e_n&quot;, description);</span>
+<span class="nc" id="L114">        NetworkManager.getInstance().addToQueue(r);</span>
+<span class="nc" id="L115">    }</span>
+
+    @Override
+    public boolean supports(AnalyticsCapability capability) {
+<span class="pc bpc" id="L119" title="3 of 8 branches missed.">        return capability == AnalyticsCapability.SCREEN_VIEWS</span>
+                || capability == AnalyticsCapability.EVENTS
+                || capability == AnalyticsCapability.CRASH_REPORTING
+                || capability == AnalyticsCapability.REAL_TIME;
+    }
+
+    private ConnectionRequest base() {
+<span class="fc" id="L126">        ConnectionRequest r = new ConnectionRequest();</span>
+<span class="fc" id="L127">        r.setUrl(trackerUrl);</span>
+<span class="fc" id="L128">        r.setPost(false);</span>
+<span class="fc" id="L129">        r.setFailSilently(true);</span>
+<span class="fc" id="L130">        r.addArgument(&quot;idsite&quot;, idSite);</span>
+<span class="fc" id="L131">        r.addArgument(&quot;rec&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L132">        r.addArgument(&quot;apiv&quot;, &quot;1&quot;);</span>
+<span class="fc" id="L133">        r.addArgument(&quot;send_image&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L134">        r.addArgument(&quot;_id&quot;, visitorId());</span>
+<span class="fc" id="L135">        r.addArgument(&quot;rand&quot;, Long.toString(System.currentTimeMillis()));</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (userId != null) {</span>
+<span class="nc" id="L137">            r.addArgument(&quot;uid&quot;, userId);</span>
+        }
+<span class="fc" id="L139">        return r;</span>
+    }
+
+    private String visitorId() {
+<span class="fc" id="L143">        AnalyticsContext ctx = getContext();</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        String c = ctx == null || ctx.getClientId() == null ? &quot;&quot; : ctx.getClientId();</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (c.length() &gt;= 16) {</span>
+<span class="fc" id="L146">            return c.substring(0, 16);</span>
+        }
+<span class="nc" id="L148">        StringBuilder b = new StringBuilder(c);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        while (b.length() &lt; 16) {</span>
+<span class="nc" id="L150">            b.append('0');</span>
+        }
+<span class="nc" id="L152">        return b.toString();</span>
+    }
+
+    private String pseudoUrl(String path) {
+<span class="fc" id="L156">        String host = &quot;app&quot;;</span>
+<span class="fc" id="L157">        AnalyticsContext ctx = getContext();</span>
+<span class="pc bpc" id="L158" title="3 of 6 branches missed.">        if (ctx != null &amp;&amp; ctx.getAppName() != null &amp;&amp; ctx.getAppName().length() &gt; 0) {</span>
+<span class="nc" id="L159">            host = ctx.getAppName();</span>
+        }
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        return &quot;https://&quot; + host + &quot;/&quot; + (path == null ? &quot;&quot; : path);</span>
+    }
+
+    private static String normalize(String base) {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (base == null) {</span>
+<span class="nc" id="L166">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">        if (base.endsWith(&quot;/matomo.php&quot;) || base.endsWith(&quot;/piwik.php&quot;)) {</span>
+<span class="fc" id="L169">            return base;</span>
+        }
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (base.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L172">            return base + &quot;matomo.php&quot;;</span>
+        }
+<span class="fc" id="L174">        return base + &quot;/matomo.php&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

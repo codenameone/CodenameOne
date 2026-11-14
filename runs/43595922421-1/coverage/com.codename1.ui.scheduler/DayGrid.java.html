@@ -1,0 +1,1191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DayGrid.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">DayGrid.java</span></div><h1>DayGrid.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.scheduling.ScheduleItem;
+import com.codename1.scheduling.ScheduleResource;
+import com.codename1.scheduling.TimeMath;
+import com.codename1.scheduling.WorkCalendar;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+/// Time running down the screen under a row of columns: the day, work week
+/// and week views, where a column is a day, and the resource day view, where
+/// a column is a resource and the day is the same in all of them.
+final class DayGrid extends ScrollSurface {
+    private static final int MOVE = 1;
+    private static final int RESIZE_START = 2;
+    private static final int RESIZE_END = 3;
+    private static final int RANGE = 4;
+    private static final int MAX_ALL_DAY_ROWS = 3;
+    // A slot of the grid as a key of the hover: the column times this, and the minute.
+    private static final long SLOT_KEY = 10000L;
+    // An item shorter than this is laid out as if it lasted this long, so
+    // that it has room for a line of text and its neighbours stay off it.
+    private static final int MIN_LAYOUT_MINUTES = 25;
+
+    /// An item, or the part of one that falls in a column.
+<span class="fc" id="L56">    static final class Box {</span>
+        ScheduleItem item;
+        int col;
+        int startMin;
+        int endMin;
+        int lane;
+<span class="fc" id="L62">        int lanes = 1;</span>
+        boolean startsBefore;
+        boolean endsAfter;
+    }
+
+    /// An item in the lane above the grid: all day, or a day long or more.
+<span class="fc" id="L68">    static final class Chip {</span>
+        ScheduleItem item;
+        int fromCol;
+        int toCol;
+        int row;
+        boolean startsBefore;
+        boolean endsAfter;
+    }
+
+<span class="fc" id="L77">    private static final Comparator&lt;Box&gt; BY_START = new Comparator&lt;Box&gt;() {</span>
+        @Override
+        public int compare(Box a, Box b) {
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            if (a.startMin != b.startMin) {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                return a.startMin &lt; b.startMin ? -1 : 1;</span>
+            }
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (a.endMin != b.endMin) {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                return a.endMin &gt; b.endMin ? -1 : 1;</span>
+            }
+<span class="nc" id="L86">            return a.item.getId().compareTo(b.item.getId());</span>
+        }
+    };
+
+<span class="fc" id="L90">    private static final Comparator&lt;Chip&gt; CHIP_ORDER = new Comparator&lt;Chip&gt;() {</span>
+        @Override
+        public int compare(Chip a, Chip b) {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (a.fromCol != b.fromCol) {</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                return a.fromCol &lt; b.fromCol ? -1 : 1;</span>
+            }
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (a.toCol != b.toCol) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                return a.toCol &gt; b.toCol ? -1 : 1;</span>
+            }
+<span class="nc" id="L99">            return a.item.getId().compareTo(b.item.getId());</span>
+        }
+    };
+
+    private final Scheduler owner;
+<span class="fc" id="L104">    private long[] days = new long[0];</span>
+    private ScheduleResource[] resources;
+<span class="fc" id="L106">    private boolean dirty = true;</span>
+<span class="fc" id="L107">    private int laidW = -1;</span>
+<span class="fc" id="L108">    private int laidH = -1;</span>
+<span class="fc" id="L109">    private int laidGen = -1;</span>
+    private float hourH;
+    private int colHeaderH;
+    private int allDayH;
+    private int chipH;
+    private int allDayRows;
+    private int contentW;
+<span class="fc" id="L116">    private int pendingScrollMinute = -1;</span>
+<span class="fc" id="L117">    private final ArrayList&lt;Box&gt; boxes = new ArrayList&lt;Box&gt;();</span>
+<span class="fc" id="L118">    private final ArrayList&lt;Box&gt; backgrounds = new ArrayList&lt;Box&gt;();</span>
+<span class="fc" id="L119">    private final ArrayList&lt;Chip&gt; chips = new ArrayList&lt;Chip&gt;();</span>
+<span class="fc" id="L120">    private final ArrayList&lt;ScheduleItem&gt; loaded = new ArrayList&lt;ScheduleItem&gt;();</span>
+<span class="fc" id="L121">    private final int[] rect = new int[4];</span>
+
+    private int mode;
+    private ScheduleItem editItem;
+    private long editStart;
+    private long editEnd;
+    private String editResource;
+    private long grabTime;
+    private int anchorCol;
+    private int anchorMin;
+
+<span class="fc" id="L132">    DayGrid(Scheduler owner) {</span>
+<span class="fc" id="L133">        this.owner = owner;</span>
+<span class="fc" id="L134">        setUIID(&quot;Scheduler&quot;);</span>
+<span class="fc" id="L135">    }</span>
+
+    /// Shows `count` days from `firstDay`, or one day across `columns` when
+    /// that is not null.
+    void show(long firstDay, int count, List&lt;ScheduleResource&gt; columns) {
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        boolean first = days.length == 0;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (columns != null) {</span>
+<span class="fc" id="L142">            resources = new ScheduleResource[columns.size()];</span>
+<span class="fc" id="L143">            columns.toArray(resources);</span>
+<span class="fc" id="L144">            days = new long[Math.max(1, resources.length)];</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            for (int i = 0; i &lt; days.length; i++) {</span>
+<span class="fc" id="L146">                days[i] = firstDay;</span>
+            }
+        } else {
+<span class="fc" id="L149">            resources = null;</span>
+<span class="fc" id="L150">            days = new long[count];</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L152">                days[i] = firstDay + i;</span>
+            }
+        }
+<span class="fc" id="L155">        dirty = true;</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (first) {</span>
+<span class="fc" id="L157">            pendingScrollMinute = owner.getInitialMinute();</span>
+        }
+<span class="fc" id="L159">        repaint();</span>
+<span class="fc" id="L160">    }</span>
+
+    /// Lists the days to show one by one, for a work week that skips some.
+    void show(long[] list) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        boolean first = days.length == 0;</span>
+<span class="fc" id="L165">        resources = null;</span>
+<span class="fc" id="L166">        days = list;</span>
+<span class="fc" id="L167">        dirty = true;</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (first) {</span>
+<span class="nc" id="L169">            pendingScrollMinute = owner.getInitialMinute();</span>
+        }
+<span class="fc" id="L171">        repaint();</span>
+<span class="fc" id="L172">    }</span>
+
+    void modelChanged() {
+<span class="fc" id="L175">        dirty = true;</span>
+<span class="fc" id="L176">        repaint();</span>
+<span class="fc" id="L177">    }</span>
+
+    void scrollToMinute(int minute) {
+<span class="nc" id="L180">        pendingScrollMinute = minute;</span>
+<span class="nc" id="L181">        dirty = true;</span>
+<span class="nc" id="L182">        repaint();</span>
+<span class="nc" id="L183">    }</span>
+
+    List&lt;Box&gt; boxes() {
+<span class="fc" id="L186">        return boxes;</span>
+    }
+
+    List&lt;Chip&gt; chips() {
+<span class="fc" id="L190">        return chips;</span>
+    }
+
+    // ------------------------------------------------------------- layout
+
+    @Override
+    void prepare(int width, int height) {
+<span class="fc" id="L197">        int gen = UIManager.getThemeGeneration();</span>
+<span class="pc bpc" id="L198" title="1 of 8 branches missed.">        if (!dirty &amp;&amp; width == laidW &amp;&amp; height == laidH &amp;&amp; gen == laidGen) {</span>
+<span class="fc" id="L199">            return;</span>
+        }
+<span class="fc" id="L201">        laidW = width;</span>
+<span class="fc" id="L202">        laidH = height;</span>
+<span class="fc" id="L203">        laidGen = gen;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (dirty) {</span>
+<span class="fc" id="L205">            dirty = false;</span>
+<span class="fc" id="L206">            load();</span>
+        }
+<span class="fc" id="L208">        Style time = Look.style(&quot;SchedulerTimeLabel&quot;);</span>
+<span class="fc" id="L209">        Style header = Look.style(&quot;SchedulerHeader&quot;);</span>
+<span class="fc" id="L210">        Font hf = header.getFont();</span>
+<span class="fc" id="L211">        headerW = time.getFont().stringWidth(Dates.time(22 * 60, owner.is24Hours(), true)) + Look.mm(2.5f);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (resources != null) {</span>
+<span class="fc" id="L213">            boolean detail = false;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            for (ScheduleResource r : resources) {</span>
+<span class="pc bpc" id="L215" title="3 of 4 branches missed.">                if (r.getDetail() != null &amp;&amp; r.getDetail().length() &gt; 0) {</span>
+<span class="nc" id="L216">                    detail = true;</span>
+                }
+            }
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            colHeaderH = hf.getHeight() * (detail ? 2 : 1) + Look.mm(2.5f);</span>
+<span class="fc" id="L220">        } else {</span>
+<span class="fc" id="L221">            colHeaderH = hf.getHeight() * 2 + Look.mm(3.5f);</span>
+        }
+<span class="fc" id="L223">        chipH = Look.style(&quot;SchedulerItem&quot;).getFont().getHeight() + Look.mm(1.2f);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        allDayH = allDayRows == 0 ? 0 : Math.min(allDayRows, MAX_ALL_DAY_ROWS) * chipH + Look.mm(1);</span>
+<span class="fc" id="L225">        headerH = colHeaderH + allDayH;</span>
+<span class="fc" id="L226">        int bodyW = Math.max(0, width - headerW);</span>
+<span class="fc" id="L227">        int bodyH = Math.max(0, height - headerH);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        int minCol = Look.mm(resources != null ? 18 : 7);</span>
+<span class="fc" id="L229">        contentW = Math.max(bodyW, days.length * minCol);</span>
+<span class="fc" id="L230">        float least = Math.max(Look.mm(4), bodyH / 24f);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (hourH &lt;= 0) {</span>
+<span class="fc" id="L232">            hourH = Look.mm(9);</span>
+        }
+<span class="fc" id="L234">        hourH = Math.max(least, Math.min(Look.mm(40), hourH));</span>
+<span class="pc bpc" id="L235" title="1 of 4 branches missed.">        if (pendingScrollMinute &gt;= 0 &amp;&amp; bodyH &gt; 0) {</span>
+            // Half a label higher than the hour asked for: its label is
+            // centred on its line, and would be cut in two by the header.
+<span class="fc" id="L238">            int room = Look.style(&quot;SchedulerTimeLabel&quot;).getFont().getHeight() / 2 + Look.mm(0.5f);</span>
+<span class="fc" id="L239">            setOffsets(getOffX(), Math.max(0, Math.round(pendingScrollMinute * hourH / 60f) - room));</span>
+<span class="fc" id="L240">            pendingScrollMinute = -1;</span>
+        }
+<span class="fc" id="L242">    }</span>
+
+    @Override
+    double[] saveZoom() {
+<span class="fc" id="L246">        return new double[]{hourH};</span>
+    }
+
+    @Override
+    void restoreZoom(double[] saved) {
+<span class="fc" id="L251">        hourH = (float) saved[0];</span>
+<span class="fc" id="L252">    }</span>
+
+    @Override
+    int contentWidth() {
+<span class="fc" id="L256">        return contentW;</span>
+    }
+
+    @Override
+    int contentHeight() {
+<span class="fc" id="L261">        return Math.round(24 * hourH);</span>
+    }
+
+    private int colX(int col) {
+<span class="fc" id="L265">        return (int) ((long) col * contentW / days.length);</span>
+    }
+
+    private int colAt(int cx) {
+<span class="fc" id="L269">        int c = (int) ((long) cx * days.length / Math.max(1, contentW));</span>
+<span class="fc" id="L270">        return Math.max(0, Math.min(days.length - 1, c));</span>
+    }
+
+    private int minuteY(int minute) {
+<span class="fc" id="L274">        return Math.round(minute * hourH / 60f);</span>
+    }
+
+    // The working hours of a calendar as minutes of a day of this view. They
+    // are the calendar's own when it keeps the scheduler's zone. Somebody
+    // who works in another zone has hours that fall elsewhere on this
+    // column, and partly on the days either side of it.
+    private int[] workingMinutes(WorkCalendar cal, long day) {
+<span class="nc" id="L282">        ZoneId zone = owner.getZone();</span>
+<span class="nc" id="L283">        ZoneId theirs = cal.getZone();</span>
+<span class="nc bnc" id="L284" title="All 4 branches missed.">        if (theirs == null || theirs.equals(zone)) {</span>
+<span class="nc" id="L285">            return cal.getWorkingHours(day);</span>
+        }
+<span class="nc" id="L287">        long from = TimeMath.startOfEpochDay(day, zone);</span>
+<span class="nc" id="L288">        long to = TimeMath.startOfEpochDay(day + 1, zone);</span>
+<span class="nc" id="L289">        long first = TimeMath.epochDay(from, theirs);</span>
+<span class="nc" id="L290">        long last = TimeMath.epochDay(to - 1, theirs);</span>
+<span class="nc" id="L291">        int[] out = new int[0];</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        for (long d = first; d &lt;= last; d++) {</span>
+<span class="nc" id="L293">            int[] iv = cal.getWorkingHours(d);</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            for (int i = 0; i &lt; iv.length; i += 2) {</span>
+<span class="nc" id="L295">                long a = Math.max(from, TimeMath.at(d, iv[i], theirs));</span>
+<span class="nc" id="L296">                long b = Math.min(to, TimeMath.at(d, iv[i + 1], theirs));</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                if (b &lt;= a) {</span>
+<span class="nc" id="L298">                    continue;</span>
+                }
+                // Minutes of this column's own clock, which is what the
+                // column is laid out in: on a day the clock changes they are
+                // not the minutes that have passed since midnight.
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                int start = a &lt;= from ? 0 : TimeMath.minuteOfDay(a, zone);</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                int end = b &gt;= to ? TimeMath.MINUTES_PER_DAY : TimeMath.minuteOfDay(b, zone);</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">                if (end &lt;= start) {</span>
+<span class="nc" id="L306">                    continue;</span>
+                }
+<span class="nc bnc" id="L308" title="All 4 branches missed.">                if (out.length &gt; 0 &amp;&amp; start &lt;= out[out.length - 1]) {</span>
+<span class="nc" id="L309">                    out[out.length - 1] = Math.max(out[out.length - 1], end);</span>
+                } else {
+<span class="nc" id="L311">                    int[] grown = new int[out.length + 2];</span>
+<span class="nc" id="L312">                    System.arraycopy(out, 0, grown, 0, out.length);</span>
+<span class="nc" id="L313">                    grown[out.length] = start;</span>
+<span class="nc" id="L314">                    grown[out.length + 1] = end;</span>
+<span class="nc" id="L315">                    out = grown;</span>
+                }
+            }
+        }
+<span class="nc" id="L319">        return out;</span>
+    }
+
+    private int minuteAt(int cy) {
+<span class="fc" id="L323">        return Math.max(0, Math.min(TimeMath.MINUTES_PER_DAY, (int) (cy * 60f / hourH)));</span>
+    }
+
+    private int resourceColumn(String id) {
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L328">            return -1;</span>
+        }
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        for (int i = 0; i &lt; resources.length; i++) {</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">            if (resources[i].getId().equals(id)) {</span>
+<span class="fc" id="L332">                return i;</span>
+            }
+        }
+<span class="fc" id="L335">        return -1;</span>
+    }
+
+    private void load() {
+<span class="fc" id="L339">        boxes.clear();</span>
+<span class="fc" id="L340">        backgrounds.clear();</span>
+<span class="fc" id="L341">        chips.clear();</span>
+<span class="fc" id="L342">        loaded.clear();</span>
+<span class="fc" id="L343">        allDayRows = 0;</span>
+<span class="pc bpc" id="L344" title="2 of 4 branches missed.">        if (days.length == 0 || owner.getModel() == null) {</span>
+<span class="nc" id="L345">            return;</span>
+        }
+<span class="fc" id="L347">        ZoneId zone = owner.getZone();</span>
+<span class="fc" id="L348">        long firstDay = days[0];</span>
+<span class="fc" id="L349">        long lastDay = days[days.length - 1];</span>
+<span class="fc" id="L350">        long from = TimeMath.startOfEpochDay(firstDay, zone);</span>
+<span class="fc" id="L351">        long to = TimeMath.startOfEpochDay(lastDay + 1, zone);</span>
+<span class="fc" id="L352">        owner.getModel().getItems(from, to, loaded);</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        for (ScheduleItem item : loaded) {</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            boolean event = item.getKind() == ScheduleItem.Kind.EVENT;</span>
+<span class="fc" id="L355">            int only = -1;</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">            if (resources != null) {</span>
+<span class="fc" id="L357">                only = resourceColumn(item.getResourceId());</span>
+<span class="pc bpc" id="L358" title="3 of 6 branches missed.">                if (only &lt; 0 &amp;&amp; (event || item.getResourceId() != null)) {</span>
+<span class="nc" id="L359">                    continue;</span>
+                }
+            }
+<span class="pc bpc" id="L362" title="1 of 6 branches missed.">            if (event &amp;&amp; (item.isAllDay() || item.getEnd() - item.getStart() &gt;= TimeMath.DAY)) {</span>
+<span class="fc" id="L363">                addChip(item, only, zone);</span>
+<span class="fc" id="L364">                continue;</span>
+            }
+<span class="fc bfc" id="L366" title="All 2 branches covered.">            for (int c = 0; c &lt; days.length; c++) {</span>
+<span class="pc bpc" id="L367" title="1 of 6 branches missed.">                if (resources != null &amp;&amp; only &gt;= 0 &amp;&amp; c != only) {</span>
+<span class="fc" id="L368">                    continue;</span>
+                }
+<span class="fc" id="L370">                long ds = TimeMath.startOfEpochDay(days[c], zone);</span>
+<span class="fc" id="L371">                long de = TimeMath.startOfEpochDay(days[c] + 1, zone);</span>
+<span class="pc bpc" id="L372" title="5 of 6 branches missed.">                boolean instant = item.getEnd() == item.getStart() &amp;&amp; item.getStart() &gt;= ds &amp;&amp; item.getStart() &lt; de;</span>
+<span class="pc bpc" id="L373" title="1 of 4 branches missed.">                if (!instant &amp;&amp; !item.intersects(ds, de)) {</span>
+<span class="fc" id="L374">                    continue;</span>
+                }
+<span class="fc" id="L376">                Box b = new Box();</span>
+<span class="fc" id="L377">                b.item = item;</span>
+<span class="fc" id="L378">                b.col = c;</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">                b.startsBefore = item.getStart() &lt; ds;</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">                b.endsAfter = item.getEnd() &gt; de;</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                b.startMin = b.startsBefore ? 0 : TimeMath.minuteOfDay(item.getStart(), zone);</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">                b.endMin = item.getEnd() &gt;= de ? TimeMath.MINUTES_PER_DAY : TimeMath.minuteOfDay(item.getEnd(), zone);</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">                if (b.endMin &lt; b.startMin) {</span>
+<span class="nc" id="L384">                    b.endMin = b.startMin;</span>
+                }
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                if (event) {</span>
+<span class="fc" id="L387">                    boxes.add(b);</span>
+                } else {
+<span class="nc" id="L389">                    backgrounds.add(b);</span>
+                }
+            }
+<span class="fc" id="L392">        }</span>
+<span class="fc" id="L393">        Collections.sort(boxes, BY_START);</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        for (int c = 0; c &lt; days.length; c++) {</span>
+<span class="fc" id="L395">            layoutColumn(c);</span>
+        }
+<span class="fc" id="L397">        layoutChips();</span>
+<span class="fc" id="L398">    }</span>
+
+    private void addChip(ScheduleItem item, int only, ZoneId zone) {
+<span class="fc" id="L401">        Chip chip = new Chip();</span>
+<span class="fc" id="L402">        chip.item = item;</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (resources != null) {</span>
+<span class="nc" id="L404">            chip.fromCol = only;</span>
+<span class="nc" id="L405">            chip.toCol = only;</span>
+        } else {
+<span class="fc" id="L407">            long s = TimeMath.epochDay(item.getStart(), zone);</span>
+            // The end is exclusive: an item that ends at midnight is not on
+            // the day that starts then.
+<span class="fc" id="L410">            long e = TimeMath.epochDay(Math.max(item.getStart(), item.getEnd() - 1), zone);</span>
+<span class="fc" id="L411">            chip.fromCol = -1;</span>
+<span class="fc" id="L412">            chip.toCol = -1;</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">            for (int c = 0; c &lt; days.length; c++) {</span>
+<span class="fc bfc" id="L414" title="All 4 branches covered.">                if (days[c] &gt;= s &amp;&amp; days[c] &lt;= e) {</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">                    if (chip.fromCol &lt; 0) {</span>
+<span class="fc" id="L416">                        chip.fromCol = c;</span>
+                    }
+<span class="fc" id="L418">                    chip.toCol = c;</span>
+                }
+            }
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">            if (chip.fromCol &lt; 0) {</span>
+<span class="nc" id="L422">                return;</span>
+            }
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            chip.startsBefore = s &lt; days[chip.fromCol];</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">            chip.endsAfter = e &gt; days[chip.toCol];</span>
+        }
+<span class="fc" id="L427">        chips.add(chip);</span>
+<span class="fc" id="L428">    }</span>
+
+    // The boxes of a column that overlap, directly or through one another,
+    // share its width in equal lanes.
+    private void layoutColumn(int col) {
+<span class="fc" id="L433">        ArrayList&lt;Box&gt; group = new ArrayList&lt;Box&gt;();</span>
+<span class="fc" id="L434">        ArrayList&lt;Integer&gt; laneEnd = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L435">        int groupEnd = -1;</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        for (Box b : boxes) {</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            if (b.col != col) {</span>
+<span class="fc" id="L438">                continue;</span>
+            }
+<span class="fc" id="L440">            int end = Math.max(b.endMin, b.startMin + MIN_LAYOUT_MINUTES);</span>
+<span class="fc bfc" id="L441" title="All 4 branches covered.">            if (!group.isEmpty() &amp;&amp; b.startMin &gt;= groupEnd) {</span>
+<span class="fc" id="L442">                close(group, laneEnd.size());</span>
+<span class="fc" id="L443">                group.clear();</span>
+<span class="fc" id="L444">                laneEnd.clear();</span>
+            }
+<span class="fc" id="L446">            int lane = -1;</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">            for (int i = 0; i &lt; laneEnd.size(); i++) {</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">                if (laneEnd.get(i).intValue() &lt;= b.startMin) {</span>
+<span class="nc" id="L449">                    lane = i;</span>
+<span class="nc" id="L450">                    break;</span>
+                }
+            }
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">            if (lane &lt; 0) {</span>
+<span class="fc" id="L454">                lane = laneEnd.size();</span>
+<span class="fc" id="L455">                laneEnd.add(Integer.valueOf(end));</span>
+            } else {
+<span class="nc" id="L457">                laneEnd.set(lane, Integer.valueOf(end));</span>
+            }
+<span class="fc" id="L459">            b.lane = lane;</span>
+<span class="fc" id="L460">            group.add(b);</span>
+<span class="fc" id="L461">            groupEnd = Math.max(groupEnd, end);</span>
+<span class="fc" id="L462">        }</span>
+<span class="fc" id="L463">        close(group, laneEnd.size());</span>
+<span class="fc" id="L464">    }</span>
+
+    private static void close(List&lt;Box&gt; group, int lanes) {
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        for (Box b : group) {</span>
+<span class="fc" id="L468">            b.lanes = Math.max(1, lanes);</span>
+<span class="fc" id="L469">        }</span>
+<span class="fc" id="L470">    }</span>
+
+    private void layoutChips() {
+<span class="fc" id="L473">        Collections.sort(chips, CHIP_ORDER);</span>
+<span class="fc" id="L474">        ArrayList&lt;Integer&gt; rowEnd = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L475" title="All 2 branches covered.">        for (Chip c : chips) {</span>
+<span class="fc" id="L476">            int row = -1;</span>
+<span class="pc bfc" id="L477" title="All 2 branches covered.">            for (int i = 0; i &lt; rowEnd.size(); i++) {</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">                if (rowEnd.get(i).intValue() &lt; c.fromCol) {</span>
+<span class="fc" id="L479">                    row = i;</span>
+<span class="fc" id="L480">                    break;</span>
+                }
+            }
+<span class="fc bfc" id="L483" title="All 2 branches covered.">            if (row &lt; 0) {</span>
+<span class="fc" id="L484">                row = rowEnd.size();</span>
+<span class="fc" id="L485">                rowEnd.add(Integer.valueOf(c.toCol));</span>
+            } else {
+<span class="fc" id="L487">                rowEnd.set(row, Integer.valueOf(c.toCol));</span>
+            }
+<span class="fc" id="L489">            c.row = row;</span>
+<span class="fc" id="L490">        }</span>
+<span class="fc" id="L491">        allDayRows = rowEnd.size();</span>
+<span class="fc" id="L492">    }</span>
+
+    /// The rectangle of a box in the content's coordinates.
+    void boxRect(Box b, int[] out) {
+<span class="fc" id="L496">        int x0 = colX(b.col);</span>
+<span class="fc" id="L497">        int cw = colX(b.col + 1) - x0;</span>
+        // A strip is left clear at the edge of a column that has room, so
+        // there is always empty space to press on.
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        int usable = cw - (cw &gt; Look.mm(14) ? Look.mm(1.6f) : 1);</span>
+<span class="fc" id="L501">        int lx = x0 + (int) ((long) b.lane * usable / b.lanes);</span>
+<span class="fc" id="L502">        int rx = x0 + (int) ((long) (b.lane + 1) * usable / b.lanes);</span>
+<span class="fc" id="L503">        int top = minuteY(b.startMin);</span>
+<span class="fc" id="L504">        int bottom = minuteY(b.endMin);</span>
+<span class="fc" id="L505">        out[0] = lx + 1;</span>
+<span class="fc" id="L506">        out[1] = top + 1;</span>
+<span class="fc" id="L507">        out[2] = Math.max(2, rx - lx - 1);</span>
+<span class="fc" id="L508">        out[3] = Math.max(Look.mm(2.6f), bottom - top - 1);</span>
+<span class="fc" id="L509">    }</span>
+
+    private boolean chipHidden(Chip c) {
+<span class="pc bpc" id="L512" title="3 of 4 branches missed.">        return allDayRows &gt; MAX_ALL_DAY_ROWS &amp;&amp; c.row &gt;= MAX_ALL_DAY_ROWS - 1;</span>
+    }
+
+    private void chipRect(Chip c, int[] out) {
+<span class="fc" id="L516">        int x0 = colX(c.fromCol);</span>
+<span class="fc" id="L517">        int x1 = colX(c.toCol + 1);</span>
+<span class="fc" id="L518">        out[0] = x0 + 1;</span>
+<span class="fc" id="L519">        out[1] = colHeaderH + c.row * chipH;</span>
+<span class="fc" id="L520">        out[2] = x1 - x0 - 2;</span>
+<span class="fc" id="L521">        out[3] = chipH - 1;</span>
+<span class="fc" id="L522">    }</span>
+
+    private int hiddenChips(int col) {
+<span class="nc" id="L525">        int n = 0;</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">        for (Chip c : chips) {</span>
+<span class="nc bnc" id="L527" title="All 6 branches missed.">            if (chipHidden(c) &amp;&amp; c.fromCol &lt;= col &amp;&amp; c.toCol &gt;= col) {</span>
+<span class="nc" id="L528">                n++;</span>
+            }
+<span class="nc" id="L530">        }</span>
+<span class="nc" id="L531">        return n;</span>
+    }
+
+    // -------------------------------------------------------------- paint
+
+    @Override
+    void paintBody(Graphics g, int x, int y) {
+<span class="fc" id="L538">        Style grid = Look.style(&quot;SchedulerGrid&quot;);</span>
+<span class="fc" id="L539">        Style off = Look.style(&quot;SchedulerOffHours&quot;);</span>
+<span class="fc" id="L540">        int cx = g.getClipX();</span>
+<span class="fc" id="L541">        int cy = g.getClipY();</span>
+<span class="fc" id="L542">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L543">        int ch = g.getClipHeight();</span>
+<span class="fc" id="L544">        Look.fill(g, grid, cx, cy, cw, ch);</span>
+<span class="fc" id="L545">        int height = contentHeight();</span>
+<span class="fc" id="L546">        ZoneId zone = owner.getZone();</span>
+
+<span class="fc bfc" id="L548" title="All 2 branches covered.">        for (int c = 0; c &lt; days.length; c++) {</span>
+<span class="fc" id="L549">            int x0 = x + colX(c);</span>
+<span class="fc" id="L550">            int x1 = x + colX(c + 1);</span>
+<span class="pc bpc" id="L551" title="2 of 4 branches missed.">            if (x1 &lt; cx || x0 &gt; cx + cw) {</span>
+<span class="nc" id="L552">                continue;</span>
+            }
+<span class="pc bpc" id="L554" title="2 of 6 branches missed.">            WorkCalendar cal = resources != null &amp;&amp; resources.length &gt; 0 &amp;&amp; resources[c].getCalendar() != null</span>
+<span class="pc" id="L555">                    ? resources[c].getCalendar() : owner.getWorkCalendar();</span>
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">            if (cal != null) {</span>
+<span class="nc" id="L557">                int[] iv = workingMinutes(cal, days[c]);</span>
+<span class="nc" id="L558">                int cursor = 0;</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">                for (int i = 0; i &lt; iv.length; i += 2) {</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">                    if (iv[i] &gt; cursor) {</span>
+<span class="nc" id="L561">                        Look.fill(g, off, x0, y + minuteY(cursor), x1 - x0, minuteY(iv[i]) - minuteY(cursor));</span>
+                    }
+<span class="nc" id="L563">                    cursor = iv[i + 1];</span>
+                }
+<span class="nc bnc" id="L565" title="All 2 branches missed.">                if (cursor &lt; TimeMath.MINUTES_PER_DAY) {</span>
+<span class="nc" id="L566">                    Look.fill(g, off, x0, y + minuteY(cursor), x1 - x0, height - minuteY(cursor));</span>
+                }
+            }
+        }
+
+<span class="fc" id="L571">        paintSlot(g, x, y, hovered(), grid.getFgColor());</span>
+<span class="fc" id="L572">        paintSlot(g, x, y, fading(), grid.getFgColor());</span>
+
+        // A background band is part of the grid, as the shading of the hours
+        // off is: the hour lines are drawn over it, so an hour can still be
+        // read across a column that is all one band.
+<span class="fc" id="L577">        ScheduleItemRenderer renderer = owner.getItemRenderer();</span>
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">        for (Box b : backgrounds) {</span>
+<span class="nc" id="L579">            int x0 = x + colX(b.col);</span>
+<span class="nc" id="L580">            int x1 = x + colX(b.col + 1);</span>
+<span class="nc" id="L581">            int top = y + minuteY(b.startMin);</span>
+<span class="nc" id="L582">            renderer.paintItem(g, owner, b.item, x0 + 1, top, x1 - x0 - 1, y + minuteY(b.endMin) - top, 0);</span>
+<span class="nc" id="L583">        }</span>
+
+<span class="fc" id="L585">        int line = Look.line(grid, 255);</span>
+<span class="fc" id="L586">        int faint = Look.line(grid, 110);</span>
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">        boolean halves = hourH &gt;= Look.mm(11);</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">        for (int h = 0; h &lt;= 24; h++) {</span>
+<span class="fc" id="L589">            int yy = y + minuteY(h * 60);</span>
+<span class="pc bpc" id="L590" title="1 of 4 branches missed.">            if (yy &gt;= cy - 1 &amp;&amp; yy &lt;= cy + ch) {</span>
+<span class="fc" id="L591">                g.setColor(line);</span>
+<span class="fc" id="L592">                g.drawLine(cx, yy, cx + cw, yy);</span>
+            }
+<span class="pc bpc" id="L594" title="1 of 4 branches missed.">            if (halves &amp;&amp; h &lt; 24) {</span>
+<span class="fc" id="L595">                int hy = y + minuteY(h * 60 + 30);</span>
+<span class="pc bpc" id="L596" title="2 of 4 branches missed.">                if (hy &gt;= cy &amp;&amp; hy &lt;= cy + ch) {</span>
+<span class="fc" id="L597">                    g.setColor(faint);</span>
+<span class="fc" id="L598">                    g.drawLine(cx, hy, cx + cw, hy);</span>
+                }
+            }
+        }
+<span class="fc" id="L602">        g.setColor(line);</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">        for (int c = 1; c &lt; days.length; c++) {</span>
+<span class="fc" id="L604">            int lx = x + colX(c);</span>
+<span class="fc" id="L605">            g.drawLine(lx, cy, lx, cy + ch);</span>
+        }
+
+<span class="fc" id="L608">        ScheduleItem selected = owner.getSelectedItem();</span>
+<span class="fc" id="L609">        Box selectedBox = null;</span>
+<span class="fc" id="L610">        boolean lit = anyHover();</span>
+<span class="pc bpc" id="L611" title="3 of 6 branches missed.">        float lift = mode == MOVE || mode == RESIZE_START || mode == RESIZE_END ? liftLevel() : 0;</span>
+<span class="fc" id="L612">        int alpha = g.getAlpha();</span>
+<span class="fc bfc" id="L613" title="All 2 branches covered.">        for (Box b : boxes) {</span>
+<span class="fc" id="L614">            boxRect(b, rect);</span>
+<span class="fc" id="L615">            settle(b.item.getId(), rect);</span>
+<span class="pc bpc" id="L616" title="2 of 4 branches missed.">            if (y + rect[1] &gt; cy + ch || y + rect[1] + rect[3] &lt; cy) {</span>
+<span class="nc" id="L617">                continue;</span>
+            }
+<span class="fc" id="L619">            int state = 0;</span>
+<span class="fc bfc" id="L620" title="All 2 branches covered.">            float over = lit ? hoverLevel(b.item.getId()) : 0;</span>
+<span class="fc bfc" id="L621" title="All 2 branches covered.">            if (over &gt; 0) {</span>
+<span class="fc" id="L622">                state |= ScheduleItemRenderer.HOVERED;</span>
+            }
+<span class="pc bpc" id="L624" title="3 of 4 branches missed.">            boolean held = lift &gt; 0 &amp;&amp; b.item == editItem; //NOPMD CompareObjectsWithEquals - the very item that is held</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            if (held) {</span>
+                // What is left behind while the item is carried: where it
+                // was, and where it returns to if it is not let go.
+<span class="nc" id="L628">                g.setAlpha(Math.round(alpha * (1 - 0.6f * lift)));</span>
+            }
+<span class="fc bfc" id="L630" title="All 2 branches covered.">            if (b.item == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="fc" id="L631">                state |= ScheduleItemRenderer.SELECTED;</span>
+<span class="fc" id="L632">                selectedBox = b;</span>
+            }
+<span class="fc bfc" id="L634" title="All 2 branches covered.">            if (b.startsBefore) {</span>
+<span class="fc" id="L635">                state |= ScheduleItemRenderer.STARTS_BEFORE;</span>
+            }
+<span class="fc bfc" id="L637" title="All 2 branches covered.">            if (b.endsAfter) {</span>
+<span class="fc" id="L638">                state |= ScheduleItemRenderer.ENDS_AFTER;</span>
+            }
+<span class="fc" id="L640">            renderer.paintItem(g, owner, b.item, x + rect[0], y + rect[1], rect[2], rect[3], state);</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">            if (held) {</span>
+<span class="nc" id="L642">                g.setAlpha(alpha);</span>
+            } else {
+<span class="fc" id="L644">                Look.glow(g, grid.getFgColor(), x + rect[0], y + rect[1], rect[2], rect[3], over);</span>
+            }
+<span class="fc" id="L646">        }</span>
+<span class="pc bpc" id="L647" title="5 of 10 branches missed.">        if (selectedBox != null &amp;&amp; owner.isEditable() &amp;&amp; selectedBox.item.isResizable() &amp;&amp; !isDragEdits()</span>
+                &amp;&amp; mode == 0) {
+<span class="nc" id="L649">            boxRect(selectedBox, rect);</span>
+<span class="nc" id="L650">            paintHandle(g, grid, x + rect[0] + rect[2] / 2, y + rect[1]);</span>
+<span class="nc" id="L651">            paintHandle(g, grid, x + rect[0] + rect[2] / 2, y + rect[1] + rect[3]);</span>
+        }
+<span class="pc bpc" id="L653" title="1 of 2 branches missed.">        if (mode != 0) {</span>
+<span class="nc" id="L654">            paintEdit(g, x, y, zone);</span>
+        }
+<span class="fc" id="L656">        paintNow(g, x, y, zone);</span>
+<span class="fc" id="L657">    }</span>
+
+    private static void paintHandle(Graphics g, Style grid, int cx, int cy) {
+<span class="nc" id="L660">        int r = Look.mm(1.1f);</span>
+<span class="nc" id="L661">        boolean aa = g.isAntiAliased();</span>
+<span class="nc" id="L662">        g.setAntiAliased(true);</span>
+<span class="nc" id="L663">        g.setColor(Look.under(grid));</span>
+<span class="nc" id="L664">        g.fillArc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);</span>
+<span class="nc" id="L665">        g.setColor(Look.style(&quot;SchedulerNow&quot;).getFgColor());</span>
+<span class="nc" id="L666">        g.drawArc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);</span>
+<span class="nc" id="L667">        g.setAntiAliased(aa);</span>
+<span class="nc" id="L668">    }</span>
+
+    // What is being dragged out: a new range, or an item at the time it
+    // would move to.
+    private void paintEdit(Graphics g, int x, int y, ZoneId zone) {
+<span class="nc bnc" id="L673" title="All 2 branches missed.">        for (int c = 0; c &lt; days.length; c++) {</span>
+<span class="nc bnc" id="L674" title="All 2 branches missed.">            if (resources != null) {</span>
+<span class="nc bnc" id="L675" title="All 2 branches missed.">                int target = mode == RANGE ? anchorCol : resourceColumn(editResource);</span>
+<span class="nc bnc" id="L676" title="All 2 branches missed.">                if (c != target) {</span>
+<span class="nc" id="L677">                    continue;</span>
+                }
+            }
+<span class="nc" id="L680">            long ds = TimeMath.startOfEpochDay(days[c], zone);</span>
+<span class="nc" id="L681">            long de = TimeMath.startOfEpochDay(days[c] + 1, zone);</span>
+<span class="nc bnc" id="L682" title="All 4 branches missed.">            if (editEnd &lt;= ds || editStart &gt;= de) {</span>
+<span class="nc" id="L683">                continue;</span>
+            }
+<span class="nc bnc" id="L685" title="All 2 branches missed.">            int top = editStart &lt;= ds ? 0 : minuteY(TimeMath.minuteOfDay(editStart, zone));</span>
+<span class="nc bnc" id="L686" title="All 2 branches missed.">            int bottom = editEnd &gt;= de ? contentHeight() : minuteY(TimeMath.minuteOfDay(editEnd, zone));</span>
+<span class="nc" id="L687">            int x0 = x + colX(c) + 1;</span>
+<span class="nc" id="L688">            int w = colX(c + 1) - colX(c) - 2;</span>
+<span class="nc" id="L689">            int h = Math.max(Look.mm(2.6f), bottom - top);</span>
+<span class="nc bnc" id="L690" title="All 2 branches missed.">            if (mode == RANGE) {</span>
+<span class="nc" id="L691">                Style sel = Look.style(&quot;SchedulerSelection&quot;);</span>
+<span class="nc" id="L692">                Look.fill(g, sel, x0, y + top, w, h);</span>
+<span class="nc" id="L693">                g.setColor(sel.getFgColor());</span>
+<span class="nc" id="L694">                g.drawRect(x0, y + top, w - 1, h - 1);</span>
+                // The size of the hours beside the grid: a theme that gives
+                // the selection no font of its own would write the range
+                // in its default one, larger than anything else here.
+<span class="nc" id="L698">                Font f = Look.style(&quot;SchedulerTimeLabel&quot;).getFont();</span>
+<span class="nc bnc" id="L699" title="All 2 branches missed.">                if (h &gt;= f.getHeight()) {</span>
+<span class="nc" id="L700">                    g.setFont(f);</span>
+<span class="nc" id="L701">                    g.drawString(Look.fit(owner.formatRange(editStart, editEnd), f, w - Look.mm(2)), x0 + Look.mm(1),</span>
+                            y + top + 1);
+                }
+<span class="nc" id="L704">            } else {</span>
+<span class="nc" id="L705">                Look.shadow(g, x0, y + top, w, h, liftLevel());</span>
+<span class="nc" id="L706">                owner.getItemRenderer().paintItem(g, owner, editItem, x0, y + top, w, h,</span>
+                        ScheduleItemRenderer.DRAGGED | ScheduleItemRenderer.SELECTED);
+                // The time it would land on, over the item: in the colour
+                // and the size of the hours beside the grid, which it is
+                // read against. The colour of the grid's lines is too
+                // pale to read as text.
+<span class="nc" id="L712">                Style label = Look.style(&quot;SchedulerTimeLabel&quot;);</span>
+<span class="nc" id="L713">                Font f = label.getFont();</span>
+<span class="nc" id="L714">                g.setFont(f);</span>
+<span class="nc" id="L715">                g.setColor(label.getFgColor());</span>
+<span class="nc" id="L716">                String s = owner.formatRange(editStart, editEnd);</span>
+<span class="nc" id="L717">                int ty = y + top - f.getHeight();</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">                if (ty &gt; y + getOffY()) {</span>
+<span class="nc" id="L719">                    g.drawString(Look.fit(s, f, w), x0, ty);</span>
+                }
+            }
+        }
+<span class="nc" id="L723">    }</span>
+
+    private void paintNow(Graphics g, int x, int y, ZoneId zone) {
+<span class="fc" id="L726">        long now = owner.now();</span>
+<span class="fc" id="L727">        long today = TimeMath.epochDay(now, zone);</span>
+<span class="fc" id="L728">        int first = -1;</span>
+<span class="fc" id="L729">        int last = -1;</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">        for (int c = 0; c &lt; days.length; c++) {</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">            if (days[c] == today) {</span>
+<span class="fc bfc" id="L732" title="All 2 branches covered.">                if (first &lt; 0) {</span>
+<span class="fc" id="L733">                    first = c;</span>
+                }
+<span class="fc" id="L735">                last = c;</span>
+            }
+        }
+<span class="pc bpc" id="L738" title="1 of 2 branches missed.">        if (first &lt; 0) {</span>
+<span class="nc" id="L739">            return;</span>
+        }
+<span class="fc" id="L741">        Style st = Look.style(&quot;SchedulerNow&quot;);</span>
+<span class="fc" id="L742">        int yy = y + minuteY(TimeMath.minuteOfDay(now, zone));</span>
+<span class="fc" id="L743">        int x0 = x + colX(first);</span>
+<span class="fc" id="L744">        int x1 = x + colX(last + 1);</span>
+<span class="fc" id="L745">        int r = Look.mm(0.9f);</span>
+<span class="fc" id="L746">        boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L747">        g.setAntiAliased(true);</span>
+<span class="fc" id="L748">        g.setColor(st.getFgColor());</span>
+<span class="fc" id="L749">        g.fillRect(x0, yy - 1, x1 - x0, 2);</span>
+<span class="fc" id="L750">        g.fillArc(x0 - r, yy - r, 2 * r, 2 * r, 0, 360);</span>
+<span class="fc" id="L751">        g.setAntiAliased(aa);</span>
+<span class="fc" id="L752">    }</span>
+
+    @Override
+    void paintTopHeader(Graphics g, int x, int y) {
+<span class="fc" id="L756">        Style header = Look.style(&quot;SchedulerHeader&quot;);</span>
+<span class="fc" id="L757">        Style todaySt = Look.style(&quot;SchedulerHeaderToday&quot;);</span>
+<span class="fc" id="L758">        Font f = header.getFont();</span>
+<span class="fc" id="L759">        int fh = f.getHeight();</span>
+<span class="fc" id="L760">        int cx = g.getClipX();</span>
+<span class="fc" id="L761">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L762">        Look.fill(g, header, cx, y, cw, headerH);</span>
+<span class="fc" id="L763">        long today = TimeMath.epochDay(owner.now(), owner.getZone());</span>
+<span class="fc" id="L764">        g.setFont(f);</span>
+<span class="fc" id="L765">        int alpha = g.getAlpha();</span>
+<span class="fc bfc" id="L766" title="All 2 branches covered.">        for (int c = 0; c &lt; days.length; c++) {</span>
+<span class="fc" id="L767">            int x0 = x + colX(c);</span>
+<span class="fc" id="L768">            int w = colX(c + 1) - colX(c);</span>
+<span class="pc bpc" id="L769" title="2 of 4 branches missed.">            if (x0 + w &lt; cx || x0 &gt; cx + cw) {</span>
+<span class="nc" id="L770">                continue;</span>
+            }
+<span class="fc bfc" id="L772" title="All 2 branches covered.">            if (resources != null) {</span>
+<span class="pc bpc" id="L773" title="1 of 2 branches missed.">                if (resources.length == 0) {</span>
+<span class="nc" id="L774">                    continue;</span>
+                }
+<span class="fc" id="L776">                ScheduleResource r = resources[c];</span>
+<span class="fc" id="L777">                String name = Look.fit(r.getName(), f, w - Look.mm(2));</span>
+<span class="pc bpc" id="L778" title="1 of 2 branches missed.">                boolean two = colHeaderH &gt; fh * 2;</span>
+<span class="pc bpc" id="L779" title="1 of 2 branches missed.">                int ty = y + (colHeaderH - (two ? 2 * fh : fh)) / 2;</span>
+<span class="fc" id="L780">                g.setColor(header.getFgColor());</span>
+<span class="fc" id="L781">                g.drawString(name, x0 + (w - f.stringWidth(name)) / 2, ty);</span>
+<span class="pc bpc" id="L782" title="3 of 4 branches missed.">                if (two &amp;&amp; r.getDetail() != null) {</span>
+<span class="nc" id="L783">                    String d = Look.fit(r.getDetail(), f, w - Look.mm(2));</span>
+<span class="nc" id="L784">                    g.setAlpha(alpha * 160 / 255);</span>
+<span class="nc" id="L785">                    g.drawString(d, x0 + (w - f.stringWidth(d)) / 2, ty + fh);</span>
+<span class="nc" id="L786">                    g.setAlpha(alpha);</span>
+<span class="nc" id="L787">                }</span>
+                continue;
+            }
+<span class="fc" id="L790">            String wd = Look.fit(Dates.weekdayShort(TimeMath.dayOfWeek(days[c])), f, w);</span>
+<span class="fc" id="L791">            String num = String.valueOf(Dates.dayOfMonth(days[c]));</span>
+<span class="fc" id="L792">            int top = y + Look.mm(0.8f);</span>
+<span class="fc" id="L793">            g.setColor(header.getFgColor());</span>
+<span class="fc" id="L794">            g.setAlpha(alpha * 170 / 255);</span>
+<span class="fc" id="L795">            g.drawString(wd, x0 + (w - f.stringWidth(wd)) / 2, top);</span>
+<span class="fc" id="L796">            g.setAlpha(alpha);</span>
+<span class="fc" id="L797">            int nw = f.stringWidth(num);</span>
+<span class="fc" id="L798">            int ny = top + fh + Look.mm(0.6f);</span>
+<span class="fc bfc" id="L799" title="All 2 branches covered.">            if (days[c] == today) {</span>
+<span class="fc" id="L800">                int d = Math.min(w - 2, fh + Look.mm(1.4f));</span>
+<span class="fc" id="L801">                boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L802">                g.setAntiAliased(true);</span>
+<span class="fc" id="L803">                g.setColor(todaySt.getBgColor());</span>
+<span class="fc" id="L804">                g.fillArc(x0 + (w - d) / 2, ny + (fh - d) / 2, d, d, 0, 360);</span>
+<span class="fc" id="L805">                g.setAntiAliased(aa);</span>
+<span class="fc" id="L806">                g.setColor(todaySt.getFgColor());</span>
+            }
+<span class="fc" id="L808">            g.drawString(num, x0 + (w - nw) / 2, ny);</span>
+        }
+<span class="fc bfc" id="L810" title="All 2 branches covered.">        if (allDayH &gt; 0) {</span>
+<span class="fc" id="L811">            ScheduleItemRenderer renderer = owner.getItemRenderer();</span>
+<span class="fc" id="L812">            ScheduleItem selected = owner.getSelectedItem();</span>
+<span class="fc bfc" id="L813" title="All 2 branches covered.">            for (Chip c : chips) {</span>
+<span class="pc bpc" id="L814" title="1 of 2 branches missed.">                if (chipHidden(c)) {</span>
+<span class="nc" id="L815">                    continue;</span>
+                }
+<span class="fc" id="L817">                chipRect(c, rect);</span>
+<span class="fc" id="L818">                int state = ScheduleItemRenderer.COMPACT;</span>
+<span class="pc bpc" id="L819" title="1 of 2 branches missed.">                if (c.item == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="nc" id="L820">                    state |= ScheduleItemRenderer.SELECTED;</span>
+                }
+<span class="pc bpc" id="L822" title="1 of 2 branches missed.">                if (c.startsBefore) {</span>
+<span class="nc" id="L823">                    state |= ScheduleItemRenderer.STARTS_BEFORE;</span>
+                }
+<span class="pc bpc" id="L825" title="1 of 2 branches missed.">                if (c.endsAfter) {</span>
+<span class="nc" id="L826">                    state |= ScheduleItemRenderer.ENDS_AFTER;</span>
+                }
+<span class="fc" id="L828">                float over = hoverLevel(c.item.getId());</span>
+<span class="pc bpc" id="L829" title="1 of 2 branches missed.">                if (over &gt; 0) {</span>
+<span class="nc" id="L830">                    state |= ScheduleItemRenderer.HOVERED;</span>
+                }
+<span class="fc" id="L832">                renderer.paintItem(g, owner, c.item, x + rect[0], y + rect[1], rect[2], rect[3], state);</span>
+<span class="fc" id="L833">                Look.glow(g, header.getFgColor(), x + rect[0], y + rect[1], rect[2], rect[3], over);</span>
+<span class="fc" id="L834">            }</span>
+<span class="pc bpc" id="L835" title="1 of 2 branches missed.">            if (allDayRows &gt; MAX_ALL_DAY_ROWS) {</span>
+<span class="nc" id="L836">                g.setFont(f);</span>
+<span class="nc" id="L837">                g.setColor(header.getFgColor());</span>
+<span class="nc bnc" id="L838" title="All 2 branches missed.">                for (int c = 0; c &lt; days.length; c++) {</span>
+<span class="nc" id="L839">                    int n = hiddenChips(c);</span>
+<span class="nc bnc" id="L840" title="All 2 branches missed.">                    if (n &gt; 0) {</span>
+<span class="nc" id="L841">                        g.drawString(&quot;+&quot; + n, x + colX(c) + Look.mm(1),</span>
+                                y + colHeaderH + (MAX_ALL_DAY_ROWS - 1) * chipH + (chipH - fh) / 2);
+                    }
+                }
+            }
+        }
+<span class="fc" id="L847">        g.setColor(Look.mix(header.getBgColor(), header.getFgColor(), 50));</span>
+<span class="fc" id="L848">        g.drawLine(cx, y + headerH - 1, cx + cw, y + headerH - 1);</span>
+<span class="fc" id="L849">    }</span>
+
+    @Override
+    void paintLeftHeader(Graphics g, int x, int y) {
+<span class="fc" id="L853">        Style st = Look.style(&quot;SchedulerTimeLabel&quot;);</span>
+<span class="fc" id="L854">        Font f = st.getFont();</span>
+<span class="fc" id="L855">        int fh = f.getHeight();</span>
+<span class="fc" id="L856">        Look.fill(g, st, x, g.getClipY(), headerW, g.getClipHeight());</span>
+<span class="fc" id="L857">        g.setFont(f);</span>
+<span class="fc" id="L858">        g.setColor(st.getFgColor());</span>
+<span class="pc bpc" id="L859" title="1 of 2 branches missed.">        int every = hourH &lt; fh * 1.3f ? 2 : 1;</span>
+<span class="fc" id="L860">        boolean h24 = owner.is24Hours();</span>
+<span class="fc bfc" id="L861" title="All 2 branches covered.">        for (int h = every; h &lt; 24; h += every) {</span>
+<span class="fc" id="L862">            String s = Dates.time(h * 60, h24, true);</span>
+<span class="fc" id="L863">            g.drawString(s, x + headerW - f.stringWidth(s) - Look.mm(1), y + minuteY(h * 60) - fh / 2);</span>
+        }
+<span class="fc" id="L865">    }</span>
+
+    @Override
+    void paintCorner(Graphics g, int x, int y) {
+<span class="fc" id="L869">        Style header = Look.style(&quot;SchedulerHeader&quot;);</span>
+<span class="fc" id="L870">        Look.fill(g, header, x, y, headerW, headerH);</span>
+<span class="fc" id="L871">        g.setColor(Look.mix(header.getBgColor(), header.getFgColor(), 50));</span>
+<span class="fc" id="L872">        g.drawLine(x, y + headerH - 1, x + headerW, y + headerH - 1);</span>
+<span class="fc" id="L873">    }</span>
+
+    // ------------------------------------------------------------ pointer
+
+    /// The box at a point of the component, or null.
+    Box boxAt(int px, int py) {
+<span class="pc bpc" id="L879" title="2 of 4 branches missed.">        if (px &lt; headerW || py &lt; headerH) {</span>
+<span class="nc" id="L880">            return null;</span>
+        }
+<span class="fc" id="L882">        int cx = px - headerW + getOffX();</span>
+<span class="fc" id="L883">        int cy = py - headerH + getOffY();</span>
+<span class="fc bfc" id="L884" title="All 2 branches covered.">        for (int i = boxes.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L885">            Box b = boxes.get(i);</span>
+<span class="fc" id="L886">            boxRect(b, rect);</span>
+<span class="pc bpc" id="L887" title="3 of 8 branches missed.">            if (cx &gt;= rect[0] &amp;&amp; cx &lt; rect[0] + rect[2] &amp;&amp; cy &gt;= rect[1] &amp;&amp; cy &lt; rect[1] + rect[3]) {</span>
+<span class="fc" id="L888">                return b;</span>
+            }
+        }
+<span class="fc" id="L891">        return null;</span>
+    }
+
+    private Chip chipAt(int px, int py) {
+<span class="nc" id="L895">        int cx = px - headerW + getOffX();</span>
+<span class="nc bnc" id="L896" title="All 2 branches missed.">        for (Chip c : chips) {</span>
+<span class="nc bnc" id="L897" title="All 2 branches missed.">            if (chipHidden(c)) {</span>
+<span class="nc" id="L898">                continue;</span>
+            }
+<span class="nc" id="L900">            chipRect(c, rect);</span>
+<span class="nc bnc" id="L901" title="All 8 branches missed.">            if (cx &gt;= rect[0] &amp;&amp; cx &lt; rect[0] + rect[2] &amp;&amp; py &gt;= rect[1] &amp;&amp; py &lt; rect[1] + rect[3]) {</span>
+<span class="nc" id="L902">                return c;</span>
+            }
+<span class="nc" id="L904">        }</span>
+<span class="nc" id="L905">        return null;</span>
+    }
+
+    private long snap(long time) {
+<span class="fc" id="L909">        ZoneId zone = owner.getZone();</span>
+<span class="fc" id="L910">        int step = Math.max(1, owner.getSnapMinutes());</span>
+<span class="fc" id="L911">        long day = TimeMath.epochDay(time, zone);</span>
+<span class="fc" id="L912">        int m = TimeMath.minuteOfDay(time, zone);</span>
+<span class="fc" id="L913">        int snapped = (m + step / 2) / step * step;</span>
+<span class="fc" id="L914">        return TimeMath.at(day, Math.min(TimeMath.MINUTES_PER_DAY, snapped), zone);</span>
+    }
+
+    private int snapMinute(int minute, boolean down) {
+<span class="fc" id="L918">        int step = Math.max(1, owner.getSnapMinutes());</span>
+<span class="fc bfc" id="L919" title="All 2 branches covered.">        return (down ? minute : minute + step / 2) / step * step;</span>
+    }
+
+    @Override
+    boolean beginEdit(int x, int y, boolean handlesOnly) {
+<span class="pc bpc" id="L924" title="3 of 8 branches missed.">        if (!owner.isEditable() || x &lt; headerW || y &lt; headerH || days.length == 0) {</span>
+<span class="fc" id="L925">            return false;</span>
+        }
+<span class="fc" id="L927">        int cx = x - headerW + getOffX();</span>
+<span class="fc" id="L928">        int cy = y - headerH + getOffY();</span>
+<span class="fc" id="L929">        ZoneId zone = owner.getZone();</span>
+<span class="fc" id="L930">        Box b = boxAt(x, y);</span>
+<span class="pc bpc" id="L931" title="1 of 4 branches missed.">        if (b == null &amp;&amp; handlesOnly) {</span>
+            // The handles reach a little outside the item they belong to.
+<span class="nc" id="L933">            int reach = Look.mm(2.5f);</span>
+<span class="nc" id="L934">            b = boxAt(x, y - reach);</span>
+<span class="nc bnc" id="L935" title="All 2 branches missed.">            if (b == null) {</span>
+<span class="nc" id="L936">                b = boxAt(x, y + reach);</span>
+            }
+        }
+<span class="fc bfc" id="L939" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L940">            boxRect(b, rect);</span>
+<span class="pc bpc" id="L941" title="1 of 2 branches missed.">            int edge = Math.min(rect[3] / 3, Look.mm(handlesOnly ? 3f : 1.6f));</span>
+<span class="pc bpc" id="L942" title="1 of 4 branches missed.">            boolean bottom = !b.endsAfter &amp;&amp; rect[1] + rect[3] - cy &lt;= edge;</span>
+<span class="pc bpc" id="L943" title="2 of 6 branches missed.">            boolean top = !bottom &amp;&amp; !b.startsBefore &amp;&amp; cy - rect[1] &lt;= edge;</span>
+<span class="pc bpc" id="L944" title="7 of 8 branches missed.">            if (handlesOnly &amp;&amp; (b.item != owner.getSelectedItem() || !(top || bottom))) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L945">                return false;</span>
+            }
+<span class="pc bpc" id="L947" title="2 of 6 branches missed.">            if ((top || bottom) &amp;&amp; b.item.isResizable()) {</span>
+<span class="pc bpc" id="L948" title="1 of 2 branches missed.">                mode = bottom ? RESIZE_END : RESIZE_START;</span>
+<span class="pc bpc" id="L949" title="2 of 4 branches missed.">            } else if (!handlesOnly &amp;&amp; b.item.isMovable()) {</span>
+<span class="fc" id="L950">                mode = MOVE;</span>
+            } else {
+<span class="nc" id="L952">                return false;</span>
+            }
+<span class="fc" id="L954">            editItem = b.item;</span>
+<span class="fc" id="L955">            editStart = b.item.getStart();</span>
+<span class="fc" id="L956">            editEnd = b.item.getEnd();</span>
+<span class="fc" id="L957">            editResource = b.item.getResourceId();</span>
+<span class="fc" id="L958">            grabTime = TimeMath.at(days[b.col], minuteAt(cy), zone);</span>
+<span class="fc" id="L959">            owner.viewSelected(b.item);</span>
+<span class="fc" id="L960">            return true;</span>
+        }
+<span class="pc bpc" id="L962" title="1 of 2 branches missed.">        if (handlesOnly) {</span>
+<span class="nc" id="L963">            return false;</span>
+        }
+<span class="fc" id="L965">        mode = RANGE;</span>
+<span class="fc" id="L966">        editItem = null;</span>
+<span class="fc" id="L967">        anchorCol = colAt(cx);</span>
+<span class="fc" id="L968">        anchorMin = snapMinute(minuteAt(cy), true);</span>
+<span class="fc" id="L969">        editStart = TimeMath.at(days[anchorCol], anchorMin, zone);</span>
+<span class="fc" id="L970">        editEnd = editStart + owner.getDefaultMinutes() * TimeMath.MINUTE;</span>
+<span class="pc bpc" id="L971" title="3 of 4 branches missed.">        editResource = resources != null &amp;&amp; resources.length &gt; 0 ? resources[anchorCol].getId() : null;</span>
+<span class="fc" id="L972">        return true;</span>
+    }
+
+    @Override
+    void editDragged(int x, int y) {
+<span class="pc bpc" id="L977" title="1 of 2 branches missed.">        if (mode == 0) {</span>
+<span class="nc" id="L978">            return;</span>
+        }
+<span class="fc" id="L980">        ZoneId zone = owner.getZone();</span>
+<span class="fc" id="L981">        int cx = Math.max(0, Math.min(contentW - 1, x - headerW + getOffX()));</span>
+<span class="fc" id="L982">        int cy = Math.max(0, Math.min(contentHeight(), y - headerH + getOffY()));</span>
+<span class="fc" id="L983">        int col = colAt(cx);</span>
+<span class="fc" id="L984">        int minute = minuteAt(cy);</span>
+<span class="fc" id="L985">        long step = Math.max(1, owner.getSnapMinutes()) * TimeMath.MINUTE;</span>
+<span class="fc" id="L986">        long pointer = TimeMath.at(days[col], minute, zone);</span>
+<span class="fc bfc" id="L987" title="All 2 branches covered.">        if (mode == MOVE) {</span>
+<span class="fc" id="L988">            long length = editItem.getEnd() - editItem.getStart();</span>
+<span class="fc" id="L989">            editStart = snap(editItem.getStart() + pointer - grabTime);</span>
+<span class="fc" id="L990">            editEnd = editStart + length;</span>
+<span class="pc bpc" id="L991" title="1 of 4 branches missed.">            if (resources != null &amp;&amp; resources.length &gt; 0) {</span>
+<span class="fc" id="L992">                editResource = resources[col].getId();</span>
+            }
+<span class="fc bfc" id="L994" title="All 2 branches covered.">        } else if (mode == RESIZE_END) {</span>
+<span class="fc" id="L995">            editEnd = Math.max(editStart + step, snap(pointer));</span>
+<span class="pc bpc" id="L996" title="1 of 2 branches missed.">        } else if (mode == RESIZE_START) {</span>
+<span class="nc" id="L997">            editStart = Math.min(editEnd - step, snap(pointer));</span>
+        } else {
+<span class="fc" id="L999">            int m = snapMinute(minute, false);</span>
+<span class="pc bpc" id="L1000" title="1 of 2 branches missed.">            if (m &gt; anchorMin) {</span>
+<span class="fc" id="L1001">                editStart = TimeMath.at(days[anchorCol], anchorMin, zone);</span>
+<span class="fc" id="L1002">                editEnd = TimeMath.at(days[anchorCol], m, zone);</span>
+<span class="nc bnc" id="L1003" title="All 2 branches missed.">            } else if (m &lt; anchorMin) {</span>
+<span class="nc" id="L1004">                editStart = TimeMath.at(days[anchorCol], m, zone);</span>
+<span class="nc" id="L1005">                editEnd = TimeMath.at(days[anchorCol], anchorMin, zone) + step;</span>
+            } else {
+<span class="nc" id="L1007">                editStart = TimeMath.at(days[anchorCol], anchorMin, zone);</span>
+<span class="nc" id="L1008">                editEnd = editStart + owner.getDefaultMinutes() * TimeMath.MINUTE;</span>
+            }
+        }
+<span class="fc" id="L1011">    }</span>
+
+    @Override
+    void endEdit(boolean commit) {
+<span class="fc" id="L1015">        int m = mode;</span>
+<span class="fc" id="L1016">        ScheduleItem item = editItem;</span>
+<span class="pc bpc" id="L1017" title="1 of 4 branches missed.">        if (item != null &amp;&amp; editRect(rect)) {</span>
+            // From where it was let go to where it belongs, which is the
+            // place it came from when the move is refused or given up.
+<span class="fc" id="L1020">            settleFrom(item.getId(), rect[0], rect[1], rect[2], rect[3]);</span>
+        }
+<span class="fc" id="L1022">        mode = 0;</span>
+<span class="fc" id="L1023">        editItem = null;</span>
+<span class="pc bpc" id="L1024" title="1 of 2 branches missed.">        if (!commit) {</span>
+<span class="nc" id="L1025">            return;</span>
+        }
+<span class="fc bfc" id="L1027" title="All 2 branches covered.">        if (m == RANGE) {</span>
+<span class="fc" id="L1028">            owner.viewRange(editStart, editEnd, editResource);</span>
+<span class="pc bpc" id="L1029" title="1 of 6 branches missed.">        } else if (item != null &amp;&amp; (editStart != item.getStart() || editEnd != item.getEnd()</span>
+<span class="pc bpc" id="L1030" title="1 of 2 branches missed.">                || !same(editResource, item.getResourceId()))) {</span>
+<span class="fc" id="L1031">            owner.viewChanged(item, editStart, editEnd, editResource);</span>
+        }
+<span class="fc" id="L1033">    }</span>
+
+    // Where the item that is being dragged is drawn, in the content: the
+    // first column it shows in.
+    boolean editRect(int[] out) {
+<span class="fc" id="L1038">        ZoneId zone = owner.getZone();</span>
+<span class="fc" id="L1039">        int col = -1;</span>
+<span class="fc" id="L1040">        long ds = 0;</span>
+<span class="fc" id="L1041">        long de = 0;</span>
+<span class="fc bfc" id="L1042" title="All 4 branches covered.">        for (int c = 0; c &lt; days.length &amp;&amp; col &lt; 0; c++) {</span>
+<span class="pc bpc" id="L1043" title="1 of 4 branches missed.">            if (resources != null &amp;&amp; c != resourceColumn(editResource)) {</span>
+<span class="nc" id="L1044">                continue;</span>
+            }
+<span class="fc" id="L1046">            ds = TimeMath.startOfEpochDay(days[c], zone);</span>
+<span class="fc" id="L1047">            de = TimeMath.startOfEpochDay(days[c] + 1, zone);</span>
+<span class="pc bpc" id="L1048" title="2 of 4 branches missed.">            if (editEnd &gt; ds &amp;&amp; editStart &lt; de) {</span>
+<span class="fc" id="L1049">                col = c;</span>
+            }
+        }
+<span class="pc bpc" id="L1052" title="1 of 2 branches missed.">        if (col &lt; 0) {</span>
+<span class="nc" id="L1053">            return false;</span>
+        }
+<span class="pc bpc" id="L1055" title="1 of 2 branches missed.">        int top = editStart &lt;= ds ? 0 : minuteY(TimeMath.minuteOfDay(editStart, zone));</span>
+<span class="pc bpc" id="L1056" title="1 of 2 branches missed.">        int bottom = editEnd &gt;= de ? contentHeight() : minuteY(TimeMath.minuteOfDay(editEnd, zone));</span>
+<span class="fc" id="L1057">        out[0] = colX(col) + 1;</span>
+<span class="fc" id="L1058">        out[1] = top;</span>
+<span class="fc" id="L1059">        out[2] = colX(col + 1) - colX(col) - 2;</span>
+<span class="fc" id="L1060">        out[3] = Math.max(Look.mm(2.6f), bottom - top);</span>
+<span class="fc" id="L1061">        return true;</span>
+    }
+
+    // The slot of the grid a key of `hoverAt` names, lit.
+    private void paintSlot(Graphics g, int x, int y, Object key, int rgb) {
+<span class="pc bpc" id="L1066" title="3 of 4 branches missed.">        if (!(key instanceof Long) || days.length == 0) {</span>
+<span class="fc" id="L1067">            return;</span>
+        }
+<span class="nc" id="L1069">        long v = ((Long) key).longValue();</span>
+<span class="nc" id="L1070">        int col = (int) (v / SLOT_KEY);</span>
+<span class="nc" id="L1071">        int minute = (int) (v % SLOT_KEY);</span>
+<span class="nc bnc" id="L1072" title="All 2 branches missed.">        if (col &gt;= days.length) {</span>
+<span class="nc" id="L1073">            return;</span>
+        }
+<span class="nc" id="L1075">        int top = minuteY(minute);</span>
+<span class="nc" id="L1076">        Look.wash(g, rgb, x + colX(col) + 1, y + top, colX(col + 1) - colX(col) - 1,</span>
+<span class="nc" id="L1077">                minuteY(Math.min(TimeMath.MINUTES_PER_DAY, minute + slotMinutes())) - top, hoverLevel(key));</span>
+<span class="nc" id="L1078">    }</span>
+
+    // A slot is a step of the snap, and half an hour when the steps are
+    // too fine to point at.
+    private int slotMinutes() {
+<span class="fc" id="L1083">        return Math.max(30, owner.getSnapMinutes());</span>
+    }
+
+    @Override
+    void hoverAt(int x, int y) {
+<span class="pc bpc" id="L1088" title="2 of 4 branches missed.">        if (days.length == 0 || x &lt; headerW) {</span>
+<span class="nc" id="L1089">            hover(null, DEFAULT_CURSOR);</span>
+<span class="nc" id="L1090">            return;</span>
+        }
+<span class="pc bpc" id="L1092" title="1 of 2 branches missed.">        if (y &lt; headerH) {</span>
+<span class="nc" id="L1093">            Chip chip = chipAt(x, y);</span>
+<span class="nc bnc" id="L1094" title="All 4 branches missed.">            hover(chip == null ? null : chip.item.getId(), chip == null ? DEFAULT_CURSOR : HAND_CURSOR);</span>
+<span class="nc bnc" id="L1095" title="All 2 branches missed.">            tip(chip == null ? null : chip.item.getTitle());</span>
+<span class="nc" id="L1096">            return;</span>
+        }
+<span class="fc" id="L1098">        int cy = y - headerH + getOffY();</span>
+<span class="fc" id="L1099">        Box b = boxAt(x, y);</span>
+<span class="fc bfc" id="L1100" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L1101">            int cursor = HAND_CURSOR;</span>
+<span class="pc bpc" id="L1102" title="1 of 4 branches missed.">            if (owner.isEditable() &amp;&amp; isDragEdits()) {</span>
+<span class="fc" id="L1103">                boxRect(b, rect);</span>
+<span class="fc" id="L1104">                int edge = Math.min(rect[3] / 3, Look.mm(1.6f));</span>
+<span class="pc bpc" id="L1105" title="1 of 4 branches missed.">                boolean bottom = !b.endsAfter &amp;&amp; rect[1] + rect[3] - cy &lt;= edge;</span>
+<span class="pc bpc" id="L1106" title="1 of 6 branches missed.">                boolean top = !bottom &amp;&amp; !b.startsBefore &amp;&amp; cy - rect[1] &lt;= edge;</span>
+<span class="pc bpc" id="L1107" title="1 of 6 branches missed.">                if ((top || bottom) &amp;&amp; b.item.isResizable()) {</span>
+<span class="fc bfc" id="L1108" title="All 2 branches covered.">                    cursor = top ? N_RESIZE_CURSOR : S_RESIZE_CURSOR;</span>
+<span class="pc bpc" id="L1109" title="1 of 2 branches missed.">                } else if (b.item.isMovable()) {</span>
+<span class="fc" id="L1110">                    cursor = MOVE_CURSOR;</span>
+                }
+            }
+<span class="fc" id="L1113">            hover(b.item.getId(), cursor);</span>
+<span class="fc" id="L1114">            tip(b.item.getTitle() + &quot;, &quot; + owner.formatRange(b.item.getStart(), b.item.getEnd()));</span>
+<span class="fc" id="L1115">            return;</span>
+        }
+<span class="fc" id="L1117">        tip(null);</span>
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">        if (!owner.isEditable()) {</span>
+<span class="fc" id="L1119">            hover(null, DEFAULT_CURSOR);</span>
+<span class="fc" id="L1120">            return;</span>
+        }
+        // An empty slot, which a drag or a double click would fill.
+<span class="fc" id="L1123">        int col = colAt(Math.max(0, Math.min(contentW - 1, x - headerW + getOffX())));</span>
+<span class="fc" id="L1124">        int slot = slotMinutes();</span>
+<span class="fc" id="L1125">        int minute = Math.max(0, Math.min(TimeMath.MINUTES_PER_DAY - 1, minuteAt(cy))) / slot * slot;</span>
+<span class="fc" id="L1126">        hover(Long.valueOf(col * SLOT_KEY + minute), DEFAULT_CURSOR);</span>
+<span class="fc" id="L1127">    }</span>
+
+    private static boolean same(String a, String b) {
+<span class="pc bpc" id="L1130" title="3 of 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    @Override
+    void tapped(int x, int y, boolean doubleTap) {
+<span class="pc bpc" id="L1135" title="2 of 4 branches missed.">        if (days.length == 0 || x &lt; headerW) {</span>
+<span class="nc" id="L1136">            return;</span>
+        }
+<span class="fc" id="L1138">        int cx = x - headerW + getOffX();</span>
+<span class="pc bpc" id="L1139" title="1 of 2 branches missed.">        if (y &lt; headerH) {</span>
+<span class="nc" id="L1140">            Chip chip = chipAt(x, y);</span>
+<span class="nc bnc" id="L1141" title="All 2 branches missed.">            if (chip != null) {</span>
+<span class="nc" id="L1142">                pick(chip.item, doubleTap);</span>
+<span class="nc bnc" id="L1143" title="All 6 branches missed.">            } else if (resources == null &amp;&amp; (y &lt; colHeaderH || hiddenChips(colAt(cx)) &gt; 0)) {</span>
+<span class="nc" id="L1144">                owner.viewDrill(days[colAt(cx)]);</span>
+            }
+<span class="nc" id="L1146">            return;</span>
+        }
+<span class="fc" id="L1148">        Box b = boxAt(x, y);</span>
+<span class="fc bfc" id="L1149" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L1150">            pick(b.item, doubleTap);</span>
+<span class="fc" id="L1151">            return;</span>
+        }
+<span class="fc bfc" id="L1153" title="All 2 branches covered.">        if (owner.getSelectedItem() != null) {</span>
+<span class="fc" id="L1154">            owner.viewSelected(null);</span>
+<span class="pc bpc" id="L1155" title="3 of 4 branches missed.">        } else if (doubleTap &amp;&amp; owner.isEditable()) {</span>
+<span class="nc" id="L1156">            int col = colAt(cx);</span>
+<span class="nc" id="L1157">            int minute = snapMinute(minuteAt(y - headerH + getOffY()), true);</span>
+<span class="nc" id="L1158">            long start = TimeMath.at(days[col], minute, owner.getZone());</span>
+<span class="nc bnc" id="L1159" title="All 4 branches missed.">            owner.viewRange(start, start + owner.getDefaultMinutes() * TimeMath.MINUTE,</span>
+<span class="nc" id="L1160">                    resources != null &amp;&amp; resources.length &gt; 0 ? resources[col].getId() : null);</span>
+        }
+<span class="fc" id="L1162">    }</span>
+
+    private void pick(ScheduleItem item, boolean doubleTap) {
+<span class="fc" id="L1165">        owner.viewSelected(item);</span>
+<span class="pc bpc" id="L1166" title="1 of 4 branches missed.">        if (doubleTap || owner.isOpenOnTap()) {</span>
+<span class="fc" id="L1167">            owner.viewOpened(item);</span>
+        }
+<span class="fc" id="L1169">    }</span>
+
+    @Override
+    boolean zoomBy(float factor, int x, int y) {
+<span class="nc" id="L1173">        float before = hourH;</span>
+<span class="nc" id="L1174">        float least = Math.max(Look.mm(4), bodyHeight() / 24f);</span>
+<span class="nc" id="L1175">        float next = Math.max(least, Math.min(Look.mm(40), hourH * factor));</span>
+<span class="nc bnc" id="L1176" title="All 2 branches missed.">        if (Math.abs(next - before) &lt; 0.01f) {</span>
+<span class="nc" id="L1177">            return false;</span>
+        }
+        // The minute under the pointer stays under it.
+<span class="nc" id="L1180">        float minute = (y - headerH + getOffY()) * 60f / before;</span>
+<span class="nc" id="L1181">        hourH = next;</span>
+<span class="nc" id="L1182">        setOffsets(getOffX(), Math.round(minute * next / 60f) - (y - headerH));</span>
+<span class="nc" id="L1183">        repaint();</span>
+<span class="nc" id="L1184">        return true;</span>
+    }
+
+    float getHourHeight() {
+<span class="fc" id="L1188">        return hourH;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

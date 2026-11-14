@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MqttTopic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.mqtt</a> &gt; <span class="el_source">MqttTopic.java</span></div><h1>MqttTopic.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.mqtt;
+
+/// Topic names and topic filters: validation and the `+` / `#` matching rules of
+/// MQTT 3.1.1 section 4.7.
+public final class MqttTopic {
+    private MqttTopic() {
+    }
+
+    /// Checks a topic name, the thing a message is published to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the name
+    ///
+    /// #### Throws
+    ///
+    /// `IllegalArgumentException` when it is empty, contains a wildcard, a NUL
+    /// character, or is longer than 65535 UTF-8 bytes
+    public static void validateName(String topic) {
+<span class="fc" id="L42">        checkCommon(topic);</span>
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">        if (topic.indexOf('+') &gt;= 0 || topic.indexOf('#') &gt;= 0) {</span>
+<span class="fc" id="L44">            throw new IllegalArgumentException(&quot;Topic name must not contain wildcards: &quot; + topic);</span>
+        }
+<span class="fc" id="L46">    }</span>
+
+    /// Checks a topic filter, the thing a subscription is made with.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filter`: the filter
+    ///
+    /// #### Throws
+    ///
+    /// `IllegalArgumentException` when it is empty, has a `+` that is not a whole
+    /// level, a `#` that is not the whole last level, or a NUL character
+    public static void validateFilter(String filter) {
+<span class="fc" id="L59">        checkCommon(filter);</span>
+<span class="fc" id="L60">        int n = filter.length();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L62">            char c = filter.charAt(i);</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">            boolean levelStart = i == 0 || filter.charAt(i - 1) == '/';</span>
+<span class="fc bfc" id="L64" title="All 4 branches covered.">            boolean levelEnd = i == n - 1 || filter.charAt(i + 1) == '/';</span>
+<span class="fc bfc" id="L65" title="All 6 branches covered.">            if (c == '+' &amp;&amp; !(levelStart &amp;&amp; levelEnd)) {</span>
+<span class="fc" id="L66">                throw new IllegalArgumentException(&quot;'+' must be a whole level: &quot; + filter);</span>
+            }
+<span class="fc bfc" id="L68" title="All 6 branches covered.">            if (c == '#' &amp;&amp; !(levelStart &amp;&amp; i == n - 1)) {</span>
+<span class="fc" id="L69">                throw new IllegalArgumentException(&quot;'#' must be the whole last level: &quot; + filter);</span>
+            }
+        }
+<span class="fc" id="L72">    }</span>
+
+    private static void checkCommon(String s) {
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        if (s == null || s.length() == 0) {</span>
+<span class="fc" id="L76">            throw new IllegalArgumentException(&quot;Topic must not be empty&quot;);</span>
+        }
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (s.indexOf('\0') &gt;= 0) {</span>
+<span class="nc" id="L79">            throw new IllegalArgumentException(&quot;Topic must not contain U+0000&quot;);</span>
+        }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (s.length() &gt; 21845) {</span>
+            // 3 bytes per char is the worst case; the exact check is made by the codec.
+            try {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                if (s.getBytes(&quot;UTF-8&quot;).length &gt; 65535) {</span>
+<span class="nc" id="L85">                    throw new IllegalArgumentException(&quot;Topic is longer than 65535 bytes&quot;);</span>
+                }
+<span class="nc" id="L87">            } catch (java.io.UnsupportedEncodingException e) {</span>
+<span class="nc" id="L88">                IllegalArgumentException err = new IllegalArgumentException(&quot;UTF-8 is not available&quot;);</span>
+<span class="nc" id="L89">                err.initCause(e);</span>
+<span class="nc" id="L90">                throw err;</span>
+<span class="nc" id="L91">            }</span>
+        }
+<span class="fc" id="L93">    }</span>
+
+    /// Tells whether a topic name matches a topic filter. A filter that starts
+    /// with a wildcard does not match a name that starts with `$`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filter`: a valid topic filter
+    ///
+    /// - `topic`: a valid topic name
+    ///
+    /// #### Returns
+    ///
+    /// true when the name is covered by the filter
+    public static boolean matches(String filter, String topic) {
+<span class="pc bpc" id="L108" title="2 of 6 branches missed.">        if (topic.length() &gt; 0 &amp;&amp; topic.charAt(0) == '$' &amp;&amp; filter.length() &gt; 0</span>
+<span class="fc bfc" id="L109" title="All 4 branches covered.">                &amp;&amp; (filter.charAt(0) == '+' || filter.charAt(0) == '#')) {</span>
+<span class="fc" id="L110">            return false;</span>
+        }
+<span class="fc" id="L112">        int fi = 0;</span>
+<span class="fc" id="L113">        int ti = 0;</span>
+<span class="fc" id="L114">        int fn = filter.length();</span>
+<span class="fc" id="L115">        int tn = topic.length();</span>
+        while (true) {
+<span class="fc" id="L117">            int fe = filter.indexOf('/', fi);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (fe &lt; 0) {</span>
+<span class="fc" id="L119">                fe = fn;</span>
+            }
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            boolean lastFilterLevel = fe == fn;</span>
+<span class="fc bfc" id="L122" title="All 4 branches covered.">            if (fe - fi == 1 &amp;&amp; filter.charAt(fi) == '#') {</span>
+<span class="fc" id="L123">                return true;</span>
+            }
+<span class="fc" id="L125">            int te = topic.indexOf('/', ti);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (te &lt; 0) {</span>
+<span class="fc" id="L127">                te = tn;</span>
+            }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            boolean lastTopicLevel = te == tn;</span>
+<span class="fc bfc" id="L130" title="All 4 branches covered.">            boolean plus = fe - fi == 1 &amp;&amp; filter.charAt(fi) == '+';</span>
+<span class="fc bfc" id="L131" title="All 4 branches covered.">            if (!plus &amp;&amp; !filter.regionMatches(fi, topic, ti, fe - fi)) {</span>
+<span class="fc" id="L132">                return false;</span>
+            }
+<span class="fc bfc" id="L134" title="All 4 branches covered.">            if (!plus &amp;&amp; fe - fi != te - ti) {</span>
+<span class="fc" id="L135">                return false;</span>
+            }
+<span class="fc bfc" id="L137" title="All 4 branches covered.">            if (lastFilterLevel || lastTopicLevel) {</span>
+<span class="fc bfc" id="L138" title="All 4 branches covered.">                if (lastFilterLevel &amp;&amp; lastTopicLevel) {</span>
+<span class="fc" id="L139">                    return true;</span>
+                }
+                // &quot;a/#&quot; also matches &quot;a&quot;: the parent level.
+<span class="pc bpc" id="L142" title="1 of 6 branches missed.">                return lastTopicLevel &amp;&amp; fe + 2 == fn &amp;&amp; filter.charAt(fe + 1) == '#';</span>
+            }
+<span class="fc" id="L144">            fi = fe + 1;</span>
+<span class="fc" id="L145">            ti = te + 1;</span>
+<span class="fc" id="L146">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

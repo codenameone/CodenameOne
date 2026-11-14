@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CarTemplate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.car</a> &gt; <span class="el_source">CarTemplate.java</span></div><h1>CarTemplate.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.car;
+
+/// The base type for the fixed catalog of in-car templates. Unlike Codename One `Form`s, the head
+/// unit (Apple CarPlay / Google Android Auto) does not allow arbitrary rendering -- it only displays
+/// one of a small, driver-distraction-vetted set of templates. A `CarScreen` produces exactly one
+/// `CarTemplate` from its `CarScreen#createTemplate()` method.
+///
+/// Concrete templates:
+///
+/// - `CarListTemplate` -- a (optionally sectioned) scrolling list of rows.
+/// - `CarGridTemplate` -- a grid of image-forward items.
+/// - `CarPaneTemplate` -- a detail pane of label/value rows plus action buttons.
+/// - `CarMessageTemplate` -- a short message with actions (and read-aloud/voice-reply for messaging).
+/// - `CarNavigationTemplate` -- a turn-by-turn surface with a drawable map (navigation apps only).
+/// - `CarNowPlayingTemplate` -- the system now-playing surface for audio apps.
+<span class="fc" id="L38">public abstract class CarTemplate {</span>
+    private String title;
+
+    /// Returns the template title shown in the head-unit header, or null.
+    public String getTitle() {
+<span class="fc" id="L43">        return title;</span>
+    }
+
+    /// Sets the template title shown in the head-unit header.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the header title
+    void setTitleInternal(String title) {
+<span class="fc" id="L52">        this.title = title;</span>
+<span class="fc" id="L53">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

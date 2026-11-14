@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MqttClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.mqtt</a> &gt; <span class="el_source">MqttClient.java</span></div><h1>MqttClient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.mqtt;
+
+import com.codename1.ui.CN;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/// An MQTT 3.1.1 client for QoS 0 and QoS 1.
+///
+/// #### Threading
+///
+/// Like the rest of the framework the client is single threaded: call it on the
+/// EDT, and every [MqttListener] / [MqttMessageListener] callback arrives there.
+/// Transport threads only post to the EDT, so the client itself holds no locks.
+/// Writes happen on the calling thread.
+///
+/// #### Delivery
+///
+/// A QoS 1 publish stays in flight until its PUBACK and is sent again, with the
+/// DUP flag, after a reconnect; with a clean session the in flight list is
+/// dropped when connecting. A QoS 1 publish made while disconnected is queued
+/// and sent after the next successful connect. QoS 0 needs a connection. An
+/// incoming QoS 1 message is acknowledged before it is delivered.
+///
+/// #### Keep alive
+///
+/// A small daemon thread ticks once a second and posts the check to the EDT. A
+/// PINGREQ goes out when nothing was sent for the keep alive interval; when no
+/// PINGRESP arrives within one and a half intervals the connection is declared
+/// lost. The same tick enforces the connect timeout.
+///
+/// #### Subscriptions
+///
+/// A subscription made with a listener routes matching messages to it only; a
+/// message no such subscription claims goes to the [MqttListener]. The client
+/// does not re-subscribe on reconnect: do it from [MqttListener#connected()]
+/// (a broker keeps the subscriptions of a persistent session, `cleanSession(false)`).
+public final class MqttClient {
+    private static final int DISCONNECTED = 0;
+    private static final int CONNECTING = 1;
+    private static final int CONNECTED = 2;
+
+    private static final class Route {
+        final String filter;
+        final MqttMessageListener listener;
+
+<span class="fc" id="L70">        Route(String filter, MqttMessageListener listener) {</span>
+<span class="fc" id="L71">            this.filter = filter;</span>
+<span class="fc" id="L72">            this.listener = listener;</span>
+<span class="fc" id="L73">        }</span>
+    }
+
+    private static final class NoListener implements MqttListener {
+        @Override
+        public void connected() {
+<span class="nc" id="L79">        }</span>
+
+        @Override
+        public void messageArrived(String topic, byte[] payload, boolean retained) {
+<span class="nc" id="L83">        }</span>
+
+        @Override
+        public void connectionLost(String reason) {
+<span class="nc" id="L87">        }</span>
+    }
+
+    private final MqttTransport injected;
+<span class="fc" id="L91">    private int state = DISCONNECTED;</span>
+<span class="fc" id="L92">    private MqttOptions options = new MqttOptions(&quot;tcp://localhost&quot;, &quot;&quot;);</span>
+<span class="fc" id="L93">    private MqttListener listener = new NoListener();</span>
+
+    private MqttTransport transport;
+    private int generation;
+<span class="fc" id="L97">    private byte[] buf = new byte[256];</span>
+    private int bufLen;
+    private long lastSend;
+    private long pingSentAt;
+    private long connectStart;
+    private int nextId;
+<span class="fc" id="L103">    private final ArrayList&lt;MqttPacket&gt; inFlight = new ArrayList&lt;MqttPacket&gt;();</span>
+<span class="fc" id="L104">    private final ArrayList&lt;Route&gt; routes = new ArrayList&lt;Route&gt;();</span>
+<span class="fc" id="L105">    private final HashMap&lt;Integer, String[]&gt; pendingSubs = new HashMap&lt;Integer, String[]&gt;();</span>
+    private AtomicBoolean tickerStop;
+<span class="fc" id="L107">    private long fakeNow = -1;</span>
+
+    /// Creates a disconnected client.
+<span class="fc" id="L110">    public MqttClient() {</span>
+<span class="fc" id="L111">        this.injected = null;</span>
+<span class="fc" id="L112">    }</span>
+
+<span class="fc" id="L114">    MqttClient(MqttTransport transport) {</span>
+<span class="fc" id="L115">        this.injected = transport;</span>
+<span class="fc" id="L116">    }</span>
+
+    /// Opens a connection and sends CONNECT. Returns at once; the outcome arrives
+    /// as [MqttListener#connected()] or [MqttListener#connectionLost(String)].
+    ///
+    /// #### Parameters
+    ///
+    /// - `options`: broker and session settings
+    ///
+    /// - `listener`: receives the callbacks
+    ///
+    /// #### Throws
+    ///
+    /// `IllegalStateException` when already connected or connecting,
+    /// `IllegalArgumentException` for an unsupported URI
+    public void connect(MqttOptions options, MqttListener listener) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (state != DISCONNECTED) {</span>
+<span class="nc" id="L133">            throw new IllegalStateException(&quot;Already connected&quot;);</span>
+        }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        MqttTransport t = injected != null ? injected : createTransport(options);</span>
+<span class="fc" id="L136">        this.options = options;</span>
+<span class="fc" id="L137">        this.listener = listener;</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (options.isCleanSession()) {</span>
+<span class="fc" id="L139">            inFlight.clear();</span>
+<span class="fc" id="L140">            pendingSubs.clear();</span>
+        }
+<span class="fc" id="L142">        bufLen = 0;</span>
+<span class="fc" id="L143">        pingSentAt = 0;</span>
+<span class="fc" id="L144">        state = CONNECTING;</span>
+<span class="fc" id="L145">        transport = t;</span>
+<span class="fc" id="L146">        connectStart = now();</span>
+<span class="fc" id="L147">        final int gen = ++generation;</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (injected == null) {</span>
+<span class="nc" id="L149">            startTicker();</span>
+        }
+<span class="fc" id="L151">        t.open(new MqttTransport.Handler() {</span>
+            @Override
+            public void opened() {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                if (gen == generation) {</span>
+<span class="fc" id="L155">                    onOpened();</span>
+                }
+<span class="fc" id="L157">            }</span>
+
+            @Override
+            public void received(byte[] data, int len) {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                if (gen == generation) {</span>
+<span class="fc" id="L162">                    onReceived(data, len);</span>
+                }
+<span class="fc" id="L164">            }</span>
+
+            @Override
+            public void closed(String reason) {
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                if (gen == generation) {</span>
+<span class="fc" id="L169">                    fail(reason);</span>
+                }
+<span class="fc" id="L171">            }</span>
+        });
+<span class="fc" id="L173">    }</span>
+
+    private static MqttTransport createTransport(MqttOptions o) {
+<span class="fc" id="L176">        String uri = o.getUri();</span>
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">        if (startsWithIgnoreCase(uri, &quot;ws://&quot;) || startsWithIgnoreCase(uri, &quot;wss://&quot;)) {</span>
+<span class="nc" id="L178">            return new WebSocketMqttTransport(uri, o.getConnectTimeoutMillis());</span>
+        }
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (!startsWithIgnoreCase(uri, &quot;tcp://&quot;)) {</span>
+<span class="fc" id="L181">            throw new IllegalArgumentException(&quot;Unsupported URI scheme (use tcp://, ws:// or wss://): &quot; + uri);</span>
+        }
+<span class="nc" id="L183">        String hp = uri.substring(6);</span>
+<span class="nc" id="L184">        int slash = hp.indexOf('/');</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (slash &gt;= 0) {</span>
+<span class="nc" id="L186">            hp = hp.substring(0, slash);</span>
+        }
+<span class="nc" id="L188">        int port = 1883;</span>
+<span class="nc" id="L189">        int colon = hp.lastIndexOf(':');</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (colon &gt;= 0) {</span>
+            try {
+<span class="nc" id="L192">                port = Integer.parseInt(hp.substring(colon + 1));</span>
+<span class="nc" id="L193">            } catch (NumberFormatException e) {</span>
+<span class="nc" id="L194">                IllegalArgumentException err = new IllegalArgumentException(&quot;Bad port in &quot; + uri);</span>
+<span class="nc" id="L195">                err.initCause(e);</span>
+<span class="nc" id="L196">                throw err;</span>
+<span class="nc" id="L197">            }</span>
+<span class="nc" id="L198">            hp = hp.substring(0, colon);</span>
+        }
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (hp.length() == 0) {</span>
+<span class="nc" id="L201">            throw new IllegalArgumentException(&quot;Missing host in &quot; + uri);</span>
+        }
+<span class="nc" id="L203">        return new SocketMqttTransport(hp, port, o.getConnectTimeoutMillis());</span>
+    }
+
+    private static boolean startsWithIgnoreCase(String s, String prefix) {
+<span class="fc" id="L207">        return s.regionMatches(true, 0, prefix, 0, prefix.length());</span>
+    }
+
+    /// Whether the broker has accepted the connection and it is still up.
+    public boolean isConnected() {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        return state == CONNECTED;</span>
+    }
+
+    /// The number of QoS 1 publishes not yet acknowledged, queued ones included.
+    public int getInFlightCount() {
+<span class="fc" id="L217">        return inFlight.size();</span>
+    }
+
+    /// Publishes a message.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the topic name, without wildcards
+    ///
+    /// - `payload`: the message body
+    ///
+    /// - `qos`: 0 (needs a connection) or 1 (queued until connected)
+    ///
+    /// - `retain`: ask the broker to retain the message
+    public void publish(String topic, byte[] payload, int qos, boolean retain) {
+<span class="fc" id="L232">        MqttTopic.validateName(topic);</span>
+<span class="pc bpc" id="L233" title="2 of 4 branches missed.">        if (qos &lt; 0 || qos &gt; 1) {</span>
+<span class="nc" id="L234">            throw new IllegalArgumentException(&quot;Only QoS 0 and 1 are supported&quot;);</span>
+        }
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (qos == 0) {</span>
+<span class="fc" id="L237">            requireConnected();</span>
+<span class="fc" id="L238">            send(MqttPacket.publish(topic, payload, 0, retain, false, 0));</span>
+<span class="fc" id="L239">            return;</span>
+        }
+<span class="fc" id="L241">        MqttPacket p = MqttPacket.publish(topic, payload, 1, retain, false, allocId());</span>
+<span class="fc" id="L242">        inFlight.add(p);</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (state == CONNECTED) {</span>
+<span class="fc" id="L244">            send(p);</span>
+        }
+<span class="fc" id="L246">    }</span>
+
+    /// Subscribes; matching messages go to the [MqttListener].
+    ///
+    /// #### Parameters
+    ///
+    /// - `topicFilter`: the filter, `+` and `#` allowed
+    ///
+    /// - `qos`: the maximum QoS wanted, 0 or 1
+    public void subscribe(String topicFilter, int qos) {
+<span class="fc" id="L256">        subscribe(topicFilter, qos, null);</span>
+<span class="fc" id="L257">    }</span>
+
+    /// Subscribes and routes matching messages to a listener of their own.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topicFilter`: the filter, `+` and `#` allowed
+    ///
+    /// - `qos`: the maximum QoS wanted, 0 or 1
+    ///
+    /// - `messageListener`: receives the matches; null means the [MqttListener]
+    public void subscribe(String topicFilter, int qos, MqttMessageListener messageListener) {
+<span class="fc" id="L269">        MqttTopic.validateFilter(topicFilter);</span>
+<span class="pc bpc" id="L270" title="2 of 4 branches missed.">        if (qos &lt; 0 || qos &gt; 1) {</span>
+<span class="nc" id="L271">            throw new IllegalArgumentException(&quot;Only QoS 0 and 1 are supported&quot;);</span>
+        }
+<span class="fc" id="L273">        requireConnected();</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (messageListener != null) {</span>
+<span class="fc" id="L275">            removeRoutes(topicFilter);</span>
+<span class="fc" id="L276">            routes.add(new Route(topicFilter, messageListener));</span>
+        }
+<span class="fc" id="L278">        int id = allocId();</span>
+<span class="fc" id="L279">        pendingSubs.put(Integer.valueOf(id), new String[] {topicFilter});</span>
+<span class="fc" id="L280">        send(MqttPacket.subscribe(id, new String[] {topicFilter}, new int[] {qos}));</span>
+<span class="fc" id="L281">    }</span>
+
+    /// Removes a subscription.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topicFilter`: the filter given to subscribe
+    public void unsubscribe(String topicFilter) {
+<span class="nc" id="L289">        MqttTopic.validateFilter(topicFilter);</span>
+<span class="nc" id="L290">        requireConnected();</span>
+<span class="nc" id="L291">        removeRoutes(topicFilter);</span>
+<span class="nc" id="L292">        send(MqttPacket.unsubscribe(allocId(), new String[] {topicFilter}));</span>
+<span class="nc" id="L293">    }</span>
+
+    /// Sends DISCONNECT and closes the connection. No `connectionLost` follows.
+    /// QoS 1 publishes still unacknowledged stay queued for the next connect.
+    public void disconnect() {
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        if (state == DISCONNECTED) {</span>
+<span class="fc" id="L299">            return;</span>
+        }
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (state == CONNECTED) {</span>
+            try {
+<span class="fc" id="L303">                transport.send(MqttCodec.encode(MqttPacket.disconnect()));</span>
+<span class="nc" id="L304">            } catch (IOException e) {</span>
+                // going away anyway
+<span class="nc" id="L306">                state = DISCONNECTED;</span>
+<span class="fc" id="L307">            }</span>
+        }
+<span class="fc" id="L309">        shutdown();</span>
+<span class="fc" id="L310">    }</span>
+
+    private void requireConnected() {
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        if (state != CONNECTED) {</span>
+<span class="fc" id="L314">            throw new IllegalStateException(&quot;Not connected&quot;);</span>
+        }
+<span class="fc" id="L316">    }</span>
+
+    private void removeRoutes(String filter) {
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        for (int i = routes.size() - 1; i &gt;= 0; i--) {</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (routes.get(i).filter.equals(filter)) {</span>
+<span class="fc" id="L321">                routes.remove(i);</span>
+            }
+        }
+<span class="fc" id="L324">    }</span>
+
+    private int allocId() {
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">        for (int n = 0; n &lt; 65535; n++) {</span>
+<span class="fc" id="L328">            nextId = nextId % 65535 + 1;</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">            if (!idInUse(nextId)) {</span>
+<span class="fc" id="L330">                return nextId;</span>
+            }
+        }
+<span class="nc" id="L333">        throw new IllegalStateException(&quot;No free packet id&quot;);</span>
+    }
+
+    private boolean idInUse(int id) {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        for (MqttPacket pending : inFlight) {</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">            if (pending.getPacketId() == id) {</span>
+<span class="nc" id="L339">                return true;</span>
+            }
+<span class="fc" id="L341">        }</span>
+<span class="fc" id="L342">        return pendingSubs.containsKey(Integer.valueOf(id));</span>
+    }
+
+    private long now() {
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        return fakeNow &gt;= 0 ? fakeNow : System.currentTimeMillis();</span>
+    }
+
+    private void send(MqttPacket p) {
+        try {
+<span class="fc" id="L351">            transport.send(MqttCodec.encode(p));</span>
+<span class="fc" id="L352">            lastSend = now();</span>
+<span class="fc" id="L353">        } catch (IOException e) {</span>
+<span class="fc" id="L354">            fail(&quot;Write failed: &quot; + e.getMessage());</span>
+<span class="fc" id="L355">        }</span>
+<span class="fc" id="L356">    }</span>
+
+    private void onOpened() {
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (state == CONNECTING) {</span>
+<span class="fc" id="L360">            send(MqttPacket.connect(options));</span>
+        }
+<span class="fc" id="L362">    }</span>
+
+    private void onReceived(byte[] data, int len) {
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        if (bufLen + len &gt; buf.length) {</span>
+<span class="nc" id="L366">            byte[] nb = new byte[Math.max(buf.length * 2, bufLen + len)];</span>
+<span class="nc" id="L367">            System.arraycopy(buf, 0, nb, 0, bufLen);</span>
+<span class="nc" id="L368">            buf = nb;</span>
+        }
+<span class="fc" id="L370">        System.arraycopy(data, 0, buf, bufLen, len);</span>
+<span class="fc" id="L371">        bufLen += len;</span>
+        try {
+<span class="fc bfc" id="L373" title="All 2 branches covered.">            while (state != DISCONNECTED) {</span>
+<span class="fc" id="L374">                int total = MqttCodec.packetLength(buf, 0, bufLen, options.getMaxPacketSize());</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">                if (total &lt; 0) {</span>
+<span class="fc" id="L376">                    return;</span>
+                }
+<span class="fc" id="L378">                int hdr = 1;</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">                while ((buf[hdr] &amp; 0x80) != 0) {</span>
+<span class="nc" id="L380">                    hdr++;</span>
+                }
+<span class="fc" id="L382">                hdr++;</span>
+<span class="fc" id="L383">                byte[] body = new byte[total - hdr];</span>
+<span class="fc" id="L384">                System.arraycopy(buf, hdr, body, 0, body.length);</span>
+<span class="fc" id="L385">                int first = buf[0] &amp; 0xff;</span>
+<span class="fc" id="L386">                System.arraycopy(buf, total, buf, 0, bufLen - total);</span>
+<span class="fc" id="L387">                bufLen -= total;</span>
+<span class="fc" id="L388">                handle(MqttCodec.decode(first, body));</span>
+<span class="fc" id="L389">            }</span>
+<span class="fc" id="L390">        } catch (IOException e) {</span>
+<span class="fc" id="L391">            fail(&quot;Protocol error: &quot; + e.getMessage());</span>
+<span class="fc" id="L392">        }</span>
+<span class="fc" id="L393">    }</span>
+
+    private void handle(MqttPacket p) throws IOException {
+<span class="fc" id="L396">        int type = p.getType();</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        if (state == CONNECTING) {</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            if (type != MqttPacket.CONNACK) {</span>
+<span class="nc" id="L399">                throw new MqttException(&quot;Expected CONNACK, got packet type &quot; + type);</span>
+            }
+<span class="fc bfc" id="L401" title="All 2 branches covered.">            if (p.getReturnCode() != 0) {</span>
+<span class="fc" id="L402">                fail(&quot;Connection refused: &quot; + refusal(p.getReturnCode()));</span>
+<span class="fc" id="L403">                return;</span>
+            }
+<span class="fc" id="L405">            state = CONNECTED;</span>
+<span class="fc" id="L406">            pingSentAt = 0;</span>
+<span class="pc bpc" id="L407" title="1 of 4 branches missed.">            for (int i = 0; i &lt; inFlight.size() &amp;&amp; state == CONNECTED; i++) {</span>
+<span class="fc" id="L408">                MqttPacket m = inFlight.get(i);</span>
+<span class="fc" id="L409">                m.setDup(true);</span>
+<span class="fc" id="L410">                send(m);</span>
+            }
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            if (state == CONNECTED) {</span>
+<span class="fc" id="L413">                listener.connected();</span>
+            }
+<span class="fc" id="L415">            return;</span>
+        }
+<span class="pc bpc" id="L417" title="2 of 6 branches missed.">        switch (type) {</span>
+            case MqttPacket.PUBLISH:
+<span class="fc bfc" id="L419" title="All 2 branches covered.">                if (p.getQos() == 1) {</span>
+<span class="fc" id="L420">                    send(MqttPacket.puback(p.getPacketId()));</span>
+                }
+<span class="fc" id="L422">                deliver(p);</span>
+<span class="fc" id="L423">                break;</span>
+            case MqttPacket.PUBACK:
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">                for (int i = 0; i &lt; inFlight.size(); i++) {</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">                    if (inFlight.get(i).getPacketId() == p.getPacketId()) {</span>
+<span class="fc" id="L427">                        inFlight.remove(i);</span>
+<span class="fc" id="L428">                        break;</span>
+                    }
+                }
+<span class="fc" id="L431">                break;</span>
+            case MqttPacket.SUBACK:
+<span class="fc" id="L433">                String[] filters = pendingSubs.remove(Integer.valueOf(p.getPacketId()));</span>
+<span class="pc bpc" id="L434" title="2 of 6 branches missed.">                if (filters != null &amp;&amp; p.getQosList().length &gt; 0 &amp;&amp; p.getQosList()[0] == 0x80) {</span>
+<span class="fc" id="L435">                    removeRoutes(filters[0]);</span>
+                }
+                break;
+            case MqttPacket.UNSUBACK:
+<span class="nc" id="L439">                break;</span>
+            case MqttPacket.PINGRESP:
+<span class="fc" id="L441">                pingSentAt = 0;</span>
+<span class="fc" id="L442">                break;</span>
+            default:
+<span class="nc" id="L444">                throw new MqttException(&quot;Unexpected packet type &quot; + type);</span>
+        }
+<span class="fc" id="L446">    }</span>
+
+    private void deliver(MqttPacket p) {
+<span class="fc" id="L449">        boolean claimed = false;</span>
+<span class="fc" id="L450">        ArrayList&lt;Route&gt; snapshot = new ArrayList&lt;Route&gt;(routes);</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">        for (Route r : snapshot) {</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">            if (MqttTopic.matches(r.filter, p.getTopic())) {</span>
+<span class="fc" id="L453">                claimed = true;</span>
+<span class="fc" id="L454">                r.listener.messageArrived(p.getTopic(), p.getPayload(), p.isRetain());</span>
+            }
+<span class="fc" id="L456">        }</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">        if (!claimed) {</span>
+<span class="fc" id="L458">            listener.messageArrived(p.getTopic(), p.getPayload(), p.isRetain());</span>
+        }
+<span class="fc" id="L460">    }</span>
+
+    private static String refusal(int code) {
+<span class="pc bpc" id="L463" title="5 of 6 branches missed.">        switch (code) {</span>
+            case 1:
+<span class="nc" id="L465">                return &quot;unacceptable protocol version&quot;;</span>
+            case 2:
+<span class="nc" id="L467">                return &quot;identifier rejected&quot;;</span>
+            case 3:
+<span class="nc" id="L469">                return &quot;server unavailable&quot;;</span>
+            case 4:
+<span class="nc" id="L471">                return &quot;bad user name or password&quot;;</span>
+            case 5:
+<span class="fc" id="L473">                return &quot;not authorized&quot;;</span>
+            default:
+<span class="nc" id="L475">                return &quot;return code &quot; + code;</span>
+        }
+    }
+
+    /// Runs the keep alive and connect timeout checks for the given time.
+    void tick(long nowMillis) {
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        if (state == CONNECTING) {</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">            if (nowMillis - connectStart &gt; options.getConnectTimeoutMillis()) {</span>
+<span class="fc" id="L483">                fail(&quot;Connect timed out&quot;);</span>
+            }
+<span class="fc" id="L485">            return;</span>
+        }
+<span class="fc" id="L487">        long ka = options.getKeepAliveSeconds() * 1000L;</span>
+<span class="pc bpc" id="L488" title="2 of 4 branches missed.">        if (state != CONNECTED || ka == 0) {</span>
+<span class="nc" id="L489">            return;</span>
+        }
+<span class="fc bfc" id="L491" title="All 2 branches covered.">        if (pingSentAt != 0) {</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">            if (nowMillis - pingSentAt &gt; ka + ka / 2) {</span>
+<span class="fc" id="L493">                fail(&quot;Keep alive timed out&quot;);</span>
+            }
+<span class="fc bfc" id="L495" title="All 2 branches covered.">        } else if (nowMillis - lastSend &gt;= ka) {</span>
+<span class="fc" id="L496">            pingSentAt = nowMillis;</span>
+<span class="fc" id="L497">            send(MqttPacket.pingreq());</span>
+        }
+<span class="fc" id="L499">    }</span>
+
+    /// Test hook: drives the clock by hand and turns the ticker thread off.
+    void setClock(long millis) {
+<span class="fc" id="L503">        fakeNow = millis;</span>
+<span class="fc" id="L504">    }</span>
+
+    void tickNow() {
+<span class="nc" id="L507">        tick(now());</span>
+<span class="nc" id="L508">    }</span>
+
+    private void startTicker() {
+<span class="nc" id="L511">        final AtomicBoolean stop = new AtomicBoolean();</span>
+<span class="nc" id="L512">        tickerStop = stop;</span>
+<span class="nc" id="L513">        Thread t = new Thread(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L516" title="All 2 branches missed.">                while (!stop.get()) {</span>
+                    try {
+<span class="nc" id="L518">                        Thread.sleep(1000);</span>
+<span class="nc" id="L519">                    } catch (InterruptedException e) {</span>
+<span class="nc" id="L520">                        return;</span>
+<span class="nc" id="L521">                    }</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">                    if (stop.get()) {</span>
+<span class="nc" id="L523">                        return;</span>
+                    }
+<span class="nc" id="L525">                    CN.callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc bnc" id="L528" title="All 2 branches missed.">                            if (!stop.get()) {</span>
+<span class="nc" id="L529">                                tickNow();</span>
+                            }
+<span class="nc" id="L531">                        }</span>
+                    });
+                }
+<span class="nc" id="L534">            }</span>
+        });
+<span class="nc" id="L536">        t.setDaemon(true);</span>
+<span class="nc" id="L537">        t.start();</span>
+<span class="nc" id="L538">    }</span>
+
+    private void fail(String reason) {
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">        if (state == DISCONNECTED) {</span>
+<span class="nc" id="L542">            return;</span>
+        }
+<span class="fc" id="L544">        MqttListener l = listener;</span>
+<span class="fc" id="L545">        shutdown();</span>
+<span class="fc" id="L546">        l.connectionLost(reason);</span>
+<span class="fc" id="L547">    }</span>
+
+    private void shutdown() {
+<span class="fc" id="L550">        state = DISCONNECTED;</span>
+<span class="fc" id="L551">        generation++;</span>
+<span class="fc" id="L552">        pendingSubs.clear();</span>
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">        if (tickerStop != null) {</span>
+<span class="nc" id="L554">            tickerStop.set(true);</span>
+<span class="nc" id="L555">            tickerStop = null;</span>
+        }
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">        if (transport != null) {</span>
+<span class="fc" id="L558">            transport.close();</span>
+<span class="fc" id="L559">            transport = null;</span>
+        }
+<span class="fc" id="L561">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

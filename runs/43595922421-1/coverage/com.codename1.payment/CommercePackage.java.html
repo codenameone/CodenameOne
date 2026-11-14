@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CommercePackage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment</a> &gt; <span class="el_source">CommercePackage.java</span></div><h1>CommercePackage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.payment;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// One thing a customer can buy from an [Offering]: a store product together
+/// with the role it plays in the offering (the monthly plan, the annual plan,
+/// a lifetime unlock).
+///
+/// Everything the Codename One Commerce service said about the package is
+/// fixed when the instance is made. The store's own [Product], which carries
+/// the localized price, is attached later, once the store has been asked.
+public final class CommercePackage {
+    /// A one time purchase that never expires.
+    public static final String TYPE_LIFETIME = &quot;LIFETIME&quot;;
+    /// A subscription billed once a year.
+    public static final String TYPE_ANNUAL = &quot;ANNUAL&quot;;
+    /// A subscription billed every six months.
+    public static final String TYPE_SIX_MONTH = &quot;SIX_MONTH&quot;;
+    /// A subscription billed every three months.
+    public static final String TYPE_THREE_MONTH = &quot;THREE_MONTH&quot;;
+    /// A subscription billed every two months.
+    public static final String TYPE_TWO_MONTH = &quot;TWO_MONTH&quot;;
+    /// A subscription billed once a month.
+    public static final String TYPE_MONTHLY = &quot;MONTHLY&quot;;
+    /// A subscription billed once a week.
+    public static final String TYPE_WEEKLY = &quot;WEEKLY&quot;;
+    /// A package that is none of the standard ones.
+    public static final String TYPE_CUSTOM = &quot;CUSTOM&quot;;
+
+    private final String id;
+    private final String type;
+    private final String productId;
+    private final String period;
+    private final String trialPeriod;
+    private final String introPrice;
+    private final String introPeriod;
+    private final boolean eligibleForIntro;
+    private Product product;
+    private String offeringId;
+
+    /// Builds a package from the parsed JSON object of the service's
+    /// offerings payload.
+<span class="fc" id="L66">    CommercePackage(Map json) {</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        Map m = json == null ? new HashMap() : json;</span>
+<span class="fc" id="L68">        id = CustomerInfo.asString(m.get(&quot;id&quot;));</span>
+<span class="fc" id="L69">        String t = CustomerInfo.asString(m.get(&quot;type&quot;));</span>
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">        type = t == null || t.length() == 0 ? TYPE_CUSTOM : t;</span>
+<span class="fc" id="L71">        productId = CustomerInfo.asString(m.get(&quot;productId&quot;));</span>
+<span class="fc" id="L72">        period = emptyAsNull(CustomerInfo.asString(m.get(&quot;period&quot;)));</span>
+<span class="fc" id="L73">        trialPeriod = emptyAsNull(CustomerInfo.asString(m.get(&quot;trialPeriod&quot;)));</span>
+<span class="fc" id="L74">        introPrice = emptyAsNull(CustomerInfo.asString(m.get(&quot;introPrice&quot;)));</span>
+<span class="fc" id="L75">        introPeriod = emptyAsNull(CustomerInfo.asString(m.get(&quot;introPeriod&quot;)));</span>
+<span class="fc" id="L76">        eligibleForIntro = CustomerInfo.asBoolean(m.get(&quot;eligibleForIntro&quot;));</span>
+<span class="fc" id="L77">    }</span>
+
+    private static String emptyAsNull(String s) {
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">        return s == null || s.length() == 0 ? null : s;</span>
+    }
+
+    /// The id of the offering this package was listed in, or null for a
+    /// package that came from no offering. A web checkout names the package
+    /// by both ids.
+    public String getOfferingId() {
+<span class="fc" id="L87">        return offeringId;</span>
+    }
+
+    /// Set by the offering that lists this package.
+    void setOfferingId(String offeringId) {
+<span class="fc" id="L92">        this.offeringId = offeringId;</span>
+<span class="fc" id="L93">    }</span>
+
+    /// The id of the package inside its offering.
+    public String getId() {
+<span class="fc" id="L97">        return id;</span>
+    }
+
+    /// The role of the package, one of the `TYPE_` constants. A package the
+    /// service gave no type is [#TYPE_CUSTOM].
+    public String getType() {
+<span class="fc" id="L103">        return type;</span>
+    }
+
+    /// Whether the package is of the given type. Types are compared without
+    /// regard to case.
+    ///
+    /// #### Parameters
+    ///
+    /// - `packageType`: one of the `TYPE_` constants
+    public boolean isType(String packageType) {
+<span class="fc" id="L113">        return type.equalsIgnoreCase(packageType);</span>
+    }
+
+    /// The store product id (SKU) this package sells.
+    public String getProductId() {
+<span class="fc" id="L118">        return productId;</span>
+    }
+
+    /// The billing period as an ISO-8601 duration such as `P1M`, or null for
+    /// a package that is not billed periodically.
+    public String getPeriod() {
+<span class="fc" id="L124">        return period;</span>
+    }
+
+    /// The free trial as an ISO-8601 duration such as `P7D`, or null when
+    /// the package has none.
+    public String getTrialPeriod() {
+<span class="fc" id="L130">        return trialPeriod;</span>
+    }
+
+    /// The introductory price as text, or null when the package has none.
+    public String getIntroPrice() {
+<span class="fc" id="L135">        return introPrice;</span>
+    }
+
+    /// How long the introductory price lasts, as an ISO-8601 duration, or
+    /// null when the package has none.
+    public String getIntroPeriod() {
+<span class="fc" id="L141">        return introPeriod;</span>
+    }
+
+    /// Whether this customer may still take the free trial or introductory
+    /// price of the package, as far as the service knows.
+    public boolean isEligibleForIntro() {
+<span class="fc" id="L147">        return eligibleForIntro;</span>
+    }
+
+    /// Whether buying the package starts a subscription. Everything is a
+    /// subscription except a [#TYPE_LIFETIME] package and a [#TYPE_CUSTOM]
+    /// one with no billing period.
+    public boolean isSubscription() {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (isType(TYPE_LIFETIME)) {</span>
+<span class="fc" id="L155">            return false;</span>
+        }
+<span class="fc bfc" id="L157" title="All 4 branches covered.">        return !(isType(TYPE_CUSTOM) &amp;&amp; period == null);</span>
+    }
+
+    /// The store's product for this package, which carries the localized
+    /// price and name.
+    ///
+    /// #### Returns
+    ///
+    /// the product, or null while the store has not been asked or does not
+    /// list products on this platform
+    public Product getProduct() {
+<span class="fc" id="L168">        return product;</span>
+    }
+
+    /// Attaches the store's product once the store answered.
+    void setProduct(Product product) {
+<span class="fc" id="L173">        this.product = product;</span>
+<span class="fc" id="L174">    }</span>
+
+    /// This package as the JSON object it was built from, for storage.
+    Map&lt;String, Object&gt; toMap() {
+<span class="nc" id="L178">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L179">        CustomerInfo.putIfSet(out, &quot;id&quot;, id);</span>
+<span class="nc" id="L180">        CustomerInfo.putIfSet(out, &quot;type&quot;, type);</span>
+<span class="nc" id="L181">        CustomerInfo.putIfSet(out, &quot;productId&quot;, productId);</span>
+<span class="nc" id="L182">        CustomerInfo.putIfSet(out, &quot;period&quot;, period);</span>
+<span class="nc" id="L183">        CustomerInfo.putIfSet(out, &quot;trialPeriod&quot;, trialPeriod);</span>
+<span class="nc" id="L184">        CustomerInfo.putIfSet(out, &quot;introPrice&quot;, introPrice);</span>
+<span class="nc" id="L185">        CustomerInfo.putIfSet(out, &quot;introPeriod&quot;, introPeriod);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        out.put(&quot;eligibleForIntro&quot;, eligibleForIntro ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="nc" id="L187">        return out;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L192">        return &quot;CommercePackage{&quot; + id + &quot;, &quot; + type + &quot;, &quot; + productId + &quot;}&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

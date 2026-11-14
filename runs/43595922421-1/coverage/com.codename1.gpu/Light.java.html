@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Light.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Light.java</span></div><h1>Light.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu;
+
+/// A single directional light plus a global ambient term, consumed by lit
+/// materials (`Material.Type.LAMBERT` and `Material.Type.PHONG`). The direction
+/// is the direction the light travels, in world space. Set the active light on
+/// the device with `GraphicsDevice.setLight(Light)`.
+<span class="fc" id="L29">public final class Light {</span>
+<span class="fc" id="L30">    private float dirX = -0.5f;</span>
+<span class="fc" id="L31">    private float dirY = -1.0f;</span>
+<span class="fc" id="L32">    private float dirZ = -0.5f;</span>
+<span class="fc" id="L33">    private int color = 0xffffffff;</span>
+<span class="fc" id="L34">    private int ambientColor = 0xff404040;</span>
+    private boolean shadows;
+<span class="fc" id="L36">    private int shadowMapSize = 1024;</span>
+<span class="fc" id="L37">    private float shadowExtent = 20f;</span>
+    private float shadowCenterX;
+    private float shadowCenterY;
+    private float shadowCenterZ;
+<span class="fc" id="L41">    private float shadowBias = 0.0015f;</span>
+<span class="fc" id="L42">    private float shadowStrength = 0.8f;</span>
+
+    /// Sets the world space direction the light travels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x component
+    ///
+    /// - `y`: the y component
+    ///
+    /// - `z`: the z component
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setDirection(float x, float y, float z) {
+<span class="fc" id="L58">        this.dirX = x;</span>
+<span class="fc" id="L59">        this.dirY = y;</span>
+<span class="fc" id="L60">        this.dirZ = z;</span>
+<span class="fc" id="L61">        return this;</span>
+    }
+
+    /// Returns the x component of the light direction.
+    public float getDirectionX() {
+<span class="nc" id="L66">        return dirX;</span>
+    }
+
+    /// Returns the y component of the light direction.
+    public float getDirectionY() {
+<span class="nc" id="L71">        return dirY;</span>
+    }
+
+    /// Returns the z component of the light direction.
+    public float getDirectionZ() {
+<span class="nc" id="L76">        return dirZ;</span>
+    }
+
+    /// Returns the light color as a packed ARGB integer.
+    public int getColor() {
+<span class="nc" id="L81">        return color;</span>
+    }
+
+    /// Sets the light color as a packed ARGB integer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the packed ARGB color
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setColor(int argb) {
+<span class="nc" id="L94">        this.color = argb;</span>
+<span class="nc" id="L95">        return this;</span>
+    }
+
+    /// Returns the ambient color as a packed ARGB integer.
+    public int getAmbientColor() {
+<span class="nc" id="L100">        return ambientColor;</span>
+    }
+
+    /// Sets the ambient color as a packed ARGB integer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the packed ARGB color
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setAmbientColor(int argb) {
+<span class="nc" id="L113">        this.ambientColor = argb;</span>
+<span class="nc" id="L114">        return this;</span>
+    }
+
+    /// Turns shadow casting on or off. With shadows on, a `GraphicsDevice`
+    /// that supports them (`GpuCapabilities.isShadowsSupported`) renders the
+    /// scene from the light into a shadow map before each frame, and lit
+    /// materials that receive shadows are darkened where it is blocked.
+    ///
+    /// The map covers a square `extent` units either side of the shadow centre,
+    /// seen along the light's direction; move the centre with the camera
+    /// (`setShadowCenter`) and keep the extent as small as the view allows,
+    /// since the map's resolution is spread over it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadows`: true to cast shadows
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadows(boolean shadows) {
+<span class="fc" id="L135">        this.shadows = shadows;</span>
+<span class="fc" id="L136">        return this;</span>
+    }
+
+    /// Returns true if the light casts shadows.
+    public boolean isShadows() {
+<span class="fc" id="L141">        return shadows;</span>
+    }
+
+    /// Sets the area and resolution of the shadow map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: the width and height of the map in texels; clamped to 256 to 4096
+    ///
+    /// - `extent`: the half width of the square it covers, in world units
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowMap(int size, float extent) {
+<span class="fc" id="L156">        this.shadowMapSize = Math.max(256, Math.min(4096, size));</span>
+<span class="fc" id="L157">        this.shadowExtent = Math.max(0.01f, extent);</span>
+<span class="fc" id="L158">        return this;</span>
+    }
+
+    /// Returns the shadow map's width and height in texels.
+    public int getShadowMapSize() {
+<span class="fc" id="L163">        return shadowMapSize;</span>
+    }
+
+    /// Returns the x of the point the shadow map is centred on.
+    public float getShadowCenterX() {
+<span class="fc" id="L168">        return shadowCenterX;</span>
+    }
+
+    /// Returns the z of the point the shadow map is centred on.
+    public float getShadowCenterZ() {
+<span class="fc" id="L173">        return shadowCenterZ;</span>
+    }
+
+    /// Returns the half width of the area the shadow map covers.
+    public float getShadowExtent() {
+<span class="fc" id="L178">        return shadowExtent;</span>
+    }
+
+    /// Centres the shadow map on a world point, normally the one the camera
+    /// looks at.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x coordinate
+    ///
+    /// - `y`: the y coordinate
+    ///
+    /// - `z`: the z coordinate
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowCenter(float x, float y, float z) {
+<span class="fc" id="L196">        this.shadowCenterX = x;</span>
+<span class="fc" id="L197">        this.shadowCenterY = y;</span>
+<span class="fc" id="L198">        this.shadowCenterZ = z;</span>
+<span class="fc" id="L199">        return this;</span>
+    }
+
+    /// Sets how dark a shadow is and how far a surface must be behind the
+    /// shadow map before it counts as shadowed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strength`: 0 for no darkening, 1 for no direct light at all
+    ///
+    /// - `bias`: the depth offset in the map's 0..1 range; raise it if
+    ///   surfaces shadow themselves in stripes (&quot;acne&quot;), lower it if shadows
+    ///   detach from the objects that cast them
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowStyle(float strength, float bias) {
+<span class="fc" id="L217">        this.shadowStrength = Math.max(0f, Math.min(1f, strength));</span>
+<span class="fc" id="L218">        this.shadowBias = Math.max(0f, bias);</span>
+<span class="fc" id="L219">        return this;</span>
+    }
+
+    /// Returns how dark a shadow is, from 0 to 1.
+    public float getShadowStrength() {
+<span class="fc" id="L224">        return shadowStrength;</span>
+    }
+
+    /// Returns the shadow depth bias.
+    public float getShadowBias() {
+<span class="fc" id="L229">        return shadowBias;</span>
+    }
+
+    /// Computes the matrix that takes a world position to the shadow map's
+    /// clip space: an orthographic view along the light's direction, centred
+    /// on the shadow centre. Every backend uses this one, so shadows land in
+    /// the same place on each.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: a 16 element array that receives the column-major matrix
+    public void computeShadowMatrix(float[] out) {
+<span class="fc" id="L241">        float len = (float) Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        float dx = len &gt; 0 ? dirX / len : 0;</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        float dy = len &gt; 0 ? dirY / len : -1;</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        float dz = len &gt; 0 ? dirZ / len : 0;</span>
+<span class="fc" id="L245">        float back = shadowExtent * 2f;</span>
+<span class="fc" id="L246">        float upX = 0;</span>
+<span class="fc" id="L247">        float upY = 1;</span>
+<span class="fc" id="L248">        float upZ = 0;</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (Math.abs(dy) &gt; 0.99f) {</span>
+<span class="nc" id="L250">            upY = 0;</span>
+<span class="nc" id="L251">            upZ = 1;</span>
+        }
+<span class="fc" id="L253">        float[] view = Matrix4.lookAt(shadowCenterX - dx * back, shadowCenterY - dy * back,</span>
+                shadowCenterZ - dz * back, shadowCenterX, shadowCenterY, shadowCenterZ, upX, upY, upZ);
+        // Snap the centre to whole texels in light space, so the map does not
+        // shimmer as the camera moves.
+<span class="fc" id="L257">        float texel = shadowExtent * 2f / shadowMapSize;</span>
+<span class="fc" id="L258">        view[12] = (float) Math.floor(view[12] / texel) * texel;</span>
+<span class="fc" id="L259">        view[13] = (float) Math.floor(view[13] / texel) * texel;</span>
+<span class="fc" id="L260">        float[] proj = Matrix4.ortho(-shadowExtent, shadowExtent, -shadowExtent, shadowExtent, 0.05f, back * 2f);</span>
+<span class="fc" id="L261">        Matrix4.multiply(proj, view, out);</span>
+<span class="fc" id="L262">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

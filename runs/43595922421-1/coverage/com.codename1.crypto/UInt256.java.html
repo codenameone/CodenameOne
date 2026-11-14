@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UInt256.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto</a> &gt; <span class="el_source">UInt256.java</span></div><h1>UInt256.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto;
+
+import com.codename1.util.BigInteger;
+
+/// An unsigned 256-bit integer: the width of every EVM quantity and wide enough for any
+/// Bitcoin or Solana amount. Immutable.
+///
+/// Arithmetic is exact and refuses to wrap: an overflow or a negative result throws
+/// `ArithmeticException`, because a balance that silently wraps is a loss of funds.
+/// [#parseUnits] and [#formatUnits] move between base units and the decimal amounts people
+/// read (`&quot;1.5&quot;` ether is `1500000000000000000` wei).
+///
+/// The arithmetic is [com.codename1.util.BigInteger]'s, which both the device and the
+/// backend compile; this class adds the 256-bit range check and the wallet encodings.
+@com.codename1.impl.SharedWithBackend
+public final class UInt256 implements Comparable&lt;UInt256&gt; {
+<span class="fc" id="L39">    private static final BigInteger LIMIT = BigInteger.ONE.shiftLeft(256);</span>
+
+    /// Zero.
+<span class="fc" id="L42">    public static final UInt256 ZERO = new UInt256(BigInteger.ZERO);</span>
+    /// One.
+<span class="fc" id="L44">    public static final UInt256 ONE = new UInt256(BigInteger.ONE);</span>
+    /// 2^256 - 1.
+<span class="fc" id="L46">    public static final UInt256 MAX = new UInt256(LIMIT.subtract(BigInteger.ONE));</span>
+
+    /// Always in [0, 2^256).
+    private final BigInteger value;
+
+<span class="fc" id="L51">    private UInt256(BigInteger value) {</span>
+<span class="fc" id="L52">        this.value = value;</span>
+<span class="fc" id="L53">    }</span>
+
+    /// Wraps `v`, refusing anything outside [0, 2^256).
+    private static UInt256 checked(BigInteger v) {
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (v.signum() &lt; 0) {</span>
+<span class="fc" id="L58">            throw new ArithmeticException(&quot;negative result&quot;);</span>
+        }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (v.bitLength() &gt; 256) {</span>
+<span class="fc" id="L61">            throw new ArithmeticException(&quot;256-bit overflow&quot;);</span>
+        }
+<span class="fc" id="L63">        return new UInt256(v);</span>
+    }
+
+    /// The value of a non-negative long.
+    public static UInt256 valueOf(long value) {
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (value &lt; 0) {</span>
+<span class="nc" id="L69">            throw new ArithmeticException(&quot;negative value&quot;);</span>
+        }
+<span class="fc" id="L71">        return new UInt256(BigInteger.valueOf(value));</span>
+    }
+
+    /// Reads a big-endian unsigned integer of at most 32 significant bytes; leading zero
+    /// bytes beyond 32 are allowed.
+    public static UInt256 fromBytes(byte[] bigEndian) {
+<span class="fc" id="L77">        return fromBytes(bigEndian, 0, bigEndian.length);</span>
+    }
+
+    /// Reads `length` big-endian bytes at `offset`.
+    public static UInt256 fromBytes(byte[] data, int offset, int length) {
+<span class="fc" id="L82">        byte[] mag = new byte[length];</span>
+<span class="fc" id="L83">        System.arraycopy(data, offset, mag, 0, length);</span>
+<span class="fc" id="L84">        BigInteger v = new BigInteger(1, mag);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (v.bitLength() &gt; 256) {</span>
+<span class="nc" id="L86">            throw new ArithmeticException(&quot;more than 256 bits&quot;);</span>
+        }
+<span class="fc" id="L88">        return new UInt256(v);</span>
+    }
+
+    /// Parses decimal digits, or hexadecimal after `0x`.
+    ///
+    /// #### Throws
+    ///
+    /// - `NumberFormatException`: for anything else, a sign, or a value above [#MAX]
+    public static UInt256 parse(String text) {
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">        if (text == null || text.length() == 0) {</span>
+<span class="nc" id="L98">            throw new NumberFormatException(&quot;empty number&quot;);</span>
+        }
+<span class="pc bpc" id="L100" title="1 of 8 branches missed.">        if (text.length() &gt; 2 &amp;&amp; text.charAt(0) == '0' &amp;&amp; (text.charAt(1) == 'x' || text.charAt(1) == 'X')) {</span>
+<span class="fc" id="L101">            return parse(text.substring(2), 16);</span>
+        }
+<span class="fc" id="L103">        return parse(text, 10);</span>
+    }
+
+    /// Parses digits in radix 10 or 16, no prefix.
+    public static UInt256 parse(String digits, int radix) {
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        if (radix != 10 &amp;&amp; radix != 16) {</span>
+<span class="nc" id="L109">            throw new IllegalArgumentException(&quot;radix 10 or 16&quot;);</span>
+        }
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (digits.length() == 0) {</span>
+<span class="nc" id="L112">            throw new NumberFormatException(&quot;empty number&quot;);</span>
+        }
+        // BigInteger accepts a sign; an amount must not have one.
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (int iter = 0; iter &lt; digits.length(); iter++) {</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (Character.digit(digits.charAt(iter), radix) &lt; 0) {</span>
+<span class="fc" id="L117">                throw new NumberFormatException(&quot;bad digit in &quot; + digits);</span>
+            }
+        }
+<span class="fc" id="L120">        BigInteger v = new BigInteger(digits, radix);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (v.bitLength() &gt; 256) {</span>
+<span class="fc" id="L122">            throw new NumberFormatException(&quot;more than 256 bits: &quot; + digits);</span>
+        }
+<span class="fc" id="L124">        return new UInt256(v);</span>
+    }
+
+    /// Parses a decimal amount into base units: `parseUnits(&quot;1.5&quot;, 18)` is 1.5 ether in wei.
+    ///
+    /// #### Throws
+    ///
+    /// - `NumberFormatException`: for a malformed amount or more fraction digits than
+    ///   `decimals`
+    public static UInt256 parseUnits(String amount, int decimals) {
+<span class="pc bpc" id="L134" title="3 of 6 branches missed.">        if (amount == null || decimals &lt; 0 || decimals &gt; 77) {</span>
+<span class="nc" id="L135">            throw new NumberFormatException(&quot;bad amount&quot;);</span>
+        }
+<span class="fc" id="L137">        String a = amount.trim();</span>
+<span class="fc" id="L138">        int dot = a.indexOf('.');</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        String whole = dot &lt; 0 ? a : a.substring(0, dot);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        String fraction = dot &lt; 0 ? &quot;&quot; : a.substring(dot + 1);</span>
+<span class="pc bpc" id="L141" title="3 of 6 branches missed.">        if ((whole.length() == 0 &amp;&amp; fraction.length() == 0) || fraction.length() &gt; decimals</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                || fraction.indexOf('.') &gt;= 0) {</span>
+<span class="fc" id="L143">            throw new NumberFormatException(&quot;bad amount: &quot; + amount);</span>
+        }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        StringBuilder digits = new StringBuilder(whole.length() == 0 ? &quot;0&quot; : whole).append(fraction);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (int iter = fraction.length(); iter &lt; decimals; iter++) {</span>
+<span class="fc" id="L147">            digits.append('0');</span>
+        }
+<span class="fc" id="L149">        return parse(digits.toString(), 10);</span>
+    }
+
+    /// Formats base units as a decimal amount, without trailing fraction zeros:
+    /// `formatUnits(1500000000000000000, 18)` is `&quot;1.5&quot;`.
+    public String formatUnits(int decimals) {
+<span class="fc" id="L155">        String digits = toString();</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (decimals &lt;= 0) {</span>
+<span class="nc" id="L157">            return digits;</span>
+        }
+<span class="fc" id="L159">        StringBuilder padded = new StringBuilder();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (int iter = digits.length(); iter &lt;= decimals; iter++) {</span>
+<span class="fc" id="L161">            padded.append('0');</span>
+        }
+<span class="fc" id="L163">        padded.append(digits);</span>
+<span class="fc" id="L164">        String all = padded.toString();</span>
+<span class="fc" id="L165">        String whole = all.substring(0, all.length() - decimals);</span>
+<span class="fc" id="L166">        String fraction = all.substring(all.length() - decimals);</span>
+<span class="fc" id="L167">        int end = fraction.length();</span>
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">        while (end &gt; 0 &amp;&amp; fraction.charAt(end - 1) == '0') {</span>
+<span class="fc" id="L169">            end--;</span>
+        }
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        return end == 0 ? whole : whole + &quot;.&quot; + fraction.substring(0, end);</span>
+    }
+
+    /// `this + other`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: when the sum exceeds [#MAX]
+    public UInt256 add(UInt256 other) {
+<span class="fc" id="L180">        return checked(value.add(other.value));</span>
+    }
+
+    /// `this - other`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: when `other` is larger
+    public UInt256 subtract(UInt256 other) {
+<span class="fc" id="L189">        return checked(value.subtract(other.value));</span>
+    }
+
+    /// `this * other`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: when the product exceeds [#MAX]
+    public UInt256 multiply(UInt256 other) {
+<span class="fc" id="L198">        return checked(value.multiply(other.value));</span>
+    }
+
+    /// `this * factor` for a small non-negative factor.
+    public UInt256 multiply(long factor) {
+<span class="nc" id="L203">        return multiply(valueOf(factor));</span>
+    }
+
+    /// The quotient and remainder of `this / divisor`.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: for a zero divisor
+    public UInt256[] divideAndRemainder(UInt256 divisor) {
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (divisor.isZero()) {</span>
+<span class="nc" id="L213">            throw new ArithmeticException(&quot;division by zero&quot;);</span>
+        }
+<span class="fc" id="L215">        BigInteger[] qr = value.divideAndRemainder(divisor.value);</span>
+<span class="fc" id="L216">        return new UInt256[] {new UInt256(qr[0]), new UInt256(qr[1])};</span>
+    }
+
+    /// `this / divisor`, rounded down.
+    public UInt256 divide(UInt256 divisor) {
+<span class="nc" id="L221">        return divideAndRemainder(divisor)[0];</span>
+    }
+
+    /// `this mod divisor`.
+    public UInt256 mod(UInt256 divisor) {
+<span class="nc" id="L226">        return divideAndRemainder(divisor)[1];</span>
+    }
+
+    /// `this &lt;&lt; bits`, refusing to drop set bits.
+    public UInt256 shiftLeft(int bits) {
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L232">            return this;</span>
+        }
+<span class="pc bpc" id="L234" title="2 of 4 branches missed.">        if (bits &lt; 0 || bits &gt; 256) {</span>
+<span class="nc" id="L235">            throw new ArithmeticException(&quot;256-bit overflow&quot;);</span>
+        }
+<span class="fc" id="L237">        return checked(value.shiftLeft(bits));</span>
+    }
+
+    /// `this &gt;&gt;&gt; bits`.
+    public UInt256 shiftRight(int bits) {
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (bits &lt; 0) {</span>
+<span class="nc" id="L243">            throw new IllegalArgumentException(&quot;negative shift&quot;);</span>
+        }
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        return bits &gt;= 256 ? ZERO : new UInt256(value.shiftRight(bits));</span>
+    }
+
+    /// `10^exponent`, for unit conversions.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: when the power exceeds [#MAX]
+    public static UInt256 tenPow(int exponent) {
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        if (exponent &lt; 0) {</span>
+<span class="nc" id="L255">            return ONE;</span>
+        }
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (exponent &gt; 78) {</span>
+<span class="nc" id="L258">            throw new ArithmeticException(&quot;256-bit overflow&quot;);</span>
+        }
+<span class="nc" id="L260">        return checked(BigInteger.valueOf(10).pow(exponent));</span>
+    }
+
+    /// Tells whether bit `n` (0 is the lowest) is set.
+    public boolean testBit(int n) {
+<span class="nc bnc" id="L265" title="All 6 branches missed.">        return n &gt;= 0 &amp;&amp; n &lt; 256 &amp;&amp; value.testBit(n);</span>
+    }
+
+    /// The number of significant bits; 0 for zero.
+    public int bitLength() {
+<span class="fc" id="L270">        return value.bitLength();</span>
+    }
+
+    /// Tells whether this is zero.
+    public boolean isZero() {
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        return value.signum() == 0;</span>
+    }
+
+    /// The value as a long.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: when it does not fit in 63 bits
+    public long longValueExact() {
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (bitLength() &gt; 63) {</span>
+<span class="nc" id="L285">            throw new ArithmeticException(&quot;does not fit in a long&quot;);</span>
+        }
+<span class="fc" id="L287">        return value.longValue();</span>
+    }
+
+    /// The 32 big-endian bytes.
+    public byte[] toBytes32() {
+<span class="fc" id="L292">        byte[] min = toMinimalBytes();</span>
+<span class="fc" id="L293">        byte[] out = new byte[32];</span>
+<span class="fc" id="L294">        System.arraycopy(min, 0, out, 32 - min.length, min.length);</span>
+<span class="fc" id="L295">        return out;</span>
+    }
+
+    /// The minimal big-endian bytes, empty for zero: the RLP and JSON-RPC quantity form.
+    public byte[] toMinimalBytes() {
+        // Two's complement: a value with its top bit set gains a leading zero byte.
+<span class="fc" id="L301">        byte[] twos = value.toByteArray();</span>
+<span class="fc" id="L302">        int start = 0;</span>
+<span class="fc bfc" id="L303" title="All 4 branches covered.">        while (start &lt; twos.length &amp;&amp; twos[start] == 0) {</span>
+<span class="fc" id="L304">            start++;</span>
+        }
+<span class="fc" id="L306">        byte[] out = new byte[twos.length - start];</span>
+<span class="fc" id="L307">        System.arraycopy(twos, start, out, 0, out.length);</span>
+<span class="fc" id="L308">        return out;</span>
+    }
+
+    /// Lowercase hexadecimal without leading zeros or prefix; `&quot;0&quot;` for zero.
+    public String toHex() {
+<span class="fc" id="L313">        String hex = com.codename1.security.Hash.toHex(toMinimalBytes());</span>
+<span class="fc" id="L314">        int start = 0;</span>
+<span class="pc bpc" id="L315" title="1 of 4 branches missed.">        while (start &lt; hex.length() - 1 &amp;&amp; hex.charAt(start) == '0') {</span>
+<span class="nc" id="L316">            start++;</span>
+        }
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        return hex.length() == 0 ? &quot;0&quot; : hex.substring(start);</span>
+    }
+
+    /// The JSON-RPC quantity form, `0x` and minimal hex: `0x0`, `0x1a`.
+    public String toQuantity() {
+<span class="fc" id="L323">        return &quot;0x&quot; + toHex();</span>
+    }
+
+    /// The decimal digits.
+    @Override
+    public String toString() {
+<span class="fc" id="L329">        return value.toString();</span>
+    }
+
+    @Override
+    public int compareTo(UInt256 other) {
+<span class="nc" id="L334">        return value.compareTo(other.value);</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L339" title="2 of 4 branches missed.">        return o instanceof UInt256 &amp;&amp; value.equals(((UInt256) o).value);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L344">        return value.hashCode();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

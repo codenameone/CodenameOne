@@ -1,0 +1,1074 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MaterialTimePicker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">MaterialTimePicker.java</span></div><h1>MaterialTimePicker.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.l10n.DateFormatSymbols;
+import com.codename1.ui.Button;
+import com.codename1.ui.ButtonGroup;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.MathUtil;
+
+/// A time picker in the Material 3 style: the hour and the minute in large
+/// type over a clock face. The hand is dragged to the hour, the face then
+/// turns to minutes, and a keyboard button swaps the face for two text
+/// fields.
+///
+/// A `Picker` opens one in a dialog when the theme constant `pickerStyle` is
+/// `material`. It is a component like any other and can be placed in a form
+/// directly. The value is an `Integer`, the minutes since midnight, as it is
+/// for the time of a `Picker`.
+///
+/// With `setShowMeridiem(true)` the face has twelve hours and AM and PM
+/// beside the time; without, it has two rings, the afternoon inside.
+///
+/// ![The hours of a Material time picker](https://www.codenameone.com/developer-guide/img/generated/picker-material-time.png)
+/// ![The minutes](https://www.codenameone.com/developer-guide/img/generated/picker-material-time-minutes.png)
+/// ![Twenty four hours](https://www.codenameone.com/developer-guide/img/generated/picker-material-time-24h.png)
+///
+/// Under a mouse the number the pointer is over is marked. The hand follows
+/// a finger as it is dragged, and turns by the shorter way round to a time
+/// that is set any other way: the minutes after an hour is chosen, a time
+/// typed in, a call to `setTime`.
+///
+/// ![The hand turning from ten to two, as four stopped frames](https://www.codenameone.com/developer-guide/img/generated/picker-material-hand-stages.png)
+///
+/// #### Styling
+///
+/// `PickerMaterialOverline` is the small title. `PickerMaterialTimeField` is
+/// the hour and the minute, its selected style the one the face is showing,
+/// and `PickerMaterialTimeSeparator` the colon between them.
+/// `PickerMaterialPeriod` is AM and PM. `PickerMaterialDial` is the face:
+/// its background the disc and its foreground the numbers, and its selected
+/// style the hand, with the foreground the number under it. Its disabled
+/// style is an hour outside the range. `PickerMaterialButton` is the
+/// keyboard button and `PickerMaterialField` a text field.
+public class MaterialTimePicker extends Container implements InternalPickerWidget {
+    private int hour;
+    private int minute;
+    private boolean meridiem;
+<span class="fc" id="L89">    private int minuteStep = 1;</span>
+<span class="fc" id="L90">    private int minHour = -1;</span>
+<span class="fc" id="L91">    private int maxHour = -1;</span>
+    private boolean minutesShown;
+    private boolean inputMode;
+    private boolean typedWrong;
+    private boolean pointedHour;
+    private boolean updating;
+
+<span class="fc" id="L98">    private final Label overline = new Label(&quot;&quot;, &quot;PickerMaterialOverline&quot;);</span>
+<span class="fc" id="L99">    private final RadioButton hourField = new RadioButton(&quot;&quot;);</span>
+<span class="fc" id="L100">    private final RadioButton minuteField = new RadioButton(&quot;&quot;);</span>
+<span class="fc" id="L101">    private final TextField hourInput = new TextField();</span>
+<span class="fc" id="L102">    private final TextField minuteInput = new TextField();</span>
+<span class="fc" id="L103">    private final RadioButton am = new RadioButton(&quot;&quot;);</span>
+<span class="fc" id="L104">    private final RadioButton pm = new RadioButton(&quot;&quot;);</span>
+    // Two rows of one height each, so AM and PM together are as tall as
+    // the hour beside them whatever a theme pads them with.
+<span class="fc" id="L107">    private final Container periods = new Container(new GridLayout(2, 1));</span>
+<span class="fc" id="L108">    private final Container time = new Container();</span>
+<span class="fc" id="L109">    private final Colon separator = new Colon();</span>
+<span class="fc" id="L110">    private final Label hourCaption = new Label(&quot;&quot;, &quot;PickerMaterialOverline&quot;);</span>
+<span class="fc" id="L111">    private final Label minuteCaption = new Label(&quot;&quot;, &quot;PickerMaterialOverline&quot;);</span>
+<span class="fc" id="L112">    private final Dial dial = new Dial();</span>
+<span class="fc" id="L113">    private final Button modeButton = new Button(&quot;&quot;, &quot;PickerMaterialButton&quot;);</span>
+<span class="fc" id="L114">    private final Container modeRow = new Container(new FlowLayout(Component.LEFT));</span>
+<span class="fc" id="L115">    private final EventDispatcher listeners = new EventDispatcher();</span>
+
+    /// A picker showing midnight on a 24 hour face.
+    public MaterialTimePicker() {
+<span class="fc" id="L119">        super(new BorderLayout());</span>
+<span class="fc" id="L120">        setUIID(&quot;PickerMaterial&quot;);</span>
+<span class="fc" id="L121">        overline.setText(getUIManager().localize(&quot;picker.selectTime&quot;, &quot;Select time&quot;));</span>
+<span class="fc" id="L122">        hourCaption.setText(getUIManager().localize(&quot;picker.hour&quot;, &quot;Hour&quot;));</span>
+<span class="fc" id="L123">        minuteCaption.setText(getUIManager().localize(&quot;picker.minute&quot;, &quot;Minute&quot;));</span>
+<span class="fc" id="L124">        time.setLayout(new TimeRow());</span>
+<span class="fc" id="L125">        String[] names = new DateFormatSymbols().getAmPmStrings();</span>
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">        am.setText(names != null &amp;&amp; names.length &gt; 1 ? names[0] : &quot;AM&quot;);</span>
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">        pm.setText(names != null &amp;&amp; names.length &gt; 1 ? names[1] : &quot;PM&quot;);</span>
+
+<span class="fc" id="L129">        ButtonGroup fields = new ButtonGroup();</span>
+<span class="fc" id="L130">        field(hourField, fields);</span>
+<span class="fc" id="L131">        field(minuteField, fields);</span>
+<span class="fc" id="L132">        hourField.setSelected(true);</span>
+<span class="fc" id="L133">        hourField.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L136">                showMinutes(false);</span>
+<span class="nc" id="L137">            }</span>
+        });
+<span class="fc" id="L139">        minuteField.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L142">                showMinutes(true);</span>
+<span class="nc" id="L143">            }</span>
+        });
+<span class="fc" id="L145">        typedField(hourInput);</span>
+<span class="fc" id="L146">        typedField(minuteInput);</span>
+
+<span class="fc" id="L148">        ButtonGroup half = new ButtonGroup();</span>
+<span class="fc" id="L149">        am.setToggle(true);</span>
+<span class="fc" id="L150">        pm.setToggle(true);</span>
+<span class="fc" id="L151">        am.setUIID(&quot;PickerMaterialPeriod&quot;);</span>
+<span class="fc" id="L152">        pm.setUIID(&quot;PickerMaterialPeriod&quot;);</span>
+<span class="fc" id="L153">        half.add(am);</span>
+<span class="fc" id="L154">        half.add(pm);</span>
+<span class="fc" id="L155">        ActionListener halfChosen = new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                int h = hour % 12 + (pm.isSelected() ? 12 : 0);</span>
+<span class="nc bnc" id="L159" title="All 4 branches missed.">                if (h != hour &amp;&amp; isEnabledHour(h)) {</span>
+<span class="nc" id="L160">                    hour = h;</span>
+<span class="nc" id="L161">                    changed();</span>
+                }
+<span class="nc" id="L163">                refresh();</span>
+<span class="nc" id="L164">            }</span>
+        };
+<span class="fc" id="L166">        am.addActionListener(halfChosen);</span>
+<span class="fc" id="L167">        pm.addActionListener(halfChosen);</span>
+<span class="fc" id="L168">        periods.add(am).add(pm);</span>
+
+<span class="fc" id="L170">        Container head = new Container(new BorderLayout());</span>
+<span class="fc" id="L171">        head.setUIID(&quot;PickerMaterialHeader&quot;);</span>
+<span class="fc" id="L172">        head.add(BorderLayout.NORTH, overline);</span>
+<span class="fc" id="L173">        head.add(BorderLayout.CENTER, time);</span>
+
+<span class="fc" id="L175">        FontImage.setMaterialIcon(modeButton, FontImage.MATERIAL_KEYBOARD);</span>
+<span class="fc" id="L176">        modeButton.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                setInputMode(!inputMode);</span>
+<span class="nc" id="L180">            }</span>
+        });
+<span class="fc" id="L182">        modeRow.add(modeButton);</span>
+
+<span class="fc" id="L184">        add(BorderLayout.NORTH, head);</span>
+<span class="fc" id="L185">        add(BorderLayout.CENTER, dial);</span>
+<span class="fc" id="L186">        add(BorderLayout.SOUTH, modeRow);</span>
+<span class="fc" id="L187">        buildTime();</span>
+<span class="fc" id="L188">        refresh();</span>
+<span class="fc" id="L189">    }</span>
+
+    private void field(RadioButton b, ButtonGroup g) {
+<span class="fc" id="L192">        b.setToggle(true);</span>
+<span class="fc" id="L193">        b.setUIID(&quot;PickerMaterialTimeField&quot;);</span>
+<span class="fc" id="L194">        g.add(b);</span>
+<span class="fc" id="L195">    }</span>
+
+    private void typedField(TextField f) {
+<span class="fc" id="L198">        f.setUIID(&quot;PickerMaterialField&quot;);</span>
+<span class="fc" id="L199">        f.setConstraint(TextArea.NUMERIC);</span>
+<span class="fc" id="L200">        f.setColumns(2);</span>
+        // Two digits in a box made for them: there is nothing to scroll to,
+        // and the bar of a text area was drawn down the side of the box.
+<span class="fc" id="L203">        f.setScrollVisible(false);</span>
+<span class="fc" id="L204">        f.setMaxSize(2);</span>
+<span class="fc" id="L205">        f.addDataChangedListener(new DataChangedListener() {</span>
+            @Override
+            public void dataChanged(int type, int index) {
+<span class="fc" id="L208">                typed();</span>
+<span class="fc" id="L209">            }</span>
+        });
+<span class="fc" id="L211">    }</span>
+
+    private void buildTime() {
+<span class="fc" id="L214">        time.removeAll();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (inputMode) {</span>
+<span class="fc" id="L216">            time.add(hourInput);</span>
+        } else {
+<span class="fc" id="L218">            time.add(hourField);</span>
+        }
+<span class="fc" id="L220">        time.add(separator);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (inputMode) {</span>
+<span class="fc" id="L222">            time.add(minuteInput);</span>
+        } else {
+<span class="fc" id="L224">            time.add(minuteField);</span>
+        }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (meridiem) {</span>
+<span class="fc" id="L227">            time.add(periods);</span>
+        }
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (inputMode) {</span>
+<span class="fc" id="L230">            time.add(hourCaption);</span>
+<span class="fc" id="L231">            time.add(minuteCaption);</span>
+        }
+<span class="fc" id="L233">    }</span>
+
+    // The row of the time: the hour and the minute in two boxes of one
+    // size, the colon between them and AM and PM beside them, all of one
+    // height and centred as a group.
+    //
+    // A flow of the four gave each its own preferred size. The hour was
+    // narrower than the minute whenever it had one digit, the two periods
+    // were as tall as their paddings added up to, and the colon sat
+    // wherever the font put it. Here the box of the hour sets the size and
+    // everything else is measured against it.
+<span class="fc" id="L244">    private final class TimeRow extends Layout {</span>
+        private int boxWidth() {
+<span class="fc" id="L246">            return Math.max(hourField.getPreferredW(), minuteField.getPreferredW());</span>
+        }
+
+        private int boxHeight() {
+<span class="fc" id="L250">            return Math.max(hourField.getPreferredH(), minuteField.getPreferredH());</span>
+        }
+
+        private int captionGap() {
+<span class="fc" id="L254">            return Display.getInstance().convertToPixels(0.7f);</span>
+        }
+
+        private int periodsWidth() {
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            return meridiem ? periods.getPreferredW() + Display.getInstance().convertToPixels(2f) : 0;</span>
+        }
+
+        @Override
+        public void layoutContainer(Container parent) {
+<span class="fc" id="L263">            Style s = parent.getStyle();</span>
+<span class="fc" id="L264">            int fw = boxWidth();</span>
+<span class="fc" id="L265">            int fh = boxHeight();</span>
+<span class="fc" id="L266">            int sw = separator.getPreferredW();</span>
+<span class="fc" id="L267">            int pw = periodsWidth();</span>
+<span class="fc" id="L268">            int room = parent.getWidth() - s.getHorizontalPadding();</span>
+<span class="fc" id="L269">            int x = s.getPaddingLeftNoRTL() + Math.max(0, (room - 2 * fw - sw - pw) / 2);</span>
+<span class="fc" id="L270">            int y = s.getPaddingTop();</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            if (inputMode) {</span>
+<span class="fc" id="L272">                padTyped(fw, fh);</span>
+            }
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            place(inputMode ? (Component) hourInput : hourField, x, y, fw, fh);</span>
+<span class="fc" id="L275">            place(separator, x + fw, y, sw, fh);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            place(inputMode ? (Component) minuteInput : minuteField, x + fw + sw, y, fw, fh);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            if (meridiem) {</span>
+<span class="fc" id="L278">                int gap = pw - periods.getPreferredW();</span>
+                // The outer edges of the two are the edges of the row: what
+                // a theme puts around each as a margin stays between them.
+<span class="fc" id="L281">                int over = am.getStyle().getMarginTop();</span>
+<span class="fc" id="L282">                int under = pm.getStyle().getMarginBottom();</span>
+<span class="fc" id="L283">                place(periods, x + 2 * fw + sw + gap, y - over, pw - gap, fh + over + under);</span>
+            }
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            if (inputMode) {</span>
+<span class="fc" id="L286">                int cy = y + fh + captionGap();</span>
+<span class="fc" id="L287">                place(hourCaption, x, cy, fw, hourCaption.getPreferredH());</span>
+<span class="fc" id="L288">                place(minuteCaption, x + fw + sw, cy, fw, minuteCaption.getPreferredH());</span>
+            }
+<span class="fc" id="L290">        }</span>
+
+        private void place(Component c, int x, int y, int w, int h) {
+<span class="fc" id="L293">            c.setX(x);</span>
+<span class="fc" id="L294">            c.setY(y);</span>
+<span class="fc" id="L295">            c.setWidth(w);</span>
+<span class="fc" id="L296">            c.setHeight(h);</span>
+<span class="fc" id="L297">        }</span>
+
+        @Override
+        public Dimension getPreferredSize(Container parent) {
+<span class="fc" id="L301">            Style s = parent.getStyle();</span>
+<span class="fc" id="L302">            int h = boxHeight();</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (inputMode) {</span>
+<span class="fc" id="L304">                h += captionGap() + Math.max(hourCaption.getPreferredH(), minuteCaption.getPreferredH());</span>
+            }
+<span class="fc" id="L306">            return new Dimension(2 * boxWidth() + separator.getPreferredW() + periodsWidth()</span>
+<span class="fc" id="L307">                    + s.getHorizontalPadding(), h + s.getVerticalPadding());</span>
+        }
+    }
+
+    // A typed field is the box of the hour with a caret in it: the same
+    // type, and two digits in the middle of it. A text field draws its text
+    // from its padding and has no centred alignment, so the padding is what
+    // puts the digits there.
+    private void padTyped(int fw, int fh) {
+<span class="fc" id="L316">        Font f = getUIManager().getComponentStyle(&quot;PickerMaterialTimeField&quot;).getFont();</span>
+<span class="fc" id="L317">        int px = Math.max(0, (fw - f.stringWidth(&quot;00&quot;)) / 2);</span>
+<span class="fc" id="L318">        int py = Math.max(0, (fh - f.getHeight()) / 2);</span>
+<span class="fc" id="L319">        padTyped(hourInput, f, px, py);</span>
+<span class="fc" id="L320">        padTyped(minuteInput, f, px, py);</span>
+<span class="fc" id="L321">    }</span>
+
+    // Asked of the style every time and written only when it differs: a
+    // theme that is refreshed gives the field a new style, and a number
+    // remembered here would say the padding was still on it.
+    private static void padTyped(TextField t, Font f, int px, int py) {
+<span class="fc" id="L327">        Style now = t.getUnselectedStyle();</span>
+<span class="pc bpc" id="L328" title="2 of 6 branches missed.">        if (now.getFont() == f &amp;&amp; now.getPaddingLeftNoRTL() == px &amp;&amp; now.getPaddingTop() == py) { //NOPMD CompareObjectsWithEquals - the very font</span>
+<span class="fc" id="L329">            return;</span>
+        }
+<span class="fc" id="L331">        Style all = t.getAllStyles();</span>
+<span class="fc" id="L332">        all.setFont(f);</span>
+<span class="fc" id="L333">        all.setPaddingUnit(Style.UNIT_TYPE_PIXELS);</span>
+<span class="fc" id="L334">        all.setPadding(py, py, px, px);</span>
+<span class="fc" id="L335">        all.setMarginUnit(Style.UNIT_TYPE_PIXELS);</span>
+<span class="fc" id="L336">        all.setMargin(0, 0, 0, 0);</span>
+<span class="fc" id="L337">    }</span>
+
+    // The colon between the hour and the minute: two dots about the middle
+    // of the row. The glyph of a font sits between the baseline and the
+    // height of a lower case letter, which is under the middle of the
+    // digits beside it.
+    private static final class Colon extends Component {
+<span class="fc" id="L344">        Colon() {</span>
+<span class="fc" id="L345">            setUIID(&quot;PickerMaterialTimeSeparator&quot;);</span>
+<span class="fc" id="L346">            setFocusable(false);</span>
+<span class="fc" id="L347">        }</span>
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc" id="L351">            Style s = getStyle();</span>
+<span class="fc" id="L352">            int h = s.getFont().getHeight();</span>
+<span class="fc" id="L353">            return new Dimension(Math.max(h / 3, Display.getInstance().convertToPixels(3f)) + s.getHorizontalPadding(),</span>
+                    h);
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="fc" id="L359">            Style s = getStyle();</span>
+<span class="fc" id="L360">            int d = Math.max(3, s.getFont().getHeight() / 7);</span>
+<span class="fc" id="L361">            int cx = getX() + getWidth() / 2;</span>
+<span class="fc" id="L362">            int cy = getY() + getHeight() / 2;</span>
+<span class="fc" id="L363">            int off = d * 2;</span>
+<span class="fc" id="L364">            boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L365">            g.setAntiAliased(true);</span>
+<span class="fc" id="L366">            g.setColor(s.getFgColor());</span>
+<span class="fc" id="L367">            g.fillArc(cx - d / 2, cy - off - d / 2, d, d, 0, 360);</span>
+<span class="fc" id="L368">            g.fillArc(cx - d / 2, cy + off - d / 2, d, d, 0, 360);</span>
+<span class="fc" id="L369">            g.setAntiAliased(aa);</span>
+<span class="fc" id="L370">        }</span>
+    }
+
+    // -------------------------------------------------------------- value
+
+    /// The hour of the day, 0 to 23.
+    public int getHour() {
+<span class="fc" id="L377">        return hour;</span>
+    }
+
+    public int getMinute() {
+<span class="fc" id="L381">        return minute;</span>
+    }
+
+    /// Sets the time. The hour is of the day, 0 to 23, whatever the face
+    /// shows; an hour outside the range is brought to the nearest one in it.
+    /// The minute is kept as it is given: the step is where the hand stops
+    /// when it is turned, and a time that is only looked at is not changed
+    /// by having been shown.
+    public void setTime(int hourOfDay, int minuteOfHour) {
+<span class="fc" id="L390">        int h = Math.max(0, Math.min(23, hourOfDay));</span>
+<span class="pc bpc" id="L391" title="1 of 4 branches missed.">        if (minHour &gt;= 0 &amp;&amp; maxHour &gt; minHour) {</span>
+<span class="fc" id="L392">            h = Math.max(minHour, Math.min(maxHour - 1, h));</span>
+        }
+<span class="fc" id="L394">        hour = h;</span>
+<span class="fc" id="L395">        minute = Math.max(0, Math.min(59, minuteOfHour));</span>
+<span class="fc" id="L396">        typedWrong = false;</span>
+<span class="fc" id="L397">        refresh();</span>
+<span class="fc" id="L398">    }</span>
+
+    /// Whether what is typed is a time. When it is not, the fields are
+    /// written again with the time that is set, so that what is confirmed
+    /// next is what is read there and not something that was never shown.
+    boolean acceptInput() {
+<span class="fc bfc" id="L404" title="All 4 branches covered.">        if (!inputMode || !typedWrong) {</span>
+<span class="fc" id="L405">            return true;</span>
+        }
+<span class="fc" id="L407">        typedWrong = false;</span>
+<span class="fc" id="L408">        refresh();</span>
+<span class="fc" id="L409">        return false;</span>
+    }
+
+    /// The minutes since midnight, as an `Integer`.
+    @Override
+    public Object getValue() {
+<span class="fc" id="L415">        return Integer.valueOf(hour * 60 + minute);</span>
+    }
+
+    /// Sets the time from the minutes since midnight. Anything that is not
+    /// an `Integer` is ignored.
+    @Override
+    public void setValue(Object value) {
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        if (value instanceof Integer) {</span>
+<span class="fc" id="L423">            int v = ((Integer) value).intValue();</span>
+<span class="fc" id="L424">            setTime(v / 60, v % 60);</span>
+        }
+<span class="fc" id="L426">    }</span>
+
+    /// Whether the face has twelve hours with AM and PM beside the time.
+    public boolean isShowMeridiem() {
+<span class="fc" id="L430">        return meridiem;</span>
+    }
+
+    public void setShowMeridiem(boolean v) {
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        if (meridiem != v) {</span>
+<span class="fc" id="L435">            meridiem = v;</span>
+<span class="fc" id="L436">            buildTime();</span>
+<span class="fc" id="L437">            refresh();</span>
+<span class="fc" id="L438">            time.revalidateLater();</span>
+        }
+<span class="fc" id="L440">    }</span>
+
+    /// The minutes the hand stops at: 5 for every five minutes, 1 for all.
+    public void setMinuteStep(int step) {
+<span class="fc" id="L444">        minuteStep = Math.max(1, Math.min(30, step));</span>
+<span class="fc" id="L445">        refresh();</span>
+<span class="fc" id="L446">    }</span>
+
+    public int getMinuteStep() {
+<span class="nc" id="L449">        return minuteStep;</span>
+    }
+
+    /// The hours that can be chosen: from `min` up to but not `max`. A
+    /// negative `min` removes the limit.
+    public void setHourRange(int min, int max) {
+<span class="pc bpc" id="L455" title="3 of 6 branches missed.">        if (min &lt; 0 || max &lt;= min || max &gt; 24) {</span>
+<span class="nc" id="L456">            minHour = -1;</span>
+<span class="nc" id="L457">            maxHour = -1;</span>
+        } else {
+<span class="fc" id="L459">            minHour = min;</span>
+<span class="fc" id="L460">            maxHour = max;</span>
+<span class="fc" id="L461">            setTime(hour, minute);</span>
+        }
+<span class="fc" id="L463">        dial.repaint();</span>
+<span class="fc" id="L464">    }</span>
+
+    boolean isEnabledHour(int h) {
+<span class="pc bpc" id="L467" title="1 of 6 branches missed.">        return minHour &lt; 0 || (h &gt;= minHour &amp;&amp; h &lt; maxHour);</span>
+    }
+
+    /// The small title over the time: &quot;Select time&quot; unless set.
+    public void setTitle(String title) {
+<span class="nc bnc" id="L472" title="All 2 branches missed.">        overline.setText(title == null ? &quot;&quot; : title);</span>
+<span class="nc" id="L473">    }</span>
+
+    public String getTitle() {
+<span class="nc" id="L476">        return overline.getText();</span>
+    }
+
+    /// Told when the user chooses another time.
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L481">        listeners.addListener(l);</span>
+<span class="fc" id="L482">    }</span>
+
+    public void removeActionListener(ActionListener l) {
+<span class="nc" id="L485">        listeners.removeListener(l);</span>
+<span class="nc" id="L486">    }</span>
+
+    private void changed() {
+<span class="fc" id="L489">        listeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Other));</span>
+<span class="fc" id="L490">    }</span>
+
+    // --------------------------------------------------------------- view
+
+    /// Whether the time is typed and not picked from the face.
+    public boolean isInputMode() {
+<span class="nc" id="L496">        return inputMode;</span>
+    }
+
+    public void setInputMode(boolean v) {
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        if (inputMode == v) {</span>
+<span class="nc" id="L501">            return;</span>
+        }
+<span class="fc" id="L503">        inputMode = v;</span>
+        // The fields are written again with the time that is set.
+<span class="fc" id="L505">        typedWrong = false;</span>
+<span class="fc" id="L506">        dial.setHidden(v);</span>
+<span class="fc" id="L507">        buildTime();</span>
+<span class="fc" id="L508">        refresh();</span>
+<span class="fc" id="L509">        revalidateLater();</span>
+<span class="fc" id="L510">    }</span>
+
+    /// The button that swaps the face for text fields. It is under the face
+    /// until something takes it: a dialog puts it beside its own buttons.
+    public Button getInputModeButton() {
+<span class="fc" id="L515">        return modeButton;</span>
+    }
+
+    boolean isMinutesShown() {
+<span class="fc" id="L519">        return minutesShown;</span>
+    }
+
+    void showMinutes(boolean v) {
+<span class="fc" id="L523">        minutesShown = v;</span>
+<span class="fc" id="L524">        refresh();</span>
+<span class="fc" id="L525">    }</span>
+
+    Component dialPane() {
+<span class="fc" id="L528">        return dial;</span>
+    }
+
+    /// Where the hand points now, in degrees clockwise from twelve.
+    float handAt() {
+<span class="fc" id="L533">        return dial.handAt();</span>
+    }
+
+    /// The number of the face the pointer is over, or -1.
+    int overNumber() {
+<span class="fc" id="L538">        return dial.overIndex;</span>
+    }
+
+    Container timeRow() {
+<span class="fc" id="L542">        return time;</span>
+    }
+
+    TextField hourInputField() {
+<span class="fc" id="L546">        return hourInput;</span>
+    }
+
+    TextField minuteInputField() {
+<span class="fc" id="L550">        return minuteInput;</span>
+    }
+
+    private static String two(int v) {
+<span class="fc bfc" id="L554" title="All 2 branches covered.">        return v &lt; 10 ? &quot;0&quot; + v : String.valueOf(v);</span>
+    }
+
+    private String hourText() {
+<span class="fc bfc" id="L558" title="All 2 branches covered.">        if (meridiem) {</span>
+<span class="fc" id="L559">            int h = hour % 12;</span>
+<span class="fc bfc" id="L560" title="All 2 branches covered.">            return String.valueOf(h == 0 ? 12 : h);</span>
+        }
+<span class="fc" id="L562">        return two(hour);</span>
+    }
+
+    private void refresh() {
+<span class="fc" id="L566">        hourField.setText(hourText());</span>
+<span class="fc" id="L567">        minuteField.setText(two(minute));</span>
+<span class="fc bfc" id="L568" title="All 2 branches covered.">        hourField.setSelected(!minutesShown);</span>
+<span class="fc" id="L569">        minuteField.setSelected(minutesShown);</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">        am.setSelected(hour &lt; 12);</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        pm.setSelected(hour &gt;= 12);</span>
+<span class="fc bfc" id="L572" title="All 2 branches covered.">        FontImage.setMaterialIcon(modeButton, inputMode ? FontImage.MATERIAL_SCHEDULE : FontImage.MATERIAL_KEYBOARD);</span>
+<span class="fc bfc" id="L573" title="All 4 branches covered.">        if (inputMode &amp;&amp; !updating) {</span>
+<span class="fc" id="L574">            updating = true;</span>
+            // Two digits, as the minute has: the hour is typed over, and a
+            // box with one digit off its middle reads as a broken one.
+<span class="pc bpc" id="L577" title="1 of 4 branches missed.">            int h = meridiem ? (hour % 12 == 0 ? 12 : hour % 12) : hour;</span>
+<span class="fc" id="L578">            hourInput.setText(two(h));</span>
+<span class="fc" id="L579">            minuteInput.setText(two(minute));</span>
+<span class="fc" id="L580">            updating = false;</span>
+        }
+<span class="fc" id="L582">        dial.repaint();</span>
+<span class="fc" id="L583">    }</span>
+
+    private static int number(String s) {
+<span class="pc bpc" id="L586" title="3 of 6 branches missed.">        if (s == null || s.length() == 0 || s.length() &gt; 2) {</span>
+<span class="nc" id="L587">            return -1;</span>
+        }
+<span class="fc" id="L589">        int v = 0;</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L591">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L592" title="2 of 4 branches missed.">            if (c &lt; '0' || c &gt; '9') {</span>
+<span class="nc" id="L593">                return -1;</span>
+            }
+<span class="fc" id="L595">            v = v * 10 + (c - '0');</span>
+        }
+<span class="fc" id="L597">        return v;</span>
+    }
+
+    private void typed() {
+<span class="pc bpc" id="L601" title="1 of 4 branches missed.">        if (updating || !inputMode) {</span>
+<span class="fc" id="L602">            return;</span>
+        }
+<span class="fc" id="L604">        int h = number(hourInput.getText());</span>
+<span class="fc" id="L605">        int m = number(minuteInput.getText());</span>
+<span class="fc" id="L606">        typedWrong = true;</span>
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">        if (meridiem) {</span>
+<span class="nc bnc" id="L608" title="All 4 branches missed.">            if (h &lt; 1 || h &gt; 12) {</span>
+<span class="nc" id="L609">                return;</span>
+            }
+<span class="nc bnc" id="L611" title="All 2 branches missed.">            h = h % 12 + (hour &gt;= 12 ? 12 : 0);</span>
+        }
+<span class="pc bpc" id="L613" title="4 of 10 branches missed.">        if (h &lt; 0 || h &gt; 23 || m &lt; 0 || m &gt; 59 || !isEnabledHour(h)) {</span>
+<span class="fc" id="L614">            return;</span>
+        }
+        // A minute that is typed is the minute that is meant; the step is
+        // for the hand.
+<span class="fc" id="L618">        typedWrong = false;</span>
+<span class="pc bpc" id="L619" title="1 of 4 branches missed.">        if (h != hour || m != minute) {</span>
+<span class="fc" id="L620">            hour = h;</span>
+<span class="fc" id="L621">            minute = m;</span>
+            // The fields keep what was typed: writing &quot;07&quot; back over a &quot;7&quot;
+            // would move the caret under the hand that is typing.
+<span class="fc" id="L624">            updating = true;</span>
+<span class="fc" id="L625">            refresh();</span>
+<span class="fc" id="L626">            updating = false;</span>
+<span class="fc" id="L627">            changed();</span>
+        }
+<span class="fc" id="L629">    }</span>
+
+    // ----------------------------------------------------------- the face
+
+    private static final int SWEEP_MS = 220;
+<span class="fc" id="L634">    private long fixedClock = -1;</span>
+
+    /// Stops the clock the hand turns by at a time, for a screenshot of
+    /// the turn or a test of it. A negative value returns to the clock.
+    public void setAnimationTime(long millis) {
+        // What changed before this is a turn that starts now.
+<span class="fc" id="L640">        dial.sync();</span>
+<span class="fc" id="L641">        fixedClock = millis;</span>
+<span class="fc" id="L642">        dial.sync();</span>
+<span class="fc" id="L643">        dial.repaint();</span>
+<span class="fc" id="L644">    }</span>
+
+    private long clock() {
+<span class="fc bfc" id="L647" title="All 2 branches covered.">        return fixedClock &gt;= 0 ? fixedClock : System.currentTimeMillis();</span>
+    }
+
+    /// The clock face, painted.
+    private final class Dial extends Component {
+<span class="fc" id="L652">        Dial() {</span>
+<span class="fc" id="L653">            setUIID(&quot;PickerMaterialDialPane&quot;);</span>
+<span class="fc" id="L654">            setFocusable(false);</span>
+<span class="fc" id="L655">        }</span>
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc" id="L659">            int d = Display.getInstance().convertToPixels(40);</span>
+<span class="fc" id="L660">            Style s = getStyle();</span>
+<span class="fc" id="L661">            return new Dimension(d + s.getHorizontalPadding(), d + s.getVerticalPadding());</span>
+        }
+
+        private int radius() {
+<span class="fc" id="L665">            Style s = getStyle();</span>
+<span class="fc" id="L666">            return Math.min(getWidth() - s.getHorizontalPadding(), getHeight() - s.getVerticalPadding()) / 2;</span>
+        }
+
+        // The ring of the hours after noon, inside the ring at `outer`.
+        // Half way to the centre, as on the platform's own dial: any
+        // closer in and twelve two-digit numbers run into one another.
+        private int innerRing(int outer, int k) {
+<span class="fc" id="L673">            return outer - k * 3 / 2;</span>
+        }
+
+        private int knob(int r) {
+<span class="fc" id="L677">            return Math.max(3, r * 19 / 100);</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="fc" id="L682">            Style face = getUIManager().getComponentStyle(&quot;PickerMaterialDial&quot;);</span>
+<span class="fc" id="L683">            Style hand = getUIManager().getComponentSelectedStyle(&quot;PickerMaterialDial&quot;);</span>
+<span class="fc" id="L684">            Style off = getUIManager().getComponentCustomStyle(&quot;PickerMaterialDial&quot;, &quot;dis&quot;);</span>
+<span class="fc" id="L685">            int r = radius();</span>
+<span class="pc bpc" id="L686" title="1 of 2 branches missed.">            if (r &lt;= 0) {</span>
+<span class="nc" id="L687">                return;</span>
+            }
+<span class="fc" id="L689">            int cx = getX() + getWidth() / 2;</span>
+<span class="fc" id="L690">            int cy = getY() + getHeight() / 2;</span>
+<span class="fc" id="L691">            int k = knob(r);</span>
+<span class="fc" id="L692">            int outer = r - k - Math.max(1, r / 28);</span>
+<span class="fc" id="L693">            int inner = innerRing(outer, k);</span>
+<span class="fc" id="L694">            boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L695">            g.setAntiAliased(true);</span>
+<span class="fc" id="L696">            g.setColor(face.getBgColor());</span>
+<span class="fc" id="L697">            g.fillArc(cx - r, cy - r, 2 * r, 2 * r, 0, 360);</span>
+
+            // The hand first, then the numbers over it.
+<span class="fc" id="L700">            sync();</span>
+<span class="fc" id="L701">            float p = sweep();</span>
+<span class="fc" id="L702">            double a = Math.toRadians(fromAt + turn(fromAt, toAt) * p);</span>
+<span class="pc bpc" id="L703" title="3 of 6 branches missed.">            float inward = (fromIn ? 1 : 0) + ((toIn ? 1 : 0) - (fromIn ? 1 : 0)) * p;</span>
+<span class="fc" id="L704">            int ring = outer - Math.round((outer - inner) * inward);</span>
+<span class="fc" id="L705">            int hx = cx + (int) Math.round(Math.sin(a) * ring);</span>
+<span class="fc" id="L706">            int hy = cy - (int) Math.round(Math.cos(a) * ring);</span>
+<span class="pc bpc" id="L707" title="1 of 2 branches missed.">            if (overIndex &gt;= 0) {</span>
+                // Where a press would put the hand.
+<span class="nc" id="L709">                double oa = Math.toRadians(overIndex * 30);</span>
+<span class="nc bnc" id="L710" title="All 2 branches missed.">                int or = overIn ? inner : outer;</span>
+<span class="nc" id="L711">                int alpha0 = g.getAlpha();</span>
+<span class="nc" id="L712">                g.setColor(face.getFgColor());</span>
+<span class="nc" id="L713">                g.setAlpha(alpha0 * 28 / 255);</span>
+<span class="nc" id="L714">                g.fillArc(cx + (int) Math.round(Math.sin(oa) * or) - k, cy - (int) Math.round(Math.cos(oa) * or) - k,</span>
+                        2 * k, 2 * k, 0, 360);
+<span class="nc" id="L716">                g.setAlpha(alpha0);</span>
+            }
+<span class="fc" id="L718">            g.setColor(hand.getBgColor());</span>
+<span class="fc" id="L719">            g.drawLine(cx, cy, hx, hy);</span>
+<span class="fc" id="L720">            g.drawLine(cx + 1, cy, hx + 1, hy);</span>
+<span class="fc" id="L721">            g.fillArc(cx - k / 4, cy - k / 4, k / 2, k / 2, 0, 360);</span>
+<span class="fc" id="L722">            g.fillArc(hx - k, hy - k, 2 * k, 2 * k, 0, 360);</span>
+            // A number is written in the hand's colour while the hand is
+            // on it, which during a sweep is not the number that is set:
+            // that one would be white on the pale face until the hand
+            // arrived.
+<span class="fc" id="L727">            knobX = hx;</span>
+<span class="fc" id="L728">            knobY = hy;</span>
+<span class="fc" id="L729">            knobNear = k * k * 2 / 5;</span>
+<span class="fc" id="L730">            litColor = hand.getFgColor();</span>
+<span class="fc" id="L731">            plainColor = face.getFgColor();</span>
+
+<span class="fc" id="L733">            Font f = face.getFont();</span>
+            // The inner ring is shorter round, and its numbers smaller.
+<span class="fc bfc" id="L735" title="All 4 branches covered.">            Font small = meridiem || minutesShown ? f : innerFont(f);</span>
+<span class="fc" id="L736">            g.setFont(f);</span>
+<span class="fc" id="L737">            int alpha = g.getAlpha();</span>
+<span class="fc" id="L738">            boolean marked = false;</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">            for (int i = 0; i &lt; 12; i++) {</span>
+<span class="fc bfc" id="L740" title="All 2 branches covered.">                if (minutesShown) {</span>
+<span class="fc bfc" id="L741" title="All 2 branches covered.">                    boolean under = minute == i * 5;</span>
+<span class="fc" id="L742">                    marked |= under;</span>
+<span class="fc bfc" id="L743" title="All 2 branches covered.">                    number(g, f, two(i * 5), cx, cy, outer, i, under ? hand.getFgColor() : face.getFgColor());</span>
+<span class="fc bfc" id="L744" title="All 2 branches covered.">                } else if (meridiem) {</span>
+<span class="fc bfc" id="L745" title="All 2 branches covered.">                    int h = i + (hour &gt;= 12 ? 12 : 0);</span>
+<span class="fc" id="L746">                    boolean ok = isEnabledHour(h);</span>
+<span class="pc bpc" id="L747" title="1 of 2 branches missed.">                    g.setAlpha(ok ? alpha : alpha * 97 / 255);</span>
+<span class="fc bfc" id="L748" title="All 2 branches covered.">                    number(g, f, String.valueOf(i == 0 ? 12 : i), cx, cy, outer, i,</span>
+<span class="pc bpc" id="L749" title="1 of 4 branches missed.">                            hour % 12 == i ? hand.getFgColor() : ok ? face.getFgColor() : off.getFgColor());</span>
+<span class="fc" id="L750">                } else {</span>
+<span class="fc bfc" id="L751" title="All 2 branches covered.">                    int morning = i == 0 ? 12 : i;</span>
+<span class="fc bfc" id="L752" title="All 2 branches covered.">                    int evening = i == 0 ? 0 : i + 12;</span>
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">                    g.setAlpha(isEnabledHour(morning) ? alpha : alpha * 97 / 255);</span>
+<span class="fc" id="L754">                    number(g, f, String.valueOf(morning), cx, cy, outer, i,</span>
+<span class="pc bpc" id="L755" title="1 of 4 branches missed.">                            hour == morning ? hand.getFgColor() : isEnabledHour(morning) ? face.getFgColor() : off.getFgColor());</span>
+<span class="pc bpc" id="L756" title="1 of 2 branches missed.">                    g.setAlpha(isEnabledHour(evening) ? alpha : alpha * 97 / 255);</span>
+<span class="fc" id="L757">                    number(g, small, two(evening), cx, cy, inner, i,</span>
+<span class="pc bpc" id="L758" title="2 of 4 branches missed.">                            hour == evening ? hand.getFgColor() : isEnabledHour(evening) ? face.getFgColor() : off.getFgColor());</span>
+                }
+<span class="fc" id="L760">                g.setAlpha(alpha);</span>
+            }
+<span class="fc bfc" id="L762" title="All 4 branches covered.">            if (minutesShown &amp;&amp; !marked) {</span>
+                // Between two numbers: a dot says where exactly.
+<span class="fc" id="L764">                g.setColor(hand.getFgColor());</span>
+<span class="fc" id="L765">                g.fillArc(hx - 2, hy - 2, 4, 4, 0, 360);</span>
+            }
+<span class="fc" id="L767">            g.setAntiAliased(aa);</span>
+<span class="fc" id="L768">        }</span>
+
+        private int knobX;
+        private int knobY;
+        private int knobNear;
+        private int litColor;
+        private int plainColor;
+        private Font innerOf;
+        private Font innerFont;
+
+        private Font innerFont(Font f) {
+<span class="pc bpc" id="L779" title="1 of 2 branches missed.">            if (innerOf != f) { //NOPMD CompareObjectsWithEquals - the font the cached one was made from</span>
+<span class="fc" id="L780">                innerOf = f;</span>
+<span class="pc bpc" id="L781" title="1 of 2 branches missed.">                innerFont = f.isTTFNativeFont() ? f.derive(f.getPixelSize() * 0.85f, f.getStyle()) : f;</span>
+            }
+<span class="fc" id="L783">            return innerFont;</span>
+        }
+
+        // ---- the hand turns to a time it was not dragged to ----
+
+        private boolean aimed;
+        private int aimedAt;
+        private boolean held;
+        private float fromAt;
+        private float toAt;
+        private boolean fromIn;
+        private boolean toIn;
+<span class="fc" id="L795">        private long sweepSince = -1;</span>
+        private boolean registered;
+<span class="fc" id="L797">        private int overIndex = -1;</span>
+        private boolean overIn;
+
+        // The shorter way round from one angle to another.
+        private float turn(float from, float to) {
+<span class="fc" id="L802">            float d = (to - from) % 360;</span>
+<span class="fc bfc" id="L803" title="All 2 branches covered.">            if (d &gt; 180) {</span>
+<span class="fc" id="L804">                d -= 360;</span>
+<span class="fc bfc" id="L805" title="All 2 branches covered.">            } else if (d &lt; -180) {</span>
+<span class="fc" id="L806">                d += 360;</span>
+            }
+<span class="fc" id="L808">            return d;</span>
+        }
+
+        // Points the hand at the time the picker has now.
+        void sync() {
+<span class="fc bfc" id="L813" title="All 2 branches covered.">            if (minutesShown) {</span>
+<span class="fc" id="L814">                aim(minute * 6, false);</span>
+            } else {
+<span class="fc bfc" id="L816" title="All 6 branches covered.">                aim(hour * 30 % 360, !meridiem &amp;&amp; (hour == 0 || hour &gt; 12));</span>
+            }
+<span class="fc" id="L818">        }</span>
+
+        float handAt() {
+<span class="fc" id="L821">            sync();</span>
+<span class="fc" id="L822">            float a = (fromAt + turn(fromAt, toAt) * sweep()) % 360;</span>
+<span class="pc bpc" id="L823" title="1 of 2 branches missed.">            return a &lt; 0 ? a + 360 : a;</span>
+        }
+
+        // How far the hand has come, from 0 to 1.
+        private float sweep() {
+<span class="fc bfc" id="L828" title="All 2 branches covered.">            if (sweepSince &lt; 0) {</span>
+<span class="fc" id="L829">                return 1;</span>
+            }
+<span class="fc" id="L831">            long t = clock() - sweepSince;</span>
+<span class="fc bfc" id="L832" title="All 2 branches covered.">            if (t &gt;= SWEEP_MS) {</span>
+<span class="fc" id="L833">                return 1;</span>
+            }
+<span class="fc bfc" id="L835" title="All 2 branches covered.">            float p = t &lt;= 0 ? 0 : t / (float) SWEEP_MS;</span>
+<span class="fc" id="L836">            return p * p * (3 - 2 * p);</span>
+        }
+
+        // The time the face shows has changed. Under a finger the hand is
+        // where the finger is; set any other way it turns there: the hour
+        // was chosen and the minutes are asked, a field was typed in, the
+        // half of the day was changed.
+        private void aim(int at, boolean in) {
+<span class="fc bfc" id="L844" title="All 6 branches covered.">            if (aimed &amp;&amp; at == aimedAt &amp;&amp; in == toIn) {</span>
+<span class="fc" id="L845">                return;</span>
+            }
+<span class="pc bpc" id="L847" title="1 of 6 branches missed.">            if (!aimed || held || !isInitialized()) {</span>
+<span class="fc" id="L848">                sweepSince = -1;</span>
+            } else {
+<span class="fc" id="L850">                float p = sweep();</span>
+<span class="fc" id="L851">                fromAt = fromAt + turn(fromAt, toAt) * p;</span>
+                // Halfway between the rings it starts from the nearer one.
+<span class="pc bpc" id="L853" title="1 of 2 branches missed.">                fromIn = p &lt; 0.5f ? fromIn : toIn;</span>
+<span class="fc" id="L854">                sweepSince = clock();</span>
+<span class="fc" id="L855">                Form f = getComponentForm();</span>
+<span class="pc bpc" id="L856" title="2 of 4 branches missed.">                if (f != null &amp;&amp; !registered) {</span>
+<span class="fc" id="L857">                    f.registerAnimated(this);</span>
+<span class="fc" id="L858">                    registered = true;</span>
+                }
+            }
+<span class="fc bfc" id="L861" title="All 2 branches covered.">            if (sweepSince &lt; 0) {</span>
+<span class="fc" id="L862">                fromAt = at;</span>
+<span class="fc" id="L863">                fromIn = in;</span>
+            }
+            // The angle as it was given, to compare the next one with: two
+            // floats are not compared for equality.
+<span class="fc" id="L867">            aimedAt = at;</span>
+<span class="fc" id="L868">            toAt = at;</span>
+<span class="fc" id="L869">            toIn = in;</span>
+<span class="fc" id="L870">            aimed = true;</span>
+<span class="fc" id="L871">        }</span>
+
+        @Override
+        public boolean animate() {
+<span class="pc bpc" id="L875" title="2 of 6 branches missed.">            boolean busy = sweepSince &gt;= 0 &amp;&amp; fixedClock &lt; 0 &amp;&amp; clock() - sweepSince &lt; SWEEP_MS;</span>
+<span class="pc bpc" id="L876" title="1 of 4 branches missed.">            if (!busy &amp;&amp; registered) {</span>
+<span class="fc" id="L877">                Form f = getComponentForm();</span>
+<span class="pc bpc" id="L878" title="1 of 2 branches missed.">                if (f != null) {</span>
+<span class="fc" id="L879">                    f.deregisterAnimated(this);</span>
+                }
+<span class="fc" id="L881">                registered = false;</span>
+            }
+<span class="fc" id="L883">            return busy;</span>
+        }
+
+        @Override
+        protected void deinitialize() {
+<span class="fc bfc" id="L888" title="All 2 branches covered.">            if (registered) {</span>
+<span class="fc" id="L889">                Form f = getComponentForm();</span>
+<span class="pc bpc" id="L890" title="1 of 2 branches missed.">                if (f != null) {</span>
+<span class="fc" id="L891">                    f.deregisterAnimated(this);</span>
+                }
+<span class="fc" id="L893">                registered = false;</span>
+            }
+<span class="fc" id="L895">            sweepSince = -1;</span>
+<span class="fc" id="L896">            held = false;</span>
+<span class="fc" id="L897">            overIndex = -1;</span>
+<span class="fc" id="L898">            super.deinitialize();</span>
+<span class="fc" id="L899">        }</span>
+
+        @Override
+        protected void initComponent() {
+<span class="fc" id="L903">            super.initComponent();</span>
+<span class="pc bpc" id="L904" title="1 of 2 branches missed.">            if (Display.getInstance().isDesktop()) {</span>
+<span class="nc" id="L905">                Form f = getComponentForm();</span>
+<span class="nc bnc" id="L906" title="All 4 branches missed.">                if (f != null &amp;&amp; !f.isEnableCursors()) {</span>
+<span class="nc" id="L907">                    f.setEnableCursors(true);</span>
+                }
+<span class="nc" id="L909">                setCursor(HAND_CURSOR);</span>
+            }
+<span class="fc" id="L911">        }</span>
+
+        @Override
+        public void pointerHover(int[] x, int[] y) {
+<span class="fc" id="L915">            int r = radius();</span>
+<span class="pc bpc" id="L916" title="3 of 6 branches missed.">            if (r &lt;= 0 || x == null || x.length == 0) {</span>
+<span class="nc" id="L917">                return;</span>
+            }
+<span class="fc" id="L919">            int dx = x[0] - getAbsoluteX() - getWidth() / 2;</span>
+<span class="fc" id="L920">            int dy = y[0] - getAbsoluteY() - getHeight() / 2;</span>
+<span class="fc" id="L921">            int index = -1;</span>
+<span class="fc" id="L922">            boolean in = false;</span>
+<span class="pc bpc" id="L923" title="4 of 6 branches missed.">            if (dx * dx + dy * dy &lt;= r * r &amp;&amp; (dx != 0 || dy != 0)) {</span>
+<span class="fc" id="L924">                double deg = Math.toDegrees(MathUtil.atan2(dx, -dy));</span>
+<span class="pc bpc" id="L925" title="1 of 2 branches missed.">                if (deg &lt; 0) {</span>
+<span class="fc" id="L926">                    deg += 360;</span>
+                }
+<span class="fc" id="L928">                index = (int) Math.round(deg / 30) % 12;</span>
+<span class="pc bpc" id="L929" title="1 of 2 branches missed.">                if (!minutesShown) {</span>
+                    int h;
+<span class="pc bpc" id="L931" title="1 of 2 branches missed.">                    if (meridiem) {</span>
+<span class="pc bpc" id="L932" title="1 of 2 branches missed.">                        h = index + (hour &gt;= 12 ? 12 : 0);</span>
+                    } else {
+<span class="nc" id="L934">                        int k = knob(r);</span>
+<span class="nc" id="L935">                        int outer = r - k - Math.max(1, r / 28);</span>
+<span class="nc" id="L936">                        int inner = innerRing(outer, k);</span>
+<span class="nc bnc" id="L937" title="All 2 branches missed.">                        in = dx * dx + dy * dy &lt; (outer + inner) * (outer + inner) / 4;</span>
+<span class="nc bnc" id="L938" title="All 6 branches missed.">                        h = in ? (index == 0 ? 0 : index + 12) : (index == 0 ? 12 : index);</span>
+                    }
+<span class="pc bpc" id="L940" title="1 of 2 branches missed.">                    if (!isEnabledHour(h)) {</span>
+<span class="nc" id="L941">                        index = -1;</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L945" title="3 of 4 branches missed.">            if (index != overIndex || in != overIn) {</span>
+<span class="fc" id="L946">                overIndex = index;</span>
+<span class="fc" id="L947">                overIn = in;</span>
+<span class="fc" id="L948">                repaint();</span>
+            }
+<span class="fc" id="L950">        }</span>
+
+        @Override
+        public void setHovered(boolean hovered) {
+<span class="fc" id="L954">            super.setHovered(hovered);</span>
+<span class="pc bpc" id="L955" title="2 of 4 branches missed.">            if (!hovered &amp;&amp; overIndex &gt;= 0) {</span>
+<span class="fc" id="L956">                overIndex = -1;</span>
+<span class="fc" id="L957">                repaint();</span>
+            }
+<span class="fc" id="L959">        }</span>
+
+        private void number(Graphics g, Font f, String s, int cx, int cy, int ring, int i, int color) {
+<span class="fc" id="L962">            double a = Math.toRadians(i * 30);</span>
+<span class="fc" id="L963">            int x = cx + (int) Math.round(Math.sin(a) * ring);</span>
+<span class="fc" id="L964">            int y = cy - (int) Math.round(Math.cos(a) * ring);</span>
+<span class="fc" id="L965">            int dx = x - knobX;</span>
+<span class="fc" id="L966">            int dy = y - knobY;</span>
+<span class="fc bfc" id="L967" title="All 2 branches covered.">            boolean under = dx * dx + dy * dy &lt;= knobNear;</span>
+<span class="fc" id="L968">            int shown = color;</span>
+<span class="fc bfc" id="L969" title="All 2 branches covered.">            if (under) {</span>
+<span class="fc" id="L970">                shown = litColor;</span>
+<span class="fc bfc" id="L971" title="All 2 branches covered.">            } else if (color == litColor) {</span>
+<span class="fc" id="L972">                shown = plainColor;</span>
+            }
+<span class="fc" id="L974">            g.setColor(shown);</span>
+<span class="fc" id="L975">            g.setFont(f);</span>
+<span class="fc" id="L976">            g.drawString(s, x - f.stringWidth(s) / 2, y - f.getHeight() / 2);</span>
+<span class="fc" id="L977">        }</span>
+
+        private void point(int px, int py) {
+<span class="fc" id="L980">            int r = radius();</span>
+<span class="pc bpc" id="L981" title="1 of 2 branches missed.">            if (r &lt;= 0) {</span>
+<span class="nc" id="L982">                return;</span>
+            }
+<span class="fc" id="L984">            int dx = px - getAbsoluteX() - getWidth() / 2;</span>
+<span class="fc" id="L985">            int dy = py - getAbsoluteY() - getHeight() / 2;</span>
+<span class="pc bpc" id="L986" title="1 of 4 branches missed.">            if (dx == 0 &amp;&amp; dy == 0) {</span>
+<span class="nc" id="L987">                return;</span>
+            }
+<span class="fc" id="L989">            double deg = Math.toDegrees(MathUtil.atan2(dx, -dy));</span>
+<span class="fc bfc" id="L990" title="All 2 branches covered.">            if (deg &lt; 0) {</span>
+<span class="fc" id="L991">                deg += 360;</span>
+            }
+<span class="fc bfc" id="L993" title="All 2 branches covered.">            if (minutesShown) {</span>
+                // Round the face: past the last stop is the hour again, where
+                // a time that is set stays at the last stop of its hour.
+<span class="fc" id="L996">                int m = (int) Math.round(deg / 6) % 60;</span>
+<span class="fc" id="L997">                m = (m + minuteStep / 2) / minuteStep * minuteStep % 60;</span>
+<span class="fc bfc" id="L998" title="All 2 branches covered.">                if (m != minute) {</span>
+<span class="fc" id="L999">                    minute = m;</span>
+<span class="fc" id="L1000">                    refresh();</span>
+<span class="fc" id="L1001">                    changed();</span>
+                }
+<span class="fc" id="L1003">                return;</span>
+            }
+<span class="fc" id="L1005">            int i = (int) Math.round(deg / 30) % 12;</span>
+            int h;
+<span class="fc bfc" id="L1007" title="All 2 branches covered.">            if (meridiem) {</span>
+<span class="fc bfc" id="L1008" title="All 2 branches covered.">                h = i + (hour &gt;= 12 ? 12 : 0);</span>
+            } else {
+<span class="fc" id="L1010">                int k = knob(r);</span>
+<span class="fc" id="L1011">                int outer = r - k - Math.max(1, r / 28);</span>
+<span class="fc" id="L1012">                int inner = innerRing(outer, k);</span>
+<span class="fc bfc" id="L1013" title="All 2 branches covered.">                boolean inside = dx * dx + dy * dy &lt; (outer + inner) * (outer + inner) / 4;</span>
+<span class="pc bpc" id="L1014" title="1 of 6 branches missed.">                h = inside ? (i == 0 ? 0 : i + 12) : (i == 0 ? 12 : i);</span>
+            }
+<span class="fc" id="L1016">            pointedHour = isEnabledHour(h);</span>
+<span class="fc bfc" id="L1017" title="All 4 branches covered.">            if (h != hour &amp;&amp; pointedHour) {</span>
+<span class="fc" id="L1018">                hour = h;</span>
+<span class="fc" id="L1019">                refresh();</span>
+<span class="fc" id="L1020">                changed();</span>
+            }
+<span class="fc" id="L1022">        }</span>
+
+        @Override
+        public void pointerPressed(int x, int y) {
+<span class="fc" id="L1026">            held = true;</span>
+<span class="fc" id="L1027">            overIndex = -1;</span>
+<span class="fc" id="L1028">            point(x, y);</span>
+<span class="fc" id="L1029">        }</span>
+
+        @Override
+        public void pointerDragged(int x, int y) {
+<span class="nc" id="L1033">            point(x, y);</span>
+<span class="nc" id="L1034">        }</span>
+
+        @Override
+        public void pointerReleased(int x, int y) {
+<span class="fc" id="L1038">            pointedHour = false;</span>
+<span class="fc" id="L1039">            point(x, y);</span>
+            // The hand is where the finger left it before anything turns it.
+<span class="fc" id="L1041">            sync();</span>
+<span class="fc" id="L1042">            held = false;</span>
+<span class="fc bfc" id="L1043" title="All 4 branches covered.">            if (!minutesShown &amp;&amp; pointedHour) {</span>
+                // The hour is chosen; the minute is what is asked next. An
+                // hour that cannot be chosen leaves the question open.
+<span class="fc" id="L1046">                showMinutes(true);</span>
+            }
+<span class="fc" id="L1048">        }</span>
+    }
+
+    /// The point of the face an hour of the day or a minute is at, for a
+    /// test to tap.
+    int[] pointOf(int value, boolean ofMinutes) {
+<span class="fc" id="L1054">        int r = dial.radius();</span>
+<span class="fc" id="L1055">        int k = dial.knob(r);</span>
+<span class="fc" id="L1056">        int outer = r - k - Math.max(1, r / 28);</span>
+<span class="fc" id="L1057">        int inner = dial.innerRing(outer, k);</span>
+<span class="fc" id="L1058">        int ring = outer;</span>
+        double a;
+<span class="fc bfc" id="L1060" title="All 2 branches covered.">        if (ofMinutes) {</span>
+<span class="fc" id="L1061">            a = Math.toRadians(value * 6);</span>
+        } else {
+<span class="fc" id="L1063">            a = Math.toRadians(value * 30 % 360);</span>
+<span class="fc bfc" id="L1064" title="All 6 branches covered.">            if (!meridiem &amp;&amp; (value == 0 || value &gt; 12)) {</span>
+<span class="fc" id="L1065">                ring = inner;</span>
+            }
+        }
+<span class="fc" id="L1068">        return new int[]{</span>
+<span class="fc" id="L1069">            dial.getAbsoluteX() + dial.getWidth() / 2 + (int) Math.round(Math.sin(a) * ring),</span>
+<span class="fc" id="L1070">            dial.getAbsoluteY() + dial.getHeight() / 2 - (int) Math.round(Math.cos(a) * ring)</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
