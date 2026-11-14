@@ -72,6 +72,38 @@ public final class PyFunction extends PyObject {
         Object run(Object a, Object b, Object c, Object d, Object e, Object f);
     }
 
+    public interface Body7 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g);
+    }
+
+    public interface Body8 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h);
+    }
+
+    public interface Body9 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i);
+    }
+
+    public interface Body10 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j);
+    }
+
+    public interface Body11 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k);
+    }
+
+    public interface Body12 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l);
+    }
+
+    public interface Body13 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m);
+    }
+
+    public interface Body14 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n);
+    }
+
     /// A function whose body is one float expression of its parameters
     /// also has its value as a raw double: the arithmetic alone, for the
     /// parameter types the expression implies. It answers NaN for "not
@@ -120,12 +152,20 @@ public final class PyFunction extends PyObject {
     final Object[] kwDefaults;
     final Body body;
     private Body0 body0;
-    private Body1 body1;
-    private Body2 body2;
+    Body1 body1;
+    Body2 body2;
     private Body3 body3;
     private Body4 body4;
     private Body5 body5;
     private Body6 body6;
+    private Body7 body7;
+    private Body8 body8;
+    private Body9 body9;
+    private Body10 body10;
+    private Body11 body11;
+    private Body12 body12;
+    private Body13 body13;
+    private Body14 body14;
     private PureD1 pure1;
     private PureD2 pure2;
     private PureD3 pure3;
@@ -201,6 +241,62 @@ public final class PyFunction extends PyObject {
         body6 = b;
     }
 
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body7 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6]));
+        body7 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body8 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]));
+        body8 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body9 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]));
+        body9 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body10 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9]));
+        body10 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body11 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10]));
+        body11 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body12 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11]));
+        body12 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body13 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12]));
+        body13 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body14 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12], a[13]));
+        body14 = b;
+    }
+
     @Override
     public Object call0() {
         if (body0 != null) {
@@ -214,7 +310,8 @@ public final class PyFunction extends PyObject {
         if (body1 != null) {
             return body1.run(a);
         }
-        return widen(1) ? fill(1, a, null, null, null, null) : call(new Object[] {a}, Py.NO_KW);
+        return widen(1) ? fill(1, a, null, null, null, null)
+                : starOnly(1) ? star(1, a, null, null, null, null) : call(new Object[] {a}, Py.NO_KW);
     }
 
     @Override
@@ -222,7 +319,8 @@ public final class PyFunction extends PyObject {
         if (body2 != null) {
             return body2.run(a, b);
         }
-        return widen(2) ? fill(2, a, b, null, null, null) : call(new Object[] {a, b}, Py.NO_KW);
+        return widen(2) ? fill(2, a, b, null, null, null)
+                : starOnly(2) ? star(2, a, b, null, null, null) : call(new Object[] {a, b}, Py.NO_KW);
     }
 
     @Override
@@ -230,7 +328,8 @@ public final class PyFunction extends PyObject {
         if (body3 != null) {
             return body3.run(a, b, c);
         }
-        return widen(3) ? fill(3, a, b, c, null, null) : call(new Object[] {a, b, c}, Py.NO_KW);
+        return widen(3) ? fill(3, a, b, c, null, null)
+                : starOnly(3) ? star(3, a, b, c, null, null) : call(new Object[] {a, b, c}, Py.NO_KW);
     }
 
     @Override
@@ -238,7 +337,8 @@ public final class PyFunction extends PyObject {
         if (body4 != null) {
             return body4.run(a, b, c, d);
         }
-        return widen(4) ? fill(4, a, b, c, d, null) : call(new Object[] {a, b, c, d}, Py.NO_KW);
+        return widen(4) ? fill(4, a, b, c, d, null)
+                : starOnly(4) ? star(4, a, b, c, d, null) : call(new Object[] {a, b, c, d}, Py.NO_KW);
     }
 
     @Override
@@ -246,12 +346,90 @@ public final class PyFunction extends PyObject {
         if (body5 != null) {
             return body5.run(a, b, c, d, e);
         }
-        return widen(5) ? fill(5, a, b, c, d, e) : call(new Object[] {a, b, c, d, e}, Py.NO_KW);
+        return widen(5) ? fill(5, a, b, c, d, e)
+                : starOnly(5) ? star(5, a, b, c, d, e) : call(new Object[] {a, b, c, d, e}, Py.NO_KW);
     }
 
     @Override
     public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
         return body6 != null ? body6.run(a, b, c, d, e, f) : call(new Object[] {a, b, c, d, e, f}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call7(Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        return body7 != null ? body7.run(a, b, c, d, e, f, g) : call(new Object[] {a, b, c, d, e, f, g}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call8(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        return body8 != null ? body8.run(a, b, c, d, e, f, g, h) : call(new Object[] {a, b, c, d, e, f, g, h}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call9(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        return body9 != null ? body9.run(a, b, c, d, e, f, g, h, i) : call(new Object[] {a, b, c, d, e, f, g, h, i}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call10(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        return body10 != null ? body10.run(a, b, c, d, e, f, g, h, i, j) : call(new Object[] {a, b, c, d, e, f, g, h, i, j}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call11(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        return body11 != null ? body11.run(a, b, c, d, e, f, g, h, i, j, k) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call12(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        return body12 != null ? body12.run(a, b, c, d, e, f, g, h, i, j, k, l) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call13(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        return body13 != null ? body13.run(a, b, c, d, e, f, g, h, i, j, k, l, m) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call14(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n) {
+        return body14 != null ? body14.run(a, b, c, d, e, f, g, h, i, j, k, l, m, n) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}, Py.NO_KW);
+    }
+
+    /// Whether a positional call with `n` arguments binds as `f(*args)` does:
+    /// plain leading parameters and one `*args`, nothing keyword-only.
+    private boolean starOnly(int n) {
+        return varArgs && kwOnly == 0 && n >= positional;
+    }
+
+    /// [#call] of `f(*args)` or `f(*args, **kwargs)` from a fixed-arity call
+    /// with no keywords: the leading arguments go to their slots and the rest
+    /// straight into the tuple, with no argument array built first and copied
+    /// out of. `**kwargs` gets an empty dict, the shared one when the function
+    /// never keeps it ([#kwShared]) -- a logger's `debug(msg, *args, **kwargs)`
+    /// is this shape and is called once per token by a parser that logs.
+    private Object star(int n, Object a, Object b, Object c, Object d, Object e) {
+        Object[] slots = spareSlots;
+        spareSlots = null;
+        if (slots == null) {
+            slots = new Object[positional + (varKw ? 2 : 1)];
+        }
+        if (varKw) {
+            slots[positional + 1] = kwShared ? NO_KWARGS : new PyDict();
+        }
+        int rest = n - positional;
+        Object[] items = rest == 0 ? null : new Object[rest];
+        for (int i = 0; i < n; i++) {
+            Object v = i == 0 ? a : i == 1 ? b : i == 2 ? c : i == 3 ? d : e;
+            if (i < positional) {
+                slots[i] = v;
+            } else {
+                items[i - positional] = v;
+            }
+        }
+        slots[positional] = items == null ? PyTuple.EMPTY : new PyTuple(items);
+        Object r = body.run(slots);
+        spareSlots = clear(slots);
+        return r;
     }
 
     /// Whether a positional call with `n` arguments can go straight to the
@@ -409,6 +587,23 @@ public final class PyFunction extends PyObject {
         return fn;
     }
 
+    /// The annotations as the program [Annotations#build] runs, and the
+    /// module whose names it reads: what most functions have in place of a
+    /// thunk.
+    private String annotationTable;
+    private PyModule annotationModule;
+
+    /// As [#meta(Object, Object, Body0)], the annotations a table.
+    public static Object meta(Object fn, Object doc, PyModule module, String annotations) {
+        if (fn instanceof PyFunction) {
+            PyFunction f = (PyFunction) fn;
+            f.doc = doc;
+            f.annotationTable = annotations;
+            f.annotationModule = module;
+        }
+        return fn;
+    }
+
     /// One annotation's value: `value`'s result, or `fallback` when
     /// evaluating it raises (an annotation the runtime cannot express, such
     /// as a generic alias it does not model, never fails the definition).
@@ -422,6 +617,18 @@ public final class PyFunction extends PyObject {
 
     int kindFlags;
 
+    /// `__module__`: the module the `def` ran in, null for a function made
+    /// by the runtime itself.
+    private Object module;
+
+    /// Sets `__module__`, which pickle-free code still reads: `repr` of a
+    /// class built by a decorator, `functools.wraps`, registries keyed by
+    /// `f"{f.__module__}.{f.__qualname__}"`. Not `mod`: that is `%`.
+    public PyFunction inModule(Object m) {
+        module = m;
+        return this;
+    }
+
     /// Sets `__qualname__` where it is not just the name.
     public PyFunction qual(String q) {
         qualname = q;
@@ -432,6 +639,16 @@ public final class PyFunction extends PyObject {
     /// `co_flags` bit CPython gives it (0x20, 0x80, 0x200).
     public PyFunction kind(int flags) {
         kindFlags = flags;
+        return this;
+    }
+
+    /// How many leading parameters are positional-only (before a `/`).
+    int positionalOnly;
+
+    /// Marks the first `n` parameters positional-only: a keyword argument
+    /// with one of their names is refused, or goes to `**kwargs`.
+    public PyFunction positionalOnly(int n) {
+        positionalOnly = n;
         return this;
     }
 
@@ -455,7 +672,7 @@ public final class PyFunction extends PyObject {
             case "__doc__":
                 return doc != null ? doc : Py.NONE;
             case "__module__":
-                return Py.NONE;
+                return module != null ? module : Py.NONE;
             case "__dict__":
                 if (attrs == null) {
                     attrs = new PyDict();
@@ -477,8 +694,9 @@ public final class PyFunction extends PyObject {
             }
             case "__annotations__":
                 PyDict d = new PyDict();
-                if (annotationThunk != null) {
-                    Object made = annotationThunk.run();
+                if (annotationThunk != null || annotationTable != null) {
+                    Object made = annotationTable != null
+                            ? Annotations.build(annotationModule, annotationTable) : annotationThunk.run();
                     Object[] kv = made instanceof Object[] ? (Object[]) made : Py.NO_ARGS;
                     for (int i = 0; i < kv.length; i += 2) {
                         d.setItem(kv[i], kv[i + 1]);
@@ -499,10 +717,45 @@ public final class PyFunction extends PyObject {
         attrs.setItem(attr, value);
     }
 
+    /// `del f.name` of an attribute set on the function, as click does with
+    /// the `__click_params__` its decorators collect.
+    @Override
+    public void delAttr(String attr) {
+        if (attrs == null || !attrs.contains(attr)) {
+            throw Py.attributeError("'function' object has no attribute '" + attr + "'");
+        }
+        attrs.delItem(attr);
+    }
+
     @Override
     public Object call(Object[] args, String[] kwNames) {
         if (kwNames.length == 0 && !varArgs && kwOnly == 0 && !varKw && args.length == positional) {
             return body.run(args);
+        }
+        if (varArgs && kwNames.length == 0 && kwOnly == 0 && args.length >= positional) {
+            // f(*args) (or f(*args, **kwargs)) called positionally: the slots
+            // are the leading arguments, one tuple of the rest and an empty
+            // dict, with none of bindArgs' keyword matching.
+            Object[] slots = spareSlots;
+            spareSlots = null;
+            if (slots == null) {
+                slots = new Object[positional + (varKw ? 2 : 1)];
+            }
+            if (varKw) {
+                slots[positional + 1] = kwShared ? NO_KWARGS : new PyDict();
+            }
+            System.arraycopy(args, 0, slots, 0, positional);
+            int rest = args.length - positional;
+            if (rest == 0) {
+                slots[positional] = PyTuple.EMPTY;
+            } else {
+                Object[] items = new Object[rest];
+                System.arraycopy(args, positional, items, 0, rest);
+                slots[positional] = new PyTuple(items);
+            }
+            Object r = body.run(slots);
+            spareSlots = clear(slots);
+            return r;
         }
         if (positional <= 6 && !varArgs && kwOnly == 0 && !varKw && args.length <= positional) {
             Object r = bindDirect(args, kwNames);
@@ -510,33 +763,656 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return body.run(bindArgs(args, kwNames));
+        // One slot array per function, reused: every generated body copies
+        // its slots into locals on entry (a generator into its fields when
+        // it is made), so the array is free once run returns. A nested call
+        // finds the spare taken and allocates its own; a throw just leaves
+        // it taken. Python code here runs on one thread at a time.
+        Object[] slots = spareSlots;
+        spareSlots = null;
+        if (slots == null) {
+            slots = new Object[positional + (varArgs ? 1 : 0) + kwOnly + (varKw ? 1 : 0)];
+        }
+        Object r = body.run(bindArgs(slots, args, kwNames));
+        spareSlots = clear(slots);
+        return r;
     }
 
-    /// A call to a function of at most six plain parameters, keywords
+    /// True when a call of `n` arguments can bind in locals.
+    private boolean direct(int n) {
+        return positional <= 14 && !varArgs && kwOnly == 0 && !varKw && n <= positional;
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a) {
+        if (direct(1)) {
+            Object r = bindDirect(1, kwNames, a, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(1)) {
+            Object r = bindPlanned(1, kwNames, a, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b) {
+        if (direct(2)) {
+            Object r = bindDirect(2, kwNames, a, b, null, null, null, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(2)) {
+            Object r = bindPlanned(2, kwNames, a, b, null, null, null, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c) {
+        if (direct(3)) {
+            Object r = bindDirect(3, kwNames, a, b, c, null, null, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(3)) {
+            Object r = bindPlanned(3, kwNames, a, b, c, null, null, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d) {
+        if (direct(4)) {
+            Object r = bindDirect(4, kwNames, a, b, c, d, null, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(4)) {
+            Object r = bindPlanned(4, kwNames, a, b, c, d, null, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
+        if (direct(5)) {
+            Object r = bindDirect(5, kwNames, a, b, c, d, e, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(5)) {
+            Object r = bindPlanned(5, kwNames, a, b, c, d, e, null, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
+        if (direct(6)) {
+            Object r = bindDirect(6, kwNames, a, b, c, d, e, f, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(6)) {
+            Object r = bindPlanned(6, kwNames, a, b, c, d, e, f, null, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e, f}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        if (direct(7)) {
+            Object r = bindDirect(7, kwNames, a, b, c, d, e, f, g, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(7)) {
+            Object r = bindPlanned(7, kwNames, a, b, c, d, e, f, g, null, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e, f, g}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        if (direct(8)) {
+            Object r = bindDirect(8, kwNames, a, b, c, d, e, f, g, h, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(8)) {
+            Object r = bindPlanned(8, kwNames, a, b, c, d, e, f, g, h, null, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e, f, g, h}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        if (direct(9)) {
+            Object r = bindDirect(9, kwNames, a, b, c, d, e, f, g, h, i, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(9)) {
+            Object r = bindPlanned(9, kwNames, a, b, c, d, e, f, g, h, i, null, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e, f, g, h, i}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        if (direct(10)) {
+            Object r = bindDirect(10, kwNames, a, b, c, d, e, f, g, h, i, j, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(10)) {
+            Object r = bindPlanned(10, kwNames, a, b, c, d, e, f, g, h, i, j, null, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        if (direct(11)) {
+            Object r = bindDirect(11, kwNames, a, b, c, d, e, f, g, h, i, j, k, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(11)) {
+            Object r = bindPlanned(11, kwNames, a, b, c, d, e, f, g, h, i, j, k, null, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        if (direct(12)) {
+            Object r = bindDirect(12, kwNames, a, b, c, d, e, f, g, h, i, j, k, l, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(12)) {
+            Object r = bindPlanned(12, kwNames, a, b, c, d, e, f, g, h, i, j, k, l, null, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        if (direct(13)) {
+            Object r = bindDirect(13, kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(13)) {
+            Object r = bindPlanned(13, kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m, null);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}, kwNames);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n) {
+        if (direct(14)) {
+            Object r = bindDirect(14, kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m, n);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        if (planned(14)) {
+            Object r = bindPlanned(14, kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m, n);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
+        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}, kwNames);
+    }
+
+    /// True when a keyword call of `n` arguments can go through
+    /// [#bindPlanned]: no `*args` or `**kwargs` to collect into.
+    private boolean planned(int n) {
+        return !varArgs && (varKw || n <= positional + kwOnly);
+    }
+
+    /// The slot of each name of the last keyword-name array [#bindPlanned]
+    /// matched, keyword-only parameters included.
+    private String[] plannedKw;
+    private int[] plannedSlots;
+
+    /// A keyword call of a function [#direct] cannot take -- more than six
+    /// parameters, or keyword-only ones: the `n` arguments go straight into
+    /// the reused slot array, defaults fill the rest, and the array body
+    /// runs. [#UNBOUND] before running anything when the call is not that
+    /// simple (an unknown, repeated or positional-only keyword, a missing
+    /// argument, a positional-only parameter named), and [#call] then binds
+    /// and reports it exactly as before.
+    private Object bindPlanned(int n, String[] kwNames, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7, Object p8, Object p9, Object p10, Object p11, Object p12, Object p13) {
+        int nPos = n - kwNames.length;
+        if (nPos > positional) {
+            return UNBOUND;
+        }
+        int[] kwSlots;
+        if (kwNames == plannedKw) { //NOPMD CompareObjectsWithEquals - identity is meant
+            kwSlots = plannedSlots;
+        } else {
+            kwSlots = new int[kwNames.length];
+            for (int i = 0; i < kwSlots.length; i++) {
+                int slot = slotOf(kwNames[i]);
+                if (slot < 0) {
+                    for (int p = 0; p < kwOnly; p++) {
+                        if (params[positional + p].equals(kwNames[i])) {
+                            slot = positional + p;
+                            break;
+                        }
+                    }
+                }
+                kwSlots[i] = slot;
+            }
+            plannedKw = kwNames;
+            plannedSlots = kwSlots;
+        }
+        int total = positional + kwOnly;
+        Object[] slots = spareSlots;
+        spareSlots = null;
+        if (slots == null) {
+            slots = new Object[varKw ? total + 1 : total];
+        }
+        // `**kwargs` (markitdown's `convert_a(self, el, text, **kwargs)`,
+        // called per link): a keyword no parameter takes goes into the dict
+        // in the slot after the keyword-only ones, where bindArgs puts it.
+        PyDict extra = null;
+        for (int i = 0; i < n; i++) {
+            int slot = i < nPos ? i : kwSlots[i - nPos];
+            if (slot < 0 && varKw && i >= nPos) {
+                if (extra == null) {
+                    extra = new PyDict();
+                }
+                String k = kwNames[i - nPos];
+                if (extra.getOrNull(k) != null) {
+                    spareSlots = clear(slots);
+                    return UNBOUND;
+                }
+                extra.setItem(k, arg(i, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13));
+                continue;
+            }
+            if (slot < 0 || slots[slot] != null) {
+                spareSlots = clear(slots);
+                return UNBOUND;
+            }
+            Object v;
+            switch (i) {
+                case 0:
+                    v = p0;
+                    break;
+                case 1:
+                    v = p1;
+                    break;
+                case 2:
+                    v = p2;
+                    break;
+                case 3:
+                    v = p3;
+                    break;
+                case 4:
+                    v = p4;
+                    break;
+                case 5:
+                    v = p5;
+                    break;
+                case 6:
+                    v = p6;
+                    break;
+                case 7:
+                    v = p7;
+                    break;
+                case 8:
+                    v = p8;
+                    break;
+                case 9:
+                    v = p9;
+                    break;
+                case 10:
+                    v = p10;
+                    break;
+                case 11:
+                    v = p11;
+                    break;
+                case 12:
+                    v = p12;
+                    break;
+                default:
+                    v = p13;
+                    break;
+            }
+            slots[slot] = v;
+        }
+        int first = positional - defaults.length;
+        for (int p = 0; p < total; p++) {
+            if (slots[p] == null) {
+                Object v = p < positional ? dflt(p, first) : kwDefaults == null ? null : kwDefaults[p - positional];
+                if (v == null) {
+                    spareSlots = clear(slots);
+                    return UNBOUND;
+                }
+                slots[p] = v;
+            }
+        }
+        if (varKw) {
+            slots[total] = extra != null ? extra : kwShared ? NO_KWARGS : new PyDict();
+        }
+        Object r = body.run(slots);
+        spareSlots = clear(slots);
+        return r;
+    }
+
+    /// Argument `i` of `p0`..`p13`.
+    private static Object arg(int i, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7, Object p8, Object p9, Object p10, Object p11, Object p12, Object p13) {
+        switch (i) {
+            case 0:
+                return p0;
+            case 1:
+                return p1;
+            case 2:
+                return p2;
+            case 3:
+                return p3;
+            case 4:
+                return p4;
+            case 5:
+                return p5;
+            case 6:
+                return p6;
+            case 7:
+                return p7;
+            case 8:
+                return p8;
+            case 9:
+                return p9;
+            case 10:
+                return p10;
+            case 11:
+                return p11;
+            case 12:
+                return p12;
+            default:
+                return p13;
+        }
+    }
+
+    private Object[] spareSlots;
+
+    /// Set when the body only ever passes its `**kwargs` on with `**` (a
+    /// logger's `debug(msg, *args, **kwargs)`): a call without keywords then
+    /// gets [#NO_KWARGS] rather than a new dict nobody can see, write or keep.
+    /// The transpiler proves this; see `Emitter.kwForwardOnly`.
+    private boolean kwShared;
+
+    /// The empty `**kwargs` of a [#kwShared] function. Spreading it adds
+    /// nothing, and a callee that collects keywords builds its own dict.
+    static final PyDict NO_KWARGS = new PyDict();
+
+    /// Marks the function [#kwShared].
+    public PyFunction kwShared() {
+        kwShared = true;
+        return this;
+    }
+
+    /// The slot of each name of the last two keyword-name arrays
+    /// [#bindDirect] matched. Every call site hoists its array into a static,
+    /// so the same array arrives again and again: one identity check instead
+    /// of a string comparison per keyword and parameter.
+    private String[] directKw0;
+    private int[] directSlots0;
+    private String[] directKw1;
+    private int[] directSlots1;
+
+    private int[] directSlots(String[] kwNames) {
+        if (kwNames == directKw0) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return directSlots0;
+        }
+        if (kwNames == directKw1) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return directSlots1;
+        }
+        int[] r = new int[kwNames.length];
+        for (int i = 0; i < r.length; i++) {
+            r[i] = slotOf(kwNames[i]);
+        }
+        directKw1 = directKw0;
+        directSlots1 = directSlots0;
+        directKw0 = kwNames;
+        directSlots0 = r;
+        return r;
+    }
+
+    /// The keyword-name arrays of the last few call sites that bound through
+    /// [#bindArgs], and the slot each of their names goes to (-1 for a name
+    /// that is no parameter).
+    private static final int SEEN = 4;
+    private String[][] seenKw;
+    private int[][] seenSlots;
+    private int seenNext;
+    private String[] pendingKw;
+
+    private static Object[] clear(Object[] a) {
+        for (int i = 0; i < a.length; i++) {
+            a[i] = null;
+        }
+        return a;
+    }
+
+    /// A call to a function of at most 14 plain parameters, keywords
     /// included (`f(x, key=y)`, `f(**kw)`): the arguments are matched to
     /// parameters in locals and the fixed-arity body runs, so no second
-    /// array is bound. Null when the call is not that simple -- an unknown
-    /// or repeated keyword, a missing argument, no body of this arity --
-    /// it answers [#UNBOUND] before running anything, and [#bindArgs] then
-    /// reports the call exactly as before.
+    /// array is bound. [#UNBOUND] when the call is not that simple -- an
+    /// unknown or repeated keyword, a missing argument, no body of this
+    /// arity -- before running anything, and [#bindArgs] then reports the
+    /// call exactly as before.
     private Object bindDirect(Object[] args, String[] kwNames) {
-        int nPos = args.length - kwNames.length;
+        int n = args.length;
+        return bindDirect(n, kwNames, n > 0 ? args[0] : null, n > 1 ? args[1] : null, n > 2 ? args[2] : null, n > 3 ? args[3] : null, n > 4 ? args[4] : null, n > 5 ? args[5] : null, n > 6 ? args[6] : null, n > 7 ? args[7] : null, n > 8 ? args[8] : null, n > 9 ? args[9] : null, n > 10 ? args[10] : null, n > 11 ? args[11] : null, n > 12 ? args[12] : null, n > 13 ? args[13] : null);
+    }
+
+    /// [#bindDirect] for a function of at most four parameters called with
+    /// at most four arguments -- `self.match(i, _known_rules=True)` in bs4's
+    /// filter loop: four locals and one placement per argument instead of
+    /// the fourteen-way form. Answers exactly what the general form does.
+    private Object bindSmall(int n, String[] kwNames, Object p0, Object p1, Object p2, Object p3) {
+        int nPos = n - kwNames.length;
+        int[] kwSlots = kwNames.length == 0 ? null : directSlots(kwNames);
+        Object x0 = null;
+        Object x1 = null;
+        Object x2 = null;
+        Object x3 = null;
+        for (int i = 0; i < n; i++) {
+            int slot = i;
+            if (i >= nPos) {
+                slot = kwSlots[i - nPos];
+            }
+            if (slot < 0 || slot >= positional) {
+                // Too many arguments or no such parameter: bindArgs reports it.
+                return UNBOUND;
+            }
+            Object v = i == 0 ? p0 : i == 1 ? p1 : i == 2 ? p2 : p3;
+            if (slot == 0) {
+                if (x0 != null) {
+                    return UNBOUND;
+                }
+                x0 = v;
+            } else if (slot == 1) {
+                if (x1 != null) {
+                    return UNBOUND;
+                }
+                x1 = v;
+            } else if (slot == 2) {
+                if (x2 != null) {
+                    return UNBOUND;
+                }
+                x2 = v;
+            } else {
+                if (x3 != null) {
+                    return UNBOUND;
+                }
+                x3 = v;
+            }
+        }
+        int first = positional - defaults.length;
+        if (positional >= 1 && x0 == null) {
+            x0 = dflt(0, first);
+        }
+        if (positional >= 2 && x1 == null) {
+            x1 = dflt(1, first);
+        }
+        if (positional >= 3 && x2 == null) {
+            x2 = dflt(2, first);
+        }
+        if (positional >= 4 && x3 == null) {
+            x3 = dflt(3, first);
+        }
+        if (positional > 0 && x0 == null || positional > 1 && x1 == null || positional > 2 && x2 == null
+                || positional > 3 && x3 == null) {
+            return UNBOUND;
+        }
+        switch (positional) {
+            case 0:
+                return body0 != null ? body0.run() : UNBOUND;
+            case 1:
+                return body1 != null ? body1.run(x0) : UNBOUND;
+            case 2:
+                return body2 != null ? body2.run(x0, x1) : UNBOUND;
+            case 3:
+                return body3 != null ? body3.run(x0, x1, x2) : UNBOUND;
+            default:
+                return body4 != null ? body4.run(x0, x1, x2, x3) : UNBOUND;
+        }
+    }
+
+    /// [#bindDirect] over the `n` arguments `p0`..`p13` themselves.
+    private Object bindDirect(int n, String[] kwNames, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7, Object p8, Object p9, Object p10, Object p11, Object p12, Object p13) {
+        if (positional <= 4 && n <= 4) {
+            return bindSmall(n, kwNames, p0, p1, p2, p3);
+        }
+        int nPos = n - kwNames.length;
+        int[] kwSlots = kwNames.length == 0 ? null : directSlots(kwNames);
         Object x0 = null;
         Object x1 = null;
         Object x2 = null;
         Object x3 = null;
         Object x4 = null;
         Object x5 = null;
-        for (int i = 0; i < args.length; i++) {
+        Object x6 = null;
+        Object x7 = null;
+        Object x8 = null;
+        Object x9 = null;
+        Object x10 = null;
+        Object x11 = null;
+        Object x12 = null;
+        Object x13 = null;
+        for (int i = 0; i < n; i++) {
             int slot = i;
             if (i >= nPos) {
-                slot = slotOf(kwNames[i - nPos]);
+                slot = kwSlots[i - nPos];
                 if (slot < 0) {
                     return UNBOUND;
                 }
             }
-            Object v = args[i];
+            Object v;
+            switch (i) {
+                case 0:
+                    v = p0;
+                    break;
+                case 1:
+                    v = p1;
+                    break;
+                case 2:
+                    v = p2;
+                    break;
+                case 3:
+                    v = p3;
+                    break;
+                case 4:
+                    v = p4;
+                    break;
+                case 5:
+                    v = p5;
+                    break;
+                case 6:
+                    v = p6;
+                    break;
+                case 7:
+                    v = p7;
+                    break;
+                case 8:
+                    v = p8;
+                    break;
+                case 9:
+                    v = p9;
+                    break;
+                case 10:
+                    v = p10;
+                    break;
+                case 11:
+                    v = p11;
+                    break;
+                case 12:
+                    v = p12;
+                    break;
+                default:
+                    v = p13;
+                    break;
+            }
             switch (slot) {
                 case 0:
                     if (x0 != null) {
@@ -568,11 +1444,59 @@ public final class PyFunction extends PyObject {
                     }
                     x4 = v;
                     break;
-                default:
+                case 5:
                     if (x5 != null) {
                         return UNBOUND;
                     }
                     x5 = v;
+                    break;
+                case 6:
+                    if (x6 != null) {
+                        return UNBOUND;
+                    }
+                    x6 = v;
+                    break;
+                case 7:
+                    if (x7 != null) {
+                        return UNBOUND;
+                    }
+                    x7 = v;
+                    break;
+                case 8:
+                    if (x8 != null) {
+                        return UNBOUND;
+                    }
+                    x8 = v;
+                    break;
+                case 9:
+                    if (x9 != null) {
+                        return UNBOUND;
+                    }
+                    x9 = v;
+                    break;
+                case 10:
+                    if (x10 != null) {
+                        return UNBOUND;
+                    }
+                    x10 = v;
+                    break;
+                case 11:
+                    if (x11 != null) {
+                        return UNBOUND;
+                    }
+                    x11 = v;
+                    break;
+                case 12:
+                    if (x12 != null) {
+                        return UNBOUND;
+                    }
+                    x12 = v;
+                    break;
+                default:
+                    if (x13 != null) {
+                        return UNBOUND;
+                    }
+                    x13 = v;
                     break;
             }
         }
@@ -583,8 +1507,19 @@ public final class PyFunction extends PyObject {
         x3 = x3 != null || positional < 4 ? x3 : dflt(3, first);
         x4 = x4 != null || positional < 5 ? x4 : dflt(4, first);
         x5 = x5 != null || positional < 6 ? x5 : dflt(5, first);
-        if (positional > 0 && x0 == null || positional > 1 && x1 == null || positional > 2 && x2 == null
-                || positional > 3 && x3 == null || positional > 4 && x4 == null || positional > 5 && x5 == null) {
+        x6 = x6 != null || positional < 7 ? x6 : dflt(6, first);
+        x7 = x7 != null || positional < 8 ? x7 : dflt(7, first);
+        x8 = x8 != null || positional < 9 ? x8 : dflt(8, first);
+        x9 = x9 != null || positional < 10 ? x9 : dflt(9, first);
+        x10 = x10 != null || positional < 11 ? x10 : dflt(10, first);
+        x11 = x11 != null || positional < 12 ? x11 : dflt(11, first);
+        x12 = x12 != null || positional < 13 ? x12 : dflt(12, first);
+        x13 = x13 != null || positional < 14 ? x13 : dflt(13, first);
+        if (positional > 0 && x0 == null || positional > 1 && x1 == null || positional > 2 && x2 == null ||
+                positional > 3 && x3 == null || positional > 4 && x4 == null || positional > 5 && x5 == null ||
+                positional > 6 && x6 == null || positional > 7 && x7 == null || positional > 8 && x8 == null ||
+                positional > 9 && x9 == null || positional > 10 && x10 == null ||
+                positional > 11 && x11 == null || positional > 12 && x12 == null || positional > 13 && x13 == null) {
             return UNBOUND;
         }
         switch (positional) {
@@ -600,8 +1535,24 @@ public final class PyFunction extends PyObject {
                 return body4 != null ? body4.run(x0, x1, x2, x3) : UNBOUND;
             case 5:
                 return body5 != null ? body5.run(x0, x1, x2, x3, x4) : UNBOUND;
-            default:
+            case 6:
                 return body6 != null ? body6.run(x0, x1, x2, x3, x4, x5) : UNBOUND;
+            case 7:
+                return body7 != null ? body7.run(x0, x1, x2, x3, x4, x5, x6) : UNBOUND;
+            case 8:
+                return body8 != null ? body8.run(x0, x1, x2, x3, x4, x5, x6, x7) : UNBOUND;
+            case 9:
+                return body9 != null ? body9.run(x0, x1, x2, x3, x4, x5, x6, x7, x8) : UNBOUND;
+            case 10:
+                return body10 != null ? body10.run(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9) : UNBOUND;
+            case 11:
+                return body11 != null ? body11.run(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10) : UNBOUND;
+            case 12:
+                return body12 != null ? body12.run(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11) : UNBOUND;
+            case 13:
+                return body13 != null ? body13.run(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) : UNBOUND;
+            default:
+                return body14 != null ? body14.run(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13) : UNBOUND;
         }
     }
 
@@ -610,14 +1561,24 @@ public final class PyFunction extends PyObject {
         return i >= first ? defaults[i - first] : null;
     }
 
-    /// The positional parameter named `k`, or -1.
+    /// The positional parameter named `k`, or -1. A positional-only one
+    /// cannot be named, so [#bindArgs] reports or collects that keyword.
     private int slotOf(String k) {
-        for (int p = 0; p < positional; p++) {
+        for (int p = positionalOnly; p < positional; p++) {
             if (params[p].equals(k)) {
                 return p;
             }
         }
         return -1;
+    }
+
+    private boolean isPositionalOnly(String k) {
+        for (int p = 0; p < positionalOnly; p++) {
+            if (params[p].equals(k)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<String> add(List<String> l, String n) {
@@ -640,8 +1601,13 @@ public final class PyFunction extends PyObject {
     }
 
     Object[] bindArgs(Object[] args, String[] kwNames) {
+        return bindArgs(null, args, kwNames);
+    }
+
+    /// Binds into `reuse` when given (all null), or into a new array.
+    private Object[] bindArgs(Object[] reuse, Object[] args, String[] kwNames) {
         int slots = positional + (varArgs ? 1 : 0) + kwOnly + (varKw ? 1 : 0);
-        Object[] out = new Object[slots];
+        Object[] out = reuse != null ? reuse : new Object[slots];
         int nPos = args.length - kwNames.length;
         int copy = Math.min(nPos, positional);
         System.arraycopy(args, 0, out, 0, copy);
@@ -659,28 +1625,62 @@ public final class PyFunction extends PyObject {
         } else if (varArgs) {
             out[positional] = PyTuple.EMPTY;
         }
-        PyDict kw = varKw ? new PyDict() : null;
+        PyDict kw = varKw ? (kwShared && kwNames.length == 0 ? NO_KWARGS : new PyDict()) : null;
         int kwBase = positional + (varArgs ? 1 : 0);
+        List<String> byKeyword = null;
+        // Which slot each keyword names is the same every time one call site
+        // calls: its names are one constant array. Matching them against the
+        // parameters by text again was most of what binding a keyword call cost.
+        int[] known = null;
+        if (kwNames.length > 0 && seenKw != null) {
+            for (int c = 0; c < SEEN; c++) {
+                if (seenKw[c] == kwNames) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    known = seenSlots[c];
+                    break;
+                }
+            }
+        }
+        // Learnt at the second sight of an array: one built for a single call
+        // (`f(**kw)`) never comes back, and must not push out those that do.
+        int[] learnt = null;
+        if (known == null && kwNames.length > 0) {
+            if (pendingKw == kwNames) { //NOPMD CompareObjectsWithEquals - identity is meant
+                learnt = new int[kwNames.length];
+            } else {
+                pendingKw = kwNames;
+            }
+        }
         for (int i = 0; i < kwNames.length; i++) {
             String k = kwNames[i];
             Object v = args[nPos + i];
             int slot = -1;
-            for (int p = 0; p < positional; p++) {
-                if (params[p].equals(k)) {
-                    slot = p;
-                    break;
-                }
-            }
-            if (slot < 0) {
-                for (int p = 0; p < kwOnly; p++) {
-                    if (params[kwBase + p].equals(k)) {
-                        slot = kwBase + p;
+            if (known != null) {
+                slot = known[i];
+            } else {
+                for (int p = positionalOnly; p < positional; p++) {
+                    if (params[p].equals(k)) {
+                        slot = p;
                         break;
                     }
+                }
+                if (slot < 0) {
+                    for (int p = 0; p < kwOnly; p++) {
+                        if (params[kwBase + p].equals(k)) {
+                            slot = kwBase + p;
+                            break;
+                        }
+                    }
+                }
+                if (learnt != null) {
+                    learnt[i] = slot;
                 }
             }
             if (slot < 0) {
                 if (kw == null) {
+                    if (isPositionalOnly(k)) {
+                        byKeyword = add(byKeyword, k);
+                        continue;
+                    }
                     throw Py.typeError(qn() + "() got an unexpected keyword argument '" + k + "'");
                 }
                 kw.setItem(k, v);
@@ -690,6 +1690,23 @@ public final class PyFunction extends PyObject {
                 throw Py.typeError(qn() + "() got multiple values for argument '" + k + "'");
             }
             out[slot] = v;
+        }
+        if (byKeyword != null) {
+            StringBuilder sb = new StringBuilder();
+            for (String n : byKeyword) {
+                sb.append(sb.length() == 0 ? "" : ", ").append(n);
+            }
+            throw Py.typeError(qn() + "() got some positional-only arguments passed as keyword arguments: '"
+                    + sb + "'");
+        }
+        if (learnt != null) {
+            if (seenKw == null) {
+                seenKw = new String[SEEN][];
+                seenSlots = new int[SEEN][];
+            }
+            seenKw[seenNext] = kwNames;
+            seenSlots[seenNext] = learnt;
+            seenNext = (seenNext + 1) % SEEN;
         }
         int firstDefault = positional - defaults.length;
         List<String> missing = null;

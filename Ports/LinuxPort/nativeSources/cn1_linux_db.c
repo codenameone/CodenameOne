@@ -29,6 +29,7 @@
 #include "cn1_db_sqlite_impl.h"
 
 CN1_DB_DEFINE_NATIVES(cn1DbLinuxEngine)
+CN1_DB_DEFINE_FUNCTION_NATIVES(cn1DbLinuxEngine, com_codename1_impl_linux_LinuxDatabase_sqlFunctionCall___long_int_int_long)
 
 /*
  * The entry points, spelled out rather than pasted together.
@@ -156,4 +157,100 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_sqlStmtFinalize___long(CODENAME_O
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_sqlStmtReset___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
     cn1DbLinuxEngine_sqlStmtReset___long(threadStateData, __cn1Arg1);
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_sqlDbCreateFunction___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4) {
+    return cn1DbLinuxEngine_sqlDbCreateFunction___long_byte_1ARRAY_int_int_R_int(threadStateData, __cn1Arg1, __cn1Arg2, __cn1Arg3, __cn1Arg4);
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_sqlValueType___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlValueType___long_int_R_int(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_sqlValueLong___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlValueLong___long_int_R_long(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_DOUBLE com_codename1_impl_linux_LinuxNative_sqlValueDouble___long_int_R_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlValueDouble___long_int_R_double(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_sqlValueText___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlValueText___long_int_R_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_sqlValueBlob___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlValueBlob___long_int_R_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_sqlResultNull___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    cn1DbLinuxEngine_sqlResultNull___long(threadStateData, __cn1Arg1);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_sqlResultLong___long_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_LONG __cn1Arg2) {
+    cn1DbLinuxEngine_sqlResultLong___long_long(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_sqlResultDouble___long_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_DOUBLE __cn1Arg2) {
+    cn1DbLinuxEngine_sqlResultDouble___long_double(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_sqlResultText___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    cn1DbLinuxEngine_sqlResultText___long_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_sqlResultBlob___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    cn1DbLinuxEngine_sqlResultBlob___long_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_sqlResultError___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    cn1DbLinuxEngine_sqlResultError___long_byte_1ARRAY(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_sqlDbChanges___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbLinuxEngine_sqlDbChanges___long_R_long(threadStateData, __cn1Arg1);
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_sqlDbLastInsertRowid___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbLinuxEngine_sqlDbLastInsertRowid___long_R_long(threadStateData, __cn1Arg1);
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_sqlColType___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlColType___long_int_R_int(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_sqlStmtBindString___long_int_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_OBJECT __cn1Arg3) {
+    cn1DbLinuxEngine_sqlStmtBindString___long_int_java_lang_String(threadStateData, __cn1Arg1, __cn1Arg2, __cn1Arg3);
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_sqlColString___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlColString___long_int_R_java_lang_String(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_sqlColNameString___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlColNameString___long_int_R_java_lang_String(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_sqlRowValues___long_java_lang_Object_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlRowValues___long_java_lang_Object_1ARRAY_R_boolean(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_sqlStmtStepStatus___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbLinuxEngine_sqlStmtStepStatus___long_R_int(threadStateData, __cn1Arg1);
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_sqlStmtPrepareStatus___long_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    return cn1DbLinuxEngine_sqlStmtPrepareStatus___long_java_lang_String_R_long(threadStateData, __cn1Arg1, __cn1Arg2);
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_sqlDbErrorText___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbLinuxEngine_sqlDbErrorText___long_R_java_lang_String(threadStateData, __cn1Arg1);
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_sqlStmtRunStatus___long_java_lang_Object_1ARRAY_long_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_OBJECT __cn1Arg3) {
+    return cn1DbLinuxEngine_sqlStmtRunStatus___long_java_lang_Object_1ARRAY_long_1ARRAY_R_int(threadStateData, __cn1Arg1, __cn1Arg2, __cn1Arg3);
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_sqlStmtFinalizeStatus___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    return cn1DbLinuxEngine_sqlStmtFinalizeStatus___long_R_int(threadStateData, __cn1Arg1);
 }

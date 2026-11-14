@@ -121,7 +121,7 @@ final class Formatting {
         if (v instanceof PyInstance) {
             Object m = Py.typeOf(v).lookup("__format__");
             if (m != null) {
-                return Py.strValue(Py.obj(m).call(new Object[] {v, Py.str(spec)}, Py.NO_KW), "__format__");
+                return Py.strValue(Py.obj(m).call2(v, Py.str(spec)), "__format__");
             }
             if (spec.length() == 0) {
                 return Py.toStr(v);
@@ -136,6 +136,19 @@ final class Formatting {
         }
         Spec p = Spec.parse(spec);
         if (Py.isInt(v) && !(v instanceof PyBool && p.type == 0)) {
+            if ((p.type == 0 || p.type == 'd' || p.type == 'x') && v instanceof Long
+                    && ((Long) v).longValue() != Long.MIN_VALUE) {
+                // A machine int: its digits straight from the long, where
+                // formatInt would build a BigInteger for each one.
+                long l = ((Long) v).longValue();
+                boolean neg = l < 0;
+                long a = neg ? -l : l;
+                String digits = p.type == 'x' ? Long.toHexString(a) : Long.toString(a);
+                if (p.grouping != 0) {
+                    digits = group(digits, p.grouping, p.type == 'x' ? 4 : 3);
+                }
+                return pad(signOf(neg, p) + (p.type == 'x' && p.alt ? "0x" : ""), digits, p, '>');
+            }
             if (p.type == 0 || "dboxXcn".indexOf(p.type) >= 0) {
                 return formatInt(Py.intView(v), p);
             }
@@ -487,29 +500,233 @@ final class Formatting {
 
     // ---- printf style ----------------------------------------------------
 
+    /// `"lit %s lit %d" % (a, b)` with a literal format and a literal tuple,
+    /// lowered by the transpiler: `lits` holds the text between the
+    /// conversions (one more than there are values), `convs` one of `s`,
+    /// `d` or `i` per value. The values arrive already evaluated, so the
+    /// order matches CPython, and nothing parses the format at run time.
+    public static String pct(String[] lits, String convs, Object a) {
+        return lits[0] + conv(convs.charAt(0), a) + lits[1];
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b) {
+        return lits[0] + conv(convs.charAt(0), a) + lits[1] + conv(convs.charAt(1), b) + lits[2];
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b, Object c) {
+        return lits[0] + conv(convs.charAt(0), a) + lits[1] + conv(convs.charAt(1), b) + lits[2]
+                + conv(convs.charAt(2), c) + lits[3];
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b, Object c, Object d) {
+        return lits[0] + conv(convs.charAt(0), a) + lits[1] + conv(convs.charAt(1), b) + lits[2]
+                + conv(convs.charAt(2), c) + lits[3] + conv(convs.charAt(3), d) + lits[4];
+    }
+
+    /// One `%s`, `%d` or `%i` conversion of `v`, for the transpiler's
+    /// concatenation of a literal format whose values are mostly typed.
+    public static String conv1(char c, Object v) {
+        return conv(c, v);
+    }
+
+    private static String conv(char c, Object v) {
+        if (c == 's') {
+            return v instanceof String ? (String) v : Py.toStr(v);
+        }
+        if (v instanceof Long) {
+            return Long.toString(((Long) v).longValue());
+        }
+        // Anything else -- a bool, a big int, a float, a subclass -- as the
+        // general path formats it, with its errors.
+        return percent(c == 'd' ? "%d" : "%i", Py.tuple(v));
+    }
+
+    /// Appends `v` right-aligned in `width` columns, padded with zeros after the sign when
+    /// `zero` is set and with spaces before it otherwise, as `%0Nd` and `%Nd` do.
+    private static void padInt(StringBuilder sb, long v, int width, boolean zero) {
+        String digits = v < 0 ? Long.toString(v).substring(1) : Long.toString(v);
+        int len = digits.length() + (v < 0 ? 1 : 0);
+        if (!zero) {
+            for (int k = len; k < width; k++) {
+                sb.append(' ');
+            }
+        }
+        if (v < 0) {
+            sb.append('-');
+        }
+        if (zero) {
+            for (int k = len; k < width; k++) {
+                sb.append('0');
+            }
+        }
+        sb.append(digits);
+    }
+
+    /// `fmt % args` when every conversion is a bare `%s`, `%d`, `%i` or `%%` of a str or an
+    /// int, as nearly every one is: formatted with nothing allocated but the result, which is
+    /// what CPython allocates. Null for anything else, which the general path then formats --
+    /// or reports, with the message Python gives.
+    private static String percentSimple(String fmt, Object args) {
+        Object[] items = null;
+        int count;
+        if (args instanceof PyTuple) {
+            items = ((PyTuple) args).arr();
+            count = items.length;
+        } else if (args instanceof Long || args instanceof String) {
+            count = 1;
+        } else {
+            return null;
+        }
+        // Local on purpose: ParparVM keeps a builder that does not escape on the stack,
+        // unlocked, where a shared static one is locked on every append.
+        // Sized for the format plus a typical argument each, so the common
+        // case never grows (and copies) the buffer.
+        StringBuilder sb = new StringBuilder(fmt.length() + 16 * count);
+        int n = fmt.length();
+        int ai = 0;
+        int i = 0;
+        while (i < n) {
+            int pct = fmt.indexOf('%', i);
+            if (pct < 0) {
+                sb.append(fmt, i, n);
+                break;
+            }
+            sb.append(fmt, i, pct);
+            if (pct + 1 >= n) {
+                return null;
+            }
+            char c = fmt.charAt(pct + 1);
+            i = pct + 2;
+            if (c == '%') {
+                sb.append('%');
+                continue;
+            }
+            if (c != 's' && c != 'd' && c != 'i' || ai >= count) {
+                return null;
+            }
+            Object v = items == null ? args : items[ai];
+            ai++;
+            if (v instanceof Long) {
+                // %s of an int is its str(), the same digits %d writes.
+                sb.append(((Long) v).longValue());
+            } else if (c == 's' && v instanceof String) {
+                sb.append((String) v);
+            } else {
+                return null;
+            }
+        }
+        if (ai != count) {
+            return null;
+        }
+        return sb.toString();
+    }
+
     static String percent(String fmt, Object args) {
+        String simple = percentSimple(fmt, args);
+        if (simple != null) {
+            return simple;
+        }
+        return percent(fmt, args, false);
+    }
+
+    /// `fmt % args` for a bytes format (PEP 461): the format and every
+    /// bytes-like value are latin-1 chars here, one char per byte, so the
+    /// str formatter does the work and the result is encoded back.
+    static PyBytes percentBytes(byte[] fmt, Object args) {
+        return new PyBytes(latin1Bytes(percent(Codecs.latin1(fmt, 0, fmt.length), args, true)));
+    }
+
+    /// The chars of a latin-1 text as its bytes, one byte each.
+    private static byte[] latin1Bytes(String s) {
+        byte[] out = new byte[s.length()];
+        for (int k = 0; k < out.length; k++) {
+            out[k] = (byte) s.charAt(k);
+        }
+        return out;
+    }
+
+    /// The bytes `%s` and `%b` insert: a bytes-like value, or what its
+    /// `__bytes__` answers. A str is refused, as CPython refuses it.
+    private static String bytesArg(Object value) {
+        byte[] b = PyBytes.like(value);
+        if (b == null && !(value instanceof String)) {
+            Object m = Py.obj(value).getAttrOrNull("__bytes__");
+            if (m != null) {
+                b = PyBytes.like(Py.call(m));
+            }
+        }
+        if (b == null) {
+            throw Py.typeError("%b requires a bytes-like object, or an object that implements __bytes__, not '"
+                    + Py.typeOf(value).name + "'");
+        }
+        return Codecs.latin1(b, 0, b.length);
+    }
+
+    private static String percent(String fmt, Object args, boolean bytesMode) {
         Object[] items;
         PyDict mapping = null;
         if (args instanceof PyTuple) {
-            items = ((PyTuple) args).items;
+            items = ((PyTuple) args).arr();
         } else {
             items = new Object[] {args};
             if (args instanceof PyDict) {
                 mapping = (PyDict) args;
             }
         }
-        StringBuilder sb = new StringBuilder();
-        int ai = 0;
         int n = fmt.length();
+        StringBuilder sb = new StringBuilder(n + 16 * items.length);
+        int ai = 0;
         for (int i = 0; i < n; i++) {
             char c = fmt.charAt(i);
             if (c != '%') {
-                sb.append(c);
+                // The literal run up to the next %, in one append: each append
+                // takes the builder's lock.
+                int pct = fmt.indexOf('%', i);
+                int stop = pct < 0 ? n : pct;
+                sb.append(fmt, i, stop);
+                i = stop - 1;
                 continue;
             }
             i++;
             if (i >= n) {
                 throw Py.valueError("incomplete format");
+            }
+            // A bare %s, %d or %i of a str or an int, as nearly every one is:
+            // appended directly. The general path below builds a spec string
+            // for format() to parse again, and took ints through BigInteger.
+            char quick = fmt.charAt(i);
+            if ((quick == 's' || quick == 'd' || quick == 'i') && mapping == null && ai < items.length) {
+                Object v = items[ai];
+                // In a bytes format %s takes no int, so only %d and %i come here.
+                if (v instanceof Long && !(bytesMode && quick == 's')) {
+                    sb.append(((Long) v).longValue());
+                    ai++;
+                    continue;
+                }
+                if (quick == 's' && v instanceof String && !bytesMode) {
+                    sb.append((String) v);
+                    ai++;
+                    continue;
+                }
+            }
+            // %Nd and %0Nd of an int, the other common spelling (dates, ids): padded here
+            // rather than through a spec string format() would parse again.
+            if (mapping == null && ai < items.length && items[ai] instanceof Long) {
+                int j = i;
+                boolean zero = j < n && fmt.charAt(j) == '0';
+                if (zero) {
+                    j++;
+                }
+                int width = 0;
+                while (j < n && j - i < 4 && fmt.charAt(j) >= '0' && fmt.charAt(j) <= '9') {
+                    width = width * 10 + fmt.charAt(j++) - '0';
+                }
+                if (j < n && (fmt.charAt(j) == 'd' || fmt.charAt(j) == 'i')) {
+                    padInt(sb, ((Long) items[ai]).longValue(), width, zero);
+                    ai++;
+                    i = j;
+                    continue;
+                }
             }
             Object value = null;
             if (fmt.charAt(i) == '(') {
@@ -518,7 +735,8 @@ final class Formatting {
                 if (mapping == null) {
                     throw Py.typeError("format requires a mapping");
                 }
-                value = mapping.getItem(Py.str(key));
+                // A bytes format names bytes keys: b"%(k)s" reads b"k".
+                value = mapping.getItem(bytesMode ? new PyBytes(latin1Bytes(key)) : Py.str(key));
                 i = close + 1;
             }
             StringBuilder spec = new StringBuilder();
@@ -577,6 +795,26 @@ final class Formatting {
             String align = left ? "<" : "";
             // printf-style padding right-justifies text too, unlike format().
             String textAlign = left ? "<" : ">";
+            if (bytesMode && (conv == 's' || conv == 'b')) {
+                sb.append(format(Py.str(bytesArg(value)), textAlign + width + prec));
+                continue;
+            }
+            if (bytesMode && (conv == 'r' || conv == 'a')) {
+                // %r is %a in a bytes format: repr() limited to ASCII.
+                sb.append(format(Py.call(Builtins.ASCII, value), textAlign + width + prec));
+                continue;
+            }
+            if (bytesMode && conv == 'c') {
+                byte[] one = PyBytes.like(value);
+                if (one != null && one.length == 1) {
+                    sb.append((char) (one[0] & 0xff));
+                } else if (Py.isInt(value) && Py.asLong(value) >= 0 && Py.asLong(value) < 256) {
+                    sb.append((char) Py.asLong(value));
+                } else {
+                    throw Py.typeError("%c requires an integer in range(256) or a single byte");
+                }
+                continue;
+            }
             switch (conv) {
                 case 's':
                     sb.append(format(Py.str(Py.toStr(value)), textAlign + width + prec));

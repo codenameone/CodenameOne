@@ -134,8 +134,9 @@ class bool_:
         return self._v
 
 
-float32 = float16 = float_ = double = float64
+float32 = float16 = float_ = double = half = single = longdouble = float64
 int32 = int16 = int8 = uint8 = uint16 = uint32 = uint64 = intp = int_ = int64
+short = ushort = intc = uintc = uint = longlong = ulonglong = uintp = int64
 _TYPE_NAMES = {float: "float64", int: "int64", _b.bool: "bool", float64: "float64", int64: "int64", bool_: "bool"}
 number = object
 floating = float64
@@ -751,6 +752,48 @@ def array(obj, dtype=None, copy=True, ndmin=0):
     while r.ndim < ndmin:
         r = r.reshape((1,) + r._shape)
     return r
+
+
+_BUFFER_CODES = {
+    "f8": "d", "f4": "f", "f2": "e", "i8": "q", "i4": "i", "i2": "h", "i1": "b",
+    "u8": "Q", "u4": "I", "u2": "H", "u1": "B", "b1": "?",
+    "float64": "d", "float32": "f", "float16": "e", "double": "d", "single": "f", "half": "e",
+    "int64": "q", "int32": "i", "int16": "h", "int8": "b",
+    "uint64": "Q", "uint32": "I", "uint16": "H", "uint8": "B", "bool": "?",
+    "float": "d", "int": "q",
+}
+
+
+def frombuffer(buffer, dtype=float, count=-1, offset=0, *, like=None):
+    """A 1-d array of the values packed in a bytes-like object. Any byte
+    order and width is read ("<f4", ">i2", "uint8", ...); the values are
+    then held as float64, int64 or bool like every array here, so the
+    result is a copy rather than a view of the buffer."""
+    import struct as _struct
+    if isinstance(dtype, type):
+        spec = {float: "float64", int: "int64", _b.bool: "bool"}.get(dtype, getattr(dtype, "__name__", ""))
+    else:
+        spec = str(dtype)
+    order = "<"
+    if spec[:1] in "<>=|":
+        order = {"<": "<", ">": ">", "=": "=", "|": "<"}[spec[0]]
+        spec = spec[1:]
+    code = _BUFFER_CODES.get(spec)
+    if code is None and spec[:1] in "fiub" and spec[1:].isdigit():
+        code = _BUFFER_CODES.get(spec[0] + spec[1:])
+    if code is None:
+        raise TypeError("data type %r not understood" % (dtype,))
+    data = bytes(memoryview(buffer))[offset:]
+    size = _struct.calcsize(code)
+    if count < 0:
+        if len(data) % size:
+            raise ValueError("buffer size must be a multiple of element size")
+        count = len(data) // size
+    elif count * size > len(data):
+        raise ValueError("buffer is smaller than requested size")
+    values = list(_struct.unpack(order + code * count, data[:count * size]))
+    kind = "float64" if code in "dfe" else "bool" if code == "?" else "int64"
+    return array(values, dtype=kind)
 
 
 def asarray(obj, dtype=None):

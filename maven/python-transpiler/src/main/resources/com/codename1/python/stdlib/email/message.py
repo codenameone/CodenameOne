@@ -114,6 +114,8 @@ class Message:
                 result.append((k.strip().lower(), _unquote(v.strip()) if unquote else v.strip()))
             else:
                 result.append((p.strip() if i == 0 else p.strip().lower(), ""))
+        if unquote:
+            result = _decode_rfc2231_params(result)
         return result
 
     def get_param(self, param, failobj=None, header="content-type", unquote=True):
@@ -219,3 +221,48 @@ class EmailMessage(Message):
         if isinstance(content, str):
             self["Content-Type"] = "text/%s; charset=\"%s\"" % (subtype, charset)
         self._payload = content
+
+
+def _decode_rfc2231_params(params):
+    """RFC 2231 parameters, as email.utils.decode_params gives them:
+    `name*=charset'lang'%xx`, and continuations `name*0`, `name*1*`, ...,
+    become one (name, (charset, language, text)) entry, `text` holding the
+    percent-decoded bytes as latin-1 characters for collapse_rfc2231_value
+    to decode. The entry takes the place of the first part seen."""
+    from urllib.parse import unquote as _pct
+    out = []
+    parts = {}
+    order = []
+    for k, v in params:
+        if "*" not in k or not out:
+            out.append((k, v))
+            continue
+        name, _, rest = k.partition("*")
+        encoded = k.endswith("*")
+        num = rest[:-1] if encoded else rest
+        if num and not num.isdigit():
+            out.append((k, v))
+            continue
+        if name not in parts:
+            parts[name] = []
+            order.append(name)
+            out.append((name, None))
+        parts[name].append((int(num) if num else 0, encoded, v))
+    for name in order:
+        segs = sorted(parts[name], key=lambda x: x[0])
+        charset = language = None
+        text = []
+        for n, encoded, v in segs:
+            if encoded:
+                if n == 0 and v.count("'") >= 2:
+                    charset, language, v = v.split("'", 2)
+                v = _pct(v, encoding="latin-1")
+            text.append(v)
+        joined = "".join(text)
+        value = (charset or "", language or "", joined) if any(e for _, e, _ in segs) else joined
+        for i, (k, v) in enumerate(out):
+            if k == name and v is None:
+                out[i] = (name, value)
+                break
+    return out
+

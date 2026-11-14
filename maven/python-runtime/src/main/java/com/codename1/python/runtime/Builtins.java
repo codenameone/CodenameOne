@@ -61,7 +61,7 @@ public final class Builtins {
     });
     /// Marks an optional argument that was not passed.
     private static final Object ABSENT = new PyStr("<absent>");
-    public static final PyBuiltin OBJECT_INIT = PyBuiltin.positional("__init__", a -> Py.NONE);
+    public static final PyBuiltin OBJECT_INIT = PyBuiltin.positional("__init__", a -> Py.NONE).with1(a -> Py.NONE);
 
     public static final Object PRINT = new PyBuiltin("print", (args, kw) -> {
         Args a = new Args("print", args, kw).check(Integer.MAX_VALUE, "sep", "end", "file", "flush");
@@ -101,7 +101,7 @@ public final class Builtins {
 
     public static final Object LEN = PyBuiltin.unary("len", x -> PyInt.of(Py.len(x)));
     /// `object.__hash__`, which the object type reads without defining it.
-    static final Object OBJECT_HASH = PyBuiltin.positional("__hash__", a -> Py.of((long) System.identityHashCode(a[0])));
+    static final Object OBJECT_HASH = PyBuiltin.fixed1("__hash__", a0 -> Py.of((long) System.identityHashCode(a0)));
 
     public static final Object REPR = PyBuiltin.unary("repr", x -> Py.str(Py.toRepr(x)));
     public static final Object ASCII = PyBuiltin.unary("ascii", x -> Py.str(asciiOnly(Py.toRepr(x))));
@@ -110,7 +110,8 @@ public final class Builtins {
     public static final Object ABS = PyBuiltin.unary("abs", x -> abs(x));
     public static final Object CALLABLE = PyBuiltin.unary("callable", x -> Py.bool(isCallable(x)));
     public static final Object ITER = PyBuiltin.positional("iter", a -> iter(a));
-    public static final Object NEXT = PyBuiltin.positional("next", a -> next(a));
+    public static final Object NEXT = PyBuiltin.positional("next", a -> next(a))
+            .with1(x -> next(x, null, false)).with2((x, d) -> next(x, d, true));
     public static final Object AITER = PyBuiltin.unary("aiter", x -> Py.callMethod(x, "__aiter__"));
     // anext with a default is an awaitable that answers the default on StopAsyncIteration; the
     // asyncio module supplies that wrapper, so the builtin covers the one-argument form.
@@ -127,23 +128,31 @@ public final class Builtins {
     public static final Object OCT = PyBuiltin.unary("oct", x -> Py.str(Formatting.format(x, "#o")));
     public static final Object BIN = PyBuiltin.unary("bin", x -> Py.str(Formatting.format(x, "#b")));
     public static final Object FORMAT = PyBuiltin.positional("format", a -> Py.format(a[0], a.length > 1 ? Py.toStr(a[1]) : ""));
-    public static final Object DIVMOD = PyBuiltin.positional("divmod", a -> PyTuple.of(Py.floordiv(a[0], a[1]), Py.mod(a[0], a[1])));
+    public static final Object DIVMOD = PyBuiltin.fixed2("divmod", (a0, a1) -> Py.tuple(Py.floordiv(a0, a1), Py.mod(a0, a1)));
     public static final Object POW = PyBuiltin.positional("pow", a -> pow(a));
     public static final Object ROUND = new PyBuiltin("round", (args, kw) -> round(new Args("round", args, kw).check(2, "number", "ndigits")));
-    public static final Object ISINSTANCE = PyBuiltin.positional("isinstance", a -> Py.bool(Py.isinstance(a[0], a[1])))
+    /// What the body of a function the build removed is: it raises, with
+    /// the message the build wrote for it.
+    public static final Object CN1_REMOVED = PyBuiltin.fixed1("__cn1_removed__", a0 -> {
+        throw Py.runtimeError(String.valueOf(a0));
+    });
+    /// What the body of a function the build replaced calls: the Java
+    /// registered for its name, with the function's own arguments.
+    public static final Object CN1_REPLACED = PyBuiltin.positional("__cn1_replaced__", a -> NativeModule.replaced(a));
+    public static final Object ISINSTANCE = PyBuiltin.fixed2("isinstance", (a0, a1) -> Py.bool(Py.isinstance(a0, a1)))
             .with2((x, t) -> Py.bool(Py.isinstance(x, t)));
-    public static final Object ISSUBCLASS = PyBuiltin.positional("issubclass", a -> Py.bool(issubclass(a[0], a[1])))
+    public static final Object ISSUBCLASS = PyBuiltin.fixed2("issubclass", (a0, a1) -> Py.bool(issubclass(a0, a1)))
             .with2((x, t) -> Py.bool(issubclass(x, t)));
     public static final Object GETATTR = PyBuiltin.positional("getattr", a -> getattr(a))
             .with2((o, n) -> Py.obj(o).getAttr(Py.toStr(n)))
             .with3(Builtins::getattr3);
-    public static final Object SETATTR = PyBuiltin.positional("setattr", a -> {
-        Py.obj(a[0]).setAttr(Py.toStr(a[1]), a[2]);
+    public static final Object SETATTR = PyBuiltin.fixed3("setattr", (a0, a1, a2) -> {
+        Py.obj(a0).setAttr(Py.toStr(a1), a2);
         return Py.NONE;
     });
-    public static final Object HASATTR = PyBuiltin.positional("hasattr", a -> {
+    public static final Object HASATTR = PyBuiltin.fixed2("hasattr", (a0, a1) -> {
         try {
-            return Py.bool(Py.obj(a[0]).getAttrOrNull(Py.toStr(a[1])) != null);
+            return Py.bool(Py.obj(a0).getAttrOrNull(Py.toStr(a1)) != null);
         } catch (PyException e) {
             if (e.matches(Py.ATTRIBUTE_ERROR)) {
                 return Py.FALSE;
@@ -151,17 +160,52 @@ public final class Builtins {
             throw e;
         }
     });
-    public static final Object DELATTR = PyBuiltin.positional("delattr", a -> {
-        Py.obj(a[0]).delAttr(Py.toStr(a[1]));
+    public static final Object DELATTR = PyBuiltin.fixed2("delattr", (a0, a1) -> {
+        Py.obj(a0).delAttr(Py.toStr(a1));
         return Py.NONE;
     });
     public static final Object VARS = PyBuiltin.unary("vars", x -> Py.obj(x).getAttr("__dict__"));
     public static final Object DIR = PyBuiltin.unary("dir", x -> dir(x));
     public static final Object SUM = new PyBuiltin("sum", (args, kw) -> sum(new Args("sum", args, kw).check(2, "start")));
-    public static final Object MIN = new PyBuiltin("min", (args, kw) -> minMax("min", args, kw, true));
-    public static final Object MAX = new PyBuiltin("max", (args, kw) -> minMax("max", args, kw, false));
+    public static final Object MIN = new PyBuiltin("min", (args, kw) -> minMax("min", args, kw, true))
+            .with1(x -> minMax1("min", x, true)).with2((x, y) -> Py.ltBool(y, x) ? y : x)
+            .with3((x, y, z) -> {
+                Object m = Py.ltBool(y, x) ? y : x;
+                return Py.ltBool(z, m) ? z : m;
+            })
+            .with4((x, y, z, w) -> {
+                Object m = Py.ltBool(y, x) ? y : x;
+                m = Py.ltBool(z, m) ? z : m;
+                return Py.ltBool(w, m) ? w : m;
+            });
+    public static final Object MAX = new PyBuiltin("max", (args, kw) -> minMax("max", args, kw, false))
+            .with1(x -> minMax1("max", x, false)).with2((x, y) -> Py.ltBool(x, y) ? y : x)
+            .with3((x, y, z) -> {
+                Object m = Py.ltBool(x, y) ? y : x;
+                return Py.ltBool(m, z) ? z : m;
+            })
+            .with4((x, y, z, w) -> {
+                Object m = Py.ltBool(x, y) ? y : x;
+                m = Py.ltBool(m, z) ? z : m;
+                return Py.ltBool(m, w) ? w : m;
+            });
     public static final Object ANY = PyBuiltin.positional("any", a -> {
         Object it = Py.iter(one("any", a));
+        if (it instanceof PyGenerator) {
+            // A generator expression, the usual argument: stepped under ONE
+            // handler (see PyList.extend), not a try per value.
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object v = PyGenerator.loopNext(g); v != null; v = PyGenerator.loopNext(g)) {
+                    if (Py.isTrue(v)) {
+                        return Py.TRUE;
+                    }
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
+            }
+            return Py.FALSE;
+        }
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             if (Py.isTrue(v)) {
                 return Py.TRUE;
@@ -171,6 +215,21 @@ public final class Builtins {
     });
     public static final Object ALL = PyBuiltin.positional("all", a -> {
         Object it = Py.iter(one("all", a));
+        if (it instanceof PyGenerator) {
+            // A generator expression, the usual argument: stepped under ONE
+            // handler (see PyList.extend), not a try per value.
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object v = PyGenerator.loopNext(g); v != null; v = PyGenerator.loopNext(g)) {
+                    if (!Py.isTrue(v)) {
+                        return Py.FALSE;
+                    }
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
+            }
+            return Py.TRUE;
+        }
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             if (!Py.isTrue(v)) {
                 return Py.FALSE;
@@ -197,13 +256,20 @@ public final class Builtins {
             if (v == null) {
                 return null;
             }
-            Object r = PyTuple.of(n[0], v);
+            Object r = Py.tuple(n[0], v);
             n[0] = Py.add(n[0], PyInt.of(1));
             return r;
         });
     });
     public static final Object ZIP = new PyBuiltin("zip", (args, kw) -> {
         Args a = new Args("zip", args, kw).check(Integer.MAX_VALUE, "strict");
+        Object strictT = a.kw("strict");
+        if (a.npos > 0 && (strictT == null || !Py.isTrue(strictT))) {
+            Object z = zipTuples(args, a.npos);
+            if (z != null) {
+                return z;
+            }
+        }
         final Object[] its = new Object[a.npos];
         for (int i = 0; i < its.length; i++) {
             its[i] = Py.iter(args[i]);
@@ -234,7 +300,46 @@ public final class Builtins {
             return new PyTuple(row);
         });
     });
+    /// `zip(*rows)` over tuples, the transpose pdfplumber's merge_bboxes
+    /// does per word: tuples cannot change, so each column is read by index,
+    /// with no iterator per argument and no next() call per item. Null
+    /// when any argument is not a tuple.
+    private static Object zipTuples(Object[] args, int n) {
+        final Object[][] cols = new Object[n][];
+        int len = Integer.MAX_VALUE;
+        for (int i = 0; i < n; i++) {
+            if (!(args[i] instanceof PyTuple)) {
+                return null;
+            }
+            cols[i] = ((PyTuple) args[i]).arr();
+            len = Math.min(len, cols[i].length);
+        }
+        final int end = len;
+        final int[] pos = new int[1];
+        return new PyJavaIter(() -> {
+            int p = pos[0];
+            if (p >= end) {
+                return null;
+            }
+            pos[0] = p + 1;
+            if (cols.length == 2) {
+                return Py.tuple(cols[0][p], cols[1][p]);
+            }
+            Object[] row = new Object[cols.length];
+            for (int i = 0; i < row.length; i++) {
+                row[i] = cols[i][p];
+            }
+            return new PyTuple(row);
+        });
+    }
+
     public static final Object MAP = PyBuiltin.positional("map", a -> {
+        if (a.length == 2) {
+            return map1(a[0], a[1]);
+        }
+        if (a.length == 3) {
+            return new MapIter(Py.obj(a[0]), new Feed(a[1]), new Feed(a[2]));
+        }
         final Object f = a[0];
         final Object[] its = new Object[a.length - 1];
         for (int i = 0; i < its.length; i++) {
@@ -250,19 +355,145 @@ public final class Builtins {
             }
             return Py.obj(f).call(row, Py.NO_KW);
         });
-    });
-    public static final Object FILTER = PyBuiltin.positional("filter", a -> {
-        final Object f = a[0];
-        final Object it = Py.iter(a[1]);
-        return new PyJavaIter(() -> {
-            for (Object v = Py.next(it); v != null; v = Py.next(it)) {
-                if (f == Py.NONE ? Py.isTrue(v) : Py.isTrue(Py.obj(f).call(new Object[] {v}, Py.NO_KW))) { //NOPMD CompareObjectsWithEquals - identity is meant
+    }).with2(Builtins::map1).with3((a0, a1, a2) -> new MapIter(Py.obj(a0), new Feed(a1), new Feed(a2)));
+
+    /// `map(f, iterable)`, the usual case: a one-argument call per item.
+    private static Object map1(Object f, Object iterable) {
+        return new MapIter(Py.obj(f), new Feed(iterable), null);
+    }
+
+    public static final Object FILTER = PyBuiltin.fixed2("filter", (a0, a1) ->
+            new FilterIter(a0 == Py.NONE ? null : Py.obj(a0), new Feed(a1))); //NOPMD CompareObjectsWithEquals - identity is meant
+
+    /// The source of a map or filter: a list or tuple read by index (a
+    /// list's length read again each step, as its own iterator does), any
+    /// other iterable through its iterator. No iterator object and no
+    /// next() call per value for the usual list argument.
+    static final class Feed {
+        private final PyList list;
+        private final Object[] arr;
+        private final Object it;
+        private int i;
+
+        Feed(Object iterable) {
+            if (iterable instanceof PyList) {
+                list = (PyList) iterable;
+                arr = null;
+                it = null;
+            } else if (iterable instanceof PyTuple) {
+                list = null;
+                arr = ((PyTuple) iterable).arr();
+                it = null;
+            } else {
+                list = null;
+                arr = null;
+                it = Py.iter(iterable);
+            }
+        }
+
+        Object next() {
+            int k = i;
+            if (list != null) {
+                if (k >= list.size) {
+                    return null;
+                }
+                i = k + 1;
+                return list.get(k);
+            }
+            if (arr != null) {
+                if (k >= arr.length) {
+                    return null;
+                }
+                i = k + 1;
+                return arr[k];
+            }
+            return Py.next(it);
+        }
+    }
+
+    /// `map(f, a)` and `map(f, a, b)`: a call1 or call2 per item, no row array.
+    static final class MapIter extends PyObject {
+        private final PyObject fn;
+        private final Feed a;
+        private final Feed b;
+        private boolean done;
+
+        MapIter(PyObject fn, Feed a, Feed b) {
+            this.fn = fn;
+            this.a = a;
+            this.b = b;
+        }
+
+        @Override
+        public PyType type() {
+            return Py.ITERATOR_TYPE;
+        }
+
+        @Override
+        public Object iter() {
+            return this;
+        }
+
+        @Override
+        public Object next() {
+            if (done) {
+                return null;
+            }
+            Object x = a.next();
+            if (x == null) {
+                done = true;
+                return null;
+            }
+            if (b == null) {
+                return fn.call1(x);
+            }
+            Object y = b.next();
+            if (y == null) {
+                done = true;
+                return null;
+            }
+            return fn.call2(x, y);
+        }
+    }
+
+    /// `filter(f, iterable)`; `f` null for `filter(None, ...)`.
+    static final class FilterIter extends PyObject {
+        private final PyObject fn;
+        private final Feed src;
+        private boolean done;
+
+        FilterIter(PyObject fn, Feed src) {
+            this.fn = fn;
+            this.src = src;
+        }
+
+        @Override
+        public PyType type() {
+            return Py.ITERATOR_TYPE;
+        }
+
+        @Override
+        public Object iter() {
+            return this;
+        }
+
+        @Override
+        public Object next() {
+            if (done) {
+                return null;
+            }
+            final Feed s = src;
+            final PyObject f = fn;
+            for (Object v = s.next(); v != null; v = s.next()) {
+                if (f == null ? Py.isTrue(v) : Py.isTrue(f.call1(v))) {
                     return v;
                 }
             }
+            done = true;
             return null;
-        });
-    });
+        }
+    }
+
     public static final Object SUPER = PyBuiltin.positional("super", a -> {
         if (a.length != 2 || !(a[0] instanceof PyType)) {
             throw Py.runtimeError("super(): no arguments");
@@ -341,25 +572,22 @@ public final class Builtins {
         }));
         // The reduction protocol's defaults are written in Python, in copyreg,
         // which pickle and copy import; object only forwards to them.
-        o.define("__reduce_ex__", PyBuiltin.positional("__reduce_ex__",
-                a -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce_ex"), a[0], a[1])));
-        o.define("__reduce__", PyBuiltin.positional("__reduce__",
-                a -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce"), a[0])));
-        o.define("__getstate__", PyBuiltin.positional("__getstate__",
-                a -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_getstate"), a[0])));
-        o.define("__delattr__", PyBuiltin.positional("__delattr__", a -> {
-            if (a[0] instanceof PyInstance) {
-                ((PyInstance) a[0]).delAttrDirect(Py.toStr(a[1]));
-            } else if (a[0] instanceof PyType) {
-                ((PyType) a[0]).delAttrDirect(Py.toStr(a[1]));
+        o.define("__reduce_ex__", PyBuiltin.fixed2("__reduce_ex__", (a0, a1) -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce_ex"), a0, a1)));
+        o.define("__reduce__", PyBuiltin.fixed1("__reduce__", a0 -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce"), a0)));
+        o.define("__getstate__", PyBuiltin.fixed1("__getstate__", a0 -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_getstate"), a0)));
+        o.define("__delattr__", PyBuiltin.fixed2("__delattr__", (a0, a1) -> {
+            if (a0 instanceof PyInstance) {
+                ((PyInstance) a0).delAttrDirect(Py.toStr(a1));
+            } else if (a0 instanceof PyType) {
+                ((PyType) a0).delAttrDirect(Py.toStr(a1));
             } else {
-                Py.obj(a[0]).delAttr(Py.toStr(a[1]));
+                Py.obj(a0).delAttr(Py.toStr(a1));
             }
             return Py.NONE;
         }));
-        o.define("__repr__", PyBuiltin.positional("__repr__", a -> Py.str("<" + Py.typeOf(a[0]).name
-                + " object at 0x" + Integer.toHexString(System.identityHashCode(a[0])) + ">")));
-        o.define("__str__", PyBuiltin.positional("__str__", a -> Py.str(Py.toRepr(a[0]))));
+        o.define("__repr__", PyBuiltin.fixed1("__repr__", a0 -> Py.str("<" + Py.typeOf(a0).fullName()
+                + " object at 0x" + Integer.toHexString(System.identityHashCode(a0)) + ">")));
+        o.define("__str__", PyBuiltin.fixed1("__str__", a0 -> Py.str(Py.toRepr(a0))));
         installExceptions();
         installFactories();
         TypeMethods.install();
@@ -373,19 +601,25 @@ public final class Builtins {
         names();
     }
 
+    /// BaseException's own `__init__` and `__new__`: a type that has both
+    /// builds an instance from a message directly (`PyType.plainException`).
+    static Object BASE_EXCEPTION_INIT; //NOPMD MutableStaticState - set once, at install
+    static Object BASE_EXCEPTION_NEW; //NOPMD MutableStaticState - set once, at install
+
     private static void installExceptions() {
         PyType b = Py.BASE_EXCEPTION;
-        b.define("__init__", PyBuiltin.method(b, "__init__", a -> {
+        BASE_EXCEPTION_INIT = PyBuiltin.method(b, "__init__", a -> {
             Object[] rest = new Object[a.length - 1];
             System.arraycopy(a, 1, rest, 0, rest.length);
             if (a[0] instanceof PyInstance) {
                 ((PyInstance) a[0]).setAttrDirect("args", new PyTuple(rest));
             }
             return Py.NONE;
-        }));
+        });
+        b.define("__init__", BASE_EXCEPTION_INIT);
         // Keyword arguments are accepted and ignored, as CPython's are: they
         // are for a subclass's __init__, and args holds the positional ones.
-        b.define("__new__", new PyStaticMethod(new PyBuiltin("__new__", (all, kw) -> {
+        BASE_EXCEPTION_NEW = new PyStaticMethod(new PyBuiltin("__new__", (all, kw) -> {
             Object[] a = all;
             if (kw.length > 0) {
                 a = new Object[all.length - kw.length];
@@ -404,36 +638,39 @@ public final class Builtins {
             System.arraycopy(a, 1, rest, 0, rest.length);
             e.setAttrDirect("args", new PyTuple(rest));
             return e;
-        })));
-        b.define("__str__", PyBuiltin.positional("__str__", a -> {
-            Object[] args = exceptionArgs(a[0]);
+        }));
+        b.define("__new__", BASE_EXCEPTION_NEW);
+        b.define("__str__", PyBuiltin.fixed1("__str__", a0 -> {
+            Object[] args = exceptionArgs(a0);
             if (args.length == 0) {
                 return Py.EMPTY_STR;
             }
             if (args.length == 1) {
-                if (Py.typeOf(a[0]).isSubtype(Py.KEY_ERROR)) {
+                if (Py.typeOf(a0).isSubtype(Py.KEY_ERROR)) {
                     return Py.str(Py.toRepr(args[0]));
                 }
                 return Py.str(Py.toStr(args[0]));
             }
             return Py.str(new PyTuple(args).repr());
         }));
-        b.define("__repr__", PyBuiltin.positional("__repr__", a -> {
-            Object[] args = exceptionArgs(a[0]);
+        b.define("__repr__", PyBuiltin.fixed1("__repr__", a0 -> {
+            Object[] args = exceptionArgs(a0);
             String inner = args.length == 1 ? Py.toRepr(args[0]) : Py.joinRepr("", args, args.length, "");
-            return Py.str(Py.typeOf(a[0]).name + "(" + inner + ")");
+            return Py.str(Py.typeOf(a0).name + "(" + inner + ")");
         }));
         installOsError();
-        b.define("with_traceback", PyBuiltin.positional("with_traceback", a -> a[0]));
+        installUnicodeError(Py.UNICODE_DECODE_ERROR, "decode");
+        installUnicodeError(Py.UNICODE_ENCODE_ERROR, "encode");
+        b.define("with_traceback", PyBuiltin.fixed1("with_traceback", a0 -> a0));
         b.define("__cause__", Py.NONE);
         b.define("__context__", Py.NONE);
         b.define("__suppress_context__", Py.FALSE);
         b.define("__traceback__", Py.NONE);
-        Py.STOP_ITERATION.define("value", new PyProperty(PyBuiltin.positional("value", a -> {
-            Object[] args = exceptionArgs(a[0]);
+        Py.STOP_ITERATION.define("value", new PyProperty(PyBuiltin.fixed1("value", a0 -> {
+            Object[] args = exceptionArgs(a0);
             return args.length == 0 ? Py.NONE : args[0];
         }), null, null));
-        Py.SYSTEM_EXIT.define("code", new PyProperty(PyBuiltin.positional("code", a -> systemExitCode(a[0])),
+        Py.SYSTEM_EXIT.define("code", new PyProperty(PyBuiltin.fixed1("code", a0 -> systemExitCode(a0)),
                 null, null));
     }
 
@@ -496,9 +733,9 @@ public final class Builtins {
             e.setAttrDirect("args", new PyTuple(args));
             return Py.NONE;
         }));
-        t.define("__str__", PyBuiltin.positional("__str__", a -> {
-            if (a[0] instanceof PyInstance) {
-                PyInstance e = (PyInstance) a[0];
+        t.define("__str__", PyBuiltin.fixed1("__str__", a0 -> {
+            if (a0 instanceof PyInstance) {
+                PyInstance e = (PyInstance) a0;
                 Object errno = orNone(e.own("errno"));
                 Object strerror = orNone(e.own("strerror"));
                 Object filename = orNone(e.own("filename"));
@@ -515,13 +752,63 @@ public final class Builtins {
                     return Py.str(head);
                 }
             }
-            return Py.call(Py.BASE_EXCEPTION.lookup("__str__"), a[0]);
+            return Py.call(Py.BASE_EXCEPTION.lookup("__str__"), a0);
+        }));
+    }
+
+    /// UnicodeDecodeError(encoding, object, start, end, reason) and its
+    /// encode twin keep their parts as attributes, which a decoder that
+    /// retries past the bad bytes reads (`e.start`), and format the message
+    /// from them.
+    private static void installUnicodeError(PyType t, String verb) {
+        t.define("__init__", PyBuiltin.method(t, "__init__", a -> {
+            if (!(a[0] instanceof PyInstance)) {
+                return Py.NONE;
+            }
+            PyInstance e = (PyInstance) a[0];
+            int n = a.length - 1;
+            Object[] args = new Object[n];
+            System.arraycopy(a, 1, args, 0, n);
+            if (n == 5) {
+                e.setAttrDirect("encoding", a[1]);
+                e.setAttrDirect("object", a[2]);
+                e.setAttrDirect("start", a[3]);
+                e.setAttrDirect("end", a[4]);
+                e.setAttrDirect("reason", a[5]);
+            }
+            e.setAttrDirect("args", new PyTuple(args));
+            return Py.NONE;
+        }));
+        t.define("__str__", PyBuiltin.fixed1("__str__", a0 -> {
+            if (a0 instanceof PyInstance && ((PyInstance) a0).own("reason") != null) {
+                PyInstance e = (PyInstance) a0;
+                long start = Py.asLong(e.own("start"));
+                long end = Py.asLong(e.own("end"));
+                String head = "'" + Py.toStr(e.own("encoding")) + "' codec can't " + verb + " ";
+                Object obj = e.own("object");
+                if (end == start + 1) {
+                    byte[] raw = PyBytes.like(obj);
+                    if (raw == null) {
+                        String text = Py.toStr(obj);
+                        int cp = text.codePointAt(Character.offsetByCodePoints(text, 0, (int) start));
+                        head += "character '" + Codecs.escape(cp) + "'";
+                    } else {
+                        String h = Integer.toHexString(raw[(int) start] & 0xff);
+                        head += "byte 0x" + (h.length() < 2 ? "0" + h : h);
+                    }
+                    head += " in position " + start;
+                } else {
+                    head += (PyBytes.like(obj) == null ? "characters" : "bytes") + " in position " + start + "-" + (end - 1);
+                }
+                return Py.str(head + ": " + Py.toStr(e.own("reason")));
+            }
+            return Py.call(Py.BASE_EXCEPTION.lookup("__str__"), a0);
         }));
     }
 
     static Object[] exceptionArgs(Object e) {
         Object args = ((PyInstance) e).own("args");
-        return args instanceof PyTuple ? ((PyTuple) args).items : Py.NO_ARGS;
+        return args instanceof PyTuple ? ((PyTuple) args).arr() : Py.NO_ARGS;
     }
 
     private static void installFactories() {
@@ -545,7 +832,7 @@ public final class Builtins {
                 return PyInt.of(0);
             }
             if (base != null) {
-                return PyInt.parse(intText(x, true), (int) Py.asLong(base));
+                return PyInt.parse(intText(x, true), (int) Py.asLong(base), x);
             }
             return toInt(x);
         };
@@ -553,6 +840,30 @@ public final class Builtins {
         Py.STR_TYPE.unary = x -> Py.str(Py.toStr(x));
         Py.FLOAT_TYPE.unary = Builtins::toFloat;
         Py.BOOL_TYPE.unary = x -> Py.bool(Py.isTrue(x));
+        // One-argument construction of the exact builtin types runs without
+        // an argument array; the factories below take every other call.
+        Py.TUPLE_TYPE.unary = x -> x instanceof PyTuple ? x : new PyTuple(Py.toArray(x));
+        Py.LIST_TYPE.unary = x -> {
+            PyList l = new PyList();
+            l.extend(x);
+            return l;
+        };
+        Py.DICT_TYPE.unary = x -> {
+            PyDict d = new PyDict();
+            d.update(x);
+            return d;
+        };
+        Py.SET_TYPE.unary = x -> PySet.of(x, false);
+        Py.FROZENSET_TYPE.unary = x -> PySet.of(x, true);
+        Py.TYPE_TYPE.unary = Py::typeOf;
+        Py.INT_TYPE.binary = (x, base) -> PyInt.parse(intText(x, true), (int) Py.asLong(base), x);
+        Py.STR_TYPE.binary = (x, enc) -> {
+            if (!(x instanceof PyBytes)) {
+                throw Py.typeError("decoding to str: need a bytes-like object, " + Py.typeOf(x).name + " found");
+            }
+            return Py.str(Codecs.decodeKeep(((PyBytes) x).value, Py.toStr(enc), "strict"));
+        };
+        Py.RANGE_TYPE.unary = x -> new PyRange(0, Py.index(x), 1);
         Py.BOOL_TYPE.factory = (t, args, kw) -> Py.bool(args.length > 0 && Py.isTrue(args[0]));
         Py.FLOAT_TYPE.factory = (t, args, kw) -> args.length == 0 ? Py.ofFloat(0) : toFloat(args[0]);
         Py.STR_TYPE.factory = (t, args, kw) -> {
@@ -564,7 +875,7 @@ public final class Builtins {
             if (!(p[0] instanceof PyBytes)) {
                 throw Py.typeError("decoding to str: need a bytes-like object, " + Py.typeOf(p[0]).name + " found");
             }
-            return Py.str(Codecs.decode(((PyBytes) p[0]).value, p[1] == ABSENT ? "utf-8" : Py.toStr(p[1]),
+            return Py.str(Codecs.decodeKeep(((PyBytes) p[0]).value, p[1] == ABSENT ? "utf-8" : Py.toStr(p[1]),
                     p[2] == ABSENT ? "strict" : Py.toStr(p[2])));
         };
         Py.LIST_TYPE.factory = (t, args, kw) -> {
@@ -661,27 +972,27 @@ public final class Builtins {
             PyProperty p = property(a[0]);
             return a.length < 2 || a[1] == Py.NONE ? a[0] : p.get(a[1]);
         }));
-        Py.PROPERTY_TYPE.define("__set__", PyBuiltin.positional("__set__", a -> {
-            property(a[0]).set(a[1], a[2]);
+        Py.PROPERTY_TYPE.define("__set__", PyBuiltin.fixed3("__set__", (a0, a1, a2) -> {
+            property(a0).set(a1, a2);
             return Py.NONE;
         }));
-        Py.PROPERTY_TYPE.define("__delete__", PyBuiltin.positional("__delete__", a -> {
-            property(a[0]).delete(a[1]);
+        Py.PROPERTY_TYPE.define("__delete__", PyBuiltin.fixed2("__delete__", (a0, a1) -> {
+            property(a0).delete(a1);
             return Py.NONE;
         }));
         // On the type rather than only on PyProperty, so an instance of a
         // property subclass has them too; a copy keeps the receiver's class.
-        Py.PROPERTY_TYPE.define("getter", PyBuiltin.positional("getter", a -> {
-            PyProperty p = property(a[0]);
-            return propertyCopy(a[0], a[1], p.fset, p.fdel);
+        Py.PROPERTY_TYPE.define("getter", PyBuiltin.fixed2("getter", (a0, a1) -> {
+            PyProperty p = property(a0);
+            return propertyCopy(a0, a1, p.fset, p.fdel);
         }));
-        Py.PROPERTY_TYPE.define("setter", PyBuiltin.positional("setter", a -> {
-            PyProperty p = property(a[0]);
-            return propertyCopy(a[0], p.fget, a[1], p.fdel);
+        Py.PROPERTY_TYPE.define("setter", PyBuiltin.fixed2("setter", (a0, a1) -> {
+            PyProperty p = property(a0);
+            return propertyCopy(a0, p.fget, a1, p.fdel);
         }));
-        Py.PROPERTY_TYPE.define("deleter", PyBuiltin.positional("deleter", a -> {
-            PyProperty p = property(a[0]);
-            return propertyCopy(a[0], p.fget, p.fset, a[1]);
+        Py.PROPERTY_TYPE.define("deleter", PyBuiltin.fixed2("deleter", (a0, a1) -> {
+            PyProperty p = property(a0);
+            return propertyCopy(a0, p.fget, p.fset, a1);
         }));
         String[] parts = {"fget", "fset", "fdel"};
         for (int i = 0; i < parts.length; i++) {
@@ -751,7 +1062,12 @@ public final class Builtins {
             NAMES.put(t.name, t);
         }
         // What the transpiler rewrites a `match` case into (see PyMatch).
-        NAMES.put("__cn1_match__", PyBuiltin.positional("__cn1_match__", a -> PyMatch.match(a[0], a[1])));
+        NAMES.put("__cn1_match__", PyBuiltin.fixed2("__cn1_match__", (a0, a1) -> PyMatch.match(a0, a1)));
+        // What the transpiler rewrites `try: x = next(it) except
+        // StopIteration:` into: no exception is raised when `next` is the
+        // builtin, and one a shadowing `next` raises is caught here.
+        NAMES.put("__cn1_stop__", NEXT_STOP);
+        NAMES.put("__cn1_next_or_stop__", PyBuiltin.fixed2("__cn1_next_or_stop__", Builtins::nextOrStop));
         ExceptionGroups.names(NAMES);
         // open() is io.open, written in Python; the transpiler bundles `io`
         // into any program that mentions open.
@@ -764,9 +1080,12 @@ public final class Builtins {
         NAMES.put("False", Py.FALSE);
         NAMES.put("NotImplemented", Py.NOT_IMPLEMENTED);
         NAMES.put("Ellipsis", Py.ELLIPSIS);
+        // True, as under CPython without -O: assert statements run.
+        NAMES.put("__debug__", Py.TRUE);
         Object[] fns = {PRINT, LEN, REPR, ASCII, HASH, ID, ABS, CALLABLE, ITER, NEXT, ORD, CHR, HEX, OCT, BIN,
             FORMAT, DIVMOD, POW, ROUND, ISINSTANCE, ISSUBCLASS, GETATTR, SETATTR, HASATTR, DELATTR, VARS, DIR,
-            SUM, MIN, MAX, ANY, ALL, SORTED, REVERSED, ENUMERATE, ZIP, MAP, FILTER, SUPER, INPUT, AITER, ANEXT};
+            SUM, MIN, MAX, ANY, ALL, SORTED, REVERSED, ENUMERATE, ZIP, MAP, FILTER, SUPER, INPUT, AITER, ANEXT,
+            CN1_REMOVED, CN1_REPLACED};
         for (Object fn : fns) {
             NAMES.put(((PyBuiltin) fn).name, fn);
         }
@@ -804,21 +1123,40 @@ public final class Builtins {
             return Py.mul(PyInt.parse(Formatting.fixed(Math.abs(d), 0), 10), PyInt.of(d < 0 ? -1 : 1));
         }
         if (x instanceof String || x instanceof PyBytes || x instanceof PyByteArray) {
-            return PyInt.parse(intText(x, false), 10);
+            return PyInt.parse(intText(x, false), 10, x);
         }
         Object m = Py.typeOf(x).lookup("__int__");
         if (m == null) {
             m = Py.typeOf(x).lookup("__index__");
         }
         if (m != null) {
-            return Py.obj(m).call(new Object[] {x}, Py.NO_KW);
+            return Py.obj(m).call1(x);
+        }
+        Object text = textBase(x);
+        if (text != null) {
+            return toInt(text);
         }
         throw Py.typeError("int() argument must be a string, a bytes-like object or a real number, not '"
                 + Py.typeOf(x).name + "'");
     }
 
+    /// The str, bytes or bytearray an instance of a subclass of one of them
+    /// holds, which int(), float() and complex() parse as they parse the
+    /// base value; null for anything else.
+    static Object textBase(Object x) {
+        if (x instanceof PyInstance) {
+            Object b = ((PyInstance) x).base;
+            if (b instanceof String || b instanceof PyStr || b instanceof PyBytes || b instanceof PyByteArray) {
+                return b;
+            }
+        }
+        return null;
+    }
+
     /// The text `int()` parses: a str, or the ASCII of a bytes-like value.
-    private static String intText(Object x, boolean explicitBase) {
+    private static String intText(Object value, boolean explicitBase) {
+        Object text = textBase(value);
+        Object x = text != null ? text : value;
         if (x instanceof String) {
             return (String) x;
         }
@@ -833,11 +1171,7 @@ public final class Builtins {
             throw Py.typeError("int() argument must be a string, a bytes-like object or a real number, not '"
                     + Py.typeOf(x).name + "'");
         }
-        char[] c = new char[b.length];
-        for (int i = 0; i < b.length; i++) {
-            c[i] = (char) (b[i] & 0xff);
-        }
-        return new String(c);
+        return Codecs.latin1(b, 0, b.length);
     }
 
     static Object toFloat(Object x) {
@@ -846,6 +1180,10 @@ public final class Builtins {
         }
         if (Py.isInt(x)) {
             return Py.ofFloat(Py.asDouble(x));
+        }
+        Object text = textBase(x);
+        if (text != null && Py.typeOf(x).lookup("__float__") == null) {
+            return toFloat(text);
         }
         if (x instanceof String) {
             String raw = ((String) x).trim();
@@ -874,12 +1212,8 @@ public final class Builtins {
         byte[] b = x instanceof PyStr ? null : PyBytes.like(x);
         if (b != null) {
             // float(b"1.5") parses the bytes as ASCII text.
-            char[] cs = new char[b.length];
-            for (int i = 0; i < b.length; i++) {
-                cs[i] = (char) (b[i] & 0xff);
-            }
             try {
-                return toFloat(new String(cs));
+                return toFloat(Codecs.latin1(b, 0, b.length));
             } catch (PyException e) {
                 throw Py.valueError("could not convert string to float: " + Py.toRepr(x)); //NOPMD PreserveStackTrace - CPython's error has no cause
             }
@@ -953,7 +1287,7 @@ public final class Builtins {
         if (m == null) {
             throw Py.typeError("bad operand type for abs(): '" + Py.typeOf(x).name + "'");
         }
-        return Py.obj(m).call(new Object[] {x}, Py.NO_KW);
+        return Py.obj(m).call1(x);
     }
 
     static boolean isCallable(Object x) {
@@ -974,21 +1308,65 @@ public final class Builtins {
     }
 
     private static Object next(Object[] a) {
-        Object v = Py.next(a[0]);
+        return next(a[0], a.length > 1 ? a[1] : null, a.length > 1);
+    }
+
+    private static Object next(Object it, Object fallback, boolean hasFallback) {
+        Object v = Py.next(it);
         if (v == null) {
-            if (a.length > 1) {
-                return a[1];
+            if (hasFallback) {
+                return fallback;
             }
-            if (a[0] instanceof PyGenerator) {
-                // A finished generator's StopIteration carries its return value.
-                throw PyGenerator.stopIteration(((PyGenerator) a[0]).returned());
-            }
-            throw new PyException(Py.STOP_ITERATION.call(Py.NO_ARGS, Py.NO_KW));
+            throw exhausted(it);
         }
         return v;
     }
 
+    /// The marker `__cn1_next_or_stop__` answers for an exhausted iterator.
+    static final Object NEXT_STOP = new PyObject() {
+        @Override
+        public PyType type() {
+            return Py.OBJECT_TYPE;
+        }
+    };
+
+    private static Object nextOrStop(Object f, Object it) {
+        if (f == NEXT) {
+            Object v = Py.next(it);
+            return v == null ? NEXT_STOP : v;
+        }
+        try {
+            return Py.call(f, it);
+        } catch (PyException e) {
+            if (e.matches(Py.STOP_ITERATION)) {
+                return NEXT_STOP;
+            }
+            throw e;
+        }
+    }
+
+    /// The StopIteration `next(it)` raises once `it` is exhausted.
+    static PyException exhausted(Object it) {
+        if (it instanceof PyGenerator) {
+            // A finished generator's StopIteration carries its return value.
+            return PyGenerator.stopIteration(((PyGenerator) it).returned());
+        }
+        return new PyException(Py.STOP_ITERATION.call(Py.NO_ARGS, Py.NO_KW));
+    }
+
     static Object ord(Object x) {
+        if (x instanceof String) {
+            // One code point is one char, or a surrogate pair: no count of
+            // the whole string for what is nearly always one char.
+            String s = (String) x;
+            int n = s.length();
+            if (n == 1) {
+                return PyInt.of(s.charAt(0));
+            }
+            if (n == 2 && Character.isHighSurrogate(s.charAt(0)) && Character.isLowSurrogate(s.charAt(1))) {
+                return PyInt.of(Character.toCodePoint(s.charAt(0), s.charAt(1)));
+            }
+        }
         if (!(x instanceof String) || PyStr.codePoints((String) x) != 1) {
             throw Py.typeError("ord() expected a character, but string of length "
                     + (x instanceof String ? PyStr.codePoints((String) x) : 0) + " found");
@@ -1043,7 +1421,7 @@ public final class Builtins {
         if (x instanceof PyInstance) {
             Object m = Py.typeOf(x).lookup("__round__");
             if (m != null) {
-                return nd == Py.NONE ? Py.obj(m).call(new Object[] {x}, Py.NO_KW) : Py.obj(m).call(new Object[] {x, nd}, Py.NO_KW); //NOPMD CompareObjectsWithEquals - identity is meant
+                return nd == Py.NONE ? Py.obj(m).call1(x) : Py.obj(m).call2(x, nd); //NOPMD CompareObjectsWithEquals - identity is meant
             }
         }
         if (Py.isInt(x)) {
@@ -1086,7 +1464,7 @@ public final class Builtins {
             throw Py.typeError("issubclass() arg 1 must be a class");
         }
         if (t instanceof PyTuple) {
-            Object[] items = ((PyTuple) t).items;
+            Object[] items = ((PyTuple) t).arr();
             for (Object item : items) {
                 if (issubclass(c, item)) {
                     return true;
@@ -1095,7 +1473,11 @@ public final class Builtins {
             return false;
         }
         if (!(t instanceof PyType)) {
-            throw Py.typeError("issubclass() arg 2 must be a class, a tuple of classes, or a union");
+            Object check = Py.typeOf(t).lookup("__subclasscheck__");
+            if (check == null) {
+                throw Py.typeError("issubclass() arg 2 must be a class, a tuple of classes, or a union");
+            }
+            return Py.isTrue(Py.call(check, t, c));
         }
         return ((PyType) t).subclassCheck((PyType) c);
     }
@@ -1146,7 +1528,30 @@ public final class Builtins {
     }
 
     private static Object sum(Args a) {
-        Object it = Py.iter(a.required(0, "iterable"));
+        Object src = a.required(0, "iterable");
+        if (src instanceof PyRange && a.get(1, "start", null) == null) {
+            // The values of a range are known: add them as longs, no iterator and
+            // no box per value. An overflow is left to the general loop below,
+            // which promotes to a big int from a fresh iterator.
+            PyRange r = (PyRange) src;
+            long n = r.length();
+            long acc = 0;
+            long v = r.start;
+            boolean ok = true;
+            for (long i = 0; i < n; i++) {
+                long t = acc + v;
+                if (((acc ^ t) & (v ^ t)) < 0) {
+                    ok = false;
+                    break;
+                }
+                acc = t;
+                v += r.step;
+            }
+            if (ok) {
+                return PyInt.of(acc);
+            }
+        }
+        Object it = Py.iter(src);
         Object acc = a.get(1, "start", PyInt.of(0));
         if (acc instanceof String) {
             throw Py.typeError("sum() can't sum strings [use ''.join(seq) instead]");
@@ -1162,8 +1567,10 @@ public final class Builtins {
         boolean floatMode = false;
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             if (intMode) {
-                if (Py.isInt(v) && !Py.intView(v).isBig()) {
-                    long b = Py.intView(v).value;
+                // A small int is a Long; read it as one. intView builds a PyInt per
+                // value above the cache, which was most of what sum(range(n)) did.
+                if (v instanceof Long) {
+                    long b = ((Long) v).longValue();
                     long r = ia + b;
                     if (((ia ^ r) & (b ^ r)) >= 0) {
                         ia = r;
@@ -1214,7 +1621,71 @@ public final class Builtins {
         return acc;
     }
 
+    /// `min(iterable)` / `max(iterable)` with no key or default.
+    private static Object minMax1(String fn, Object iterable, boolean min) {
+        Object[] items = null;
+        int n = 0;
+        if (iterable instanceof PyTuple) {
+            items = ((PyTuple) iterable).arr();
+            n = items.length;
+        } else if (iterable instanceof PyList) {
+            PyList l = (PyList) iterable;
+            if (l.floats == null && l.ints == null) {
+                items = l.items;
+                n = l.size;
+            }
+        }
+        if (items != null && n > 0) {
+            // A tuple or list is read in place, and two floats or two ints
+            // compared as such: pdfplumber's merge_bboxes takes min and max
+            // of each column of a word's character boxes.
+            Object best = items[0];
+            for (int i = 1; i < n; i++) {
+                Object v = items[i];
+                if (min ? less(v, best) : less(best, v)) {
+                    best = v;
+                }
+            }
+            return best;
+        }
+        Object it = Py.iter(iterable);
+        Object best = Py.next(it);
+        if (best == null) {
+            throw Py.valueError(fn + "() iterable argument is empty");
+        }
+        for (Object v = Py.next(it); v != null; v = Py.next(it)) {
+            if (min ? Py.ltBool(v, best) : Py.ltBool(best, v)) {
+                best = v;
+            }
+        }
+        return best;
+    }
+
+    /// `a < b` as a bool, directly for two floats or two ints.
+    private static boolean less(Object a, Object b) {
+        if (a instanceof Double && b instanceof Double) {
+            return ((Double) a).doubleValue() < ((Double) b).doubleValue();
+        }
+        if (a instanceof Long && b instanceof Long) {
+            return ((Long) a).longValue() < ((Long) b).longValue();
+        }
+        return Py.ltBool(a, b);
+    }
+
     private static Object minMax(String fn, Object[] args, String[] kw, boolean min) {
+        if (kw.length == 0 && args.length >= 2) {
+            // min(a, b, ...) with no key: a straight scan over the arguments,
+            // with no argument parsing, tuple or iterator. pdfminer's
+            // apply_matrix_rect calls it four times per rectangle.
+            Object best = args[0];
+            for (int i = 1; i < args.length; i++) {
+                Object v = args[i];
+                if (min ? less(v, best) : less(best, v)) {
+                    best = v;
+                }
+            }
+            return best;
+        }
         Args a = new Args(fn, args, kw).check(Integer.MAX_VALUE, "key", "default");
         Object key = a.kw("key");
         if (key == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
@@ -1232,11 +1703,27 @@ public final class Builtins {
         }
         Object best = null;
         Object bestKey = null;
-        for (Object v = Py.next(it); v != null; v = Py.next(it)) {
-            Object k = key == null ? v : Py.obj(key).call(new Object[] {v}, Py.NO_KW);
-            if (best == null || (min ? Py.ltBool(k, bestKey) : Py.ltBool(bestKey, k))) {
-                best = v;
-                bestKey = k;
+        if (it instanceof PyGenerator) {
+            // Stepped under one handler (see PyList.extend).
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object v = PyGenerator.loopNext(g); v != null; v = PyGenerator.loopNext(g)) {
+                    Object k = key == null ? v : Py.obj(key).call1(v);
+                    if (best == null || (min ? Py.ltBool(k, bestKey) : Py.ltBool(bestKey, k))) {
+                        best = v;
+                        bestKey = k;
+                    }
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
+            }
+        } else {
+            for (Object v = Py.next(it); v != null; v = Py.next(it)) {
+                Object k = key == null ? v : Py.obj(key).call1(v);
+                if (best == null || (min ? Py.ltBool(k, bestKey) : Py.ltBool(bestKey, k))) {
+                    best = v;
+                    bestKey = k;
+                }
             }
         }
         if (best == null) {
@@ -1251,7 +1738,7 @@ public final class Builtins {
     private static Object reversed(Object seq) {
         Object m = Py.typeOf(seq).lookup("__reversed__");
         if (m != null) {
-            return Py.obj(m).call(new Object[] {seq}, Py.NO_KW);
+            return Py.obj(m).call1(seq);
         }
         if (seq instanceof PyInstance && ((PyInstance) seq).base != null) {
             // A subclass of a built-in reverses as its built-in value does.

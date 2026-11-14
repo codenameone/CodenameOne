@@ -153,6 +153,38 @@ public class ByteCodeClass {
         return false;
     }
 
+    /// Maps each plain reference setter onto cn1InlSetRefField (cn1_globals.h), so a
+    /// store is inlined at the call site instead of being a call: with both barrier
+    /// macros in its body a setter is far over clang's -inline-threshold=50, and every
+    /// reference store in the program was a call. Volatile fields, a Reference's
+    /// referent and builds with field null checks keep the out-of-line setter, whose
+    /// stores are atomic or checked. Emitted after the struct, for offsetof.
+    private void appendInlineRefSetters(StringBuilder b) {
+        if (Util.getProperty("fieldNullChecks", "false").equals("true")) {
+            return;
+        }
+        for (ByteCodeField fld : fullFieldList) {
+            if (!fld.isObjectType() || fld.isVolatile() || isReferenceReferent(clsName, fld)) {
+                continue;
+            }
+            String declGuard = targetGuardFor(fld.getClsName().replace('/', '_').replace('$', '_').replace('-', '_'),
+                    fld.getFieldName());
+            if (declGuard == null) {
+                declGuard = targetGuardFor(clsName, fld.getFieldName());
+            }
+            if (declGuard != null) {
+                b.append("#if ").append(declGuard).append("\n");
+            }
+            b.append("#define set_field_").append(clsName).append("_").append(fld.getFieldName())
+                    .append("(cn1__v, cn1__t) cn1InlSetRefField((cn1__t), offsetof(struct obj__")
+                    .append(clsName).append(", ").append(fld.getClsName()).append("_")
+                    .append(fld.getFieldName()).append("), (cn1__v))\n");
+            if (declGuard != null) {
+                b.append("#endif\n");
+            }
+        }
+    }
+
     private static boolean isReferenceReferent(String owningClass, ByteCodeField fld) {
         return REFERENCE_CLASS.equals(owningClass)
                 && REFERENCE_REFERENT_FIELD.equals(fld.getFieldName())
@@ -1222,7 +1254,8 @@ public class ByteCodeClass {
 
         // Accessors below test completion before fetching thread context. The
         // recursion flag in class__X is set before <clinit> and cannot publish it.
-        b.append("static int __").append(clsName).append("_LOADED__=0;\n");
+        // Not static: the header's inline static getters (see the header emitter) read it.
+        b.append("int __").append(clsName).append("_LOADED__=0;\n");
         staticFieldList = new ArrayList<ByteCodeField>();
         buildStaticFieldList(staticFieldList);
         String enumValuesField = null;
@@ -1317,12 +1350,14 @@ public class ByteCodeClass {
                         b.append(" = 0;\n");
                     }
 
-                    // static getter
+                    // static getter. Parenthesized: the header maps the name onto an
+                    // inline fast path with a function-like macro.
                     b.append(bf.getCDefinition());
-                    b.append(" get_static_");
+                    b.append(" (get_static_");
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_').replace('-', '_'));
+                    b.append(")");
                     // Match the initializer's acquire/release completion check.
                     // TLS lookup and initialization are cold after the first access.
                     // No guard at all for an eagerly initialized class: it was
@@ -1366,7 +1401,14 @@ public class ByteCodeClass {
                         b.append(bf.getClsName());
                         b.append(bf.isObjectType() ? "(threadStateData);\n    " : "(getThreadLocalData());\n    ");
                     }
-                    if (bf.isObjectType()) {
+                    if (bf.isObjectType() && !bf.isVolatile()) {
+                        // The barriers and the store, behind one flag test: with both
+                        // barrier macros expanded here every static was 330 bytes of
+                        // setter, 10 MB of a program with thirty thousand of them.
+                        // cn1SetRefFieldSlow runs the same two macros in the same order.
+                        b.append("cn1InlSetStaticRef((JAVA_OBJECT*)&STATIC_FIELD_").append(bf.getClsName())
+                         .append("_").append(bf.getFieldName()).append(", __cn1StaticVal);");
+                    } else if (bf.isObjectType()) {
                         // SATB insertion barrier: record the reference being stored, so
                         // a static that takes a child mid-mark keeps it alive.
                         b.append("CN1_WRITE_BARRIER(JAVA_NULL, __cn1StaticVal);\n    ");
@@ -1374,7 +1416,9 @@ public class ByteCodeClass {
                         b.append("CN1_SATB_DELETE(&STATIC_FIELD_").append(bf.getClsName())
                          .append("_").append(bf.getFieldName()).append(");\n    ");
                     }
-                    if (bf.isVolatile()) {
+                    if (bf.isObjectType() && !bf.isVolatile()) { //NOPMD EmptyControlStatement - stored above
+                        // cn1InlSetStaticRef stored it.
+                    } else if (bf.isVolatile()) {
                         b.append("atomic_store_explicit(&STATIC_FIELD_");
                         b.append(bf.getClsName());
                         b.append("_");
@@ -1483,13 +1527,26 @@ public class ByteCodeClass {
 
             // Instance field setters don't use thread context directly.
             // CN1_SETTER_INLINE: see its definition in cn1_globals.h.
-            b.append("CN1_SETTER_INLINE void set_field_");
+            // Parenthesized: the header may map this name onto cn1InlSetRefField with a
+            // function-like macro (appendInlineRefSetters), which must not rewrite the
+            // definition itself.
+            b.append("CN1_SETTER_INLINE void (set_field_");
             b.append(clsName);
             b.append("_");
             b.append(fld.getFieldName());
-            b.append("(");
+            b.append(")(");
             b.append(fld.getCDefinition());
-            if(fld.isObjectType()) {
+            boolean mapped = fld.isObjectType() && !fld.isVolatile() && nullCheck.length() == 0
+                    && !isReferenceReferent(clsName, fld);
+            if(mapped) {
+                // The header maps this setter onto cn1InlSetRefField (appendInlineRefSetters),
+                // so nothing calls the function; it is the same code, and not a second
+                // expansion of both barriers -- 320 bytes a field, 12 MB of a program with
+                // forty thousand of them.
+                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n    cn1InlSetRefField(__cn1T, offsetof(struct obj__")
+                 .append(clsName).append(", ").append(fld.getClsName()).append("_")
+                 .append(fld.getFieldName()).append("), __cn1Val);\n}\n\n");
+            } else if(fld.isObjectType()) {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("   ");
                 // SATB insertion barrier: record the reference being stored, so an object
                 // linked into the graph mid-mark is kept alive even when the container it
@@ -1507,7 +1564,9 @@ public class ByteCodeClass {
             } else {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n  ").append(nullCheck).append("  ");
             }
-            if(isReferenceReferent(clsName, fld)) {
+            if(mapped) { //NOPMD EmptyControlStatement - stored above
+                // cn1InlSetRefField stored it.
+            } else if(isReferenceReferent(clsName, fld)) {
                 // Reference.clear() and the constructor both land here, and the collector
                 // stores JAVA_NULL into the same word concurrently. Atomic for the reason
                 // spelled out on the getter above.
@@ -1984,7 +2043,9 @@ public class ByteCodeClass {
                 }
             } else {
                 for(BytecodeMethod m : virtualMethodList) {
-                    m.appendVirtualMethodC(clsName, b, offset);
+                    if(!inheritsThunk(m, offset)) {
+                        m.appendVirtualMethodC(clsName, b, offset);
+                    }
                     offset++;
                 }
             }
@@ -2451,9 +2512,12 @@ public class ByteCodeClass {
     private void appendSuperStub(StringBuilder b, List<BytecodeMethod> bm, ByteCodeClass base) {
         // append super stub
         BytecodeMethod.setAcceptStaticOnEquals(true);
+        // Nothing is written for an inherited method: the header names the
+        // declaring class's function under this class's name (appendSuperStubHeader).
+        // A forwarding function per class and inherited method was 430,000 functions
+        // and 27 MB of one program whose classes share a wide base class.
         for(BytecodeMethod m : base.methods) {
             if(!m.isPrivate() && !bm.contains(m)) {
-                m.appendSuperCall(b, clsName);
                 bm.add(m);
             }
         }
@@ -2461,6 +2525,21 @@ public class ByteCodeClass {
             appendSuperStub(b, bm, base.baseClassObject);
         }
         BytecodeMethod.setAcceptStaticOnEquals(false);
+    }
+
+    /// Whether this class's dispatch thunk for the method in `slot` is the base
+    /// class's: the method is inherited, not overridden here, it sits in the same
+    /// vtable slot, and both thunks resolve the receiver's class the same way. The
+    /// thunk reads the slot out of the receiver's own vtable, so the base class's
+    /// dispatches a subclass instance exactly as a second copy would.
+    private boolean inheritsThunk(BytecodeMethod m, int slot) {
+        ByteCodeClass base = baseClassObject;
+        return !isInterface && base != null && !base.isInterface
+                && !"java_lang_Class".equals(clsName) && !"java_lang_Class".equals(base.clsName)
+                && !m.isVirtualOverriden()
+                && slot < base.virtualMethodList.size()
+                && base.virtualMethodList.get(slot) == m //NOPMD CompareObjectsWithEquals - the same method object is an inherited one
+                && Parser.canReceiveTagged(clsName) == Parser.canReceiveTagged(base.clsName);
     }
 
     private boolean hasMethodInBaseClass(BytecodeMethod method) {
@@ -2512,7 +2591,17 @@ public class ByteCodeClass {
         // append super stub
         for(BytecodeMethod m : base.methods) {
             if(!m.isPrivate() && !bm.contains(m)) {
-                m.appendMethodHeader(b, clsName);
+                if(m.isNative()) {
+                    m.appendMethodHeader(b, clsName);
+                } else {
+                    // The inherited method under this class's name IS the declaring
+                    // class's function; its header is included through the base class.
+                    b.append("#define ");
+                    m.appendFunctionPointer(b, clsName);
+                    b.append(" ");
+                    m.appendFunctionPointer(b);
+                    b.append("\n");
+                }
                 bm.add(m);
             }
         }
@@ -2810,7 +2899,17 @@ public class ByteCodeClass {
             appendDefaultInterfaceStubHeaders(b, bm);
         }
         
+        int thunkSlot = -1;
         for(BytecodeMethod m : virtualMethodList) {
+            thunkSlot++;
+            if(inheritsThunk(m, thunkSlot)) {
+                b.append("#define virtual_");
+                m.appendFunctionPointer(b, clsName);
+                b.append(" virtual_");
+                m.appendFunctionPointer(b, baseClassObject.clsName);
+                b.append("\n");
+                continue;
+            }
             if(m.isVirtualOverriden()) {
                 b.append("#define virtual_");
                 b.append(m.getClsName());
@@ -2861,6 +2960,25 @@ public class ByteCodeClass {
                     }
                     b.append(bf.getCDefinition());
                     b.append(" v);\n");
+                    if (!bf.isVolatile()) {
+                        // Inline fast path: a read of an initialized class's static is a
+                        // flag test and a load. The getter was a call per read -- a Python
+                        // constant (None, a small int) is a static field, and 6% of a
+                        // generator drain was spent calling two of these. The out-of-line
+                        // getter still runs the initializer the first time. Inside its own
+                        // expansion the macro's name is not expanded again.
+                        String getter = "get_static_" + clsName + "_" + bf.getFieldName().replace('$', '_').replace('-', '_');
+                        String storage = "STATIC_FIELD_" + clsName + "_" + bf.getFieldName();
+                        b.append("#define ").append(getter).append("() ");
+                        if (eagerInit(clsName)) {
+                            b.append("(").append(storage).append(")\n");
+                        } else {
+                            b.append("(__atomic_load_n(&__").append(clsName)
+                                    .append("_LOADED__, __ATOMIC_ACQUIRE) ? ").append(storage)
+                                    .append(" : ").append(getter).append("())\n");
+                            b.append("extern int __").append(clsName).append("_LOADED__;\n");
+                        }
+                    }
                     }
                 } else {
                     b.append("#define get_static_");
@@ -2945,6 +3063,7 @@ public class ByteCodeClass {
             b.append("    unsigned char __cn1InlineStorage[16] __attribute__((aligned(16)));\n");
         }
         b.append("};\n\n");
+        appendInlineRefSetters(b);
                      
         
         b.append("\n\n#endif //__");

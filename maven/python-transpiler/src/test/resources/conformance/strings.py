@@ -53,3 +53,5 @@ for w in Splitter().split():
     print(w)
 
 print(len("\ud800"), len("a\U0001F600b"), len("\udc00\ud800x"), len("x" * 40 + "\U0001F600"))
+# Formal name aliases (NameAliases.txt), which Beautiful Soup uses.
+print([hex(ord(c)) for c in "\N{BYTE ORDER MARK}\N{LINE FEED}\N{nbsp}\N{ZWJ}"])

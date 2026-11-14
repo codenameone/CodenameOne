@@ -98,3 +98,26 @@ Buffer = bytes
 CapsuleType = object
 NoDefault = object()
 NoExtraItems = object()
+
+
+class sentinel:
+    """A unique object with a readable repr (PEP 661): undefined = sentinel("undefined")."""
+
+    def __init__(self, name, repr=None):
+        self._name = name
+        self._repr = repr if repr is not None else "<" + name + ">"
+
+    def __repr__(self):
+        return self._repr
+
+    def __reduce__(self):
+        return self._name
+
+    def __or__(self, other):
+        return Union[self, other]
+
+    def __ror__(self, other):
+        return Union[other, self]
+
+
+Sentinel = sentinel

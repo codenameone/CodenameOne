@@ -91,6 +91,19 @@ public class VarOp extends Instruction implements AssignableExpression {
                     }
                 }
                 break;
+            case Opcodes.BIPUSH:
+            case Opcodes.SIPUSH:
+                // The int constant itself, as BasicInstruction answers for the
+                // same opcodes: without it `c < 128` or `x == 1000` compiled
+                // through the operand stack, never folded into one C test as a
+                // compare with a local or an LDC constant is. A negative one is
+                // parenthesized, so no fold can paste it after a minus.
+                if (var < 0) {
+                    b.append('(').append(var).append(')');
+                } else {
+                    b.append(var);
+                }
+                break;
             default:
                 return false;
                 

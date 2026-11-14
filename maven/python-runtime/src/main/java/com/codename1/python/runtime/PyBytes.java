@@ -31,6 +31,28 @@ public final class PyBytes extends PyObject {
         this.value = value;
     }
 
+    /// The empty and the one-byte values, shared as CPython shares them: a
+    /// tokenizer's `s[j:j + 1]` (pdfminer's psparser, once per character)
+    /// otherwise allocates a byte array and a bytes object every time.
+    private static final PyBytes[] SMALL = new PyBytes[257];
+
+    /// `v[lo:hi]` as a new bytes, or the shared value for zero or one byte.
+    static PyBytes range(byte[] v, int lo, int hi) {
+        int n = hi <= lo ? 0 : hi - lo;
+        if (n <= 1) {
+            int k = n == 0 ? 256 : v[lo] & 0xff;
+            PyBytes b = SMALL[k];
+            if (b == null) {
+                b = new PyBytes(n == 0 ? new byte[0] : new byte[] {v[lo]});
+                SMALL[k] = b;
+            }
+            return b;
+        }
+        byte[] out = new byte[n];
+        System.arraycopy(v, lo, out, 0, n);
+        return new PyBytes(out);
+    }
+
     @Override
     public PyType type() {
         return Py.BYTES_TYPE;
@@ -262,13 +284,17 @@ public final class PyBytes extends PyObject {
         if (key instanceof PySlice) {
             int[] r = ((PySlice) key).indices(value.length);
             int n = PySlice.length(r);
+            if (r[2] == 1) {
+                // A plain slice is one block copy, not a checked store per element.
+                return range(value, r[0], r[0] + n);
+            }
             byte[] out = new byte[n];
             for (int i = 0, j = r[0]; i < n; i++, j += r[2]) {
                 out[i] = value[j];
             }
             return new PyBytes(out);
         }
-        long i = Py.index(key);
+        long i = Py.subscript(key);
         if (i < 0) {
             i += value.length;
         }
@@ -289,11 +315,24 @@ public final class PyBytes extends PyObject {
     }
 
     static void install() {
-        Py.BYTES_TYPE.define("decode", PyBuiltin.methodKw(Py.BYTES_TYPE, "decode", (a, kw) -> {
+        final PyBuiltin decode = PyBuiltin.methodKw(Py.BYTES_TYPE, "decode", (a, kw) -> {
+            // `b.decode()` and `b.decode("utf-8")`, bound without Args.
+            if ((kw == null || kw.length == 0) && a.length <= 2 && a[0] instanceof PyBytes
+                    && (a.length == 1 || a[1] instanceof String)) {
+                return Codecs.decodeKeep(((PyBytes) a[0]).value, a.length == 1 ? "utf-8" : (String) a[1], "strict");
+            }
             Object[] p = Args.bind("decode", a, kw, new String[] {"self", "encoding", "errors"},
                     new Object[] {null, Py.str("utf-8"), Py.str("strict")});
-            return Py.str(Codecs.decode(((PyBytes) p[0]).value, Py.toStr(p[1]), Py.toStr(p[2])));
-        }));
+            return Py.str(Codecs.decodeKeep(((PyBytes) p[0]).value, Py.toStr(p[1]), Py.toStr(p[2])));
+        });
+        // `b.decode()` and `b.decode("utf-8")` once more, without an argument array: the
+        // method-call site hands a builtin its receiver and argument directly.
+        decode.with1(b -> b instanceof PyBytes ? Codecs.decodeKeep(((PyBytes) b).value, "utf-8", "strict")
+                : decode.impl.call(new Object[] {b}, Py.NO_KW));
+        decode.with2((b, e) -> b instanceof PyBytes && e instanceof String
+                ? Codecs.decodeKeep(((PyBytes) b).value, (String) e, "strict")
+                : decode.impl.call(new Object[] {b, e}, Py.NO_KW));
+        Py.BYTES_TYPE.define("decode", decode);
         Py.BYTES_TYPE.define("hex", PyBuiltin.methodKw(Py.BYTES_TYPE, "hex", (args, kw) -> {
             Object[] p = Args.bind("hex", args, kw, new String[] {"self", "sep", "bytes_per_sep"},
                     new Object[] {null, Py.NONE, PyInt.of(1)});
@@ -325,8 +364,8 @@ public final class PyBytes extends PyObject {
             return Py.str(sb.toString());
         }));
         installLatin1Delegates();
-        Py.BYTES_TYPE.define("fromhex", new PyClassMethod(PyBuiltin.positional("fromhex", a -> {
-            String h = Py.toStr(a[1]);
+        Py.BYTES_TYPE.define("fromhex", new PyClassMethod(PyBuiltin.fixed2("fromhex", (a0, a1) -> {
+            String h = Py.toStr(a1);
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
             int i = 0;
             while (i < h.length()) {
@@ -346,27 +385,36 @@ public final class PyBytes extends PyObject {
             }
             return new PyBytes(out.toByteArray());
         })));
-        Py.BYTES_TYPE.define("upper", PyBuiltin.method(Py.BYTES_TYPE, "upper", a -> asciiCase((PyBytes) a[0], true)));
-        Py.BYTES_TYPE.define("lower", PyBuiltin.method(Py.BYTES_TYPE, "lower", a -> asciiCase((PyBytes) a[0], false)));
-        Py.BYTES_TYPE.define("isdigit", PyBuiltin.method(Py.BYTES_TYPE, "isdigit",
-                a -> Py.bool(allAscii((PyBytes) a[0], "0123456789"))));
-        Py.BYTES_TYPE.define("isalpha", PyBuiltin.method(Py.BYTES_TYPE, "isalpha",
-                a -> Py.bool(allAscii((PyBytes) a[0], LETTERS))));
-        Py.BYTES_TYPE.define("isalnum", PyBuiltin.method(Py.BYTES_TYPE, "isalnum",
-                a -> Py.bool(allAscii((PyBytes) a[0], LETTERS + "0123456789"))));
-        Py.BYTES_TYPE.define("isspace", PyBuiltin.method(Py.BYTES_TYPE, "isspace",
-                a -> Py.bool(allAscii((PyBytes) a[0], " \t\n\r\u000b\f"))));
+        Py.BYTES_TYPE.define("upper", PyBuiltin.method1(Py.BYTES_TYPE, "upper", a0 -> asciiCase((PyBytes) a0, true)));
+        Py.BYTES_TYPE.define("lower", PyBuiltin.method1(Py.BYTES_TYPE, "lower", a0 -> asciiCase((PyBytes) a0, false)));
+        Py.BYTES_TYPE.define("isdigit", PyBuiltin.method1(Py.BYTES_TYPE, "isdigit", a0 -> Py.bool(allAscii((PyBytes) a0, "0123456789"))));
+        Py.BYTES_TYPE.define("isalpha", PyBuiltin.method1(Py.BYTES_TYPE, "isalpha", a0 -> Py.bool(allAscii((PyBytes) a0, LETTERS))));
+        Py.BYTES_TYPE.define("isalnum", PyBuiltin.method1(Py.BYTES_TYPE, "isalnum", a0 -> Py.bool(allAscii((PyBytes) a0, LETTERS + "0123456789"))));
+        Py.BYTES_TYPE.define("isspace", PyBuiltin.method1(Py.BYTES_TYPE, "isspace", a0 -> Py.bool(allAscii((PyBytes) a0, " \t\n\r\u000b\f"))));
         installAsciiText();
-        Py.BYTES_TYPE.factory = (t, args, kw) -> {
-            if (args.length == 0) {
-                return new PyBytes(new byte[0]);
-            }
-            Object x = args[0];
+        Py.BYTES_TYPE.factory = (t, args, kw) -> args.length == 0 ? new PyBytes(new byte[0]) : fromOne(t, args[0]);
+        Py.BYTES_TYPE.unary = x -> fromOne(Py.BYTES_TYPE, x);
+    }
+
+    /// `t(x)` for bytes or a subclass `t`.
+    static Object fromOne(PyType t, Object x) {
+        {
             if (x instanceof String) {
                 return new PyBytes(Utf8.encode(((String) x)));
             }
             if (Py.isInt(x)) {
                 return new PyBytes(new byte[(int) Py.asLong(x)]);
+            }
+            if (x instanceof PyBytes && t == Py.BYTES_TYPE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                // bytes(b) is b: it cannot change. Hashing and I/O code calls
+                // this on every buffer it is handed.
+                return x;
+            }
+            if (x instanceof PyByteArray) {
+                return new PyBytes(((PyByteArray) x).bytes());
+            }
+            if (x instanceof PyMemoryView) {
+                return new PyBytes(((PyMemoryView) x).bytes().clone());
             }
             Object[] items = Py.toArray(x);
             byte[] r = new byte[items.length];
@@ -378,7 +426,7 @@ public final class PyBytes extends PyObject {
                 r[i] = (byte) v;
             }
             return new PyBytes(r);
-        };
+        }
     }
 
     private static boolean isUpper(int c) {
@@ -443,17 +491,23 @@ public final class PyBytes extends PyObject {
             for (byte e : del) {
                 drop[e & 0xff] = true;
             }
-            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(v.length);
+            byte[] out = new byte[v.length];
+            int n = 0;
             for (byte el : v) {
                 int c = el & 0xff;
                 if (!drop[c]) {
-                    out.write(table == null ? c : table[c] & 0xff);
+                    out[n++] = table == null ? el : table[c];
                 }
             }
-            return new PyBytes(out.toByteArray());
+            if (n != out.length) {
+                byte[] cut = new byte[n];
+                System.arraycopy(out, 0, cut, 0, n);
+                out = cut;
+            }
+            return new PyBytes(out);
         }));
-        t.define("isascii", PyBuiltin.method(t, "isascii", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("isascii", PyBuiltin.method1(t, "isascii", a0 -> {
+            byte[] v = self(a0).value;
             for (byte e : v) {
                 if (e < 0) {
                     return Py.FALSE;
@@ -461,10 +515,10 @@ public final class PyBytes extends PyObject {
             }
             return Py.TRUE;
         }));
-        t.define("islower", PyBuiltin.method(t, "islower", a -> Py.bool(cased(self(a[0]).value, false))));
-        t.define("isupper", PyBuiltin.method(t, "isupper", a -> Py.bool(cased(self(a[0]).value, true))));
-        t.define("istitle", PyBuiltin.method(t, "istitle", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("islower", PyBuiltin.method1(t, "islower", a0 -> Py.bool(cased(self(a0).value, false))));
+        t.define("isupper", PyBuiltin.method1(t, "isupper", a0 -> Py.bool(cased(self(a0).value, true))));
+        t.define("istitle", PyBuiltin.method1(t, "istitle", a0 -> {
+            byte[] v = self(a0).value;
             boolean cased = false;
             boolean prevCased = false;
             for (byte e : v) {
@@ -487,8 +541,8 @@ public final class PyBytes extends PyObject {
             }
             return Py.bool(cased);
         }));
-        t.define("swapcase", PyBuiltin.method(t, "swapcase", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("swapcase", PyBuiltin.method1(t, "swapcase", a0 -> {
+            byte[] v = self(a0).value;
             byte[] r = new byte[v.length];
             for (int i = 0; i < v.length; i++) {
                 int c = v[i] & 0xff;
@@ -496,8 +550,8 @@ public final class PyBytes extends PyObject {
             }
             return new PyBytes(r);
         }));
-        t.define("capitalize", PyBuiltin.method(t, "capitalize", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("capitalize", PyBuiltin.method1(t, "capitalize", a0 -> {
+            byte[] v = self(a0).value;
             byte[] r = new byte[v.length];
             for (int i = 0; i < v.length; i++) {
                 int c = v[i] & 0xff;
@@ -509,8 +563,8 @@ public final class PyBytes extends PyObject {
             }
             return new PyBytes(r);
         }));
-        t.define("title", PyBuiltin.method(t, "title", a -> {
-            byte[] v = self(a[0]).value;
+        t.define("title", PyBuiltin.method1(t, "title", a0 -> {
+            byte[] v = self(a0).value;
             byte[] r = new byte[v.length];
             boolean prevCased = false;
             for (int i = 0; i < v.length; i++) {
@@ -556,7 +610,14 @@ public final class PyBytes extends PyObject {
     private static void installLatin1Delegates() {
         for (String e : LATIN1_DELEGATES) {
             final String name = e;
+            final int search = searchKind(name);
             Py.BYTES_TYPE.define(name, PyBuiltin.methodKw(Py.BYTES_TYPE, name, (args, kw) -> {
+                if (search != 0 && args.length >= 2 && args.length <= 4 && kw.length == 0) {
+                    Object r = searched(search, args);
+                    if (r != null) {
+                        return r;
+                    }
+                }
                 Object[] mapped = new Object[args.length];
                 for (int k = 0; k < args.length; k++) {
                     Object v = args[k];
@@ -572,14 +633,211 @@ public final class PyBytes extends PyObject {
         }
     }
 
+    /// Which of the searches [#searched] answers `name` is, 0 for none of them.
+    private static int searchKind(String name) {
+        if ("startswith".equals(name)) {
+            return 1;
+        }
+        if ("endswith".equals(name)) {
+            return 2;
+        }
+        if ("find".equals(name)) {
+            return 3;
+        }
+        if ("rfind".equals(name)) {
+            return 4;
+        }
+        if ("count".equals(name)) {
+            return 5;
+        }
+        return 0;
+    }
+
+    /// A search of one bytes value for another, with no range, done on the bytes
+    /// themselves; null for any other call, which goes the long way. That way maps
+    /// the whole receiver to text first, so testing how a file starts
+    /// (`data.startswith(b"%PDF-")`, and a type sniffer asks that a dozen times)
+    /// copied the file twice per question.
+    ///
+    /// The optional start and end are taken as slice bounds, the way CPython's
+    /// `ADJUST_INDICES` takes them. A tokenizer scans a buffer with
+    /// `data.find(b">>", pos)`; that form used to copy the whole buffer to text
+    /// on every call, which made scanning a file quadratic in its size.
+    private static Object searched(int kind, Object[] args) {
+        byte[] h = like(args[0]);
+        if (h == null) {
+            return null;
+        }
+        Object arg = args[1];
+        int lo = 0;
+        int hi = h.length;
+        if (args.length > 2) {
+            long[] r = window(h.length, args);
+            if (r.length == 0) {
+                return null;
+            }
+            lo = (int) r[0];
+            hi = (int) r[1];
+            if (lo > h.length) {
+                // Past the end: nothing is found, not even an empty needle.
+                return kind <= 2 ? Py.FALSE : kind == 5 ? PyInt.of(0) : PyInt.of(-1);
+            }
+        }
+        if (kind >= 3 && arg instanceof Long) {
+            long v = ((Long) arg).longValue();
+            if (v < 0 || v > 255) {
+                return null;
+            }
+            arg = new PyBytes(new byte[] {(byte) v});
+        }
+        if (lo != 0 || hi != h.length) {
+            return searchedIn(kind, h, lo, hi, arg);
+        }
+        if (kind <= 2 && arg instanceof PyTuple) {
+            Object[] each = ((PyTuple) arg).arr();
+            for (Object one : each) {
+                if (like(one) == null) {
+                    return null;
+                }
+            }
+            for (Object one : each) {
+                byte[] n = like(one);
+                if (matchesAt(h, n, kind == 1 ? 0 : h.length - n.length)) {
+                    return Py.TRUE;
+                }
+            }
+            return Py.FALSE;
+        }
+        byte[] n = like(arg);
+        if (n == null) {
+            return null;
+        }
+        if (kind == 1) {
+            return Py.bool(matchesAt(h, n, 0));
+        }
+        if (kind == 2) {
+            return Py.bool(matchesAt(h, n, h.length - n.length));
+        }
+        if (n.length == 0) {
+            return null;
+        }
+        if (kind == 3) {
+            for (int i = 0; i + n.length <= h.length; i++) {
+                if (h[i] == n[0] && matchesAt(h, n, i)) {
+                    return PyInt.of(i);
+                }
+            }
+            return PyInt.of(-1);
+        }
+        if (kind == 4) {
+            for (int i = h.length - n.length; i >= 0; i--) {
+                if (h[i] == n[0] && matchesAt(h, n, i)) {
+                    return PyInt.of(i);
+                }
+            }
+            return PyInt.of(-1);
+        }
+        int count = 0;
+        int i = 0;
+        while (i + n.length <= h.length) {
+            if (h[i] == n[0] && matchesAt(h, n, i)) {
+                count++;
+                i += n.length;
+            } else {
+                i++;
+            }
+        }
+        return PyInt.of(count);
+    }
+
+    /// The start and end of a ranged search, clamped as slice bounds except that
+    /// a start past the end is kept so the caller can answer it; empty when
+    /// either is neither an int nor None.
+    private static final long[] NO_WINDOW = new long[0];
+
+    private static long[] window(int len, Object[] args) {
+        long lo = 0;
+        long hi = len;
+        Object a = args[2];
+        if (a instanceof Long) {
+            lo = ((Long) a).longValue();
+            if (lo < 0) {
+                lo = Math.max(0, lo + len);
+            }
+        } else if (a != Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return NO_WINDOW;
+        }
+        if (args.length > 3) {
+            Object b = args[3];
+            if (b instanceof Long) {
+                hi = ((Long) b).longValue();
+                hi = hi < 0 ? Math.max(0, hi + len) : Math.min(hi, len);
+            } else if (b != Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return NO_WINDOW;
+            }
+        }
+        return new long[] {lo, hi};
+    }
+
+    /// [#searched] over `h[lo:hi]`, `lo` at most the length; null for what it
+    /// leaves to the long way (a tuple of prefixes, an empty needle).
+    private static Object searchedIn(int kind, byte[] h, int lo, int hi, Object arg) {
+        byte[] n = like(arg);
+        if (n == null || n.length == 0) {
+            return null;
+        }
+        if (kind == 1) {
+            return Py.bool(hi - lo >= n.length && matchesAt(h, n, lo));
+        }
+        if (kind == 2) {
+            return Py.bool(hi - lo >= n.length && matchesAt(h, n, hi - n.length));
+        }
+        if (kind == 3) {
+            byte first = n[0];
+            for (int i = lo; i + n.length <= hi; i++) {
+                if (h[i] == first && matchesAt(h, n, i)) {
+                    return PyInt.of(i);
+                }
+            }
+            return PyInt.of(-1);
+        }
+        if (kind == 4) {
+            for (int i = hi - n.length; i >= lo; i--) {
+                if (h[i] == n[0] && matchesAt(h, n, i)) {
+                    return PyInt.of(i);
+                }
+            }
+            return PyInt.of(-1);
+        }
+        int count = 0;
+        int i = lo;
+        while (i + n.length <= hi) {
+            if (h[i] == n[0] && matchesAt(h, n, i)) {
+                count++;
+                i += n.length;
+            } else {
+                i++;
+            }
+        }
+        return PyInt.of(count);
+    }
+
+    private static boolean matchesAt(byte[] h, byte[] n, int at) {
+        if (at < 0 || at + n.length > h.length) {
+            return false;
+        }
+        for (int i = 0; i < n.length; i++) {
+            if (h[at + i] != n[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static Object toLatin1(Object o) {
         byte[] v = like(o);
         if (v != null) {
-            char[] c = new char[v.length];
-            for (int i = 0; i < v.length; i++) {
-                c[i] = (char) (v[i] & 0xff);
-            }
-            return new String(c);
+            return Codecs.latin1(v, 0, v.length);
         }
         if (o instanceof String) {
             throw Py.typeError("a bytes-like object is required, not 'str'");

@@ -274,7 +274,10 @@ public class CustomInvoke extends Instruction {
             if (targetObjectLiteral != null) {
                 b.append("cloneArray(").append(targetObjectLiteral).append(")");
             } else {
-                b.append("cloneArray(POP_OBJ(1))");
+                // The array was pushed by the instruction before: POP_OBJ
+                // takes no argument (`x().clone()` assigned to a local
+                // emitted POP_OBJ(1), which no C compiler accepts).
+                b.append("cloneArray(POP_OBJ())");
             }
             return true;
         }

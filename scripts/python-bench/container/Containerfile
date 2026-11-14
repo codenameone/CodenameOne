@@ -1,0 +1,37 @@
+# The benchmark machine: the native kernels are real Linux port binaries
+# (build_parparvm.sh), measured beside CPython, PyPy and GraalPy on the same
+# kernel source in the same container, so every column sees one kernel, one
+# libc and one CPU budget.
+#
+#   podman build -t cn1-python-bench -f scripts/python-bench/container/Containerfile .
+#
+# container/run.sh builds it and runs the table.
+FROM docker.io/library/python:3.14-slim-bookworm
+
+ARG PYPY=pypy3.11-v7.3.19
+ARG GRAALPY=24.2.2
+ARG TEMURIN8=8u462b08
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        clang cmake ninja-build pkg-config make time unzip curl ca-certificates bzip2 \
+        libfreetype-dev libpng-dev libjpeg-dev zlib1g-dev libssl-dev libcurl4-openssl-dev \
+        openjdk-17-jdk-headless linux-perf binutils \
+    && rm -rf /var/lib/apt/lists/*
+
+# JDK 8 runs the translator, as on CI; Debian no longer packages one.
+RUN set -e; arch=$(uname -m); case "$arch" in x86_64) t=x64;; aarch64) t=aarch64;; esac; \
+    v=${TEMURIN8}; \
+    curl -fsSL "https://github.com/adoptium/temurin8-binaries/releases/download/jdk${v%b*}-b${v#*b}/OpenJDK8U-jdk_${t}_linux_hotspot_${v}.tar.gz" \
+        | tar -xz -C /opt && mv /opt/jdk8* /opt/jdk8
+
+RUN set -e; arch=$(uname -m); case "$arch" in x86_64) p=linux64;; aarch64) p=aarch64;; esac; \
+    curl -fsSL "https://downloads.python.org/pypy/${PYPY}-${p}.tar.bz2" | tar -xj -C /opt \
+    && mv /opt/${PYPY}-${p} /opt/pypy
+
+RUN set -e; arch=$(uname -m); case "$arch" in x86_64) g=amd64;; aarch64) g=aarch64;; esac; \
+    curl -fsSL "https://github.com/oracle/graalpython/releases/download/graal-${GRAALPY}/graalpy-${GRAALPY}-linux-${g}.tar.gz" \
+        | tar -xz -C /opt && mv /opt/graalpy-* /opt/graalpy
+
+ENV JDK_8_HOME=/opt/jdk8 \
+    CC=clang \
+    CN1_DISPLAY=headless

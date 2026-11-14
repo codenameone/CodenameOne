@@ -96,21 +96,21 @@ public abstract class PyServer {
     public static Object openWebSocket(Object webSockets, String target, String[] headers,
                                        final WebSocketSink sink) {
         Object[] req = request("GET", target, headers, null);
-        PyBuiltin send = PyBuiltin.positional("send", a -> {
-            String kind = Py.toStr(a[0]);
+        PyBuiltin send = PyBuiltin.fixed3("send", (a0, a1, a2) -> {
+            String kind = Py.toStr(a0);
             if ("accept".equals(kind)) {
-                sink.accept(a[1] == Py.NONE ? null : Py.toStr(a[1]), strings(a[2])); //NOPMD CompareObjectsWithEquals - identity is meant
+                sink.accept(a1 == Py.NONE ? null : Py.toStr(a1), strings(a2)); //NOPMD CompareObjectsWithEquals - identity is meant
             } else if ("text".equals(kind)) {
-                sink.text(Py.toStr(a[1]));
+                sink.text(Py.toStr(a1));
             } else if ("bytes".equals(kind)) {
-                sink.binary(PyBytes.like(a[1]));
+                sink.binary(PyBytes.like(a1));
             } else if ("deny".equals(kind)) {
-                Object detail = a[2];
+                Object detail = a2;
                 Object[] parts = detail instanceof PyList ? ((PyList) detail).toArray() : null;
-                sink.deny((int) Py.asLong(a[1]), parts == null ? new String[0] : strings(parts[0]),
+                sink.deny((int) Py.asLong(a1), parts == null ? new String[0] : strings(parts[0]),
                         parts == null ? new byte[0] : PyBytes.like(parts[1]));
             } else {
-                sink.close((int) Py.asLong(a[1]), a[2] == Py.NONE ? "" : Py.toStr(a[2])); //NOPMD CompareObjectsWithEquals - identity is meant
+                sink.close((int) Py.asLong(a1), a2 == Py.NONE ? "" : Py.toStr(a2)); //NOPMD CompareObjectsWithEquals - identity is meant
             }
             return Py.NONE;
         });
@@ -171,7 +171,7 @@ public abstract class PyServer {
         String query = q < 0 ? "" : target.substring(q + 1);
         PyList hs = new PyList(headers.length / 2);
         for (int i = 0; i + 1 < headers.length; i += 2) {
-            hs.append(new PyTuple(new Object[] {headers[i], headers[i + 1]}));
+            hs.append(Py.tuple(headers[i], headers[i + 1]));
         }
         return new Object[] {method, path, query, hs, new PyBytes(body == null ? new byte[0] : body)};
     }
@@ -195,7 +195,7 @@ public abstract class PyServer {
         Object after = t.size() == 4 && t.get(3) != Py.NONE ? t.get(3) : null; //NOPMD CompareObjectsWithEquals - identity is meant
         Object hl = t.get(1);
         Object[] pairs = hl instanceof PyList ? ((PyList) hl).toArray()
-                : hl instanceof PyTuple ? ((PyTuple) hl).items : null;
+                : hl instanceof PyTuple ? ((PyTuple) hl).arr() : null;
         if (pairs == null) {
             throw Py.typeError("dispatch headers must be a list of (name, value) pairs");
         }

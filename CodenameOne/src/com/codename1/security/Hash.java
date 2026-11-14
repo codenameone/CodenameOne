@@ -115,6 +115,68 @@ public final class Hash {
         return new Hash(MessageDigestImpl.create(algorithm));
     }
 
+    /// A BLAKE2b hash (RFC 7693), optionally keyed, salted and personalised.
+    ///
+    /// #### Parameters
+    ///
+    /// - `digestSize`: bytes of output, 1 to 64
+    ///
+    /// - `key`: the MAC key, at most 64 bytes; empty for a plain hash
+    ///
+    /// - `salt`: at most 16 bytes, zero padded; may be empty
+    ///
+    /// - `person`: the personalisation string, at most 16 bytes, zero padded;
+    ///   may be empty
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: if a size is out of range
+    public static Hash blake2b(int digestSize, byte[] key, byte[] salt, byte[] person) {
+        return blake2(true, digestSize, key, salt, person);
+    }
+
+    /// A BLAKE2s hash (RFC 7693), the 32-bit variant of [#blake2b].
+    ///
+    /// #### Parameters
+    ///
+    /// - `digestSize`: bytes of output, 1 to 32
+    ///
+    /// - `key`: the MAC key, at most 32 bytes; empty for a plain hash
+    ///
+    /// - `salt`: at most 8 bytes, zero padded; may be empty
+    ///
+    /// - `person`: the personalisation string, at most 8 bytes, zero padded;
+    ///   may be empty
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: if a size is out of range
+    public static Hash blake2s(int digestSize, byte[] key, byte[] salt, byte[] person) {
+        return blake2(false, digestSize, key, salt, person);
+    }
+
+    private static Hash blake2(boolean big, int digestSize, byte[] key, byte[] salt, byte[] person) {
+        int max = big ? 64 : 32;
+        int half = big ? 16 : 8;
+        byte[] k = key == null ? new byte[0] : key;
+        byte[] s = salt == null ? new byte[0] : salt;
+        byte[] p = person == null ? new byte[0] : person;
+        if (digestSize < 1 || digestSize > max || k.length > max || s.length > half || p.length > half) {
+            throw new CryptoException("BLAKE2 parameters out of range");
+        }
+        return new Hash(new MessageDigestImpl.Blake2(big, digestSize, k, s, p));
+    }
+
+    /// An independent hash in the same state as this one: a shared prefix is
+    /// hashed once and each copy finished on its own.
+    ///
+    /// #### Returns
+    ///
+    /// the copy; updating either leaves the other unchanged
+    public Hash copy() {
+        return new Hash(impl.copy());
+    }
+
     /// Feeds the entire array into the running hash.
     ///
     /// #### Parameters

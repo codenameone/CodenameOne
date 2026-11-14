@@ -1,0 +1,5 @@
+True 140 bytes
+b'n\x00a\x00\xef\x00' b'na?ve caf? ?'
+b'Na\xc3\xaf' b'na\xc3\xaf' b'na\xc3\xaf'
+True b'\n!'
+140 False 140

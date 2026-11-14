@@ -46,6 +46,7 @@ class BrokenExecutor(RuntimeError):
 
 
 class Future:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self):
         self._condition = threading.Condition()
         self._state = _PENDING

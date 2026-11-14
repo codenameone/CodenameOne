@@ -7,6 +7,8 @@ WRAPPER_ASSIGNMENTS = ("__module__", "__name__", "__qualname__", "__doc__")
 WRAPPER_UPDATES = ("__dict__",)
 _MISSING = object()
 
+from _cn1functools import _lru_cache_wrapper
+
 
 def reduce(function, iterable, initial=_MISSING):
     it = iter(iterable)
@@ -23,6 +25,7 @@ def reduce(function, iterable, initial=_MISSING):
 
 
 class partial:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, func, *args, **keywords):
         if not callable(func):
             raise TypeError("the first argument must be callable")
@@ -65,6 +68,8 @@ def update_wrapper(wrapper, wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPP
             setattr(wrapper, attr, value)
         except (AttributeError, TypeError):
             pass
+    for attr in updated:
+        getattr(wrapper, attr).update(getattr(wrapped, attr, {}))
     wrapper.__wrapped__ = wrapped
     return wrapper
 
@@ -153,21 +158,6 @@ class _CacheInfo(tuple):
         return "CacheInfo(hits=%r, misses=%r, maxsize=%r, currsize=%r)" % tuple(self)
 
 
-def _make_key(args, kwds, typed):
-    key = args
-    if kwds:
-        key = key + (_MISSING,)
-        for item in kwds.items():
-            key = key + item
-    if typed:
-        key = key + tuple(type(v) for v in args)
-        if kwds:
-            key = key + tuple(type(v) for v in kwds.values())
-    elif len(key) == 1 and type(key[0]) in (int, str):
-        return key[0]
-    return key
-
-
 def lru_cache(maxsize=128, typed=False):
     if callable(maxsize) and not isinstance(maxsize, int):
         return lru_cache(128, False)(maxsize)
@@ -175,34 +165,8 @@ def lru_cache(maxsize=128, typed=False):
         maxsize = 0
 
     def decorating(user_function):
-        cache = {}
-        stats = [0, 0]
-
-        def wrapper(*args, **kwds):
-            key = _make_key(args, kwds, typed)
-            if key in cache:
-                stats[0] += 1
-                result = cache.pop(key)
-                cache[key] = result
-                return result
-            stats[1] += 1
-            result = user_function(*args, **kwds)
-            if maxsize != 0:
-                cache[key] = result
-                if maxsize is not None and len(cache) > maxsize:
-                    del cache[next(iter(cache))]
-            return result
-
-        def cache_info():
-            return _CacheInfo(stats[0], stats[1], maxsize, len(cache))
-
-        def cache_clear():
-            cache.clear()
-            stats[0] = 0
-            stats[1] = 0
-
-        wrapper.cache_info = cache_info
-        wrapper.cache_clear = cache_clear
+        wrapper = _lru_cache_wrapper(user_function, maxsize, typed, _CacheInfo)
+        wrapper.cache_parameters = lambda: {"maxsize": maxsize, "typed": typed}
         return update_wrapper(wrapper, user_function)
     return decorating
 
@@ -212,6 +176,7 @@ def cache(user_function):
 
 
 class cached_property:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, func):
         self.func = func
         self.attrname = None

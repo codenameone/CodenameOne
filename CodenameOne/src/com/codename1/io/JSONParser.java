@@ -897,8 +897,47 @@ public class JSONParser implements JSONParseCallback {
     }
 
     private static void writeJsonString(StringBuilder sb, String s) {
+        appendQuoted(sb, s, false);
+    }
+
+    private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
+
+    /// Appends `s` to `sb` as a quoted JSON string.
+    ///
+    /// `"`, `\` and the control characters below U+0020 are escaped, the
+    /// common ones by their short forms. With `asciiOnly` every character above
+    /// U+007E is written as a backslash-u escape too (a supplementary character as its
+    /// surrogate pair), so the output is pure ASCII whatever the input. A string
+    /// that needs no escape is appended in one call.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sb`: the destination
+    ///
+    /// - `s`: the string to write
+    ///
+    /// - `asciiOnly`: true to escape everything outside printable ASCII
+    public static void appendQuoted(StringBuilder sb, String s, boolean asciiOnly) {
+        int n = s.length();
+        char limit = asciiOnly ? (char) 0x7f : (char) 0xffff;
+        int i = 0;
+        while (i < n) {
+            char c = s.charAt(i);
+            if (c < 0x20 || c == '"' || c == '\\' || c >= limit) {
+                break;
+            }
+            i++;
+        }
         sb.append('"');
-        for (int i = 0; i < s.length(); i++) {
+        if (i == n) {
+            sb.append(s);
+            sb.append('"');
+            return;
+        }
+        if (i > 0) {
+            sb.append(s, 0, i);
+        }
+        for (; i < n; i++) {
             char c = s.charAt(i);
             switch (c) {
                 case '"':
@@ -923,13 +962,10 @@ public class JSONParser implements JSONParseCallback {
                     sb.append("\\t");
                     break;
                 default:
-                    if (c < 0x20) {
-                        sb.append("\\u");
-                        String h = Integer.toHexString(c);
-                        for (int p = h.length(); p < 4; p++) {
-                            sb.append('0');
-                        }
-                        sb.append(h);
+                    if (c < 0x20 || c >= limit) {
+                        sb.append('\\').append('u')
+                                .append(HEX_DIGITS[c >> 12 & 15]).append(HEX_DIGITS[c >> 8 & 15])
+                                .append(HEX_DIGITS[c >> 4 & 15]).append(HEX_DIGITS[c & 15]);
                     } else {
                         sb.append(c);
                     }
@@ -1524,20 +1560,54 @@ public class JSONParser implements JSONParseCallback {
     ///
     /// - `IOException`: for a null or malformed document, naming the offset
     public static Object parseStrict(String json, boolean exactIntegers) throws IOException {
+        return parseStrict(json, exactIntegers ? EXACT_INTEGERS : DEFAULT_VALUES);
+    }
+
+    /// Parses one complete JSON document strictly, as [#parseStrict(String)]
+    /// does, building every value with `factory`.
+    ///
+    /// The factory decides what an object, an array and each scalar become, so a
+    /// caller can read a document straight into its own types; see
+    /// [JSONValueFactory]. Errors throw a [JSONParseException] naming the offset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: the document
+    ///
+    /// - `factory`: builds the values
+    ///
+    /// #### Returns
+    ///
+    /// the value the factory built for the document's top-level value
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: for a null or malformed document
+    public static Object parseStrict(String json, JSONValueFactory factory) throws IOException {
         if (json == null) {
-            throw new IOException("No JSON to parse");
+            throw new JSONParseException("No JSON to parse", -1);
         }
-        StrictReader p = new StrictReader(json, exactIntegers);
+        StrictReader p = new StrictReader(json, factory);
         p.skipWhitespace();
         Object value = p.readValue();
         p.skipWhitespace();
         if (p.pos < json.length()) {
-            throw new IOException("Trailing content at offset " + p.pos);
+            throw new JSONParseException("Trailing content at offset " + p.pos, p.pos);
         }
         return value;
     }
 
-    /// The recursive-descent reader behind [#parseStrict(String, boolean)].
+    private static final JSONValueFactory DEFAULT_VALUES = new JSONValueFactory();
+
+    /// What `exactIntegers` asks for: an integer beyond a long as [RawJson].
+    private static final JSONValueFactory EXACT_INTEGERS = new JSONValueFactory() {
+        @Override
+        public Object bigInteger(String digits) {
+            return new RawJson(digits);
+        }
+    };
+
+    /// The recursive-descent reader behind [#parseStrict(String, JSONValueFactory)].
     private static final class StrictReader {
         /// How deep a document may nest before it is refused. The reader is
         /// recursive, so nesting depth is stack depth, and a server parses whatever
@@ -1550,18 +1620,29 @@ public class JSONParser implements JSONParseCallback {
         private static final int MAX_DEPTH = 512;
 
         private final String src;
-        private final boolean exactIntegers;
+        private final int len;
+        private final JSONValueFactory factory;
+        private final boolean nonFinite;
+        private final boolean controls;
         private int pos;
         private int depth;
+        private StringBuilder scratch; //NOPMD AvoidStringBufferField - one parse's string scratch, dropped with the reader
 
-        StrictReader(String src, boolean exactIntegers) {
+        StrictReader(String src, JSONValueFactory factory) {
             this.src = src;
-            this.exactIntegers = exactIntegers;
+            this.len = src.length();
+            this.factory = factory;
+            this.nonFinite = factory.allowNonFinite();
+            this.controls = factory.allowControlCharacters();
+        }
+
+        private static JSONParseException error(String message, int at) {
+            return new JSONParseException(message + " at offset " + at, at);
         }
 
         Object readValue() throws IOException {
-            if (pos >= src.length()) {
-                throw new IOException("Unexpected end of JSON");
+            if (pos >= len) {
+                throw error("Unexpected end of JSON", pos);
             }
             char c = src.charAt(pos);
             switch (c) {
@@ -1570,13 +1651,34 @@ public class JSONParser implements JSONParseCallback {
                 case '[':
                     return readNested(false);
                 case '"':
-                    return readString();
+                    return factory.string(readString());
                 case 't':
-                    return readLiteral("true", Boolean.TRUE);
+                    readLiteral("true");
+                    return factory.bool(true);
                 case 'f':
-                    return readLiteral("false", Boolean.FALSE);
+                    readLiteral("false");
+                    return factory.bool(false);
                 case 'n':
-                    return readLiteral("null", null);
+                    readLiteral("null");
+                    return factory.nullValue();
+                case 'N':
+                    if (nonFinite) {
+                        readLiteral("NaN");
+                        return factory.decimal(Double.NaN);
+                    }
+                    return readNumber();
+                case 'I':
+                    if (nonFinite) {
+                        readLiteral("Infinity");
+                        return factory.decimal(Double.POSITIVE_INFINITY);
+                    }
+                    return readNumber();
+                case '-':
+                    if (nonFinite && src.startsWith("-Infinity", pos)) {
+                        pos += 9;
+                        return factory.decimal(Double.NEGATIVE_INFINITY);
+                    }
+                    return readNumber();
                 default:
                     return readNumber();
             }
@@ -1584,7 +1686,7 @@ public class JSONParser implements JSONParseCallback {
 
         private Object readNested(boolean object) throws IOException {
             if (depth >= MAX_DEPTH) {
-                throw new IOException("JSON nested deeper than " + MAX_DEPTH);
+                throw error("JSON nested deeper than " + MAX_DEPTH, pos);
             }
             depth++;
             try {
@@ -1597,58 +1699,58 @@ public class JSONParser implements JSONParseCallback {
             }
         }
 
-        private Map<String, Object> readObject() throws IOException {
-            Map<String, Object> out = new LinkedHashMap<String, Object>();
+        private Object readObject() throws IOException {
+            Object out = factory.newObject();
             pos++;
             skipWhitespace();
             if (peek() == '}') {
                 pos++;
-                return out;
+                return factory.endObject(out);
             }
             while (true) {
                 skipWhitespace();
                 if (peek() != '"') {
-                    throw new IOException("Expected a key at offset " + pos);
+                    throw error("Expected a key", pos);
                 }
-                String key = readString();
+                String key = readKey();
                 skipWhitespace();
                 if (peek() != ':') {
-                    throw new IOException("Expected ':' at offset " + pos);
+                    throw error("Expected ':'", pos);
                 }
                 pos++;
                 skipWhitespace();
-                out.put(key, readValue());
+                factory.put(out, key, readValue());
                 skipWhitespace();
                 char c = peek();
                 pos++;
                 if (c == '}') {
-                    return out;
+                    return factory.endObject(out);
                 }
                 if (c != ',') {
-                    throw new IOException("Expected ',' or '}' at offset " + (pos - 1));
+                    throw error("Expected ',' or '}'", pos - 1);
                 }
             }
         }
 
-        private List<Object> readArray() throws IOException {
-            List<Object> out = new ArrayList<Object>();
+        private Object readArray() throws IOException {
+            Object out = factory.newArray();
             pos++;
             skipWhitespace();
             if (peek() == ']') {
                 pos++;
-                return out;
+                return factory.endArray(out);
             }
             while (true) {
                 skipWhitespace();
-                out.add(readValue());
+                factory.add(out, readValue());
                 skipWhitespace();
                 char c = peek();
                 pos++;
                 if (c == ']') {
-                    return out;
+                    return factory.endArray(out);
                 }
                 if (c != ',') {
-                    throw new IOException("Expected ',' or ']' at offset " + (pos - 1));
+                    throw error("Expected ',' or ']'", pos - 1);
                 }
             }
         }
@@ -1666,31 +1768,94 @@ public class JSONParser implements JSONParseCallback {
             return -1;
         }
 
-        @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
+        /// Keys seen in this document, by hash of their characters. Objects in
+        /// a document repeat the same few member names, so each name becomes
+        /// one String shared by every object, as CPython's decoder memoizes
+        /// keys: a thousand records hold one "id", not a thousand.
+        /// Keys seen recently, by hash: a document repeats its keys, and one string per
+        /// key name serves every object that has it. One table for every parse, so a parse
+        /// allocates none. Readers on other threads may overwrite a slot, which is harmless:
+        /// a slot holds an immutable string and is only used once it matches, so a lost
+        /// write costs one substring.
+        private static final String[] KEYS = new String[64];
+
+        private String readKey() throws IOException {
+            int start = pos + 1;
+            int h = 0;
+            int i = start;
+            while (i < len) {
+                char c = src.charAt(i);
+                if (c == '"' || c == '\\' || c < 0x20) {
+                    break;
+                }
+                h = 31 * h + c;
+                i++;
+            }
+            if (i >= len || src.charAt(i) != '"' || i - start > 64) {
+                return readString();
+            }
+            int n = i - start;
+            String[] table = KEYS;
+            int slot = (h ^ (h >>> 16)) & (table.length - 1);
+            String k = table[slot];
+            if (k == null || k.length() != n || !src.regionMatches(start, k, 0, n)) {
+                k = src.substring(start, i);
+                table[slot] = k;
+            }
+            pos = i + 1;
+            return k;
+        }
+
+        /// Most strings have no escape: those are one substring of the source,
+        /// which keeps the compact Latin-1 form where the source has it, and
+        /// nothing is copied through a builder.
         private String readString() throws IOException {
-            pos++;
-            StringBuilder out = new StringBuilder();
+            int start = ++pos;
+            while (pos < len) {
+                char c = src.charAt(pos);
+                if (c == '"') {
+                    return src.substring(start, pos++);
+                }
+                if (c == '\\') {
+                    break;
+                }
+                // RFC 8259: everything below U+0020 arrives escaped; taking it
+                // literally accepts documents a conforming parser upstream
+                // rejects, and the two then disagree about where a string ends.
+                if (c < 0x20 && !controls) {
+                    throw error("A control character must be escaped in a JSON string", pos);
+                }
+                pos++;
+            }
+            StringBuilder out = scratch;
+            if (out == null) {
+                out = new StringBuilder();
+                scratch = out;
+            }
+            out.setLength(0);
+            out.append(src, start, pos);
+            return readEscaped(out);
+        }
+
+        @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
+        private String readEscaped(StringBuilder out) throws IOException {
             while (true) {
-                if (pos >= src.length()) {
-                    throw new IOException("Unterminated string");
+                if (pos >= len) {
+                    throw error("Unterminated string", pos);
                 }
                 char c = src.charAt(pos++);
                 if (c == '"') {
                     return out.toString();
                 }
                 if (c != '\\') {
-                    // RFC 8259: everything below U+0020 arrives escaped; taking it
-                    // literally accepts documents a conforming parser upstream
-                    // rejects, and the two then disagree about where a string ends.
-                    if (c < 0x20) {
-                        throw new IOException("A control character must be escaped in a "
-                                + "JSON string, at offset " + (pos - 1));
+                    if (c < 0x20 && !controls) {
+                        throw error("A control character must be escaped in a JSON string", pos - 1);
                     }
                     out.append(c);
                     continue;
                 }
-                if (pos >= src.length()) {
-                    throw new IOException("Unterminated escape");
+                if (pos >= len) {
+                    throw error("Unterminated escape", pos);
                 }
                 char esc = src.charAt(pos++);
                 switch (esc) {
@@ -1719,8 +1884,8 @@ public class JSONParser implements JSONParseCallback {
                         out.append('\t');
                         break;
                     case 'u':
-                        if (pos + 4 > src.length()) {
-                            throw new IOException("Truncated unicode escape");
+                        if (pos + 4 > len) {
+                            throw error("Truncated unicode escape", pos);
                         }
                         // Four ASCII hex digits, exactly: parseInt took a sign and
                         // any Unicode digit, three spellings of one character
@@ -1729,7 +1894,7 @@ public class JSONParser implements JSONParseCallback {
                         for (int k = 0; k < 4; k++) {
                             int d = hexDigit(src.charAt(pos + k));
                             if (d < 0) {
-                                throw new IOException("Malformed unicode escape at offset " + pos);
+                                throw error("Malformed unicode escape", pos);
                             }
                             escaped = escaped * 16 + d;
                         }
@@ -1737,69 +1902,121 @@ public class JSONParser implements JSONParseCallback {
                         pos += 4;
                         break;
                     default:
-                        throw new IOException("Unknown escape \\" + esc);
+                        throw error("Unknown escape \\" + esc, pos - 1);
                 }
             }
         }
 
-        private Object readLiteral(String literal, Object value) throws IOException {
+        private void readLiteral(String literal) throws IOException {
             if (!src.startsWith(literal, pos)) {
-                throw new IOException("Expected " + literal + " at offset " + pos);
+                throw error("Expected " + literal, pos);
             }
             pos += literal.length();
-            return value;
         }
+
+        private static final double[] POW10 = {1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10,
+            1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
 
         private static boolean isDigit(char c) {
             return c >= '0' && c <= '9';
         }
 
         /// A number by the grammar rather than by what Java happens to parse:
-        /// `+1`, `01`, `.5` and `1.` are not JSON numbers.
+        /// `+1`, `01`, `.5` and `1.` are not JSON numbers. An integer of up to 18
+        /// digits is accumulated as it is read, with no substring.
         private Object readNumber() throws IOException {
             int start = pos;
-            boolean floating = false;
-            if (pos < src.length() && src.charAt(pos) == '-') {
+            boolean negative = false;
+            if (pos < len && src.charAt(pos) == '-') {
+                negative = true;
                 pos++;
             }
             int intStart = pos;
-            if (pos < src.length() && src.charAt(pos) == '0') {
+            long acc = 0;
+            if (pos < len && src.charAt(pos) == '0') {
                 pos++;
-                if (pos < src.length() && isDigit(src.charAt(pos))) {
-                    throw new IOException("A leading zero is not a JSON number, at offset " + start);
+                if (pos < len && isDigit(src.charAt(pos))) {
+                    throw error("A leading zero is not a JSON number", start);
                 }
             } else {
-                while (pos < src.length() && isDigit(src.charAt(pos))) {
+                while (pos < len) {
+                    char d = src.charAt(pos);
+                    if (!isDigit(d)) {
+                        break;
+                    }
+                    acc = acc * 10 + (d - '0');
                     pos++;
                 }
             }
             if (pos == intStart) {
-                throw new IOException("Expected a digit at offset " + intStart);
+                throw error("Expected a digit", intStart);
             }
-            if (pos < src.length() && src.charAt(pos) == '.') {
+            int intDigits = pos - intStart;
+            boolean floating = false;
+            // Significant digits so far in acc (a leading zero is not one), and
+            // the power of ten acc is scaled by.
+            int sig = acc == 0 ? 0 : intDigits;
+            int scale = 0;
+            if (pos < len && src.charAt(pos) == '.') {
                 floating = true;
                 pos++;
                 int fracStart = pos;
-                while (pos < src.length() && isDigit(src.charAt(pos))) {
+                while (pos < len) {
+                    char d = src.charAt(pos);
+                    if (!isDigit(d)) {
+                        break;
+                    }
+                    if (sig < 18) {
+                        acc = acc * 10 + (d - '0');
+                        scale--;
+                        if (acc != 0) {
+                            sig++;
+                        }
+                    } else {
+                        sig = 99;
+                    }
                     pos++;
                 }
                 if (pos == fracStart) {
-                    throw new IOException("Expected a digit after '.' at offset " + fracStart);
+                    throw error("Expected a digit after '.'", fracStart);
                 }
             }
-            if (pos < src.length() && (src.charAt(pos) == 'e' || src.charAt(pos) == 'E')) {
+            if (pos < len && (src.charAt(pos) == 'e' || src.charAt(pos) == 'E')) {
                 floating = true;
                 pos++;
-                if (pos < src.length() && (src.charAt(pos) == '-' || src.charAt(pos) == '+')) {
+                boolean expNegative = false;
+                if (pos < len && (src.charAt(pos) == '-' || src.charAt(pos) == '+')) {
+                    expNegative = src.charAt(pos) == '-';
                     pos++;
                 }
                 int expStart = pos;
-                while (pos < src.length() && isDigit(src.charAt(pos))) {
+                int exp = 0;
+                while (pos < len && isDigit(src.charAt(pos))) {
+                    if (exp < 10000) {
+                        exp = exp * 10 + (src.charAt(pos) - '0');
+                    }
                     pos++;
                 }
                 if (pos == expStart) {
-                    throw new IOException("Expected a digit in the exponent at offset " + expStart);
+                    throw error("Expected a digit in the exponent", expStart);
                 }
+                scale += expNegative ? -exp : exp;
+            }
+            if (!floating && intDigits <= 18) {
+                return factory.integer(negative ? -acc : acc);
+            }
+            // Clinger's fast path: a mantissa below 2^53 and a power of ten up
+            // to 10^22 are both exact doubles, so one multiplication or division
+            // is the correctly rounded value -- the answer parseDouble gives,
+            // without building a string for it.
+            if (floating && intDigits <= 18 && sig <= 15 && scale >= -22 && scale <= 22) {
+                double v = (double) acc;
+                if (scale < 0) {
+                    v /= POW10[-scale];
+                } else {
+                    v *= POW10[scale];
+                }
+                return factory.decimal(negative ? -v : v);
             }
             String text = src.substring(start, pos);
             if (floating) {
@@ -1807,24 +2024,23 @@ public class JSONParser implements JSONParseCallback {
                 try {
                     parsed = Double.parseDouble(text);
                 } catch (NumberFormatException err) {
-                    throw new IOException("Malformed number '" + text + "'", err);
+                    JSONParseException e = error("Malformed number '" + text + "'", start);
+                    e.initCause(err);
+                    throw e;
                 }
                 // parseDouble answers Infinity for 1e999 rather than throwing, and
-                // the writer emits null for it: refuse it here instead.
-                if (Double.isNaN(parsed) || Double.isInfinite(parsed)) {
-                    throw new IOException("Number out of range for JSON: '" + text + "'");
+                // the writer emits null for it: refuse it here unless asked.
+                if (!nonFinite && (Double.isNaN(parsed) || Double.isInfinite(parsed))) {
+                    throw error("Number out of range for JSON: '" + text + "'", start);
                 }
-                return Double.valueOf(parsed);
+                return factory.decimal(parsed);
             }
             // Integers stay integers: a long through a double loses precision above
             // 2^53, and ids and amounts are exactly the values that get large.
             if (fitsLong(text)) {
-                return Long.valueOf(Long.parseLong(text));
+                return factory.integer(Long.parseLong(text));
             }
-            if (exactIntegers) {
-                return new RawJson(text);
-            }
-            throw new IOException("Malformed number '" + text + "'");
+            return factory.bigInteger(text);
         }
 
         /// The token is digits with an optional minus sign; decides without
@@ -1843,14 +2059,14 @@ public class JSONParser implements JSONParseCallback {
         }
 
         private char peek() throws IOException {
-            if (pos >= src.length()) {
-                throw new IOException("Unexpected end of JSON");
+            if (pos >= len) {
+                throw error("Unexpected end of JSON", pos);
             }
             return src.charAt(pos);
         }
 
         void skipWhitespace() {
-            while (pos < src.length()) {
+            while (pos < len) {
                 char c = src.charAt(pos);
                 if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
                     pos++;
@@ -1860,7 +2076,6 @@ public class JSONParser implements JSONParseCallback {
             }
         }
     }
-
 
     static class ReaderClass {
         char[] buffer;

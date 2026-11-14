@@ -87,6 +87,21 @@ public final class PythonProjectBuilder {
         return this;
     }
 
+    private File packageDataDir;
+
+    /// Where to write `cn1python.dat`, the package data the Python modules
+    /// read beside their `__file__` (`PyPackageData`): a directory whose
+    /// contents ship at the root of the application, the build's classes
+    /// directory. Null writes none.
+    public PythonProjectBuilder packageData(File dir) {
+        this.packageDataDir = dir;
+        return this;
+    }
+
+    /// The name of the package data resource. Must match
+    /// `PyPackageData.RESOURCE`.
+    public static final String PACKAGE_DATA = "cn1python.dat";
+
     /// The jars and class directories `from java.<package> import <Class>`
     /// resolves against: the project's compile class path, whose
     /// `java-runtime` supplies the device's `java.*`. The project's own
@@ -192,14 +207,25 @@ public final class PythonProjectBuilder {
         }
         Map<String, String> sources = new TreeMap<String, String>();
         Map<String, String> nativeModules = new TreeMap<String, String>();
+        // The PyPI packages' paths.
+        java.util.Set<String> libraries = new java.util.TreeSet<String>();
         try {
             collect(sourceDir, "", sources);
+            // What to keep, leave out or replace with Java, read by the
+            // transpiler with the modules.
+            File directives = new File(sourceDir, DIRECTIVES);
+            if (directives.isFile()) {
+                sources.put(DIRECTIVES, new String(Files.readAllBytes(directives.toPath()),
+                        StandardCharsets.UTF_8));
+            }
             // PyPI packages import resolved beside the project; the
             // project's own file wins where both have one.
             File packages = new File(sourceDir.getParentFile(), PythonPackageResolver.PACKAGES_DIR);
             if (packages.isDirectory()) {
                 Map<String, String> vendored = new TreeMap<String, String>();
                 collect(packages, "", vendored);
+                libraries.addAll(vendored.keySet());
+                libraries.removeAll(sources.keySet());
                 vendored.putAll(sources);
                 sources = vendored;
                 nativeModules = PythonExtensionStubs.readIndex(new File(packages, PythonExtensionStubs.INDEX));
@@ -223,13 +249,19 @@ public final class PythonProjectBuilder {
         }
         Map<String, String> out;
         try {
+            List<String> deferred = new ArrayList<String>();
             out = PythonTranspiler.transpile(sources, entry, withProjectClasses(sources), nativeModules,
-                    stackBytes());
+                    stackBytes(), libraries, deferred);
+            for (String d : deferred) {
+                log.info("Python: " + d);
+            }
+            installShims(out);
         } catch (PythonSyntaxError e) {
             throw new BuildException("src/main/python/" + e.file + ":" + e.line + ":" + e.col + ": " + e.reason, e);
         } catch (IllegalArgumentException e) {
             throw new BuildException(e.getMessage(), e);
         }
+        writePackageData();
         int written = sync(out);
         if (written == 0) {
             log.info("Python sources are up to date");
@@ -238,6 +270,46 @@ public final class PythonProjectBuilder {
                     + " file(s) changed)");
         }
         return true;
+    }
+
+    /// The file of build directives, in the Python source root.
+    static final String DIRECTIVES = "cn1-python.properties";
+
+    private static final String SHIM_DIR = "com/codename1/python/ext/";
+
+    /// Moves the Java a `replace=` directive asks for out of the generated
+    /// sources and into the project's own, where the developer fills it in.
+    /// A class the project already has is left exactly as it is: a function
+    /// it does not yet answer for says so, by name, when it is called.
+    private void installShims(Map<String, String> out) throws BuildException {
+        List<String> shims = new ArrayList<String>();
+        for (String k : out.keySet()) {
+            if (k.startsWith(SHIM_DIR) && k.endsWith("Shims.java")) {
+                shims.add(k);
+            }
+        }
+        for (String k : shims) {
+            String text = out.remove(k);
+            if (javaSourceDir == null) {
+                throw new BuildException(DIRECTIVES + " has a replace= line, and this build has no Java"
+                        + " source directory to write " + k + " into");
+            }
+            File f = new File(javaSourceDir, k.replace('/', File.separatorChar));
+            if (f.isFile()) {
+                continue;
+            }
+            try {
+                File dir = f.getParentFile();
+                if (dir != null) {
+                    Files.createDirectories(dir.toPath());
+                }
+                Files.write(f.toPath(), text.getBytes(StandardCharsets.US_ASCII));
+            } catch (IOException e) {
+                throw new BuildException("Could not write " + f + ": " + e.getMessage(), e);
+            }
+            log.warn("Wrote " + f + ": the Java that replaces Python named by replace= in " + DIRECTIVES
+                    + ". Fill it in; until then those functions raise when they are called.");
+        }
     }
 
     private static void collect(File dir, String prefix, Map<String, String> into) throws IOException {
@@ -259,6 +331,64 @@ public final class PythonProjectBuilder {
 
     /// Makes the output directory hold exactly `files`, writing only those
     /// whose text changed. Returns how many were written or removed.
+    /// Packs the non-module files of `python-packages` and of the project's
+    /// own sources, the project's winning where both have one, into
+    /// [#PACKAGE_DATA]; removes it when there are none.
+    private void writePackageData() throws BuildException {
+        if (packageDataDir == null) {
+            return;
+        }
+        Map<String, File> data = new TreeMap<String, File>();
+        File packages = new File(sourceDir.getParentFile(), PythonPackageResolver.PACKAGES_DIR);
+        if (packages.isDirectory()) {
+            collectData(packages, "", data, true);
+        }
+        collectData(sourceDir, "", data, false);
+        File target = new File(packageDataDir, PACKAGE_DATA);
+        try {
+            if (data.isEmpty()) {
+                Files.deleteIfExists(target.toPath());
+                return;
+            }
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+            out.writeInt(data.size());
+            for (Map.Entry<String, File> e : data.entrySet()) {
+                byte[] b = Files.readAllBytes(e.getValue().toPath());
+                out.writeUTF(e.getKey());
+                out.writeInt(b.length);
+                out.write(b);
+            }
+            out.flush();
+            byte[] packed = bytes.toByteArray();
+            if (target.isFile() && Arrays.equals(Files.readAllBytes(target.toPath()), packed)) {
+                return;
+            }
+            Files.createDirectories(packageDataDir.toPath());
+            Files.write(target.toPath(), packed);
+            log.info("Packed " + data.size() + " Python package data file(s) into " + target);
+        } catch (IOException e) {
+            throw new BuildException("Could not write " + target + ": " + e.getMessage(), e);
+        }
+    }
+
+    private static void collectData(File dir, String prefix, Map<String, File> into, boolean packages) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File c : children) {
+            String rel = prefix + c.getName();
+            if (c.isDirectory()) {
+                if (!c.getName().startsWith(".") && !"__pycache__".equals(c.getName())) {
+                    collectData(c, rel + "/", into, packages);
+                }
+            } else if (!c.getName().endsWith(".py") && PythonPackageResolver.isPackageData(rel, c.getName())) {
+                into.put(rel, c);
+            }
+        }
+    }
+
     private int sync(Map<String, String> files) throws BuildException {
         int changed = 0;
         try {

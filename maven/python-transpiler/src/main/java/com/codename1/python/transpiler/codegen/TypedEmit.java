@@ -80,6 +80,10 @@ final class TypedEmit {
         /// waiting in `Typed.take`, which `c` takes. Only the consumers that
         /// know to take it exactly once see one (see `pushed`); or null.
         String pk;
+        /// Whether `lc` is known to fit a Java `int` (a length, an index
+        /// `find` answered), so adding a constant of 31 bits to it cannot
+        /// overflow a `long`.
+        boolean small;
 
         E(String c, Ty t) {
             this(c, t, null);
@@ -146,10 +150,22 @@ final class TypedEmit {
     private Set<String> nonNull = new HashSet<String>();
     /// Int locals whose value a Java long holds right now, and that long.
     private Map<String, String> shadow = new HashMap<String, String>();
+    /// The exceptions of the handlers being lowered, innermost last: what a
+    /// bare `raise` raises again.
+    private final List<String> handlers = new ArrayList<String>();
+    /// For each loop being lowered, innermost first, the label a break
+    /// leaves by: the block around a loop with an `else`, or "" for a plain
+    /// break.
+    private final java.util.ArrayDeque<String> loopLabels = new java.util.ArrayDeque<String>();
     /// The int ranges of the function being emitted, and the locals they
     /// put in a Java `long` (see `IntRanges`).
     private IntRanges ranges;
     private Set<String> longLocals = new HashSet<String>();
+    /// Untyped locals that accumulate with `+=` / `-=`: held as a long and
+    /// an object (null while the long is the value), so adding an int to
+    /// one that holds an int allocates nothing. The object takes anything
+    /// else, and every read boxes the pair back into one value.
+    private Set<String> accLocals = new HashSet<String>();
     /// The module functions that also have a version taking their int
     /// parameters as Java longs (`TL_`), and the interval each such
     /// parameter is known to hold there; what that version returns, when
@@ -388,9 +404,6 @@ final class TypedEmit {
 
     void plan() {
         findPure();
-        if (!in.open.isEmpty()) {
-            return;
-        }
         for (Layouts.Cls k : layouts.classes.values()) {
             Map<String, Ty> m = new LinkedHashMap<String, Ty>();
             for (String f : k.fields) {
@@ -401,9 +414,22 @@ final class TypedEmit {
             }
             typedFields.put(k, m);
         }
+        // A typed field no generic code may reach directly: the generic
+        // code goes through getField/setField, which box. Done before any
+        // body is written: a typed function holding a nested def writes
+        // that def's generic code as part of its own.
+        for (Map.Entry<Layouts.Cls, Map<String, Ty>> e : typedFields.entrySet()) {
+            for (String f : e.getValue().keySet()) {
+                List<Layouts.Cls> o = layouts.fieldOwners.get(f);
+                o.remove(e.getKey());
+                if (o.isEmpty()) {
+                    layouts.fieldOwners.remove(f);
+                }
+            }
+        }
         for (Infer.Fn f : in.fns.values()) {
             byScope.put(f.def.scope, f);
-            if (f.cls != null && !f.def.name.equals("__init__")) {
+            if (f.cls != null && !f.def.name.equals("__init__") && !in.removed(f.def)) {
                 String key = f.def.name + "/" + (f.params.length - 1);
                 List<Infer.Fn> g = groups.get(key);
                 if (g == null) {
@@ -414,9 +440,16 @@ final class TypedEmit {
             }
         }
         Set<Infer.Fn> ok = new LinkedHashSet<Infer.Fn>(in.fns.values());
+        for (Infer.Fn f : in.fns.values()) {
+            // Nothing reaches it: there is no body to type, and no types
+            // its calls and stores were held to.
+            if (in.removed(f.def)) {
+                ok.remove(f);
+            }
+        }
         Map<Infer.Fn, Set<Infer.Fn>> deps = new HashMap<Infer.Fn, Set<Infer.Fn>>();
         Map<Infer.Fn, Set<String>> gdeps = new HashMap<Infer.Fn, Set<String>>();
-        for (Infer.Fn f : in.fns.values()) {
+        for (Infer.Fn f : ok) {
             typed.put(f, typedName(f));
         }
         boolean changed = true;
@@ -459,17 +492,6 @@ final class TypedEmit {
             }
         }
         usedGroups.retainAll(liveGroups(ok));
-        // A typed field no generic code may reach directly: the generic
-        // code goes through getField/setField, which box.
-        for (Map.Entry<Layouts.Cls, Map<String, Ty>> e : typedFields.entrySet()) {
-            for (String f : e.getValue().keySet()) {
-                List<Layouts.Cls> o = layouts.fieldOwners.get(f);
-                o.remove(e.getKey());
-                if (o.isEmpty()) {
-                    layouts.fieldOwners.remove(f);
-                }
-            }
-        }
     }
 
     private Set<String> liveGroups(Set<Infer.Fn> ok) {
@@ -651,6 +673,20 @@ final class TypedEmit {
         return "TF_" + Emitter.mangle(f.def.name);
     }
 
+    /// Field `f` of `k` read on `recv`, an expression of `k`'s Java class,
+    /// as an object, or null when the field is not held typed.
+    String foreignGet(Layouts.Cls k, String f, String recv) {
+        Ty t = typedField(k, f);
+        if (t == null) {
+            return null;
+        }
+        String m = Emitter.mangle(f);
+        if (t.k == Ty.K.INT) {
+            return dual(recv + ".t_" + m, recv + ".b_" + m).c;
+        }
+        return box(new E(recv + ".t_" + m, t));
+    }
+
     Ty typedField(Layouts.Cls owner, String f) {
         Map<String, Ty> m = typedFields.get(owner);
         return m == null ? null : m.get(f);
@@ -802,7 +838,44 @@ final class TypedEmit {
     // ---- functions -------------------------------------------------------
 
     private String var(String n) {
-        return "v_" + Emitter.mangle(n);
+        String c = compVar(n);
+        return c != null ? c : "v_" + Emitter.mangle(n);
+    }
+
+    /// Where `n` resolves from the scope being lowered. A cell only
+    /// comprehensions capture is a plain local: they are lowered in line,
+    /// reading it where they stand. Inside one, its own targets and the
+    /// locals of the function (or of a comprehension around it) are locals.
+    private Scope.Binding binding(String n) {
+        Scope.Binding b = sc.resolve(n);
+        if (b == Scope.Binding.CELL && (in.compOnlyCell(sc, n) || compVar(n) != null)) {
+            return Scope.Binding.LOCAL;
+        }
+        if (b == Scope.Binding.FREE && sc.kind == Scope.Kind.COMPREHENSION) {
+            Scope o = sc.owner(n);
+            // A name Emitter.uncell took off the function's cells (only
+            // helper comprehensions read it) is a plain local of it too.
+            if (o == cur.def.scope && (in.compOnlyCell(o, n) || !o.cells.contains(n)) || o != null && o.kind == Scope.Kind.COMPREHENSION //NOPMD CompareObjectsWithEquals - identity is meant
+                    && compVars.containsKey(o)) {
+                return Scope.Binding.LOCAL;
+            }
+        }
+        return b;
+    }
+
+    /// The Java local of each target of the comprehensions being lowered.
+    private final Map<Scope, Map<String, String>> compVars = new IdentityHashMap<Scope, Map<String, String>>();
+
+    /// The Java local holding comprehension target `n` as seen from the
+    /// scope being lowered, or null when `n` is not one.
+    private String compVar(String n) {
+        for (Scope s = sc; s != null && s.kind == Scope.Kind.COMPREHENSION; s = s.parent) {
+            Map<String, String> m = compVars.get(s);
+            if (m != null && s.isLocal(n)) {
+                return m.get(n);
+            }
+        }
+        return null;
     }
 
     /// The object half of int local `n` (see `dual`).
@@ -829,6 +902,9 @@ final class TypedEmit {
     }
 
     private Ty localType(String n) {
+        if (compVar(n) != null) {
+            return Ty.DYN;
+        }
         Ty t = cur.locals.get(n);
         return t == null ? Ty.BOT : t;
     }
@@ -889,38 +965,79 @@ final class TypedEmit {
                 throw new Unsupported("long parameter " + f.names.get(i) + " outgrows a long");
             }
         }
-        if (!f.def.scope.cells.isEmpty() || f.def.scope.hasYield || f.def.isAsync || !f.def.decorators.isEmpty()
+        if (!Infer.compOnlyCells(f.def).containsAll(f.def.scope.cells) || f.def.scope.hasYield || f.def.isAsync || !f.def.decorators.isEmpty()
                 || f.def.args.vararg != null || f.def.args.kwarg != null || !f.def.args.kwonly.isEmpty()) {
             throw new Unsupported("signature");
         }
         for (String n : f.locals.keySet()) {
-            if (sc.resolve(n) != Scope.Binding.LOCAL) {
+            if (binding(n) != Scope.Binding.LOCAL) {
                 throw new Unsupported("non-local " + n);
             }
         }
         da = new DefAssign();
         da.function(f.def.body, sc.params);
+        soleStores = soleStores(f.def.body);
+        // A parameter is bound on entry as well: its one assignment in the
+        // body is a second store, and folding it gave every read the value
+        // only one path assigns.
+        soleStores.keySet().removeAll(sc.params);
+        accLocals = accumulators(f);
+        folded = new IdentityHashMap<Expr, Object>();
         recycled = ListRecycling.find(f.def.body, f.names, sc);
         scalars = findScalars(f);
         StringBuilder b = new StringBuilder();
         b.append("    static ").append(retJ(f)).append(' ').append(lp != null ? longName(f) : typed.get(f)).append('(');
         Set<String> declared = new HashSet<String>(f.names);
         StringBuilder norm = new StringBuilder();
+        // A parameter the body rebinds to other types (an int made a tuple)
+        // arrives under its own name and is copied into the local.
+        StringBuilder rebound = new StringBuilder();
+        paramAlias.clear();
         for (int i = 0; i < f.names.size(); i++) {
             String n = f.names.get(i);
             if (lp != null && lp[i] != null) {
                 b.append(i == 0 ? "" : ", ").append("long ").append(var(n));
                 continue;
             }
-            b.append(i == 0 ? "" : ", ").append(param(f.params[i], var(n), big(n)));
+            Ty lt = f.locals.get(n);
+            String pv = var(n);
+            String pb = big(n);
+            boolean pi = f.params[i].k == Ty.K.INT;
+            if (lt != null && !longLocals.contains(n)
+                    && (pi != (lt.k == Ty.K.INT) || !pi && !jt(lt).equals(jt(f.params[i])))) {
+                if (lt.k == Ty.K.INT || longParams.get(f) != null) {
+                    throw new Unsupported("parameter " + n + " rebound");
+                }
+                pv = "p_" + var(n);
+                pb = "p_" + big(n);
+                E arg = f.params[i].k == Ty.K.INT ? dual(pv, pb) : new E(pv, f.params[i]);
+                if ("Object".equals(jt(lt))) {
+                    rebound.append("        Object ").append(var(n)).append(" = ").append(box(arg)).append(";\n");
+                } else {
+                    // The argument need not convert (`xy = list(xy)` takes a
+                    // tuple): read as it came until the first statement, which
+                    // must rebind it, stores the local.
+                    Stmt first = f.def.body.isEmpty() ? null : f.def.body.get(0);
+                    if (!(first instanceof Assign) || ((Assign) first).targets.size() != 1
+                            || !(((Assign) first).targets.get(0) instanceof Name)
+                            || !n.equals(((Name) ((Assign) first).targets.get(0)).id)) {
+                        throw new Unsupported("parameter " + n + " rebound");
+                    }
+                    paramAlias.put(n, arg);
+                    rebound.append("        ").append(jt(lt)).append(' ').append(var(n)).append(" = ")
+                            .append("double".equals(jt(lt)) ? "0.0" : "boolean".equals(jt(lt)) ? "false" : "null")
+                            .append(";\n");
+                }
+            }
+            b.append(i == 0 ? "" : ", ").append(param(f.params[i], pv, pb));
             if (f.params[i].k == Ty.K.INT) {
                 // A caller holding only the object passes it whole.
-                norm.append("        if (").append(big(n)).append(" instanceof Long) {\n            ").append(var(n))
-                        .append(" = ((Long) ").append(big(n)).append(").longValue();\n            ").append(big(n))
+                norm.append("        if (").append(pb).append(" instanceof Long) {\n            ").append(pv)
+                        .append(" = ((Long) ").append(pb).append(").longValue();\n            ").append(pb)
                         .append(" = null;\n        }\n");
             }
         }
-        b.append(") {\n").append(norm);
+        b.append(") {\n").append(norm).append(rebound);
         IntRanges.Iv[] dl = asLong ? null : longParams.get(f);
         if (dl != null) {
             // Arguments the long version takes go there.
@@ -954,7 +1071,7 @@ final class TypedEmit {
                 declared.add(e.getKey());
                 b.append("        long ").append(var(e.getKey())).append(" = 0L;\n");
             } else if (declared.add(e.getKey())) {
-                if (e.getValue().k == Ty.K.INT) {
+                if (e.getValue().k == Ty.K.INT || accLocals.contains(e.getKey())) {
                     b.append("        long ").append(var(e.getKey())).append(" = 0L;\n        Object ")
                             .append(big(e.getKey())).append(" = null;\n");
                 } else {
@@ -964,7 +1081,25 @@ final class TypedEmit {
             }
         }
         scalarDecls(b);
+        for (String n : Infer.paramCells(f.def)) {
+            // The cell a closure reads, beside the typed parameter.
+            int pi = f.names.indexOf(n);
+            Ty lt = f.locals.get(n);
+            String v;
+            if (lp != null && lp[pi] != null || longLocals.contains(n)) {
+                v = "Long.valueOf(" + var(n) + ")";
+            } else if (lt != null && lt.k == Ty.K.INT) {
+                v = box(dual(var(n), big(n)));
+            } else {
+                v = box(new E(var(n), lt == null ? Ty.DYN : lt));
+            }
+            b.append("        final Object[] ").append(em.cellName(f.def.scope, n)).append(" = new Object[] {").append(v)
+                    .append("};\n");
+        }
+        temps = new StringBuilder();
+        int at = b.length();
         boolean abrupt = block(f.def.body, b, 2);
+        b.insert(at, temps);
         if (!abrupt) {
             if (f.ret.k == Ty.K.INT) {
                 // Never reached (the function would not return an int if
@@ -1005,18 +1140,45 @@ final class TypedEmit {
         return "t" + (++tmp);
     }
 
+    /// Declarations of the temporaries expressions assign in line
+    /// (`exprTemp`), put at the top of the function being lowered.
+    private StringBuilder temps; //NOPMD AvoidStringBufferField - the generator's output
+
+    /// A local of Java type `jt` declared at the top of the function, for an
+    /// expression to assign a value it reads again (`(t = x) ... t`).
+    private String exprTemp(String jt) {
+        String t = fresh();
+        temps.append("        ").append(jt).append(' ').append(t).append(" = ")
+                .append("long".equals(jt) ? "0L" : "double".equals(jt) ? "0.0" : "boolean".equals(jt) ? "false" : "null")
+                .append(";\n");
+        return t;
+    }
+
     /// Statements that hoisted int arithmetic (`hoistInt`) runs before, or
     /// null where nothing may run first (a loop header).
     private StringBuilder pre; //NOPMD AvoidStringBufferField - the generator's output
     private int preInd;
 
     private boolean stmt(Stmt s, StringBuilder b, int ind) {
+        if (s instanceof FunctionDef) {
+            FunctionDef d = (FunctionDef) s;
+            if (!d.decorators.isEmpty() || !d.args.defaults.isEmpty() || d.args.kwDefaults.stream().anyMatch(x -> x != null)
+                    || !cur.def.scope.cells.isEmpty() && !Infer.paramCells(cur.def).containsAll(capturedBy(d))) {
+                throw new Unsupported("nested def");
+            }
+            // A closure over parameters only: the generic function object,
+            // its free names read from the cells made on entry.
+            store(new Name(d.name), new E(em.nestedDef(d), Ty.DYN), b, ind);
+            return false;
+        }
         StringBuilder savedPre = pre;
         int savedInd = preInd;
         boolean hoist = (s instanceof ExprStmt || s instanceof Assign || s instanceof AugAssign
                 || s instanceof Return || s instanceof If) && !hasWalrus(s);
         pre = hoist ? new StringBuilder() : null;
         preInd = ind;
+        Stmt savedStmt = curStmt;
+        curStmt = s;
         boolean savedPure = stmtPure;
         stmtPure = hoist && callsArePure(s instanceof If ? ((If) s).test : s);
         StringBuilder sb = new StringBuilder();
@@ -1031,8 +1193,312 @@ final class TypedEmit {
         } finally {
             pre = savedPre;
             preInd = savedInd;
+            curStmt = savedStmt;
             stmtPure = savedPure;
         }
+    }
+
+    /// `try` as the generic code lowers it (`Emitter.tryStmt`): the same
+    /// handler matching, `Typed.untake`, `sys.exception()` bookkeeping and
+    /// order, so a function with a try keeps its typed version. Only the
+    /// flow facts change: what the body assigns may or may not have
+    /// happened when a handler runs, so none of it is known there or after.
+    /// The abrupt answer follows javac's reachability exactly, as `block`
+    /// requires: a try with handlers completes normally when its body or any
+    /// handler does, and a finally is abrupt when its own block is.
+    /// The exception variable and the label of the try whose body is being
+    /// lowered as jumps (see `raiseOnly`); null elsewhere.
+    private String[] localRaise;
+
+    /// Builtin exception classes whose construction from plain values runs
+    /// no user code and cannot raise.
+    private static final Set<String> PLAIN_EXCEPTIONS = new HashSet<String>(Arrays.asList("ValueError", "KeyError",
+            "IndexError", "TypeError", "RuntimeError", "LookupError", "ArithmeticError", "ZeroDivisionError",
+            "AttributeError", "StopIteration", "Exception", "NotImplementedError", "AssertionError", "OverflowError"));
+
+    /// Whether `body` can raise only by a `raise C(args)` statement of its
+    /// own, with C a builtin exception: ifs, passes and raises over tests
+    /// and arguments of int and bool locals and constants, and at least one
+    /// raise. Such a try needs no Java try (see `tryStmt`).
+    private boolean raiseOnly(List<Stmt> body) {
+        boolean[] raises = {false};
+        return raiseOnly(body, raises) && raises[0];
+    }
+
+    private boolean raiseOnly(List<Stmt> body, boolean[] raises) {
+        for (Stmt s : body) {
+            if (s instanceof Pass) {
+                continue;
+            }
+            if (s instanceof If) {
+                If f = (If) s;
+                if (!noRaise(f.test) || !raiseOnly(f.body, raises) || !raiseOnly(f.orelse, raises)) {
+                    return false;
+                }
+                continue;
+            }
+            if (s instanceof Raise && ((Raise) s).cause == null && ((Raise) s).exc instanceof Call) {
+                Call c = (Call) ((Raise) s).exc;
+                if (!(c.func instanceof Name) || !PLAIN_EXCEPTIONS.contains(((Name) c.func).id)
+                        || binding(((Name) c.func).id) != Scope.Binding.BUILTIN || !c.keywords.isEmpty()) {
+                    return false;
+                }
+                for (Expr a : c.args) {
+                    if (!noRaise(a)) {
+                        return false;
+                    }
+                }
+                raises[0] = true;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Whether `e` cannot raise: constants, int and bool locals, and
+    /// comparisons, `not`, `and`/`or` and the overflow-safe int operators
+    /// of those (`%` and `//` only by a non-zero constant).
+    private boolean noRaise(Expr e) {
+        if (e instanceof Constant) {
+            Constant.Kind k = ((Constant) e).kind;
+            return k == Constant.Kind.INT || k == Constant.Kind.TRUE || k == Constant.Kind.FALSE || k == Constant.Kind.NONE;
+        }
+        if (e instanceof Name) {
+            String n = ((Name) e).id;
+            if (binding(n) != Scope.Binding.LOCAL || inlineArgs != null) {
+                return false;
+            }
+            Ty t = localType(n);
+            return (t.k == Ty.K.INT || t.k == Ty.K.BOOL) && !t.opt;
+        }
+        if (e instanceof UnaryOp) {
+            UnaryOp u = (UnaryOp) e;
+            return ("not".equals(u.op) || "-".equals(u.op)) && noRaise(u.operand);
+        }
+        if (e instanceof BoolOp) {
+            for (Expr v : ((BoolOp) e).values) {
+                if (!noRaise(v)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (e instanceof Compare) {
+            Compare c = (Compare) e;
+            for (String op : c.ops) {
+                if (!("==".equals(op) || "!=".equals(op) || "<".equals(op) || "<=".equals(op) || ">".equals(op)
+                        || ">=".equals(op))) {
+                    return false;
+                }
+            }
+            if (!noRaise(c.left)) {
+                return false;
+            }
+            for (Expr x : c.comparators) {
+                if (!noRaise(x)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (e instanceof BinOp) {
+            BinOp o = (BinOp) e;
+            if ("%".equals(o.op) || "//".equals(o.op)) {
+                Long k = intConstant(o.right);
+                return k != null && k.longValue() != 0 && noRaise(o.left);
+            }
+            return ("+".equals(o.op) || "-".equals(o.op) || "*".equals(o.op) || "&".equals(o.op) || "|".equals(o.op)
+                    || "^".equals(o.op)) && noRaise(o.left) && noRaise(o.right);
+        }
+        return false;
+    }
+
+    private boolean tryStmt(Try t, StringBuilder b, int ind) {
+        if (t.star) {
+            throw new Unsupported("except*");
+        }
+        Set<String> touched = new HashSet<String>(assigned(t.body));
+        for (ExceptHandler h : t.handlers) {
+            touched.addAll(assigned(h.body));
+            if (h.name != null) {
+                touched.add(h.name);
+            }
+        }
+        touched.addAll(assigned(t.orelse));
+        touched.addAll(assigned(t.finalbody));
+        nonNull.removeAll(touched);
+        shadow.keySet().removeAll(touched);
+        forgetPaths();
+        Set<String> entry = new HashSet<String>(nonNull);
+        boolean fin = !t.finalbody.isEmpty();
+        if (fin) {
+            indent(b, ind);
+            b.append("try {\n");
+            ind++;
+        }
+        boolean abrupt;
+        if (t.handlers.isEmpty()) {
+            abrupt = block(t.body, b, ind);
+        } else {
+            String ok = t.orelse.isEmpty() ? null : fresh();
+            if (ok != null) {
+                indent(b, ind);
+                b.append("boolean ").append(ok).append(" = false;\n");
+            }
+            boolean jump = t.orelse.isEmpty() && raiseOnly(t.body);
+            String pe = fresh();
+            boolean bodyAbrupt;
+            if (jump) {
+                // The body raises only by its own `raise` statements: each
+                // is a jump to the handlers, and no Java try (a setjmp on
+                // ParparVM) is entered at all.
+                String lbl = fresh();
+                indent(b, ind);
+                b.append("PyException ").append(pe).append(" = null;\n");
+                indent(b, ind);
+                b.append(lbl).append(": {\n");
+                String[] outer = localRaise;
+                localRaise = new String[] {pe, lbl};
+                try {
+                    block(t.body, b, ind + 1);
+                } finally {
+                    localRaise = outer;
+                }
+                indent(b, ind);
+                b.append("}\n");
+                indent(b, ind);
+                b.append("if (").append(pe).append(" != null) {\n");
+                bodyAbrupt = false;
+            } else {
+                String tk = fresh();
+                indent(b, ind);
+                b.append("final int ").append(tk).append(" = Typed.taken();\n");
+                indent(b, ind);
+                b.append("try {\n");
+                bodyAbrupt = block(t.body, b, ind + 1);
+                if (ok != null && !bodyAbrupt) {
+                    indent(b, ind + 1);
+                    b.append(ok).append(" = true;\n");
+                }
+                String th = fresh();
+                indent(b, ind);
+                b.append("} catch (Throwable ").append(th).append(") {\n");
+                indent(b, ind + 1);
+                b.append("Typed.untake(").append(tk).append(");\n");
+                indent(b, ind + 1);
+                b.append("final PyException ").append(pe).append(" = Py.convert(").append(th).append(");\n");
+            }
+            handlers.add(pe);
+            boolean catchAll = false;
+            boolean allAbrupt = true;
+            try {
+                for (int i = 0; i < t.handlers.size(); i++) {
+                    ExceptHandler h = t.handlers.get(i);
+                    nonNull = new HashSet<String>(entry);
+                    indent(b, ind + 1);
+                    if (h.type == null) {
+                        if (i != t.handlers.size() - 1) {
+                            throw new Unsupported("default except not last");
+                        }
+                        b.append(i == 0 ? "{\n" : "} else {\n");
+                        catchAll = true;
+                    } else {
+                        b.append(i == 0 ? "if (" : "} else if (").append(pe).append(".matches(").append(excRef(h.type))
+                                .append(")) {\n");
+                    }
+                    if (h.name != null) {
+                        if (binding(h.name) != Scope.Binding.LOCAL || longLocals.contains(h.name)
+                                || !"Object".equals(jt(localType(h.name)))) {
+                            throw new Unsupported("except as " + h.name);
+                        }
+                        indent(b, ind + 2);
+                        b.append(var(h.name)).append(" = ").append(pe).append(".value;\n");
+                    }
+                    String hv = fresh();
+                    indent(b, ind + 2);
+                    b.append("final Object ").append(hv).append(" = Py.enterHandler(").append(pe).append(");\n");
+                    indent(b, ind + 2);
+                    b.append("try {\n");
+                    boolean ha = block(h.body, b, ind + 3);
+                    indent(b, ind + 2);
+                    b.append("} finally {\n");
+                    indent(b, ind + 3);
+                    b.append("Py.exitHandler(").append(hv).append(");\n");
+                    indent(b, ind + 2);
+                    b.append("}\n");
+                    if (h.name != null && !ha) {
+                        indent(b, ind + 2);
+                        b.append(var(h.name)).append(" = null;\n");
+                    }
+                    allAbrupt &= ha;
+                }
+            } finally {
+                handlers.remove(handlers.size() - 1);
+            }
+            if (!catchAll) {
+                indent(b, ind + 1);
+                b.append("} else {\n");
+                indent(b, ind + 2);
+                b.append("throw ").append(pe).append(";\n");
+            }
+            indent(b, ind + 1);
+            b.append("}\n");
+            indent(b, ind);
+            b.append("}\n");
+            nonNull = new HashSet<String>(entry);
+            abrupt = bodyAbrupt && allAbrupt;
+            if (ok != null && !bodyAbrupt) {
+                indent(b, ind);
+                b.append("if (").append(ok).append(") {\n");
+                block(t.orelse, b, ind + 1);
+                indent(b, ind);
+                b.append("}\n");
+                nonNull = new HashSet<String>(entry);
+            }
+        }
+        if (fin) {
+            ind--;
+            indent(b, ind);
+            b.append("} finally {\n");
+            boolean fa = block(t.finalbody, b, ind + 1);
+            indent(b, ind);
+            b.append("}\n");
+            nonNull = new HashSet<String>(entry);
+            abrupt |= fa;
+        }
+        shadow.keySet().removeAll(touched);
+        forgetPaths();
+        return abrupt;
+    }
+
+    /// An exception class or instance for `raise` and `except`: a builtin
+    /// or a module-level class by reference, a tuple of them, or any value
+    /// the typed code can lower, boxed.
+    private String excRef(Expr e) {
+        if (e instanceof Name) {
+            String n = ((Name) e).id;
+            Scope.Binding k = binding(n);
+            if (k == Scope.Binding.BUILTIN && !em.moduleScopeHasStarImport()) {
+                return em.builtinRef(n);
+            }
+            if (k == Scope.Binding.GLOBAL) {
+                return "g(" + em.slot(n) + ")";
+            }
+        }
+        if (e instanceof TupleExpr) {
+            StringBuilder sb = new StringBuilder("Py.tuple(");
+            List<Expr> el = ((TupleExpr) e).elts;
+            for (int i = 0; i < el.size(); i++) {
+                if (el.get(i) instanceof Starred) {
+                    throw new Unsupported("starred");
+                }
+                sb.append(i == 0 ? "" : ", ").append(excRef(el.get(i)));
+            }
+            sb.append(')');
+            return Emitter.foldable(el) ? em.hoist("PyTuple", sb.toString()) : sb.toString();
+        }
+        return box(expr(e));
     }
 
     private static boolean hasWalrus(Object o) {
@@ -1106,6 +1572,9 @@ final class TypedEmit {
                         + "))";
             }
             store(n, new E(c, localType(n.id).nonNone()), b, ind);
+            return false;
+        }
+        if (s instanceof Assign && dictCount((Assign) s, b, ind)) {
             return false;
         }
         if (s instanceof Assign) {
@@ -1209,10 +1678,13 @@ final class TypedEmit {
         }
         if (s instanceof While) {
             While w = (While) s;
-            if (!w.orelse.isEmpty()) {
-                throw new Unsupported("while-else");
-            }
             boolean forever = w.test instanceof Constant && ((Constant) w.test).kind == Constant.Kind.TRUE;
+            // A loop that never ends but by a break never runs its else.
+            String label = w.orelse.isEmpty() || forever ? "" : fresh();
+            if (!label.isEmpty()) {
+                indent(b, ind);
+                b.append(label).append(": {\n");
+            }
             nonNull.removeAll(assigned(w.body));
             shadow.keySet().removeAll(assigned(w.body));
             forgetPaths();
@@ -1252,28 +1724,92 @@ final class TypedEmit {
                 b.append("while (").append(test).append(") {\n");
             }
             nonNull.addAll(whenTrue(w.test));
-            block(w.body, b, ind + 1);
+            loopLabels.push(label);
+            try {
+                block(w.body, b, ind + 1);
+            } finally {
+                loopLabels.pop();
+            }
             nonNull = inv;
             if (!Infer.hasBreak(w.body)) {
                 nonNull.addAll(whenFalse(w.test));
             }
             indent(b, ind);
             b.append("}\n");
+            if (!label.isEmpty()) {
+                return loopElse(w.orelse, w.body, inv, b, ind);
+            }
             return forever && !Infer.hasBreak(w.body);
         }
         if (s instanceof For) {
-            forLoop((For) s, b, ind);
+            For f = (For) s;
+            String label = f.orelse.isEmpty() ? "" : fresh();
+            if (!label.isEmpty()) {
+                indent(b, ind);
+                b.append(label).append(": {\n");
+            }
+            Set<String> inv = new HashSet<String>(nonNull);
+            inv.removeAll(assigned(f.body));
+            if (f.target instanceof Name) {
+                inv.remove(((Name) f.target).id);
+            }
+            loopLabels.push(label);
+            try {
+                forLoop(f, b, ind);
+            } finally {
+                loopLabels.pop();
+            }
+            if (!label.isEmpty()) {
+                return loopElse(f.orelse, f.body, inv, b, ind);
+            }
             return false;
         }
         if (s instanceof Break) {
             indent(b, ind);
-            b.append("break;\n");
+            String l = loopLabels.isEmpty() ? "" : loopLabels.peek();
+            b.append(l.isEmpty() ? "break;\n" : "break " + l + ";\n");
             return true;
         }
         if (s instanceof Continue) {
             indent(b, ind);
             b.append("continue;\n");
             return true;
+        }
+        if (s instanceof Raise) {
+            Raise r = (Raise) s;
+            indent(b, ind);
+            if (r.exc == null) {
+                if (handlers.isEmpty()) {
+                    throw new Unsupported("bare raise outside a handler");
+                }
+                b.append("throw ").append(handlers.get(handlers.size() - 1)).append(";\n");
+            } else if (r.cause != null) {
+                b.append("throw Py.raise(").append(excRef(r.exc)).append(", ").append(excRef(r.cause)).append(");\n");
+            } else if (localRaise != null) {
+                // A jump to the handlers of the try around it (see `raiseOnly`).
+                // The class is looked up at run time and may have been
+                // rebound to one whose construction raises: that error is the
+                // one the handlers see. The Java try is entered only on this
+                // path, never on the one that does not raise.
+                String th = fresh();
+                b.append("try {\n");
+                indent(b, ind + 1);
+                b.append(localRaise[0]).append(" = Py.raise(").append(excRef(r.exc)).append(");\n");
+                indent(b, ind);
+                b.append("} catch (Throwable ").append(th).append(") {\n");
+                indent(b, ind + 1);
+                b.append(localRaise[0]).append(" = Py.convert(").append(th).append(");\n");
+                indent(b, ind);
+                b.append("}\n");
+                indent(b, ind);
+                b.append("break ").append(localRaise[1]).append(";\n");
+            } else {
+                b.append("throw Py.raise(").append(excRef(r.exc)).append(");\n");
+            }
+            return true;
+        }
+        if (s instanceof Try) {
+            return tryStmt((Try) s, b, ind);
         }
         throw new Unsupported(s.getClass().getSimpleName());
     }
@@ -1374,6 +1910,86 @@ final class TypedEmit {
         b.append("}\n");
     }
 
+    /// `for w in s.split()` / `for w in s.split(sep)` with a str target: the
+    /// pieces found one at a time in `s`, held in a Java local, so the list
+    /// and its array are never made. The string is immutable, so finding
+    /// each piece as the loop reaches it sees what the list would hold.
+    private boolean splitLoop(For f, StringBuilder b, int ind) {
+        if (!(f.iter instanceof Call) || !(((Call) f.iter).func instanceof Attribute)) {
+            return false;
+        }
+        Call c = (Call) f.iter;
+        Attribute m = (Attribute) c.func;
+        String tn = ((Name) f.target).id;
+        Ty vt = localType(tn);
+        if (!"split".equals(m.attr) || !c.keywords.isEmpty() || c.args.size() > 1
+                // A separator that is a name or a constant is read with no
+                // statement of its own, so the receiver is still read first.
+                || c.args.size() == 1 && !(c.args.get(0) instanceof Name || c.args.get(0) instanceof Constant)
+                || longLocals.contains(tn)
+                || vt.k != Ty.K.STR && vt.k != Ty.K.DYN) {
+            return false;
+        }
+        E r = expr(m.value);
+        if (r.t.k != Ty.K.STR || r.t.opt) {
+            return false;
+        }
+        E sepE = c.args.isEmpty() ? null : expr(c.args.get(0));
+        if (sepE != null && (sepE.t.k != Ty.K.STR || sepE.t.opt)) {
+            return false;
+        }
+        String s = fresh();
+        String p = fresh();
+        String q = fresh();
+        indent(b, ind);
+        b.append("{\n");
+        indent(b, ind + 1);
+        b.append("String ").append(s).append(" = ").append(r.c).append(";\n");
+        if (sepE == null) {
+            indent(b, ind + 1);
+            b.append("int ").append(p).append(" = 0;\n");
+            indent(b, ind + 1);
+            b.append("while ((").append(p).append(" = Typed.wordStart(").append(s).append(", ").append(p).append(")) < ")
+                    .append(s).append(".length()) {\n");
+            indent(b, ind + 2);
+            b.append("int ").append(q).append(" = Typed.wordEnd(").append(s).append(", ").append(p).append(");\n");
+            indent(b, ind + 2);
+            b.append(var(tn)).append(" = ").append(s).append(".substring(").append(p).append(", ").append(q)
+                    .append(");\n");
+            indent(b, ind + 2);
+            b.append(p).append(" = ").append(q).append(";\n");
+        } else {
+            String sep = fresh();
+            indent(b, ind + 1);
+            b.append("String ").append(sep).append(" = Typed.splitSep(").append(sepE.c).append(");\n");
+            indent(b, ind + 1);
+            b.append("int ").append(p).append(" = 0;\n");
+            indent(b, ind + 1);
+            b.append("while (").append(p).append(" >= 0) {\n");
+            indent(b, ind + 2);
+            b.append("int ").append(q).append(" = ").append(s).append(".indexOf(").append(sep).append(", ").append(p)
+                    .append(");\n");
+            indent(b, ind + 2);
+            b.append(var(tn)).append(" = ").append(q).append(" < 0 ? ").append(s).append(".substring(").append(p)
+                    .append(") : ").append(s).append(".substring(").append(p).append(", ").append(q).append(");\n");
+            indent(b, ind + 2);
+            b.append(p).append(" = ").append(q).append(" < 0 ? -1 : ").append(q).append(" + ").append(sep)
+                    .append(".length();\n");
+        }
+        Set<String> inBody = assigned(f.body);
+        if (!inBody.contains(tn)) {
+            nonNull.add(tn);
+        }
+        block(f.body, b, ind + 2);
+        // The target keeps whatever it held when the loop runs no times.
+        nonNull.remove(tn);
+        indent(b, ind + 1);
+        b.append("}\n");
+        indent(b, ind);
+        b.append("}\n");
+        return true;
+    }
+
     /// Whether every read of `n` in `o` is the argument of the builtin `ord`.
     private boolean onlyOrd(Object o, String n) {
         if (ordOf(o, n)) {
@@ -1398,9 +2014,25 @@ final class TypedEmit {
                 && sc.resolve("ord") == Scope.Binding.BUILTIN && !em.moduleScopeHasStarImport();
     }
 
+    /// The `else` of a loop just emitted inside the block `label` opened:
+    /// it runs when the loop ends without a break, which leaves the block.
+    /// Whether the block cannot complete normally, as javac judges it.
+    private boolean loopElse(List<Stmt> orelse, List<Stmt> body, Set<String> inv, StringBuilder b, int ind) {
+        boolean abrupt = block(orelse, b, ind + 1);
+        indent(b, ind);
+        b.append("}\n");
+        // After a break the else did not run: only what held at the top of
+        // every iteration is known.
+        nonNull.retainAll(inv);
+        shadow.keySet().removeAll(assigned(orelse));
+        forgetPaths();
+        return abrupt && !Infer.hasBreak(body);
+    }
+
     private void forLoop(For f, StringBuilder b, int ind) {
-        if (!f.orelse.isEmpty()) {
-            throw new Unsupported("for-else");
+        if (!(f.target instanceof Name) || binding(((Name) f.target).id) != Scope.Binding.LOCAL) {
+            anyTargetLoop(f, b, ind);
+            return;
         }
         Set<String> inBody = assigned(f.body);
         nonNull.removeAll(inBody);
@@ -1409,7 +2041,7 @@ final class TypedEmit {
         if (f.target instanceof Name) {
             nonNull.remove(((Name) f.target).id);
         }
-        if (!(f.target instanceof Name) || sc.resolve(((Name) f.target).id) != Scope.Binding.LOCAL) {
+        if (!(f.target instanceof Name) || binding(((Name) f.target).id) != Scope.Binding.LOCAL) {
             throw new Unsupported("for target");
         }
         String v = var(((Name) f.target).id);
@@ -1469,13 +2101,43 @@ final class TypedEmit {
             b.append("}\n");
             return;
         }
+        if (splitLoop(f, b, ind)) {
+            return;
+        }
         E it = expr(f.iter);
         if (it.t.k == Ty.K.STR && !it.t.opt) {
             strLoop(f, it, inBody, b, ind);
             return;
         }
         if (it.t.k != Ty.K.LIST) {
-            throw new Unsupported("for over " + it.t);
+            // Any other iterable: the generic iterator, with the body still
+            // typed. An int target is held as a long and an object, which a
+            // value of unknown type cannot fill without a test, so it stays
+            // with the generic version.
+            if (vt.k == Ty.K.INT || longLocals.contains(((Name) f.target).id)) {
+                throw new Unsupported("for over " + it.t + " into an int");
+            }
+            String itr = fresh();
+            String x = fresh();
+            String store = conv(new E(x, Ty.DYN), vt);
+            indent(b, ind);
+            b.append("{\n");
+            indent(b, ind + 1);
+            b.append("final PyObject ").append(itr).append(" = Py.iter(").append(box(it)).append(");\n");
+            indent(b, ind + 1);
+            b.append("try {\n");
+            indent(b, ind + 1);
+            b.append(loopHead(x, loopNext(itr), null));
+            indent(b, ind + 2);
+            b.append(v).append(" = ").append(store).append(";\n");
+            block(f.body, b, ind + 2);
+            indent(b, ind + 1);
+            b.append("}\n");
+            indent(b, ind + 1);
+            b.append(loopHandler(itr));
+            indent(b, ind);
+            b.append("}\n");
+            return;
         }
         Ty el = in.elem(it.t);
         String l = fresh();
@@ -1504,6 +2166,76 @@ final class TypedEmit {
         b.append("}\n");
     }
 
+    /// A loop whose target is not one local: a tuple to unpack, a global, an
+    /// attribute or an element. Each item is stored as an assignment would.
+    private void anyTargetLoop(For f, StringBuilder b, int ind) {
+        Set<String> inBody = new HashSet<String>(assigned(f.body));
+        inBody.addAll(assigned(java.util.Collections.<Stmt>singletonList(new Assign(
+                java.util.Collections.singletonList(f.target), f.target))));
+        nonNull.removeAll(inBody);
+        shadow.keySet().removeAll(inBody);
+        forgetPaths();
+        E it = loopSource(f.iter, f.target);
+        String handled = null;
+        indent(b, ind);
+        b.append("{\n");
+        if (it.t.k == Ty.K.LIST && !it.t.opt) {
+            Ty el = in.elem(it.t);
+            String l = fresh();
+            String k = fresh();
+            indent(b, ind + 1);
+            b.append("PyList ").append(l).append(" = Typed.iterable(").append(it.c).append(");\n");
+            indent(b, ind + 1);
+            b.append("for (int ").append(k).append(" = 0; ").append(k).append(" < ").append(l).append(".size(); ")
+                    .append(k).append("++) {\n");
+            E item = el.k == Ty.K.FLOAT ? new E("Typed.atF(" + l + ", " + k + ")", Ty.FLOAT)
+                    : new E(unbox(l + ".get(" + k + ")", el), el);
+            store(f.target, spillTo(item, b, ind + 2), b, ind + 2);
+        } else {
+            String itr = fresh();
+            String x = fresh();
+            indent(b, ind + 1);
+            b.append("final PyObject ").append(itr).append(" = Py.iter(").append(box(it)).append(");\n");
+            indent(b, ind + 1);
+            b.append("try {\n");
+            indent(b, ind + 1);
+            b.append(loopHead(x, loopNext(itr), null));
+            store(f.target, new E(x, Ty.DYN), b, ind + 2);
+            handled = itr;
+        }
+        block(f.body, b, ind + 2);
+        indent(b, ind + 1);
+        b.append("}\n");
+        if (handled != null) {
+            indent(b, ind + 1);
+            b.append(loopHandler(handled));
+        }
+        indent(b, ind);
+        b.append("}\n");
+    }
+
+    /// The next value of loop iterator `itr`, without a handler per value when
+    /// it is a plain generator: the loop holds the one handler instead
+    /// ([#loopHandler]; see PyGenerator.loopNext).
+    static String loopNext(String itr) {
+        return "PyGenerator.loopNext(" + itr + ")";
+    }
+
+    /// `for (Object x = next; x != null; [step, ]x = next) {` -- the first
+    /// fetch is the init, not the test, so the back edge lands on the test
+    /// INSIDE the try. A loop whose test is the try's first instruction jumps
+    /// back to the try's own start, and the translator re-enters the try on
+    /// every iteration.
+    static String loopHead(String x, String next, String step) {
+        return "for (Object " + x + " = " + next + "; " + x + " != null; "
+                + (step != null ? step + ", " : "") + x + " = " + next + ") {\n";
+    }
+
+    /// Closes the try a [#loopNext] loop is wrapped in.
+    static String loopHandler(String itr) {
+        return "} catch (Throwable " + itr + "$e) {\n throw PyGenerator.loopEscape(" + itr + ", " + itr + "$e);\n}\n";
+    }
+
     private static Long intConstant(Expr e) {
         if (e instanceof Constant && ((Constant) e).kind == Constant.Kind.INT) {
             // Any spelling: hex, octal and binary constants are as common
@@ -1529,11 +2261,235 @@ final class TypedEmit {
         return c.matches("\\(?-?[0-9]+L\\)?");
     }
 
+    /// The statement being lowered, which a comprehension is hoisted ahead of.
+    private Stmt curStmt;
+
+    /// A list, set or dict comprehension, as a loop run ahead of the
+    /// statement (`pre`) into a fresh container. Only where nothing the
+    /// statement evaluates before it could observe the difference
+    /// (`inertBefore`), and where its targets name no local of the function.
+    private E comp(Comp c) {
+        if (pre == null || condDepth != 0 || curStmt == null || c.scope == null || !inertBefore(curStmt, c)) {
+            throw new Unsupported("comprehension");
+        }
+        Map<String, String> vars = new HashMap<String, String>();
+        for (Comprehension g : c.generators) {
+            if (g.isAsync || !compTargets(g.target, vars)) {
+                throw new Unsupported("comprehension target");
+            }
+        }
+        boolean[] ok = {true};
+        Infer.children(c, x -> ok[0] &= compBody(x));
+        if (!ok[0]) {
+            throw new Unsupported("comprehension body");
+        }
+        StringBuilder p = pre;
+        int ind = preInd;
+        Scope outer = sc;
+        String kind = c.kind == Comp.Kind.SET ? "PySet" : c.kind == Comp.Kind.DICT ? "PyDict" : "PyList";
+        String r = exprTemp(kind);
+        for (Map.Entry<String, String> v : vars.entrySet()) {
+            v.setValue(exprTemp("Object"));
+        }
+        forgetPaths();
+        compVars.put(c.scope, vars);
+        try {
+            String[] first = compHead(c.generators.get(0));
+            pre = null;
+            sc = c.scope;
+            indent(p, ind);
+            p.append(r).append(" = new ").append(kind).append("();\n");
+            int d = ind;
+            for (int i = 0; i < c.generators.size(); i++) {
+                Comprehension g = c.generators.get(i);
+                String[] h = i == 0 ? first : compHead(g);
+                indent(p, d);
+                p.append("{\n");
+                indent(p, d + 1);
+                p.append(h[0]);
+                indent(p, d + 1);
+                p.append(h[1]);
+                d += 2;
+                store(g.target, new E(h[2], Ty.DYN), p, d);
+                for (Expr f : g.ifs) {
+                    indent(p, d);
+                    p.append("if (!(").append(testExpr(f)).append(")) {\n");
+                    indent(p, d + 1);
+                    p.append("continue;\n");
+                    indent(p, d);
+                    p.append("}\n");
+                }
+            }
+            indent(p, d);
+            if (c.kind == Comp.Kind.DICT) {
+                String k = box(expr(c.elt));
+                p.append(r).append(".setItem(").append(k).append(", ").append(box(expr(c.value))).append(");\n");
+            } else {
+                p.append(r).append(c.kind == Comp.Kind.SET ? ".addItem(" : ".append(").append(box(expr(c.elt)))
+                        .append(");\n");
+            }
+            for (int i = c.generators.size() - 1; i >= 0; i--) {
+                d -= 2;
+                indent(p, d + 1);
+                p.append("}\n");
+                indent(p, d);
+                p.append("}\n");
+            }
+        } finally {
+            sc = outer;
+            pre = p;
+            compVars.remove(c.scope);
+            nonNull.removeAll(vars.keySet());
+            shadow.keySet().removeAll(vars.keySet());
+        }
+        forgetPaths();
+        return new E(r, c.kind == Comp.Kind.LIST ? in.type(c, cur, sc) : Ty.DYN);
+    }
+
+    /// What a loop over `iter` into `target` iterates: `x.items()` into two
+    /// names walks the pairs (see Emitter.itemPairs).
+    private E loopSource(Expr iter, Expr target) {
+        Expr recv = Emitter.itemPairs(iter, target);
+        return recv != null ? new E("ItemWalk.of(" + box(expr(recv)) + ")", Ty.DYN) : expr(iter);
+    }
+
+    /// The loop over one `for` clause of a comprehension: the statement
+    /// evaluating what it iterates, the loop header, and the item (boxed).
+    /// A `range` counts in a long and a list is indexed, as `for` does.
+    private String[] compHead(Comprehension g) {
+        if (in.rangeCall(g.iter, sc) && ((Call) g.iter).args.size() <= 2) {
+            List<Expr> a = ((Call) g.iter).args;
+            String start = a.size() == 1 ? "0L" : bound(expr(a.get(0)));
+            String stop = bound(expr(a.get(a.size() - 1)));
+            String s0 = fresh();
+            String e = fresh();
+            String i = fresh();
+            return new String[] {"long " + s0 + " = " + start + ", " + e + " = " + stop + ";\n",
+                "for (long " + i + " = " + s0 + "; " + i + " < " + e + "; " + i + "++) {\n",
+                "Long.valueOf(" + i + ")"};
+        }
+        E it = loopSource(g.iter, g.target);
+        if (it.t.k == Ty.K.LIST && !it.t.opt) {
+            String l = fresh();
+            String k = fresh();
+            return new String[] {"PyList " + l + " = Typed.iterable(" + it.c + ");\n",
+                "for (int " + k + " = 0; " + k + " < " + l + ".size(); " + k + "++) {\n",
+                l + ".get(" + k + ")"};
+        }
+        String itr = fresh();
+        String x = fresh();
+        return new String[] {"final PyObject " + itr + " = Py.iter(" + box(it) + ");\n",
+            "for (Object " + x + "; (" + x + " = " + itr + ".next()) != null;) {\n", x};
+    }
+
+    /// Records the names a comprehension target binds; false when it binds
+    /// anything but names, or a name the function has as a local.
+    private boolean compTargets(Expr t, Map<String, String> vars) {
+        if (t instanceof Name) {
+            String n = ((Name) t).id;
+            if (compVar(n) != null) {
+                return false;
+            }
+            vars.put(n, null);
+            return true;
+        }
+        if (t instanceof TupleExpr || t instanceof ListExpr) {
+            for (Expr e : t instanceof TupleExpr ? ((TupleExpr) t).elts : ((ListExpr) t).elts) {
+                if (!compTargets(e, vars)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /// Whether a comprehension's body can be lowered in line: nothing in it
+    /// opens a scope that would capture its targets, or binds outside it.
+    private static boolean compBody(Object o) {
+        if (o instanceof NamedExpr || o instanceof Lambda || o instanceof Yield || o instanceof Await
+                || o instanceof Comp && ((Comp) o).kind == Comp.Kind.GENERATOR) {
+            return false;
+        }
+        boolean[] ok = {true};
+        Infer.children(o, x -> ok[0] &= compBody(x));
+        return ok[0];
+    }
+
+    /// Whether everything `s` evaluates before `target` is inert: running
+    /// the comprehension first cannot change what it reads. Only straight
+    /// line evaluation is walked; a comprehension under a branch of `and`,
+    /// `or` or `if` is never reached, so never hoisted.
+    private boolean inertBefore(Object s, Object target) {
+        return inertWalk(s, target) == 1;
+    }
+
+    /// 1 found the target with only inert nodes before it, 0 walked `o`
+    /// without finding it and it was inert, -1 gave up.
+    private int inertWalk(Object o, Object target) {
+        if (o == target) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return 1;
+        }
+        List<Object> kids = new ArrayList<Object>();
+        if (o instanceof ExprStmt) {
+            kids.add(((ExprStmt) o).value);
+        } else if (o instanceof Return) {
+            if (((Return) o).value != null) {
+                kids.add(((Return) o).value);
+            }
+        } else if (o instanceof Assign) {
+            kids.add(((Assign) o).value);
+        } else if (o instanceof AugAssign) {
+            if (!(((AugAssign) o).target instanceof Name)) {
+                return -1;
+            }
+            kids.add(((AugAssign) o).value);
+        } else if (o instanceof If) {
+            kids.add(((If) o).test);
+        } else if (o instanceof Call) {
+            Call c = (Call) o;
+            if (c.func instanceof Attribute) {
+                kids.add(((Attribute) c.func).value);
+            } else {
+                kids.add(c.func);
+            }
+            kids.addAll(c.args);
+            for (Keyword k : c.keywords) {
+                kids.add(k.value);
+            }
+        } else if (o instanceof TupleExpr) {
+            kids.addAll(((TupleExpr) o).elts);
+        } else if (o instanceof ListExpr) {
+            kids.addAll(((ListExpr) o).elts);
+        } else if (o instanceof BinOp) {
+            kids.add(((BinOp) o).left);
+            kids.add(((BinOp) o).right);
+        } else if (o instanceof Name) {
+            Scope.Binding b = binding(((Name) o).id);
+            return b == Scope.Binding.LOCAL || b == Scope.Binding.CELL || b == Scope.Binding.BUILTIN ? 0 : -1;
+        } else if (o instanceof Constant) {
+            return 0;
+        } else {
+            return -1;
+        }
+        for (Object k : kids) {
+            int r = inertWalk(k, target);
+            if (r != 0) {
+                return r;
+            }
+        }
+        // A call or an operator finished before the target ran user code.
+        return o instanceof Call || o instanceof BinOp ? -1 : 0;
+    }
+
     private void store(Expr t, E v, StringBuilder b, int ind) {
         if (t instanceof Name) {
             String n = ((Name) t).id;
-            switch (sc.resolve(n)) {
+            switch (binding(n)) {
                 case LOCAL:
+                    if (compVar(n) == null) {
+                        paramAlias.remove(n);
+                    }
                     indent(b, ind);
                     if (longLocals.contains(n)) {
                         // The analysis proved every value it holds fits.
@@ -1541,7 +2497,7 @@ final class TypedEmit {
                                 .append(";\n");
                         return;
                     }
-                    if (localType(n).k == Ty.K.INT) {
+                    if (localType(n).k == Ty.K.INT || accLocals.contains(n)) {
                         storePair(var(n), big(n), v, b, ind);
                     } else {
                         b.append(var(n)).append(" = ").append(conv(v, localType(n))).append(";\n");
@@ -1681,6 +2637,50 @@ final class TypedEmit {
             }
             return;
         }
+        if (t instanceof TupleExpr || t instanceof ListExpr) {
+            // Unpacking anything but a literal of the same length: the
+            // generic helpers, each element then stored as the target
+            // wants it (Infer types them as dynamic, or as the list's
+            // elements).
+            List<Expr> elts = t instanceof TupleExpr ? ((TupleExpr) t).elts : ((ListExpr) t).elts;
+            int star = -1;
+            for (int i = 0; i < elts.size(); i++) {
+                if (elts.get(i) instanceof Starred) {
+                    if (star >= 0) {
+                        throw new Unsupported("two starred targets");
+                    }
+                    star = i;
+                }
+            }
+            String arr = fresh();
+            if (star < 0) {
+                // A fixed-size tuple is read in place: the runtime answers
+                // an empty array for one and no array is made.
+                String held = fresh();
+                indent(b, ind);
+                b.append("final Object ").append(held).append(" = ").append(box(v)).append(";\n");
+                indent(b, ind);
+                b.append("final Object[] ").append(arr).append(" = ")
+                        .append(Emitter.onlyNames(t) ? "Py.unpackNamesT(" : "Py.unpackT(").append(held).append(", ")
+                        .append(elts.size()).append(");\n");
+                for (int i = 0; i < elts.size(); i++) {
+                    store(elts.get(i), new E("(" + arr + ".length != 0 ? " + arr + "[" + i + "] : ((PyTuple) " + held
+                            + ").get(" + i + "))", Ty.DYN), b, ind);
+                }
+                return;
+            }
+            indent(b, ind);
+            b.append("final Object[] ").append(arr).append(" = ");
+            {
+                b.append("Py.unpackStar(").append(box(v)).append(", ").append(star).append(", ")
+                        .append(elts.size() - star - 1).append(");\n");
+            }
+            for (int i = 0; i < elts.size(); i++) {
+                Expr e = elts.get(i);
+                store(e instanceof Starred ? ((Starred) e).value : e, new E(arr + "[" + i + "]", Ty.DYN), b, ind);
+            }
+            return;
+        }
         throw new Unsupported("store target " + t.getClass().getSimpleName());
     }
 
@@ -1732,19 +2732,106 @@ final class TypedEmit {
         }
     }
 
+    /// The untyped locals of `f` worth holding as a long and an object: a
+    /// `+=` or `-=` targets them, and nothing deletes them.
+    private Set<String> accumulators(Infer.Fn f) {
+        Set<String> targets = new HashSet<String>();
+        Infer.Visit[] v = new Infer.Visit[1];
+        v[0] = x -> {
+            if (x instanceof AugAssign && ((AugAssign) x).target instanceof Name
+                    && ("+".equals(((AugAssign) x).op) || "-".equals(((AugAssign) x).op))) {
+                targets.add(((Name) ((AugAssign) x).target).id);
+            }
+            if (!(x instanceof FunctionDef || x instanceof Lambda || x instanceof ClassDef || x instanceof Comp)) {
+                Infer.children(x, v[0]);
+            }
+        };
+        for (Stmt st : f.def.body) {
+            v[0].on(st);
+        }
+        Set<String> out = new HashSet<String>();
+        for (String n : targets) {
+            Ty t = f.locals.get(n);
+            if (t != null && t.k == Ty.K.DYN && !sc.params.contains(n) && !longLocals.contains(n)
+                    && !sc.deleted.contains(n) && sc.resolve(n) == Scope.Binding.LOCAL) {
+                out.add(n);
+            }
+        }
+        return out;
+    }
+
+    /// `n += v` (or `-=`) on an accumulator: the long sum while both are
+    /// ints and it fits, Python's in-place operator on the boxed value
+    /// otherwise.
+    private void accumulate(String n, String op, E v, StringBuilder b, int ind) {
+        String lv = var(n);
+        String ob = big(n);
+        String slow = "Py." + ("+".equals(op) ? "iadd" : "isub") + "(" + ob + " == null ? (Object) Long.valueOf(" + lv
+                + ") : " + ob + ", ";
+        String r = fresh();
+        String s = fresh();
+        indent(b, ind);
+        String over = "+".equals(op) ? "((" + lv + " ^ " + s + ") & (" + r + " ^ " + s + ")) < 0"
+                : "((" + lv + " ^ " + r + ") & (" + lv + " ^ " + s + ")) < 0";
+        if (v.t.k == Ty.K.INT && !v.t.opt && v.lc != null && v.pk == null) {
+            b.append("long ").append(r).append(" = ").append(v.lc).append(";\n");
+            indent(b, ind);
+            b.append("long ").append(s).append(" = ").append(lv).append(' ').append(op).append(' ').append(r).append(";\n");
+            indent(b, ind);
+            b.append("if (").append(ob).append(" == null && !(").append(over).append(")) {\n");
+            indent(b, ind + 1);
+            b.append(lv).append(" = ").append(s).append(";\n");
+            indent(b, ind);
+            b.append("} else {\n");
+            indent(b, ind + 1);
+            storePair(lv, ob, new E(slow + "Long.valueOf(" + r + "))", Ty.DYN), b, ind + 1);
+            indent(b, ind);
+            b.append("}\n");
+            return;
+        }
+        String x = fresh();
+        b.append("Object ").append(x).append(" = ").append(box(v)).append(";\n");
+        indent(b, ind);
+        b.append("if (").append(ob).append(" == null && ").append(x).append(" instanceof Long) {\n");
+        indent(b, ind + 1);
+        b.append("long ").append(r).append(" = ((Long) ").append(x).append(").longValue();\n");
+        indent(b, ind + 1);
+        b.append("long ").append(s).append(" = ").append(lv).append(' ').append(op).append(' ').append(r).append(";\n");
+        indent(b, ind + 1);
+        b.append("if (!(").append(over).append(")) {\n");
+        indent(b, ind + 2);
+        b.append(lv).append(" = ").append(s).append(";\n");
+        indent(b, ind + 2);
+        b.append(x).append(" = null;\n");
+        indent(b, ind + 1);
+        b.append("}\n");
+        indent(b, ind);
+        b.append("}\n");
+        indent(b, ind);
+        b.append("if (").append(x).append(" != null) {\n");
+        indent(b, ind + 1);
+        storePair(lv, ob, new E(slow + x + ")", Ty.DYN), b, ind + 1);
+        indent(b, ind);
+        b.append("}\n");
+    }
+
     private void augAssign(AugAssign a, StringBuilder b, int ind) {
         Expr t = a.target;
+        if (t instanceof Name && accLocals.contains(((Name) t).id) && ("+".equals(a.op) || "-".equals(a.op))) {
+            accumulate(((Name) t).id, a.op, expr(a.value), b, ind);
+            return;
+        }
         if (t instanceof Name && longLocals.contains(((Name) t).id)) {
             store(t, top(new BinOp(t, a.op, a.value)), b, ind);
             return;
         }
         if (t instanceof Name && (localType(((Name) t).id).k == Ty.K.INT || localType(((Name) t).id).k == Ty.K.FLOAT)
-                && sc.resolve(((Name) t).id) == Scope.Binding.LOCAL) {
+                && binding(((Name) t).id) == Scope.Binding.LOCAL) {
             store(t, top(new BinOp(t, a.op, a.value)), b, ind);
             return;
         }
         if (t instanceof Attribute && ((Attribute) t).value instanceof Name
-                && sc.resolve(((Name) ((Attribute) t).value).id) == Scope.Binding.LOCAL) {
+                && binding(((Name) ((Attribute) t).value).id) == Scope.Binding.LOCAL) {
             // The receiver is a local: reading it again is reading it once.
             E r0 = expr(((Attribute) t).value);
             if (r0.t.k == Ty.K.INST && fieldTy(r0, ((Attribute) t).attr).k == Ty.K.INT
@@ -1755,6 +2842,12 @@ final class TypedEmit {
         }
         if (t instanceof Name) {
             E cur0 = expr(t);
+            if (cur0.t.k == Ty.K.LIST && !cur0.t.opt && "+".equals(a.op)) {
+                // list += extends in place, so an alias sees the new items;
+                // Py.iadd answers the same PyList it was given.
+                store(t, new E("((PyList) Py.iadd(" + cur0.c + ", " + box(expr(a.value)) + "))", cur0.t), b, ind);
+                return;
+            }
             E r = binop(a.op, cur0, expr(a.value), a.value);
             store(t, r, b, ind);
             return;
@@ -1787,6 +2880,24 @@ final class TypedEmit {
             Subscript s = (Subscript) t;
             E l = expr(s.value);
             E i = expr(s.index);
+            if (l.t.k == Ty.K.DICT) {
+                // Python's order: the dict, the key, the read, the operand,
+                // the store; the dict and the key are each evaluated once.
+                String dv = fresh();
+                String kv = fresh();
+                indent(b, ind);
+                b.append("Object ").append(dv).append(" = ").append(l.c).append(";\n");
+                indent(b, ind);
+                b.append("Object ").append(kv).append(" = ").append(box(i)).append(";\n");
+                E old = dictRead("Typed.dgetv(" + dv + ", " + kv + ")", l.t);
+                String ov = fresh();
+                indent(b, ind);
+                b.append(jt(old.t)).append(' ').append(ov).append(" = ").append(old.c).append(";\n");
+                E v = binop(a.op, new E(ov, old.t), expr(a.value), a.value);
+                indent(b, ind);
+                b.append("Py.setitem(").append(dv).append(", ").append(kv).append(", ").append(box(v)).append(");\n");
+                return;
+            }
             if (l.t.k != Ty.K.LIST || !(i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
                 throw new Unsupported("subscript aug on " + l.t);
             }
@@ -1886,7 +2997,8 @@ final class TypedEmit {
 
     /// `x.attr` of a local `x`, the key narrowing keeps for that field.
     private String path(Attribute a) {
-        if (a.value instanceof Name && sc.resolve(((Name) a.value).id) == Scope.Binding.LOCAL) {
+        if (a.value instanceof Name && binding(((Name) a.value).id) == Scope.Binding.LOCAL
+                && compVar(((Name) a.value).id) == null) {
             return ((Name) a.value).id + "." + a.attr;
         }
         return null;
@@ -1911,6 +3023,156 @@ final class TypedEmit {
     }
 
     /// The three parts of a slice, boxed, `Py.NONE` for a missing one.
+    /// `s[a:b]` with no step and int bounds, the bounds passed as Java
+    /// longs (each beside the object that replaces it when it is a big int
+    /// or a bool, see `dual`); or null when a bound is anything else.
+    private String strSliceLong(E l, Slice sl) {
+        if (sl.step != null) {
+            return null;
+        }
+        String[] lo = sl.lower == null ? new String[] {"0L", "null"} : longPair(expr(sl.lower));
+        String[] hi = sl.upper == null ? new String[] {"Long.MAX_VALUE", "null"} : longPair(expr(sl.upper));
+        if (lo.length == 0 || hi.length == 0) {
+            return null;
+        }
+        return "Typed.sliceL(" + l.c + ", " + lo[0] + ", " + lo[1] + ", " + hi[0] + ", " + hi[1] + ")";
+    }
+
+    private static final String[] NO_PAIR = new String[0];
+
+    /// A list read through a call (a module global's `Typed.asList(g(5))`)
+    /// held in a local before the statement, where the statement cannot
+    /// rebind it, so the fast index and length paths can name it twice.
+    private E heldList(E l) {
+        if (plain(l.c) || pre == null || !stmtPure || condDepth != 0) {
+            return l;
+        }
+        String t = fresh();
+        indent(pre, preInd);
+        pre.append("final PyList ").append(t).append(" = ").append(l.c).append(";\n");
+        return new E(t, l.t);
+    }
+
+    /// `x % k` for an int `x` held as a long and a constant `k` of 31 bits
+    /// above zero: Python's remainder, never an overflow, and an int.
+    private E modConstant(BinOp b) {
+        Long k = intConstant(b.right);
+        Ty lt = in.type(b.left, cur, sc);
+        if (lt == null || lt.opt || lt.k != Ty.K.INT) {
+            return null;
+        }
+        if (k == null || k <= 0 || k > Integer.MAX_VALUE) {
+            // `x % y` of two ints held as longs: the remainder is smaller
+            // than `y`, so it is a long too; a zero `y` raises.
+            Ty rt = in.type(b.right, cur, sc);
+            if (k != null || rt == null || rt.opt || rt.k != Ty.K.INT) {
+                return null;
+            }
+            E l = expr(b.left);
+            E r = expr(b.right);
+            if (l.lc == null || l.pk != null || r.lc == null || r.pk != null || l.t.k != Ty.K.INT || r.t.k != Ty.K.INT
+                    || l.t.opt || r.t.opt) {
+                return binop("%", l, r, b.right);
+            }
+            String lc = "Typed.lmod(" + l.lc + ", " + r.lc + ")";
+            E m = new E("Long.valueOf(" + lc + ")", Ty.INT, lc);
+            m.small = r.small;
+            return m;
+        }
+        E l = expr(b.left);
+        if (l.lc == null || l.pk != null || l.t.k != Ty.K.INT || l.t.opt) {
+            return binop("%", l, constE(k), b.right);
+        }
+        String lc = "Typed.imod(" + l.lc + ", " + k + "L)";
+        E r = new E("Long.valueOf(" + lc + ")", Ty.INT, lc);
+        r.small = true;
+        return r;
+    }
+
+    /// `"| %s | %d |" % (s, n)` with every value typed: a str for `%s`, an
+    /// int held as a long for `%d`, `%i` or `%s`. One Java concatenation,
+    /// with no tuple, no boxed int and no conversion dispatch; the values
+    /// are evaluated left to right, as CPython builds the tuple. Null when
+    /// any value is of another type, so `Py.pct` or `Py.mod` takes it.
+    private E percentConcat(BinOp b) {
+        if (!"%".equals(b.op) || !(b.left instanceof Constant)) {
+            return null;
+        }
+        List<Expr> vals;
+        if (b.right instanceof TupleExpr) {
+            vals = ((TupleExpr) b.right).elts;
+        } else {
+            Ty rt = in.type(b.right, cur, sc);
+            if (rt == null || rt.opt || rt.k != Ty.K.STR && rt.k != Ty.K.INT) {
+                return null;
+            }
+            vals = java.util.Collections.singletonList(b.right);
+        }
+        for (Expr v : vals) {
+            Ty vt = v instanceof Starred ? null : in.type(v, cur, sc);
+            if (vt == null || vt.opt || vt.k != Ty.K.STR && vt.k != Ty.K.INT) {
+                return null;
+            }
+        }
+        List<String> lits = em.percentParts((Constant) b.left, vals.size());
+        if (lits == null) {
+            return null;
+        }
+        String convs = lits.get(lits.size() - 1);
+        List<String> parts = new ArrayList<>();
+        for (int i = 0; i < vals.size(); i++) {
+            Object kv = inlineArgs == null ? fold(vals.get(i)) : null;
+            if (kv instanceof String && convs.charAt(i) == 's' || kv instanceof Long) {
+                // A folded value joins the literal text around it.
+                lits.set(i, lits.get(i) + kv + lits.get(i + 1));
+                lits.remove(i + 1);
+                convs = convs.substring(0, i) + convs.substring(i + 1);
+                vals = new ArrayList<Expr>(vals);
+                vals.remove(i);
+                i--;
+                continue;
+            }
+            E v = expr(vals.get(i));
+            char k = convs.charAt(i);
+            if (v.t.k == Ty.K.STR && !v.t.opt && k == 's') {
+                parts.add(v.c);
+            } else if (v.t.k == Ty.K.INT && !v.t.opt && v.lc != null && v.pk == null) {
+                parts.add("Long.toString(" + v.lc + ")");
+            } else {
+                parts.add("Py.pconv('" + k + "', " + box(v) + ")");
+            }
+        }
+        StringBuilder sb = new StringBuilder("(");
+        boolean first = true;
+        for (int i = 0; i <= vals.size(); i++) {
+            String lit = lits.get(i);
+            if (!lit.isEmpty() || first && i == vals.size()) {
+                sb.append(first ? "" : " + ").append(Emitter.javaString(lit));
+                first = false;
+            }
+            if (i < vals.size()) {
+                sb.append(first ? "\"\" + " : " + ").append(parts.get(i));
+                first = false;
+            }
+        }
+        return new E(sb.append(')').toString(), Ty.STR);
+    }
+
+    /// An int as a Java long and the object standing in for it (null when
+    /// the long is the value), both free of effects; or an empty array.
+    private static String[] longPair(E e) {
+        if (e.t.k != Ty.K.INT || e.t.opt || e.pk != null) {
+            return NO_PAIR;
+        }
+        if (e.ll != null && e.bg != null) {
+            return new String[] {e.ll, e.bg};
+        }
+        if (e.lc != null && (plain(e.lc) || literal(e.lc) || e.small)) {
+            return new String[] {e.lc, "null"};
+        }
+        return NO_PAIR;
+    }
+
     private String sliceParts(Slice s) {
         Expr[] parts = {s.lower, s.upper, s.step};
         StringBuilder sb = new StringBuilder();
@@ -1921,7 +3183,7 @@ final class TypedEmit {
     }
 
     private boolean narrowable(String n) {
-        return sc.resolve(n) == Scope.Binding.LOCAL && localType(n).nullable();
+        return binding(n) == Scope.Binding.LOCAL && localType(n).nullable();
     }
 
     /// The local `x` of `x is None` / `x is not None`, or null.
@@ -1940,6 +3202,333 @@ final class TypedEmit {
     }
 
     /// Every local `body` may store into.
+    /// Per function: each local stored exactly once, by a plain `n = value`,
+    /// mapped to that value. A local whose one value folds to a constant
+    /// holds that constant wherever it is bound, in a loop or not.
+    private Map<String, Expr> soleStores;
+    /// [#fold]'s answers, NO_FOLD for an expression that does not fold.
+    private Map<Expr, Object> folded;
+    private static final Object NO_FOLD = new Object();
+    private final Set<String> folding = new HashSet<String>();
+
+    /// The names of the enclosing function nested `d` reads as free.
+    private Set<String> capturedBy(FunctionDef d) {
+        Set<String> out = new HashSet<String>();
+        Infer.Visit[] v = new Infer.Visit[1];
+        v[0] = x -> {
+            if (x instanceof Name && cur.def.scope.cells.contains(((Name) x).id)) {
+                out.add(((Name) x).id);
+            }
+            Infer.children(x, v[0]);
+        };
+        for (Stmt st : d.body) {
+            v[0].on(st);
+        }
+        return out;
+    }
+
+    /// How many times each name is bound anywhere in `body`, nested scopes
+    /// included.
+    static Map<String, Integer> storeCounts(List<Stmt> body) {
+        Map<String, Integer> count = new HashMap<String, Integer>();
+        Map<String, Expr> value = new HashMap<String, Expr>();
+        for (Stmt st : body) {
+            countStores(st, count, value);
+        }
+        return count;
+    }
+
+    private static Map<String, Expr> soleStores(List<Stmt> body) {
+        Map<String, Integer> count = new HashMap<String, Integer>();
+        Map<String, Expr> value = new HashMap<String, Expr>();
+        for (Stmt st : body) {
+            countStores(st, count, value);
+        }
+        Map<String, Expr> r = new HashMap<String, Expr>();
+        for (Map.Entry<String, Expr> en : value.entrySet()) {
+            if (count.get(en.getKey()) == 1) {
+                r.put(en.getKey(), en.getValue());
+            }
+        }
+        return r;
+    }
+
+    /// Every way a name is bound counts, in nested scopes too: a comprehension
+    /// variable or an inner function's local of the same name only makes the
+    /// local look stored twice, which costs a fold and never correctness.
+    private static void countStores(Object o, Map<String, Integer> count, Map<String, Expr> value) {
+        List<String> ns = new ArrayList<String>();
+        if (o instanceof Assign) {
+            Assign a = (Assign) o;
+            for (Expr t : a.targets) {
+                names(t, ns);
+            }
+            if (a.targets.size() == 1 && a.targets.get(0) instanceof Name) {
+                value.put(((Name) a.targets.get(0)).id, a.value);
+            }
+        } else if (o instanceof AugAssign) {
+            names(((AugAssign) o).target, ns);
+        } else if (o instanceof AnnAssign) {
+            names(((AnnAssign) o).target, ns);
+            ns.add(ns.isEmpty() ? "" : ns.get(0));
+        } else if (o instanceof For) {
+            names(((For) o).target, ns);
+        } else if (o instanceof NamedExpr) {
+            ns.add(((NamedExpr) o).target.id);
+        } else if (o instanceof Comprehension) {
+            names(((Comprehension) o).target, ns);
+        } else if (o instanceof WithItem && ((WithItem) o).vars != null) {
+            names(((WithItem) o).vars, ns);
+        } else if (o instanceof ExceptHandler && ((ExceptHandler) o).name != null) {
+            ns.add(((ExceptHandler) o).name);
+        } else if (o instanceof Delete) {
+            for (Expr t : ((Delete) o).targets) {
+                names(t, ns);
+            }
+        } else if (o instanceof Import || o instanceof ImportFrom) {
+            for (Alias al : o instanceof Import ? ((Import) o).names : ((ImportFrom) o).names) {
+                ns.add(al.asname != null ? al.asname : al.name);
+            }
+        } else if (o instanceof Global) {
+            for (String n : ((Global) o).names) {
+                ns.add(n);
+                ns.add(n);
+            }
+        } else if (o instanceof FunctionDef) {
+            ns.add(((FunctionDef) o).name);
+        } else if (o instanceof ClassDef) {
+            ns.add(((ClassDef) o).name);
+        }
+        for (String n : ns) {
+            Integer c = count.get(n);
+            count.put(n, c == null ? 1 : c + 1);
+        }
+        Infer.children(o, x -> countStores(x, count, value));
+    }
+
+    /// `e` as a constant computed here, when it is a pure function of
+    /// literals and of locals whose one store folds: a str, a Long or a
+    /// Boolean; or null. Strings fold only while ASCII, where Java's
+    /// `trim`-free scans, `indexOf` and case maps answer what CPython does.
+    private Object fold(Expr e) {
+        Object m = folded.get(e);
+        if (m != null) {
+            return m == NO_FOLD ? null : m; //NOPMD CompareObjectsWithEquals - sentinel
+        }
+        Object r = fold0(e);
+        folded.put(e, r == null ? NO_FOLD : r);
+        return r;
+    }
+
+    private Object fold0(Expr e) {
+        if (e instanceof Constant) {
+            Constant c = (Constant) e;
+            if (c.kind == Constant.Kind.STR) {
+                return ascii(c.text) ? c.text : null;
+            }
+            if (c.kind == Constant.Kind.INT && c.text.length() <= 9 && c.text.matches("[0-9]+")) {
+                return Long.valueOf(c.text);
+            }
+            if (c.kind == Constant.Kind.TRUE || c.kind == Constant.Kind.FALSE) {
+                return c.kind == Constant.Kind.TRUE;
+            }
+            return null;
+        }
+        if (e instanceof Name) {
+            Name n = (Name) e;
+            Expr v = soleStores.get(n.id);
+            if (v == null || !da.safe.contains(n) || binding(n.id) != Scope.Binding.LOCAL || !folding.add(n.id)) {
+                return null;
+            }
+            try {
+                return fold(v);
+            } finally {
+                folding.remove(n.id);
+            }
+        }
+        if (e instanceof UnaryOp && "-".equals(((UnaryOp) e).op)) {
+            Object v = fold(((UnaryOp) e).operand);
+            return v instanceof Long ? Long.valueOf(-(Long) v) : null;
+        }
+        if (e instanceof BinOp) {
+            BinOp b = (BinOp) e;
+            Object l = fold(b.left);
+            Object r = l == null ? null : fold(b.right);
+            if (l instanceof Long && r instanceof Long && small((Long) l) && small((Long) r)) {
+                long x = (Long) l;
+                long y = (Long) r;
+                switch (b.op) {
+                    case "+":
+                        return x + y;
+                    case "-":
+                        return x - y;
+                    case "*":
+                        return x * y;
+                    default:
+                        return null;
+                }
+            }
+            if (l instanceof String && r instanceof String && "+".equals(b.op)
+                    && ((String) l).length() + ((String) r).length() <= 4096) {
+                return (String) l + r;
+            }
+            return null;
+        }
+        if (e instanceof Subscript && ((Subscript) e).index instanceof Slice) {
+            Slice sl = (Slice) ((Subscript) e).index;
+            Object v = fold(((Subscript) e).value);
+            if (!(v instanceof String) || sl.step != null) {
+                return null;
+            }
+            String str = (String) v;
+            Object lo = sl.lower == null ? Long.valueOf(0) : fold(sl.lower);
+            Object hi = sl.upper == null ? Long.valueOf(str.length()) : fold(sl.upper);
+            if (!(lo instanceof Long) || !(hi instanceof Long)) {
+                return null;
+            }
+            int n = str.length();
+            long a = (Long) lo < 0 ? Math.max(0, (Long) lo + n) : Math.min((Long) lo, n);
+            long z = (Long) hi < 0 ? Math.max(0, (Long) hi + n) : Math.min((Long) hi, n);
+            return a >= z ? "" : str.substring((int) a, (int) z);
+        }
+        if (!(e instanceof Call) || !((Call) e).keywords.isEmpty()) {
+            return null;
+        }
+        Call c = (Call) e;
+        for (Expr a : c.args) {
+            if (a instanceof Starred) {
+                return null;
+            }
+        }
+        if (c.func instanceof Name && "len".equals(((Name) c.func).id) && c.args.size() == 1
+                && binding("len") == Scope.Binding.BUILTIN) {
+            Object v = fold(c.args.get(0));
+            return v instanceof String ? Long.valueOf(((String) v).length()) : null;
+        }
+        if (!(c.func instanceof Attribute)) {
+            return null;
+        }
+        Object recv = fold(((Attribute) c.func).value);
+        if (!(recv instanceof String)) {
+            return null;
+        }
+        String str = (String) recv;
+        List<Object> args = new ArrayList<Object>();
+        for (Expr a : c.args) {
+            Object v = fold(a);
+            if (!(v instanceof String)) {
+                return null;
+            }
+            args.add(v);
+        }
+        String m = ((Attribute) c.func).attr;
+        int na = args.size();
+        if (na == 0) {
+            switch (m) {
+                case "strip":
+                    return stripAscii(str, true, true);
+                case "lstrip":
+                    return stripAscii(str, true, false);
+                case "rstrip":
+                    return stripAscii(str, false, true);
+                case "lower":
+                    return asciiCase(str, false);
+                case "upper":
+                    return asciiCase(str, true);
+                default:
+                    return null;
+            }
+        }
+        String a0 = (String) args.get(0);
+        if (na == 1) {
+            switch (m) {
+                case "find":
+                    return Long.valueOf(str.indexOf(a0));
+                case "rfind":
+                    return Long.valueOf(str.lastIndexOf(a0));
+                case "startswith":
+                    return str.startsWith(a0);
+                case "endswith":
+                    return str.endsWith(a0);
+                case "count":
+                    return a0.isEmpty() ? null : Long.valueOf(countOf(str, a0));
+                default:
+                    return null;
+            }
+        }
+        if (na == 2 && "replace".equals(m) && !a0.isEmpty()) {
+            String r = str.replace(a0, (String) args.get(1));
+            return r.length() <= 4096 ? r : null;
+        }
+        return null;
+    }
+
+    private static boolean small(long v) {
+        return v > -(1L << 30) && v < (1L << 30);
+    }
+
+    private static boolean ascii(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) >= 128) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// CPython's whitespace among ASCII: space, tab to carriage return, and
+    /// the four separators 0x1c to 0x1f.
+    private static boolean pySpace(char ch) {
+        return ch == ' ' || ch >= '\t' && ch <= '\r' || ch >= 0x1c && ch <= 0x1f;
+    }
+
+    private static String stripAscii(String s, boolean left, boolean right) {
+        int a = 0;
+        int z = s.length();
+        while (left && a < z && pySpace(s.charAt(a))) {
+            a++;
+        }
+        while (right && z > a && pySpace(s.charAt(z - 1))) {
+            z--;
+        }
+        return s.substring(a, z);
+    }
+
+    private static String asciiCase(String s, boolean up) {
+        char[] cs = s.toCharArray();
+        for (int i = 0; i < cs.length; i++) {
+            char ch = cs[i];
+            if (up && ch >= 'a' && ch <= 'z') {
+                cs[i] = (char) (ch - 32);
+            } else if (!up && ch >= 'A' && ch <= 'Z') {
+                cs[i] = (char) (ch + 32);
+            }
+        }
+        return new String(cs);
+    }
+
+    private static int countOf(String s, String sub) {
+        int n = 0;
+        for (int i = s.indexOf(sub); i >= 0; i = s.indexOf(sub, i + sub.length())) {
+            n++;
+        }
+        return n;
+    }
+
+    /// A folded constant as an expression of its type.
+    private static E constE(Object k) {
+        if (k instanceof String) {
+            return new E(Emitter.javaString((String) k), Ty.STR);
+        }
+        if (k instanceof Boolean) {
+            return new E(((Boolean) k) ? "true" : "false", Ty.BOOL);
+        }
+        long v = (Long) k;
+        E r = new E("Long.valueOf(" + v + "L)", Ty.INT, v + "L");
+        r.small = v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE;
+        return r;
+    }
+
     static Set<String> assigned(List<Stmt> body) {
         List<String> out = new ArrayList<String>();
         for (Stmt s : body) {
@@ -2098,6 +3687,18 @@ final class TypedEmit {
         if (sub != null) {
             return sub;
         }
+        if (!(e instanceof Constant) && inlineArgs == null && soleStores != null) {
+            Object k = fold(e);
+            if (k != null) {
+                return constE(k);
+            }
+        }
+        if (e instanceof BinOp && "%".equals(((BinOp) e).op) && inlineArgs == null) {
+            E m = modConstant((BinOp) e);
+            if (m != null) {
+                return m;
+            }
+        }
         if (e != plainExpr && (e instanceof BinOp || e instanceof UnaryOp || e instanceof IfExp //NOPMD CompareObjectsWithEquals
                 || e instanceof Call && ranges.inlinable((Call) e) != null)) {
             E w = wrapped(e);
@@ -2128,6 +3729,8 @@ final class TypedEmit {
                 }
                 case STR:
                     return new E(em.constant(c), Ty.STR);
+                case BYTES:
+                    return new E(em.constant(c), Ty.BYTES);
                 default:
                     throw new Unsupported("constant");
             }
@@ -2147,6 +3750,19 @@ final class TypedEmit {
             if (r.t.k != Ty.K.INST) {
                 return new E(em.attrSite(a.attr) + ".get(" + box(r) + ")", Ty.DYN);
             }
+            Layouts.Cls fo = Infer.fieldOwner(r.t.cls, a.attr);
+            if (fo != null && typedField(fo, a.attr) == null && !in.definitelySet(fo, a.attr) && !r.t.opt && plain(r.c)) {
+                // A field that may be unset: its value when it holds one, the
+                // generic read -- class attribute, AttributeError -- when not.
+                String f = r.c + ".f_" + Emitter.mangle(a.attr);
+                return new E("(" + f + " != null ? " + f + " : " + em.attrSite(a.attr) + ".get(" + r.c + "))", Ty.DYN);
+            }
+            if (fo == null || typedField(fo, a.attr) == null && !in.definitelySet(fo, a.attr)) {
+                // Not a field the class declares, or one that may be unset: the
+                // generic read, with its AttributeError, __getattr__ and class
+                // attributes, rather than giving up the whole typed function.
+                return new E(em.attrSite(a.attr) + ".get(" + box(r) + ")", Ty.DYN);
+            }
             Ty ft = fieldTy(r, a.attr);
             if (ft.k == Ty.K.INT && typedField(owner(r, a.attr), a.attr) != null) {
                 return intField(r, a.attr);
@@ -2155,20 +3771,50 @@ final class TypedEmit {
             return new E(fieldRef(r, a.attr), p != null && nonNull.contains(p) ? ft.nonNone() : ft);
         }
         if (e instanceof BinOp) {
+            BinOp b = (BinOp) e;
+            E pc = percentConcat(b);
+            if (pc != null) {
+                return pc;
+            }
+            String pf = em.percentHead(b);
+            if (pf != null) {
+                StringBuilder sb = new StringBuilder(pf);
+                for (Expr v : ((TupleExpr) b.right).elts) {
+                    sb.append(", ").append(box(expr(v)));
+                }
+                return new E(sb.append(')').toString(), Ty.STR);
+            }
+            if ("%".equals(b.op) && b.left instanceof Constant && !(b.right instanceof TupleExpr)) {
+                Ty rt = in.type(b.right, cur, sc);
+                if (rt != null && !rt.opt && (rt.k == Ty.K.STR || rt.k == Ty.K.INT || rt.k == Ty.K.FLOAT)) {
+                    String one = em.percentHead((Constant) b.left, 1);
+                    if (one != null) {
+                        return new E(one + ", " + box(expr(b.right)) + ")", Ty.STR);
+                    }
+                }
+            }
             if (pre != null && arith(e)) {
                 E h = hoistInt(e);
                 if (h != null) {
                     return h;
                 }
             }
-            BinOp b = (BinOp) e;
             if ("+".equals(b.op) && b.left instanceof BinOp && "+".equals(((BinOp) b.left).op)) {
                 E c = strChain(b);
                 if (c != null) {
                     return c;
                 }
             }
-            return binop(b.op, expr(b.left), expr(b.right), b.right);
+            E fz = fusedDyn(e);
+            if (fz != null) {
+                return fz;
+            }
+            E bl = expr(b.left);
+            E br = expr(b.right);
+            if (Infer.realPow(b, bl.t, br.t)) {
+                return new E("Typed.pow(" + toD(bl) + ", " + toD(br) + ")", Ty.FLOAT);
+            }
+            return binop(b.op, bl, br, b.right);
         }
         if (e instanceof UnaryOp) {
             UnaryOp u = (UnaryOp) e;
@@ -2191,7 +3837,8 @@ final class TypedEmit {
                         }
                 }
             }
-            throw new Unsupported("unary " + u.op + " " + o.t);
+            String f = "-".equals(u.op) ? "neg" : "~".equals(u.op) ? "invert" : "pos";
+            return new E("Py." + f + "(" + box(o) + ")", Ty.DYN);
         }
         if (e instanceof BoolOp) {
             BoolOp o = (BoolOp) e;
@@ -2250,8 +3897,18 @@ final class TypedEmit {
             Subscript s = (Subscript) e;
             if (s.index instanceof Slice) {
                 E l = expr(s.value);
+                if (l.t.k == Ty.K.STR && !l.t.opt) {
+                    String fast = strSliceLong(l, (Slice) s.index);
+                    if (fast != null) {
+                        return new E(fast, Ty.STR);
+                    }
+                    return new E("Typed.slice(" + l.c + ", " + sliceParts((Slice) s.index) + ")", Ty.STR);
+                }
                 if (l.t.k != Ty.K.LIST) {
-                    throw new Unsupported("slice of " + l.t);
+                    // A bytes or any other value: the generic slice, which has a
+                    // direct path for bytes with int bounds.
+                    return new E("Py.getslice(" + box(l) + ", " + sliceParts((Slice) s.index) + ")",
+                            l.t.k == Ty.K.BYTES ? Ty.BYTES : Ty.DYN);
                 }
                 return new E("Typed.asList(Py.getslice(" + l.c + ", " + sliceParts((Slice) s.index) + "))",
                         l.t.nonNone());
@@ -2262,9 +3919,33 @@ final class TypedEmit {
             }
             E l = expr(s.value);
             E i = expr(s.index);
+            if (l.t.k == Ty.K.DICT) {
+                return dictRead("Typed.dgetv(" + l.c + ", " + box(i) + ")", l.t);
+            }
+            if (l.t.k == Ty.K.BYTES && (i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
+                if (i.lc == null) {
+                    // As for a str below: the generic read raises what
+                    // CPython raises for an index no long holds.
+                    return new E("Py.getitem(" + box(l) + ", " + box(i) + ")", Ty.INT);
+                }
+                String c = "Typed.bat(" + l.c + ", " + i.lc + ")";
+                return small(new E("Long.valueOf(" + c + ")", Ty.INT, c));
+            }
+            if (l.t.k == Ty.K.STR && !l.t.opt && (i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
+                // An index that is not a long in hand goes the generic way: one
+                // too big for a long is an IndexError there, as in CPython.
+                String slow = "Typed.asStr(Py.getitem(" + l.c + ", " + box(i) + "))";
+                return new E(i.lc != null ? "Typed.sat(" + l.c + ", " + i.lc + ")"
+                        : i.ll != null ? "(" + i.bg + " == null ? Typed.sat(" + l.c + ", " + i.ll + ") : " + slow + ")"
+                        : slow, Ty.STR);
+            }
             if (l.t.k != Ty.K.LIST || !(i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
+                if (Emitter.isStrLiteral(i.c)) {
+                    return new E(em.keyRead(box(l), i.c), Ty.DYN);
+                }
                 return new E("Py.getitem(" + box(l) + ", " + box(i) + ")", Ty.DYN);
             }
+            l = heldList(l);
             Ty el = in.elem(l.t);
             if (el.k == Ty.K.BOT) {
                 throw new Unsupported("element of nothing");
@@ -2330,6 +4011,9 @@ final class TypedEmit {
                         : "(" + in + " ? (" + l.c + ".ints != null ? (Object) Long.valueOf(" + l.c + ".ints[(int) " + i.lc
                         + "]) : " + l.c + ".floats == null ? " + l.c + ".items[(int) " + i.lc + "] : " + slow + ") : "
                         + slow + ")";
+            } else if (i.lc != null && i.pk == null && el.k != Ty.K.FLOAT) {
+                // A list named by a call: one helper, the index unboxed.
+                fast = "Typed.at(" + l.c + ", " + i.lc + ")";
             }
             return el.k == Ty.K.FLOAT ? new E(fast, el) : new E(unbox(fast, el), el);
         }
@@ -2342,13 +4026,17 @@ final class TypedEmit {
                 }
                 sb.append(i == 0 ? "" : ", ").append(box(expr(el.get(i))));
             }
-            return new E(sb.append(')').toString(), Ty.DYN);
+            sb.append(')');
+            return new E(Emitter.foldable(el) ? em.hoist("PyTuple", sb.toString()) : sb.toString(), Ty.DYN);
         }
         if (e instanceof ListExpr) {
             ListExpr l = (ListExpr) e;
             Integer site = in.siteOf.get(l);
             if (site == null) {
                 throw new Unsupported("list site");
+            }
+            if (l.elts.isEmpty()) {
+                return new E("Py.list()", Ty.list(new int[] {site.intValue()}, false));
             }
             StringBuilder sb = new StringBuilder("Typed.list(new Object[] {");
             for (int i = 0; i < l.elts.size(); i++) {
@@ -2362,30 +4050,166 @@ final class TypedEmit {
         if (e instanceof Call) {
             return call((Call) e);
         }
+        if (e instanceof Comp && (((Comp) e).kind != Comp.Kind.GENERATOR || eagerGens.contains(e))) {
+            return comp((Comp) e);
+        }
         if (e instanceof DictExpr) {
             DictExpr d = (DictExpr) e;
-            StringBuilder sb = new StringBuilder("Py.dict(");
+            // Made at its final size, one put per pair: no array of the pairs is built.
+            StringBuilder sb = new StringBuilder("new PyDict(").append(d.keys.size()).append(')');
             for (int i = 0; i < d.keys.size(); i++) {
                 if (d.keys.get(i) == null) {
                     throw new Unsupported("dict spread");
                 }
-                sb.append(i == 0 ? "" : ", ").append(box(expr(d.keys.get(i)))).append(", ")
-                        .append(box(expr(d.values.get(i))));
+                sb.append(".put(").append(box(expr(d.keys.get(i)))).append(", ")
+                        .append(box(expr(d.values.get(i)))).append(')');
             }
-            return new E(sb.append(')').toString(), Ty.DYN);
+            return new E(sb.toString(), Ty.DYN);
+        }
+        if (e instanceof Lambda && closedLambda((Lambda) e) && ((Lambda) e).args.defaults.isEmpty()
+                && ((Lambda) e).args.kwDefaults.stream().allMatch(x -> x == null)) {
+            // Nothing of this function in it: the function object the generic
+            // code makes, which reads no local of the frame it is made in.
+            return new E(em.lambdaValue((Lambda) e), Ty.DYN);
+        }
+        if (e instanceof JoinedStr) {
+            return new E(joined((JoinedStr) e), Ty.DYN);
         }
         throw new Unsupported(e.getClass().getSimpleName());
     }
 
+    /// An f-string, as the generic code builds it: every value is formatted
+    /// by the runtime, so a typed operand is boxed and nothing else differs.
+    private String joined(JoinedStr j) {
+        List<String> parts = new ArrayList<String>();
+        for (Expr p : j.parts) {
+            if (p instanceof Constant) {
+                parts.add(em.constant((Constant) p));
+                continue;
+            }
+            FormattedValue f = (FormattedValue) p;
+            String v = box(expr(f.value));
+            if (f.conversion == 'r') {
+                v = "Py.str(Py.toRepr(" + v + "))";
+            } else if (f.conversion == 's') {
+                v = "Py.str(Py.strOf(" + v + "))";
+            } else if (f.conversion == 'a') {
+                v = "Py.call(Builtins.ASCII, " + v + ")";
+            }
+            String spec;
+            if (f.spec == null || f.spec.parts.isEmpty()) {
+                spec = "\"\"";
+            } else if (f.spec.parts.size() == 1 && f.spec.parts.get(0) instanceof Constant) {
+                spec = Emitter.javaString(((Constant) f.spec.parts.get(0)).text);
+            } else {
+                spec = "Py.strOf(" + joined(f.spec) + ")";
+            }
+            parts.add("Py.format(" + v + ", " + spec + ")");
+        }
+        if (parts.isEmpty()) {
+            return "Py.str(\"\")";
+        }
+        if (parts.size() == 1) {
+            return parts.get(0);
+        }
+        StringBuilder sb = new StringBuilder("Py.concat(");
+        for (int i = 0; i < parts.size(); i++) {
+            sb.append(i == 0 ? "" : ", ").append(parts.get(i));
+        }
+        return sb.append(')').toString();
+    }
+
+    /// Whether lambda `l` reads nothing but its parameters, globals and
+    /// builtins, and opens no scope of its own.
+    private static boolean closedLambda(Lambda l) {
+        if (l.scope.hasYield || !l.scope.cells.isEmpty()) {
+            return false;
+        }
+        boolean[] ok = {true};
+        Infer.Visit[] v = new Infer.Visit[1];
+        v[0] = x -> {
+            if (x instanceof Lambda || x instanceof Comp || x instanceof NamedExpr || x instanceof Yield
+                    || x instanceof Await) {
+                ok[0] = false;
+            } else if (x instanceof Name) {
+                Scope.Binding b = l.scope.resolve(((Name) x).id);
+                ok[0] &= b == Scope.Binding.LOCAL || b == Scope.Binding.GLOBAL || b == Scope.Binding.BUILTIN;
+            } else if (ok[0]) {
+                Infer.children(x, v[0]);
+            }
+        };
+        v[0].on(l.body);
+        return ok[0];
+    }
+
+    /// The parameters of a lambda being expanded in place (`inlineLambda`),
+    /// each to its argument already in a local; read by `name` while `sc` is
+    /// that lambda's scope.
+    private Map<String, E> inlineArgs;
+    private Scope inlineScope;
+
+    /// `(lambda x, y: body)(a, b)` as `body`, in this function: the arguments
+    /// into locals before the statement, in order, then the body over them.
+    /// Null when that is not the same: the statement may not move its
+    /// evaluation, or the lambda reads this function's locals.
+    private E inlineLambda(Lambda l, Call c) {
+        Arguments la = l.args;
+        if (pre == null || !stmtPure || condDepth != 0 || inlineArgs != null || !c.keywords.isEmpty()
+                || la.vararg != null || la.kwarg != null || !la.kwonly.isEmpty() || !la.defaults.isEmpty()
+                || la.positional.size() != c.args.size() || !closedLambda(l)) {
+            return null;
+        }
+        Map<String, E> map = new HashMap<String, E>();
+        for (int i = 0; i < c.args.size(); i++) {
+            if (c.args.get(i) instanceof Starred) {
+                return null;
+            }
+        }
+        for (int i = 0; i < c.args.size(); i++) {
+            map.put(la.positional.get(i).name, spillTo(expr(c.args.get(i)), pre, preInd));
+        }
+        Scope saved = sc;
+        sc = l.scope;
+        inlineArgs = map;
+        inlineScope = l.scope;
+        try {
+            return expr(l.body);
+        } finally {
+            sc = saved;
+            inlineArgs = null;
+            inlineScope = null;
+        }
+    }
+
+    /// Parameters read as they arrived until the body's first statement
+    /// rebinds them (`function`).
+    private final Map<String, E> paramAlias = new HashMap<String, E>();
+
     private E name(Name nm) {
         String n = nm.id;
-        switch (sc.resolve(n)) {
+        if (inlineArgs != null && sc == inlineScope && inlineArgs.containsKey(n)) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return inlineArgs.get(n);
+        }
+        switch (binding(n)) {
             case LOCAL: {
+                String cv = compVar(n);
+                if (cv != null) {
+                    // A comprehension's own target, in a temporary of its own
+                    // even where the function has a local of the same name.
+                    return new E(cv, Ty.DYN);
+                }
+                E alias = paramAlias.get(n);
+                if (alias != null) {
+                    return alias;
+                }
                 if (!sc.params.contains(n) && !da.safe.contains(nm)) {
                     throw new Unsupported("maybe unbound " + n);
                 }
                 Ty t = localType(n);
-                if (sc.deleted.contains(n)) {
+                if (sc.deleted.contains(n) && (longLocals.contains(n) || !"Object".equals(jt(t)))) {
+                    // An object local is null once deleted, and DefAssign has
+                    // already proven this read follows a binding (an except
+                    // target inside its handler); a long cannot be unbound.
                     throw new Unsupported("deleted " + n);
                 }
                 if (longLocals.contains(n)) {
@@ -2398,11 +4222,16 @@ final class TypedEmit {
                 if (t.k == Ty.K.INT) {
                     return dual(var(n), big(n));
                 }
+                if (accLocals.contains(n)) {
+                    return new E("(" + big(n) + " == null ? (Object) Long.valueOf(" + var(n) + ") : " + big(n) + ")", Ty.DYN);
+                }
                 return new E(var(n), nonNull.contains(n) ? t.nonNone() : t);
             }
             case GLOBAL: {
                 if (in.globalFns.containsKey(n) || in.globalClasses.containsKey(n)) {
-                    throw new Unsupported("function as a value");
+                    // The function or class object itself: Infer has seen
+                    // it escape, so nothing assumes its every caller.
+                    return new E("g(" + em.slot(n) + ")", Ty.DYN);
                 }
                 Ty t = in.globals.get(n);
                 if (t == null || t.k == Ty.K.BOT) {
@@ -2410,6 +4239,11 @@ final class TypedEmit {
                 }
                 return new E(unbox("g(" + em.slot(n) + ")", t), t);
             }
+            case BUILTIN:
+                if (em.moduleScopeHasStarImport()) {
+                    throw new Unsupported("name " + n);
+                }
+                return new E(em.builtinRef(n), Ty.DYN);
             default:
                 throw new Unsupported("name " + n);
         }
@@ -2567,7 +4401,7 @@ final class TypedEmit {
             }
             return collectLeaves(((BinOp) e).left, out) && collectLeaves(((BinOp) e).right, out);
         }
-        boolean quiet = e instanceof Constant || e instanceof Name && sc.resolve(((Name) e).id) == Scope.Binding.LOCAL;
+        boolean quiet = e instanceof Constant || e instanceof Name && binding(((Name) e).id) == Scope.Binding.LOCAL;
         if (!quiet && !((stmtPure || topLeaves) && condDepth == 0)) {
             return false;
         }
@@ -2592,6 +4426,9 @@ final class TypedEmit {
         }
         if (e instanceof UnaryOp) {
             return kindOf(((UnaryOp) e).operand);
+        }
+        if (!(e instanceof BinOp)) {
+            return 0;
         }
         BinOp b = (BinOp) e;
         char l = kindOf(b.left);
@@ -3145,6 +4982,36 @@ final class TypedEmit {
         return new E("new StringBuilder(" + cap + ")" + sb + ".toString()", Ty.STR);
     }
 
+    /// Arithmetic of two or more operators whose every leaf is of a type
+    /// not known here (`a * x + c * y + e` over a tuple's items): the
+    /// generic emitter's fused helper, which computes the whole tree in
+    /// doubles when the leaves are floats and boxes only the result,
+    /// instead of one boxed value per operator. Null when a leaf is typed;
+    /// the typed operators are better then.
+    private E fusedDyn(Expr e) {
+        if (Emitter.numOps(e) < 2) {
+            return null;
+        }
+        List<Expr> leaves = new ArrayList<Expr>();
+        Emitter.numLeaves(e, leaves);
+        if (leaves.isEmpty()) {
+            return null;
+        }
+        Map<Expr, String> code = new IdentityHashMap<Expr, String>();
+        for (Expr l : leaves) {
+            if (l instanceof Constant) {
+                continue;
+            }
+            E v = expr(l);
+            if (v.t.k != Ty.K.DYN) {
+                return null;
+            }
+            code.put(l, box(v));
+        }
+        String f = em.fused(e, null, x -> code.containsKey(x) ? code.get(x) : box(expr(x)));
+        return f == null ? null : new E(f, Ty.DYN);
+    }
+
     E binop(String op, E l, E r, Expr right) {
         Ty t = Infer.binop(op, l.t, r.t, right);
         if (l.t.k == Ty.K.LIST && "*".equals(op) && (r.t.k == Ty.K.INT || r.t.k == Ty.K.BOOL)) {
@@ -3173,13 +5040,34 @@ final class TypedEmit {
                         throw new Unsupported("float " + op);
                 }
             }
-            case INT:
+            case INT: {
+                Long k = intConstant(right);
+                if (("+".equals(op) || "-".equals(op)) && l.small && l.lc != null && l.pk == null && !l.t.opt && k != null
+                        && Math.abs(k.longValue()) < 0x80000000L) {
+                    // A length or an index plus a constant of 31 bits: no
+                    // overflow is possible, so plain Java arithmetic.
+                    String lc = "(" + l.lc + " " + op + " " + k + "L)";
+                    return new E("Long.valueOf(" + lc + ")", Ty.INT, lc);
+                }
                 return new E(intOp(pyOp(op), box(l), box(r), right), Ty.INT);
+            }
             case STR:
+                if ("%".equals(op)) {
+                    return new E("Typed.format(" + l.c + ", " + box(r) + ")", Ty.STR);
+                }
+                if ("*".equals(op)) {
+                    return new E("Typed.asStr(Py.mul(" + box(l) + ", " + box(r) + "))", Ty.STR);
+                }
                 return new E("Typed.concat(" + l.c + ", " + r.c + ")", Ty.STR);
             case BOT:
                 throw new Unsupported("operation on nothing");
             default:
+                if ("+".equals(op) || "-".equals(op)) {
+                    // An operand of unknown type is still an int most of the time
+                    // (`s += x` over a generator's values). The int helper tests for
+                    // two Longs inline and hands anything else to the same Py call.
+                    return new E(intOp(pyOp(op), box(l), box(r), right), Ty.DYN);
+                }
                 return new E("Py." + pyOp(op) + "(" + box(l) + ", " + box(r) + ")", Ty.DYN);
         }
     }
@@ -3203,11 +5091,56 @@ final class TypedEmit {
 
     private E compare(Compare c) {
         if (c.ops.size() != 1) {
-            throw new Unsupported("chained comparison");
+            // `a < b < c` is `a < b and b < c` with b evaluated once (into a
+            // temporary unless it is a name or a constant) and c only when
+            // the first link held; every link must be a bool.
+            StringBuilder sb = new StringBuilder("(");
+            E left = expr(c.left);
+            for (int i = 0; i < c.ops.size(); i++) {
+                Expr rn = c.comparators.get(i);
+                // A later link runs only when the ones before it held:
+                // nothing of it may be hoisted ahead of the test.
+                condDepth += i == 0 ? 0 : 1;
+                E right;
+                try {
+                    right = expr(rn);
+                } finally {
+                    condDepth -= i == 0 ? 0 : 1;
+                }
+                E use = right;
+                E next = right;
+                if (i < c.ops.size() - 1 && !(rn instanceof Name || rn instanceof Constant)) {
+                    if (right.lc != null || right.ll != null) {
+                        throw new Unsupported("chained comparison");
+                    }
+                    String t = exprTemp(jt(right.t));
+                    use = new E("(" + t + " = " + right.c + ")", right.t);
+                    next = new E(t, right.t);
+                }
+                E e = compareOp(c.ops.get(i), left, use, rn);
+                if (e.t.k != Ty.K.BOOL) {
+                    throw new Unsupported("chained comparison");
+                }
+                sb.append(i == 0 ? "" : " && ").append(e.c);
+                left = next;
+            }
+            return new E(sb.append(")").toString(), Ty.BOOL);
         }
-        String op = c.ops.get(0);
-        E l = expr(c.left);
-        E r = expr(c.comparators.get(0));
+        List<Expr> lit = Emitter.inTuple(c);
+        if (lit != null) {
+            // `x in ("ltr", "rtl")`: compared item by item, no tuple built.
+            StringBuilder r = new StringBuilder("not in".equals(c.ops.get(0)) ? "(!" : "(").append("Py.inOf(")
+                    .append(box(expr(c.left)));
+            for (Expr t : lit) {
+                r.append(", ").append(box(expr(t)));
+            }
+            return new E(r.append("))").toString(), Ty.BOOL);
+        }
+        return compareOp(c.ops.get(0), expr(c.left), expr(c.comparators.get(0)), c.comparators.get(0));
+    }
+
+    /// `l op r`, both evaluated; `rn` is r's tree, for its int range.
+    private E compareOp(String op, E l, E r, Expr rn) {
         if ("is".equals(op) || "is not".equals(op) || isNone(l) || isNone(r)) {
             boolean neg = "is not".equals(op) || "!=".equals(op);
             if (!("is".equals(op) || "is not".equals(op) || "==".equals(op) || "!=".equals(op))) {
@@ -3219,9 +5152,12 @@ final class TypedEmit {
             } else if (isNone(l)) {
                 s = isNoneTest(r);
             } else if (l.t.k == Ty.K.INST && r.t.k == Ty.K.INST || l.t.k == Ty.K.LIST && r.t.k == Ty.K.LIST) {
-                s = "(" + l.c + " == " + r.c + ")";
+                // As objects: Java refuses `==` between two classes neither
+                // of which extends the other, and two such values are
+                // simply not the same object.
+                s = "((Object) " + l.c + " == (Object) " + r.c + ")";
             } else if (op.startsWith("is")) {
-                s = "(" + box(l) + " == " + box(r) + ")";
+                s = "((Object) " + box(l) + " == (Object) " + box(r) + ")";
             } else {
                 throw new Unsupported("== on " + l.t + ", " + r.t);
             }
@@ -3230,14 +5166,23 @@ final class TypedEmit {
         boolean li = l.t.k == Ty.K.INT || l.t.k == Ty.K.BOOL;
         boolean ri = r.t.k == Ty.K.INT || r.t.k == Ty.K.BOOL;
         if ("in".equals(op) || "not in".equals(op)) {
+            String s;
             if (r.t.k == Ty.K.LIST) {
-                String s = "Typed.nzl(" + r.c + ").contains(" + box(l) + ")";
-                return new E("in".equals(op) ? s : "!" + s, Ty.BOOL);
+                s = "Typed.nzl(" + r.c + ").contains(" + box(l) + ")";
+            } else if (r.t.k == Ty.K.STR && !r.t.opt && l.t.k == Ty.K.STR && !l.t.opt) {
+                s = "(" + r.c + ".indexOf(" + l.c + ") >= 0)";
+            } else {
+                s = "Typed.in(" + box(l) + ", " + box(r) + ")";
             }
-            throw new Unsupported("in " + r.t);
+            return new E("in".equals(op) ? s : "!" + s, Ty.BOOL);
         }
         if (l.t.k == Ty.K.BOOL && r.t.k == Ty.K.BOOL && ("==".equals(op) || "!=".equals(op))) {
             return new E("(" + l.c + " " + op + " " + r.c + ")", Ty.BOOL);
+        }
+        if (l.t.k == Ty.K.INT && r.t.k == Ty.K.INT && l.lc != null && r.lc != null && l.pk == null && r.pk == null
+                && !l.t.opt && !r.t.opt) {
+            // Both at hand as Java longs (a length, a counter, a constant).
+            return new E("(" + l.lc + " " + op + " " + r.lc + ")", Ty.BOOL);
         }
         if (li && ri) {
             String f;
@@ -3258,11 +5203,11 @@ final class TypedEmit {
                     f = "eq";
                     break;
                 case "!=":
-                    return new E("!" + intOp("eq", box(l), box(r), c.comparators.get(0)), Ty.BOOL);
+                    return new E("!" + intOp("eq", box(l), box(r), rn), Ty.BOOL);
                 default:
                     throw new Unsupported("compare " + op);
             }
-            return new E(intOp(f, box(l), box(r), c.comparators.get(0)), Ty.BOOL);
+            return new E(intOp(f, box(l), box(r), rn), Ty.BOOL);
         }
         if ((l.t.k == Ty.K.FLOAT || li) && (r.t.k == Ty.K.FLOAT || ri)) {
             return new E("(" + toD(l) + " " + op + " " + toD(r) + ")", Ty.BOOL);
@@ -3320,8 +5265,22 @@ final class TypedEmit {
         if (!c.keywords.isEmpty()) {
             throw new Unsupported("keyword arguments");
         }
+        return exprs(c.args);
+    }
+
+    /// The arguments of `c`, a call of `f` from its parameter `from` on,
+    /// keywords bound to parameters as Infer bound them.
+    private List<E> args(Call c, FunctionDef f, int from) {
+        List<Expr> b = f == null ? null : Infer.staticArgs(c, f, from);
+        if (b == null) {
+            throw new Unsupported("keyword arguments");
+        }
+        return exprs(b);
+    }
+
+    private List<E> exprs(List<Expr> l) {
         List<E> r = new ArrayList<E>();
-        for (Expr a : c.args) {
+        for (Expr a : l) {
             if (a instanceof Starred) {
                 throw new Unsupported("starred argument");
             }
@@ -3467,7 +5426,39 @@ final class TypedEmit {
         return new E(call, f.ret.k == Ty.K.BOT ? Ty.DYN : f.ret);
     }
 
+    /// Builtins that consume a generator argument whole, at once: handing
+    /// them a list of the same items is not observable.
+    private static final Set<String> EAGER = new HashSet<String>(Arrays.asList(
+            "sum", "list", "tuple", "set", "frozenset", "sorted", "min", "max"));
+
+    /// Generator expressions lowered as list comprehensions (`EAGER`).
+    private final Set<Comp> eagerGens = java.util.Collections.newSetFromMap(new IdentityHashMap<Comp, Boolean>());
+
     private E call(Call c) {
+        if (Emitter.castCall(c)) {
+            // `cast(T, v)` (see Emitter.castCall). Both branches are
+            // conditional, so nothing of either is hoisted ahead of the test.
+            condDepth++;
+            try {
+                String f = box(expr(c.func));
+                String v = box(expr(c.args.get(1)));
+                String r = "(" + f + " == StdModules.CAST ? " + v + " : Py.call(" + box(expr(c.func)) + ", "
+                        + box(expr(c.args.get(0))) + ", " + box(expr(c.args.get(1))) + "))";
+                forgetPaths();
+                return new E(r, Ty.DYN);
+            } finally {
+                condDepth--;
+            }
+        }
+        if (c.args.size() == 1 && c.keywords.isEmpty() && c.args.get(0) instanceof Comp
+                && ((Comp) c.args.get(0)).kind == Comp.Kind.GENERATOR
+                && (c.func instanceof Name && EAGER.contains(((Name) c.func).id)
+                && binding(((Name) c.func).id) == Scope.Binding.BUILTIN && !em.moduleScopeHasStarImport()
+                || c.func instanceof Attribute && "join".equals(((Attribute) c.func).attr)
+                && ((Attribute) c.func).value instanceof Constant
+                && ((Constant) ((Attribute) c.func).value).kind == Constant.Kind.STR)) {
+            eagerGens.add((Comp) c.args.get(0));
+        }
         E r = call0(c);
         if (pre != null && stmtPure && condDepth == 0 && (r.t.k == Ty.K.FLOAT || r.t.k == Ty.K.BOOL)) {
             // A pure call's result into a local, in evaluation order (see
@@ -3482,7 +5473,141 @@ final class TypedEmit {
         return r;
     }
 
+    /// The hidden calls of a miss probe, as `Emitter.missIntrinsic` lowers
+    /// them.
+    private E missIntrinsic(Call c) {
+        String fn = ((Name) c.func).id;
+        if ("$probe".equals(fn)) {
+            return new E(probeRead(c.args.get(0), true), Ty.DYN);
+        }
+        if ("$unmiss".equals(fn) && plainProbe(c.args.get(0))) {
+            // A miss reaches here only when the handler's name was rebound:
+            // the re-read raises the real KeyError for it.
+            String m = box(expr(c.args.get(0)));
+            return dictRead("(" + m + " == Py.MISS ? " + probeRead(c.args.get(1), false) + " : " + m + ")",
+                    expr(((Subscript) c.args.get(1)).value).t);
+        }
+        if ("$ismiss".equals(fn) && plainProbe(c.args.get(0))) {
+            return new E("(" + box(expr(c.args.get(0))) + " == Py.MISS && " + excRef(c.args.get(1)) + " == Py.KEY_ERROR)",
+                    Ty.BOOL);
+        }
+        if ("$unmiss".equals(fn)) {
+            String m = box(expr(c.args.get(0)));
+            String v = "(" + m + " == Py.MISS ? " + probeRead(c.args.get(1), false) + " : Py.unmissed(" + m + "))";
+            Expr x = c.args.get(1);
+            if (x instanceof Subscript && ((Subscript) x).value instanceof Name) {
+                E d = expr(((Subscript) x).value);
+                if (d.t.k == Ty.K.DICT) {
+                    return dictRead(v, d.t);
+                }
+            }
+            return new E(v, Ty.DYN);
+        }
+        if ("$ismiss".equals(fn)) {
+            return new E("Py.isMiss(" + box(expr(c.args.get(0))) + ", " + excRef(c.args.get(1)) + ", "
+                    + ("AttributeError".equals(((Name) c.args.get(1)).id) ? "Py.ATTRIBUTE_ERROR" : "Py.KEY_ERROR") + ")",
+                    Ty.BOOL);
+        }
+        return null;
+    }
+
+    /// `d[k] = d.get(k, c) + e` on a dict local, with a name for a key and
+    /// int constants for c and e: one probe of `d`, as the generic code
+    /// does it. False, emitting nothing, when the statement is not that.
+    private boolean dictCount(Assign a, StringBuilder b, int ind) {
+        if (a.targets.size() != 1 || !(a.targets.get(0) instanceof Subscript) || !(a.value instanceof BinOp)) {
+            return false;
+        }
+        Subscript t = (Subscript) a.targets.get(0);
+        BinOp op = (BinOp) a.value;
+        if (!"+".equals(op.op) || !(t.value instanceof Name) || !(t.index instanceof Name) || !(op.left instanceof Call)
+                || intConstant(op.right) == null) {
+            return false;
+        }
+        Call c = (Call) op.left;
+        if (!(c.func instanceof Attribute) || !"get".equals(((Attribute) c.func).attr)
+                || !(((Attribute) c.func).value instanceof Name) || c.args.size() != 2 || !c.keywords.isEmpty()
+                || !(c.args.get(0) instanceof Name) || intConstant(c.args.get(1)) == null) {
+            return false;
+        }
+        String d = ((Name) t.value).id;
+        String k = ((Name) t.index).id;
+        if (!d.equals(((Name) ((Attribute) c.func).value).id) || !k.equals(((Name) c.args.get(0)).id)) {
+            return false;
+        }
+        E de = expr(t.value);
+        if (de.t.k != Ty.K.DICT || de.t.opt) {
+            return false;
+        }
+        indent(b, ind);
+        b.append("Py.dictCount(").append(de.c).append(", ").append(box(expr(t.index))).append(", ")
+                .append(box(expr(c.args.get(1)))).append(", ").append(box(expr(op.right))).append(");\n");
+        return true;
+    }
+
+    /// `c`, a read of a dict of type `d`, as the type its values have.
+    private E dictRead(String c, Ty d) {
+        Ty vt = in.dictVal(d);
+        if (vt.k == Ty.K.BOT) {
+            throw new Unsupported("value of an empty dict");
+        }
+        return vt.k == Ty.K.DYN || vt.isObject() ? new E(c, vt.k == Ty.K.DYN ? Ty.DYN : vt) : new E(unbox(c, vt), vt);
+    }
+
+    private String probeRead(Expr e, boolean probe) {
+        if (e instanceof Attribute) {
+            Attribute a = (Attribute) e;
+            if (a.value instanceof Name && scalars.containsKey(((Name) a.value).id)) {
+                return scalarProbeRead(((Name) a.value).id, a.attr, probe);
+            }
+            return em.attrSite(a.attr) + (probe ? ".getOrMiss(" : ".get(") + box(expr(a.value)) + ")";
+        }
+        Subscript s = (Subscript) e;
+        if (probe && dictProbe(s)) {
+            E k = expr(s.index);
+            return "Typed.dprobe(" + expr(s.value).c + ", " + (k.lc != null ? k.lc : box(k)) + ")";
+        }
+        return (probe ? "Py.getitemOrMiss(" : "Py.getitem(") + box(expr(s.value)) + ", " + box(expr(s.index)) + ")";
+    }
+
+    /// `d[k]` on a dict local that is never None: a plain `PyDict`, whose
+    /// probe answers the value or the bare miss sentinel.
+    private boolean dictProbe(Subscript s) {
+        if (!(s.value instanceof Name) || binding(((Name) s.value).id) != Scope.Binding.LOCAL) {
+            return false;
+        }
+        Ty t = localType(((Name) s.value).id);
+        return t.k == Ty.K.DICT && !t.opt;
+    }
+
+    /// Whether hidden local `m` (a miss probe's) only ever holds a
+    /// [#dictProbe]: the value itself, or `Py.MISS`.
+    private boolean plainProbe(Expr m) {
+        if (!(m instanceof Name) || soleStores == null) {
+            return false;
+        }
+        Expr v = soleStores.get(((Name) m).id);
+        return v instanceof Call && ((Call) v).func instanceof Name && "$probe".equals(((Name) ((Call) v).func).id)
+                && ((Call) v).args.get(0) instanceof Subscript && dictProbe((Subscript) ((Call) v).args.get(0));
+    }
+
     private E call0(Call c) {
+        if (c.func instanceof Lambda) {
+            E r = inlineLambda((Lambda) c.func, c);
+            if (r != null) {
+                return r;
+            }
+        }
+        if (c.func instanceof Name && ((Name) c.func).id.startsWith("$")) {
+            E miss = missIntrinsic(c);
+            if (miss != null) {
+                return miss;
+            }
+        }
+        if (Emitter.getattrDefault(c) && binding("getattr") == Scope.Binding.BUILTIN && !em.moduleScopeHasStarImport()) {
+            Attribute probe = new Attribute(c.args.get(0), ((Constant) c.args.get(1)).text);
+            return new E("Py.orDefault(" + probeRead(probe, true) + ", " + box(expr(c.args.get(2))) + ")", Ty.DYN);
+        }
         if (c.args.size() == 1 && c.args.get(0) instanceof Name && codePoints.containsKey(((Name) c.args.get(0)).id)
                 && ordOf(c, ((Name) c.args.get(0)).id)) {
             String l = "((long) " + codePoints.get(((Name) c.args.get(0)).id) + ")";
@@ -3496,11 +5621,20 @@ final class TypedEmit {
         }
         if (c.func instanceof Name) {
             String n = ((Name) c.func).id;
-            Scope.Binding b = sc.resolve(n);
+            Scope.Binding b = binding(n);
             if (b == Scope.Binding.GLOBAL) {
                 Infer.Fn f = in.globalFns.get(n);
+                if (f != null && in.doors.contains(c)) {
+                    // An argument is not known to be what a parameter's
+                    // annotation names (Infer.callFn): the function object
+                    // is called, and its guard picks the version to run.
+                    Ty rt = in.type(c, cur, sc);
+                    String g = genericCall("g(" + em.slot(n) + ")", c).c;
+                    return rt.k == Ty.K.DYN || rt.k == Ty.K.BOT || rt.isObject() ? new E(g, rt.k == Ty.K.BOT ? Ty.DYN : rt)
+                            : new E(unbox(g, rt), rt);
+                }
                 if (f != null) {
-                    List<E> a = args(c);
+                    List<E> a = args(c, f.def, 0);
                     calls.add(f);
                     IntRanges.Iv[] lp = longParams.get(f);
                     String call = lp != null && IntRanges.within(IntRanges.longArgs(f, sites.get(c)), lp)
@@ -3519,7 +5653,9 @@ final class TypedEmit {
                 }
                 Layouts.Cls k = in.globalClasses.get(n);
                 if (k != null) {
-                    return construct(k, args(c));
+                    Layouts.Cls io = Layouts.resolver(k, "__init__");
+                    return construct(k, c.keywords.isEmpty() ? args(c)
+                            : args(c, io == null ? null : io.typable.get("__init__"), 1));
                 }
             }
             if (b == Scope.Binding.BUILTIN && !em.moduleScopeHasStarImport() && "list".equals(n)
@@ -3547,9 +5683,34 @@ final class TypedEmit {
                         return r;
                     }
                 }
+                if ("isinstance".equals(n) && c.args.size() == 2 && c.keywords.isEmpty()
+                        && !(c.args.get(0) instanceof Starred) && !(c.args.get(1) instanceof Starred)) {
+                    // A Java boolean: no argument array, no bool to box and test.
+                    if (c.args.get(1) instanceof TupleExpr) {
+                        List<Expr> ts = ((TupleExpr) c.args.get(1)).elts;
+                        if (ts.size() >= 2 && ts.size() <= 8 && !Infer.hasStarred(ts)) {
+                            // `isinstance(x, (A, B))`: no tuple built (Py.isinstanceAny).
+                            StringBuilder r = new StringBuilder("Py.isTrue(Py.isinstanceAny(").append(em.builtinRef(n))
+                                    .append(", ").append(box(expr(c.args.get(0))));
+                            for (Expr t : ts) {
+                                r.append(", ").append(box(expr(t)));
+                            }
+                            return new E(r.append("))").toString(), Ty.BOOL);
+                        }
+                    }
+                    return new E("Py.isinstanceB(" + em.builtinRef(n) + ", " + box(expr(c.args.get(0))) + ", "
+                            + box(expr(c.args.get(1))) + ")", Ty.BOOL);
+                }
+                if ("next".equals(n) && (c.args.size() == 1 || c.args.size() == 2) && c.keywords.isEmpty()
+                        && !(c.args.get(0) instanceof Starred) && !(c.args.get(c.args.size() - 1) instanceof Starred)) {
+                    return new E("Py.nextB(" + em.builtinRef(n) + ", " + box(expr(c.args.get(0)))
+                            + (c.args.size() == 2 ? ", " + box(expr(c.args.get(1))) : "") + ")", Ty.DYN);
+                }
                 return genericCall(em.builtinRef(n), c);
             }
-            throw new Unsupported("call of " + n);
+            // Any other callable a name holds: a class without a layout,
+            // an imported function, a parameter.
+            return genericCall(box(name((Name) c.func)), c);
         }
         if (in.isMathCall(c, sc)) {
             String fn = ((Attribute) c.func).attr;
@@ -3570,7 +5731,7 @@ final class TypedEmit {
         if (c.func instanceof Attribute) {
             Attribute a = (Attribute) c.func;
             if (a.value instanceof Name && in.globalClasses.containsKey(((Name) a.value).id)
-                    && sc.resolve(((Name) a.value).id) == Scope.Binding.GLOBAL) {
+                    && binding(((Name) a.value).id) == Scope.Binding.GLOBAL) {
                 Layouts.Cls k = in.globalClasses.get(((Name) a.value).id);
                 Layouts.Cls o = Layouts.resolver(k, a.attr);
                 FunctionDef m = o == null ? null : o.typable.get(a.attr);
@@ -3579,7 +5740,7 @@ final class TypedEmit {
                 }
                 Infer.Fn f = in.fns.get(m);
                 calls.add(f);
-                return result(f, typed.get(f) + "(" + argList(f, 0, args(c)) + ")");
+                return result(f, typed.get(f) + "(" + argList(f, 0, args(c, m, 0)) + ")");
             }
             E r = expr(a.value);
             if (r.t.k == Ty.K.LIST && !r.t.opt && "extend".equals(a.attr) && c.keywords.isEmpty()
@@ -3592,9 +5753,53 @@ final class TypedEmit {
                 return new E("Typed.extendRepeat(" + r.c + ", " + box(left ? first : second) + ", "
                         + box(left ? second : first) + ")", Ty.NONE);
             }
-            List<E> args = args(c);
+            List<E> args;
+            if (!c.keywords.isEmpty() && r.t.k == Ty.K.INST) {
+                // One method it can be: keywords bound to its parameters,
+                // as Infer bound them.
+                List<FunctionDef> kc = in.candidates(r.t.cls, a.attr);
+                List<Expr> b = kc != null && kc.size() == 1 ? Infer.staticArgs(c, kc.get(0), 1, true) : null;
+                if (b == null) {
+                    throw new Unsupported("keyword arguments");
+                }
+                args = exprs(b);
+            } else {
+                args = args(c);
+            }
             if (r.t.k == Ty.K.LIST && !r.t.opt) {
                 return listMethod(r, a.attr, args);
+            }
+            if (r.t.k == Ty.K.STR && !r.t.opt && Infer.splitCall(a.attr, types(args), c)) {
+                Integer site = in.siteOf.get(c);
+                if (site != null) {
+                    return new E("Typed.split(" + r.c + ", " + (args.isEmpty() ? "Py.NONE" : args.get(0).c) + ")",
+                            Ty.list(new int[] {site.intValue()}, false));
+                }
+            }
+            if (Infer.codecCall(r.t, a.attr, types(args), c)) {
+                String enc = args.isEmpty() ? "null" : args.get(0).c;
+                String err = args.size() < 2 ? "null" : args.get(1).c;
+                return "encode".equals(a.attr) ? new E("Typed.encode(" + r.c + ", " + enc + ", " + err + ")", Ty.BYTES)
+                        : new E("Typed.decode(" + r.c + ", " + enc + ", " + err + ")", Ty.STR);
+            }
+            if (r.t.k == Ty.K.STR && !r.t.opt && c.keywords.isEmpty() && !Infer.hasStarred(c.args)) {
+                E s = strMethod(r, a.attr, args);
+                if (s != null) {
+                    return s;
+                }
+            }
+            if (r.t.k == Ty.K.DICT && !r.t.opt && "get".equals(a.attr) && c.keywords.isEmpty()
+                    && !Infer.hasStarred(c.args) && (args.size() == 1 || args.size() == 2)) {
+                E def = args.size() == 2 ? args.get(1) : null;
+                Ty vt = Ty.join(in.dictVal(r.t), def == null ? Ty.NONE : def.t);
+                String g = "Typed.dgetd(" + r.c + ", " + box(args.get(0)) + ", " + (def == null ? "Py.NONE" : box(def)) + ")";
+                if (vt.k == Ty.K.BOT || vt.k == Ty.K.DYN || vt.opt) {
+                    return new E(g, Ty.DYN);
+                }
+                if (vt.isObject()) {
+                    return new E(g, vt);
+                }
+                return new E(unbox(g, vt), vt);
             }
             if (r.t.k != Ty.K.INST) {
                 String k = "get".equals(a.attr) && args.size() == 1 && c.keywords.isEmpty() ? intKey(args.get(0)) : null;
@@ -3637,7 +5842,7 @@ final class TypedEmit {
             String al = argList(f, 1, args);
             return result(f, recv + ".tv_" + Emitter.mangle(a.attr) + "_" + args.size() + "(" + al + ")");
         }
-        throw new Unsupported("call");
+        return genericCall(box(expr(c.func)), c);
     }
 
     /// The guard and the `Math` call of `math.fn(ds)` when its domain can be
@@ -3682,7 +5887,7 @@ final class TypedEmit {
         for (E x : args) {
             a.append(", ").append(box(x));
         }
-        if (args.size() <= 6) {
+        if (args.size() <= 13) {
             return new E(site + ".call" + args.size() + "(" + a + ")", Ty.DYN);
         }
         StringBuilder arr = new StringBuilder();
@@ -3876,7 +6081,7 @@ final class TypedEmit {
             java.math.BigInteger c = in.intConsts.get(n);
             return c == null ? null : lit(c);
         }
-        switch (sc.resolve(n)) {
+        switch (binding(n)) {
             case LOCAL:
                 if (longLocals.contains(n)) {
                     if (!sc.params.contains(n) && !da.safe.contains(nm)) {
@@ -4020,6 +6225,12 @@ final class TypedEmit {
         String[] attrs;
         final Set<String> reads = new HashSet<String>();
         final Set<String> getters = new HashSet<String>();
+        /// Attributes a miss probe or a `getattr` with a default asks for.
+        final Set<String> probes = new HashSet<String>();
+        /// The probed ones no field, class or base defines: each answers a
+        /// miss while the class still lacks it, and rebuilds the object
+        /// from every field when it does not.
+        final Set<String> missing = new HashSet<String>();
     }
 
     private Map<String, Scalar> scalars = new HashMap<String, Scalar>();
@@ -4058,6 +6269,18 @@ final class TypedEmit {
     /// Whether every use of `x` reads a field its constructor set.
     private boolean scalarUses(Scalar x) {
         Set<String> fields = new HashSet<String>(Arrays.asList(x.attrs));
+        for (String p : x.probes) {
+            if (fields.contains(p)) {
+                x.reads.add(p);
+            } else if (p.startsWith("__") || Layouts.resolver(x.k, p) != null) {
+                return false;
+            } else {
+                x.missing.add(p);
+            }
+        }
+        if (!x.missing.isEmpty()) {
+            x.reads.addAll(fields);
+        }
         for (String g : x.getters) {
             Layouts.Cls o = Layouts.resolver(x.k, g);
             FunctionDef d = o == null ? null : o.typable.get(g);
@@ -4122,6 +6345,8 @@ final class TypedEmit {
             storeTargets(((Comprehension) o).target, cand, bad);
         } else if (o instanceof WithItem && ((WithItem) o).vars != null) {
             storeTargets(((WithItem) o).vars, cand, bad);
+        } else if (o instanceof Call && scalarProbe((Call) o, cand, bad)) {
+            return;
         } else if (o instanceof Call && ((Call) o).func instanceof Attribute) {
             Attribute f = (Attribute) ((Call) o).func;
             if (f.value instanceof Name && cand.containsKey(((Name) f.value).id)) {
@@ -4157,6 +6382,62 @@ final class TypedEmit {
         Infer.children(o, x -> scanScalars(x, cand, bad));
     }
 
+    /// A miss probe (`$probe(n.a)`, `$unmiss(m, n.a)`) or `getattr(n, "a", d)`
+    /// on candidate `n`: records `a` as probed and scans the rest. False,
+    /// scanning nothing, when the call is none of those.
+    private boolean scalarProbe(Call c, Map<String, Scalar> cand, Set<String> bad) {
+        Expr recv;
+        String attr;
+        List<Expr> rest = new ArrayList<Expr>();
+        String fn = c.func instanceof Name ? ((Name) c.func).id : "";
+        if ("$probe".equals(fn) || "$unmiss".equals(fn)) {
+            Expr x = c.args.get(c.args.size() - 1);
+            if (!(x instanceof Attribute)) {
+                return false;
+            }
+            recv = ((Attribute) x).value;
+            attr = ((Attribute) x).attr;
+            rest.addAll(c.args.subList(0, c.args.size() - 1));
+        } else if (Emitter.getattrDefault(c) && binding("getattr") == Scope.Binding.BUILTIN
+                && !em.moduleScopeHasStarImport()) {
+            recv = c.args.get(0);
+            attr = ((Constant) c.args.get(1)).text;
+            rest.add(c.args.get(2));
+        } else {
+            return false;
+        }
+        if (!(recv instanceof Name) || !cand.containsKey(((Name) recv).id)) {
+            return false;
+        }
+        if (da.safe.contains((Name) recv)) {
+            cand.get(((Name) recv).id).probes.add(attr);
+        } else {
+            bad.add(((Name) recv).id);
+        }
+        for (Expr x : rest) {
+            scanScalars(x, cand, bad);
+        }
+        return true;
+    }
+
+    /// `n.attr` probed (`probe`) or read on scalar local `n`.
+    private String scalarProbeRead(String n, String attr, boolean probe) {
+        Scalar x = scalars.get(n);
+        if (!x.missing.contains(attr)) {
+            return box(scalarRead(n, attr));
+        }
+        List<E> fs = new ArrayList<E>();
+        for (String a : x.attrs) {
+            fs.add(scalarRead(n, a));
+        }
+        String site = em.attrSite(attr);
+        String obj = construct(x.k, fs).c;
+        if (!probe) {
+            return site + ".get(" + obj + ")";
+        }
+        return "(" + site + ".classLacks(" + x.k.typeVar + ") ? Py.MISS : " + site + ".getOrMiss(" + obj + "))";
+    }
+
     /// Marks every candidate whose field a store target writes.
     private static void storeTargets(Expr t, Map<String, Scalar> cand, Set<String> bad) {
         if (t instanceof Attribute && ((Attribute) t).value instanceof Name) {
@@ -4179,7 +6460,7 @@ final class TypedEmit {
     /// `x` on the first one, and requires the same class every time.
     private boolean scalarCtor(Scalar x, Call c) {
         if (!(c.func instanceof Name) || !c.keywords.isEmpty()
-                || sc.resolve(((Name) c.func).id) != Scope.Binding.GLOBAL) {
+                || binding(((Name) c.func).id) != Scope.Binding.GLOBAL) {
             return false;
         }
         Layouts.Cls k = in.globalClasses.get(((Name) c.func).id);
@@ -4325,11 +6606,16 @@ final class TypedEmit {
         switch (n) {
             case "len":
                 if (a.size() == 1 && a.get(0).t.k == Ty.K.LIST) {
-                    return new E("h_len(" + a.get(0).c + ")", Ty.INT);
+                    a = new ArrayList<E>(a);
+                    a.set(0, heldList(a.get(0)));
+                    // The list read through a call stays in the long: every use
+                    // of a length reads it once.
+                    String l = "Typed.llen(" + a.get(0).c + ")";
+                    return small(new E("Long.valueOf(" + l + ")", Ty.INT, l));
                 }
                 if (a.size() == 1 && a.get(0).t.k == Ty.K.STR && !a.get(0).t.opt) {
                     String l = "Typed.slen(" + a.get(0).c + ")";
-                    return new E("Long.valueOf(" + l + ")", Ty.INT, l);
+                    return small(new E("Long.valueOf(" + l + ")", Ty.INT, l));
                 }
                 if (a.size() == 1 && a.get(0).t.k == Ty.K.DYN) {
                     // The builtin's work without a call, unless the name
@@ -4414,7 +6700,12 @@ final class TypedEmit {
             a.append(a.length() == 0 ? "" : ", ").append(box(expr(kw.value)));
             names.append(names.length() == 0 ? "" : ", ").append(Emitter.javaString(kw.arg));
         }
-        return new E("Py.callKw(" + f + ", new Object[] {" + a + "}, new String[] {" + names + "})", Ty.DYN);
+        // Hoisted: the callee caches its keyword binding by the array's identity.
+        String w = em.hoist("String[]", "new String[] {" + names + "}");
+        if (c.args.size() + c.keywords.size() <= 14) {
+            return new E("Py.callKwF(" + f + ", " + w + ", " + a + ")", Ty.DYN);
+        }
+        return new E("Py.callKw(" + f + ", new Object[] {" + a + "}, " + w + ")", Ty.DYN);
     }
 
     /// The count of `[v] * n` or `n * [v]` when it is an int, or null.
@@ -4430,6 +6721,87 @@ final class TypedEmit {
         Expr n = l == b.left ? b.right : b.left; //NOPMD CompareObjectsWithEquals - identity is meant
         Ty t = in.type(n, cur, sc);
         return t.k == Ty.K.INT && !t.opt ? n : null;
+    }
+
+    /// A str method called on a str: the runtime helper directly, for the
+    /// shapes [Infer#strMethod] types, so the result type agrees.
+    private E strMethod(E r, String m, List<E> a) {
+        List<Ty> ts = new ArrayList<>();
+        for (E x : a) {
+            ts.add(x.t);
+        }
+        Ty t = Infer.strMethod(m, ts);
+        if (t == null) {
+            return null;
+        }
+        String v = r.c;
+        String c;
+        if (a.isEmpty() && Infer.isAllKind(m) >= 0) {
+            return new E("Typed.isAll(" + v + ", " + Infer.isAllKind(m) + ")", Ty.BOOL);
+        }
+        if (a.size() >= 2 && !"replace".equals(m)) {
+            String bounds = ", " + box(a.get(1)) + ", " + (a.size() == 3 ? box(a.get(2)) : "Py.NONE") + ", ";
+            String fn = t.k == Ty.K.BOOL ? "Typed.affix(" : "Typed.find(";
+            String tail = (t.k == Ty.K.BOOL ? "startswith".equals(m) : "rfind".equals(m)) + ")";
+            c = fn + v + ", " + a.get(0).c + bounds + tail;
+            String start = a.size() == 2 ? a.get(1).lc : null;
+            if (start != null) {
+                // The start as the long it is: nothing boxed.
+                c = fn + v + ", " + a.get(0).c + ", " + start + ", " + tail;
+            } else if (a.size() == 2 && a.get(1).ll != null) {
+                // Either way the receiver and the text are evaluated once,
+                // after a test that reads a local of this frame only.
+                c = "(" + a.get(1).bg + " == null ? " + fn + v + ", " + a.get(0).c + ", " + a.get(1).ll + ", " + tail
+                        + " : " + c + ")";
+            }
+            return t.k == Ty.K.BOOL ? new E(c, Ty.BOOL) : small(new E("Long.valueOf(" + c + ")", t, c));
+        }
+        switch (m) {
+            case "strip":
+            case "lstrip":
+            case "rstrip":
+                c = "Typed.strip(" + v + (a.isEmpty() ? "" : ", " + a.get(0).c) + ", " + !"rstrip".equals(m)
+                        + ", " + !"lstrip".equals(m) + ")";
+                break;
+            case "lower":
+            case "upper":
+                c = "Typed.mapCase(" + v + ", " + ("upper".equals(m) ? 1 : 0) + ")";
+                break;
+            case "replace":
+                c = "Typed.replace(" + v + ", " + a.get(0).c + ", " + a.get(1).c + ")";
+                break;
+            case "find":
+            case "rfind":
+                c = "Typed.find(" + v + ", " + a.get(0).c + ", " + "rfind".equals(m) + ")";
+                break;
+            case "count":
+                c = "Typed.count(" + v + ", " + a.get(0).c + ")";
+                break;
+            case "startswith":
+                c = v + ".startsWith(" + a.get(0).c + ")";
+                break;
+            case "endswith":
+                c = v + ".endsWith(" + a.get(0).c + ")";
+                break;
+            default:
+                c = "Typed.join(" + v + ", " + box(a.get(0)) + ")";
+                break;
+        }
+        return t.k == Ty.K.INT ? small(new E("Long.valueOf(" + c + ")", t, c)) : new E(c, t);
+    }
+
+    /// `e`, marked as an int that fits a Java `int` (see `E.small`).
+    private static E small(E e) {
+        e.small = true;
+        return e;
+    }
+
+    private static List<Ty> types(List<E> a) {
+        List<Ty> ts = new ArrayList<>();
+        for (E x : a) {
+            ts.add(x.t);
+        }
+        return ts;
     }
 
     private E listMethod(E l, String m, List<E> a) {
@@ -4504,6 +6876,14 @@ final class TypedEmit {
                     break;
                 case NONE:
                     check = v + " == Py.NONE";
+                    arg = v;
+                    break;
+                case DICT:
+                    check = "Typed.isDict(" + v + ")";
+                    arg = v;
+                    break;
+                case BYTES:
+                    check = v + " instanceof PyBytes";
                     arg = v;
                     break;
                 default:
@@ -4685,6 +7065,12 @@ final class TypedEmit {
         for (Layouts.Cls k : constructors) {
             Layouts.Cls ow = Layouts.resolver(k, "__init__");
             Infer.Fn f = in.fns.get(ow.typable.get("__init__"));
+            if (typed.get(f) == null) {
+                // Its __init__ fell back to the generic version after the
+                // call that asked for this was lowered, taking every
+                // function that calls it along.
+                continue;
+            }
             StringBuilder sig = new StringBuilder();
             StringBuilder pass = new StringBuilder();
             for (int i = 1; i < f.params.length; i++) {

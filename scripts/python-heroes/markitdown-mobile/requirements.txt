@@ -1,0 +1,19 @@
+# MarkItDown with the converters that run on a device: PDF, DOCX, PPTX, XLSX,
+# HTML, EPUB, CSV, RSS, ZIP and notebooks. Every dependency is pinned to the
+# version the upstream test suite was run against. magika is not downloaded:
+# the runtime provides it, answering from file signatures where Google's
+# runs a neural model through onnxruntime.
+beautifulsoup4==4.15.0
+certifi==2026.10.23
+charset-normalizer==3.5.2
+defusedxml==0.7.1
+et-xmlfile==2.0.0
+mammoth==1.13.0
+markdownify==1.2.3
+markitdown==0.1.9
+openpyxl==3.1.5
+pdfminer-six==20260107
+pdfplumber==0.11.10
+python-pptx==1.0.2
+soupsieve==4.0.1
+xlsxwriter==3.3.1

@@ -31,6 +31,8 @@ import org.objectweb.asm.Opcodes;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -39,32 +41,26 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A method that catches anything must declare its operand stack pointer
- * {@code volatile}.
+ * A method that catches anything must not keep its operand stack pointer live
+ * across the {@code setjmp}.
  *
  * <p>A try/catch is compiled into a {@code setjmp} region, so the edges leaving
  * it are abnormal ones. {@code SP} is modified all through that region -- every
- * push and pop moves it -- and it is read again after a {@code longjmp} lands in
- * the catch. C99 7.13.2.1p3 makes the value of a non-volatile automatic that was
- * modified since the {@code setjmp} <em>indeterminate</em> after a
- * {@code longjmp}, so declaring it unqualified was undefined behaviour in every
- * method that catches anything -- which is app code, not just framework code.</p>
+ * push and pop moves it. C99 7.13.2.1p3 makes the value of a non-volatile
+ * automatic that was modified since the {@code setjmp} <em>indeterminate</em>
+ * after a {@code longjmp}, and {@code gcc} on musl rejected the whole
+ * translation unit with {@code internal compiler error: SSA corruption} --
+ * "Unable to coalesce ssa_names 57 and 58 which are marked as MUST COALESCE,
+ * SP_57(ab) and SP_58(ab), during RTL pass: expand" -- because two versions of
+ * {@code SP} were live across an abnormal edge. A short-circuit condition
+ * inside a {@code try} was enough to trigger it.</p>
  *
- * <p>It went unnoticed until a toolchain refused it. {@code gcc} on musl rejects
- * the whole translation unit with {@code internal compiler error: SSA
- * corruption} -- "Unable to coalesce ssa_names 57 and 58 which are marked as
- * MUST COALESCE, SP_57(ab) and SP_58(ab), during RTL pass: expand" -- because
- * two versions of {@code SP} live across an abnormal edge are required to share
- * one register and cannot. A short-circuit condition inside a {@code try} was
- * enough to trigger it, and the first report was a framework method that
- * happened to have that shape.</p>
- *
- * <p>Asserted on the emitted C rather than by compiling, because the only
- * toolchain that reproduces the crash is the one in the Alpine CI leg. What this
- * pins is the property the fix rests on, in both directions: the qualifier
- * appears exactly when a frame can be re-entered by a longjmp, and not
- * otherwise, since making every frame pay for it was the thing the locals
- * heuristic was carefully written to avoid.</p>
+ * <p>The first fix declared {@code SP} {@code volatile}, which sent every push
+ * and pop of such a method through memory. The fix now is that {@code SP} is
+ * never live there: {@code CN1_TRY_ENTRY} assigns it from the frame's const
+ * {@code cn1SpEntry} on both returns of the {@code setjmp}, and the catch
+ * blocks assign it again before reading it. These tests pin both halves: the
+ * frame keeps {@code SP} unqualified, and the macros restart it.</p>
  */
 class SetjmpFrameVolatileTest {
 
@@ -75,40 +71,43 @@ class SetjmpFrameVolatileTest {
         Parser.cleanup();
     }
 
-    /**
-     * The frame of a method with a catch block declares a volatile SP; the frame
-     * of one without does not.
-     */
+    /** Neither frame declares a volatile SP; the catching one enters a try. */
     @Test
-    void onlySetjmpFramesDeclareAVolatileStackPointer() throws Exception {
+    void setjmpFramesKeepTheStackPointerInARegister() throws Exception {
         String code = translateHost();
 
         String guarded = cFunctionBody(code, "_catches___");
-        assertTrue(hasVolatileStackPointer(guarded),
-                "a method that catches must keep SP across the longjmp, was:\n"
-                        + guarded);
+        assertTrue(guarded.contains("CN1_TRY_ENTRY()"), "the catching method enters a try, was:\n" + guarded);
+        assertFalse(hasVolatileStackPointer(guarded),
+                "SP is restarted after the setjmp, not kept in memory, was:\n" + guarded);
 
         String plain = cFunctionBody(code, "_plain___");
-        assertFalse(hasVolatileStackPointer(plain),
-                "a method with no catch is unwound past, so its SP must stay"
-                        + " register-allocatable, was:\n" + plain);
+        assertFalse(hasVolatileStackPointer(plain), "a method with no catch, was:\n" + plain);
     }
 
     /**
-     * The qualifier goes on the pointer, not on the pointee.
-     *
-     * <p>{@code volatile struct elementStruct* SP} would make every operand-stack
-     * read and write volatile -- a different and far more expensive statement
-     * than keeping the pointer itself in memory. The two spellings are one token
-     * apart and both compile, so nothing but a test distinguishes them.</p>
+     * The try entry restarts SP after the setjmp, from a const every frame
+     * declares, and the catch block assigns it before it reads it.
      */
     @Test
-    void theStackPointerIsVolatileNotTheStackItself() throws Exception {
-        String guarded = cFunctionBody(translateHost(), "_catches___");
-        assertFalse(guarded.contains("volatile struct elementStruct* SP")
-                        || guarded.contains("volatile struct elementStruct *SP"),
-                "the stack slots must not become volatile, only the pointer,"
-                        + " was:\n" + guarded);
+    void theTryEntryRestartsTheStackPointer() throws Exception {
+        String h = new String(Files.readAllBytes(Paths.get("..", "ByteCodeTranslator", "src", "cn1_globals.h")),
+                StandardCharsets.US_ASCII).replaceAll("\\s+", " ");
+        String entry = macro(h, "#define CN1_TRY_ENTRY()");
+        assertTrue(entry.indexOf("SP = cn1SpEntry;") > entry.indexOf("CN1_TRY_SETJMP"),
+                "CN1_TRY_ENTRY must assign SP after the setjmp, was: " + entry);
+        assertTrue(macro(h, "#define CN1_DECLARE_SP(").contains("struct elementStruct* const cn1SpEntry"),
+                "every frame declares the const SP starts from");
+        String catchBlock = macro(h, "#define DEFINE_CATCH_BLOCK(");
+        assertTrue(catchBlock.contains("SP = &stack[1];"), "the catch block assigns SP, was: " + catchBlock);
+    }
+
+    /** The text of the macro starting at {@code head}, up to the next directive. */
+    private static String macro(String flat, String head) {
+        int at = flat.indexOf(head);
+        assertTrue(at >= 0, "cn1_globals.h has no " + head);
+        int end = flat.indexOf("#define", at + head.length());
+        return flat.substring(at, end < 0 ? flat.length() : end);
     }
 
     /** Whether this frame declares SP as a volatile pointer, in any spelling. */

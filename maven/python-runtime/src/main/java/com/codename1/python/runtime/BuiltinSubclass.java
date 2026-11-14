@@ -69,11 +69,17 @@ final class BuiltinSubclass {
                     ? ((PyInstance) a[1]).base : a[1];
             Object r = op.apply(Py.obj(a[0]), other);
             return r == null ? Py.NOT_IMPLEMENTED : r;
+        }).with2((self, x) -> {
+            // The fixed-arity call (`x in s`, `s == y` on an instance of a
+            // subclass): the receiver arrives unwrapped, no argument arrays.
+            Object other = x instanceof PyInstance && ((PyInstance) x).base != null ? ((PyInstance) x).base : x;
+            Object r = op.apply(Py.obj(self), other);
+            return r == null ? Py.NOT_IMPLEMENTED : r;
         }));
     }
 
     private static void unary(PyType t, String name, Unary op) {
-        t.define(name, PyBuiltin.method(t, name, a -> op.apply(Py.obj(a[0]))));
+        t.define(name, PyBuiltin.method(t, name, a -> op.apply(Py.obj(a[0]))).with1(self -> op.apply(Py.obj(self))));
     }
 
     private static void arithmetic(PyType t) {
@@ -94,9 +100,16 @@ final class BuiltinSubclass {
         unary(t, "__neg__", PyObject::neg);
         unary(t, "__pos__", PyObject::pos);
         unary(t, "__abs__", s -> Builtins.lookup("abs") instanceof PyObject
-                ? ((PyObject) Builtins.lookup("abs")).call(new Object[] {s}, Py.NO_KW) : null);
+                ? ((PyObject) Builtins.lookup("abs")).call1(s) : null);
         unary(t, "__float__", s -> Py.ofFloat(s.asDouble()));
-        unary(t, "__bool__", s -> Py.bool(s.isTrue()));
+        // The truth of the builtin value an instance wraps. Marked, so that
+        // PyType.truthMethods recognizes it and `if s:` on a str subclass
+        // (bs4's NavigableString) asks the String itself: it called this
+        // builtin and made a PyStr view of the String for every test.
+        PyBuiltin b = PyBuiltin.method(t, "__bool__", a -> Py.bool(Py.isTrue(a[0])))
+                .with1(s -> Py.bool(Py.isTrue(s)));
+        b.baseTruth = true;
+        t.define("__bool__", b);
     }
 
     private static void bits(PyType t) {
@@ -136,12 +149,12 @@ final class BuiltinSubclass {
         binary(t, "__contains__", (s, x) -> Py.bool(s.contains(x)));
         binary(t, "__getitem__", PyObject::getItem);
         if (t == Py.LIST_TYPE || t == Py.DICT_TYPE || t == Py.BYTEARRAY_TYPE || t == Py.MEMORYVIEW_TYPE) { //NOPMD CompareObjectsWithEquals - identity is meant
-            t.define("__setitem__", PyBuiltin.method(t, "__setitem__", a -> {
-                Py.obj(a[0]).setItem(a[1], a[2]);
+            t.define("__setitem__", PyBuiltin.method3(t, "__setitem__", (a0, a1, a2) -> {
+                Py.obj(a0).setItem(a1, a2);
                 return Py.NONE;
             }));
-            t.define("__delitem__", PyBuiltin.method(t, "__delitem__", a -> {
-                Py.obj(a[0]).delItem(a[1]);
+            t.define("__delitem__", PyBuiltin.method2(t, "__delitem__", (a0, a1) -> {
+                Py.obj(a0).delItem(a1);
                 return Py.NONE;
             }));
         }
@@ -153,30 +166,66 @@ final class BuiltinSubclass {
             if (args.length == 0 || !(args[0] instanceof PyType)) {
                 throw Py.notATypeObject(t.name, args);
             }
-            PyType cls = (PyType) args[0];
-            if (!cls.isSubtype(t)) {
-                throw Py.typeError(t.name + ".__new__(" + cls.name + "): " + cls.name + " is not a subtype of "
-                        + t.name);
-            }
+            PyType cls = newTarget(t, args[0]);
             Object[] rest = new Object[args.length - 1];
             System.arraycopy(args, 1, rest, 0, rest.length);
-            Object v = t.factory.create(t, rest, kw);
-            if (cls == t) { //NOPMD CompareObjectsWithEquals - identity is meant
-                return v;
+            return wrapNew(t, cls, t.factory.create(t, rest, kw));
+        }).withTwo((c, a) -> {
+            // `str.__new__(cls, value)`, which bs4 runs for every text node: no
+            // argument arrays, and the value is made the way `str(value)` makes it.
+            if (!(c instanceof PyType)) {
+                throw Py.notATypeObject(t.name, new Object[] {c, a});
             }
-            PyInstance o = cls.newInstance();
-            o.base = v;
-            return o;
+            PyType cls = newTarget(t, c);
+            Object v = t.unary != null ? t.unary.create(a) : t.factory.create(t, new Object[] {a}, Py.NO_KW);
+            return wrapNew(t, cls, v);
         })));
+    }
+
+    private static PyType newTarget(PyType t, Object c) {
+        PyType cls = (PyType) c;
+        if (!cls.isSubtype(t)) {
+            throw Py.typeError(t.name + ".__new__(" + cls.name + "): " + cls.name + " is not a subtype of "
+                    + t.name);
+        }
+        return cls;
+    }
+
+    private static Object wrapNew(PyType t, PyType cls, Object v) {
+        if (cls == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return v;
+        }
+        PyInstance o = cls.newInstance();
+        o.base = v;
+        return o;
     }
 
     /// `T.__init__(self, *args)` of a mutable builtin `T`: refills the value.
     private static void initMethod(final PyType t) {
-        t.define("__init__", PyBuiltin.methodKw(t, "__init__", (args, kw) -> {
+        t.define("__init__", PyBuiltin.methodKwSelf(t, "__init__", (args, kw) -> {
+            Object self0 = PyBuiltin.base(t, args[0]);
+            if (kw.length == 0 && args.length <= 2 && !(self0 instanceof PyProperty)) {
+                // `list.__init__(self, it)` from a subclass constructor, as
+                // bs4's ResultSet does per search: refill from the iterable
+                // directly rather than building a fresh value to copy.
+                // CPython clears a list or a set first and never a dict.
+                if (self0 instanceof PyList) {
+                    PyList l = (PyList) self0;
+                    l.clear();
+                    if (args.length == 2) {
+                        l.extend(args[1]);
+                    }
+                    return Py.NONE;
+                }
+                if (self0 instanceof PyDict && args.length == 2 && args[1] instanceof PyDict) {
+                    ((PyDict) self0).update(args[1]);
+                    return Py.NONE;
+                }
+            }
             Object[] rest = new Object[args.length - 1];
             System.arraycopy(args, 1, rest, 0, rest.length);
             Object fresh = t.factory.create(t, rest, kw);
-            Object self = args[0];
+            Object self = self0;
             if (self instanceof PyProperty && fresh instanceof PyProperty) {
                 ((PyProperty) self).fill((PyProperty) fresh);
             } else if (self instanceof PyList) {
@@ -184,9 +233,8 @@ final class BuiltinSubclass {
                 l.clear();
                 l.extend(fresh);
             } else if (self instanceof PyDict) {
-                PyDict d = (PyDict) self;
-                d.clear();
-                d.update(fresh);
+                // dict.__init__ adds to what is there; it never clears.
+                ((PyDict) self).update(fresh);
             } else if (self instanceof PySet) {
                 PySet s = (PySet) self;
                 s.clear();

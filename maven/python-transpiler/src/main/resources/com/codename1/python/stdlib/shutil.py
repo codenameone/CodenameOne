@@ -1,53 +1,195 @@
-# Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
-# Licensed under the GNU General Public License version 2 with the Classpath
-# exception, as the rest of the Codename One Python runtime.
+# Copyright (c) 2001 Python Software Foundation; All Rights Reserved
+# Licensed under the Python Software Foundation License Version 2; the full
+# text is in maven/python-transpiler/third-party/cpython/LICENSE.txt.
+#
+# Derived from CPython's Lib/shutil.py. Changes: rewritten for the Codename One
+# Python runtime, trimmed to what the transpiler supports and reorganised;
+# the C accelerators and platform-specific branches are left out.
+"""shutil over the application's file system: copying, moving and removing
+files and trees. which() finds nothing, since a device runs no programs."""
 
-"""shutil: the parts of CPython's module that make sense here."""
-import os
-
-__all__ = ["get_terminal_size", "copyfileobj", "copyfile", "copy"]
+import os as _os
+import collections as _collections
 
 
-def get_terminal_size(fallback=(80, 24)):
-    """COLUMNS and LINES when set, else the terminal on standard output,
-    else `fallback` -- in that order, as CPython does."""
-    try:
-        columns = int(os.getenv("COLUMNS", ""))
-    except ValueError:
-        columns = 0
-    try:
-        lines = int(os.getenv("LINES", ""))
-    except ValueError:
-        lines = 0
-    if columns <= 0 or lines <= 0:
-        try:
-            size = os.get_terminal_size(1)
-        except OSError:
-            size = os.terminal_size(fallback)
-        if columns <= 0:
-            columns = size.columns or fallback[0]
-        if lines <= 0:
-            lines = size.lines or fallback[1]
-    return os.terminal_size((columns, lines))
+class Error(OSError):
+    pass
+
+
+class SameFileError(Error):
+    pass
+
+
+class SpecialFileError(OSError):
+    pass
+
+
+class ReadError(OSError):
+    pass
+
+
+class RegistryError(Exception):
+    pass
+
+
+COPY_BUFSIZE = 64 * 1024
 
 
 def copyfileobj(fsrc, fdst, length=0):
-    size = length if length and length > 0 else 65536
+    length = length or COPY_BUFSIZE
     while True:
-        buf = fsrc.read(size)
+        buf = fsrc.read(length)
         if not buf:
             break
         fdst.write(buf)
 
 
 def copyfile(src, dst, *, follow_symlinks=True):
-    with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
-        copyfileobj(fsrc, fdst)
+    src, dst = _os.fspath(src), _os.fspath(dst)
+    if _os.path.abspath(src) == _os.path.abspath(dst):
+        raise SameFileError("%r and %r are the same file" % (src, dst))
+    with open(src, "rb") as f, open(dst, "wb") as g:
+        copyfileobj(f, g)
     return dst
 
 
+def copymode(src, dst, *, follow_symlinks=True):
+    pass
+
+
+def copystat(src, dst, *, follow_symlinks=True):
+    pass
+
+
 def copy(src, dst, *, follow_symlinks=True):
-    if os.path.isdir(dst):
-        dst = os.path.join(dst, os.path.basename(src))
+    dst = _os.fspath(dst)
+    if _os.path.isdir(dst):
+        dst = _os.path.join(dst, _os.path.basename(_os.fspath(src)))
     return copyfile(src, dst)
 
+
+copy2 = copy
+
+
+def ignore_patterns(*patterns):
+    import fnmatch
+
+    def _ignore(path, names):
+        out = set()
+        for p in patterns:
+            out.update(fnmatch.filter(names, p))
+        return out
+    return _ignore
+
+
+def copytree(src, dst, symlinks=False, ignore=None, copy_function=copy2, ignore_dangling_symlinks=False,
+             dirs_exist_ok=False):
+    src, dst = _os.fspath(src), _os.fspath(dst)
+    names = _os.listdir(src)
+    skip = ignore(src, names) if ignore is not None else set()
+    _os.makedirs(dst, exist_ok=dirs_exist_ok)
+    for n in names:
+        if n in skip:
+            continue
+        s, d = _os.path.join(src, n), _os.path.join(dst, n)
+        if _os.path.isdir(s):
+            copytree(s, d, symlinks, ignore, copy_function, ignore_dangling_symlinks, dirs_exist_ok)
+        else:
+            copy_function(s, d)
+    return dst
+
+
+def rmtree(path, ignore_errors=False, onerror=None, *, onexc=None, dir_fd=None):
+    path = _os.fspath(path)
+    try:
+        for n in _os.listdir(path):
+            p = _os.path.join(path, n)
+            if _os.path.isdir(p):
+                rmtree(p, ignore_errors, onerror, onexc=onexc)
+            else:
+                _os.remove(p)
+        _os.rmdir(path)
+    except OSError as e:
+        if ignore_errors:
+            return
+        if onexc is not None:
+            onexc(rmtree, path, e)
+        elif onerror is not None:
+            onerror(rmtree, path, (type(e), e, e.__traceback__))
+        else:
+            raise
+
+
+def move(src, dst, copy_function=copy2):
+    src, dst = _os.fspath(src), _os.fspath(dst)
+    if _os.path.isdir(dst):
+        dst = _os.path.join(dst, _os.path.basename(src.rstrip("/")))
+    try:
+        _os.rename(src, dst)
+    except OSError:
+        if _os.path.isdir(src):
+            copytree(src, dst, copy_function=copy_function)
+            rmtree(src)
+        else:
+            copy_function(src, dst)
+            _os.remove(src)
+    return dst
+
+
+_ntuple_diskusage = _collections.namedtuple("usage", "total used free")
+
+
+def disk_usage(path):
+    return _ntuple_diskusage(0, 0, 0)
+
+
+def which(cmd, mode=None, path=None):
+    return None
+
+
+def get_terminal_size(fallback=(80, 24)):
+    """COLUMNS and LINES when set, else the terminal on standard output,
+    else `fallback` -- in that order, as CPython does."""
+    try:
+        columns = int(_os.getenv("COLUMNS", ""))
+    except ValueError:
+        columns = 0
+    try:
+        lines = int(_os.getenv("LINES", ""))
+    except ValueError:
+        lines = 0
+    if columns <= 0 or lines <= 0:
+        try:
+            size = _os.get_terminal_size(1)
+        except OSError:
+            size = _os.terminal_size(fallback)
+        if columns <= 0:
+            columns = size.columns or fallback[0]
+        if lines <= 0:
+            lines = size.lines or fallback[1]
+    return _os.terminal_size((columns, lines))
+
+
+def chown(path, user=None, group=None):
+    pass
+
+
+def make_archive(base_name, format, root_dir=None, base_dir=None, verbose=0, dry_run=0, owner=None,
+                 group=None, logger=None):
+    if format != "zip":
+        raise ValueError("unknown archive format '%s'" % (format,))
+    import zipfile
+    root_dir = root_dir or _os.getcwd()
+    out = base_name + ".zip"
+    with zipfile.ZipFile(out, "w") as z:
+        for d, ds, fs in _os.walk(_os.path.join(root_dir, base_dir or "")):
+            for f in fs:
+                full = _os.path.join(d, f)
+                z.write(full, _os.path.relpath(full, root_dir))
+    return out
+
+
+def unpack_archive(filename, extract_dir=None, format=None, *, filter=None):
+    import zipfile
+    with zipfile.ZipFile(filename) as z:
+        z.extractall(extract_dir or _os.getcwd())

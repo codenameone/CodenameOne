@@ -381,7 +381,33 @@ final class DefAssign {
                 expr(k, in);
             }
             exprs(((DictExpr) e).values, in);
+        } else if (e instanceof Comp) {
+            // A comprehension runs where it stands: its first iterable in
+            // this scope, the rest reading this scope's locals as they are
+            // now (its own targets are its own scope's).
+            Comp c = (Comp) e;
+            expr(c.generators.get(0).iter, in);
+            Set<String> inner = new HashSet<String>(in);
+            if (c.scope != null) {
+                inner.addAll(c.scope.assigned);
+            }
+            for (int i = 0; i < c.generators.size(); i++) {
+                Comprehension g = c.generators.get(i);
+                if (i > 0) {
+                    expr(g.iter, inner);
+                }
+                exprs(g.ifs, inner);
+            }
+            expr(c.elt, inner);
+            expr(c.value, inner);
+        } else if (e instanceof JoinedStr) {
+            for (Expr part : ((JoinedStr) e).parts) {
+                expr(part, in);
+            }
+        } else if (e instanceof FormattedValue) {
+            expr(((FormattedValue) e).value, in);
+            expr(((FormattedValue) e).spec, in);
         }
-        // Comprehensions, lambdas, f-strings, await, yield: left checked.
+        // Lambdas, await, yield: left checked.
     }
 }

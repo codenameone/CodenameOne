@@ -93,20 +93,20 @@ public final class PyImage {
             System.arraycopy(b, 0, r.d, 0, r.d.length);
             return wrap(r);
         }));
-        m.setAttr("size", PyBuiltin.positional("size", a -> {
-            PyImageData s = img(a[0]);
-            return new PyTuple(new Object[] {PyInt.of(s.w), PyInt.of(s.h)});
+        m.setAttr("size", PyBuiltin.fixed1("size", a0 -> {
+            PyImageData s = img(a0);
+            return Py.tuple(PyInt.of(s.w), PyInt.of(s.h));
         }));
-        m.setAttr("tobytes", PyBuiltin.positional("tobytes", a -> {
-            PyImageData s = img(a[0]);
+        m.setAttr("tobytes", PyBuiltin.fixed1("tobytes", a0 -> {
+            PyImageData s = img(a0);
             byte[] out = new byte[s.d.length];
             System.arraycopy(s.d, 0, out, 0, out.length);
             return new PyBytes(out);
         }));
-        m.setAttr("getpixel", PyBuiltin.positional("getpixel", a -> {
-            PyImageData s = img(a[0]);
-            int x = i(a[1]);
-            int y = i(a[2]);
+        m.setAttr("getpixel", PyBuiltin.fixed3("getpixel", (a0, a1, a2) -> {
+            PyImageData s = img(a0);
+            int x = i(a1);
+            int y = i(a2);
             if (x < 0 || y < 0 || x >= s.w || y >= s.h) {
                 throw Py.error(Py.INDEX_ERROR, "image index out of range");
             }
@@ -137,7 +137,7 @@ public final class PyImage {
             paste(img(a[0]), img(a[1]), i(a[2]), i(a[3]), a[4] == Py.NONE ? null : img(a[4])); //NOPMD CompareObjectsWithEquals - identity is meant
             return Py.NONE;
         }));
-        m.setAttr("transpose", PyBuiltin.positional("transpose", a -> wrap(transpose(img(a[0]), i(a[1])))));
+        m.setAttr("transpose", PyBuiltin.fixed2("transpose", (a0, a1) -> wrap(transpose(img(a0), i(a1)))));
         m.setAttr("affine", PyBuiltin.positional("affine", a -> {
             Object[] c = Py.toArray(a[3]);
             double[] k = new double[6];
@@ -155,23 +155,23 @@ public final class PyImage {
             return wrap(requireEngine().resample(img(a[0]), i(a[1]), i(a[2]), box,
                     a.length > 4 ? i(a[4]) : FILTER_BILINEAR, a.length > 5 && Py.isTrue(a[5])));
         }));
-        m.setAttr("palette", PyBuiltin.positional("palette", a -> wrap(palette(img(a[0]), bytes(a[1])))));
+        m.setAttr("palette", PyBuiltin.fixed2("palette", (a0, a1) -> wrap(palette(img(a0), bytes(a1)))));
         m.setAttr("scatter", PyBuiltin.positional("scatter", a -> {
             scatter(img(a[0]), img(a[1]), i(a[2]), i(a[3]), i(a[4]), i(a[5]));
             return Py.NONE;
         }));
-        m.setAttr("convert", PyBuiltin.positional("convert", a -> wrap(convert(img(a[0]), i(a[1])))));
-        m.setAttr("band", PyBuiltin.positional("band", a -> {
-            PyImageData s = img(a[0]);
-            int b = i(a[1]);
+        m.setAttr("convert", PyBuiltin.fixed2("convert", (a0, a1) -> wrap(convert(img(a0), i(a1)))));
+        m.setAttr("band", PyBuiltin.fixed2("band", (a0, a1) -> {
+            PyImageData s = img(a0);
+            int b = i(a1);
             PyImageData r = new PyImageData(s.w, s.h, 1);
             for (int p = 0, n = s.w * s.h; p < n; p++) {
                 r.d[p] = s.d[p * s.bands + b];
             }
             return wrap(r);
         }));
-        m.setAttr("merge", PyBuiltin.positional("merge", a -> {
-            Object[] parts = Py.toArray(a[0]);
+        m.setAttr("merge", PyBuiltin.fixed1("merge", a0 -> {
+            Object[] parts = Py.toArray(a0);
             PyImageData first = img(parts[0]);
             PyImageData r = new PyImageData(first.w, first.h, parts.length);
             for (int b = 0; b < parts.length; b++) {
@@ -185,10 +185,10 @@ public final class PyImage {
             }
             return wrap(r);
         }));
-        m.setAttr("getbbox", PyBuiltin.positional("getbbox", a -> getbbox(img(a[0]), Py.isTrue(a[1]))));
-        m.setAttr("point", PyBuiltin.positional("point", a -> {
-            PyImageData s = img(a[0]);
-            byte[] lut = bytes(a[1]);
+        m.setAttr("getbbox", PyBuiltin.fixed2("getbbox", (a0, a1) -> getbbox(img(a0), Py.isTrue(a1))));
+        m.setAttr("point", PyBuiltin.fixed2("point", (a0, a1) -> {
+            PyImageData s = img(a0);
+            byte[] lut = bytes(a1);
             PyImageData r = new PyImageData(s.w, s.h, s.bands);
             for (int p = 0; p < s.d.length; p += s.bands) {
                 for (int b = 0; b < s.bands; b++) {
@@ -197,9 +197,9 @@ public final class PyImage {
             }
             return wrap(r);
         }));
-        m.setAttr("boxblur", PyBuiltin.positional("boxblur", a -> {
-            PyImageData s = img(a[0]);
-            int r = i(a[1]);
+        m.setAttr("boxblur", PyBuiltin.fixed2("boxblur", (a0, a1) -> {
+            PyImageData s = img(a0);
+            int r = i(a1);
             PyImageData t = blurRows(s, r);
             PyImageData u = blurRows(transpose(t, 5), r);
             return wrap(transpose(u, 5));
@@ -208,11 +208,11 @@ public final class PyImage {
                 new PyBytes(requireEngine().pngUnfilter(bytes(a[0]), i(a[1]), i(a[2]), i(a[3])))));
         m.setAttr("png_expand", PyBuiltin.positional("png_expand", a ->
                 wrap(requireEngine().pngExpand(bytes(a[0]), i(a[1]), i(a[2]), i(a[3]), i(a[4])))));
-        m.setAttr("jpeg_decode", PyBuiltin.positional("jpeg_decode", a -> wrap(requireEngine().jpegDecode(bytes(a[0])))));
+        m.setAttr("jpeg_decode", PyBuiltin.fixed1("jpeg_decode", a0 -> wrap(requireEngine().jpegDecode(bytes(a0)))));
         m.setAttr("jpeg_encode", PyBuiltin.positional("jpeg_encode", a ->
                 new PyBytes(requireEngine().jpegEncode(img(a[0]), (float) Py.asDouble(a[1])))));
-        m.setAttr("png_rows", PyBuiltin.positional("png_rows", a -> {
-            PyImageData s = img(a[0]);
+        m.setAttr("png_rows", PyBuiltin.fixed1("png_rows", a0 -> {
+            PyImageData s = img(a0);
             int row = s.w * s.bands;
             byte[] out = new byte[(row + 1) * s.h];
             for (int y = 0; y < s.h; y++) {
@@ -230,19 +230,19 @@ public final class PyImage {
                 new PyJavaObject(requireEngine().defaultFont(Py.asDouble(a[0])))));
         m.setAttr("ft_variant", PyBuiltin.positional("ft_variant", a ->
                 new PyJavaObject(requireEngine().deriveFont(ft(a[0]), Py.asDouble(a[1])))));
-        m.setAttr("ft_name", PyBuiltin.positional("ft_name", a -> {
-            String[] n = requireEngine().fontName(ft(a[0]));
-            return new PyTuple(new Object[] {new PyStr(n[0]), new PyStr(n[1])});
+        m.setAttr("ft_name", PyBuiltin.fixed1("ft_name", a0 -> {
+            String[] n = requireEngine().fontName(ft(a0));
+            return Py.tuple(new PyStr(n[0]), new PyStr(n[1]));
         }));
-        m.setAttr("ft_metrics", PyBuiltin.positional("ft_metrics", a -> {
-            int[] mt = requireEngine().fontMetrics(ft(a[0]));
-            return new PyTuple(new Object[] {PyInt.of(mt[0]), PyInt.of(mt[1])});
+        m.setAttr("ft_metrics", PyBuiltin.fixed1("ft_metrics", a0 -> {
+            int[] mt = requireEngine().fontMetrics(ft(a0));
+            return Py.tuple(PyInt.of(mt[0]), PyInt.of(mt[1]));
         }));
         m.setAttr("ft_length", PyBuiltin.positional("ft_length", a ->
                 PyInt.of(requireEngine().textLength(ft(a[0]), Py.toStr(a[1])))));
-        m.setAttr("ft_bbox", PyBuiltin.positional("ft_bbox", a -> {
-            int[] b = requireEngine().textBox(ft(a[0]), Py.toStr(a[1]), anchor(a[2]));
-            return new PyTuple(new Object[] {PyInt.of(b[0]), PyInt.of(b[1]), PyInt.of(b[2]), PyInt.of(b[3])});
+        m.setAttr("ft_bbox", PyBuiltin.fixed3("ft_bbox", (a0, a1, a2) -> {
+            int[] b = requireEngine().textBox(ft(a0), Py.toStr(a1), anchor(a2));
+            return Py.tuple(PyInt.of(b[0]), PyInt.of(b[1]), PyInt.of(b[2]), PyInt.of(b[3]));
         }));
         m.setAttr("ft_mask", PyBuiltin.positional("ft_mask", a -> {
             PyImageEngine e = requireEngine();
@@ -250,8 +250,8 @@ public final class PyImage {
             String text = Py.toStr(a[1]);
             String anchor = anchor(a[2]);
             int[] b = e.textBox(f, text, anchor);
-            return new PyTuple(new Object[] {wrap(e.textMask(f, text, anchor, Py.isTrue(a[3]))), PyInt.of(b[2]),
-                PyInt.of(b[3])});
+            return Py.tuple(wrap(e.textMask(f, text, anchor, Py.isTrue(a[3]))), PyInt.of(b[2]),
+                PyInt.of(b[3]));
         }));
         m.setAttr("exact", PyBuiltin.positional("exact", a -> {
             PyImageEngine e = engine;
@@ -496,7 +496,7 @@ public final class PyImage {
         if (x1 < 0) {
             return Py.NONE;
         }
-        return new PyTuple(new Object[] {PyInt.of(x0), PyInt.of(y0), PyInt.of(x1 + 1), PyInt.of(y1 + 1)});
+        return Py.tuple(PyInt.of(x0), PyInt.of(y0), PyInt.of(x1 + 1), PyInt.of(y1 + 1));
     }
 
     /// One horizontal pass of Pillow's box blur for an integer radius.

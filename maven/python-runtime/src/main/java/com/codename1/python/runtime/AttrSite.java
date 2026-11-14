@@ -45,11 +45,35 @@ package com.codename1.python.runtime;
 public final class AttrSite {
     /// How many receiver layouts a site remembers.
     static final int WAYS = 4;
+    /// Overflow entries a megamorphic read site keeps past its four ways.
+    static final int HASHED = 256;
 
     private static final int NONE = 0;
     private static final int SLOT = 1;
     private static final int CLASS_ATTR = 2;
+    /// A compiled field (`PyInstance.fieldIndex`), read by index; an unset
+    /// one still takes the generic read, which finds the class's value.
+    private static final int FIELD = 3;
     private static final int BUILTIN = 3;
+    /// The instance lacks the attribute: no slot, no field, nothing in the
+    /// class, and no `__getattribute__` or `__getattr__` that could answer
+    /// it. Only [#getOrMiss] answers from it; a plain read still raises.
+    private static final int MISSING = 5;
+    /// Hit-path kinds only (gkN): a class attribute read through an instance
+    /// that is a plain value, returned as it is, or a property, whose getter
+    /// runs. Both are what getSlow's CLASS_ATTR answer would be.
+    private static final int CONST = 6;
+    private static final int PROP = 7;
+    /// `obj.__dict__` of an instance whose class has no `__dict__` of its
+    /// own and no `__getattribute__`: the instance's one live view, without
+    /// the generic read (class lookup, own-attribute probe, name compares)
+    /// it took on every access.
+    private static final int DICT = 8;
+    /// The layout [#getOrMiss] last found missing, checked before the ways:
+    /// a probe that misses usually misses on one class.
+    private PyType missType;
+    private Shape missShape;
+    private int missVersion;
 
     private final String name;
     /// A builtin method this site calls directly when the receiver is that
@@ -66,28 +90,23 @@ public final class AttrSite {
     private static final int I_CLEAR = 7;
     private static final int I_STARTSWITH = 8;
     private static final int I_ENDSWITH = 9;
+    private static final int I_STRIP = 10;
+    private static final int I_LSTRIP = 11;
+    private static final int I_RSTRIP = 12;
+    private static final int I_FIND = 13;
+    private static final int I_RFIND = 14;
+    private static final int I_REPLACE = 15;
 
     // Reads and calls. An entry with a null shape is a non-instance receiver
     // type (BUILTIN or NONE). All entries are valid only while getVersion is
     // the current class version.
     private int getVersion = -1;
     private int getUsed;
-    private int getNext;
-    private final PyType[] getTypes = new PyType[WAYS];
-    private final Shape[] getShapes = new Shape[WAYS];
-    private final int[] getKinds = new int[WAYS];
-    private final int[] getSlots = new int[WAYS];
-    private final Object[] getValues = new Object[WAYS];
-
-    // Stores: a slot hit when the instance already has the attribute, or a
-    // shape transition when the store adds it.
-    private int setVersion = -1;
-    private int setUsed;
-    private int setNext;
-    private final PyType[] setTypes = new PyType[WAYS];
-    private final Shape[] setShapes = new Shape[WAYS];
-    private final int[] setSlots = new int[WAYS];
-    private final Shape[] setTos = new Shape[WAYS];
+    private PyType[] getTypes;
+    private Shape[] getShapes;
+    private int[] getKinds;
+    private int[] getSlots;
+    private Object[] getValues;
 
     // The same entries again as plain fields, which the hit paths compare:
     // a field is a load, an array element a bounds-checked call in
@@ -114,22 +133,21 @@ public final class AttrSite {
     private Object gf1;
     private Object gf2;
     private Object gf3;
-    private PyType st0;
-    private PyType st1;
-    private PyType st2;
-    private PyType st3;
-    private Shape ss0;
-    private Shape ss1;
-    private Shape ss2;
-    private Shape ss3;
-    private int si0;
-    private int si1;
-    private int si2;
-    private int si3;
-    private Shape sto0;
-    private Shape sto1;
-    private Shape sto2;
-    private Shape sto3;
+    private Object gv0;
+    private Object gv1;
+    private Object gv2;
+    private Object gv3;
+
+    /// A site for each name of `names`, one a line: the sites of a module,
+    /// which generated code holds as one table.
+    public static AttrSite[] table(String names) {
+        String[] each = Py.names(names);
+        AttrSite[] out = new AttrSite[each.length];
+        for (int i = 0; i < each.length; i++) {
+            out[i] = new AttrSite(each[i]);
+        }
+        return out;
+    }
 
     public AttrSite(String name) {
         this.name = name.intern();
@@ -156,6 +174,18 @@ public final class AttrSite {
                 return I_STARTSWITH;
             case "endswith":
                 return I_ENDSWITH;
+            case "strip":
+                return I_STRIP;
+            case "lstrip":
+                return I_LSTRIP;
+            case "rstrip":
+                return I_RSTRIP;
+            case "find":
+                return I_FIND;
+            case "rfind":
+                return I_RFIND;
+            case "replace":
+                return I_REPLACE;
             default:
                 return I_NONE;
         }
@@ -166,8 +196,12 @@ public final class AttrSite {
         if (getVersion != PyType.version) {
             getVersion = PyType.version;
             getUsed = 0;
-            getNext = 0;
             gt0 = gt1 = gt2 = gt3 = null;
+            gv0 = gv1 = gv2 = gv3 = null;
+            if (getTypes != null && getTypes.length > WAYS) {
+                // The overflow entries name layouts of the old version.
+                getTypes = null;
+            }
             return -1;
         }
         for (int k = 0; k < getUsed; k++) {
@@ -175,7 +209,38 @@ public final class AttrSite {
                 return k;
             }
         }
+        if (getTypes != null && getTypes.length > WAYS) {
+            int k = WAYS + hash(t, shape);
+            if (getTypes[k] == t && getShapes[k] == shape) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return k;
+            }
+        }
         return -1;
+    }
+
+    /// [#findGet] for a caller whose four ways just missed: the overflow
+    /// slot is probed first, so a megamorphic site -- psparser's methods read
+    /// `self.x` on instances of half a dozen parser classes -- finds its
+    /// entry without comparing the ways a second time. An entry lives in
+    /// exactly one place (addGet runs only after findGet failed), so a miss
+    /// here still scans the ways.
+    private int findGetOverflowFirst(PyType t, Shape shape) {
+        if (getVersion == PyType.version && getTypes != null && getTypes.length > WAYS) {
+            int k = WAYS + hash(t, shape);
+            if (getTypes[k] == t && getShapes[k] == shape) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return k;
+            }
+        }
+        return findGet(t, shape);
+    }
+
+    /// The overflow slot of a layout. A megamorphic site -- one attribute
+    /// read on instances of dozens of classes, as an XML binding that defines
+    /// a class per tag does -- used to evict round robin past four layouts,
+    /// so nearly every read missed and went back to the class dictionaries.
+    private static int hash(PyType t, Shape shape) {
+        int h = t.id * 0x9E3779B1 + (shape == null ? 0 : shape.id * 0x85EBCA6B);
+        return h >>> (32 - 8);
     }
 
     private int addGet(PyType t, Shape shape, int kind, int slot, Object value) {
@@ -183,24 +248,47 @@ public final class AttrSite {
         if (getUsed < WAYS) {
             k = getUsed++;
         } else {
-            k = getNext;
-            getNext = (getNext + 1) % WAYS;
+            k = WAYS + hash(t, shape);
+            if (getTypes.length == WAYS) {
+                getTypes = java.util.Arrays.copyOf(getTypes, WAYS + HASHED);
+                getShapes = java.util.Arrays.copyOf(getShapes, WAYS + HASHED);
+                getKinds = java.util.Arrays.copyOf(getKinds, WAYS + HASHED);
+                getSlots = java.util.Arrays.copyOf(getSlots, WAYS + HASHED);
+                getValues = java.util.Arrays.copyOf(getValues, WAYS + HASHED);
+            }
+        }
+        if (getTypes == null) {
+            // Made on the first entry: most sites of a large program are in
+            // code that never runs, and five arrays each was most of what a
+            // site weighed.
+            getTypes = new PyType[WAYS];
+            getShapes = new Shape[WAYS];
+            getKinds = new int[WAYS];
+            getSlots = new int[WAYS];
+            getValues = new Object[WAYS];
         }
         getTypes[k] = t;
         getShapes[k] = shape;
         getKinds[k] = kind;
         getSlots[k] = slot;
         getValues[k] = value;
-        int fast = kind == SLOT ? SLOT : NONE;
-        Object f = kind == CLASS_ATTR && value instanceof PyFunction ? value : null;
+        int fast = kind == SLOT || kind == FIELD || kind == DICT ? kind : NONE;
+        if (kind == CLASS_ATTR) {
+            if (value instanceof PyProperty) {
+                fast = PROP;
+            } else if (!(value instanceof PyObject) && value != null) {
+                fast = CONST;
+            }
+        }
+        Object f = kind == CLASS_ATTR && takesReceiver(value) ? value : null;
         if (k == 0) {
-            gt0 = t; gs0 = shape; gk0 = fast; gi0 = slot; gf0 = f;
+            gt0 = t; gs0 = shape; gk0 = fast; gi0 = slot; gf0 = f; gv0 = value;
         } else if (k == 1) {
-            gt1 = t; gs1 = shape; gk1 = fast; gi1 = slot; gf1 = f;
+            gt1 = t; gs1 = shape; gk1 = fast; gi1 = slot; gf1 = f; gv1 = value;
         } else if (k == 2) {
-            gt2 = t; gs2 = shape; gk2 = fast; gi2 = slot; gf2 = f;
-        } else {
-            gt3 = t; gs3 = shape; gk3 = fast; gi3 = slot; gf3 = f;
+            gt2 = t; gs2 = shape; gk2 = fast; gi2 = slot; gf2 = f; gv2 = value;
+        } else if (k == 3) {
+            gt3 = t; gs3 = shape; gk3 = fast; gi3 = slot; gf3 = f; gv3 = value;
         }
         return k;
     }
@@ -213,17 +301,85 @@ public final class AttrSite {
             if (getVersion == PyType.version) {
                 PyType t = i.cls;
                 Shape s = i.shape;
-                if (gs0 == s && gt0 == t && gk0 == SLOT) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    return i.slots[gi0];
+                if (gs0 == s && gt0 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (gk0 == SLOT) {
+                        return i.slots[gi0];
+                    }
+                    if (gk0 == FIELD) {
+                        Object v = i.getField(gi0);
+                        if (v != null) {
+                            return v;
+                        }
+                    }
+                    if (gk0 == CONST) {
+                        return gv0;
+                    }
+                    if (gk0 == PROP) {
+                        return ((PyProperty) gv0).get(i);
+                    }
+                    if (gk0 == DICT) {
+                        return i.dictView();
+                    }
                 }
-                if (gs1 == s && gt1 == t && gk1 == SLOT) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    return i.slots[gi1];
+                if (gs1 == s && gt1 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (gk1 == SLOT) {
+                        return i.slots[gi1];
+                    }
+                    if (gk1 == FIELD) {
+                        Object v = i.getField(gi1);
+                        if (v != null) {
+                            return v;
+                        }
+                    }
+                    if (gk1 == CONST) {
+                        return gv1;
+                    }
+                    if (gk1 == PROP) {
+                        return ((PyProperty) gv1).get(i);
+                    }
+                    if (gk1 == DICT) {
+                        return i.dictView();
+                    }
                 }
-                if (gs2 == s && gt2 == t && gk2 == SLOT) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    return i.slots[gi2];
+                if (gs2 == s && gt2 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (gk2 == SLOT) {
+                        return i.slots[gi2];
+                    }
+                    if (gk2 == FIELD) {
+                        Object v = i.getField(gi2);
+                        if (v != null) {
+                            return v;
+                        }
+                    }
+                    if (gk2 == CONST) {
+                        return gv2;
+                    }
+                    if (gk2 == PROP) {
+                        return ((PyProperty) gv2).get(i);
+                    }
+                    if (gk2 == DICT) {
+                        return i.dictView();
+                    }
                 }
-                if (gs3 == s && gt3 == t && gk3 == SLOT) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    return i.slots[gi3];
+                if (gs3 == s && gt3 == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (gk3 == SLOT) {
+                        return i.slots[gi3];
+                    }
+                    if (gk3 == FIELD) {
+                        Object v = i.getField(gi3);
+                        if (v != null) {
+                            return v;
+                        }
+                    }
+                    if (gk3 == CONST) {
+                        return gv3;
+                    }
+                    if (gk3 == PROP) {
+                        return ((PyProperty) gv3).get(i);
+                    }
+                    if (gk3 == DICT) {
+                        return i.dictView();
+                    }
                 }
             }
             return getSlow(i);
@@ -231,8 +387,71 @@ public final class AttrSite {
         return Py.obj(o).getAttr(name);
     }
 
+    /// `obj.name` for a miss probe (see [Py#MISS]): [Py#MISS] when the read
+    /// would raise AttributeError without running any code -- remembered per
+    /// class and shape like a hit -- and a caught AttributeError from code
+    /// that did run comes back as a miss carrying it.
+    public Object getOrMiss(Object o) {
+        if (o instanceof PyInstance) {
+            PyInstance i = (PyInstance) o;
+            PyType cls = i.cls;
+            Shape shape = i.shape;
+            if (missType == cls && missShape == shape && missVersion == PyType.version) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return Py.MISS;
+            }
+            int k = findGet(cls, shape);
+            if (k >= 0 && getKinds[k] == MISSING) {
+                missType = cls;
+                missShape = shape;
+                missVersion = PyType.version;
+                return Py.MISS;
+            }
+            // A dunder (`__dict__`, `__class__`) is answered by the object
+            // itself, never from the shape or the class: it cannot be proved
+            // missing here.
+            if (k < 0 && !name.startsWith("__") && !cls.hasCustomGetattribute() && cls.lookup("__getattr__") == null
+                    && i.fieldIndex(name) < 0 && (shape == null || shape.indexOf(name) < 0)
+                    && cls.lookup(name) == null) {
+                addGet(cls, shape, MISSING, 0, null);
+                missType = cls;
+                missShape = shape;
+                missVersion = PyType.version;
+                return Py.MISS;
+            }
+        }
+        try {
+            return get(o);
+        } catch (PyException e) {
+            if (e.matches(Py.ATTRIBUTE_ERROR)) {
+                return new Py.Miss(e);
+            }
+            throw e;
+        }
+    }
+
+    /// The class [#classLacks] last found without this attribute.
+    private PyType lackType;
+    private int lackVersion;
+
+    /// Whether an instance of `cls` with no attribute of its own would miss
+    /// this one: the class, its bases and `__getattr__` all lack it. The
+    /// typed code asks this for an object it never made, whose fields it
+    /// knows; a class given the attribute later answers false from then on.
+    public boolean classLacks(PyType cls) {
+        if (lackType == cls && lackVersion == PyType.version) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return true;
+        }
+        if (name.startsWith("__") || cls.hasCustomGetattribute() || cls.lookup("__getattr__") != null
+                || cls.lookup(name) != null) {
+            return false;
+        }
+        lackType = cls;
+        lackVersion = PyType.version;
+        return true;
+    }
+
     private Object getSlow(PyInstance i) {
-        int k = findGet(i.cls, i.shape);
+        int k = findGetOverflowFirst(i.cls, i.shape);
         if (k >= 0) {
             int kind = getKinds[k];
             if (kind == SLOT) {
@@ -240,6 +459,15 @@ public final class AttrSite {
             }
             if (kind == CLASS_ATTR) {
                 return Py.bindAttr(getValues[k], i);
+            }
+            if (kind == DICT) {
+                return i.dictView();
+            }
+            if (kind == FIELD) {
+                Object v = i.getField(getSlots[k]);
+                if (v != null) {
+                    return v;
+                }
             }
             return i.getAttr(name);
         }
@@ -259,9 +487,21 @@ public final class AttrSite {
         int slot = 0;
         Object value = null;
         Object clsAttr = cls.lookup(name);
-        // A compiled field is read by the generated code itself; this site
-        // only sees it unset, and must not remember that.
-        if (!(clsAttr instanceof PyProperty) && !cls.hasCustomGetattribute() && i.fieldIndex(name) < 0) {
+        // A compiled field is remembered by its index, not its value: a read
+        // from code that cannot name the Java class -- another module -- finds
+        // it set, and one that finds it unset takes the generic read.
+        int field = i.fieldIndex(name);
+        if (clsAttr instanceof PyProperty && !cls.hasCustomGetattribute()) {
+            // A property is a data descriptor: it answers before the
+            // instance's own attributes, so while the class is unchanged
+            // (getVersion) every read is its getter. bindAttr calls it.
+            kind = CLASS_ATTR;
+            value = clsAttr;
+        } else if (field >= 0 && !(clsAttr instanceof PyProperty) && !readsThroughGet(clsAttr) && !cls.hasCustomGetattribute()) {
+            kind = FIELD;
+            slot = field;
+        } else if (!(clsAttr instanceof PyProperty) && !readsThroughGet(clsAttr) && !cls.hasCustomGetattribute()
+                && field < 0) {
             slot = shape == null ? -1 : shape.indexOf(name);
             if (slot >= 0) {
                 kind = SLOT;
@@ -270,109 +510,24 @@ public final class AttrSite {
                 value = clsAttr;
             }
         }
+        if (kind == NONE && clsAttr == null && result == i.dictViewOrNull() //NOPMD CompareObjectsWithEquals - identity is meant
+                && !cls.hasCustomGetattribute()) {
+            // The generic read answered the instance's own view: no class
+            // attribute, no own attribute and no __getattribute__ stand in
+            // front of it, and a change to any of those moves the class
+            // version or the shape this entry is keyed on.
+            kind = DICT;
+        }
         addGet(cls, shape, kind, slot, value);
         return result;
     }
 
-    // ---- stores --------------------------------------------------------------
-
-    public void set(Object o, Object v) {
-        if (o instanceof PyInstance) {
-            PyInstance i = (PyInstance) o;
-            if (setVersion == PyType.version) {
-                PyType t = i.cls;
-                Shape s = i.shape;
-                if (ss0 == s && st0 == t && sto0 == null) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    i.slots[si0] = v;
-                    return;
-                }
-                if (ss1 == s && st1 == t && sto1 == null) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    i.slots[si1] = v;
-                    return;
-                }
-                if (ss2 == s && st2 == t && sto2 == null) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    i.slots[si2] = v;
-                    return;
-                }
-                if (ss3 == s && st3 == t && sto3 == null) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    i.slots[si3] = v;
-                    return;
-                }
-            }
-            setSlow(i, v);
-            return;
-        }
-        Py.obj(o).setAttr(name, v);
-    }
-
-    private void setSlow(PyInstance i, Object v) {
-        if (setVersion == PyType.version) {
-            PyType t = i.cls;
-            Shape s = i.shape;
-            for (int k = 0; k < setUsed; k++) {
-                if (setTypes[k] == t && setShapes[k] == s) { //NOPMD CompareObjectsWithEquals - identity is meant
-                    Shape to = setTos[k];
-                    if (to == null) {
-                        i.slots[setSlots[k]] = v;
-                    } else {
-                        i.append(to, v);
-                    }
-                    return;
-                }
-            }
-        } else {
-            setVersion = PyType.version;
-            setUsed = 0;
-            setNext = 0;
-            st0 = st1 = st2 = st3 = null;
-        }
-        fillSet(i, v);
-    }
-
-    private void addSet(PyType t, Shape shape, int slot, Shape to) {
-        int k;
-        if (setUsed < WAYS) {
-            k = setUsed++;
-        } else {
-            k = setNext;
-            setNext = (setNext + 1) % WAYS;
-        }
-        setTypes[k] = t;
-        setShapes[k] = shape;
-        setSlots[k] = slot;
-        setTos[k] = to;
-        if (k == 0) {
-            st0 = t; ss0 = shape; si0 = slot; sto0 = to;
-        } else if (k == 1) {
-            st1 = t; ss1 = shape; si1 = slot; sto1 = to;
-        } else if (k == 2) {
-            st2 = t; ss2 = shape; si2 = slot; sto2 = to;
-        } else {
-            st3 = t; ss3 = shape; si3 = slot; sto3 = to;
-        }
-    }
-
-    private void fillSet(PyInstance i, Object v) {
-        PyType cls = i.cls;
-        Object clsAttr = cls.lookup(name);
-        Object sa = cls.lookup("__setattr__");
-        boolean plain = !(clsAttr instanceof PyProperty) && (sa == null || sa instanceof PyBuiltin)
-                && i.fieldIndex(name) < 0;
-        Shape before = i.shape;
-        i.setAttr(name, v);
-        if (!plain || setVersion != PyType.version) {
-            return;
-        }
-        Shape after = i.shape;
-        if (before == after) { //NOPMD CompareObjectsWithEquals - identity is meant
-            addSet(cls, before, after == null ? -1 : after.indexOf(name), null);
-        } else {
-            // Adding the attribute moved the instance to a new shape. Remember
-            // both the transition (the next new instance) and the slot on the
-            // new shape (the next store to an instance already initialised).
-            addSet(cls, before, 0, after);
-            addSet(cls, after, after.indexOf(name), null);
-        }
+    /// A class attribute that is an instance of a class with `__get__` -- a
+    /// descriptor written in Python -- answers every read by calling it, so
+    /// neither the instance's own value nor the attribute itself may be
+    /// remembered in its place.
+    private static boolean readsThroughGet(Object clsAttr) {
+        return clsAttr instanceof PyInstance && ((PyInstance) clsAttr).cls.lookup("__get__") != null;
     }
 
     // ---- calls ---------------------------------------------------------------
@@ -400,6 +555,9 @@ public final class AttrSite {
             if (intrinsic == I_SPLIT) {
                 return TypeMethods.split(v, null, -1);
             }
+            if (intrinsic == I_STRIP || intrinsic == I_LSTRIP || intrinsic == I_RSTRIP) {
+                return Py.str(TypeMethods.strip(v, null, intrinsic != I_RSTRIP, intrinsic != I_LSTRIP));
+            }
         }
         Object f = method(o);
         return f != null ? Py.obj(f).call1(o) : Py.obj(Py.obj(o).getAttr(name)).call0();
@@ -426,6 +584,9 @@ public final class AttrSite {
                 if (intrinsic == I_ENDSWITH && a instanceof String) {
                     return Py.bool(((String) o).endsWith((String) a));
                 }
+                if ((intrinsic == I_FIND || intrinsic == I_RFIND) && a instanceof String) {
+                    return PyInt.of(TypeMethods.findWhole((String) o, (String) a, intrinsic == I_RFIND));
+                }
             }
             if (intrinsic == I_GET && o instanceof PyDict && o.getClass() == PyDict.class) {
                 Object v = ((PyDict) o).getOrNull(a);
@@ -436,7 +597,35 @@ public final class AttrSite {
         return f != null ? Py.obj(f).call2(o, a) : Py.obj(Py.obj(o).getAttr(name)).call1(a);
     }
 
+    /// `o.name(...)` where `name` is a compiled field of `o`'s class and
+    /// `f` is that field as the caller read it, null when the receiver is
+    /// of another class or the field is unset. A set field is the
+    /// instance's own attribute, which a method call reads first, so it is
+    /// called without the site: pdfminer's tokenizer keeps its state as a
+    /// bound method in `self._parse1` and calls it per token, and every
+    /// parser class it runs on passes through several layouts as optional
+    /// attributes appear, which drove the site megamorphic.
+    public Object callF0(Object f, Object o) {
+        return f != null ? Py.call(f) : call0(o);
+    }
+
+    public Object callF1(Object f, Object o, Object a) {
+        return f != null ? Py.call(f, a) : call1(o, a);
+    }
+
+    public Object callF2(Object f, Object o, Object a, Object b) {
+        return f != null ? Py.call(f, a, b) : call2(o, a, b);
+    }
+
+    public Object callF3(Object f, Object o, Object a, Object b, Object c) {
+        return f != null ? Py.call(f, a, b, c) : call3(o, a, b, c);
+    }
+
     public Object call2(Object o, Object a, Object b) {
+        if (intrinsic == I_REPLACE && o instanceof String && a instanceof String && b instanceof String
+                && ((String) a).length() > 0) {
+            return Py.str(((String) o).replace((String) a, (String) b));
+        }
         if (intrinsic == I_GET && o != null && o.getClass() == PyDict.class) {
             Object v = ((PyDict) o).getOrNull(a);
             return v != null ? v : b;
@@ -461,15 +650,44 @@ public final class AttrSite {
                 : Py.obj(Py.obj(o).getAttr(name)).call5(a, b, c, d, e);
     }
 
-    /// `o.name(...)` with six arguments: a module's function (`_cn1re.run`)
-    /// takes them directly; a method, which needs a seventh for the
-    /// receiver, gets the array.
     public Object call6(Object o, Object a, Object b, Object c, Object d, Object e, Object f) {
-        Object m = method(o);
-        if (m != null) {
-            return Py.obj(m).call(new Object[] {o, a, b, c, d, e, f}, Py.NO_KW);
-        }
-        return Py.obj(Py.obj(o).getAttr(name)).call6(a, b, c, d, e, f);
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call7(o, a, b, c, d, e, f) : Py.obj(Py.obj(o).getAttr(name)).call6(a, b, c, d, e, f);
+    }
+
+    public Object call7(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call8(o, a, b, c, d, e, f, g) : Py.obj(Py.obj(o).getAttr(name)).call7(a, b, c, d, e, f, g);
+    }
+
+    public Object call8(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call9(o, a, b, c, d, e, f, g, h) : Py.obj(Py.obj(o).getAttr(name)).call8(a, b, c, d, e, f, g, h);
+    }
+
+    public Object call9(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call10(o, a, b, c, d, e, f, g, h, i) : Py.obj(Py.obj(o).getAttr(name)).call9(a, b, c, d, e, f, g, h, i);
+    }
+
+    public Object call10(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call11(o, a, b, c, d, e, f, g, h, i, j) : Py.obj(Py.obj(o).getAttr(name)).call10(a, b, c, d, e, f, g, h, i, j);
+    }
+
+    public Object call11(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call12(o, a, b, c, d, e, f, g, h, i, j, k) : Py.obj(Py.obj(o).getAttr(name)).call11(a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    public Object call12(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call13(o, a, b, c, d, e, f, g, h, i, j, k, l) : Py.obj(Py.obj(o).getAttr(name)).call12(a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    public Object call13(Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        Object fm = method(o);
+        return fm != null ? Py.obj(fm).call14(o, a, b, c, d, e, f, g, h, i, j, k, l, m) : Py.obj(Py.obj(o).getAttr(name)).call13(a, b, c, d, e, f, g, h, i, j, k, l, m);
     }
 
     /// `o.name(...)` with seven or more arguments. `args[0]` is a slot the
@@ -484,6 +702,137 @@ public final class AttrSite {
         Object[] rest = new Object[args.length - 1];
         System.arraycopy(args, 1, rest, 0, rest.length);
         return Py.obj(Py.obj(o).getAttr(name)).call(rest, Py.NO_KW);
+    }
+
+    /// `o.name(..., key=value)`: [#callN] with keyword names. A method of the
+    /// receiver's class is called with the receiver written into the empty
+    /// first slot, so the call makes neither a bound method nor a second
+    /// argument array.
+    public Object callKw(Object o, Object[] args, String[] kwNames) {
+        Object f = method(o);
+        if (f != null) {
+            args[0] = o;
+            return Py.obj(f).call(args, kwNames);
+        }
+        Object[] rest = new Object[args.length - 1];
+        System.arraycopy(args, 1, rest, 0, rest.length);
+        return Py.obj(get(o)).call(rest, kwNames);
+    }
+
+    /// [#callKw] of a fixed arity: the receiver plus at most thirteen arguments,
+    /// with no argument array at the call site.
+    public Object callKwF(Object o, String[] kwNames, Object a) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k, l);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    public Object callKwF(Object o, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        Object fn = method(o);
+        if (fn != null) {
+            return Py.obj(fn).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k, l, m);
+        }
+        return Py.obj(get(o)).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m);
+    }
+
+    /// True for a class attribute whose read through an instance is only
+    /// `PyMethod(self, attr)` (see `Py.bindAttr`): calling it with the
+    /// receiver prepended is the same call without the bound method. A
+    /// builtin binds that way too (`PyBuiltin.bind`), which is how a stdlib
+    /// class method written in Java (`re.Pattern.match`, `defaultdict`'s
+    /// `__missing__`) costs no allocation per call.
+    private static boolean takesReceiver(Object v) {
+        return v instanceof PyFunction || v instanceof PyBuiltin;
     }
 
     /// The function to call with the receiver prepended, when the call needs
@@ -507,12 +856,13 @@ public final class AttrSite {
                     return gf3;
                 }
             }
-            int k = findGet(i.cls, i.shape);
+            int k = findGetOverflowFirst(i.cls, i.shape);
             if (k >= 0) {
-                return getKinds[k] == CLASS_ATTR && getValues[k] instanceof PyFunction ? getValues[k] : null;
+                return getKinds[k] == CLASS_ATTR && takesReceiver(getValues[k]) ? getValues[k] : null;
             }
             Object clsAttr = i.cls.lookup(name);
-            if (i.cls.hasCustomGetattribute() || clsAttr instanceof PyProperty || i.fieldIndex(name) >= 0) {
+            if (i.cls.hasCustomGetattribute() || clsAttr instanceof PyProperty || readsThroughGet(clsAttr)
+                    || i.fieldIndex(name) >= 0) {
                 addGet(i.cls, i.shape, NONE, 0, null);
                 return null;
             }
@@ -523,7 +873,7 @@ public final class AttrSite {
             }
             if (clsAttr != null) {
                 addGet(i.cls, i.shape, CLASS_ATTR, 0, clsAttr);
-                return clsAttr instanceof PyFunction ? clsAttr : null;
+                return takesReceiver(clsAttr) ? clsAttr : null;
             }
             addGet(i.cls, i.shape, NONE, 0, null);
             return null;

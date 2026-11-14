@@ -23,7 +23,9 @@
  */
 package com.codename1.python.transpiler.ast;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /// A Python scope and where each of its names lives, computed by the scope
@@ -75,10 +77,18 @@ public final class Scope {
     /// Set on CLASS scopes: the Java variable holding the class being built.
     public String classVar;
 
+    /// The scopes nested directly in this one, in source order.
+    public final List<Scope> children = new ArrayList<Scope>();
+    /// The comprehension a COMPREHENSION scope is, null for the others.
+    public Node.Comp comp;
+
     public Scope(Kind kind, Scope parent, String name) {
         this.kind = kind;
         this.parent = parent;
         this.name = name;
+        if (parent != null) {
+            parent.children.add(this);
+        }
     }
 
     public boolean isFunctionLike() {

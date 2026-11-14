@@ -8,12 +8,17 @@ Supported: raises (as context manager with match=, excinfo.value / .type /
 mark.parametrize / skip / skipif / xfail (other marks are accepted and
 ignored), param(..., id=, marks=), fixture (function scope, found by parameter name from the test's class,
 the module or the fixtures registered so far; yield fixtures run their teardown;
-fixtures may use other fixtures; autouse is honoured), the built-in
-monkeypatch fixture (capsys, tmp_path and the rest are absent), and run_module(module) /
+fixtures may use other fixtures; autouse is honoured, and a conftest module's
+autouse fixtures apply to every module once it is imported; params= runs a
+test once per value), async def tests (each on a fresh asyncio loop), the
+built-in monkeypatch, tmp_path, tmpdir and request (param, addfinalizer,
+getfixturevalue) fixtures (capsys and the rest are absent), the httpx_mock
+fixture of the bundled pytest_httpx2, and run_module(module) /
 main([...]) which run every test_* function and Test* class of a module
 object and print a summary such as "3 passed, 1 failed".
 
-Not supported: collecting files from disk, conftest.py, plugins, fixture
+Not supported: collecting files from disk (a conftest module is imported by
+the test runner's code like any other), plugin entry points, async fixtures, fixture
 scopes above function (accepted, treated as function), assertion rewriting (a failed assert reports its message only), capture of
 stdout, and the long traceback report. Plain `assert` is Python's assert.
 """
@@ -25,7 +30,7 @@ import math
 
 __all__ = ["raises", "approx", "fail", "skip", "xfail", "mark", "fixture",
            "main", "run_module", "param", "Failed", "Skipped", "XFailed",
-           "ExceptionInfo", "warns", "importorskip"]
+           "ExceptionInfo", "warns", "importorskip", "FixtureRequest", "MonkeyPatch"]
 
 
 class Failed(BaseException):
@@ -288,16 +293,160 @@ _registry = {}
 
 
 class _FixtureDef:
-    def __init__(self, func, name, autouse):
+    def __init__(self, func, name, autouse, params=None, ids=None):
         self.func = func
         self.name = name
         self.autouse = autouse
+        self.params = params
+        self.ids = ids
+
+
+class FixtureRequest:
+    """The `request` a fixture or test asks for: `param` (a parametrized
+    fixture's current value), `fixturename`, `addfinalizer` and
+    `getfixturevalue`. The node, config and scope objects are absent."""
+
+    def __init__(self, param=None, fixturename=None, session=None, instance=None, cache=None):
+        self.param = param
+        self.fixturename = fixturename
+        self._session = session
+        self._instance = instance
+        self._cache = cache
+
+    def addfinalizer(self, finalizer):
+        self._session.teardowns.append(finalizer)
+
+    def getfixturevalue(self, argname):
+        return self._session.make(argname, self._instance, self._cache, [])
+
+
+class _LocalPath:
+    """tmpdir's value: the py.path.local subset tests use, over a string
+    path. `/` and join give another, str() and os.fspath the path."""
+
+    def __init__(self, path):
+        import os
+        self.strpath = os.fspath(path)
+
+    def __fspath__(self):
+        return self.strpath
+
+    def __str__(self):
+        return self.strpath
+
+    def __repr__(self):
+        return "local(%r)" % self.strpath
+
+    def __eq__(self, other):
+        import os
+        try:
+            return self.strpath == os.fspath(other)
+        except TypeError:
+            return NotImplemented
+
+    def __hash__(self):
+        return hash(self.strpath)
+
+    def __truediv__(self, other):
+        return self.join(other)
+
+    def join(self, *parts):
+        import os
+        return _LocalPath(os.path.join(self.strpath, *[str(p) for p in parts]))
+
+    @property
+    def basename(self):
+        import os
+        return os.path.basename(self.strpath)
+
+    @property
+    def dirname(self):
+        import os
+        return os.path.dirname(self.strpath)
+
+    def dirpath(self):
+        return _LocalPath(self.dirname)
+
+    def mkdir(self, *parts):
+        import os
+        target = self.join(*parts) if parts else self
+        os.mkdir(target.strpath)
+        return target
+
+    def ensure(self, *parts, dir=False):
+        import os
+        target = self.join(*parts) if parts else self
+        if dir:
+            os.makedirs(target.strpath, exist_ok=True)
+        else:
+            os.makedirs(os.path.dirname(target.strpath), exist_ok=True)
+            if not os.path.exists(target.strpath):
+                open(target.strpath, "a").close()
+        return target
+
+    def exists(self):
+        import os
+        return os.path.exists(self.strpath)
+
+    def check(self, file=None, dir=None, exists=None):
+        import os
+        if file:
+            return os.path.isfile(self.strpath)
+        if dir:
+            return os.path.isdir(self.strpath)
+        return os.path.exists(self.strpath)
+
+    def isdir(self):
+        import os
+        return os.path.isdir(self.strpath)
+
+    def isfile(self):
+        import os
+        return os.path.isfile(self.strpath)
+
+    def listdir(self):
+        import os
+        return [self.join(n) for n in sorted(os.listdir(self.strpath))]
+
+    def read(self, mode="r"):
+        with open(self.strpath, mode) as f:
+            return f.read()
+
+    def read_text(self, encoding="utf-8"):
+        with open(self.strpath, encoding=encoding) as f:
+            return f.read()
+
+    def read_binary(self):
+        with open(self.strpath, "rb") as f:
+            return f.read()
+
+    def write(self, data, mode="w", ensure=False):
+        if ensure:
+            self.dirpath().ensure(dir=True)
+        if isinstance(data, bytes) and "b" not in mode:
+            mode += "b"
+        with open(self.strpath, mode) as f:
+            f.write(data)
+
+    def write_text(self, data, encoding="utf-8", ensure=False):
+        self.write(data.encode(encoding), "wb", ensure)
+
+    def write_binary(self, data, ensure=False):
+        self.write(data, "wb", ensure)
+
+    def remove(self):
+        import os
+        import shutil
+        if os.path.isdir(self.strpath):
+            shutil.rmtree(self.strpath)
+        else:
+            os.remove(self.strpath)
 
 
 def fixture(func=None, *, scope="function", params=None, autouse=False, ids=None, name=None):
     def register(f):
         fname = name or f.__name__
-        f.__cn1_fixture__ = _FixtureDef(f, fname, autouse)
+        f.__cn1_fixture__ = _FixtureDef(f, fname, autouse, params, ids)
         _registry[fname] = f.__cn1_fixture__
         return f
     if func is not None:
@@ -305,13 +454,27 @@ def fixture(func=None, *, scope="function", params=None, autouse=False, ids=None
     return register
 
 
+_MISSING = object()
+_NOTSET = object()
+_ENV = object()
+_CWD = object()
+_SYSPATH = object()
+
+
 class _MonkeyPatch:
     def __init__(self):
         self._undo = []
 
-    def setattr(self, target, name, value=None, raising=True):
-        if value is None and isinstance(target, str):
-            raise TypeError("monkeypatch.setattr with a string target is not supported")
+    def setattr(self, target, name, value=_NOTSET, raising=True):
+        if isinstance(target, str):
+            # "package.module.attr": the module must already be imported, as
+            # nothing can be imported by a name built at run time
+            if value is not _NOTSET:
+                raise TypeError("use setattr(target, name, value) or setattr(target, value) with target "
+                                "being a dotted import string")
+            value = name
+            path, _, name = target.rpartition(".")
+            target = _resolve_dotted(path)
         old = getattr(target, name, _MISSING)
         if old is _MISSING and raising:
             raise AttributeError("%r has no attribute %r" % (target, name))
@@ -326,6 +489,44 @@ class _MonkeyPatch:
             return
         self._undo.append((target, name, old))
         delattr(target, name)
+
+    def setenv(self, name, value, prepend=None):
+        import os
+        value = str(value)
+        if prepend and name in os.environ:
+            value = value + prepend + os.environ[name]
+        self._undo.append((_ENV, name, os.environ.get(name, _MISSING)))
+        os.environ[name] = value
+
+    def delenv(self, name, raising=True):
+        import os
+        if name not in os.environ:
+            if raising:
+                raise KeyError(name)
+            return
+        self._undo.append((_ENV, name, os.environ[name]))
+        del os.environ[name]
+
+    def chdir(self, path):
+        import os
+        self._undo.append((_CWD, None, os.getcwd()))
+        os.chdir(os.fspath(path))
+
+    def syspath_prepend(self, path):
+        self._undo.append((_SYSPATH, None, list(sys.path)))
+        sys.path.insert(0, str(path))
+
+    def context(self):
+        import contextlib
+
+        @contextlib.contextmanager
+        def ctx():
+            m = _MonkeyPatch()
+            try:
+                yield m
+            finally:
+                m.undo()
+        return ctx()
 
     def setitem(self, dic, name, value):
         self._undo.append((dic, name, dic.get(name, _MISSING)))
@@ -342,7 +543,18 @@ class _MonkeyPatch:
     def undo(self):
         while self._undo:
             target, name, old = self._undo.pop()
-            if isinstance(target, dict):
+            if target is _ENV:
+                import os
+                if old is _MISSING:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = old
+            elif target is _CWD:
+                import os
+                os.chdir(old)
+            elif target is _SYSPATH:
+                sys.path[:] = old
+            elif isinstance(target, dict):
                 if old is _MISSING:
                     target.pop(name, None)
                 else:
@@ -353,7 +565,19 @@ class _MonkeyPatch:
                 setattr(target, name, old)
 
 
-_MISSING = object()
+MonkeyPatch = _MonkeyPatch
+
+
+def _resolve_dotted(path):
+    parts = path.split(".")
+    for i in range(len(parts), 0, -1):
+        mod = sys.modules.get(".".join(parts[:i]))
+        if mod is not None:
+            obj = mod
+            for attr in parts[i:]:
+                obj = getattr(obj, attr)
+            return obj
+    raise ImportError("monkeypatch target %r is not imported" % path)
 
 
 # -- running ----------------------------------------------------------------
@@ -471,6 +695,43 @@ class _Session:
         self.quiet = quiet
         self.result = _Result()
         self.teardowns = []
+        self.fixture_params = {}
+
+    def param_fixtures(self, func, instance, is_method):
+        """The parametrized fixtures a test reaches, directly or through
+        other fixtures, in the order first met."""
+        found = []
+        seen = set()
+        todo = list(_param_names(func, is_method))
+        while todo:
+            n = todo.pop(0)
+            if n in seen:
+                continue
+            seen.add(n)
+            f, m = self.find_fixture(n, instance)
+            if f is None:
+                continue
+            d = f.__cn1_fixture__
+            if d.params is not None:
+                found.append(d)
+            todo.extend(_param_names(f, m))
+        return found
+
+    def expand(self, func, instance, is_method):
+        """_expand_params, multiplied by each parametrized fixture's params;
+        the fixture values ride in the dict under a ("fixture", name) key."""
+        combos = _expand_params(func)
+        for d in self.param_fixtures(func, instance, is_method):
+            nxt = []
+            for base_id, vals, marks in combos:
+                for i, p in enumerate(d.params):
+                    pid = str(d.ids[i]) if d.ids is not None and i < len(d.ids) \
+                        else _idpart(p, d.name, i)
+                    v = dict(vals)
+                    v[("fixture", d.name)] = p
+                    nxt.append((pid if not base_id else base_id + "-" + pid, v, marks))
+            combos = nxt
+        return combos
 
     # fixture lookup: class attribute, module attribute, then the registry
     def find_fixture(self, name, instance):
@@ -482,18 +743,42 @@ class _Session:
         if f is not None and hasattr(f, "__cn1_fixture__"):
             return f, False
         d = _registry.get(name)
+        if d is None and name in ("httpx_mock", "httpx2_mock"):
+            # A plugin's fixture, used without importing the plugin: pytest
+            # would have loaded it through its entry point.
+            import pytest_httpx2  # noqa: F401
+            d = _registry.get(name)
         if d is not None:
             return d.func, False
         return None, False
 
     def make(self, name, instance, cache, stack):
-        if name in cache:
+        if name in cache and name != "request":
             return cache[name]
         if name == "monkeypatch":
             mp = _MonkeyPatch()
             self.teardowns.append(mp.undo)
             cache[name] = mp
             return mp
+        if name == "request":
+            req = FixtureRequest(self.fixture_params.get(stack[-1]) if stack else None,
+                                 stack[-1] if stack else None, self, instance, cache)
+            cache[name] = req
+            return req
+        if name == "tmpdir":
+            # tmp_path's directory, as py.path.local: pytest gives both the same one
+            value = _LocalPath(self.make("tmp_path", instance, cache, stack))
+            cache[name] = value
+            return value
+        if name == "tmp_path":
+            # A fresh directory per test under the system temporary directory,
+            # as pytest's tmp_path is; it is left in place, as pytest keeps
+            # the last few runs' directories.
+            import tempfile
+            import pathlib
+            path = pathlib.Path(tempfile.mkdtemp(prefix="pytest-"))
+            cache[name] = path
+            return path
         func, is_method = self.find_fixture(name, instance)
         if func is None:
             raise Failed("fixture '%s' not found" % name)
@@ -528,11 +813,13 @@ class _Session:
         return errors
 
     def autouse_names(self, instance):
-        names = []
+        # conftest's autouse fixtures apply to every module, as pytest's do
+        names = [d.name for d in _registry.values()
+                 if d.autouse and getattr(d.func, "__module__", "").rpartition(".")[2] == "conftest"]
         for n in dir(self.module):
             f = getattr(self.module, n)
             d = getattr(f, "__cn1_fixture__", None)
-            if d is not None and d.autouse:
+            if d is not None and d.autouse and d.name not in names:
                 names.append(d.name)
         if instance is not None:
             for n in dir(type(instance)):
@@ -562,6 +849,7 @@ class _Session:
                 if cond:
                     xfail_mark = m
         cache = {}
+        self.fixture_params = dict((k[1], v) for k, v in values.items() if isinstance(k, tuple))
         outcome = None
         detail = ""
         try:
@@ -576,9 +864,14 @@ class _Session:
                     else:
                         kwargs[n] = self.make(n, instance, cache, [])
                 if is_method:
-                    getattr(instance, func.__name__)(**kwargs)
+                    ret = getattr(instance, func.__name__)(**kwargs)
                 else:
-                    func(**kwargs)
+                    ret = func(**kwargs)
+                if type(ret).__name__ == "coroutine":
+                    # An async test runs to completion on a fresh loop, as
+                    # pytest-asyncio's function-scoped loop runs it.
+                    import asyncio
+                    asyncio.run(ret)
                 outcome = "passed"
             except Skipped as e:
                 outcome = "skipped"
@@ -613,7 +906,7 @@ class _Session:
 
     def run_function(self, prefix, func, instance, is_method, extra_marks):
         out = ""
-        for pid, values, pmarks in _expand_params(func):
+        for pid, values, pmarks in self.expand(func, instance, is_method):
             nodeid = prefix + func.__name__ + ("[" + pid + "]" if pid else "")
             out += self.run_one(nodeid, func, instance, is_method, extra_marks + pmarks, values)
         return out
@@ -626,7 +919,7 @@ class _Session:
             member = getattr(cls, attr)
             if not callable(member):
                 continue
-            for pid, values, pmarks in _expand_params(member):
+            for pid, values, pmarks in self.expand(member, cls(), True):
                 nodeid = "%s::%s::%s%s" % (self.module_name(), name, attr, "[" + pid + "]" if pid else "")
                 instance = cls()
                 if hasattr(instance, "setup_method"):

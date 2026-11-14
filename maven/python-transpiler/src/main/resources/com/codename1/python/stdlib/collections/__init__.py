@@ -6,12 +6,14 @@
 from operator import itemgetter as _itemgetter
 from itertools import chain as _chain, repeat as _repeat, starmap as _starmap
 import heapq as _heapq
+from _cn1collections import tuplegetter as _tuplegetter, nt_new as _nt_new, dd_init as _dd_init, dd_missing as _dd_missing
 
 __all__ = ["ChainMap", "Counter", "OrderedDict", "UserDict", "UserList", "UserString", "defaultdict", "deque",
            "namedtuple"]
 
 
 class deque:
+    __class_getitem__ = classmethod(type(list[int]))
     """A double-ended queue over a circular buffer."""
 
     def __init__(self, iterable=(), maxlen=None):
@@ -221,18 +223,10 @@ class deque:
 
 
 class defaultdict(dict):
-    def __init__(self, default_factory=None, *args, **kwargs):
-        if default_factory is not None and not callable(default_factory):
-            raise TypeError("first argument must be callable or None")
-        super().__init__(*args, **kwargs)
-        self.default_factory = default_factory
-
-    def __missing__(self, key):
-        if self.default_factory is None:
-            raise KeyError(key)
-        value = self.default_factory()
-        self[key] = value
-        return value
+    __class_getitem__ = classmethod(type(list[int]))
+    # In Java, as CPython has them in C: see PyCollections.
+    __init__ = _dd_init
+    __missing__ = _dd_missing
 
     def copy(self):
         return defaultdict(self.default_factory, self)
@@ -255,6 +249,7 @@ class defaultdict(dict):
 
 
 class OrderedDict(dict):
+    __class_getitem__ = classmethod(type(list[int]))
     def move_to_end(self, key, last=True):
         value = self.pop(key)
         if last:
@@ -302,6 +297,7 @@ class OrderedDict(dict):
 
 
 class Counter(dict):
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, iterable=None, /, **kwds):
         super().__init__()
         self.update(iterable, **kwds)
@@ -469,23 +465,9 @@ def namedtuple(typename, field_names, *, rename=False, defaults=None, module=Non
         field_defaults = dict(zip(field_names[len(field_names) - len(defaults):], defaults))
     n = len(field_names)
 
-    def __new__(cls, *args, **kwargs):
-        if len(args) > n:
-            raise TypeError("%s.__new__() takes %d positional arguments but %d were given" % (typename, n + 1, len(args) + 1))
-        values = list(args)
-        for name in field_names[len(args):]:
-            if name in kwargs:
-                values.append(kwargs.pop(name))
-            elif name in field_defaults:
-                values.append(field_defaults[name])
-            else:
-                raise TypeError("%s.__new__() missing 1 required positional argument: %r" % (typename, name))
-        if kwargs:
-            name = next(iter(kwargs))
-            if name in field_names:
-                raise TypeError("%s.__new__() got multiple values for argument %r" % (typename, name))
-            raise TypeError("%s.__new__() got an unexpected keyword argument %r" % (typename, name))
-        return tuple.__new__(cls, values)
+    # Binds as CPython's generated __new__(_cls, f0, f1=d, ...) does; a
+    # call passing every field positionally builds the tuple directly.
+    __new__ = _nt_new(typename, field_names, field_defaults)
 
     def _make(cls, iterable):
         result = tuple.__new__(cls, iterable)
@@ -522,7 +504,7 @@ def namedtuple(typename, field_names, *, rename=False, defaults=None, module=Non
         "__match_args__": field_names,
     }
     for index, name in enumerate(field_names):
-        namespace[name] = property(_itemgetter(index), doc="Alias for field number " + str(index))
+        namespace[name] = _tuplegetter(index, "Alias for field number " + str(index))
     result = type(typename, (tuple,), namespace)
     # CPython reads the caller's module from its frame; there are no frames
     # here, so a caller outside __main__ passes module= (the stdlib does).
@@ -531,6 +513,7 @@ def namedtuple(typename, field_names, *, rename=False, defaults=None, module=Non
 
 
 class ChainMap(dict):
+    __class_getitem__ = classmethod(type(list[int]))
     """A view of several mappings searched in order; writes go to the first."""
 
     def __init__(self, *maps):
@@ -613,6 +596,7 @@ class ChainMap(dict):
 
 
 class UserDict(dict):
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, dict=None, /, **kwargs):
         super().__init__()
         self.data = self
@@ -623,6 +607,7 @@ class UserDict(dict):
 
 
 class UserList(list):
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, initlist=None):
         super().__init__()
         self.data = self

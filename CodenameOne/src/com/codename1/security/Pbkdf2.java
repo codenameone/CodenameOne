@@ -77,20 +77,62 @@ public final class Pbkdf2 {
         return derive(Hash.SHA256, password, salt, iterations, length);
     }
 
-    private static byte[] derive(String hash, byte[] password, byte[] salt, int iterations, int length) {
+    /// PBKDF2 (RFC 8018) with HMAC over any algorithm [Hmac#create(String, byte[])]
+    /// accepts. SHA-256 and SHA-512 take the engine's native derivation when
+    /// one is installed; see [#hmacSha512] for the other parameters.
+    ///
+    /// #### Throws
+    /// - `CryptoException`: if an argument is null or out of range, or the
+    ///   algorithm has no HMAC
+    public static byte[] derive(String hash, byte[] password, byte[] salt, int iterations, int length) {
         if (password == null || salt == null) {
             throw new CryptoException("password and salt must not be null");
         }
         if (iterations < 1 || length < 1) {
             throw new CryptoException("iterations and length must be positive");
         }
-        byte[] fast = CryptoEngine.get().pbkdf2(hash, password, salt, iterations, length);
+        String a = MessageDigestImpl.normalise(hash);
+        if (!"SHA256".equals(a) && !"SHA512".equals(a)) {
+            return portable(hash, password, salt, iterations, length);
+        }
+        String name = "SHA512".equals(a) ? Hash.SHA512 : Hash.SHA256;
+        byte[] fast = CryptoEngine.get().pbkdf2(name, password, salt, iterations, length);
         if (fast != null && fast.length == length) {
             return fast;
         }
-        return Hash.SHA512.equals(hash)
+        return Hash.SHA512.equals(name)
                 ? portable512(password, salt, iterations, length)
                 : portable256(password, salt, iterations, length);
+    }
+
+    /// The derivation over a streaming [Hmac], for the algorithms with no
+    /// specialised loop.
+    static byte[] portable(String hash, byte[] password, byte[] salt, int iterations, int length) {
+        Hmac mac = Hmac.create(hash, password);
+        int hLen = mac.tagLength();
+        byte[] out = new byte[length];
+        byte[] counter = new byte[4];
+        int pos = 0;
+        for (int index = 1; pos < length; index++) {
+            counter[0] = (byte) (index >>> 24);
+            counter[1] = (byte) (index >>> 16);
+            counter[2] = (byte) (index >>> 8);
+            counter[3] = (byte) index;
+            mac.update(salt);
+            byte[] u = mac.doFinal(counter);
+            byte[] t = new byte[hLen];
+            System.arraycopy(u, 0, t, 0, hLen);
+            for (int i = 1; i < iterations; i++) {
+                u = mac.doFinal(u);
+                for (int j = 0; j < hLen; j++) {
+                    t[j] ^= u[j];
+                }
+            }
+            int n = Math.min(hLen, length - pos);
+            System.arraycopy(t, 0, out, pos, n);
+            pos += n;
+        }
+        return out;
     }
 
     /// The Java derivation with HMAC-SHA-512, whatever engine is installed:

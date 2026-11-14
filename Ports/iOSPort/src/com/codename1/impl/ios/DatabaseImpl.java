@@ -29,6 +29,8 @@ import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.impl.AbstractDBCursor;
 import com.codename1.impl.SQLStatementSplitter;
 import com.codename1.impl.SQLText;
+import com.codename1.impl.SqlFunctionBridge;
+import com.codename1.db.SqlFunction;
 
 import java.io.IOException;
 import java.util.Vector;
@@ -39,11 +41,101 @@ import java.util.Vector;
 class DatabaseImpl extends Database {
     private long peer;
 
+    /** The functions every connection has registered; SQLite holds only the id. */
+    private static final SqlFunctionBridge FUNCTIONS = new SqlFunctionBridge() {
+        @Override
+        protected int valueType(long argv, int i) {
+            return IOSImplementation.nativeInstance.sqlValueType(argv, i);
+        }
+
+        @Override
+        protected long valueLong(long argv, int i) {
+            return IOSImplementation.nativeInstance.sqlValueLong(argv, i);
+        }
+
+        @Override
+        protected double valueDouble(long argv, int i) {
+            return IOSImplementation.nativeInstance.sqlValueDouble(argv, i);
+        }
+
+        @Override
+        protected byte[] valueText(long argv, int i) {
+            return IOSImplementation.nativeInstance.sqlValueText(argv, i);
+        }
+
+        @Override
+        protected byte[] valueBlob(long argv, int i) {
+            return IOSImplementation.nativeInstance.sqlValueBlob(argv, i);
+        }
+
+        @Override
+        protected void resultNull(long ctx) {
+            IOSImplementation.nativeInstance.sqlResultNull(ctx);
+        }
+
+        @Override
+        protected void resultLong(long ctx, long v) {
+            IOSImplementation.nativeInstance.sqlResultLong(ctx, v);
+        }
+
+        @Override
+        protected void resultDouble(long ctx, double v) {
+            IOSImplementation.nativeInstance.sqlResultDouble(ctx, v);
+        }
+
+        @Override
+        protected void resultText(long ctx, byte[] utf8) {
+            IOSImplementation.nativeInstance.sqlResultText(ctx, utf8);
+        }
+
+        @Override
+        protected void resultBlob(long ctx, byte[] v) {
+            IOSImplementation.nativeInstance.sqlResultBlob(ctx, v);
+        }
+
+        @Override
+        protected void resultError(long ctx, byte[] utf8) {
+            IOSImplementation.nativeInstance.sqlResultError(ctx, utf8);
+        }
+    };
+
+    /** Called by the engine (IOSNative.m) while a statement calls a Java function. */
+    static void sqlFunctionCall(long ctx, int id, int argc, long argv) {
+        FUNCTIONS.call(ctx, id, argc, argv);
+    }
+
+    @Override
+    public long changes() throws IOException {
+        checkOpen();
+        return IOSImplementation.nativeInstance.sqlDbChanges(peer);
+    }
+
+    @Override
+    public long lastInsertRowId() throws IOException {
+        checkOpen();
+        return IOSImplementation.nativeInstance.sqlDbLastInsertRowid(peer);
+    }
+
+    @Override
+    public boolean supportsFunctions() {
+        return true;
+    }
+
+    @Override
+    public void createFunction(String name, int argCount, SqlFunction function) throws IOException {
+        checkOpen();
+        int id = function == null ? -1 : FUNCTIONS.register(function);
+        if (IOSImplementation.nativeInstance.sqlDbCreateFunction(peer, com.codename1.util.StringUtil.getBytes(name), argCount, id) != 0) {
+            throw new IOException("Could not create the SQL function " + name);
+        }
+    }
+
     /**
      * Cursors opened from this database. Closing the database finalizes its statements, so the
      * cursors have to be marked dead rather than left holding freed pointers.
      */
     private final Vector openCursors = new Vector();
+    private final com.codename1.impl.SQLStatementCache statements = new com.codename1.impl.SQLStatementCache();
 
     /** The file this connection is open on, for the shared registry a key change consults. */
     private final String openKey;
@@ -153,7 +245,7 @@ class DatabaseImpl extends Database {
         if (isLegacyBehavior()) {
             return;
         }
-        if (SQLStatementSplitter.isMultiStatement(sql)) {
+        if (!isPlainStatement(sql) && SQLStatementSplitter.isMultiStatement(sql)) {
             throw new IOException("This method takes a single SQL statement, but the string "
                     + "contains " + SQLStatementSplitter.countStatements(sql)
                     + ". Use execute(String) to run a script.");
@@ -223,6 +315,11 @@ class DatabaseImpl extends Database {
         openCursors.removeAllElements();
         for (int iter = 0; iter < cursors.length; iter++) {
             ((CursorImpl)cursors[iter]).databaseClosed();
+        }
+        // SQLite will not close a connection whose statements are still alive.
+        long[] cached = statements.drain();
+        for (int iter = 0; iter < cached.length; iter++) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(cached[iter]);
         }
         long closing = peer;
         peer = 0;
@@ -335,9 +432,23 @@ class DatabaseImpl extends Database {
             return;
         }
         try {
-            long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+            long stmt = statements.take(sql);
+            if (stmt == 0) {
+                stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+            }
+            // bind finalizes the statement itself when it throws.
             bind(stmt, params);
-            IOSImplementation.nativeInstance.sqlStmtExecuteAndFinalize(stmt);
+            try {
+                while (IOSImplementation.nativeInstance.sqlStmtStep(stmt)) {
+                    // Rows of a statement run for its effect are discarded, as before.
+                }
+            } catch (IOException err) {
+                IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+                throw err;
+            }
+            // Reset releases what the run holds, so a cached statement keeps no lock.
+            IOSImplementation.nativeInstance.sqlStmtReset(stmt);
+            IOSImplementation.nativeInstance.sqlStmtFinalize(statements.put(sql, stmt));
             // The names on success only -- a statement that failed opened no savepoint.
             noteScriptTransactionControl(sql);
         } finally {
@@ -353,7 +464,7 @@ class DatabaseImpl extends Database {
         checkOpen();
         requireSingleStatement(sql);
         requireQueryStatement(sql);
-        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+        long stmt = prepareCached(sql);
         bindText(stmt, params);
         return register(new CursorImpl(stmt), sql);
     }
@@ -373,7 +484,7 @@ class DatabaseImpl extends Database {
         if (isLegacyBehavior()) {
             return executeQuery(sql, coerceToText(params, "executeQuery"));
         }
-        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+        long stmt = prepareCached(sql);
         bind(stmt, params);
         return register(new CursorImpl(stmt), sql);
     }
@@ -390,7 +501,7 @@ class DatabaseImpl extends Database {
         // Prepared rather than handed to sqlDbExecQuery, which binds nothing when given a null
         // argument array: a statement with placeholders would run with every slot left as NULL
         // instead of reporting the parameters the caller did not supply.
-        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+        long stmt = prepareCached(sql);
         // Finalized here because this path does not go through the bind helpers, which are what
         // own the statement everywhere else.
         try {
@@ -402,8 +513,24 @@ class DatabaseImpl extends Database {
         return register(new CursorImpl(stmt), sql);
     }
 
+    private long prepareCached(String sql) throws IOException {
+        long stmt = statements.take(sql);
+        return stmt != 0 ? stmt : IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+    }
+
+    /// Takes back a closed cursor's statement, reset, for the next query with the same SQL.
+    void recycle(String sql, long stmt) throws IOException {
+        if (peer == 0 || sql == null) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            return;
+        }
+        IOSImplementation.nativeInstance.sqlStmtReset(stmt);
+        IOSImplementation.nativeInstance.sqlStmtFinalize(statements.put(sql, stmt));
+    }
+
     private Cursor register(CursorImpl cursor, String sql) {
         cursor.owner = this;
+        cursor.cacheKey = sql;
         // A statement that writes must never be re-executed to move backwards: this cursor is
         // stepped to run it, so a getCount() or last() would write again. The cursor refuses
         // rather than doing it twice.
@@ -528,6 +655,7 @@ class DatabaseImpl extends Database {
      */
     static class CursorImpl extends AbstractDBCursor {
         private long stmt;
+        String cacheKey;
         DatabaseImpl owner;
 
         CursorImpl(long stmt) {
@@ -588,7 +716,11 @@ class DatabaseImpl extends Database {
             if (stmt != 0) {
                 long closing = stmt;
                 stmt = 0;
-                IOSImplementation.nativeInstance.sqlStmtFinalize(closing);
+                if (owner != null) {
+                    owner.recycle(cacheKey, closing);
+                } else {
+                    IOSImplementation.nativeInstance.sqlStmtFinalize(closing);
+                }
             }
         }
 

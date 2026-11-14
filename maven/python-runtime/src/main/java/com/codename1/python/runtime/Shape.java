@@ -33,9 +33,26 @@ package com.codename1.python.runtime;
 /// object. That identity is what an `AttrSite` compares.
 final class Shape {
     static final Shape EMPTY = new Shape(new String[0]);
+    private static final int LINEAR = 6;
 
     final String[] names;
     private Shape[] next = new Shape[0];
+
+    /// The transitions by the name each adds, once there are more than a scan
+    /// finds quickly. The empty shape is every class's starting point, so it
+    /// collects the first attribute of each class in the program: scanning that
+    /// list was paid by the first assignment of every instance made.
+    private java.util.HashMap<String, Shape> byName;
+
+    /// A number of its own, for the hashed caches of the store sites
+    /// ([StoreSite]). Python code runs on one thread at a time.
+    final int id = nextId();
+
+    private static int ids;
+
+    private static int nextId() {
+        return ++ids;
+    }
 
     private Shape(String[] names) {
         this.names = names;
@@ -63,11 +80,36 @@ final class Shape {
 
     /// This shape extended by `name`.
     Shape with(String name) {
+        String ln = lastName;
+        if (ln == name) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return lastNext;
+        }
+        Shape r = find(name);
+        lastNext = r;
+        lastName = name;
+        return r;
+    }
+
+    /// The last transition [#with] answered: most shapes are left by one name
+    /// only, the attribute every instance of one class sets next. Written
+    /// next before name, and read name first, so a stale pair is never
+    /// handed out on one thread; Python code here runs on one at a time.
+    private String lastName;
+    private Shape lastNext;
+
+    private Shape find(String name) {
         Shape[] t = next;
-        for (Shape e : t) {
-            String last = e.names[names.length];
-            if (last == name || last.equals(name)) { //NOPMD CompareObjectsWithEquals - identity is meant
+        if (byName != null) {
+            Shape e = byName.get(name);
+            if (e != null) {
                 return e;
+            }
+        } else {
+            for (Shape e : t) {
+                String last = e.names[names.length];
+                if (last == name || last.equals(name)) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    return e;
+                }
             }
         }
         String[] n = new String[names.length + 1];
@@ -78,6 +120,14 @@ final class Shape {
         System.arraycopy(t, 0, grown, 0, t.length);
         grown[t.length] = s;
         next = grown;
+        if (byName != null) {
+            byName.put(name, s);
+        } else if (grown.length > LINEAR) {
+            byName = new java.util.HashMap<String, Shape>();
+            for (Shape e : grown) {
+                byName.put(e.names[names.length], e);
+            }
+        }
         return s;
     }
 }

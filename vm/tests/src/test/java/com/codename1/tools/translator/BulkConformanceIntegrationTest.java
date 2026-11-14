@@ -325,6 +325,8 @@ class BulkConformanceIntegrationTest {
         "com/codename1/io/CharArrayReader.java",
         "com/codename1/io/JSONParseCallback.java",
         "com/codename1/io/JSONParser.java",
+        "com/codename1/io/JSONParseException.java",
+        "com/codename1/io/JSONValueFactory.java",
         "com/codename1/io/PrettyPrinter.java",
         "com/codename1/io/JSONSanitizer.java",
         "com/codename1/crypto/UInt256.java",

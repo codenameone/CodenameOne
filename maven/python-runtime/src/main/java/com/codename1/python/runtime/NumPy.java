@@ -39,13 +39,13 @@ final class NumPy {
 
     static PyModule module() {
         PyModule m = new PyModule("_cn1np", new String[0]);
-        m.setAttr("alloc", PyBuiltin.positional("alloc", a -> new NdBuf(kind(a[0]), (int) Py.asLong(a[1]))));
-        m.setAttr("kind", PyBuiltin.positional("kind", a -> String.valueOf(buf(a[0]).kind)));
-        m.setAttr("size", PyBuiltin.positional("size", a -> Py.of((long) buf(a[0]).size())));
-        m.setAttr("fromflat", PyBuiltin.positional("fromflat", a -> fromFlat(kind(a[0]), a[1])));
-        m.setAttr("item", PyBuiltin.positional("item", a -> buf(a[0]).item((int) Py.asLong(a[1]))));
-        m.setAttr("setitem", PyBuiltin.positional("setitem", a -> {
-            setScalar(buf(a[0]), (int) Py.asLong(a[1]), a[2]);
+        m.setAttr("alloc", PyBuiltin.fixed2("alloc", (a0, a1) -> new NdBuf(kind(a0), (int) Py.asLong(a1))));
+        m.setAttr("kind", PyBuiltin.fixed1("kind", a0 -> String.valueOf(buf(a0).kind)));
+        m.setAttr("size", PyBuiltin.fixed1("size", a0 -> Py.of((long) buf(a0).size())));
+        m.setAttr("fromflat", PyBuiltin.fixed2("fromflat", (a0, a1) -> fromFlat(kind(a0), a1)));
+        m.setAttr("item", PyBuiltin.fixed2("item", (a0, a1) -> buf(a0).item((int) Py.asLong(a1))));
+        m.setAttr("setitem", PyBuiltin.fixed3("setitem", (a0, a1, a2) -> {
+            setScalar(buf(a0), (int) Py.asLong(a1), a2);
             return Py.NONE;
         }));
         m.setAttr("copy", PyBuiltin.positional("copy", a -> copy(kind(a[0]), ints(a[1]), buf(a[2]), off(a[3]), ints(a[4]))));
@@ -70,15 +70,15 @@ final class NumPy {
                 (int) Py.asLong(a[3]), buf(a[4]), off(a[5]), ints(a[6]), buf(a[7]), off(a[8]), ints(a[9]))));
         m.setAttr("where", PyBuiltin.positional("where", a -> where(kind(a[0]), ints(a[1]), buf(a[2]), off(a[3]), ints(a[4]),
                 buf(a[5]), off(a[6]), ints(a[7]), buf(a[8]), off(a[9]), ints(a[10]))));
-        m.setAttr("positions", PyBuiltin.positional("positions", a -> positions(ints(a[0]), off(a[1]), ints(a[2]))));
-        m.setAttr("compress", PyBuiltin.positional("compress", a -> compress(buf(a[0]), buf(a[1]))));
-        m.setAttr("gather", PyBuiltin.positional("gather", a -> gather(buf(a[0]), buf(a[1]))));
-        m.setAttr("scatter", PyBuiltin.positional("scatter", a -> {
-            scatter(buf(a[0]), buf(a[1]), buf(a[2]));
+        m.setAttr("positions", PyBuiltin.fixed3("positions", (a0, a1, a2) -> positions(ints(a0), off(a1), ints(a2))));
+        m.setAttr("compress", PyBuiltin.fixed2("compress", (a0, a1) -> compress(buf(a0), buf(a1))));
+        m.setAttr("gather", PyBuiltin.fixed2("gather", (a0, a1) -> gather(buf(a0), buf(a1))));
+        m.setAttr("scatter", PyBuiltin.fixed3("scatter", (a0, a1, a2) -> {
+            scatter(buf(a0), buf(a1), buf(a2));
             return Py.NONE;
         }));
-        m.setAttr("sortrows", PyBuiltin.positional("sortrows", a -> sortRows(buf(a[0]), (int) Py.asLong(a[1]), Py.isTrue(a[2]))));
-        m.setAttr("concat", PyBuiltin.positional("concat", a -> concat(kind(a[0]), a[1])));
+        m.setAttr("sortrows", PyBuiltin.fixed3("sortrows", (a0, a1, a2) -> sortRows(buf(a0), (int) Py.asLong(a1), Py.isTrue(a2))));
+        m.setAttr("concat", PyBuiltin.fixed2("concat", (a0, a1) -> concat(kind(a0), a1)));
         m.setAttr("arange", PyBuiltin.positional("arange", a -> arange(kind(a[0]), a[1], a[2], (int) Py.asLong(a[3]))));
         return m;
     }
@@ -107,7 +107,7 @@ final class NumPy {
     private static int[] ints(Object o) {
         Object[] items;
         if (o instanceof PyTuple) {
-            items = ((PyTuple) o).items;
+            items = ((PyTuple) o).arr();
         } else if (o instanceof PyList) {
             items = ((PyList) o).toArray();
         } else {
@@ -145,7 +145,7 @@ final class NumPy {
     }
 
     private static NdBuf fromFlat(char kind, Object list) {
-        Object[] items = list instanceof PyList ? ((PyList) list).toArray() : ((PyTuple) list).items;
+        Object[] items = list instanceof PyList ? ((PyList) list).toArray() : ((PyTuple) list).arr();
         NdBuf b = new NdBuf(kind, items.length);
         for (int i = 0; i < items.length; i++) {
             setScalar(b, i, items[i]);
@@ -1014,7 +1014,7 @@ final class NumPy {
     }
 
     private static NdBuf concat(char kind, Object parts) {
-        Object[] items = parts instanceof PyList ? ((PyList) parts).toArray() : ((PyTuple) parts).items;
+        Object[] items = parts instanceof PyList ? ((PyList) parts).toArray() : ((PyTuple) parts).arr();
         int n = 0;
         for (Object o : items) {
             n += buf(o).size();

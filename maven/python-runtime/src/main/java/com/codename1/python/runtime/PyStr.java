@@ -58,13 +58,16 @@ public final class PyStr extends PyObject {
         return Py.STR_TYPE;
     }
 
-    /// The last long string whose surrogates were counted. Indexing a long
-    /// string in a loop would otherwise rescan it on every access; one entry
-    /// covers that loop. The holder is immutable, so a reader on another
-    /// thread sees either the old pair or the new one, never a mix.
+    /// A long string's surrogate pair count, cached so that indexing or
+    /// slicing it in a loop does not rescan it on every access. The holder
+    /// is immutable, so a reader on another thread sees either the old entry
+    /// or the new one, never a mix.
     private static final class Count {
         final String s;
         final int n;
+        /// The UTF-16 offsets at which the pairs start, ascending; built the
+        /// first time the string is indexed by code point.
+        int[] at;
 
         Count(String s, int n) {
             this.s = s;
@@ -72,34 +75,87 @@ public final class PyStr extends PyObject {
         }
     }
 
-    private static Count lastCount = new Count("", 0);
+    /// Direct mapped by identity hash. A parser works on several long
+    /// strings at once -- its buffer, the text a match holds, the slice it
+    /// is building -- and a cache of one or two entries evicted one of them
+    /// on every access, which still cost MarkItDown a tenth of its time.
+    ///
+    /// Two tables, by length: the many short slices a parser makes must not
+    /// evict the page it is walking, whose rescan is what costs. And the slot
+    /// is the identity hash MIXED: on ParparVM it is the object's address,
+    /// whose low bits are allocation alignment, so masking it directly put
+    /// every string in a few slots and the page was rescanned on every
+    /// regex call.
+    private static final Count[] COUNTS = new Count[256];
+    private static final Count[] LONG_COUNTS = new Count[64];
+    private static final int LONG = 1024;
+    /// Strings up to this long are counted, never cached: a Latin-1 one --
+    /// nearly all of them -- answers from its storage flag, and any other is
+    /// one vector scan, cheaper than hashing its identity into a table. Kept
+    /// short: a 256-char table of non-Latin-1 text indexed per character
+    /// (pdfminer's PDFDocEncoding[o]) was a full scan per index.
+    private static final int SHORT = 32;
 
-    /// High surrogates in `s`: zero for every string without a supplementary
-    /// character.
+    private static int slot(String s, int size) {
+        int h = System.identityHashCode(s);
+        h ^= (h >>> 16);
+        h *= 0x45d9f3b;
+        h ^= (h >>> 16);
+        return h & (size - 1);
+    }
+
+    /// Surrogate pairs in `s`, each one code point of two chars: zero for
+    /// every string without a supplementary character. A lone surrogate is
+    /// not a pair; it is one char and one code point.
     static int surrogates(String s) {
         int len = s.length();
-        if (len > 32) {
-            Count c = lastCount;
-            if (c.s == s) { //NOPMD CompareObjectsWithEquals - identity is meant
-                return c.n;
-            }
+        if (len <= SHORT) {
+            // codePointCount counts a pair as one code point, as scan does, and
+            // answers a Latin-1 string -- nearly every short one -- from its
+            // storage without reading a char, on ParparVM and on a JDK alike.
+            return len - s.codePointCount(0, len);
         }
-        int n = 0;
-        for (int i = 0; i < len; i++) {
-            char c = s.charAt(i);
-            if (c >= '\uD800' && c <= '\uDBFF') {
-                n++;
-            }
+        Count[] table = len >= LONG ? LONG_COUNTS : COUNTS;
+        int slot = slot(s, table.length);
+        Count c = table[slot];
+        if (c != null && c.s == s) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return c.n;
         }
-        if (len > 32) {
-            lastCount = new Count(s, n);
-        }
+        int n = len - s.codePointCount(0, len);
+        table[slot] = new Count(s, n);
         return n;
     }
 
+    /// The pair count of `s` if the cache holds it, else -1. Never scans:
+    /// for `len`, where a miss costs the same scan a lookup would have
+    /// saved and a Latin-1 string answers without one.
+    static int cachedSurrogates(String s) {
+        int len = s.length();
+        if (len <= SHORT) {
+            return -1;
+        }
+        Count[] table = len >= LONG ? LONG_COUNTS : COUNTS;
+        Count c = table[slot(s, table.length)];
+        return c != null && c.s == s ? c.n : -1; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
+    /// Records the pair count of `s` that its maker already knows (a
+    /// decoder), so `len` and indexing do not scan for it.
+    static void knownSurrogates(String s, int n) {
+        int len = s.length();
+        if (len > SHORT) {
+            Count[] table = len >= LONG ? LONG_COUNTS : COUNTS;
+            table[slot(s, table.length)] = new Count(s, n);
+        }
+    }
+
     /// Length in code points; a lone surrogate counts as one, as in Python.
+    /// The pair count of the last long string is kept, so indexing or slicing
+    /// one in a loop does not rescan it each time: `html.parser` walks a
+    /// page that way, and a page with one non-Latin-1 character went
+    /// quadratic through `String.codePointCount`.
     public static int codePoints(String s) {
-        return s.codePointCount(0, s.length());
+        return s.length() - surrogates(s);
     }
 
     public int codePoints() {
@@ -111,11 +167,59 @@ public final class PyStr extends PyObject {
         if (surrogates(s) == 0) {
             return cp;
         }
-        int off = 0;
-        for (int i = 0; i < cp; i++) {
-            off += pairAt(s, off) ? 2 : 1;
+        int[] at = pairOffsets(s);
+        if (at.length == 0) {
+            int off = 0;
+            for (int i = 0; i < cp; i++) {
+                off += pairAt(s, off) ? 2 : 1;
+            }
+            return off;
         }
-        return off;
+        // Pair k starts at code point at[k] - k, a strictly increasing
+        // sequence; the offset is cp plus the pairs that start before it.
+        int lo = 0;
+        int hi = at.length;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (at[mid] - mid < cp) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        return cp + lo;
+    }
+
+    /// The pair offsets of a cached string, or an empty array for a short
+    /// one, which is walked instead (a string with pairs has at least one). Walking a long one per index made every loop over
+    /// it quadratic: bs4 compiles a pattern of all 2,000 HTML entities, a
+    /// few of them outside the BMP, and `re._parser` reads it one character
+    /// at a time -- 120 ms of a cold page conversion.
+    private static final int[] NO_PAIRS = new int[0];
+
+    private static int[] pairOffsets(String s) {
+        int len = s.length();
+        if (len <= SHORT) {
+            return NO_PAIRS;
+        }
+        Count[] table = len >= LONG ? LONG_COUNTS : COUNTS;
+        Count c = table[slot(s, table.length)];
+        if (c == null || c.s != s) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return NO_PAIRS;
+        }
+        int[] at = c.at;
+        if (at == null) {
+            at = new int[c.n];
+            int k = 0;
+            for (int i = 0; i + 1 < len && k < at.length; i++) {
+                if (pairAt(s, i)) {
+                    at[k++] = i;
+                    i++;
+                }
+            }
+            c.at = at;
+        }
+        return at;
     }
 
     /// Whether a surrogate pair, one code point, starts at offset `i`; a
@@ -134,13 +238,29 @@ public final class PyStr extends PyObject {
         if (surrogates(s) == 0) {
             return off;
         }
-        int cp = 0;
-        for (int i = 0; i < off; i++) {
-            if (i == 0 || !pairAt(s, i - 1)) {
-                cp++;
+        int[] at = pairOffsets(s);
+        if (at.length == 0) {
+            int cp = 0;
+            for (int i = 0; i < off; i++) {
+                if (i == 0 || !pairAt(s, i - 1)) {
+                    cp++;
+                }
+            }
+            return cp;
+        }
+        // Every pair whose low half lies before `off` was one code point
+        // of two chars.
+        int lo = 0;
+        int hi = at.length;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (at[mid] + 1 < off) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
             }
         }
-        return cp;
+        return off - lo;
     }
 
     int cpIndex(int off) {
@@ -187,9 +307,26 @@ public final class PyStr extends PyObject {
     /// quote and no double quote.
     public static String repr(String s) {
         char q = s.indexOf('\'') >= 0 && s.indexOf('"') < 0 ? '"' : '\'';
-        StringBuilder sb = new StringBuilder(s.length() + 2);
-        sb.append(q);
-        for (int i = 0; i < s.length(); i++) {
+        final int len = s.length();
+        int i = plainRun(s, 0, len, q);
+        String qs = q == '"' ? "\"" : "'";
+        if (i == len) {
+            // Nothing to escape, the usual case: one concatenation.
+            return qs + s + qs;
+        }
+        // Plain text is copied a run at a time: each append is a call that
+        // takes the builder's lock.
+        StringBuilder sb = new StringBuilder(len + 8);
+        sb.append(q).append(s, 0, i);
+        for (; i < len; i++) {
+            int run = plainRun(s, i, len, q);
+            if (run > i) {
+                sb.append(s, i, run);
+                i = run;
+                if (i == len) {
+                    break;
+                }
+            }
             char c = s.charAt(i);
             if (c == q || c == '\\') {
                 sb.append('\\').append(c);
@@ -207,6 +344,19 @@ public final class PyStr extends PyObject {
                 // A lone surrogate is not printable.
                 sb.append('\\').append('u');
                 hex(sb, c, 4);
+            } else if (c > 0xff) {
+                int cp = pairAt(s, i) ? Character.codePointAt(s, i) : c;
+                int n = Character.charCount(cp);
+                if (printable(cp)) {
+                    sb.append(s, i, i + n);
+                } else if (cp < 0x10000) {
+                    sb.append('\\').append('u');
+                    hex(sb, cp, 4);
+                } else {
+                    sb.append('\\').append('U');
+                    hex(sb, cp, 8);
+                }
+                i += n - 1;
             } else {
                 sb.append(c);
             }
@@ -215,12 +365,47 @@ public final class PyStr extends PyObject {
         return sb.toString();
     }
 
-    static void hex(StringBuilder sb, int v, int digits) {
-        String h = Integer.toHexString(v);
-        for (int i = h.length(); i < digits; i++) {
-            sb.append('0');
+    /// The end of the run from `i` that repr() copies as it is: printable
+    /// ASCII other than the quote and backslash, and printable Latin-1.
+    private static int plainRun(String s, int i, int len, char q) {
+        while (i < len) {
+            char c = s.charAt(i);
+            if (c >= 0x20 && c < 0x7f ? c == q || c == '\\' : c <= 0xa0 || c > 0xff || c == 0xad) {
+                return i;
+            }
+            i++;
         }
-        sb.append(h);
+        return len;
+    }
+
+    /// str.isprintable() for one code point: the C0 and C1 controls, DEL,
+    /// NBSP and the soft hyphen are not; above Latin-1, separators,
+    /// controls, format characters, private use and unassigned code points
+    /// are escaped by repr().
+    static boolean isPrintable(int cp) {
+        if (cp < 0x20 || cp >= 0x7f && cp <= 0xa0 || cp == 0xad) {
+            return false;
+        }
+        return cp <= 0xff || printable(cp);
+    }
+
+    /// From CPython's own tables (`UnicodeTables.PRINTABLE`): the device's
+    /// java.lang.Character has no categories above Latin-1, so asking it
+    /// escaped every emoji and CJK character in repr() on iOS.
+    private static boolean printable(int cp) {
+        return Unicode.printable(cp);
+    }
+
+    static void hex(StringBuilder sb, int v, int digits) {
+        // Digit by digit: this runs once per byte of every bytes.hex() and hexdigest(),
+        // and a string per byte was the largest source of character arrays in a run.
+        int n = 1;
+        while (n < 8 && v >>> (4 * n) != 0) {
+            n++;
+        }
+        for (int i = Math.max(n, digits) - 1; i >= 0; i--) {
+            sb.append(i >= 8 ? '0' : "0123456789abcdef".charAt(v >>> (4 * i) & 15));
+        }
     }
 
     @Override
@@ -338,7 +523,7 @@ public final class PyStr extends PyObject {
             }
             return sb.toString();
         }
-        long i = Py.index(key);
+        long i = Py.subscript(key);
         if (i < 0) {
             i += n;
         }

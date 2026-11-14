@@ -138,6 +138,93 @@ public final class ClassPathReader implements AutoCloseable {
         return c;
     }
 
+    /// Every string in the constant pools of the classes under `prefix`
+    /// (`com/codename1/python/`) that could be a Python name, or null
+    /// when the class path has no class there. These are the names such
+    /// classes may look up in a module or on an object.
+    public java.util.Set<String> names(String prefix) throws IOException {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        boolean any = false;
+        for (Object r : roots) {
+            if (r instanceof File) {
+                File d = new File((File) r, prefix);
+                if (d.isDirectory()) {
+                    try (java.util.stream.Stream<Path> w = Files.walk(d.toPath())) {
+                        for (Path c : (Iterable<Path>) w::iterator) {
+                            if (c.toString().endsWith(".class")) {
+                                poolNames(Files.readAllBytes(c), out);
+                                any = true;
+                            }
+                        }
+                    }
+                }
+            } else {
+                ZipFile z = (ZipFile) r; // NOPMD CloseResource - a class path root, closed by close()
+                java.util.Enumeration<? extends ZipEntry> en = z.entries();
+                while (en.hasMoreElements()) {
+                    ZipEntry e = en.nextElement();
+                    if (e.getName().startsWith(prefix) && e.getName().endsWith(".class")) {
+                        try (InputStream in = z.getInputStream(e)) {
+                            poolNames(readAll(in), out);
+                            any = true;
+                        }
+                    }
+                }
+            }
+        }
+        return any ? out : null;
+    }
+
+    private static void poolNames(byte[] b, java.util.Set<String> out) throws IOException {
+        DataInputStream in = new DataInputStream(new java.io.ByteArrayInputStream(b));
+        if (in.readInt() != 0xCAFEBABE) {
+            return;
+        }
+        in.readInt();
+        int n = in.readUnsignedShort();
+        for (int i = 1; i < n; i++) {
+            int tag = in.readUnsignedByte();
+            switch (tag) {
+                case 1:
+                    String u = in.readUTF();
+                    if (identifier(u)) {
+                        out.add(u);
+                    }
+                    break;
+                case 7: case 8: case 16: case 19: case 20:
+                    in.readUnsignedShort();
+                    break;
+                case 3: case 4: case 9: case 10: case 11: case 12: case 17: case 18:
+                    in.readInt();
+                    break;
+                case 5: case 6:
+                    in.readLong();
+                    i++;
+                    break;
+                case 15:
+                    in.readUnsignedByte();
+                    in.readUnsignedShort();
+                    break;
+                default:
+                    throw new IOException("unknown constant pool tag " + tag);
+            }
+        }
+    }
+
+    private static boolean identifier(String u) {
+        if (u.isEmpty() || u.length() > 80) {
+            return false;
+        }
+        for (int i = 0; i < u.length(); i++) {
+            char c = u.charAt(i);
+            boolean ok = c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || i > 0 && c >= '0' && c <= '9';
+            if (!ok) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private byte[] bytes(String path) throws IOException {
         byte[] b = fromRoots(path);
         if (b != null) {

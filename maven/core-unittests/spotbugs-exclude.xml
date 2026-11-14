@@ -471,4 +471,22 @@
         <Method name="mainEDTLoop" />
         <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
     </Match>
+
+    <!-- Identity caches of SQL text: Database.isPlainStatement remembers the
+         very string objects it found plain (an equal string is checked again,
+         which is only slower), and SQLStatementCache.take tries identity
+         before equals, which follows it. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.db.Database" />
+                <Method name="isPlainStatement" />
+            </And>
+            <And>
+                <Class name="com.codename1.impl.SQLStatementCache" />
+                <Method name="take" />
+            </And>
+        </Or>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
+    </Match>
 </FindBugsFilter>

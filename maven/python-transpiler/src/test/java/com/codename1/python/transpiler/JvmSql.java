@@ -47,7 +47,12 @@ public final class JvmSql extends PySql {
     @Override
     public PySql.Connection open(String name) throws IOException {
         String url = ":memory:".equals(name) || name.isEmpty() ? "jdbc:sqlite::memory:"
-                : "jdbc:sqlite:" + (new File(name).isAbsolute() ? name : new File(root, name).getPath());
+                : "jdbc:sqlite:" + (new File(name).isAbsolute()
+                        // An absolute path is one of the program's own, which
+                        // JvmFileSystem roots at the parent of the home directory:
+                        // the database has to be where os.mkdir put its directory.
+                        ? new File(new File(root).getParentFile(), name).getPath()
+                        : new File(root, name).getPath());
         try {
             return new Conn(new org.sqlite.JDBC().connect(url, new Properties()));
         } catch (SQLException e) {
@@ -80,8 +85,14 @@ public final class JvmSql extends PySql {
                         st.setString(i + 1, p.toString());
                     }
                 }
+                // A query word may still return nothing (PRAGMA x=on), which
+                // executeQuery refuses; execute() answers whether rows came.
+                if (query && !st.execute()) {
+                    r.changes = st.getUpdateCount();
+                    return r;
+                }
                 if (query) {
-                    try (ResultSet rs = st.executeQuery()) {
+                    try (ResultSet rs = st.getResultSet()) {
                         ResultSetMetaData md = rs.getMetaData();
                         int n = md.getColumnCount();
                         r.columns = new String[n];
@@ -139,6 +150,48 @@ public final class JvmSql extends PySql {
         public void close() throws IOException {
             try {
                 c.close();
+            } catch (SQLException e) {
+                throw new IOException(e.getMessage(), e);
+            }
+        }
+
+        @Override
+        public boolean createFunction(String name, int nargs, com.codename1.db.SqlFunction body) throws IOException {
+            try {
+                org.sqlite.Function.create(c, name, new org.sqlite.Function() {
+                    @Override
+                    protected void xFunc() throws SQLException {
+                        Object[] args = new Object[args()];
+                        for (int i = 0; i < args.length; i++) {
+                            args[i] = value_type(i) == org.sqlite.core.Codes.SQLITE_NULL ? null
+                                    : value_type(i) == org.sqlite.core.Codes.SQLITE_INTEGER ? Long.valueOf(value_long(i))
+                                    : value_type(i) == org.sqlite.core.Codes.SQLITE_FLOAT ? Double.valueOf(value_double(i))
+                                    : value_type(i) == org.sqlite.core.Codes.SQLITE_BLOB ? value_blob(i) : value_text(i);
+                        }
+                        Object v;
+                        try {
+                            v = body.call(args);
+                        } catch (RuntimeException e) {
+                            // SQLite reports a failed function as the statement's error,
+                            // in CPython's words. error() sets that message; a thrown
+                            // SQLException would reach SQLite as its toString().
+                            error("user-defined function raised exception");
+                            return;
+                        }
+                        if (v == null) {
+                            result();
+                        } else if (v instanceof Long) {
+                            result(((Long) v).longValue());
+                        } else if (v instanceof Double) {
+                            result(((Double) v).doubleValue());
+                        } else if (v instanceof byte[]) {
+                            result((byte[]) v);
+                        } else {
+                            result(String.valueOf(v));
+                        }
+                    }
+                }, nargs, 0);
+                return true;
             } catch (SQLException e) {
                 throw new IOException(e.getMessage(), e);
             }

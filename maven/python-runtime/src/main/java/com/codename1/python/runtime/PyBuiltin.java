@@ -56,11 +56,26 @@ public final class PyBuiltin extends PyObject {
 
     public final String name;
     final Impl impl;
+    /// Set on a builtin subclass's own `__bool__` (see BuiltinSubclass):
+    /// the instance's truth is its base value's.
+    boolean baseTruth;
     private One one;
     private Two two;
     private Three three;
+    private Four four;
+    private Five five;
+    private Six six;
+    private Seven seven;
     /// The builtin type a [#method] belongs to; null for a function.
     private final PyType owner;
+    /// `__qualname__` where it is not the name: a method made for a class in Python.
+    private String qual;
+
+    /// Names the class this is a method of, for `__qualname__`.
+    PyBuiltin qual(String qualifiedName) {
+        qual = qualifiedName;
+        return this;
+    }
 
     public PyBuiltin(String name, Impl impl) {
         this(name, impl, null);
@@ -73,6 +88,13 @@ public final class PyBuiltin extends PyObject {
     }
 
     /// A builtin that rejects keyword arguments, as most C functions do.
+    /// Adds a two-argument path to a builtin whose general form takes an array, so
+    /// `f(a, b)` reaches it without packing the arguments.
+    PyBuiltin withTwo(Two f) {
+        two = f;
+        return this;
+    }
+
     public static PyBuiltin positional(final String name, final Positional p) {
         return new PyBuiltin(name, new Impl() {
             @Override
@@ -83,6 +105,41 @@ public final class PyBuiltin extends PyObject {
                 return p.call(args);
             }
         });
+    }
+
+    /// A builtin of exactly `n` arguments, whose fixed-arity call runs
+    /// without an argument array.
+    private static PyBuiltin fixed(final String name, final int n, final Positional p) {
+        return positional(name, a -> {
+            // Too few is an error; extra arguments are ignored, as the array
+            // implementations these replaced ignored them (__exit__).
+            if (a.length < n) {
+                throw Py.typeError(name + " expected " + n + (n == 1 ? " argument" : " arguments") + ", got "
+                        + a.length);
+            }
+            return p.call(a);
+        });
+    }
+
+    /// [#fixed] for one argument.
+    public static PyBuiltin fixed1(final String name, final One f) {
+        PyBuiltin b = fixed(name, 1, a -> f.call(a[0]));
+        b.one = f;
+        return b;
+    }
+
+    /// [#fixed] for two arguments.
+    public static PyBuiltin fixed2(final String name, final Two f) {
+        PyBuiltin b = fixed(name, 2, a -> f.call(a[0], a[1]));
+        b.two = f;
+        return b;
+    }
+
+    /// [#fixed] for three arguments.
+    public static PyBuiltin fixed3(final String name, final Three f) {
+        PyBuiltin b = fixed(name, 3, a -> f.call(a[0], a[1], a[2]));
+        b.three = f;
+        return b;
     }
 
     /// A builtin of exactly one argument: `len`, `ord`, `repr`.
@@ -107,6 +164,50 @@ public final class PyBuiltin extends PyObject {
     /// [#with1] for two arguments.
     public PyBuiltin with2(Two f) {
         two = f;
+        return this;
+    }
+
+    /// [One] for four arguments.
+    public interface Four {
+        Object call(Object a, Object b, Object c, Object d);
+    }
+
+    /// [#with1] for four arguments.
+    public PyBuiltin with4(Four f) {
+        four = f;
+        return this;
+    }
+
+    /// [One] for five arguments.
+    public interface Five {
+        Object call(Object a, Object b, Object c, Object d, Object e);
+    }
+
+    /// [#with1] for five arguments.
+    public PyBuiltin with5(Five f) {
+        five = f;
+        return this;
+    }
+
+    /// [One] for six arguments.
+    public interface Six {
+        Object call(Object a, Object b, Object c, Object d, Object e, Object f);
+    }
+
+    /// [One] for seven arguments.
+    public interface Seven {
+        Object call(Object a, Object b, Object c, Object d, Object e, Object f, Object g);
+    }
+
+    /// [#with1] for six arguments; not for methods of a builtin type.
+    public PyBuiltin with6(Six f) {
+        six = f;
+        return this;
+    }
+
+    /// [#with1] for seven arguments; not for methods of a builtin type.
+    public PyBuiltin with7(Seven f) {
+        seven = f;
         return this;
     }
 
@@ -152,6 +253,46 @@ public final class PyBuiltin extends PyObject {
         return result(a, s, three.call(s, b, c));
     }
 
+    @Override
+    public Object call4(Object a, Object b, Object c, Object d) {
+        if (four == null) {
+            return super.call4(a, b, c, d);
+        }
+        if (owner == null) {
+            return four.call(a, b, c, d);
+        }
+        Object s = receiver(a);
+        return result(a, s, four.call(s, b, c, d));
+    }
+
+    @Override
+    public Object call5(Object a, Object b, Object c, Object d, Object e) {
+        if (five == null) {
+            return super.call5(a, b, c, d, e);
+        }
+        if (owner == null) {
+            return five.call(a, b, c, d, e);
+        }
+        Object s = receiver(a);
+        return result(a, s, five.call(s, b, c, d, e));
+    }
+
+    @Override
+    public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
+        if (six == null || owner != null) {
+            return super.call6(a, b, c, d, e, f);
+        }
+        return six.call(a, b, c, d, e, f);
+    }
+
+    @Override
+    public Object call7(Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        if (seven == null || owner != null) {
+            return super.call7(a, b, c, d, e, f, g);
+        }
+        return seven.call(a, b, c, d, e, f, g);
+    }
+
     /// [#checkReceiver] and [#unwrap] for the receiver of a fixed-arity
     /// method call: the value the implementation works on.
     private Object receiver(Object self) {
@@ -193,6 +334,33 @@ public final class PyBuiltin extends PyObject {
         return b;
     }
 
+    /// A method of builtin type `owner` taking the receiver and `n - 1`
+    /// arguments, whose fixed-arity call runs without an argument array.
+    private static PyBuiltin methodN(final PyType owner, final String name, final int n, final Positional p) {
+        return method(owner, name, a -> {
+            if (a.length < n) {
+                throw Py.typeError(name + "() takes " + (n == 1 ? "no arguments" : "exactly " + (n - 1)
+                        + (n == 2 ? " argument" : " arguments")) + " (" + (a.length - 1) + " given)");
+            }
+            return p.call(a);
+        });
+    }
+
+    /// [#methodN] for the receiver alone.
+    public static PyBuiltin method1(final PyType owner, final String name, final One f) {
+        return methodN(owner, name, 1, a -> f.call(a[0])).with1(f);
+    }
+
+    /// [#methodN] for the receiver and one argument.
+    public static PyBuiltin method2(final PyType owner, final String name, final Two f) {
+        return methodN(owner, name, 2, a -> f.call(a[0], a[1])).with2(f);
+    }
+
+    /// [#methodN] for the receiver and two arguments.
+    public static PyBuiltin method3(final PyType owner, final String name, final Three f) {
+        return methodN(owner, name, 3, a -> f.call(a[0], a[1], a[2])).with3(f);
+    }
+
     /// [#method] for an implementation that takes keyword arguments.
     public static PyBuiltin methodKw(final PyType owner, final String name, final Impl p) {
         PyBuiltin b = new PyBuiltin(name, new Impl() {
@@ -207,6 +375,30 @@ public final class PyBuiltin extends PyObject {
         return b;
     }
 
+    /// [#methodKw] for an implementation that unwraps its receiver itself
+    /// with [#base]: no copy of the arguments per call.
+    static PyBuiltin methodKwSelf(final PyType owner, final String name, final Impl p) {
+        return new PyBuiltin(name, new Impl() {
+            @Override
+            public Object call(Object[] args, String[] kwNames) {
+                checkReceiver(owner, name, args);
+                return p.call(args, kwNames);
+            }
+        }, owner);
+    }
+
+    /// The builtin value an instance of a subclass of builtin `owner`
+    /// extends, or `self` itself.
+    static Object base(PyType owner, Object self) {
+        if (owner != Py.OBJECT_TYPE && self instanceof PyInstance) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object b = ((PyInstance) self).base;
+            if (b != null) {
+                return b;
+            }
+        }
+        return self;
+    }
+
     /// The arguments with an instance of a subclass of builtin `owner`
     /// replaced by the builtin value it extends, which is what the
     /// implementation works on. A method returning that value (a chained
@@ -216,8 +408,7 @@ public final class PyBuiltin extends PyObject {
         if (owner != Py.OBJECT_TYPE && self instanceof PyInstance) { //NOPMD CompareObjectsWithEquals - identity is meant
             Object b = ((PyInstance) self).base;
             if (b != null) {
-                Object[] a = new Object[args.length];
-                System.arraycopy(args, 0, a, 0, args.length);
+                Object[] a = args.clone();
                 a[0] = b;
                 return a;
             }
@@ -252,6 +443,9 @@ public final class PyBuiltin extends PyObject {
 
     @Override
     public Object getAttrOrNull(String attr) {
+        if ("__qualname__".equals(attr) && qual != null) {
+            return qual;
+        }
         if ("__name__".equals(attr) || "__qualname__".equals(attr)) {
             return name;
         }

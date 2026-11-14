@@ -9,6 +9,8 @@ Native mode ('@', the default) follows a 64-bit little-endian device:
 
 import math as _math
 
+import _cn1struct
+
 __all__ = ["calcsize", "pack", "pack_into", "unpack", "unpack_from", "iter_unpack", "Struct", "error"]
 
 
@@ -215,8 +217,16 @@ class Struct:
     def __init__(self, format):
         self._items, self.size, self._little = _parse(format)
         self.format = format.decode("ascii") if isinstance(format, bytes) else format
+        # The items again for the Java loops, which do what CPython does in C
+        # and answer None whenever the Python code below has to run instead.
+        self._plan = _cn1struct.plan("".join(c for c, _, _ in self._items),
+                                     tuple(o for _, o, _ in self._items),
+                                     tuple(s for _, _, s in self._items), self._little)
 
     def pack(self, *args):
+        r = _cn1struct.pack(self._plan, self.size, args)
+        if r is not None:
+            return r
         return _pack_items(self._items, self.size, self._little, args)
 
     def pack_into(self, buffer, offset, *args):
@@ -231,6 +241,9 @@ class Struct:
     def unpack(self, buffer):
         if len(buffer) != self.size:
             raise error("unpack requires a buffer of %d bytes" % self.size)
+        r = _cn1struct.unpack(self._plan, buffer, 0)
+        if r is not None:
+            return r
         return _unpack_items(self._items, self._little, buffer, 0)
 
     def unpack_from(self, buffer, offset=0):
@@ -239,6 +252,9 @@ class Struct:
         if len(buffer) - offset < self.size:
             raise error("unpack_from requires a buffer of at least %d bytes for unpacking %d bytes at offset %d "
                         "(actual buffer size is %d)" % (self.size + offset, self.size, offset, len(buffer)))
+        r = _cn1struct.unpack(self._plan, buffer, offset)
+        if r is not None:
+            return r
         return _unpack_items(self._items, self._little, buffer, offset)
 
     def iter_unpack(self, buffer):

@@ -4,6 +4,7 @@
 """Parse URLs into components, and quote and unquote their parts."""
 
 from collections import namedtuple
+import _cn1url
 
 __all__ = ["urlparse", "urlunparse", "urljoin", "urldefrag", "urlsplit", "urlunsplit", "urlencode",
            "parse_qs", "parse_qsl", "quote", "quote_plus", "quote_from_bytes", "unquote", "unquote_plus",
@@ -469,6 +470,10 @@ _safe_cache = {}
 
 
 def quote(string, safe="/", encoding=None, errors=None):
+    if encoding is None and errors is None and type(string) is str:
+        r = _cn1url.quote(string, safe)
+        if r is not None:
+            return r
     if isinstance(string, str):
         if not string:
             return string
@@ -501,6 +506,9 @@ def quote_from_bytes(bs, safe="/"):
         raise TypeError("quote_from_bytes() expected bytes")
     if not bs:
         return ""
+    r = _cn1url.quote(bs, safe)
+    if r is not None:
+        return r
     if isinstance(safe, str):
         safe = safe.encode("ascii", "ignore")
     else:

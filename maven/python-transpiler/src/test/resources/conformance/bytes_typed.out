@@ -1,0 +1,8 @@
+True 24 33
+104 32 169 32
+b'h\xc3\xa9ll' hÃ©ll 5
+98 b'bc' xyz
+b'h?llo ? ' ��
+ababab  ab
+IndexError index out of range
+UnicodeDecodeError 0

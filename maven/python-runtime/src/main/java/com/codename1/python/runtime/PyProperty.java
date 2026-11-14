@@ -52,21 +52,21 @@ public final class PyProperty extends PyObject {
         if (fget == null || fget == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
             throw Py.attributeError("property has no getter");
         }
-        return Py.obj(fget).call(new Object[] {self}, Py.NO_KW);
+        return Py.obj(fget).call1(self);
     }
 
     void delete(Object self) {
         if (fdel == null || fdel == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
             throw Py.attributeError("property has no deleter");
         }
-        Py.obj(fdel).call(new Object[] {self}, Py.NO_KW);
+        Py.obj(fdel).call1(self);
     }
 
     void set(Object self, Object value) {
         if (fset == null || fset == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
             throw Py.attributeError("property has no setter");
         }
-        Py.obj(fset).call(new Object[] {self, value}, Py.NO_KW);
+        Py.obj(fset).call2(self, value);
     }
 
     @Override

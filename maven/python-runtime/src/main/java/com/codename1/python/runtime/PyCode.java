@@ -68,7 +68,7 @@ final class PyCode extends PyObject {
             case "co_argcount":
                 return Py.of((long) f.positional);
             case "co_posonlyargcount":
-                return Py.of(0L);
+                return Py.of((long) f.positionalOnly);
             case "co_kwonlyargcount":
                 return Py.of((long) f.kwOnly);
             case "co_varnames":

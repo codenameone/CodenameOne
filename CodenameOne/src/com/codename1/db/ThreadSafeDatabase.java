@@ -320,6 +320,43 @@ public class ThreadSafeDatabase extends Database {
         });
     }
 
+    @Override
+    public long changes() throws IOException {
+        return ((Long) invokeWithException(new RunnableWithResponseOrIOException() {
+            @Override
+            public Object run() throws IOException {
+                return Long.valueOf(underlying.changes());
+            }
+        })).longValue();
+    }
+
+    @Override
+    public long lastInsertRowId() throws IOException {
+        return ((Long) invokeWithException(new RunnableWithResponseOrIOException() {
+            @Override
+            public Object run() throws IOException {
+                return Long.valueOf(underlying.lastInsertRowId());
+            }
+        })).longValue();
+    }
+
+    @Override
+    public boolean supportsFunctions() {
+        return underlying.supportsFunctions();
+    }
+
+    @Override
+    public void createFunction(final String name, final int argCount, final SqlFunction function)
+            throws IOException {
+        // The function then runs on the worker too, the thread that steps every statement.
+        invokeWithException(new RunnableWithIOException() {
+            @Override
+            public void run() throws IOException {
+                underlying.createFunction(name, argCount, function);
+            }
+        });
+    }
+
     /// Closes the database on the worker, and shuts the worker down.
     ///
     /// Idempotent, and synchronous: it returns with the database closed, so a `delete()` on the

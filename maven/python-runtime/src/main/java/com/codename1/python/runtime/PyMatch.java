@@ -48,7 +48,7 @@ public final class PyMatch {
 
     private static Object[] parts(Object pattern) {
         if (pattern instanceof PyTuple) {
-            return ((PyTuple) pattern).items;
+            return ((PyTuple) pattern).arr();
         }
         throw Py.runtimeError("internal error: bad pattern");
     }

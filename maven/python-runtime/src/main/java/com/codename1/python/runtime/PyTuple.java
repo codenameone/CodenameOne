@@ -24,18 +24,27 @@
 package com.codename1.python.runtime;
 
 /// Python's `tuple`.
-public final class PyTuple extends PyObject {
+public class PyTuple extends PyObject {
     public static final PyTuple EMPTY = new PyTuple(new Object[0]);
 
-    final Object[] items;
+    /// The items; null in a fixed-size tuple ([T2] to [T6]) until [#arr]
+    /// is first asked for them.
+    Object[] elems;
 
     /// Wraps `items` without copying; the caller must not keep mutating it.
     public PyTuple(Object[] items) {
-        this.items = items;
+        this.elems = items;
     }
 
     public static PyTuple of(Object... items) {
         return items.length == 0 ? EMPTY : new PyTuple(items);
+    }
+
+    /// The items as an array, which the caller must not change. A
+    /// fixed-size tuple makes it on the first call; hot paths read
+    /// [#get] and [#size] instead.
+    Object[] arr() {
+        return elems;
     }
 
     @Override
@@ -44,34 +53,35 @@ public final class PyTuple extends PyObject {
     }
 
     public Object get(int i) {
-        return items[i];
+        return elems[i];
     }
 
     public int size() {
-        return items.length;
+        return elems.length;
     }
 
     @Override
     public int len() {
-        return items.length;
+        return size();
     }
 
     @Override
     public boolean isTrue() {
-        return items.length != 0;
+        return size() != 0;
     }
 
     @Override
     public String repr() {
-        if (items.length == 1) {
-            return "(" + Py.toRepr(items[0]) + ",)";
+        if (size() == 1) {
+            return "(" + Py.toRepr(get(0)) + ",)";
         }
-        return Py.joinRepr("(", items, items.length, ")");
+        Object[] a = arr();
+        return Py.joinRepr("(", a, a.length, ")");
     }
 
     @Override
     public long hash() {
-        return Hashing.ofTuple(items);
+        return Hashing.ofTuple(arr());
     }
 
     @Override
@@ -79,8 +89,19 @@ public final class PyTuple extends PyObject {
         if (!(o instanceof PyTuple)) {
             return null;
         }
-        Object[] b = ((PyTuple) o).items;
-        return Py.bool(Py.seqEquals(items, items.length, b, b.length));
+        PyTuple t = (PyTuple) o;
+        int n = size();
+        if (t.size() != n) {
+            return Py.FALSE;
+        }
+        for (int i = 0; i < n; i++) {
+            Object x = get(i);
+            Object y = t.get(i);
+            if (x != y && !Py.eqBool(x, y)) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return Py.FALSE;
+            }
+        }
+        return Py.TRUE;
     }
 
     @Override
@@ -104,8 +125,9 @@ public final class PyTuple extends PyObject {
     }
 
     private int cmp(Object o) {
-        Object[] b = ((PyTuple) o).items;
-        return Py.seqCompare(items, items.length, b, b.length);
+        Object[] a = arr();
+        Object[] b = ((PyTuple) o).arr();
+        return Py.seqCompare(a, a.length, b, b.length);
     }
 
     @Override
@@ -113,10 +135,11 @@ public final class PyTuple extends PyObject {
         if (!(o instanceof PyTuple)) {
             return null;
         }
-        Object[] b = ((PyTuple) o).items;
-        Object[] r = new Object[items.length + b.length];
-        System.arraycopy(items, 0, r, 0, items.length);
-        System.arraycopy(b, 0, r, items.length, b.length);
+        Object[] a = arr();
+        Object[] b = ((PyTuple) o).arr();
+        Object[] r = new Object[a.length + b.length];
+        System.arraycopy(a, 0, r, 0, a.length);
+        System.arraycopy(b, 0, r, a.length, b.length);
         return new PyTuple(r);
     }
 
@@ -125,10 +148,11 @@ public final class PyTuple extends PyObject {
         if (!(Py.isInt(o))) {
             return null;
         }
+        Object[] a = arr();
         long n = Math.max(0, Py.asLong(o));
-        Object[] r = new Object[(int) (items.length * n)];
+        Object[] r = new Object[(int) (a.length * n)];
         for (int i = 0; i < n; i++) {
-            System.arraycopy(items, 0, r, i * items.length, items.length);
+            System.arraycopy(a, 0, r, i * a.length, a.length);
         }
         return new PyTuple(r);
     }
@@ -140,32 +164,288 @@ public final class PyTuple extends PyObject {
 
     @Override
     public Object getItem(Object key) {
+        int n = size();
         if (key instanceof PySlice) {
-            int[] r = ((PySlice) key).indices(items.length);
-            int n = PySlice.length(r);
-            Object[] out = new Object[n];
-            for (int i = 0, j = r[0]; i < n; i++, j += r[2]) {
-                out[i] = items[j];
+            Object[] a = arr();
+            int[] r = ((PySlice) key).indices(n);
+            int m = PySlice.length(r);
+            Object[] out = new Object[m];
+            if (r[2] == 1) {
+                // A plain slice is one block copy, not a checked store per element.
+                System.arraycopy(a, r[0], out, 0, m);
+                return new PyTuple(out);
+            }
+            for (int i = 0, j = r[0]; i < m; i++, j += r[2]) {
+                out[i] = a[j];
             }
             return new PyTuple(out);
         }
-        long i = Py.index(key);
+        long i = Py.subscript(key);
         if (i < 0) {
-            i += items.length;
+            i += n;
         }
-        if (i < 0 || i >= items.length) {
+        if (i < 0 || i >= n) {
             throw Py.indexError("tuple index out of range");
         }
-        return items[(int) i];
+        return get((int) i);
+    }
+
+    /// By index, identity first as CPython's tuple compares: the inherited
+    /// loop made an iterator and a `next` call per item for every `x in t`.
+    @Override
+    public boolean contains(Object x) {
+        int n = size();
+        for (int i = 0; i < n; i++) {
+            Object v = get(i);
+            if (v == x || Py.eqBool(v, x)) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public Object iter() {
-        return new PyIter(items.length) {
+        return new PyIter(size()) {
             @Override
             Object at(int i) {
-                return items[i];
+                return get(i);
             }
         };
+    }
+
+    /// A tuple of 2 held in fields: one object where a wrapped array is two.
+    static final class T2 extends PyTuple {
+        private final Object a;
+        private final Object b;
+
+        T2(Object a, Object b) {
+            super(null);
+            this.a = a;
+            this.b = b;
+        }
+
+        @Override
+        public Object get(int i) {
+            switch (i) {
+                case 0:
+                    return a;
+                case 1:
+                    return b;
+                default:
+                    throw new ArrayIndexOutOfBoundsException(i);
+            }
+        }
+
+        @Override
+        public int size() {
+            return 2;
+        }
+
+        @Override
+        Object[] arr() {
+            Object[] r = elems;
+            if (r == null) {
+                r = new Object[] {a, b};
+                elems = r;
+            }
+            return r;
+        }
+    }
+
+    /// A tuple of 3 held in fields: one object where a wrapped array is two.
+    static final class T3 extends PyTuple {
+        private final Object a;
+        private final Object b;
+        private final Object c;
+
+        T3(Object a, Object b, Object c) {
+            super(null);
+            this.a = a;
+            this.b = b;
+            this.c = c;
+        }
+
+        @Override
+        public Object get(int i) {
+            switch (i) {
+                case 0:
+                    return a;
+                case 1:
+                    return b;
+                case 2:
+                    return c;
+                default:
+                    throw new ArrayIndexOutOfBoundsException(i);
+            }
+        }
+
+        @Override
+        public int size() {
+            return 3;
+        }
+
+        @Override
+        Object[] arr() {
+            Object[] r = elems;
+            if (r == null) {
+                r = new Object[] {a, b, c};
+                elems = r;
+            }
+            return r;
+        }
+    }
+
+    /// A tuple of 4 held in fields: one object where a wrapped array is two.
+    static final class T4 extends PyTuple {
+        private final Object a;
+        private final Object b;
+        private final Object c;
+        private final Object d;
+
+        T4(Object a, Object b, Object c, Object d) {
+            super(null);
+            this.a = a;
+            this.b = b;
+            this.c = c;
+            this.d = d;
+        }
+
+        @Override
+        public Object get(int i) {
+            switch (i) {
+                case 0:
+                    return a;
+                case 1:
+                    return b;
+                case 2:
+                    return c;
+                case 3:
+                    return d;
+                default:
+                    throw new ArrayIndexOutOfBoundsException(i);
+            }
+        }
+
+        @Override
+        public int size() {
+            return 4;
+        }
+
+        @Override
+        Object[] arr() {
+            Object[] r = elems;
+            if (r == null) {
+                r = new Object[] {a, b, c, d};
+                elems = r;
+            }
+            return r;
+        }
+    }
+
+    /// A tuple of 5 held in fields: one object where a wrapped array is two.
+    static final class T5 extends PyTuple {
+        private final Object a;
+        private final Object b;
+        private final Object c;
+        private final Object d;
+        private final Object e;
+
+        T5(Object a, Object b, Object c, Object d, Object e) {
+            super(null);
+            this.a = a;
+            this.b = b;
+            this.c = c;
+            this.d = d;
+            this.e = e;
+        }
+
+        @Override
+        public Object get(int i) {
+            switch (i) {
+                case 0:
+                    return a;
+                case 1:
+                    return b;
+                case 2:
+                    return c;
+                case 3:
+                    return d;
+                case 4:
+                    return e;
+                default:
+                    throw new ArrayIndexOutOfBoundsException(i);
+            }
+        }
+
+        @Override
+        public int size() {
+            return 5;
+        }
+
+        @Override
+        Object[] arr() {
+            Object[] r = elems;
+            if (r == null) {
+                r = new Object[] {a, b, c, d, e};
+                elems = r;
+            }
+            return r;
+        }
+    }
+
+    /// A tuple of 6 held in fields: one object where a wrapped array is two.
+    static final class T6 extends PyTuple {
+        private final Object a;
+        private final Object b;
+        private final Object c;
+        private final Object d;
+        private final Object e;
+        private final Object f;
+
+        T6(Object a, Object b, Object c, Object d, Object e, Object f) {
+            super(null);
+            this.a = a;
+            this.b = b;
+            this.c = c;
+            this.d = d;
+            this.e = e;
+            this.f = f;
+        }
+
+        @Override
+        public Object get(int i) {
+            switch (i) {
+                case 0:
+                    return a;
+                case 1:
+                    return b;
+                case 2:
+                    return c;
+                case 3:
+                    return d;
+                case 4:
+                    return e;
+                case 5:
+                    return f;
+                default:
+                    throw new ArrayIndexOutOfBoundsException(i);
+            }
+        }
+
+        @Override
+        public int size() {
+            return 6;
+        }
+
+        @Override
+        Object[] arr() {
+            Object[] r = elems;
+            if (r == null) {
+                r = new Object[] {a, b, c, d, e, f};
+                elems = r;
+            }
+            return r;
+        }
     }
 }

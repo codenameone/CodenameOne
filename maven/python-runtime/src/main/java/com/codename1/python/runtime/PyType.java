@@ -50,6 +50,11 @@ public final class PyType extends PyObject {
         Object create(Object x);
     }
 
+    /// [Unary] for two positional arguments: `int(s, 16)`, `str(b, "utf-8")`.
+    interface Binary {
+        Object create(Object x, Object y);
+    }
+
     public String name;
     public final PyType[] bases;
     final PyType[] mro;
@@ -73,12 +78,29 @@ public final class PyType extends PyObject {
             return Py.OBJECT_TYPE;
         }
     };
+    private boolean plainException;
+    private int plainExceptionVersion = -1;
+
+    /// Whether constructing this exception type from a message only makes an
+    /// instance and sets `args`: BaseException's `__new__` and `__init__`
+    /// both apply. `Py.error` builds those without the call protocol.
+    boolean plainException() {
+        if (plainExceptionVersion != version) {
+            plainException = factory == null && isSubtype(Py.BASE_EXCEPTION)
+                    && lookup("__new__") == Builtins.BASE_EXCEPTION_NEW //NOPMD CompareObjectsWithEquals - identity is meant
+                    && lookup("__init__") == Builtins.BASE_EXCEPTION_INIT; //NOPMD CompareObjectsWithEquals - identity is meant
+            plainExceptionVersion = version;
+        }
+        return plainException;
+    }
+
     private Map<String, Object> lookupCache;
     private int lookupVersion = -1;
     Factory factory;
     /// Set only on the builtin type itself, never inherited: a subclass of
     /// `str` constructs through `__new__`/`__init__` as usual.
     Unary unary;
+    Binary binary;
     /// The builtin type whose storage instances of this class extend, or `null`.
     final PyType solidBase;
     /// The class's metaclass: `type`, or a subclass of it (null while `type`
@@ -87,6 +109,16 @@ public final class PyType extends PyObject {
 
     /// The direct subclasses, for `type.__subclasses__()`; null until one exists.
     private List<PyType> subclasses;
+
+    /// A number of its own, for the hashed caches of the store sites
+    /// ([StoreSite]). Python code runs on one thread at a time.
+    final int id = nextTypeId();
+
+    private static int typeIds;
+
+    private static int nextTypeId() {
+        return ++typeIds;
+    }
 
     PyType(String name, PyType[] bases, Factory factory) {
         this.name = name;
@@ -117,6 +149,10 @@ public final class PyType extends PyObject {
     }
 
     private Layout layout;
+    /// The compiled class whose layout a class built at run time borrows
+    /// (see [#borrowLayout]), or null.
+    private PyType layoutFrom;
+    private boolean layoutDecided;
     private String[] compiledMethods;
     private String[] layoutFields;
     /// Set once a method the generated code calls directly may no longer be
@@ -142,22 +178,114 @@ public final class PyType extends PyObject {
 
     /// The compiled class this one's layout extends, or null.
     private PyType layoutParent() {
+        if (layoutFrom != null) {
+            return layoutFrom;
+        }
         return bases.length == 1 && bases[0].layout != null ? bases[0] : null;
     }
 
     /// Whether the class has a compiled layout.
     public boolean hasLayout() {
-        return layout != null;
+        return layout != null && layoutFrom == null;
     }
 
     /// A new, uninitialised instance.
     public PyInstance newInstance() {
+        if (!layoutDecided && layout == null) {
+            borrowLayout();
+        }
         PyInstance o = layout != null ? layout.create(this) : new PyInstance(this);
         if (solidBase != null && BuiltinSubclass.mutable(solidBase)) {
             // Filled by the builtin's __init__ (or the subclass's, through super()).
             o.base = solidBase.factory.create(solidBase, Py.NO_ARGS, Py.NO_KW);
         }
         return o;
+    }
+
+    /// Lets a class built at run time -- a subclass in another module of a
+    /// class the transpiler compiled -- make its instances with that class's
+    /// layout, so the compiled methods it inherits read their fields as
+    /// fields. Without it every one of pdfminer's parsers, all subclasses of
+    /// `psparser.PSBaseParser` defined in other modules, ran the compiled
+    /// tokenizer on a plain instance, every field through a megamorphic
+    /// site. Decided at the first instance, when the class namespace is
+    /// complete, and only when nothing in the MRO outside the compiled
+    /// chain can change what a field read or store means: no attribute
+    /// hooks or `__slots__`, and nothing but a function or a constant bound
+    /// to a field's name. A compiled method overridden below the compiled
+    /// class marks it `patched`, which sends every direct call the generic
+    /// way; later changes go through [#changed] as for a compiled class.
+    private void borrowLayout() {
+        layoutDecided = true;
+        if (solidBase != null || meta != Py.TYPE_TYPE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return;
+        }
+        PyType a = null;
+        for (int i = 1; i < mro.length && a == null; i++) {
+            if (mro[i].layout != null && mro[i].layoutFrom == null) {
+                a = mro[i];
+            }
+        }
+        if (a == null) {
+            return;
+        }
+        boolean overrides = false;
+        boolean beforeA = true;
+        for (PyType m : mro) {
+            if (m == a) { //NOPMD CompareObjectsWithEquals - identity is meant
+                beforeA = false;
+            }
+            if (m == Py.OBJECT_TYPE || m.layout != null && m.layoutFrom == null && a.isSubtype(m)) { //NOPMD CompareObjectsWithEquals - identity is meant
+                continue;
+            }
+            for (Map.Entry<String, Object> e : m.dict.entrySet()) {
+                String k = e.getKey();
+                if ("__setattr__".equals(k) || "__getattribute__".equals(k) || "__delattr__".equals(k)
+                        || "__slots__".equals(k) && !emptySlots(e.getValue())) {
+                    return;
+                }
+                if (fieldOf(a, k) && !plainClassValue(e.getValue())) {
+                    return;
+                }
+                if (beforeA && methodOf(a, k)) {
+                    overrides = true;
+                }
+            }
+        }
+        layout = a.layout;
+        layoutFrom = a;
+        patched = overrides;
+        LAYOUTS.add(this);
+    }
+
+    /// `__slots__ = ()`, as `typing.Generic` declares: no slot descriptor.
+    private static boolean emptySlots(Object v) {
+        return v instanceof PyTuple && ((PyTuple) v).size() == 0;
+    }
+
+    private static boolean fieldOf(PyType a, String name) {
+        for (PyType u = a; u != null; u = u.layoutParent()) {
+            if (contains(u.layoutFields, name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean methodOf(PyType a, String name) {
+        for (PyType u = a; u != null; u = u.layoutParent()) {
+            if (contains(u.compiledMethods, name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// A class attribute that is not a descriptor: an instance attribute of
+    /// the same name, which a field holds, takes precedence over it.
+    private static boolean plainClassValue(Object v) {
+        return v == null || v == Py.NONE || v instanceof PyFunction || v instanceof String || v instanceof Long //NOPMD CompareObjectsWithEquals - identity is meant
+                || v instanceof Double || v instanceof Boolean || v instanceof PyTuple || v instanceof PyStr;
     }
 
     /// Invalidates direct calls to `attr` and refuses what a compiled field
@@ -251,11 +379,11 @@ public final class PyType extends PyObject {
                     out.add(bases[j]);
                 }
             }
-            Object entries = Py.obj(hook).call(new Object[] {PyTuple.of(bases)}, Py.NO_KW);
+            Object entries = Py.obj(hook).call1(PyTuple.of(bases));
             if (!(entries instanceof PyTuple)) {
                 throw Py.typeError("__mro_entries__ must return a tuple");
             }
-            Object[] items = ((PyTuple) entries).items;
+            Object[] items = ((PyTuple) entries).arr();
             for (Object item : items) {
                 if (!out.contains(item)) {
                     out.add(item);
@@ -341,14 +469,14 @@ public final class PyType extends PyObject {
             return true;
         }
         Object m = metaDunder("__instancecheck__");
-        return m != null && Py.isTrue(Py.obj(m).call(new Object[] {this, o}, Py.NO_KW));
+        return m != null && Py.isTrue(Py.obj(m).call2(this, o));
     }
 
     /// `issubclass(c, this)`, through the metaclass's `__subclasscheck__`.
     boolean subclassCheck(PyType c) {
         Object m = metaDunder("__subclasscheck__");
         if (m != null) {
-            return Py.isTrue(Py.obj(m).call(new Object[] {this, c}, Py.NO_KW));
+            return Py.isTrue(Py.obj(m).call2(this, c));
         }
         return c.isSubtype(this);
     }
@@ -550,7 +678,7 @@ public final class PyType extends PyObject {
             if (v instanceof PyInstance) {
                 Object sn = ((PyInstance) v).cls.lookup("__set_name__");
                 if (sn != null) {
-                    Py.obj(sn).call(new Object[] {v, this, e.getKey()}, Py.NO_KW);
+                    Py.obj(sn).call3(v, this, e.getKey());
                 }
             }
         }
@@ -573,12 +701,12 @@ public final class PyType extends PyObject {
     public Object getItem(Object key) {
         Object m = metaDunder("__getitem__");
         if (m != null) {
-            return Py.obj(m).call(new Object[] {this, key}, Py.NO_KW);
+            return Py.obj(m).call2(this, key);
         }
         Object cg = lookup("__class_getitem__");
         if (cg != null) {
             Object f = cg instanceof PyClassMethod ? ((PyClassMethod) cg).func : cg;
-            return Py.obj(f).call(new Object[] {this, key}, Py.NO_KW);
+            return Py.obj(f).call2(this, key);
         }
         if (factory != null) {
             return new PyGenericAlias(this, key);
@@ -590,7 +718,7 @@ public final class PyType extends PyObject {
     public Object iter() {
         Object m = metaDunder("__iter__");
         if (m != null) {
-            return Py.obj(m).call(new Object[] {this}, Py.NO_KW);
+            return Py.obj(m).call1(this);
         }
         return super.iter();
     }
@@ -599,7 +727,7 @@ public final class PyType extends PyObject {
     public int len() {
         Object m = metaDunder("__len__");
         if (m != null) {
-            return (int) Py.asLong(Py.obj(m).call(new Object[] {this}, Py.NO_KW));
+            return (int) Py.asLong(Py.obj(m).call1(this));
         }
         return super.len();
     }
@@ -608,7 +736,7 @@ public final class PyType extends PyObject {
     public boolean contains(Object x) {
         Object m = metaDunder("__contains__");
         if (m != null) {
-            return Py.isTrue(Py.obj(m).call(new Object[] {this, x}, Py.NO_KW));
+            return Py.isTrue(Py.obj(m).call2(this, x));
         }
         return super.contains(x);
     }
@@ -617,7 +745,7 @@ public final class PyType extends PyObject {
     public boolean isTrue() {
         Object m = metaDunder("__bool__");
         if (m != null) {
-            return Py.isTrue(Py.obj(m).call(new Object[] {this}, Py.NO_KW));
+            return Py.isTrue(Py.obj(m).call1(this));
         }
         m = metaDunder("__len__");
         return m == null || len() != 0;
@@ -627,7 +755,7 @@ public final class PyType extends PyObject {
     public String str() {
         Object m = metaDunder("__str__");
         if (m != null) {
-            return Py.strValue(Py.obj(m).call(new Object[] {this}, Py.NO_KW), "__str__");
+            return Py.strValue(Py.obj(m).call1(this), "__str__");
         }
         return repr();
     }
@@ -667,6 +795,28 @@ public final class PyType extends PyObject {
             customGetattributeVersion = version;
         }
         return customGetattribute;
+    }
+
+    /// Whether `__getitem__` is the builtin one (a dict subclass that does
+    /// not override it), and the class's `__missing__` (null for none), kept
+    /// against [#version] as [#hasCustomGetattribute()] is: a subscript of a
+    /// `defaultdict` asked both of the whole MRO on every read.
+    private boolean builtinGetitem;
+    private Object missing;
+    private int getitemVersion = -1;
+
+    boolean hasBuiltinGetitem() {
+        if (getitemVersion != version) {
+            builtinGetitem = lookup("__getitem__") instanceof PyBuiltin;
+            missing = lookup("__missing__");
+            getitemVersion = version;
+        }
+        return builtinGetitem;
+    }
+
+    /// `__missing__`, valid after [#hasBuiltinGetitem()] answered.
+    Object missingMethod() {
+        return missing;
     }
 
     /// `issubclass(self, other)`.
@@ -748,7 +898,7 @@ public final class PyType extends PyObject {
         if (v instanceof PyInstance) {
             Object get = ((PyInstance) v).cls.lookup("__get__");
             if (get != null) {
-                return Py.obj(get).call(new Object[] {v, Py.NONE, this}, Py.NO_KW);
+                return Py.obj(get).call3(v, Py.NONE, this);
             }
         }
         return v;
@@ -760,7 +910,7 @@ public final class PyType extends PyObject {
         Object m = meta.lookup(attr);
         if (m == null) {
             Object ga = metaDunder("__getattr__");
-            return ga == null ? null : Py.obj(ga).call(new Object[] {this, attr}, Py.NO_KW);
+            return ga == null ? null : Py.obj(ga).call2(this, attr);
         }
         if (m instanceof PyProperty) {
             return ((PyProperty) m).get(this);
@@ -778,7 +928,7 @@ public final class PyType extends PyObject {
     public void setAttr(String attr, Object value) {
         Object sa = metaDunder("__setattr__");
         if (sa != null) {
-            Py.obj(sa).call(new Object[] {this, attr, value}, Py.NO_KW);
+            Py.obj(sa).call3(this, attr, value);
             return;
         }
         setAttrDirect(attr, value);
@@ -804,7 +954,7 @@ public final class PyType extends PyObject {
     public void delAttr(String attr) {
         Object da = metaDunder("__delattr__");
         if (da != null) {
-            Py.obj(da).call(new Object[] {this, attr}, Py.NO_KW);
+            Py.obj(da).call2(this, attr);
             return;
         }
         delAttrDirect(attr);
@@ -837,6 +987,17 @@ public final class PyType extends PyObject {
             // A builtin type builds and initialises its own instances.
             return factory.create(this, args, kwNames);
         }
+        if (kwNames.length == 0 && this != Py.OS_ERROR && plainException()) { //NOPMD CompareObjectsWithEquals - identity is meant
+            // An exception class that overrides neither: what __new__ and
+            // __init__ would do between them, once, without the receiver
+            // prepended to two argument arrays (raise ValueError(...) in a
+            // parser's loop).
+            PyInstance e = newInstance();
+            Object[] rest = new Object[args.length];
+            System.arraycopy(args, 0, rest, 0, rest.length);
+            e.setAttrDirect("args", rest.length == 0 ? PyTuple.EMPTY : new PyTuple(rest));
+            return e;
+        }
         Object newFn = lookup("__new__");
         Object obj;
         if (newFn != null && newFn != Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
@@ -862,7 +1023,76 @@ public final class PyType extends PyObject {
 
     /// The `__init__` of a plain class (no `__new__`, no builtin base), the
     /// case a positional constructor call takes without an argument array.
-    private Object plainInit() {
+    Object plainInit() {
+        Object init = plainInitAny();
+        return init instanceof PyFunction ? init : null;
+    }
+
+    /// The `__init__` of a plain class whatever it is, or null for a class that
+    /// is not plain.
+    private Object plainInitAny() {
+        if (plainInitVersion == version) {
+            return plainInitCache;
+        }
+        Object r = resolvePlainInit();
+        plainInitCache = r;
+        plainInitVersion = version;
+        return r;
+    }
+
+    /// [#plainInitAny()]'s answer, valid while [#plainInitVersion] equals
+    /// [#version]; any class change re-resolves it.
+    private Object plainInitCache;
+    private int plainInitVersion = -1;
+
+    /// `__bool__` of this type, else its `__len__` (one of them null), for
+    /// truth tests of instances; good while [#truthVersion] is [#version].
+    Object truthBool;
+    /// [#truthBool] is a builtin subclass's own `__bool__`: an instance's
+    /// truth is its base value's.
+    boolean truthBase;
+    /// `__len__` / `__hash__` are the builtin's own (a subclass of str,
+    /// tuple, int... that does not override them): an instance's answer is
+    /// its base value's, asked without the builtin call and the view of the
+    /// value it made. Kept with the truth methods, against the version.
+    boolean lenBase;
+    boolean hashBase;
+
+    /// How many extra attribute slots this class's instances have grown to,
+    /// the most seen: a new instance's first slot array is that long, so an
+    /// `__init__` that sets a dozen names allocates once rather than at 4, 8
+    /// and 16. Only a size hint -- any value is correct.
+    /// The last `__dict__` an instance of this class built from scratch:
+    /// the shape and set fields it was built for, the shape slots holding a
+    /// field marker, and copies of its keys, hashes, index table and value
+    /// sources (see `PyInstance.InstanceDict`).
+    Shape dictTplShape;
+    long dictTplMask;
+    boolean[] dictTplMarks;
+    Object[] dictTplKeys;
+    long[] dictTplHashes;
+    int[] dictTplIndex;
+    int[] dictTplMap;
+
+    int slotHint = 4;
+    Object truthLen;
+    int truthVersion = -1;
+
+    /// Refreshes [#truthBool] and [#truthLen] after any type changed.
+    void truthMethods() {
+        truthBool = lookup("__bool__");
+        truthLen = truthBool == null ? lookup("__len__") : null;
+        // A builtin's own __bool__, or (str, list, dict: no __bool__) its
+        // own __len__, both answer the truth of the value an instance wraps.
+        // A Python override is a function, never a builtin.
+        truthBase = truthBool instanceof PyBuiltin ? ((PyBuiltin) truthBool).baseTruth
+                : truthBool == null && truthLen instanceof PyBuiltin;
+        lenBase = lookup("__len__") instanceof PyBuiltin;
+        hashBase = lookup("__hash__") instanceof PyBuiltin;
+        truthVersion = version;
+    }
+
+    private Object resolvePlainInit() {
         if (factory != null || this == Py.TYPE_TYPE || customMeta()) { //NOPMD CompareObjectsWithEquals - identity is meant
             return null;
         }
@@ -870,8 +1100,244 @@ public final class PyType extends PyObject {
         if (newFn != null && newFn != Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
             return null;
         }
+        return lookup("__init__");
+    }
+
+    // Keyword constructor calls of a plain class (`Tag(parser, builder,
+    // name, attrs=a)`): `__init__` gets the new instance and the arguments as
+    // parameters, with no argument array and none with the instance
+    // prepended. Anything else -- a builtin, a `__new__`, a metaclass -- goes
+    // the generic way.
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a));
+            return o;
+        }
+        return super.callKwF(kwNames, a);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i, j);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k, l));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    @Override
+    public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyInstance o = newInstance();
+            initReturned(((PyFunction) init).callKwF(kwNames, o, a, b, c, d, e, f, g, h, i, j, k, l, m));
+            return o;
+        }
+        return super.callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m);
+    }
+
+    /// A positional constructor call of a plain class without an argument
+    /// array: `__init__` is a function, or the one a dataclass generated. Null
+    /// when the class is neither, and the caller builds the array after all.
+    private Object positionalNew(int n, Object a, Object b, Object c, Object d, Object e) {
+        Object init = plainInitAny();
+        if (init instanceof PyFunction) {
+            PyFunction f = (PyFunction) init;
+            PyInstance o = newInstance();
+            switch (n) {
+                case 0:
+                    initReturned(f.call1(o));
+                    break;
+                case 1:
+                    initReturned(f.call2(o, a));
+                    break;
+                case 2:
+                    initReturned(f.call3(o, a, b));
+                    break;
+                case 3:
+                    initReturned(f.call4(o, a, b, c));
+                    break;
+                case 4:
+                    initReturned(f.call5(o, a, b, c, d));
+                    break;
+                default:
+                    initReturned(f.call6(o, a, b, c, d, e));
+                    break;
+            }
+            return o;
+        }
+        PyDataclass.Init fields = PyDataclass.initOf(init);
+        if (fields != null && fields.positional(n)) {
+            PyInstance o = newInstance();
+            fields.fill(o, n, a, b, c, d, e);
+            return o;
+        }
+        return constructFixed(n, a, b, c, d, e);
+    }
+
+    /// [#construct] for a call of `n` positional arguments: `__new__` and
+    /// `__init__` called at their arity, where construct prepends the
+    /// receiver to an argument array for each. A namedtuple (`urlparse`), a
+    /// str subclass (bs4's NavigableString) and a list subclass are built
+    /// this way per element. Null for a call this does not cover, which
+    /// then goes through construct exactly as before.
+    private Object constructFixed(int n, Object a, Object b, Object c, Object d, Object e) {
+        if (factory != null || this == Py.TYPE_TYPE || this == Py.OS_ERROR || plainException() //NOPMD CompareObjectsWithEquals - identity is meant
+                || metaDunder("__call__") != null) {
+            return null;
+        }
+        Object newFn = lookup("__new__");
+        Object obj;
+        if (newFn != null && newFn != Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object fn = newFn instanceof PyStaticMethod ? ((PyStaticMethod) newFn).func : newFn;
+            obj = callWith(Py.obj(fn), this, n, a, b, c, d, e);
+            if (!Py.typeOf(obj).isSubtype(this)) {
+                return obj;
+            }
+        } else {
+            obj = newInstance();
+        }
         Object init = lookup("__init__");
-        return init instanceof PyFunction ? init : null;
+        if (init != null && init != Builtins.OBJECT_INIT) { //NOPMD CompareObjectsWithEquals - identity is meant
+            initReturned(callWith(Py.obj(init), obj, n, a, b, c, d, e));
+        } else if (n > 0 && newFn == Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
+            throw Py.typeError(name + "() takes no arguments");
+        }
+        return obj;
+    }
+
+    /// `f(first, a, ...)` with the `n` arguments after `first`.
+    private static Object callWith(PyObject f, Object first, int n, Object a, Object b, Object c, Object d, Object e) {
+        switch (n) {
+            case 0:
+                return f.call1(first);
+            case 1:
+                return f.call2(first, a);
+            case 2:
+                return f.call3(first, a, b);
+            case 3:
+                return f.call4(first, a, b, c);
+            case 4:
+                return f.call5(first, a, b, c, d);
+            default:
+                return f.call6(first, a, b, c, d, e);
+        }
     }
 
     private static void initReturned(Object r) {
@@ -882,13 +1348,8 @@ public final class PyType extends PyObject {
 
     @Override
     public Object call0() {
-        Object init = plainInit();
-        if (init == null) {
-            return super.call0();
-        }
-        PyInstance o = newInstance();
-        initReturned(((PyFunction) init).call1(o));
-        return o;
+        Object o = positionalNew(0, null, null, null, null, null);
+        return o != null ? o : super.call0();
     }
 
     @Override
@@ -896,50 +1357,56 @@ public final class PyType extends PyObject {
         if (unary != null) {
             return unary.create(a);
         }
-        Object init = plainInit();
-        if (init == null) {
-            return super.call1(a);
-        }
-        PyInstance o = newInstance();
-        initReturned(((PyFunction) init).call2(o, a));
-        return o;
+        Object o = positionalNew(1, a, null, null, null, null);
+        return o != null ? o : super.call1(a);
     }
 
     @Override
     public Object call2(Object a, Object b) {
-        Object init = plainInit();
-        if (init == null) {
-            return super.call2(a, b);
+        if (binary != null) {
+            return binary.create(a, b);
         }
-        PyInstance o = newInstance();
-        initReturned(((PyFunction) init).call3(o, a, b));
-        return o;
+        Object o = positionalNew(2, a, b, null, null, null);
+        return o != null ? o : super.call2(a, b);
     }
 
     @Override
     public Object call3(Object a, Object b, Object c) {
-        Object init = plainInit();
-        if (init == null) {
-            return super.call3(a, b, c);
-        }
-        PyInstance o = newInstance();
-        initReturned(((PyFunction) init).call4(o, a, b, c));
-        return o;
+        Object o = positionalNew(3, a, b, c, null, null);
+        return o != null ? o : super.call3(a, b, c);
+    }
+
+    @Override
+    public Object call4(Object a, Object b, Object c, Object d) {
+        Object o = positionalNew(4, a, b, c, d, null);
+        return o != null ? o : super.call4(a, b, c, d);
+    }
+
+    @Override
+    public Object call5(Object a, Object b, Object c, Object d, Object e) {
+        Object o = positionalNew(5, a, b, c, d, e);
+        return o != null ? o : super.call5(a, b, c, d, e);
     }
 
     @Override
     public String repr() {
         Object m = metaDunder("__repr__");
         if (m != null) {
-            return Py.strValue(Py.obj(m).call(new Object[] {this}, Py.NO_KW), "__repr__");
+            return Py.strValue(Py.obj(m).call1(this), "__repr__");
         }
+        return "<class '" + fullName() + "'>";
+    }
+
+    /// `module.qualname` as `repr` shows a class and its instances; a
+    /// builtin type's module is left out.
+    String fullName() {
         Object q = dict.get("__qualname__");
         String qual = q instanceof String ? (String) q : name;
         Object mod = dict.get("__module__");
         if (mod instanceof String && !"builtins".equals(mod)) {
-            return "<class '" + mod + "." + qual + "'>";
+            return mod + "." + qual;
         }
-        return "<class '" + qual + "'>";
+        return qual;
     }
 
     @Override
