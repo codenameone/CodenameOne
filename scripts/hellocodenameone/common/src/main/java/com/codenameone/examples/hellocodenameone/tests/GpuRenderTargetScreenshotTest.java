@@ -43,6 +43,10 @@ import com.codename1.ui.util.UITimer;
 /// one bottom right), so a backend that hands the texture back upside down
 /// or mirrored shows a different picture.
 public class GpuRenderTargetScreenshotTest extends BaseTest {
+    // frames the renderer has started: the first compiles every program and
+    // can outlast a fixed timer on a slow emulator, leaving a blank capture
+    private final java.util.concurrent.atomic.AtomicInteger frames =
+            new java.util.concurrent.atomic.AtomicInteger();
     private RenderView view;
 
     private static float[] mul(float[] a, float[] b) {
@@ -89,6 +93,7 @@ public class GpuRenderTargetScreenshotTest extends BaseTest {
             }
 
             public void onFrame(GraphicsDevice device) {
+                frames.incrementAndGet();
                 if (target != null && device.beginRenderTarget(target, 0xff1d2733)) {
                     device.setCamera(monitorCamera);
                     device.draw(cube, red, mul(Matrix4.translation(-1.1f, 0.6f, 0f),
@@ -135,13 +140,21 @@ public class GpuRenderTargetScreenshotTest extends BaseTest {
     }
 
     @Override
-    protected void registerReadyCallback(Form parent, final Runnable run) {
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
         UITimer.timer(1200, false, parent, new Runnable() {
+            int polls;
+
             public void run() {
+                // a third frame has started once two are complete; give up
+                // after ~20s so a broken device still reports
+                if (frames.get() >= 3 || polls++ > 90) {
+                    UITimer.timer(400, false, parent, run);
+                    return;
+                }
                 if (view != null) {
                     view.requestRender();
                 }
-                UITimer.timer(600, false, parent, run);
+                UITimer.timer(200, false, parent, this);
             }
         });
     }

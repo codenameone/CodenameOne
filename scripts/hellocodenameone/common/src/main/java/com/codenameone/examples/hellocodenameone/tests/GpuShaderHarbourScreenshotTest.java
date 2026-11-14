@@ -47,6 +47,10 @@ import com.codename1.ui.util.UITimer;
 /// rays and FXAA. The shader clock is pinned so every capture is the same
 /// frame of the waves.
 public class GpuShaderHarbourScreenshotTest extends BaseTest {
+    // frames the renderer has started: the first compiles every program and
+    // can outlast a fixed timer on a slow emulator, leaving a blank capture
+    private final java.util.concurrent.atomic.AtomicInteger frames =
+            new java.util.concurrent.atomic.AtomicInteger();
     private RenderView view;
 
     private static float[] mul(float[] a, float[] b) {
@@ -122,6 +126,7 @@ public class GpuShaderHarbourScreenshotTest extends BaseTest {
             }
 
             public void onFrame(GraphicsDevice device) {
+                frames.incrementAndGet();
                 device.setTime(2.5f);
                 device.setCamera(camera);
                 if (device.beginShadowPass(look.getLight())) {
@@ -154,13 +159,21 @@ public class GpuShaderHarbourScreenshotTest extends BaseTest {
     }
 
     @Override
-    protected void registerReadyCallback(Form parent, final Runnable run) {
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
         UITimer.timer(1200, false, parent, new Runnable() {
+            int polls;
+
             public void run() {
+                // a third frame has started once two are complete; give up
+                // after ~20s so a broken device still reports
+                if (frames.get() >= 3 || polls++ > 90) {
+                    UITimer.timer(400, false, parent, run);
+                    return;
+                }
                 if (view != null) {
                     view.requestRender();
                 }
-                UITimer.timer(600, false, parent, run);
+                UITimer.timer(200, false, parent, this);
             }
         });
     }

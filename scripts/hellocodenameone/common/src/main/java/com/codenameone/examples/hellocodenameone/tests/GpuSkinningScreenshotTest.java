@@ -49,6 +49,10 @@ import com.codename1.ui.util.UITimer;
 /// tears the tubes apart at the joints. The shadows go through the skinned
 /// depth program, so they bend with the tubes.
 public class GpuSkinningScreenshotTest extends BaseTest {
+    // frames the renderer has started: the first compiles every program and
+    // can outlast a fixed timer on a slow emulator, leaving a blank capture
+    private final java.util.concurrent.atomic.AtomicInteger frames =
+            new java.util.concurrent.atomic.AtomicInteger();
     private static final int SIDES = 12;
     private static final int RINGS = 16;
     private static final float HEIGHT = 2.4f;
@@ -180,6 +184,7 @@ public class GpuSkinningScreenshotTest extends BaseTest {
             }
 
             public void onFrame(GraphicsDevice device) {
+                frames.incrementAndGet();
                 device.setCamera(camera);
                 if (device.beginShadowPass(device.getLight())) {
                     drawScene(device);
@@ -209,13 +214,21 @@ public class GpuSkinningScreenshotTest extends BaseTest {
     }
 
     @Override
-    protected void registerReadyCallback(Form parent, final Runnable run) {
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
         UITimer.timer(1200, false, parent, new Runnable() {
+            int polls;
+
             public void run() {
+                // a third frame has started once two are complete; give up
+                // after ~20s so a broken device still reports
+                if (frames.get() >= 3 || polls++ > 90) {
+                    UITimer.timer(400, false, parent, run);
+                    return;
+                }
                 if (view != null) {
                     view.requestRender();
                 }
-                UITimer.timer(600, false, parent, run);
+                UITimer.timer(200, false, parent, this);
             }
         });
     }

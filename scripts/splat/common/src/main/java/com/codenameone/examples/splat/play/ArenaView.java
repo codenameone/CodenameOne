@@ -33,11 +33,6 @@ import com.codename1.gpu.Material;
 import com.codename1.gpu.Matrix4;
 import com.codename1.gpu.Mesh;
 import com.codename1.gpu.PostProcess;
-import com.codename1.gpu.shader.ShaderMaterial;
-import com.codename1.gpu.shader.ShaderNode;
-import com.codename1.gpu.shaders.Foliage;
-import com.codename1.gpu.shaders.Noise;
-import com.codename1.gpu.shaders.Shading;
 import com.codename1.gpu.Primitives;
 import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
@@ -174,9 +169,6 @@ public class ArenaView extends GameView {
     /// The jolt of a ball to the goggles: 1 on the hit, settling to 0.
     private float knock;
     private Material[][][] splatPaint;
-    /// One wind shader shared by every plant: they sway in step with the
-    /// same gusts, as a real yard's do.
-    private static final ShaderMaterial BREEZE = Foliage.wind().setUniform(Foliage.STRENGTH, 0.05f);
     private Model sky;
     private boolean controlsHidden;
     private Mesh quad;
@@ -308,14 +300,13 @@ public class ArenaView extends GameView {
         // A low, warm sun through haze: long shadows, a cool sky fill and fog
         // that swallows the far side of the yard.
         getLight().setDirection(-0.55f, -0.62f, -0.3f).setColor(0xfffff0dc).setAmbientColor(0xff8a929c)
-                .setShadows(true).setShadowMap(2048, 24f).setShadowStyle(0.72f, 0.0012f).setShadowSoftness(1.8f);
+                .setShadows(true).setShadowMap(2048, 24f).setShadowStyle(0.72f, 0.0012f);
         // tag::splat-atmosphere[]
         getEnvironment().setFog(HAZE, 0.0075f, 0.05f).setHemisphere(0xffa9bdd2, 0xff4f5a3c)
                 .setToneMapping(true).setExposure(1.3f)
                 .setSky(0xff4f7fb8, HAZE, 0xfffff0d0, 0.45f);
         setPostProcess(new PostProcess().setBloom(0.78f, 0.55f)
-                .setGrade(1.12f, 0.86f, 0xff0b1720, 0xfffff2dc).setVignette(0.42f).setGrain(0.035f)
-                .setFxaa(true).setGodRays(0.35f).setChromaticAberration(0.0025f));
+                .setGrade(1.12f, 0.86f, 0xff0b1720, 0xfffff2dc).setVignette(0.42f).setGrain(0.035f));
         // end::splat-atmosphere[]
         getCamera().setPerspective(HIP_FOV, NEAR, 400f);
         sphere = Primitives.sphere(d, 0.5f, 10, 14, false);
@@ -339,7 +330,7 @@ public class ArenaView extends GameView {
                         PaintDecals.splat(31L * v + 7 * wall + 1, wall == 1));
                 for (int t = 0; t < 2; t++) {
                     Material m = new Material(Material.Type.PBR).setColor(TEAM_COLORS[t]).setRoughness(0.3f)
-                            .setEmissive(dim(TEAM_COLORS[t], 0.12f)).setTexture(tex).setShader(wetPaint());
+                            .setEmissive(dim(TEAM_COLORS[t], 0.12f)).setTexture(tex);
                     m.setRenderState(RenderState.transparent().setDepthWrite(false)
                             .setCullMode(RenderState.CullMode.NONE));
                     m.setCastShadows(false);
@@ -352,13 +343,9 @@ public class ArenaView extends GameView {
         // Photo-scanned surfaces (Poly Haven, CC0), tiled every few metres:
         // the yard is concrete, the street asphalt, and beyond the wire grass.
         boolean street = arena.id.indexOf("sac") >= 0;
-        Model yard = ground(surface(street ? "asphalt" : "concrete", 0xff4a4d50), 0.92f, -w / 2f, 0f, dpt / 2f,
-                w, dpt, street ? 5f : 4f);
-        yard.getMaterial().setShader(puddles(0.92f));
-        addModel(yard);
-        Model lawn = ground(surface("grass", 0xff55683a), 1f, -w / 2f, -0.02f, dpt / 2f, 400f, 400f, 6f);
-        lawn.getMaterial().setShader(grit(2.2f, 0.35f));
-        addModel(lawn);
+        addModel(ground(surface(street ? "asphalt" : "concrete", 0xff4a4d50), 0.92f, -w / 2f, 0f, dpt / 2f,
+                w, dpt, street ? 5f : 4f));
+        addModel(ground(surface("grass", 0xff55683a), 1f, -w / 2f, -0.02f, dpt / 2f, 400f, 400f, 6f));
         perimeter(w, dpt);
         greenery(w, dpt);
         List<Box> boxes = arena.boxes();
@@ -445,37 +432,6 @@ public class ArenaView extends GameView {
         remember();
         touchControls();
         Sfx.load();
-    }
-
-    /// Wet paint: a lumpy, glossy skin over the splat texture, brighter at
-    /// grazing angles the way a fresh coat catches the sky.
-    private static ShaderMaterial wetPaint() {
-        ShaderMaterial m = new ShaderMaterial();
-        m.set(ShaderMaterial.Hook.NORMAL, Noise.bumpNormal(ShaderNode.worldPos().xz().mul(9f), 2, 0.18f));
-        m.set(ShaderMaterial.Hook.ROUGHNESS, ShaderNode.f(0.14f));
-        m.set(ShaderMaterial.Hook.EMISSIVE, ShaderNode.baseColor().rgb().mul(Shading.fresnel(4f).mul(0.25f)));
-        return m;
-    }
-
-    /// Fine grit in the ground's normal, so the low sun rakes across it.
-    private static ShaderMaterial grit(float scale, float strength) {
-        ShaderMaterial m = new ShaderMaterial();
-        m.set(ShaderMaterial.Hook.NORMAL, Noise.bumpNormal(ShaderNode.worldPos().xz().mul(scale), 3, strength));
-        return m;
-    }
-
-    /// Grit plus puddles left by the morning's rain: where a slow noise
-    /// dips, the ground darkens, flattens and turns to a mirror.
-    private static ShaderMaterial puddles(float roughness) {
-        ShaderMaterial m = grit(1.6f, 0.3f);
-        ShaderNode wp = ShaderNode.worldPos().xz();
-        ShaderNode wet = ShaderNode.smoothstep(0.58f, 0.66f, Noise.fbm(wp.mul(0.18f), 3));
-        m.set(ShaderMaterial.Hook.BASE_COLOR, ShaderNode.vec(ShaderNode.baseColor().rgb()
-                .mul(ShaderNode.mix(ShaderNode.f(1f), ShaderNode.f(0.55f), wet)), ShaderNode.f(1f)));
-        m.set(ShaderMaterial.Hook.ROUGHNESS, ShaderNode.mix(ShaderNode.f(roughness), ShaderNode.f(0.06f), wet));
-        m.set(ShaderMaterial.Hook.NORMAL, ShaderNode.mix(Noise.bumpNormal(wp.mul(1.6f), 3, 0.3f),
-                ShaderNode.vec(ShaderNode.f(0f), ShaderNode.f(0f), ShaderNode.f(1f)), wet));
-        return m;
     }
 
     /// A tiling texture from the resources, or a plain `fallback` colour
@@ -691,15 +647,10 @@ public class ArenaView extends GameView {
     /// shadow pass.
     private void scenery(String name, float height, float deg, float x, float z, boolean shadow) {
         AnimatedModel m = Models.create(device, name);
-        Model[] parts = m.getParts();
-        // trees, bushes and grass move in the breeze; rocks, logs and stumps do not
-        boolean sways = name.indexOf("rock") < 0 && !"log".equals(name) && !"stump".equals(name);
-        for (int i = 0; i < parts.length; i++) {
-            if (!shadow) {
+        if (!shadow) {
+            Model[] parts = m.getParts();
+            for (int i = 0; i < parts.length; i++) {
                 parts[i].getMaterial().setCastShadows(false);
-            }
-            if (sways) {
-                parts[i].getMaterial().setShader(BREEZE);
             }
         }
         float[] b = Models.bounds(m);
