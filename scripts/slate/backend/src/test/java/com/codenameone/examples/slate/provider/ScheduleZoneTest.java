@@ -81,7 +81,10 @@ class ScheduleZoneTest {
         Service service = People.service(services, 60);
         String provider = People.provider(accounts, offers, hours, service);
         ZoneId zone = ZoneId.of(People.tx(() -> locations.findById(People.LOCATION).getTimeZone()));
-        LocalDate monday = LocalDate.now(zone).plusDays(7).with(java.time.DayOfWeek.MONDAY);
+        // Back to Monday by arithmetic: the compiled server's DayOfWeek is
+        // not a TemporalAdjuster, so with(MONDAY) does not compile there.
+        LocalDate next = LocalDate.now(zone).plusDays(7);
+        LocalDate monday = next.minusDays(next.getDayOfWeek().getValue() - 1);
 
         List<ScheduleDto> week = schedules.days(monday.toString(), 7);
         List<ScheduleDto> capped = schedules.days(monday.toString(), 400);
