@@ -48,6 +48,8 @@ final class BackendSettings {
     static final String SECURITY_SCHEMA_KEY = "cn1.security.schema.enabled";
     /// `cn1.management.enabled`: link the management endpoints.
     static final String MANAGEMENT_KEY = "cn1.management.enabled";
+    /// `cn1.openapi.enabled`: link the OpenAPI document and Swagger UI.
+    static final String OPENAPI_KEY = "cn1.openapi.enabled";
     /// `cn1.mcp.enabled`: link the MCP endpoint.
     static final String MCP_KEY = "cn1.mcp.enabled";
     /// `cn1.otel.enabled`: link the OpenTelemetry exporters.
@@ -64,7 +66,7 @@ final class BackendSettings {
     /// Every read of such a key goes through one of these constants; nothing else in the
     /// build names one.
     static final String[] BUILD_TIME_KEYS = {
-        SECURITY_SCHEMA_KEY, MANAGEMENT_KEY, MCP_KEY, TELEMETRY_KEY
+        SECURITY_SCHEMA_KEY, MANAGEMENT_KEY, MCP_KEY, OPENAPI_KEY, TELEMETRY_KEY
     };
 
     /// Keys whose mere presence in a properties file links the MCP endpoint, because
@@ -84,6 +86,8 @@ final class BackendSettings {
     boolean management;
     /// Whether the build asked for the MCP endpoint, tools aside.
     boolean mcp;
+    /// Whether the build asked for the OpenAPI document to be served.
+    boolean openApi;
     /// Whether the build asked for the security layer's own tables:
     /// `cn1.security.schema.enabled=true`.
     boolean securitySchema;
@@ -119,6 +123,8 @@ final class BackendSettings {
                 MANAGEMENT_KEY);
         out.securitySchema |= securitySchema(ctx);
         out.mcp |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx, MCP_KEY);
+        out.openApi |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx,
+                OPENAPI_KEY);
         // Moving the endpoint or naming its origins is asking for it; the
         // endpoint's own default -- on when the server has a tool to serve --
         // still decides whether it answers.

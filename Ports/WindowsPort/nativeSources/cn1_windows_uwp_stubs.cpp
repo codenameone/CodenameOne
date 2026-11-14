@@ -71,6 +71,10 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraEnumerate___R_java_la
 }
 
 /* cn1_windows_camera.cpp */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionFocus___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+}
+
+/* cn1_windows_camera.cpp */
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraSessionLatestFrame___long_int_1ARRAY_R_int_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT outDims) {
     return 0;
 }
@@ -80,7 +84,21 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionSetPaused___long
 }
 
 /* cn1_windows_camera.cpp */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionSetZoom___long_float(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_FLOAT ratio) {
+}
+
+/* cn1_windows_camera.cpp */
+JAVA_INT com_codename1_impl_windows_WindowsNative_cameraSessionStartRecording___long_java_lang_String_boolean_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT pathObj, JAVA_BOOLEAN audio) {
+    return 0;
+}
+
+/* cn1_windows_camera.cpp */
 JAVA_LONG com_codename1_impl_windows_WindowsNative_cameraSessionStart___int_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT deviceIndex, JAVA_INT reqW, JAVA_INT reqH) {
+    return 0;
+}
+
+/* cn1_windows_camera.cpp */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_cameraSessionStopRecording___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     return 0;
 }
 

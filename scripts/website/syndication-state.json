@@ -3345,6 +3345,23 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-11-13T01:01:30+00:00"
+      },
+      "devto": {
+        "id": 5030478,
+        "url": "https://dev.to/codenameone/embedded-java-20x-smaller-than-chrome-faster-than-rust-royalty-free-59p8",
+        "syndicated_at": "2026-11-13T14:35:42+00:00"
+      }
+    },
+    "build-an-endless-runner-in-java": {
+      "hashnode": {
+        "url": "https://debugagent.com/dash-an-endless-runner-that-races-through-your-city",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6af7b29d7a64396a1ee49a7e",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-14T01:01:09+00:00"
       }
     }
   }

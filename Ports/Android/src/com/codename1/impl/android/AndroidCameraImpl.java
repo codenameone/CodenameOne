@@ -61,6 +61,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
@@ -113,6 +114,11 @@ public class AndroidCameraImpl extends CameraImpl {
     private final Activity activity;
     private Object cameraProvider;
     private Object camera;
+    // A focus asked for before CameraX bound, applied once it has; NaN when
+    // none is pending. Without it a scanner's first center focus is dropped
+    // and the next one is seconds away.
+    private volatile float pendingFocusX = Float.NaN;
+    private volatile float pendingFocusY = Float.NaN;
     private Object preview;
     private Object imageCapture;
     private Object imageAnalysis;
@@ -134,6 +140,22 @@ public class AndroidCameraImpl extends CameraImpl {
     private ExecutorService cameraExecutor;
     private boolean isFrontFacing;
     private volatile boolean closed;
+    // The selector the session was bound with, kept so pause/resume and video
+    // recording can bind and unbind use cases against the same camera.
+    private Object cameraSelector;
+    // True between pause() and resume(): the use cases are unbound and CameraX
+    // has released the device.
+    private volatile boolean paused;
+    // Video recording state. VideoCapture is bound only while a recording runs;
+    // see startVideoRecording for why it is not bound with the other use cases.
+    private Object videoCapture;
+    private Object recording;
+    private String recordingPath;
+    private boolean imageCaptureDroppedForVideo;
+    private final Object recordingLock = new Object();
+    private AsyncResource<String> pendingStop;
+    private Throwable recordingFailure;
+    private boolean recordingFinalized;
 
     public AndroidCameraImpl(Activity activity) {
         this.activity = activity;
@@ -186,6 +208,10 @@ public class AndroidCameraImpl extends CameraImpl {
                         new Dimension[0], new Dimension[0], false, true)
             };
         }
+        CameraInfo[] real = enumerateFromCamera2();
+        if (real != null && real.length > 0) {
+            return real;
+        }
         return new CameraInfo[] {
             new CameraInfo("back", CameraFacing.BACK,
                     new Dimension[] { new Dimension(1920, 1080), new Dimension(1280, 720) },
@@ -198,11 +224,116 @@ public class AndroidCameraImpl extends CameraImpl {
         };
     }
 
+    /// The device's real cameras, as Camera2 reports them: one entry per lens
+    /// facing CameraX can select ("back" and "front", the ids open() reads),
+    /// taken from the first Camera2 device with that facing -- the one CameraX
+    /// picks for `requireLensFacing`. Flash and auto focus are what the device
+    /// reports, so a fixed-focus front camera says so instead of claiming focus.
+    /// Null when Camera2 cannot be queried; the caller then falls back to a
+    /// conservative table.
+    private CameraInfo[] enumerateFromCamera2() {
+        try {
+            android.hardware.camera2.CameraManager mgr =
+                    (android.hardware.camera2.CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
+            if (mgr == null) {
+                return null;
+            }
+            CameraInfo back = null;
+            CameraInfo front = null;
+            String[] ids = mgr.getCameraIdList();
+            for (int i = 0; i < ids.length; i++) {
+                android.hardware.camera2.CameraCharacteristics cc = mgr.getCameraCharacteristics(ids[i]);
+                Integer facing = cc.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING);
+                if (facing == null) {
+                    continue;
+                }
+                boolean isFront = facing.intValue()
+                        == android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT;
+                boolean isBack = facing.intValue()
+                        == android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK;
+                if ((isFront && front != null) || (isBack && back != null) || (!isFront && !isBack)) {
+                    continue;
+                }
+                CameraInfo ci = camera2Info(isFront ? "front" : "back",
+                        isFront ? CameraFacing.FRONT : CameraFacing.BACK, cc);
+                if (isFront) {
+                    front = ci;
+                } else {
+                    back = ci;
+                }
+            }
+            java.util.List<CameraInfo> out = new java.util.ArrayList<CameraInfo>(2);
+            if (back != null) {
+                out.add(back);
+            }
+            if (front != null) {
+                out.add(front);
+            }
+            return out.toArray(new CameraInfo[out.size()]);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not enumerate cameras through Camera2: " + t);
+            return null;
+        }
+    }
+
+    private static CameraInfo camera2Info(String id, CameraFacing facing,
+                                          android.hardware.camera2.CameraCharacteristics cc) {
+        Boolean flash = cc.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE);
+        Float minFocus = cc.get(android.hardware.camera2.CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+        int[] afModes = cc.get(android.hardware.camera2.CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES);
+        // A fixed-focus lens reports a minimum focus distance of 0 and offers
+        // only CONTROL_AF_MODE_OFF.
+        boolean autoFocus = false;
+        if (minFocus != null && minFocus.floatValue() > 0f && afModes != null) {
+            for (int i = 0; i < afModes.length; i++) {
+                if (afModes[i] != android.hardware.camera2.CameraMetadata.CONTROL_AF_MODE_OFF) {
+                    autoFocus = true;
+                    break;
+                }
+            }
+        }
+        Dimension[] photo = new Dimension[0];
+        Dimension[] previewSizes = new Dimension[0];
+        android.hardware.camera2.params.StreamConfigurationMap map =
+                cc.get(android.hardware.camera2.CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+        if (map != null) {
+            photo = toDimensions(map.getOutputSizes(ImageFormat.JPEG));
+            previewSizes = toDimensions(map.getOutputSizes(android.graphics.SurfaceTexture.class));
+        }
+        return new CameraInfo(id, facing, photo, previewSizes,
+                flash != null && flash.booleanValue(), autoFocus);
+    }
+
+    private static Dimension[] toDimensions(android.util.Size[] sizes) {
+        if (sizes == null) {
+            return new Dimension[0];
+        }
+        Dimension[] out = new Dimension[sizes.length];
+        for (int i = 0; i < sizes.length; i++) {
+            out[i] = new Dimension(sizes[i].getWidth(), sizes[i].getHeight());
+        }
+        return out;
+    }
+
     @Override
     public void open(String cameraId, CameraSessionOptions opts) throws IOException {
         this.options = opts == null ? new CameraSessionOptions() : opts;
         this.isFrontFacing = "front".equals(cameraId);
-        this.info = isFrontFacing ? enumerateCameras()[1] : enumerateCameras()[0];
+        this.info = null;
+        CameraInfo[] all = enumerateCameras();
+        for (int i = 0; i < all.length; i++) {
+            if (all[i].getFacing() == (isFrontFacing ? CameraFacing.FRONT : CameraFacing.BACK)) {
+                this.info = all[i];
+                break;
+            }
+        }
+        if (this.info == null) {
+            if (!"__permission_probe__".equals(cameraId)) {
+                throw new IOException("This device has no " + (isFrontFacing ? "front" : "back") + " camera");
+            }
+            this.info = all.length > 0 ? all[0]
+                    : new CameraInfo(cameraId, CameraFacing.BACK, new Dimension[0], new Dimension[0], false, false);
+        }
 
         if ("__permission_probe__".equals(cameraId)) {
             requireCameraPermission();
@@ -226,6 +357,7 @@ public class AndroidCameraImpl extends CameraImpl {
             clsCameraSelectorBuilder.getMethod("requireLensFacing", int.class)
                     .invoke(selectorBuilder, isFrontFacing ? frontLensFacing : backLensFacing);
             Object selector = clsCameraSelectorBuilder.getMethod("build").invoke(selectorBuilder);
+            cameraSelector = selector;
 
             // Preview
             Object previewBuilder = clsPreviewBuilder.getConstructor().newInstance();
@@ -282,6 +414,12 @@ public class AndroidCameraImpl extends CameraImpl {
                         java.lang.reflect.Array.set(useCases, 1, imageCapture);
                         java.lang.reflect.Array.set(useCases, 2, imageAnalysis);
                         camera = bind.invoke(cameraProvider, lifecycleOwner, cameraSelectorFinal, useCases);
+                        float fx = pendingFocusX;
+                        float fy = pendingFocusY;
+                        pendingFocusX = Float.NaN;
+                        if (!Float.isNaN(fx)) {
+                            focus(fx, fy);
+                        }
                     } catch (Throwable t) {
                         openErr[0] = new IOException("CameraX bind failed: " + t.getMessage(), t);
                     } finally {
@@ -330,6 +468,14 @@ public class AndroidCameraImpl extends CameraImpl {
     public void takePhoto(final PhotoCaptureOptions opts, final AsyncResource<CapturedPhoto> result) {
         if (imageCapture == null) {
             result.error(new IllegalStateException("Camera not opened"));
+            return;
+        }
+        if (imageCaptureDroppedForVideo) {
+            result.error(new IllegalStateException("This device cannot take a photo while it records video"));
+            return;
+        }
+        if (paused) {
+            result.error(new IllegalStateException("Camera session is paused"));
             return;
         }
         // CameraX's in-memory OnImageCapturedCallback is an abstract class
@@ -407,23 +553,371 @@ public class AndroidCameraImpl extends CameraImpl {
     }
 
     @Override
-    public void startVideoRecording(String filePath, boolean audio) throws IOException {
-        // Video recording via CameraX requires VideoCapture which is shipped
-        // in androidx.camera:camera-video. Implementing it via reflection in
-        // this v1 is intentionally limited: most apps use the legacy
-        // com.codename1.capture.Capture#captureVideo for full-file recording
-        // and the new API for preview/photo/frames. A full reflective
-        // implementation would mirror the takePicture-to-file pattern above
-        // against Recorder + PendingRecording.
-        throw new IOException("Video recording via CameraX is not yet supported on Android. "
-                + "Use com.codename1.capture.Capture.captureVideo() for video.");
+    public void startVideoRecording(String filePath, final boolean audio) throws IOException {
+        // CameraX records through VideoCapture<Recorder> (androidx.camera:
+        // camera-video, which the build injects with the rest of CameraX).
+        //
+        // VideoCapture is bound only while a recording runs. Preview +
+        // ImageCapture + ImageAnalysis + VideoCapture is a combination a
+        // LIMITED-level device does not guarantee, and binding it up front
+        // would make open() fail on such a device for every session, including
+        // the ones that never record. If the device refuses the fourth use
+        // case, ImageCapture is unbound for the length of the recording and
+        // bound again afterwards; a takePhoto() meanwhile reports why.
+        if (closed || camera == null) {
+            throw new IOException("Camera not opened");
+        }
+        if (paused) {
+            throw new IOException("Camera session is paused");
+        }
+        if (audio) {
+            requireAudioPermission();
+        }
+        synchronized (recordingLock) {
+            if (recording != null) {
+                throw new IOException("A video recording is already in progress");
+            }
+            pendingStop = null;
+            recordingFailure = null;
+            recordingFinalized = false;
+        }
+        final File outputFile = new File(absolutePath(filePath));
+        File parent = outputFile.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new IOException("Could not create " + parent);
+        }
+        try {
+            final Class<?> clsRecorderBuilder = Class.forName("androidx.camera.video.Recorder$Builder");
+            final Class<?> clsVideoOutput = Class.forName("androidx.camera.video.VideoOutput");
+            final Class<?> clsVideoCapture = Class.forName("androidx.camera.video.VideoCapture");
+            final Class<?> clsFileOutputOptionsBuilder = Class.forName("androidx.camera.video.FileOutputOptions$Builder");
+            final Class<?> clsFileOutputOptions = Class.forName("androidx.camera.video.FileOutputOptions");
+            final Class<?> clsPendingRecording = Class.forName("androidx.camera.video.PendingRecording");
+            final Class<?> clsConsumer = Class.forName("androidx.core.util.Consumer");
+
+            final Object recorder = clsRecorderBuilder.getMethod("build")
+                    .invoke(clsRecorderBuilder.getConstructor().newInstance());
+            final Object vc = clsVideoCapture.getMethod("withOutput", clsVideoOutput).invoke(null, recorder);
+            Object foBuilder = clsFileOutputOptionsBuilder.getConstructor(File.class).newInstance(outputFile);
+            final Object fileOptions = clsFileOutputOptionsBuilder.getMethod("build").invoke(foBuilder);
+            final Object listener = Proxy.newProxyInstance(clsConsumer.getClassLoader(),
+                    new Class<?>[] { clsConsumer }, new RecordEventHandler(this, filePath));
+
+            runOnMainAndWait(new MainTask() {
+                @Override public void run() throws Exception {
+                    try {
+                        bindUseCases(new Object[] { vc });
+                    } catch (Throwable first) {
+                        // Too many use cases for this device: make room.
+                        unbindUseCases(new Object[] { imageCapture });
+                        imageCaptureDroppedForVideo = true;
+                        try {
+                            bindUseCases(new Object[] { vc });
+                        } catch (Exception second) {
+                            restoreAfterVideo(null);
+                            throw second;
+                        }
+                    }
+                    videoCapture = vc;
+                    Object pending = recorder.getClass().getMethod("prepareRecording",
+                            Context.class, clsFileOutputOptions)
+                            .invoke(recorder, activity.getApplicationContext(), fileOptions);
+                    if (audio) {
+                        pending = clsPendingRecording.getMethod("withAudioEnabled").invoke(pending);
+                    }
+                    Object rec = clsPendingRecording.getMethod("start", Executor.class, clsConsumer)
+                            .invoke(pending, mainExecutor(), listener);
+                    synchronized (recordingLock) {
+                        recording = rec;
+                        recordingPath = filePath;
+                    }
+                }
+            });
+        } catch (IOException e) {
+            throw e;
+        } catch (Throwable t) {
+            Throwable cause = t instanceof InvocationTargetException && t.getCause() != null ? t.getCause() : t;
+            throw new IOException("Could not start video recording: " + cause, cause);
+        }
     }
 
     @Override
     public void stopVideoRecording(AsyncResource<String> result) {
-        if (result != null) {
-            result.error(new IllegalStateException("Video recording not active"));
+        Object rec;
+        boolean finalized;
+        Throwable failure;
+        String path;
+        synchronized (recordingLock) {
+            rec = recording;
+            finalized = recordingFinalized;
+            failure = recordingFailure;
+            path = recordingPath;
+            if (rec == null && !finalized) {
+                if (result != null) {
+                    result.error(new IllegalStateException("Video recording not active"));
+                }
+                return;
+            }
+            if (!finalized) {
+                pendingStop = result;
+            }
         }
+        if (finalized) {
+            // The recording already ended on its own (an error, or the storage
+            // filled up): report that outcome.
+            synchronized (recordingLock) {
+                recordingFinalized = false;
+                recordingPath = null;
+            }
+            deliverStop(result, path, failure);
+            return;
+        }
+        try {
+            rec.getClass().getMethod("stop").invoke(rec);
+        } catch (Throwable t) {
+            synchronized (recordingLock) {
+                pendingStop = null;
+            }
+            deliverStop(result, null, t);
+        }
+    }
+
+    /// Called on the Android main thread with every VideoRecordEvent; only the
+    /// Finalize event matters -- it is the one that says the file is complete.
+    private static final class RecordEventHandler implements InvocationHandler {
+        private final AndroidCameraImpl owner;
+        private final String path;
+
+        RecordEventHandler(AndroidCameraImpl owner, String path) {
+            this.owner = owner;
+            this.path = path;
+        }
+
+        @Override public Object invoke(Object p, Method m, Object[] a) {
+            if ("accept".equals(m.getName()) && a != null && a.length == 1 && a[0] != null) {
+                Object event = a[0];
+                if (event.getClass().getName().endsWith("VideoRecordEvent$Finalize")) {
+                    Throwable failure = null;
+                    try {
+                        boolean hasError = ((Boolean) event.getClass().getMethod("hasError").invoke(event)).booleanValue();
+                        if (hasError) {
+                            int code = ((Integer) event.getClass().getMethod("getError").invoke(event)).intValue();
+                            Object cause = event.getClass().getMethod("getCause").invoke(event);
+                            // ERROR_SOURCE_INACTIVE (4) still writes a usable file when
+                            // the camera was released mid-recording; every other code
+                            // means the file is missing or truncated.
+                            if (code != 4) {
+                                failure = new IOException("Video recording failed (CameraX error " + code + ")"
+                                        + (cause instanceof Throwable ? ": " + ((Throwable) cause).getMessage() : ""));
+                            }
+                        }
+                    } catch (Throwable t) {
+                        failure = t;
+                    }
+                    owner.onRecordingFinalized(path, failure);
+                }
+                return null;
+            }
+            if ("hashCode".equals(m.getName())) {
+                return Integer.valueOf(System.identityHashCode(p));
+            }
+            if ("equals".equals(m.getName())) {
+                return Boolean.valueOf(a != null && a.length == 1 && a[0] == p);
+            }
+            if ("toString".equals(m.getName())) {
+                return "RecordEventHandler";
+            }
+            return null;
+        }
+    }
+
+    private void onRecordingFinalized(String path, Throwable failure) {
+        AsyncResource<String> stop;
+        synchronized (recordingLock) {
+            recording = null;
+            stop = pendingStop;
+            pendingStop = null;
+            if (stop == null) {
+                // Nobody has asked to stop yet: keep the outcome for them.
+                recordingFinalized = true;
+                recordingFailure = failure;
+            } else {
+                recordingPath = null;
+            }
+        }
+        try {
+            restoreAfterVideo(videoCapture);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not restore the camera after recording: " + t);
+        }
+        if (stop != null) {
+            deliverStop(stop, path, failure);
+        }
+    }
+
+    // Main thread only.
+    private void restoreAfterVideo(Object vc) throws Exception {
+        if (vc != null) {
+            unbindUseCases(new Object[] { vc });
+        }
+        videoCapture = null;
+        if (imageCaptureDroppedForVideo) {
+            imageCaptureDroppedForVideo = false;
+            if (!closed && !paused) {
+                bindUseCases(new Object[] { imageCapture });
+            }
+        }
+    }
+
+    private static void deliverStop(final AsyncResource<String> result, final String path, final Throwable failure) {
+        if (result == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override public void run() {
+                if (failure != null) {
+                    result.error(failure);
+                } else {
+                    result.complete(path);
+                }
+            }
+        });
+    }
+
+    private interface MainTask {
+        void run() throws Exception;
+    }
+
+    private static final class MainTaskRunner implements Runnable {
+        private final MainTask task;
+        private final Exception[] err;
+        private final CountDownLatch done;
+
+        MainTaskRunner(MainTask task, Exception[] err, CountDownLatch done) {
+            this.task = task;
+            this.err = err;
+            this.done = done;
+        }
+
+        // Whether the task started, or was abandoned before it could. A task
+        // the caller gave up on must not run later: it would bind use cases
+        // and start a recording the caller was told had failed.
+        private boolean started;
+        private boolean cancelled;
+
+        synchronized boolean cancel() {
+            if (started) {
+                return false;
+            }
+            cancelled = true;
+            return true;
+        }
+
+        private synchronized boolean begin() {
+            if (cancelled) {
+                return false;
+            }
+            started = true;
+            return true;
+        }
+
+        @Override public void run() {
+            if (!begin()) {
+                done.countDown();
+                return;
+            }
+            try {
+                task.run();
+            } catch (Exception e) {
+                err[0] = e;
+            } finally {
+                done.countDown();
+            }
+        }
+    }
+
+    /// Runs `task` on the Android main thread -- where CameraX wants binding
+    /// and PreviewView calls -- and waits for it, up to five seconds.
+    private void runOnMainAndWait(final MainTask task) throws IOException {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            try {
+                task.run();
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new IOException(String.valueOf(e), e);
+            }
+            return;
+        }
+        final Exception[] err = new Exception[1];
+        final CountDownLatch done = new CountDownLatch(1);
+        MainTaskRunner runner = new MainTaskRunner(task, err, done);
+        activity.runOnUiThread(runner);
+        boolean interrupted = false;
+        try {
+            for (;;) {
+                try {
+                    if (!done.await(5, TimeUnit.SECONDS)) {
+                        if (runner.cancel()) {
+                            throw new IOException("Timed out waiting for the Android main thread");
+                        }
+                        // Already running: its outcome is the answer, so wait for it.
+                        continue;
+                    }
+                    break;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        if (err[0] != null) {
+            Throwable cause = err[0] instanceof InvocationTargetException && err[0].getCause() != null
+                    ? err[0].getCause() : err[0];
+            if (cause instanceof IOException) {
+                throw (IOException) cause;
+            }
+            throw new IOException(String.valueOf(cause), cause);
+        }
+    }
+
+    // Main thread only.
+    private void bindUseCases(Object[] cases) throws Exception {
+        if (cameraProvider == null) {
+            throw new IOException("Camera not opened");
+        }
+        Object lifecycleOwner = clsProcessLifecycleOwner.getMethod("get").invoke(null);
+        Object useCases = java.lang.reflect.Array.newInstance(clsUseCase, cases.length);
+        for (int i = 0; i < cases.length; i++) {
+            java.lang.reflect.Array.set(useCases, i, cases[i]);
+        }
+        Method bind = clsProcessCameraProvider.getMethod("bindToLifecycle",
+                clsLifecycleOwner, clsCameraSelector, useCases.getClass());
+        camera = bind.invoke(cameraProvider, lifecycleOwner, cameraSelector, useCases);
+    }
+
+    // Main thread only.
+    private void unbindUseCases(Object[] cases) throws Exception {
+        if (cameraProvider == null) {
+            return;
+        }
+        int n = 0;
+        for (int i = 0; i < cases.length; i++) {
+            if (cases[i] != null) {
+                n++;
+            }
+        }
+        Object useCases = java.lang.reflect.Array.newInstance(clsUseCase, n);
+        int j = 0;
+        for (int i = 0; i < cases.length; i++) {
+            if (cases[i] != null) {
+                java.lang.reflect.Array.set(useCases, j++, cases[i]);
+            }
+        }
+        clsProcessCameraProvider.getMethod("unbind", useCases.getClass()).invoke(cameraProvider, useCases);
     }
 
     @Override
@@ -634,20 +1128,114 @@ public class AndroidCameraImpl extends CameraImpl {
 
     @Override
     public void focus(float xNorm, float yNorm) {
-        // Reflective focus would need MeteringPointFactory + FocusMeteringAction
-        // builder reflection. Left as a documented no-op in v1.
+        if (!closed && !paused && camera == null) {
+            pendingFocusY = yNorm;
+            pendingFocusX = xNorm;
+            return;
+        }
+        if (closed || paused || camera == null || (info != null && !info.hasAutoFocus())) {
+            return;
+        }
+        final float x = Math.max(0f, Math.min(1f, xNorm));
+        final float y = Math.max(0f, Math.min(1f, yNorm));
+        // PreviewView's factory maps a point on the view through its scale type
+        // and rotation onto the sensor, so (x, y) means the same spot the user
+        // sees. It has to be asked on the main thread, and only works once the
+        // view is laid out; before that the point is taken relative to the
+        // analysed frame, which covers the same field of view.
+        activity.runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    if (closed || paused || camera == null) {
+                        return;
+                    }
+                    Class<?> clsFactory = Class.forName("androidx.camera.core.MeteringPointFactory");
+                    Object factory = null;
+                    float px = x;
+                    float py = y;
+                    if (previewView != null && previewView.getWidth() > 0 && previewView.getHeight() > 0) {
+                        factory = clsPreviewView.getMethod("getMeteringPointFactory").invoke(previewView);
+                        px = x * previewView.getWidth();
+                        py = y * previewView.getHeight();
+                    }
+                    if (factory == null) {
+                        factory = Class.forName("androidx.camera.core.SurfaceOrientedMeteringPointFactory")
+                                .getConstructor(float.class, float.class)
+                                .newInstance(Float.valueOf(1f), Float.valueOf(1f));
+                    }
+                    Object point = clsFactory.getMethod("createPoint", float.class, float.class)
+                            .invoke(factory, Float.valueOf(px), Float.valueOf(py));
+                    Class<?> clsPoint = Class.forName("androidx.camera.core.MeteringPoint");
+                    Class<?> clsBuilder = Class.forName("androidx.camera.core.FocusMeteringAction$Builder");
+                    // The one-argument builder meters AF, AE and AWB at the point
+                    // and lets CameraX return to continuous focus after 5 s.
+                    Object builder = clsBuilder.getConstructor(clsPoint).newInstance(point);
+                    Object action = clsBuilder.getMethod("build").invoke(builder);
+                    Object cameraControl = cameraControl();
+                    if (cameraControl != null) {
+                        cameraControlMethod("startFocusAndMetering",
+                                Class.forName("androidx.camera.core.FocusMeteringAction"))
+                                .invoke(cameraControl, action);
+                    }
+                } catch (Throwable t) {
+                    Log.w(TAG, "Could not focus: " + t);
+                }
+            }
+        });
     }
 
     @Override
     public void pause() {
-        // CameraX is bound to ProcessLifecycleOwner -- it pauses automatically
-        // when the activity does. Explicit pause for a custom session would
-        // require unbinding/rebinding; deferred.
+        // CameraSession's contract: pause releases the hardware (so a modal
+        // Capture, or another app, can open the camera) while the session
+        // object survives. CameraX releases the device when its last use case
+        // is unbound. A recording in progress ends here, the same way it ends
+        // when CameraX loses the camera: its file is finalized and stop()
+        // reports it.
+        if (closed || paused) {
+            return;
+        }
+        paused = true;
+        Object rec;
+        synchronized (recordingLock) {
+            rec = recording;
+        }
+        if (rec != null) {
+            try {
+                rec.getClass().getMethod("stop").invoke(rec);
+            } catch (Throwable t) {
+                Log.w(TAG, "Could not stop the recording on pause: " + t);
+            }
+        }
+        try {
+            runOnMainAndWait(new MainTask() {
+                @Override public void run() throws Exception {
+                    unbindUseCases(new Object[] { preview, imageCapture, imageAnalysis, videoCapture });
+                }
+            });
+        } catch (IOException e) {
+            Log.e(TAG, "Could not release the camera on pause", e);
+        }
     }
 
     @Override
     public void resume() {
-        // See pause().
+        if (closed || !paused) {
+            return;
+        }
+        try {
+            runOnMainAndWait(new MainTask() {
+                @Override public void run() throws Exception {
+                    paused = false;
+                    bindUseCases(imageCaptureDroppedForVideo
+                            ? new Object[] { preview, imageAnalysis }
+                            : new Object[] { preview, imageCapture, imageAnalysis });
+                }
+            });
+        } catch (IOException e) {
+            paused = false;
+            Log.e(TAG, "Could not re-acquire the camera on resume", e);
+        }
     }
 
     @Override
@@ -660,6 +1248,18 @@ public class AndroidCameraImpl extends CameraImpl {
             cameraExecutor = null;
         }
         frameListener = null;
+        Object rec;
+        synchronized (recordingLock) {
+            rec = recording;
+        }
+        if (rec != null) {
+            // Finalizes the file; a pending stopVideoRecording still gets it.
+            try {
+                rec.getClass().getMethod("stop").invoke(rec);
+            } catch (Throwable t) {
+                Log.w(TAG, "Could not stop the recording on close: " + t);
+            }
+        }
         // Native state belongs to the main-thread callback until it completes.
         // A stalled main thread must not turn open's timeout into an EDT hang.
         final CountDownLatch unbound = new CountDownLatch(1);
@@ -669,15 +1269,9 @@ public class AndroidCameraImpl extends CameraImpl {
             activity.runOnUiThread(new Runnable() {
                 @Override public void run() {
                     try {
-                        if (cameraProvider != null) {
-                            Object useCases = java.lang.reflect.Array.newInstance(clsUseCase, 3);
-                            java.lang.reflect.Array.set(useCases, 0, preview);
-                            java.lang.reflect.Array.set(useCases, 1, imageCapture);
-                            java.lang.reflect.Array.set(useCases, 2, imageAnalysis);
-                            // Deferred cleanup must not unbind a newer session.
-                            clsProcessCameraProvider.getMethod("unbind", useCases.getClass())
-                                    .invoke(cameraProvider, useCases);
-                        }
+                        // Deferred cleanup must not unbind a newer session,
+                        // so only this session's use cases are named.
+                        unbindUseCases(new Object[] { preview, imageCapture, imageAnalysis, videoCapture });
                     } catch (Throwable t) {
                         Log.e(TAG, "Could not unbind camera", t);
                     } finally {
@@ -722,6 +1316,7 @@ public class AndroidCameraImpl extends CameraImpl {
         preview = null;
         imageCapture = null;
         imageAnalysis = null;
+        videoCapture = null;
         cameraProvider = null;
     }
 

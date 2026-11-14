@@ -117,6 +117,8 @@ final class BackendJsonCodecs {
         boolean asString;
         /// The field's own `@JsonAdapter`, by binary name, or null.
         String adapter;
+        /// The field the property was read from, for its constraints.
+        FieldInfo info;
     }
 
     /// The `@JsonCreator` constructor or factory of a class, or a record's
@@ -607,6 +609,7 @@ final class BackendJsonCodecs {
                     continue;
                 }
                 Prop p = new Prop();
+                p.info = f;
                 AnnotationValues renamed = f.getAnnotation(JSON_PROPERTY);
                 String json = renamed == null ? null : renamed.getString("value");
                 p.json = json == null || json.length() == 0 ? f.getName() : json;
@@ -2307,4 +2310,269 @@ final class BackendJsonCodecs {
         }
         return out.append('"').toString();
     }
+
+    // ------------------------------------------------------------------
+    // JSON Schema (OpenAPI)
+    // ------------------------------------------------------------------
+
+    /// The JSON Schema of the JSON form a value of `type` has, as nested ordered
+    /// maps and lists. An application class becomes a `$ref` into `components`,
+    /// which receives its schema (and those of the classes its fields reach) under
+    /// [#schemaName]. Walks the same model the codecs are written from, so the
+    /// schema describes exactly what the router reads and writes. Registers no
+    /// codec: asking for a schema generates nothing.
+    /// Which class each schema name of a document belongs to, per document (the
+    /// `components` map passed in): two classes with one simple name in different
+    /// packages -- a `v1.Account` and a `v2.Account` -- must not share a schema,
+    /// or the second is described with the first one's fields.
+    private final Map<Map<String, Object>, Map<String, String>> schemaOwners =
+            new java.util.IdentityHashMap<Map<String, Object>, Map<String, String>>();
+
+    private String uniqueSchemaName(String key, Map<String, Object> components) {
+        Map<String, String> owners = schemaOwners.get(components);
+        if (owners == null) {
+            owners = new LinkedHashMap<String, String>();
+            schemaOwners.put(components, owners);
+        }
+        String name = schemaName(key);
+        String owner = owners.get(name);
+        if (owner == null) {
+            owners.put(name, key);
+            return name;
+        }
+        if (owner.equals(key)) {
+            return name;
+        }
+        // Taken by another class: qualify with the package, then number it, so
+        // the name stays a valid component key ([A-Za-z0-9._-]).
+        String base = raw(key).replace('.', '_').replace('$', '_')
+                + name.substring(simpleOf(raw(key)).length());
+        String candidate = base;
+        for (int n = 2; owners.containsKey(candidate) && !key.equals(owners.get(candidate)); n++) {
+            candidate = base + "_" + n;
+        }
+        owners.put(candidate, key);
+        return candidate;
+    }
+
+    Map<String, Object> jsonSchema(String type, Map<String, Object> components) {
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        String t = strip(type);
+        Kind kind = t == null ? null : kindOf(t);
+        if (kind == null) {
+            return out;                  // any JSON value
+        }
+        switch (kind) {
+            case PRIMITIVE:
+            case BOX:
+                scalarSchema(t, out);
+                break;
+            case STRING:
+                out.put("type", "string");
+                break;
+            case DATE:
+                out.put("type", "integer");
+                out.put("format", "int64");
+                out.put("description", "milliseconds since the epoch");
+                break;
+            case BYTES:
+                out.put("type", "string");
+                out.put("format", "byte");
+                break;
+            case ENUM: {
+                out.put("type", "string");
+                List<String> names = new ArrayList<String>();
+                AnnotatedClass cls = RestControllerAnnotationProcessor.resolveClass(ctx,
+                        raw(t).replace('.', '/'));
+                if (cls != null) {
+                    for (FieldInfo f : cls.getFields()) {
+                        if ((f.getAccess() & Opcodes.ACC_ENUM) != 0) {
+                            names.add(f.getName());
+                        }
+                    }
+                }
+                out.put("enum", names);
+                break;
+            }
+            case RAW_MAP:
+                out.put("type", "object");
+                break;
+            case RAW_LIST:
+                out.put("type", "array");
+                out.put("items", new LinkedHashMap<String, Object>());
+                break;
+            case COLLECTION: {
+                out.put("type", "array");
+                out.put("items", jsonSchema(elementType(t, 0), components));
+                if (COLLECTIONS.get(raw(t)).endsWith("Set")) {
+                    out.put("uniqueItems", Boolean.TRUE);
+                }
+                break;
+            }
+            case MAP:
+                out.put("type", "object");
+                out.put("additionalProperties", jsonSchema(elementType(t, 1), components));
+                break;
+            case ARRAY:
+                out.put("type", "array");
+                out.put("items", jsonSchema(t.substring(0, t.length() - 2), components));
+                break;
+            case DTO: {
+                String key = dtoKey(t);
+                String name = uniqueSchemaName(key, components);
+                out.put("$ref", "#/components/schemas/" + name);
+                if (!components.containsKey(name)) {
+                    components.put(name, new LinkedHashMap<String, Object>());
+                    components.put(name, dtoSchema(dto(key), components));
+                }
+                break;
+            }
+            default:
+                break;                   // ANY and ADAPTED: whatever the value is
+        }
+        return out;
+    }
+
+    private static void scalarSchema(String t, Map<String, Object> out) {
+        if ("boolean".equals(t) || "java.lang.Boolean".equals(t)) {
+            out.put("type", "boolean");
+        } else if ("double".equals(t) || "java.lang.Double".equals(t)) {
+            out.put("type", "number");
+            out.put("format", "double");
+        } else if ("float".equals(t) || "java.lang.Float".equals(t)) {
+            out.put("type", "number");
+            out.put("format", "float");
+        } else if ("char".equals(t) || "java.lang.Character".equals(t)) {
+            out.put("type", "string");
+            out.put("minLength", Integer.valueOf(1));
+            out.put("maxLength", Integer.valueOf(1));
+        } else {
+            out.put("type", "integer");
+            out.put("format", "long".equals(t) || "java.lang.Long".equals(t) ? "int64"
+                    : "int32");
+        }
+    }
+
+    private Map<String, Object> dtoSchema(Dto dto, Map<String, Object> components) {
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        out.put("type", "object");
+        if (dto.problem != null) {
+            return out;
+        }
+        Map<String, Object> props = new LinkedHashMap<String, Object>();
+        List<String> required = new ArrayList<String>();
+        for (Prop p : dto.props) {
+            if (p.json == null || p.get == null && p.field == null && p.setter == null
+                    && !p.component) {
+                continue;
+            }
+            Map<String, Object> ps;
+            if (p.adapter != null) {
+                ps = new LinkedHashMap<String, Object>();
+            } else if (p.asString) {
+                ps = new LinkedHashMap<String, Object>();
+                ps.put("type", "string");
+                if ("java.util.Date".equals(p.type)) {
+                    ps.put("format", "date-time");
+                }
+            } else {
+                ps = jsonSchema(p.type, components);
+            }
+            // Constraints describe a value, not a reference to a class: a $ref
+            // keeps only what they say about presence, so a client generator
+            // still sees the class (an allOf wrapper reads as Object to most).
+            Map<String, Object> target = ps.containsKey("$ref")
+                    ? new LinkedHashMap<String, Object>() : ps;
+            if (p.info != null && applyConstraints(p.info, target) || p.required) {
+                required.add(p.json);
+            }
+            props.put(p.json, ps);
+        }
+        out.put("properties", props);
+        if (!required.isEmpty()) {
+            out.put("required", required);
+        }
+        if (dto.strict) {
+            out.put("additionalProperties", Boolean.FALSE);
+        }
+        return out;
+    }
+
+    /// Writes the Bean Validation constraints of `f` into `schema`; answers whether
+    /// one of them makes the property required.
+    static boolean applyConstraints(FieldInfo f, Map<String, Object> schema) {
+        return applyConstraints(new ConstraintSource() {
+            @Override
+            public AnnotationValues get(String descriptor) {
+                return f.getAnnotation(descriptor);
+            }
+        }, schema);
+    }
+
+    /// Where constraint annotations are read from: a field or a parameter.
+    interface ConstraintSource {
+        AnnotationValues get(String descriptor);
+    }
+
+    /// [#applyConstraints(FieldInfo, Map)] for any annotated element.
+    static boolean applyConstraints(ConstraintSource f, Map<String, Object> schema) {
+        boolean required = f.get(BackendValidation.NOT_NULL) != null;
+        Object type = schema.get("type");
+        boolean array = "array".equals(type);
+        boolean object = "object".equals(type);
+        if (f.get(BackendValidation.NOT_BLANK) != null) {
+            required = true;
+            schema.put("minLength", Integer.valueOf(1));
+            schema.put("pattern", ".*\\S.*");
+        }
+        if (f.get(BackendValidation.NOT_EMPTY) != null) {
+            required = true;
+            schema.put(array ? "minItems" : object ? "minProperties" : "minLength",
+                    Integer.valueOf(1));
+        }
+        AnnotationValues size = f.get(BackendValidation.SIZE);
+        if (size != null) {
+            int min = size.getIntOrDefault("min", 0);
+            int max = size.getIntOrDefault("max", Integer.MAX_VALUE);
+            String unit = array ? "Items" : object ? "Properties" : "Length";
+            if (min > 0) {
+                schema.put("min" + unit, Integer.valueOf(min));
+            }
+            if (max != Integer.MAX_VALUE) {
+                schema.put("max" + unit, Integer.valueOf(max));
+            }
+        }
+        // Numeric bounds describe numbers only; on a string schema they would
+        // claim a check the document's readers cannot apply.
+        boolean numeric = "integer".equals(type) || "number".equals(type);
+        Object min = numeric ? longValue(f.get(BackendValidation.MIN)) : null;
+        if (min != null) {
+            schema.put("minimum", min);
+        }
+        Object max = numeric ? longValue(f.get(BackendValidation.MAX)) : null;
+        if (max != null) {
+            schema.put("maximum", max);
+        }
+        return required;
+    }
+
+    private static Object longValue(AnnotationValues a) {
+        Object v = a == null ? null : a.get("value");
+        return v instanceof Number ? Long.valueOf(((Number) v).longValue()) : null;
+    }
+
+    /// The name a class's schema is filed under in `components.schemas`: its simple
+    /// name, a nested class's with its outer's (`Outer_Inner`), and a parameterized
+    /// use of a generic class with its arguments' (`Page_User`).
+    static String schemaName(String key) {
+        StringBuilder out = new StringBuilder();
+        String raw = raw(key);
+        out.append(simpleOf(raw).replace('$', '_'));
+        for (String a : args(key)) {
+            String s = strip(a);
+            out.append('_').append(s == null ? "Object" : schemaName(s));
+        }
+        return out.toString();
+    }
+
 }

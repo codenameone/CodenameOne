@@ -93,8 +93,28 @@ public final class IOSVisionImpl extends VisionImpl {
         analyzeInBackground(out, feature, mlKit, input,
                 image.getRotationDegrees(), width, height, frameFormat,
                 options.getMinimumConfidence(), options.getMaximumResults(),
-                script == null ? null : script.getId());
+                script == null ? null : script.getId(),
+                joinFormats(options.getBarcodeFormats()));
         return out;
+    }
+
+    /// The barcode formats as the comma-separated list the native side splits;
+    /// null for none, which detects every format.
+    private static String joinFormats(String[] formats) {
+        if (formats == null || formats.length == 0) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < formats.length; i++) {
+            if (formats[i] == null) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(',');
+            }
+            sb.append(formats[i]);
+        }
+        return sb.length() == 0 ? null : sb.toString();
     }
 
     private static <T> void analyzeInBackground(final AsyncResource<T> out,
@@ -107,13 +127,15 @@ public final class IOSVisionImpl extends VisionImpl {
                                                  final int frameFormat,
                                                  final float minimumConfidence,
                                                  final int maximumResults,
-                                                 final String textScript) {
+                                                 final String textScript,
+                                                 final String barcodeFormats) {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
                     String json = IOSImplementation.nativeInstance.cn1VisionAnalyze(
                             input, nativeFeatureId(feature), mlKit,
-                            rotation, width, height, frameFormat, textScript);
+                            rotation, width, height, frameFormat, textScript,
+                            barcodeFormats);
                     if (json == null || json.length() == 0) {
                         throw new VisionException(VisionException.BACKEND_ERROR,
                                 "Apple Vision returned no result");

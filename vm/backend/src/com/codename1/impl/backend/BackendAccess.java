@@ -117,6 +117,10 @@ public abstract class BackendAccess {
     /// Serves the management endpoints when the configuration turns them on.
     public abstract void management(Backend.Builder builder);
 
+    /// Serves `document`, the OpenAPI document the build wrote, and a Swagger UI
+    /// page for it; see [OpenApiDocs]. The only call that names them.
+    public abstract void openApi(Backend.Builder builder, String document);
+
     /// Puts the security layer in front of the application's routes, for a build
     /// that found a `SecurityFilterChain` bean. The only call that names the
     /// layer, so a server whose entry point does not make it has none of its code.
