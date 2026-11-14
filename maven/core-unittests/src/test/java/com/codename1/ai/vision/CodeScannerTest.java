@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -136,6 +137,42 @@ class CodeScannerTest extends UITestBase {
         flushSerialCalls();
         assertEquals(1, recorder.values.size());
         assertEquals("wanted", recorder.values.get(0).getValue());
+    }
+
+    @Test
+    void theAcceptedFormatsConfigureTheDetectorItself() {
+        new Form("Caller").show();
+        flushSerialCalls();
+
+        vision.result = new Barcode[0];
+        CodeScanner.scan(new CodeScannerOptions()
+                .formats(BarcodeFormat.PDF417, BarcodeFormat.QR_CODE));
+        flushSerialCalls();
+        camera.deliver(new byte[] {1});
+        flushSerialCalls();
+
+        assertArrayEquals(new String[] {BarcodeFormat.PDF417, BarcodeFormat.QR_CODE},
+                vision.lastOptions.getBarcodeFormats(),
+                "the platform detector must look for the accepted formats alone");
+    }
+
+    @Test
+    void formatsOnTheCallersVisionOptionsWin() {
+        new Form("Caller").show();
+        flushSerialCalls();
+
+        vision.result = new Barcode[0];
+        VisionOptions own = new VisionOptions().barcodeFormats(BarcodeFormat.AZTEC);
+        CodeScanner.scan(new CodeScannerOptions()
+                .formats(BarcodeFormat.QR_CODE)
+                .visionOptions(own));
+        flushSerialCalls();
+        own.barcodeFormats(BarcodeFormat.EAN_8);
+        camera.deliver(new byte[] {1});
+        flushSerialCalls();
+
+        assertArrayEquals(new String[] {BarcodeFormat.AZTEC},
+                vision.lastOptions.getBarcodeFormats());
     }
 
     @Test

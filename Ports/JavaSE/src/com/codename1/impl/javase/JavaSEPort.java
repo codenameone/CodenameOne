@@ -11619,7 +11619,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (mcpPort != null) {
             try {
                 com.codename1.mcp.MCP.startSocketServer(Integer.parseInt(mcpPort.trim()));
-                System.out.println("[cn1.mcp] MCP socket server listening on 127.0.0.1:" + mcpPort.trim());
+                System.out.println("[cn1.mcp] starting MCP socket server on 127.0.0.1:" + mcpPort.trim());
             } catch (Throwable mcpErr) {
                 System.err.println("[cn1.mcp] could not auto-start MCP socket server on port "
                         + mcpPort + ": " + mcpErr);
@@ -12086,6 +12086,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
 
+            if (Boolean.getBoolean("cn1.agent.background")) {
+                // Started by cn1:agent: an agent drives this window while the
+                // developer keeps working, so it must not take the focus when shown.
+                // It stays focusable, so a developer who clicks into it can still type.
+                window.setAutoRequestFocus(false);
+            }
             window.setVisible(true);
         }
         if (useNativeInput) {

@@ -17,6 +17,35 @@ This is the **Gradle** layout. Wherever the skill shows a Maven command or a
 module, the app lives at the project root, and every command is a `./gradlew`
 task.
 
+## Verify your work yourself -- you can run, see and drive the app
+
+You do not need a human, a display or an MCP host restart to check a UI change.
+Do this before reporting any UI work done:
+
+```bash
+./gradlew cn1Agent &                              # simulator in the background, MCP from the first frame
+S=.agent-skills/codename-one/tools/Sim.java
+java $S wait                                      # blocks until the app answers (first build takes a while)
+java $S snapshot                                  # the screen as JSON: every node, label, value, action
+java $S tap "Sign In"                             # by label, or by node id from the snapshot
+java $S type "Email" alice@example.com
+java $S screenshot build/after.png               # then LOOK at the PNG
+java $S record-start build/flow.mp4              # video of a flow (needs ffmpeg) ... record-stop
+kill %1                                           # stop the simulator when done
+```
+
+- On Linux with no display run `xvfb-run -a ./gradlew cn1Agent &`; on macOS the window
+  opens in the background and never takes the focus.
+- If port 8765 is busy it picks another and writes it to `build/cn1-agent.port`;
+  run `Sim.java` from the project root and it reads that file.
+- Tests run headless too: `./gradlew cn1Test` / `./gradlew test` (Linux without a
+  display: `xvfb-run -a ./gradlew ...`).
+- Native: the same `Sim.java` commands drive a development build on the iOS simulator
+  or an Android emulator; `java $S device-screenshot ios|android out.png` and
+  `device-record` capture them. See `references/mcp-agent-control.md`.
+- Only if one of these steps actually fails, say so and quote the error -- never
+  skip verification because "the environment is headless".
+
 ## Quick orientation for an agent
 
 - App source lives in `src/main/java/` (Kotlin in `src/main/kotlin/`).

@@ -61,8 +61,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /// **Browser caveats**: getUserMedia requires a secure context (HTTPS or
 /// localhost) and a user gesture -- `Camera.open(...)` must originate from a tap.
 ///
-/// Video recording is not implemented (it would route through `MediaRecorder`);
-/// callers needing video should use `com.codename1.capture.Capture#captureVideo`.
+/// Torch, zoom and focus go through `MediaStreamTrack` constraints, applied
+/// only when the track lists them in its capabilities (Chrome on Android exposes
+/// them for most rear cameras; desktop webcams and Safari mostly do not, and
+/// then each call is the documented no-op). Video is recorded with
+/// `MediaRecorder` over the preview's stream -- MP4 where the browser can write
+/// it, WebM otherwise -- and written to the requested path when it stops.
+/// `pause()` stops the tracks, releasing the camera, and `resume()` asks for
+/// the same device again.
 ///
 /// @hidden
 public class HTML5CameraImpl extends CameraImpl {
@@ -80,6 +86,12 @@ public class HTML5CameraImpl extends CameraImpl {
     private int frameTimerHandle;
     private boolean closed;
     private boolean isFrontFacing;
+    private boolean paused;
+    // Resume opens a fresh stream at default constraints, so the torch and
+    // zoom asked for (before or during the pause) are re-applied from here.
+    private boolean torch;
+    private float zoom = 1f;
+    private String recordingPath;
 
     @Override
     public CameraInfo[] enumerateCameras() {
@@ -171,16 +183,47 @@ public class HTML5CameraImpl extends CameraImpl {
 
     @Override
     public void startVideoRecording(String filePath, boolean audio) throws IOException {
-        // Browser video recording would route through MediaRecorder -> Blob ->
-        // ArrayBuffer -> byte[] -> file. Out of scope for v1.
-        throw new IOException("Video recording not implemented on the JavaScript port. "
-                + "Use com.codename1.capture.Capture.captureVideo() instead.");
+        if (closed || video == null) {
+            throw new IOException("Camera not opened");
+        }
+        if (paused) {
+            throw new IOException("Camera session is paused");
+        }
+        if (recordingPath != null) {
+            throw new IOException("A video recording is already in progress");
+        }
+        String err = nativeCameraRecordStart(video, audio);
+        if (err != null && err.length() > 0) {
+            throw new IOException(err);
+        }
+        recordingPath = filePath;
     }
 
     @Override
     public void stopVideoRecording(AsyncResource<String> result) {
-        if (result != null) {
-            result.error(new IllegalStateException("Recording not active"));
+        String path = recordingPath;
+        recordingPath = null;
+        if (path == null || video == null) {
+            if (result != null) {
+                result.error(new IllegalStateException("Recording not active"));
+            }
+            return;
+        }
+        try {
+            // "<mime>\n<base64>": the whole file, assembled on the main thread.
+            String packed = nativeCameraRecordStop(video);
+            int nl = packed == null ? -1 : packed.indexOf('\n');
+            if (nl < 0) {
+                throw new IOException("The browser recorded no video");
+            }
+            writeBytes(path, Base64.decode(packed.substring(nl + 1).getBytes("UTF-8")));
+            if (result != null) {
+                result.complete(path);
+            }
+        } catch (Throwable t) {
+            if (result != null) {
+                result.error(t);
+            }
         }
     }
 
@@ -233,21 +276,64 @@ public class HTML5CameraImpl extends CameraImpl {
         }
     }
 
-    @Override public void setFlashMode(FlashMode mode) { /* MediaStreamTrack constraints; deferred */ }
-    @Override public void setZoom(float ratio) { /* MediaStreamTrack constraints; deferred */ }
-    @Override public void focus(float xNorm, float yNorm) { /* no-op in browser */ }
-
+    // The web has a torch, not a flash fired with the shot: TORCH and ON both
+    // light it (a still taken with it lit is lit), AUTO cannot be honoured and
+    // leaves it off, as OFF does.
     @Override
-    public void pause() {
-        if (video != null) {
-            try { video.pause(); } catch (Throwable ignored) { }
+    public void setFlashMode(FlashMode mode) {
+        torch = mode == FlashMode.TORCH || mode == FlashMode.ON;
+        if (video != null && !paused) {
+            nativeCameraControl(video, "torch", torch ? 1 : 0, 0);
         }
     }
 
     @Override
+    public void setZoom(float ratio) {
+        zoom = ratio;
+        if (video != null && !paused) {
+            nativeCameraControl(video, "zoom", ratio, 0);
+        }
+    }
+
+    @Override
+    public void focus(float xNorm, float yNorm) {
+        if (video != null && !paused) {
+            nativeCameraControl(video, "focus",
+                    Math.max(0, Math.min(1, xNorm)), Math.max(0, Math.min(1, yNorm)));
+        }
+    }
+
+    /// Releases the camera: the tracks are stopped, so the browser's camera
+    /// indicator goes off and another page can open it. A recording in
+    /// progress is ended first and kept for the next stop request.
+    @Override
+    public void pause() {
+        if (video == null || paused) {
+            return;
+        }
+        paused = true;
+        try { nativeCameraSuspend(video); } catch (Throwable t) { Log.e(t); }
+    }
+
+    @Override
     public void resume() {
-        if (video != null) {
-            try { video.play(); } catch (Throwable ignored) { }
+        if (video == null || !paused) {
+            return;
+        }
+        paused = false;
+        try {
+            if (!nativeCameraResume(video)) {
+                Log.p("Camera resume failed: " + nativeCameraLastError(), Log.ERROR);
+            } else {
+                if (torch) {
+                    nativeCameraControl(video, "torch", 1, 0);
+                }
+                if (zoom != 1f) {
+                    nativeCameraControl(video, "zoom", zoom, 0);
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(t);
         }
     }
 
@@ -318,6 +404,23 @@ public class HTML5CameraImpl extends CameraImpl {
     // Returns "w,h,<base64-jpeg>" for a single frame grabbed from the video.
     @JSBody(params = {"video", "w", "h", "quality"}, script = "return null;")
     private static native String nativeCameraGrab(HTMLVideoElement video, int w, int h, double quality);
+
+    @JSBody(params = {"video", "op", "a", "b"}, script = "return false;")
+    private static native boolean nativeCameraControl(HTMLVideoElement video, String op, double a, double b);
+
+    @JSBody(params = {"video"}, script = "")
+    private static native void nativeCameraSuspend(HTMLVideoElement video);
+
+    @JSBody(params = {"video"}, script = "return false;")
+    private static native boolean nativeCameraResume(HTMLVideoElement video);
+
+    // "" when recording started, otherwise why not.
+    @JSBody(params = {"video", "audio"}, script = "return 'Video recording needs the browser host';")
+    private static native String nativeCameraRecordStart(HTMLVideoElement video, boolean audio);
+
+    // "<mime>\n<base64>" of the recorded file, or null when nothing was recorded.
+    @JSBody(params = {"video"}, script = "return null;")
+    private static native String nativeCameraRecordStop(HTMLVideoElement video);
 
     @JSBody(params = {"video"},
             script = "try{var s=video&&video.srcObject; if(s){var t=s.getTracks();for(var i=0;i<t.length;i++)t[i].stop();} if(video){video.pause(); if(video.parentNode)video.parentNode.removeChild(video); video.srcObject=null;}}catch(e){}")

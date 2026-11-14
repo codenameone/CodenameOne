@@ -34,6 +34,8 @@ public class AndroidCameraThreadingHarness {
     public AndroidCameraThreadingHarness() { activity = testActivity; }
 
     /* PRODUCTION_METHODS */
+    // open() applies a focus asked for before the bind; the harness has no focus.
+    void focus(float x, float y) {}
 
     // The production method reads the display through Android's resources;
     // AndroidCameraFrameConverterTest holds the size it picks.
@@ -51,7 +53,7 @@ public class AndroidCameraThreadingHarness {
     private void requireCameraPermission() {}
     private void requireAudioPermission() {}
     private void installFrameAnalyzer() {}
-    private CameraInfo[] enumerateCameras() { return new CameraInfo[] {new CameraInfo(), new CameraInfo()}; }
+    private CameraInfo[] enumerateCameras() { return new CameraInfo[] {new CameraInfo(CameraFacing.BACK), new CameraInfo(CameraFacing.FRONT)}; }
 
     private static void reset() {
         registeredActivity = testActivity;
@@ -411,7 +413,20 @@ public class AndroidCameraThreadingHarness {
         public static void w(String tag, String message) {}
         public static void e(String tag, String message, Throwable error) { loggedErrors++; }
     }
-    public static class CameraInfo {}
+    public static class CameraInfo {
+        private final CameraFacing facing;
+        CameraInfo(CameraFacing facing) { this.facing = facing; }
+        public CameraInfo(String id, CameraFacing facing, Dimension[] photo, Dimension[] preview,
+                          boolean flash, boolean autoFocus) { this.facing = facing; }
+        public CameraFacing getFacing() { return facing; }
+        public boolean hasAutoFocus() { return true; }
+    }
+    public enum CameraFacing { BACK, FRONT }
+    public static class Dimension { public Dimension(int w, int h) {} }
+    public static class AsyncResource<T> {
+        public void complete(T value) {}
+        public void error(Throwable t) {}
+    }
     public static class CameraSessionOptions {
         public boolean isCaptureAudio() { return false; }
         public int getPreviewWidth() { return 640; }

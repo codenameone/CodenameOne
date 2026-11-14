@@ -53,16 +53,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /// The preview is an image-based `PeerComponent` (the same approach as the
 /// WebView2 browser peer): it repaints the latest captured frame, so it renders in
 /// the offscreen screenshot pipeline as well as in a live window, without needing a
-/// composited child surface. A generic desktop webcam exposes no flash / optical
-/// zoom / focus-point / hardware video encoder through the source reader, so those
-/// are honestly reported unsupported rather than faked, per the port's rule.
+/// composited child surface.
+///
+/// Zoom and focus go through the device's UVC camera controls (`IAMCameraControl`);
+/// a webcam without them ignores the call. UVC has no focus point, so `focus`
+/// triggers the device's auto focus wherever the tap was. Video is H.264 MP4
+/// written by a Media Foundation sink writer from the frames the session already
+/// reads, with AAC audio from the default microphone when asked for. Webcams have
+/// no torch or flash Media Foundation can drive, so `setFlashMode` does nothing.
 public class WindowsCameraImpl extends CameraImpl {
     private long session;
+    // Serializes finalizing a recording with tearing the session down: both end
+    // in cn1CameraStopRecording, and close() frees the native session.
+    private final Object nativeLock = new Object();
+    // What finalizing the recording answered when close() did it before a
+    // pending stopVideoRecording got there; that stop reports it.
+    private boolean finalizedOnClose;
     private CameraSessionOptions options;
     private volatile FrameListener frameListener;
     private volatile FrameFormat frameFormat = FrameFormat.JPEG;
     private volatile int frameMaxFps = 15;
     private final AtomicBoolean listenerBusy = new AtomicBoolean();
+    private String recordingPath;
 
     @Override
     public CameraInfo[] enumerateCameras() {
@@ -76,10 +88,13 @@ public class WindowsCameraImpl extends CameraImpl {
             if (entries.get(i).length() == 0) {
                 continue;
             }
-            // A USB/built-in desktop webcam has no API-reported facing, flash or
-            // auto-focus point; the id is the device index the session opens by.
+            // "name|external|flash|autofocus". A desktop webcam has no API-reported
+            // facing and no flash; auto focus comes from the device's focus control.
+            // The id is the device index the session opens by.
+            java.util.List<String> fields = splitChar(entries.get(i), '|');
+            boolean autoFocus = fields.size() > 3 && "1".equals(fields.get(3));
             out.add(new CameraInfo(String.valueOf(out.size()), CameraFacing.EXTERNAL,
-                    new Dimension[0], new Dimension[0], false, false));
+                    new Dimension[0], new Dimension[0], false, autoFocus));
         }
         return out.toArray(new CameraInfo[out.size()]);
     }
@@ -235,36 +250,96 @@ public class WindowsCameraImpl extends CameraImpl {
         }
     }
 
-    // ----- capabilities a generic desktop webcam does not expose: honest no-ops --
+    // ----- video, zoom, focus, flash ---------------------------------------------
 
     @Override
     public void startVideoRecording(String filePath, boolean audio) throws IOException {
-        // Source-reader webcam capture exposes no hardware video sink; a real MF
-        // sink-writer pipeline is a separate feature, so report unsupported rather
-        // than pretend to record.
-        throw new IOException("Video recording is not supported by the Windows camera port");
+        if (session == 0) {
+            throw new IOException("Camera session not open");
+        }
+        if (filePath == null || filePath.length() == 0) {
+            throw new IOException("No file path for the video recording");
+        }
+        // The path is a FileSystemStorage path (possibly a file: URL); the sink
+        // writer wants the plain Windows path.
+        String nativePath = WindowsImplementation.getInstance().toNativePath(filePath);
+        int status = WindowsNative.cameraSessionStartRecording(session, nativePath, audio);
+        if (status < 0) {
+            if (status == -1) {
+                throw new IOException("A video recording is already running");
+            }
+            if (status == -2) {
+                throw new IOException("The camera has not delivered a frame yet");
+            }
+            throw new IOException("Could not start the H.264 MP4 writer for " + filePath);
+        }
+        if (status == 1) {
+            Log.p("Windows camera: no audio capture device available, recording video only");
+        }
+        recordingPath = filePath;
     }
 
     @Override
-    public void stopVideoRecording(AsyncResource<String> result) {
-        if (result != null) {
-            result.error(new IOException("Video recording is not supported by the Windows camera port"));
+    public void stopVideoRecording(final AsyncResource<String> result) {
+        final String path = recordingPath;
+        recordingPath = null;
+        final long s = session;
+        if (path == null || s == 0) {
+            if (result != null) {
+                result.error(new IllegalStateException("No video recording is running"));
+            }
+            return;
         }
+        // Finalize drains the encoder and writes the MP4 index, which can take a
+        // moment: do it off the EDT and complete the resource back on it.
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final boolean ok;
+                synchronized (nativeLock) {
+                    // close() may have freed the session meanwhile; it finalized
+                    // the recording first and left the outcome here.
+                    ok = session == s ? WindowsNative.cameraSessionStopRecording(s) : finalizedOnClose;
+                }
+                if (result == null) {
+                    return;
+                }
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (ok) {
+                            result.complete(path);
+                        } else {
+                            result.error(new IOException("The video recording could not be finalized: " + path));
+                        }
+                    }
+                });
+            }
+        }, "cn1-windows-stopvideo");
+        t.start();
     }
 
     @Override
     public void setFlashMode(FlashMode mode) {
-        // Webcams have no controllable flash.
+        // Webcams have no flash, and Media Foundation exposes no torch or LED
+        // control for UVC devices (the capture LED is the privacy indicator,
+        // driven by the device itself), so there is nothing to set.
     }
 
     @Override
     public void setZoom(float ratio) {
-        // No optical zoom on a generic webcam.
+        if (session != 0) {
+            WindowsNative.cameraSessionSetZoom(session, ratio);
+        }
     }
 
     @Override
     public void focus(float xNorm, float yNorm) {
-        // No focus-point control through the source reader.
+        // UVC has no focus point: the coordinate is ignored and the device's
+        // auto focus is triggered instead.
+        if (session != 0) {
+            WindowsNative.cameraSessionFocus(session);
+        }
     }
 
     @Override
@@ -283,11 +358,17 @@ public class WindowsCameraImpl extends CameraImpl {
 
     @Override
     public void close() {
-        long s = session;
-        session = 0;
         frameListener = null;
-        if (s != 0) {
-            WindowsNative.cameraSessionStop(s);
+        recordingPath = null;
+        synchronized (nativeLock) {
+            long s = session;
+            session = 0;
+            if (s != 0) {
+                // Finalize a running recording here, so a stop that is still on
+                // its way reports a file that is really complete.
+                finalizedOnClose = WindowsNative.cameraSessionStopRecording(s);
+                WindowsNative.cameraSessionStop(s);
+            }
         }
     }
 

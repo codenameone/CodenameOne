@@ -1,0 +1,10 @@
+{{- /* Default highlighting, unchanged, except that a fence's class attribute
+       (```java {class="cn1-no-try"}) reaches the page. Hugo drops it otherwise,
+       and cn1-snippet-runner.js reads cn1-no-try to keep "Try it" off snippets
+       the browser Playground cannot run. */ -}}
+{{- $r := transform.HighlightCodeBlock . -}}
+{{- with .Attributes.class -}}
+<div class="{{ . }}">{{ $r.Wrapped }}</div>
+{{- else -}}
+{{ $r.Wrapped }}
+{{- end -}}

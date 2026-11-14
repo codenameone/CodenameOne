@@ -141,3 +141,15 @@ minimap
 killfeed
 paintballs
 Paintballs
+
+# Release week of 2026-11-13: library and asset names
+^cpp$
+^ggml$
+^xcframeworks?$
+^javadoc$
+^overallocations?$
+^embeddables?$
+^Quaternius$
+^Rajdhani$
+InfoQ
+zags

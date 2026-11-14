@@ -4,7 +4,81 @@ You can attach to the **running simulator** and drive the app yourself: read the
 
 This is the loop to reach for when a screen "looks right" in a screenshot but you need to know whether it *behaves* right: fill the form, press submit, read what the next screen says. It complements the other two loops in this skill — `tools/DumpForm.java` (a static model of one screen, no interaction) and `references/debugging.md` (`jdb`, for stepping through code).
 
-## Turn it on
+## The agent loop: start it yourself, drive it from the shell
+
+You do not need the menu, an MCP host, or a host restart. Start the simulator for
+yourself in the background and talk to it with the bundled command-line client:
+
+```bash
+./mvnw cn1:agent &                 # Gradle: ./gradlew cn1Agent &   (Linux, no display: xvfb-run -a ./gradlew cn1Agent &)
+S=.agent-skills/codename-one/tools/Sim.java
+java $S wait                    # blocks until the first form answers
+java $S snapshot                # ui_snapshot
+java $S find "Email"            # ui_find by label
+java $S tap "Sign In"           # ui_activate, by label or node id
+java $S type "Email" alice@example.com   # ui_set_text
+java $S screenshot target/s.png # the current form as a PNG -- open it and look
+java $S record-start target/flow.mp4 ; java $S caption "Sign in" ; java $S record-stop
+java $S tools                   # every tool the app publishes, including your own
+java $S call sim_rotate '{"orientation":"landscape"}'    # any tool, raw JSON arguments
+kill %1                         # stop the simulator
+```
+
+What `cn1:agent` does for you: the MCP server listens from the first frame (it is
+`cn1:run` plus `-Dcn1.mcp.port`), the window never takes the focus or a Dock icon, and
+on a Linux machine with no display the Maven goal starts Xvfb itself. When 8765 is
+taken it picks a free port and writes it to `common/target/cn1-agent.port`
+(`build/cn1-agent.port` under Gradle); run `Sim.java` from the project root and it
+reads the file. Pass `-Dcn1.mcp.port=N` (`-Pcn1.mcp.port=N`) to insist on a port.
+
+Every action returns a fresh snapshot, so one call tells you what the screen became.
+
+## Native: the iOS simulator and an Android emulator
+
+The same commands drive a development build running natively, because the app serves
+the same MCP server. Start it in your app, gated to development builds:
+
+```java
+if (Display.getInstance().isDebuggableBuild()) {
+    MCP.startSocketServer(8765);
+}
+```
+
+**iOS simulator** (macOS with Xcode):
+
+```bash
+mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
+#   Gradle: ./gradlew buildIosXcodeProject -Pcodename1.open=false
+xcodebuild -workspace <the .xcworkspace the build logged> -scheme <App> \
+    -sdk iphonesimulator -configuration Debug -derivedDataPath target/xcode build
+xcrun simctl boot "iPhone 16" 2>/dev/null; xcrun simctl install booted target/xcode/Build/Products/Debug-iphonesimulator/<App>.app
+xcrun simctl launch booted <your.package.name>
+java $S wait                     # the simulator shares your loopback: no forward
+java $S device-screenshot ios target/ios.png
+java $S device-record ios target/ios.mp4 10
+```
+
+**Android emulator or device:**
+
+```bash
+mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-source -Dopen=false
+#   Gradle: ./gradlew buildAndroidGradleProject -Pcodename1.open=false
+(cd <the generated Gradle project the build logged> && ./gradlew installDebug)
+adb shell monkey -p <your.package.name> 1
+adb forward tcp:8765 tcp:8765
+java $S --port 8765 wait
+java $S device-screenshot android target/android.png
+java $S device-record android target/android.mp4 10
+adb forward --remove tcp:8765
+```
+
+`sim_*` tools (recording, keyboard, rotate) exist only on the desktop simulator; on a
+device use `device-screenshot` / `device-record`, which call `simctl` and `adb`.
+`references/on-device-debugging.md` adds a Java debugger to the same session.
+
+## For a human at the keyboard: the MCP menu
+
+### Turn it on
 
 Two halves, both one-time:
 
@@ -74,4 +148,4 @@ The server merges these with the built-in UI tools when a host lists what is ava
 - **Development builds only.** The socket server refuses to bind on a release build and throws `IllegalStateException` instead: the loopback interface is shared by everything on a device, so any other installed app could otherwise drive yours. `MCP.setAllowOnReleaseBuilds(true)` lifts that, and is for a controlled fleet (a kiosk, a test lab, a managed deployment) — not for an app that ships to users.
 - **Do not leave a starter in shipping code** on the assumption the gate will catch it. The JavaSE port cannot tell a packaged desktop app from the simulator, so it reports a development build in every case and the gate does not protect a desktop release.
 - **Watch what you are doing.** `MCP -> Debug Logging` echoes the conversation to the Codename One log; `SUMMARY` gives one line per call, `FULL` gives every request and response.
-- **Say when you could not check.** If the simulator is not running, or the environment is headless, say so instead of reporting that a flow works.
+- **Say when you could not check -- after trying.** A headless environment is not a reason: `cn1:agent` runs there. Report "could not verify" only when a step failed, and quote the failure.

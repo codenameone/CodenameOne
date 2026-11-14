@@ -54,6 +54,10 @@ class AndroidCameraThreadingTest {
         if (android.contains("private void preparePreview(")) {
             methods.append(method(android, "private void preparePreview("));
         }
+        // close() names only this session's use cases through it.
+        if (android.contains("private void unbindUseCases(")) {
+            methods.append(method(android, "private void unbindUseCases("));
+        }
         if (android.contains("private void clearCameraReferences(")) {
             methods.append(method(android, "private void clearCameraReferences("));
         }

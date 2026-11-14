@@ -45,24 +45,29 @@ import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /// Linux implementation of the `com.codename1.camera` `CameraImpl` (the "device
-/// camera API"), backed by Media Foundation (cn1_linux_camera.cpp). A capture
-/// session runs a source-reader loop on a worker thread keeping the latest frame;
-/// the Java side polls it for the preview and for stills -- a real webcam frame,
-/// never synthetic.
+/// camera API"), backed by GStreamer (v4l2src -> appsink, in cn1_linux_media.c,
+/// loaded with dlopen). A capture session runs a worker thread keeping the latest
+/// frame; the Java side polls it for the preview and for stills -- a real webcam
+/// frame, never synthetic.
 ///
 /// The preview is an image-based `PeerComponent` (the same approach as the
 /// WebView2 browser peer): it repaints the latest captured frame, so it renders in
 /// the offscreen screenshot pipeline as well as in a live window, without needing a
-/// composited child surface. A generic desktop webcam exposes no flash / optical
-/// zoom / focus-point / hardware video encoder through the source reader, so those
-/// are honestly reported unsupported rather than faked, per the port's rule.
+/// composited child surface. Zoom and focus are V4L2 controls set on the device
+/// node, and quietly do nothing on a webcam without them. Video recording tees
+/// the capture into a GStreamer encoder and muxer chosen from what is installed.
+/// V4L2 has no flash control, so flash is a no-op.
 public class LinuxCameraImpl extends CameraImpl {
-    private long session;
+    private volatile long session;
     private CameraSessionOptions options;
     private volatile FrameListener frameListener;
     private volatile FrameFormat frameFormat = FrameFormat.JPEG;
     private volatile int frameMaxFps = 15;
     private final AtomicBoolean listenerBusy = new AtomicBoolean();
+    private String recordingPath;
+    // Held while a recording finalizes, so close() cannot free the native session
+    // under the stop worker.
+    private final Object nativeLock = new Object();
 
     @Override
     public CameraInfo[] enumerateCameras() {
@@ -73,13 +78,17 @@ public class LinuxCameraImpl extends CameraImpl {
         java.util.List<String> entries = splitChar(packed, ';');
         java.util.List<CameraInfo> out = new java.util.ArrayList<CameraInfo>(entries.size());
         for (int i = 0; i < entries.size(); i++) {
-            if (entries.get(i).length() == 0) {
+            String entry = entries.get(i);
+            if (entry.length() == 0) {
                 continue;
             }
-            // A USB/built-in desktop webcam has no API-reported facing, flash or
-            // auto-focus point; the id is the device index the session opens by.
+            // A USB/built-in desktop webcam has no API-reported facing or flash;
+            // the second field says whether V4L2 offers an auto focus control.
+            // The id is the device index the session opens by.
+            java.util.List<String> fields = splitChar(entry, '|');
+            boolean autoFocus = fields.size() > 1 && "af".equals(fields.get(1));
             out.add(new CameraInfo(String.valueOf(out.size()), CameraFacing.EXTERNAL,
-                    new Dimension[0], new Dimension[0], false, false));
+                    new Dimension[0], new Dimension[0], false, autoFocus));
         }
         return out.toArray(new CameraInfo[out.size()]);
     }
@@ -235,36 +244,88 @@ public class LinuxCameraImpl extends CameraImpl {
         }
     }
 
-    // ----- capabilities a generic desktop webcam does not expose: honest no-ops --
+    // ----- recording, zoom, focus, flash --------------------------------------
 
     @Override
     public void startVideoRecording(String filePath, boolean audio) throws IOException {
-        // Source-reader webcam capture exposes no hardware video sink; a real MF
-        // sink-writer pipeline is a separate feature, so report unsupported rather
-        // than pretend to record.
-        throw new IOException("Video recording is not supported by the Linux camera port");
+        if (session == 0) {
+            throw new IOException("Camera session not open");
+        }
+        if (filePath == null || filePath.length() == 0) {
+            throw new IOException("No file path for the video recording");
+        }
+        if (recordingPath != null) {
+            throw new IOException("A video recording is already in progress");
+        }
+        // The path is a FileSystemStorage one (possibly a file:// URL); GStreamer's
+        // filesink wants the native path.
+        String nativePath = LinuxImplementation.getInstance().toNativePath(filePath);
+        String err = LinuxNative.cameraSessionStartRecording(session, nativePath, audio);
+        if (err != null) {
+            throw new IOException(err);
+        }
+        recordingPath = filePath;
     }
 
     @Override
-    public void stopVideoRecording(AsyncResource<String> result) {
-        if (result != null) {
-            result.error(new IOException("Video recording is not supported by the Linux camera port"));
+    public void stopVideoRecording(final AsyncResource<String> result) {
+        final String path = recordingPath;
+        final long s = session;
+        recordingPath = null;
+        if (path == null || s == 0) {
+            if (result != null) {
+                result.error(new IllegalStateException("No video recording in progress"));
+            }
+            return;
         }
+        // Finalizing waits for the muxer to write its index: off the EDT.
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final boolean ok;
+                synchronized (nativeLock) {
+                    // close() may have freed the session first.
+                    ok = session == s && LinuxNative.cameraSessionStopRecording(s);
+                }
+                if (result == null) {
+                    return;
+                }
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (ok) {
+                            result.complete(path);
+                        } else {
+                            result.error(new IOException("The video recording did not finalize cleanly: " + path));
+                        }
+                    }
+                });
+            }
+        }, "cn1-linux-stopvideo");
+        t.start();
     }
 
     @Override
     public void setFlashMode(FlashMode mode) {
-        // Webcams have no controllable flash.
+        // V4L2 defines no flash or torch control, and desktop webcams have no
+        // flash, so there is nothing to drive.
     }
 
     @Override
     public void setZoom(float ratio) {
-        // No optical zoom on a generic webcam.
+        // V4L2_CID_ZOOM_ABSOLUTE, clamped natively; a no-op without the control.
+        if (session != 0) {
+            LinuxNative.cameraSessionSetZoom(session, ratio);
+        }
     }
 
     @Override
     public void focus(float xNorm, float yNorm) {
-        // No focus-point control through the source reader.
+        // V4L2 has no focus point: a tap triggers auto focus where the device
+        // has one, and does nothing where it does not.
+        if (session != 0) {
+            LinuxNative.cameraSessionFocus(session);
+        }
     }
 
     @Override
@@ -286,8 +347,11 @@ public class LinuxCameraImpl extends CameraImpl {
         long s = session;
         session = 0;
         frameListener = null;
+        recordingPath = null;
         if (s != 0) {
-            LinuxNative.cameraSessionStop(s);
+            synchronized (nativeLock) {
+                LinuxNative.cameraSessionStop(s);
+            }
         }
     }
 

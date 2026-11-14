@@ -26,10 +26,10 @@
  * capturePhoto). A desktop has no built-in camera-capture UI, so this grabs a
  * single frame from the default webcam through Media Foundation -- the honest
  * desktop equivalent of a snapshot -- and hands the pixels back to Java, which
- * builds an Image and writes the file. The richer com.codename1.camera CameraImpl
- * (live preview peer, video) needs the generic native-peer placement that the
- * port does not have yet, so createCameraImpl() stays null; this covers the
- * common "take a photo" path.
+ * builds an Image and writes the file. The continuous capture session further
+ * down backs the com.codename1.camera CameraImpl (WindowsCameraImpl): live
+ * preview, stills, zoom/focus through IAMCameraControl and H.264 MP4 recording
+ * through an IMFSinkWriter.
  *
  * A few frames are discarded first so auto-exposure / white-balance settle before
  * the captured frame. RGB32 from MF is BGRA in memory and may be bottom-up
@@ -44,6 +44,7 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <mferror.h>
+#include <strmif.h>   /* IAMCameraControl: zoom / focus on a UVC device */
 #include <wrl/client.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -209,7 +210,20 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraCaptureFrame___int_1A
  * the frame listener. No native->Java callback is used: ParparVM threads must be
  * attached to call into Java, so polling the latest frame from the EDT is both
  * simpler and robust. Honest desktop semantics -- a real webcam frame, never
- * synthetic; flash/zoom/focus/video are reported unsupported on the Java side.
+ * synthetic.
+ *
+ * Zoom and focus go through IAMCameraControl, queried from the session's
+ * IMFMediaSource (the MF capture source exposes the UVC camera-terminal controls
+ * through it). A device that lacks a control is a quiet no-op.
+ *
+ * Recording: while a sink writer is attached, the worker hands every RGB32 sample
+ * it already reads to IMFSinkWriter, which inserts the colour converter and the
+ * H.264 encoder and writes an MP4. Audio, when asked for, comes from a second
+ * source reader on the default audio capture device (PCM 16-bit), run on its own
+ * thread and encoded to AAC by the same writer. The two capture sources do not
+ * share a presentation clock, so both streams are stamped with MFGetSystemTime()
+ * on arrival relative to the recording start; that keeps them in sync to within
+ * the capture latency of each device.
  */
 struct CN1CameraSession {
     CRITICAL_SECTION lock;
@@ -219,12 +233,49 @@ struct CN1CameraSession {
     int reqW, reqH, deviceIndex;
     JAVA_ARRAY_INT* latest;   /* width*height ARGB, malloc'd; NULL until first frame */
     int latestW, latestH;
+    /* Set by the worker once the device is open (AddRef'd), under lock. */
+    IMFMediaSource* source;
+    IMFMediaType* readerType;   /* the reader's negotiated RGB32 output type */
+    /* Recording state, under lock. writer is NULL while not recording. */
+    IMFSinkWriter* writer;
+    DWORD videoStream, audioStream;
+    bool hasAudio;
+    LONGLONG recStart, lastVideoTs, lastAudioTs;
+    LONGLONG frameDuration;
+    HANDLE audioThread;
+    volatile LONG audioRunning;
+    IMFMediaSource* audioSource;
+    IMFSourceReader* audioReader;
     CN1CameraSession() : thread(NULL), running(1), paused(0), reqW(0), reqH(0),
-            deviceIndex(0), latest(NULL), latestW(0), latestH(0) {
+            deviceIndex(0), latest(NULL), latestW(0), latestH(0), source(NULL),
+            readerType(NULL), writer(NULL), videoStream(0), audioStream(0),
+            hasAudio(false), recStart(0), lastVideoTs(-1), lastAudioTs(-1),
+            frameDuration(333333), audioThread(NULL), audioRunning(0),
+            audioSource(NULL), audioReader(NULL) {
         InitializeCriticalSection(&lock);
     }
-    ~CN1CameraSession() { if (latest) free(latest); DeleteCriticalSection(&lock); }
+    ~CN1CameraSession() {
+        if (latest) free(latest);
+        if (source) source->Release();
+        if (readerType) readerType->Release();
+        DeleteCriticalSection(&lock);
+    }
 };
+
+static bool cn1CameraStopRecording(CN1CameraSession* s);
+
+/* Write one sample to the attached sink writer, stamped with arrival time.
+   Caller holds s->lock. */
+static void cn1CameraWriteLocked(CN1CameraSession* s, IMFSample* sample, DWORD stream,
+        LONGLONG* last, LONGLONG duration) {
+    LONGLONG ts = MFGetSystemTime() - s->recStart;
+    if (ts < 0) ts = 0;
+    if (*last >= 0 && ts <= *last) ts = *last + 1; /* keep each stream monotonic */
+    *last = ts;
+    sample->SetSampleTime(ts);
+    if (duration > 0) sample->SetSampleDuration(duration);
+    s->writer->WriteSample(stream, sample);
+}
 
 /* Activate the Nth video capture device and build an RGB32 source reader. */
 static bool cn1CameraOpenReader(int deviceIndex, ComPtr<IMFMediaSource>& source,
@@ -278,6 +329,19 @@ static DWORD WINAPI cn1CameraWorker(LPVOID param) {
         CoUninitialize();
         return 0;
     }
+    {
+        ComPtr<IMFMediaType> cur;
+        IMFMediaType* copy = NULL;
+        if (SUCCEEDED(reader->GetCurrentMediaType((DWORD) MF_SOURCE_READER_FIRST_VIDEO_STREAM, &cur))
+                && SUCCEEDED(MFCreateMediaType(&copy))) {
+            cur->CopyAllItems(copy);
+        }
+        EnterCriticalSection(&s->lock);
+        s->source = source.Get();
+        s->source->AddRef();
+        s->readerType = copy;
+        LeaveCriticalSection(&s->lock);
+    }
     while (InterlockedCompareExchange(&s->running, 1, 1)) {
         if (InterlockedCompareExchange(&s->paused, 0, 0)) { Sleep(30); continue; }
         DWORD streamIndex = 0, flags = 0;
@@ -289,6 +353,11 @@ static DWORD WINAPI cn1CameraWorker(LPVOID param) {
         }
         if ((flags & MF_SOURCE_READERF_ENDOFSTREAM) != 0) break;
         if (!sample) continue;
+        EnterCriticalSection(&s->lock);
+        if (s->writer) {
+            cn1CameraWriteLocked(s, sample.Get(), s->videoStream, &s->lastVideoTs, s->frameDuration);
+        }
+        LeaveCriticalSection(&s->lock);
         ComPtr<IMFMediaBuffer> buffer;
         if (FAILED(sample->ConvertToContiguousBuffer(&buffer)) || !buffer) continue;
         BYTE* data = NULL;
@@ -332,6 +401,10 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionStop___long(
         CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     CN1CameraSession* s = (CN1CameraSession*) (intptr_t) handle;
     if (!s) return;
+    /* Finalize a recording still running so its file is playable. */
+    CN1_YIELD_THREAD;
+    cn1CameraStopRecording(s);
+    CN1_RESUME_THREAD;
     InterlockedExchange(&s->running, 0);
     if (s->thread) {
         /* Parked for the wait: Windows cannot force-stop a thread, so a collection would
@@ -374,7 +447,327 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraSessionLatestFrame___
     return result;
 }
 
-/* Friendly names of the video capture devices: "name|external|0|0;name|...". */
+/* ---------------------------- zoom / focus (IAMCameraControl) ---------------- */
+
+/* The session's camera control, or NULL while the device is not open yet or the
+   driver exposes none. Caller releases. */
+static IAMCameraControl* cn1CameraControl(CN1CameraSession* s) {
+    IAMCameraControl* ctl = NULL;
+    EnterCriticalSection(&s->lock);
+    if (s->source) {
+        s->source->QueryInterface(__uuidof(IAMCameraControl), (void**) &ctl);
+    }
+    LeaveCriticalSection(&s->lock);
+    return ctl;
+}
+
+static bool cn1CameraHasAutoFocus(IAMCameraControl* ctl) {
+    long mn = 0, mx = 0, step = 0, def = 0, caps = 0;
+    return ctl && SUCCEEDED(ctl->GetRange(CameraControl_Focus, &mn, &mx, &step, &def, &caps))
+            && (caps & CameraControl_Flags_Auto) != 0;
+}
+
+/*
+ * Zoom ratio (1.0 = none) onto CameraControl_Zoom. UVC reports absolute zoom as
+ * a focal length in device units (Windows documents millimetres, 10..600), and a
+ * zoom ratio is a ratio of focal lengths, so a positive minimum maps as
+ * min * ratio. A driver whose range starts at 0 or below gives no such meaning;
+ * its range is spread linearly over 1x..4x. Out-of-range values clamp.
+ */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionSetZoom___long_float(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_FLOAT ratio) {
+    CN1CameraSession* s = (CN1CameraSession*) (intptr_t) handle;
+    if (!s) return;
+    IAMCameraControl* ctl = cn1CameraControl(s);
+    if (!ctl) return;
+    long mn = 0, mx = 0, step = 0, def = 0, caps = 0;
+    if (SUCCEEDED(ctl->GetRange(CameraControl_Zoom, &mn, &mx, &step, &def, &caps)) && mx > mn) {
+        double r = ratio < 1.0f ? 1.0 : (double) ratio;
+        double v = mn > 0 ? mn * r : mn + (r - 1.0) / 3.0 * (mx - mn);
+        if (v > mx) v = mx;
+        if (v < mn) v = mn;
+        long value = (long) (v + 0.5);
+        if (step > 1) value = mn + ((value - mn) / step) * step;
+        ctl->Set(CameraControl_Zoom, value, CameraControl_Flags_Manual);
+    }
+    ctl->Release();
+}
+
+/*
+ * UVC has no focus point, so a tap can only ask the lens to refocus: switch the
+ * focus control to auto. Drivers that were left in manual focus (or that only
+ * refocus on the manual->auto transition) are nudged by re-setting auto. A device
+ * without an auto focus control is a quiet no-op.
+ */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionFocus___long(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    CN1CameraSession* s = (CN1CameraSession*) (intptr_t) handle;
+    if (!s) return;
+    IAMCameraControl* ctl = cn1CameraControl(s);
+    if (!ctl) return;
+    if (cn1CameraHasAutoFocus(ctl)) {
+        long value = 0, flags = 0;
+        if (FAILED(ctl->Get(CameraControl_Focus, &value, &flags))) value = 0;
+        ctl->Set(CameraControl_Focus, value, CameraControl_Flags_Auto);
+    }
+    ctl->Release();
+}
+
+/* ------------------------------ video recording ------------------------------ */
+
+/* Opens the default audio capture device as a PCM 16-bit reader at 48 kHz
+   (stereo, or mono for a mono device) -- the input the AAC encoder accepts. */
+static bool cn1CameraOpenAudio(ComPtr<IMFMediaSource>& source, ComPtr<IMFSourceReader>& reader,
+        UINT32& rate, UINT32& channels) {
+    ComPtr<IMFAttributes> attr;
+    if (FAILED(MFCreateAttributes(&attr, 1))) return false;
+    attr->SetGUID(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_GUID);
+    IMFActivate** devices = NULL;
+    UINT32 count = 0;
+    if (FAILED(MFEnumDeviceSources(attr.Get(), &devices, &count)) || count == 0) {
+        if (devices) CoTaskMemFree(devices);
+        return false;
+    }
+    HRESULT hr = devices[0]->ActivateObject(IID_PPV_ARGS(&source));
+    for (UINT32 i = 0; i < count; i++) { if (devices[i]) devices[i]->Release(); }
+    CoTaskMemFree(devices);
+    if (FAILED(hr) || !source) return false;
+    if (FAILED(MFCreateSourceReaderFromMediaSource(source.Get(), NULL, &reader))) {
+        source->Shutdown();
+        return false;
+    }
+    UINT32 nativeCh = 2;
+    ComPtr<IMFMediaType> nativeType;
+    if (SUCCEEDED(reader->GetNativeMediaType((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, &nativeType))) {
+        nativeCh = MFGetAttributeUINT32(nativeType.Get(), MF_MT_AUDIO_NUM_CHANNELS, 2);
+    }
+    channels = nativeCh == 1 ? 1 : 2;
+    rate = 48000;
+    ComPtr<IMFMediaType> pcm;
+    MFCreateMediaType(&pcm);
+    pcm->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+    pcm->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
+    pcm->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
+    pcm->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, rate);
+    pcm->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, channels);
+    pcm->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, channels * 2);
+    pcm->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, rate * channels * 2);
+    if (FAILED(reader->SetCurrentMediaType((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, pcm.Get()))) {
+        source->Shutdown();
+        return false;
+    }
+    return true;
+}
+
+static DWORD WINAPI cn1CameraAudioWorker(LPVOID param) {
+    CN1CameraSession* s = (CN1CameraSession*) param;
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    while (InterlockedCompareExchange(&s->audioRunning, 1, 1)) {
+        DWORD streamIndex = 0, flags = 0;
+        LONGLONG timestamp = 0;
+        ComPtr<IMFSample> sample;
+        if (FAILED(s->audioReader->ReadSample((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0,
+                &streamIndex, &flags, &timestamp, &sample))) {
+            break;
+        }
+        if ((flags & MF_SOURCE_READERF_ENDOFSTREAM) != 0) break;
+        if (!sample) continue;
+        LONGLONG duration = 0;
+        sample->GetSampleDuration(&duration);
+        EnterCriticalSection(&s->lock);
+        if (s->writer && s->hasAudio) {
+            cn1CameraWriteLocked(s, sample.Get(), s->audioStream, &s->lastAudioTs, duration);
+        }
+        LeaveCriticalSection(&s->lock);
+    }
+    CoUninitialize();
+    return 0;
+}
+
+/* Detaches and finalizes the writer, stopping the audio thread first. */
+static bool cn1CameraStopRecording(CN1CameraSession* s) {
+    if (s->audioThread) {
+        InterlockedExchange(&s->audioRunning, 0);
+        /* Shutting the source down unblocks a ReadSample the worker is parked in,
+           so the wait below is bounded without a timeout -- and must be: releasing
+           the reader while the worker still calls it would be a use after free. */
+        if (s->audioSource) s->audioSource->Shutdown();
+        WaitForSingleObject(s->audioThread, INFINITE);
+        CloseHandle(s->audioThread);
+        s->audioThread = NULL;
+    }
+    EnterCriticalSection(&s->lock);
+    IMFSinkWriter* w = s->writer;
+    s->writer = NULL;
+    s->hasAudio = false;
+    IMFMediaSource* audioSource = s->audioSource;
+    IMFSourceReader* audioReader = s->audioReader;
+    s->audioSource = NULL;
+    s->audioReader = NULL;
+    LeaveCriticalSection(&s->lock);
+    if (audioSource) { audioSource->Shutdown(); audioSource->Release(); }
+    if (audioReader) { audioReader->Release(); }
+    if (!w) return false;
+    /* Finalize fails when not a single sample reached the writer (paused all along,
+       or stopped at once); the file is then not a playable MP4. */
+    bool ok = SUCCEEDED(w->Finalize());
+    w->Release();
+    return ok;
+}
+
+/*
+ * Starts writing the session's frames to an H.264 MP4 at the given native path.
+ * Returns 0 when recording with the requested streams, 1 when recording video
+ * only because audio was requested but no audio capture device could be opened,
+ * -1 for a bad handle or a recording already running, -2 while the camera is
+ * not open yet, -3 when the writer or encoder could not be set up.
+ */
+JAVA_INT com_codename1_impl_windows_WindowsNative_cameraSessionStartRecording___long_java_lang_String_boolean_R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT pathObj, JAVA_BOOLEAN audio) {
+    CN1CameraSession* s = (CN1CameraSession*) (intptr_t) handle;
+    if (!s || pathObj == JAVA_NULL) return -1;
+    EnterCriticalSection(&s->lock);
+    bool busy = s->writer != NULL || s->audioThread != NULL;
+    IMFMediaType* inType = s->readerType;
+    if (inType) inType->AddRef();
+    LeaveCriticalSection(&s->lock);
+    if (busy) { if (inType) inType->Release(); return -1; }
+    if (!inType) return -2;
+    ComPtr<IMFMediaType> videoIn;
+    videoIn.Attach(inType);
+
+    UINT32 width = 0, height = 0, fpsN = 30, fpsD = 1;
+    MFGetAttributeSize(videoIn.Get(), MF_MT_FRAME_SIZE, &width, &height);
+    if (FAILED(MFGetAttributeRatio(videoIn.Get(), MF_MT_FRAME_RATE, &fpsN, &fpsD)) || fpsN == 0 || fpsD == 0) {
+        fpsN = 30; fpsD = 1;
+        MFSetAttributeRatio(videoIn.Get(), MF_MT_FRAME_RATE, fpsN, fpsD);
+    }
+    videoIn->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+    MFSetAttributeRatio(videoIn.Get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
+
+    ComPtr<IMFSourceReader> audioReader;
+    ComPtr<IMFMediaSource> audioSource;
+    UINT32 rate = 0, channels = 0;
+    bool withAudio = audio && cn1CameraOpenAudio(audioSource, audioReader, rate, channels);
+
+    WCHAR* path = cn1WinJavaStringToWide(threadStateData, pathObj, NULL);
+    if (!path) { if (audioSource) audioSource->Shutdown(); return -3; }
+    ComPtr<IMFSinkWriter> writer;
+    DWORD vStream = 0, aStream = 0;
+    HRESULT hr = E_FAIL;
+    /* Two passes at most: when the AAC stream cannot be set up (no AAC encoder,
+       an input type it refuses) the writer is rebuilt for video alone rather than
+       failing the whole recording. */
+    for (int pass = 0; pass < 2; pass++) {
+        writer.Reset();
+        ComPtr<IMFAttributes> wattr;
+        MFCreateAttributes(&wattr, 2);
+        wattr->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
+        /* MP4 regardless of the file's extension. */
+        wattr->SetGUID(MF_TRANSCODE_CONTAINERTYPE, MFTranscodeContainerType_MPEG4);
+        hr = MFCreateSinkWriterFromURL(path, NULL, wattr.Get(), &writer);
+        if (SUCCEEDED(hr)) {
+            ComPtr<IMFMediaType> h264;
+            MFCreateMediaType(&h264);
+            h264->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
+            h264->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264);
+            /* ~0.15 bits per pixel per frame: good webcam quality, clamped. */
+            double bps = (double) width * height * ((double) fpsN / fpsD) * 0.15;
+            if (bps < 500000) bps = 500000;
+            if (bps > 20000000) bps = 20000000;
+            h264->SetUINT32(MF_MT_AVG_BITRATE, (UINT32) bps);
+            h264->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+            MFSetAttributeSize(h264.Get(), MF_MT_FRAME_SIZE, width, height);
+            MFSetAttributeRatio(h264.Get(), MF_MT_FRAME_RATE, fpsN, fpsD);
+            MFSetAttributeRatio(h264.Get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
+            hr = writer->AddStream(h264.Get(), &vStream);
+            /* RGB32 in: the writer inserts the colour converter ahead of the encoder. */
+            if (SUCCEEDED(hr)) hr = writer->SetInputMediaType(vStream, videoIn.Get(), NULL);
+        }
+        if (FAILED(hr)) break; /* the video stream itself failed: nothing to retry */
+        if (withAudio) {
+            ComPtr<IMFMediaType> aac;
+            MFCreateMediaType(&aac);
+            aac->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+            aac->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AAC);
+            aac->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
+            aac->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, rate);
+            aac->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, channels);
+            aac->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 16000); /* 128 kbit/s */
+            ComPtr<IMFMediaType> pcm;
+            HRESULT ahr = writer->AddStream(aac.Get(), &aStream);
+            if (SUCCEEDED(ahr)) ahr = audioReader->GetCurrentMediaType((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pcm);
+            if (SUCCEEDED(ahr)) ahr = writer->SetInputMediaType(aStream, pcm.Get(), NULL);
+            if (FAILED(ahr)) {
+                withAudio = false;
+                hr = ahr;
+                continue;
+            }
+        }
+        hr = writer->BeginWriting();
+        break;
+    }
+    free(path);
+    if (FAILED(hr)) {
+        if (audioSource) audioSource->Shutdown();
+        return -3;
+    }
+
+    EnterCriticalSection(&s->lock);
+    s->videoStream = vStream;
+    s->audioStream = aStream;
+    s->hasAudio = withAudio;
+    s->frameDuration = (LONGLONG) (10000000.0 * fpsD / fpsN);
+    s->lastVideoTs = -1;
+    s->lastAudioTs = -1;
+    s->recStart = MFGetSystemTime();
+    s->writer = writer.Detach();
+    if (withAudio) {
+        s->audioSource = audioSource.Detach();
+        s->audioReader = audioReader.Detach();
+    }
+    LeaveCriticalSection(&s->lock);
+    if (withAudio) {
+        InterlockedExchange(&s->audioRunning, 1);
+        s->audioThread = CreateThread(NULL, 0, cn1CameraAudioWorker, s, 0, NULL);
+        if (!s->audioThread) {
+            /* The writer already declares an AAC stream that would never get a
+               sample, so its file could not be finalized. Fail the start rather
+               than record something unplayable, and let the microphone go. */
+            InterlockedExchange(&s->audioRunning, 0);
+            EnterCriticalSection(&s->lock);
+            IMFSinkWriter* w = s->writer;
+            IMFMediaSource* src = s->audioSource;
+            IMFSourceReader* rdr = s->audioReader;
+            s->writer = NULL;
+            s->hasAudio = false;
+            s->audioSource = NULL;
+            s->audioReader = NULL;
+            LeaveCriticalSection(&s->lock);
+            if (w) w->Release();
+            if (src) { src->Shutdown(); src->Release(); }
+            if (rdr) rdr->Release();
+            return -3;
+        }
+    } else if (audioSource) {
+        audioSource->Shutdown();
+    }
+    return (audio && !withAudio) ? 1 : 0;
+}
+
+/* Stops recording and finalizes the MP4; false when nothing playable was written. */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_cameraSessionStopRecording___long_R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    CN1CameraSession* s = (CN1CameraSession*) (intptr_t) handle;
+    if (!s) return JAVA_FALSE;
+    CN1_YIELD_THREAD;
+    bool ok = cn1CameraStopRecording(s);
+    CN1_RESUME_THREAD;
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/* Friendly names of the video capture devices: "name|external|flash|autofocus;...",
+   flash always 0 (see WindowsCameraImpl.setFlashMode). */
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraEnumerate___R_java_lang_String(
         CODENAME_ONE_THREAD_STATE) {
     if (!cn1CameraEnsureMF()) return newStringFromCString(threadStateData, "");
@@ -398,8 +791,22 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_cameraEnumerate___R_java_la
             WideCharToMultiByte(CP_UTF8, 0, name, -1, utf8, (int) sizeof(utf8), NULL, NULL);
             CoTaskMemFree(name);
             for (char* p = utf8; *p; p++) { if (*p == '|' || *p == ';') *p = ' '; }
-            int need = snprintf(buf + pos, sizeof(buf) - pos, "%s%s|external|0|0",
-                    pos > 0 ? ";" : "", utf8);
+            /* Auto focus is reported from the device's own focus control. Activating
+               the source to ask costs a few tens of milliseconds per device but does
+               not start streaming (no capture LED); ShutdownObject releases it. */
+            int af = 0;
+            IMFMediaSource* probe = NULL;
+            if (SUCCEEDED(devices[i]->ActivateObject(IID_PPV_ARGS(&probe))) && probe) {
+                IAMCameraControl* ctl = NULL;
+                if (SUCCEEDED(probe->QueryInterface(__uuidof(IAMCameraControl), (void**) &ctl)) && ctl) {
+                    af = cn1CameraHasAutoFocus(ctl) ? 1 : 0;
+                    ctl->Release();
+                }
+                probe->Release();
+                devices[i]->ShutdownObject();
+            }
+            int need = snprintf(buf + pos, sizeof(buf) - pos, "%s%s|external|0|%d",
+                    pos > 0 ? ";" : "", utf8, af);
             if (need > 0 && pos + need < (int) sizeof(buf)) { pos += need; }
         }
         devices[i]->Release();

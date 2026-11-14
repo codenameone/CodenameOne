@@ -30,14 +30,93 @@ import com.codename1.ai.vision.VisionPoint;
 import com.codename1.util.AsyncResource;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
 import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.common.InputImage;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /** ML Kit barcode scanning; retained only for {@code BarcodeScanner} users. */
 final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
-    private final BarcodeScanner client = BarcodeScanning.getClient();
+    // One client per format mask, built on first use and kept until close().
+    // A scanner limited to PDF417 and a BarcodeScanner.detect() with default
+    // options share this adapter, so closing one client to build the other
+    // would fail the scan still running on it.
+    private final Map<Integer, BarcodeScanner> clients = new HashMap<Integer, BarcodeScanner>();
+
+    private synchronized BarcodeScanner client(VisionOptions options) {
+        int formats = mlKitFormats(options == null ? new String[0] : options.getBarcodeFormats());
+        Integer key = Integer.valueOf(formats);
+        BarcodeScanner client = clients.get(key);
+        if (client == null) {
+            if (formats == 0) {
+                client = BarcodeScanning.getClient();
+            } else {
+                // A detector told the symbologies it is looking for skips the
+                // others on every frame; for a dense PDF417 that is the
+                // difference between reading and not.
+                client = BarcodeScanning.getClient(new BarcodeScannerOptions.Builder()
+                        .setBarcodeFormats(formats).build());
+            }
+            clients.put(key, client);
+        }
+        return client;
+    }
+
+    /// The ML Kit bit mask for the given format names; 0 (every format) when
+    /// none is named or none is one ML Kit knows.
+    static int mlKitFormats(String[] names) {
+        int mask = 0;
+        for (int i = 0; i < names.length; i++) {
+            mask |= mlKitFormat(names[i]);
+        }
+        return mask;
+    }
+
+    private static int mlKitFormat(String name) {
+        if ("AZTEC".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_AZTEC;
+        }
+        if ("CODABAR".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_CODABAR;
+        }
+        if ("CODE_39".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_CODE_39;
+        }
+        if ("CODE_93".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_CODE_93;
+        }
+        if ("CODE_128".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_CODE_128;
+        }
+        if ("DATA_MATRIX".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_DATA_MATRIX;
+        }
+        if ("EAN_8".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_EAN_8;
+        }
+        if ("EAN_13".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_EAN_13;
+        }
+        if ("ITF".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_ITF;
+        }
+        if ("PDF417".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_PDF417;
+        }
+        if ("QR_CODE".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE;
+        }
+        if ("UPC_A".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_UPC_A;
+        }
+        if ("UPC_E".equals(name)) {
+            return com.google.mlkit.vision.barcode.common.Barcode.FORMAT_UPC_E;
+        }
+        return 0;
+    }
     @Override
     @SuppressWarnings("unchecked")
     void analyze(InputImage input, final int imageWidth,
@@ -45,7 +124,7 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
                  AsyncResource<?> resource) {
         final AsyncResource<Barcode[]> out = (AsyncResource<Barcode[]>) resource;
         final int maximumResults = options.getMaximumResults();
-        client.process(input).addOnSuccessListener(
+        client(options).process(input).addOnSuccessListener(
                 new OnSuccessListener<List<com.google.mlkit.vision.barcode.common.Barcode>>() {
             public void onSuccess(
                     List<com.google.mlkit.vision.barcode.common.Barcode> values) {
@@ -76,8 +155,11 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
     }
 
     @Override
-    void close() {
-        client.close();
+    synchronized void close() {
+        for (BarcodeScanner c : clients.values()) {
+            c.close();
+        }
+        clients.clear();
     }
 
     private static String barcodeFormat(int format) {
