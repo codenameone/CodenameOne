@@ -423,6 +423,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(indexes instanceof List) for(Object index:(List)indexes) ec.indexes.add((AnnotationValues)index);
         String table = unquoteName(entityAnn.getString("table"));
         ec.tableName = (table == null || table.length() == 0) ? physical(ec.simpleName) : table;
+        AnnotationValues searchable = cls.getClassAnnotation("Lcom/codename1/backend/annotations/Searchable;");
+        if (searchable != null) {
+            String index = searchable.getString("index");
+            ec.searchIndex = index == null || index.length() == 0 ? asciiLower(ec.tableName) : index;
+            if (!validSearchIndex(ec.searchIndex)) {
+                ctx.error(cls, "@Searchable index '" + ec.searchIndex + "' of " + ec.binaryName
+                        + " must be lowercase letters, digits, '-' and '_', not starting with '-' or '_'");
+            }
+        }
         if (backend && tooLongForAnEngine(ec.tableName)) {
             ctx.error(cls, "@Entity " + ec.binaryName + " is stored in a table named '"
                     + ec.tableName + "', which is " + utf8Length(ec.tableName) + " bytes. "
@@ -484,6 +493,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             pf.fieldName = fieldPath.path;pf.declaringType=fieldPath.declaringType;
             pf.embeddedParent = fieldPath.prefix;
             pf.version = f.getAnnotation("Lcom/codename1/annotations/db/Version;") != null;
+            pf.sortKey = f.getAnnotation("Lcom/codename1/backend/annotations/SortKey;") != null;
+            pf.searchField = f.getAnnotation("Lcom/codename1/backend/annotations/SearchField;") != null;
             pf.kind = PropertyTypeKind.of(f);
             pf.record = ec.record;
             if(f.isFinal() && !ec.record && pf.kind.kind!=PropertyTypeKind.Kind.PROPERTY) ctx.error(cls,"Persistent fields must be writable: "+pf.fieldName);
@@ -772,6 +783,21 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         if(ec.idFields.size()>1) for(PersistedField field:ec.idFields) {
             if(field.autoIncrement || ec.generation!=0) ctx.error(cls,"Composite identifiers must be assigned; use @Id(autoIncrement=false)");
             if(field.dialectKind==KIND_BLOB) ctx.error(cls,"Composite identifiers cannot contain binary components: "+field.fieldName);
+        }
+        int sortKeys=0;
+        for(PersistedField field:ec.fields) {
+            if(!field.sortKey) continue;
+            sortKeys++;
+            if(!field.isId) ctx.error(cls,"@SortKey marks an identifier column; "+field.fieldName+" is not one");
+        }
+        if(sortKeys>1) ctx.error(cls,"An entity can have only one @SortKey");
+        for(PersistedField field:ec.fields) {
+            if(field.searchField && ec.searchIndex==null) ctx.error(cls,"@SearchField "+field.fieldName+" needs @Searchable on "+ec.binaryName);
+        }
+        if(sortKeys>0 && ec.idFields.size()!=2) {
+            // A document store keys an item by a partition key and at most one
+            // sort key, so the pair is the whole identifier or it cannot be stored.
+            ctx.error(cls,"@SortKey requires an identifier of exactly two columns: "+ec.binaryName);
         }
         // TWO FIELDS, ONE COLUMN. Every statement then names the column twice:
         // the CREATE TABLE is refused for a duplicate column, and against a
@@ -1152,6 +1178,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 if(field.getAnnotation("Lcom/codename1/annotations/db/EmbeddedId;")!=null) {
                     if(entity.embeddedId!=null) ctx.error("Multiple embedded identifiers");
                     entity.embeddedId=path;
+                }
+                if(field.getAnnotation("Lcom/codename1/backend/annotations/SearchField;")!=null) {
+                    // The value is stored as its own columns; marking the holder
+                    // would otherwise be dropped and every column indexed.
+                    ctx.error("@SearchField goes on the fields of the @Embeddable, not on the embedded value: "+path);
                 }
                 if(field.isFinal() && !cls.isRecord()) { ctx.error("Embedded field must be writable: "+path);continue; }
                 String type=org.objectweb.asm.Type.getType(field.getDescriptor()).getClassName();
@@ -1915,6 +1946,22 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 sb.append("value.").append(accessPath(component,ec.record));
             }
             sb.append("}); } return super.keyValues(key); }\n");
+        }
+        if(ec.searchIndex!=null) {
+            sb.append("public String searchIndex() { return \"").append(escape(ec.searchIndex)).append("\"; }\n");
+            boolean marked=false;
+            for(PersistedField field:ec.fields) marked|=field.searchField;
+            if(marked) {
+                sb.append("public boolean searchField(int index) { switch(index) {");
+                for(int i=0;i<ec.fields.size();i++) {
+                    PersistedField field=ec.fields.get(i);
+                    if(field.searchField||field.isId) sb.append(" case ").append(i).append(':');
+                }
+                sb.append(" return true; default: return false; } }\n");
+            }
+        }
+        for(int i=0;i<ec.fields.size();i++) {
+            if(ec.fields.get(i).sortKey) sb.append("public int sortKeyIndex() { return ").append(i).append("; }\n");
         }
         if(ec.generation!=0) sb.append("public int generation() { return ").append(ec.generation)
           .append("; }\npublic String generator() { return ").append('"').append(escape(ec.generator)).append("\"; }\n");
@@ -3551,6 +3598,22 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         int cascade,index,column=-1;
     }
 
+    static String asciiLower(String s) {
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            b.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return b.toString();
+    }
+    static boolean validSearchIndex(String index) {
+        if (index.length() == 0 || index.charAt(0) == '-' || index.charAt(0) == '_') return false;
+        for (int i = 0; i < index.length(); i++) {
+            char c = index.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-' || c == '_')) return false;
+        }
+        return true;
+    }
     static final class EntityClass {
         String binaryName;
         /// A record: built through its canonical constructor and never written.
@@ -3566,6 +3629,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         String daoBinaryName;
         String daoSimpleName;
         String tableName;
+        /// @Searchable: the search index name, or null.
+        String searchIndex;
         int generation;
         String generator;
         PersistedField idField;
@@ -3610,6 +3675,10 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         boolean isId;
         boolean autoIncrement;
         boolean version;
+        /// @SortKey: the sort key of a two-column identifier in a document store.
+        boolean sortKey;
+        /// @SearchField: indexed in the search document.
+        boolean searchField;
         boolean unique;
         /// @Column(insertable/updatable); both true unless the developer said otherwise.
         boolean insertable = true, updatable = true;
