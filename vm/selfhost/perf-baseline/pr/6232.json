@@ -1,0 +1,27 @@
+{
+ "pr": 6232,
+ "rebaseline": {
+  "windows-x64@intel64-family-6-model-207-genuineintel": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.857,
+      "time": 1.069,
+      "tolerance": {
+       "memory": 0.35,
+       "time": 0.5
+      }
+     },
+     "memory": 0.857,
+     "reason": "the hello suite gained six Gpu screenshot tests whose CPU-side IBL baking and noise textures are float-heavy loops; the suite's workload changed, not the VM",
+     "runs": 1,
+     "time": 1.717,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.5
+     }
+    }
+   }
+  }
+ }
+}
