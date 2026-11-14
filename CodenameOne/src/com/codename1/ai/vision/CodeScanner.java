@@ -241,7 +241,7 @@ public final class CodeScanner {
                             if (finished) {
                                 return;
                             }
-                            CameraSession session = view.getSession();
+                            CameraSession session = view.getSession(); //NOPMD CloseResource - borrowed from the view, which owns and closes it
                             if (session == null) {
                                 return;
                             }
