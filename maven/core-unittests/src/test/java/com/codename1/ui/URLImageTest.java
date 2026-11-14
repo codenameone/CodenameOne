@@ -103,5 +103,22 @@ class URLImageTest extends UITestBase {
 
         Image buffer = Image.createImage(10, 10);
         buffer.getGraphics().drawImage(img, 0, 0);
+
+        // Drawing it starts a fetch on the network thread. Left running, its
+        // request reaches the next test's queue instead, where a test that
+        // counts what it sent (PushClientTransportTest) sees one too many.
+        long deadline = System.currentTimeMillis() + 5000;
+        com.codename1.ui.DisplayTest.flushEdt();
+        while (!com.codename1.io.NetworkManager.getInstance().isQueueIdle()
+                && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                break;
+            }
+            com.codename1.ui.DisplayTest.flushEdt();
+        }
+        Assertions.assertTrue(com.codename1.io.NetworkManager.getInstance().isQueueIdle(),
+                "the image fetch is still running");
     }
 }
