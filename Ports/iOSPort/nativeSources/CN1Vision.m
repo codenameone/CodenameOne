@@ -292,6 +292,26 @@ static NSString *cn1MLKitBarcodeFormat(MLKBarcodeFormat format) {
         default: return @"UNKNOWN";
     }
 }
+
+static MLKBarcodeFormat cn1MLKitBarcodeFormats(NSArray<NSString *> *names) {
+    MLKBarcodeFormat mask = 0;
+    for (NSString *name in names ?: @[]) {
+        if ([name isEqualToString:@"AZTEC"]) mask |= MLKBarcodeFormatAztec;
+        else if ([name isEqualToString:@"CODABAR"]) mask |= MLKBarcodeFormatCodaBar;
+        else if ([name isEqualToString:@"CODE_39"]) mask |= MLKBarcodeFormatCode39;
+        else if ([name isEqualToString:@"CODE_93"]) mask |= MLKBarcodeFormatCode93;
+        else if ([name isEqualToString:@"CODE_128"]) mask |= MLKBarcodeFormatCode128;
+        else if ([name isEqualToString:@"DATA_MATRIX"]) mask |= MLKBarcodeFormatDataMatrix;
+        else if ([name isEqualToString:@"EAN_8"]) mask |= MLKBarcodeFormatEAN8;
+        else if ([name isEqualToString:@"EAN_13"]) mask |= MLKBarcodeFormatEAN13;
+        else if ([name isEqualToString:@"ITF"]) mask |= MLKBarcodeFormatITF;
+        else if ([name isEqualToString:@"PDF417"]) mask |= MLKBarcodeFormatPDF417;
+        else if ([name isEqualToString:@"QR_CODE"]) mask |= MLKBarcodeFormatQRCode;
+        else if ([name isEqualToString:@"UPC_A"]) mask |= MLKBarcodeFormatUPCA;
+        else if ([name isEqualToString:@"UPC_E"]) mask |= MLKBarcodeFormatUPCE;
+    }
+    return mask;
+}
 #endif
 
 #if defined(CN1_HAS_MLKIT_TEXT)
@@ -328,7 +348,8 @@ static MLKCommonTextRecognizerOptions *cn1MLKitTextScriptOptions(
 
 static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
                                        int feature, int rotation,
-                                       NSString *textScript) {
+                                       NSString *textScript,
+                                       NSArray<NSString *> *barcodeFormats) {
 #if defined(CN1_HAS_MLKIT_VISION)
     CN1Image *image = rawImage == NULL ? [CN1Image imageWithData:data]
             : [CN1Image imageWithCGImage:rawImage];
@@ -378,7 +399,15 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
 #endif
     } else if (feature == 1) {
 #if defined(CN1_HAS_MLKIT_BARCODE)
-        MLKBarcodeScannerOptions *options = [[MLKBarcodeScannerOptions alloc] init];
+        /*
+         * A detector told which symbologies to look for skips the others on
+         * every frame; for a dense PDF417 that is the difference between
+         * reading and not. No formats (or none ML Kit knows) means all.
+         */
+        MLKBarcodeFormat mlkFormats = cn1MLKitBarcodeFormats(barcodeFormats);
+        MLKBarcodeScannerOptions *options = mlkFormats == 0
+                ? [[MLKBarcodeScannerOptions alloc] init]
+                : [[MLKBarcodeScannerOptions alloc] initWithFormats:mlkFormats];
         MLKBarcodeScanner *scanner =
                 [MLKBarcodeScanner barcodeScannerWithOptions:options];
         __block NSArray<MLKBarcode *> *result = nil;
@@ -575,7 +604,67 @@ static NSString *cn1AppleBarcodeFormat(NSString *symbology) {
     if ([value containsString:@"UPCE"]) return @"UPC_E";
     if ([value containsString:@"ITF"]) return @"ITF";
     if ([value containsString:@"AZTEC"]) return @"AZTEC";
+    if ([value containsString:@"I2OF5"]) return @"ITF";
+    if ([value containsString:@"CODABAR"]) return @"CODABAR";
     return @"UNKNOWN";
+}
+
+/*
+ * The Apple Vision symbologies for the given format names, limited to the ones
+ * this request revision supports (asking for one it does not makes the whole
+ * request fail). Nil means every symbology: no formats were named, or none of
+ * them maps to one this OS can detect, in which case restricting would only
+ * turn a scan that might work into one that cannot.
+ */
+static NSArray<VNBarcodeSymbology> *cn1AppleBarcodeSymbologies(
+        VNDetectBarcodesRequest *request, NSArray<NSString *> *names) {
+    if (names.count == 0) return nil;
+    NSMutableArray<VNBarcodeSymbology> *wanted = [NSMutableArray array];
+    for (NSString *name in names) {
+        if ([name isEqualToString:@"QR_CODE"]) [wanted addObject:VNBarcodeSymbologyQR];
+        else if ([name isEqualToString:@"DATA_MATRIX"]) [wanted addObject:VNBarcodeSymbologyDataMatrix];
+        else if ([name isEqualToString:@"PDF417"]) [wanted addObject:VNBarcodeSymbologyPDF417];
+        else if ([name isEqualToString:@"AZTEC"]) [wanted addObject:VNBarcodeSymbologyAztec];
+        else if ([name isEqualToString:@"CODE_128"]) [wanted addObject:VNBarcodeSymbologyCode128];
+        else if ([name isEqualToString:@"CODE_93"]) {
+            if (@available(iOS 15.0, macOS 12.0, *)) {
+                [wanted addObject:VNBarcodeSymbologyCode93];
+                [wanted addObject:VNBarcodeSymbologyCode93i];
+            }
+        } else if ([name isEqualToString:@"CODE_39"]) {
+            [wanted addObject:VNBarcodeSymbologyCode39];
+            [wanted addObject:VNBarcodeSymbologyCode39Checksum];
+            [wanted addObject:VNBarcodeSymbologyCode39FullASCII];
+            [wanted addObject:VNBarcodeSymbologyCode39FullASCIIChecksum];
+        } else if ([name isEqualToString:@"EAN_13"] || [name isEqualToString:@"UPC_A"]) {
+            // Vision reports a UPC-A as the EAN-13 it is a subset of.
+            [wanted addObject:VNBarcodeSymbologyEAN13];
+        } else if ([name isEqualToString:@"EAN_8"]) [wanted addObject:VNBarcodeSymbologyEAN8];
+        else if ([name isEqualToString:@"UPC_E"]) [wanted addObject:VNBarcodeSymbologyUPCE];
+        else if ([name isEqualToString:@"ITF"]) {
+            [wanted addObject:VNBarcodeSymbologyITF14];
+            [wanted addObject:VNBarcodeSymbologyI2of5];
+            [wanted addObject:VNBarcodeSymbologyI2of5Checksum];
+        } else if ([name isEqualToString:@"CODABAR"]) {
+            if (@available(iOS 15.0, macOS 12.0, *)) {
+                [wanted addObject:VNBarcodeSymbologyCodabar];
+            }
+        }
+    }
+    NSArray<VNBarcodeSymbology> *supported = nil;
+    if (@available(iOS 15.0, macOS 12.0, *)) {
+        supported = [request supportedSymbologiesAndReturnError:nil];
+    } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        supported = [VNDetectBarcodesRequest supportedSymbologies];
+#pragma clang diagnostic pop
+    }
+    NSMutableArray<VNBarcodeSymbology> *out = [NSMutableArray array];
+    for (VNBarcodeSymbology s in wanted) {
+        if (supported == nil || [supported containsObject:s]) [out addObject:s];
+    }
+    return out.count == 0 ? nil : out;
 }
 
 static NSString *cn1ApplePoseLandmarkName(
@@ -663,7 +752,8 @@ static NSArray<NSString *> *cn1VisionLanguagesForScript(
 
 static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
                                   int feature, int rotation,
-                                  NSString *textScript) {
+                                  NSString *textScript,
+                                  NSArray<NSString *> *barcodeFormats) {
     NSError *error = nil;
     VNImageRequestHandler *handler = rawImage == NULL
             ? [[VNImageRequestHandler alloc] initWithData:data
@@ -724,6 +814,11 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
          */
         request.revision = VNDetectBarcodesRequestRevision1;
 #endif
+        NSArray<VNBarcodeSymbology> *symbologies =
+                cn1AppleBarcodeSymbologies(request, barcodeFormats);
+        if (symbologies != nil) {
+            request.symbologies = symbologies;
+        }
         if (![handler performRequests:@[request] error:&error]) {
             return cn1VisionError(error);
         }
@@ -1054,11 +1149,12 @@ static CGImageRef cn1VisionCreateRawImage(NSData *data, int width, int height,
 }
 #endif
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_boolean_int_int_int_int_java_lang_String_R_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_boolean_int_int_int_int_java_lang_String_java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_OBJECT encodedImage, JAVA_INT feature, JAVA_BOOLEAN mlKit,
         JAVA_INT rotation, JAVA_INT width, JAVA_INT height,
-        JAVA_INT frameFormat, JAVA_OBJECT textScript) {
+        JAVA_INT frameFormat, JAVA_OBJECT textScript,
+        JAVA_OBJECT barcodeFormats) {
 #if defined(INCLUDE_CN1_VISION) && !TARGET_OS_WATCH && !TARGET_OS_TV
     if (encodedImage == JAVA_NULL) {
         return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
@@ -1074,9 +1170,16 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_
     }
     NSString *script = textScript == JAVA_NULL ? @"latin"
             : toNSString(CN1_THREAD_GET_STATE_PASS_ARG textScript);
+    NSArray<NSString *> *formats = nil;
+    if (barcodeFormats != JAVA_NULL) {
+        NSString *joined = toNSString(CN1_THREAD_GET_STATE_PASS_ARG barcodeFormats);
+        if (joined.length > 0) {
+            formats = [joined componentsSeparatedByString:@","];
+        }
+    }
     NSString *result = mlKit
-            ? cn1MLKitVisionPerform(data, rawImage, feature, rotation, script)
-            : cn1VisionPerform(data, rawImage, feature, rotation, script);
+            ? cn1MLKitVisionPerform(data, rawImage, feature, rotation, script, formats)
+            : cn1VisionPerform(data, rawImage, feature, rotation, script, formats);
     if (rawImage != NULL) CGImageRelease(rawImage);
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG result);
 #else

@@ -35,6 +35,14 @@ import java.util.Properties;
 @Mojo(name="run")
 public class CN1RunMojo extends AbstractCN1Mojo {
 
+    /**
+     * Lets a subclass add to the nested simulator build before it starts -- the
+     * environment is the one channel that reaches the forked simulator JVM in
+     * every project, whatever exec arguments its pom declares.
+     */
+    protected void configureSimulatorRequest(InvocationRequest request) throws MojoExecutionException {
+    }
+
     @Override
     protected String helpStep() {
         return "local_run";
@@ -92,6 +100,7 @@ public class CN1RunMojo extends AbstractCN1Mojo {
         // This build is already reported, as the simulator, for as long as the nested
         // one runs; the nested build would report the same session a second time.
         request.addShellEnvironment(com.codename1.build.FirstBuildTelemetry.LAUNCHER_ENV, "1");
+        configureSimulatorRequest(request);
 
         Invoker invoker = new DefaultInvoker();
         InvocationResult result;

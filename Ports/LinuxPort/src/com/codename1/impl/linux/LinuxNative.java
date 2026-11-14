@@ -1137,9 +1137,10 @@ public final class LinuxNative {
 
     /**
      * Friendly names of the connected video capture devices, packed as
-     * {@code "name|external|0|0;name|external|0|0;..."} (the format
+     * {@code "name|af|0|0;name|false|0|0;..."}, the second field {@code af}
+     * when the device has a V4L2 auto focus control (the format
      * {@link LinuxCameraImpl} parses into {@code CameraInfo}). Empty string when
-     * none / Media Foundation is unavailable.
+     * none / GStreamer is unavailable.
      */
     public static native String cameraEnumerate();
 
@@ -1164,6 +1165,35 @@ public final class LinuxNative {
      * frame listener poll this.
      */
     public static native int[] cameraSessionLatestFrame(long handle, int[] outDims);
+
+    /**
+     * Sets V4L2_CID_ZOOM_ABSOLUTE on the session's device from a ratio (1.0 = no
+     * zoom), clamped to the driver's range. A quiet no-op when the device has no
+     * zoom control.
+     */
+    public static native void cameraSessionSetZoom(long handle, float ratio);
+
+    /**
+     * Triggers a one-shot auto focus (V4L2_CID_AUTO_FOCUS_START), or turns on
+     * continuous auto focus (V4L2_CID_FOCUS_AUTO). V4L2 has no focus point. A
+     * quiet no-op when the device offers neither.
+     */
+    public static native void cameraSessionFocus(long handle);
+
+    /**
+     * Starts recording the session to {@code nativePath} (a native file system
+     * path): H.264 in MP4, or VP8 in WebM, by what GStreamer has installed, with
+     * the default microphone when {@code audio}. Returns {@code null} on success,
+     * else the reason, naming any missing plugins. The preview keeps running.
+     */
+    public static native String cameraSessionStartRecording(long handle, String nativePath, boolean audio);
+
+    /**
+     * Finalizes the recording started by {@link #cameraSessionStartRecording}.
+     * Blocks until the muxer has written the file (call off the EDT); true when
+     * it finished cleanly.
+     */
+    public static native boolean cameraSessionStopRecording(long handle);
 
     // ----------------------------------------------------------- native peers
 

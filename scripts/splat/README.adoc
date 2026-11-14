@@ -109,5 +109,7 @@ Splat is released under MIT No Attribution (see `LICENSE`), not under the
 GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
 into your own application, under any licence, with no notice to keep.
 
-The game ships no art files. The fields, the players, the markers and the
-portraits are all drawn in code, so there is nothing else to license.
+The 3D models and ground textures are CC0 (Quaternius, Kenney, Poly Haven and
+MakeHuman) and the type is Rajdhani under the SIL Open Font License; `ART.md`
+lists every pack and how to re-skin the game. Sound effects, music and ambience
+are synthesized in code, so no audio files ship.

@@ -540,6 +540,22 @@ final class AppSupport {
                 layout, main, javase, simulator, prepare, css, ext, userProperties);
         registerSimulator(project, "debug", "Runs the simulator suspended, waiting for a debugger on port 5005", true,
                 layout, main, javase, simulator, prepare, css, ext, userProperties);
+        // The simulator for an AI agent: MCP served from the first frame, the window
+        // never takes the focus. The Maven twin is cn1:agent. On a Linux machine with
+        // no display run it under xvfb-run -a.
+        registerSimulator(project, "cn1Agent", "Runs the simulator for an AI agent, serving MCP on 127.0.0.1"
+                        + " (-Pcn1.mcp.port, default 8765); drive it with the skill's tools/Sim.java", false,
+                layout, main, javase, simulator, prepare, css, ext, userProperties);
+        final Provider<String> agentPort = project.getProviders().gradleProperty(AgentEnvironment.PORT_PROPERTY)
+                .orElse("");
+        final File agentPortFile = new File(layout.buildDir(), AgentEnvironment.PORT_FILE);
+        project.getTasks().named("cn1Agent", JavaExec.class).configure(
+                t -> {
+                    t.doFirst(new AgentEnvironment(agentPort, agentPortFile));
+                    // A port file outliving the simulator points tools/Sim.java at a dead port.
+                    // doLast covers a normal exit; the shutdown hook covers Ctrl-C and kill.
+                    t.doLast(new DeletePortFile(agentPortFile));
+                });
 
         project.getTasks().register("generateNativeInterfaces",
                 NativeInterfacesTask.class, t -> {
@@ -1395,6 +1411,97 @@ final class AppSupport {
             throw new org.gradle.api.GradleException(ex.getMessage(), ex);
         }
         return out;
+    }
+
+    /// Deletes the port file cn1Agent wrote once the simulator has exited.
+    static final class DeletePortFile implements org.gradle.api.Action<org.gradle.api.Task> {
+        private final File portFile;
+
+        DeletePortFile(File portFile) {
+            this.portFile = portFile;
+        }
+
+        @Override
+        public void execute(org.gradle.api.Task task) {
+            if (portFile.exists() && !portFile.delete()) {
+                task.getLogger().info("Could not delete " + portFile);
+            }
+        }
+    }
+
+    /// Picks the agent's MCP port -- 8765, or a free one when something else holds
+    /// it and none was asked for -- hands it to the simulator through the
+    /// environment, and records it where tools/Sim.java looks.
+    static final class AgentEnvironment implements org.gradle.api.Action<org.gradle.api.Task> {
+        static final String PORT_PROPERTY = "cn1.mcp.port";
+        static final String PORT_FILE = "cn1-agent.port";
+        static final int DEFAULT_PORT = 8765;
+        private final Provider<String> requested;
+        private final File portFile;
+
+        AgentEnvironment(Provider<String> requested, File portFile) {
+            this.requested = requested;
+            this.portFile = portFile;
+        }
+
+        @Override
+        public void execute(org.gradle.api.Task task) {
+            String asked = requested.get().trim();
+            int port;
+            try {
+                port = asked.isEmpty() ? DEFAULT_PORT : Integer.parseInt(asked);
+            } catch (NumberFormatException ex) {
+                throw new org.gradle.api.GradleException("-P" + PORT_PROPERTY + " must be a port number, not \""
+                        + asked + "\"", ex);
+            }
+            if (!portFree(port)) {
+                if (!asked.isEmpty()) {
+                    throw new org.gradle.api.GradleException("Port " + port
+                            + " is already in use on 127.0.0.1; pass another -P" + PORT_PROPERTY);
+                }
+                int chosen = freePort();
+                task.getLogger().warn("Port " + port + " is in use by another process; using " + chosen + " instead.");
+                port = chosen;
+            }
+            File dir = portFile.getParentFile();
+            try {
+                if (!dir.isDirectory() && !dir.mkdirs()) {
+                    throw new java.io.IOException("cannot create " + dir);
+                }
+                java.nio.file.Files.write(portFile.toPath(),
+                        String.valueOf(port).getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            } catch (java.io.IOException ex) {
+                task.getLogger().warn("Could not write " + portFile + ": " + ex.getMessage());
+            }
+            final File written = portFile;
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                if (written.exists() && !written.delete()) {
+                    written.deleteOnExit();
+                }
+            }, "cn1-agent-port-file"));
+            JavaExec exec = (JavaExec) task;
+            exec.environment("CN1_MCP_PORT", String.valueOf(port));
+            exec.environment("CN1_AGENT_BACKGROUND", "1");
+            task.getLogger().lifecycle("[cn1.mcp] agent mode: the simulator will serve MCP on 127.0.0.1:" + port);
+        }
+
+        private static boolean portFree(int port) {
+            try (java.net.ServerSocket s = new java.net.ServerSocket(port, 1,
+                    java.net.InetAddress.getByName("127.0.0.1"))) {
+                return s.getLocalPort() == port;
+            } catch (java.io.IOException ex) {
+                return false;
+            }
+        }
+
+        private static int freePort() {
+            try (java.net.ServerSocket s = new java.net.ServerSocket(0, 1,
+                    java.net.InetAddress.getByName("127.0.0.1"))) {
+                return s.getLocalPort();
+            } catch (java.io.IOException ex) {
+                throw new org.gradle.api.GradleException("Could not find a free loopback port", ex);
+            }
+        }
     }
 
     /// Removes the bundle a previous browser build wrote, before the next one

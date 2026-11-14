@@ -37,6 +37,7 @@ class FakeVisionImpl extends VisionImpl {
     int analyzeCount;
     int closeCount;
     VisionFeature lastFeature;
+    VisionOptions lastOptions;
 
     @Override
     public boolean isSupported(VisionFeature feature, String backendId) {
@@ -49,6 +50,7 @@ class FakeVisionImpl extends VisionImpl {
                                         VisionImage image, VisionOptions options) {
         analyzeCount++;
         lastFeature = feature;
+        lastOptions = options;
         AsyncResource<T> out = new AsyncResource<T>();
         if (failure != null) {
             out.error(failure);
