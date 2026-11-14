@@ -223,7 +223,7 @@ keeps the material's own behavior, so fog, shadows, the environment and tone
 mapping keep working around custom code. A material takes up to 16 uniforms
 and 4 textures, set by name with `setUniform` and `setTexture`.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava009Snippet.java[tag=3d-graphics-java-009,indent=0]
 ----
@@ -249,7 +249,7 @@ source doubles as a set of examples:
 belong together: `harbourDusk()`, `clearNoon()`, `overcast()`, `night()`,
 `desert()` and `arctic()`.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava008Snippet.java[tag=3d-graphics-java-008,indent=0]
 ----
