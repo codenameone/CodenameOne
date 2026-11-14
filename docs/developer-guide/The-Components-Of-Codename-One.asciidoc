@@ -2692,7 +2692,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Calendar.html[Calendar] class allows you to display a traditional calendar picker and optionally highlight days in various ways.
 
-NOTE: Prefer the <<picker-section,Picker UI>> over the calendar for picking a date. It looks better on the devices. To show events in time, use the <<scheduling-and-gantt,Scheduler>>.
+NOTE: Prefer the <<picker-section,Picker UI>> over the calendar for picking a date. It looks better on the devices. To show events in time, use the <<scheduling-and-gantt,Scheduler>>. To show how things connect, use a <<node-graphs,NodeGraph>>.
 
 The calendar can mark today's date. `setTodayUIID` names the style today is drawn with while it isn't the selected day, and the `calendarTodayUIID` theme constant does the same for every calendar in the application. The native themes set it to `CalendarToday`.
 

@@ -25,6 +25,7 @@ package com.codename1.ui.scheduler;
 import com.codename1.scheduling.ScheduleItem;
 import com.codename1.scheduling.ScheduleResource;
 import com.codename1.scheduling.TimeMath;
+import com.codename1.ui.ScrollSurface;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.plaf.Style;
@@ -94,7 +95,7 @@ final class AgendaList extends ScrollSurface {
     }
 
     @Override
-    void prepare(int width, int height) {
+    protected void layoutSurface(int width, int height) {
         int gen = UIManager.getThemeGeneration();
         if (!dirty && width == laidW && gen == laidGen) {
             return;
@@ -102,8 +103,8 @@ final class AgendaList extends ScrollSurface {
         dirty = false;
         laidW = width;
         laidGen = gen;
-        headerW = 0;
-        headerH = 0;
+        setHeaderSize(0, getHeaderHeight());
+        setHeaderSize(getHeaderWidth(), 0);
         Font hf = Look.style("SchedulerHeader").getFont();
         Font f = Look.style("SchedulerAgendaItem").getFont();
         int headH = hf.getHeight() + Look.mm(3);
@@ -154,17 +155,17 @@ final class AgendaList extends ScrollSurface {
     }
 
     @Override
-    int contentWidth() {
-        return bodyWidth();
+    protected int getContentWidth() {
+        return getBodyWidth();
     }
 
     @Override
-    int contentHeight() {
+    protected int getContentHeight() {
         return total;
     }
 
     @Override
-    void paintBody(Graphics g, int x, int y) {
+    protected void paintContent(Graphics g, int x, int y) {
         Style grid = Look.style("SchedulerGrid");
         Style header = Look.style("SchedulerHeader");
         Style st = Look.style("SchedulerAgendaItem");
@@ -174,7 +175,7 @@ final class AgendaList extends ScrollSurface {
         int fh = f.getHeight();
         int cy = g.getClipY();
         int ch = g.getClipHeight();
-        int w = bodyWidth();
+        int w = getBodyWidth();
         Look.fill(g, grid, g.getClipX(), cy, g.getClipWidth(), ch);
         ZoneId zone = owner.getZone();
         if (rows.isEmpty()) {
@@ -190,14 +191,14 @@ final class AgendaList extends ScrollSurface {
         int line = Look.line(grid, 200);
         int pad = Look.mm(1.5f);
         int alpha = g.getAlpha();
-        boolean lit = anyHover();
+        boolean lit = hasHoverFeedback();
         for (Row r : rows) {
             int top = y + r.top;
             if (top > cy + ch || top + r.height < cy) {
                 continue;
             }
             if (lit) {
-                Look.wash(g, grid.getFgColor(), x, top, w, r.height, hoverLevel(Integer.valueOf(r.top)));
+                Look.wash(g, grid.getFgColor(), x, top, w, r.height, getHoverLevel(Integer.valueOf(r.top)));
             }
             if (r.item == null) {
                 Look.fill(g, header, x, top, w, r.height);
@@ -260,7 +261,7 @@ final class AgendaList extends ScrollSurface {
     }
 
     Row rowAt(int py) {
-        int cy = py + getOffY();
+        int cy = py + getOffsetY();
         for (Row r : rows) {
             if (cy >= r.top && cy < r.top + r.height) {
                 return r;
@@ -270,14 +271,14 @@ final class AgendaList extends ScrollSurface {
     }
 
     @Override
-    void hoverAt(int x, int y) {
+    protected void hoverAt(int x, int y) {
         // Every row answers a click: an item opens, a day is gone to.
         Row r = x < 0 || x >= getWidth() || y < 0 || y >= getHeight() ? null : rowAt(y);
-        hover(r == null ? null : Integer.valueOf(r.top), r == null ? DEFAULT_CURSOR : HAND_CURSOR);
+        setHoverTarget(r == null ? null : Integer.valueOf(r.top), r == null ? DEFAULT_CURSOR : HAND_CURSOR);
     }
 
     @Override
-    void tapped(int x, int y, boolean doubleTap) {
+    protected void tapped(int x, int y, boolean doubleTap) {
         Row r = rowAt(y);
         if (r == null) {
             return;

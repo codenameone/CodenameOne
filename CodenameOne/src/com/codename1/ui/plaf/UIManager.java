@@ -3536,6 +3536,27 @@ public class UIManager {
         return darkMode != null && darkMode.booleanValue() && hasStyleDefinition("$Dark" + id);
     }
 
+    /// Whether the installed theme declares a style for a UIID, in any state.
+    /// A `$Dark` declaration counts only while dark mode is on. A component
+    /// that paints with defaults of its own uses them for a UIID the theme
+    /// says nothing about, instead of the blank style `getComponentStyle`
+    /// builds for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the UIID
+    ///
+    /// #### Returns
+    ///
+    /// true when the theme has an entry for that UIID
+    public boolean isThemeStyleDefined(String id) {
+        ensureBaseTheme();
+        if (themeProps == null || id == null || id.length() == 0) {
+            return false;
+        }
+        return hasStyleDefinition(id + ".") || shouldUseDarkStyle(id) && hasStyleDefinition("$Dark" + id + ".");
+    }
+
     /// Answers a prefix query against an immutable sorted index of the current theme.
     /// Each theme generation builds the index once. A lower-bound search finds the
     /// first key that could have the requested prefix, preserving the former full

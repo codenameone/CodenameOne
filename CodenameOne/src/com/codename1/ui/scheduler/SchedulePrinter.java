@@ -28,6 +28,7 @@ import com.codename1.printing.PrintResult;
 import com.codename1.printing.PrintResultListener;
 import com.codename1.printing.Printer;
 import com.codename1.scheduling.TimeMath;
+import com.codename1.ui.ScrollSurface;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -184,6 +185,10 @@ public final class SchedulePrinter {
     // depends on whether pages are numbered, which depends on the count, so
     // the count is taken with a band and taken again without one only when a
     // single untitled page turns out not to need it.
+    private static int[] cells(ScrollSurface.PageGrid p) {
+        return new int[]{p.getColumns(), p.getRows(), p.getPageContentWidth(), p.getPageContentHeight()};
+    }
+
     private int[] grid() {
         if (held != null) {
             return held;
@@ -193,10 +198,10 @@ public final class SchedulePrinter {
             return new int[]{0, 0, 0, 0, 0};
         }
         int band = bandHeight(2);
-        int[] g = s.pageGrid(pageWidth, Math.max(1, pageHeight - band));
+        int[] g = cells(s.getPageGrid(pageWidth, Math.max(1, pageHeight - band)));
         if (band > 0 && g[0] * g[1] == 1 && bandHeight(1) == 0) {
             band = 0;
-            g = s.pageGrid(pageWidth, pageHeight);
+            g = cells(s.getPageGrid(pageWidth, pageHeight));
         }
         return new int[]{g[0], g[1], g[2], g[3], band};
     }
@@ -268,7 +273,7 @@ public final class SchedulePrinter {
         }
         // Lay out at the page's size to learn how much content there is,
         // then at the size that holds all of it.
-        int[] g = s.pageGrid(pageWidth, pageHeight);
+        int[] g = cells(s.getPageGrid(pageWidth, pageHeight));
         int w = pageWidth - g[2] + g[0] * g[2];
         int h = pageHeight - g[3] + g[1] * g[3];
         if (w > maxSide || h > maxSide) {

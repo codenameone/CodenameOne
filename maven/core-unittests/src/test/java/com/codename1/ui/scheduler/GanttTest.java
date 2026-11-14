@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.scheduler;
 
+import com.codename1.ui.ScrollSurface;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.scheduling.GanttTask;
@@ -83,10 +84,10 @@ class GanttTest extends UITestBase {
         form.add(BorderLayout.CENTER, g);
         form.revalidate();
         GanttChart chart = g.surface();
-        chart.layoutNow();
+        chart.refreshLayout();
         double dayPx = TimeMath.DAY / chart.axis().getMillisPerPixel();
         chart.zoom((float) (48 / dayPx));
-        chart.layoutNow();
+        chart.refreshLayout();
         chart.scrollTo(0, 0);
         return g;
     }
@@ -97,8 +98,8 @@ class GanttTest extends UITestBase {
         int row = chart.rows().indexOf(t);
         assertTrue(row >= 0, t.getId() + " has a row");
         chart.barRect(t, row, r);
-        r[0] += chart.headerW - chart.getOffX();
-        r[1] += chart.headerH - chart.getOffY();
+        r[0] += chart.getHeaderWidth() - chart.getOffsetX();
+        r[1] += chart.getHeaderHeight() - chart.getOffsetY();
         return r;
     }
 
@@ -141,20 +142,20 @@ class GanttTest extends UITestBase {
         int[] r = bar(chart, phase);
         tap(chart, 2, r[1] + r[3] / 2);
         assertTrue(g.isCollapsed(phase));
-        chart.layoutNow();
+        chart.refreshLayout();
         assertEquals(2, chart.rows().size());
         assertSame(c, chart.rows().get(1));
 
         g.scrollToTask(b);
         assertFalse(g.isCollapsed(phase), "showing a task opens what it is under");
-        chart.layoutNow();
+        chart.refreshLayout();
         assertEquals(4, chart.rows().size());
 
         g.collapseAll();
-        chart.layoutNow();
+        chart.refreshLayout();
         assertEquals(2, chart.rows().size());
         g.expandAll();
-        chart.layoutNow();
+        chart.refreshLayout();
         assertEquals(4, chart.rows().size());
     }
 
@@ -351,7 +352,7 @@ class GanttTest extends UITestBase {
         p.update();
         chart.pointerDragged(ax + r[0] + r[2] / 2 + dayPixels(chart), ay + y);
         chart.pointerReleased(ax + r[0] + r[2] / 2 + dayPixels(chart), ay + y);
-        assertFalse(chart.isDragEditing());
+        assertFalse(chart.isEditInProgress());
         assertEquals(GanttTask.Constraint.AS_SOON_AS_POSSIBLE, a.getConstraint());
     }
 
@@ -418,7 +419,7 @@ class GanttTest extends UITestBase {
 
         // The other way round would be a cycle, and is not offered.
         g.setSelectedTask(b);
-        chart.layoutNow();
+        chart.refreshLayout();
         chart.reflowDone();
         ra = bar(chart, a);
         rb = bar(chart, b);
@@ -457,7 +458,7 @@ class GanttTest extends UITestBase {
 
         // The name in the table selects as the bar does.
         int[] ra = bar(chart, a);
-        tap(chart, chart.headerW / 2, ra[1] + ra[3] / 2);
+        tap(chart, chart.getHeaderWidth() / 2, ra[1] + ra[3] / 2);
         assertSame(a, g.getSelectedTask());
         assertNotNull(chart.barAt(rb[0] + 1, rb[1] + 1));
         assertNull(chart.barAt(rb[0] + rb[2] + 3 * dayPixels(chart), rb[1] + 1));
@@ -497,15 +498,15 @@ class GanttTest extends UITestBase {
         p.update();
         assertFalse(load.isHidden());
         Display.getInstance().getCurrent().revalidate();
-        chart.layoutNow();
-        load.layoutNow();
-        assertEquals(chart.headerW, load.headerW, "one time axis for both");
+        chart.refreshLayout();
+        load.refreshLayout();
+        assertEquals(chart.getHeaderWidth(), load.getHeaderWidth(), "one time axis for both");
 
         chart.scrollTo(3 * dayPixels(chart), 0);
-        assertTrue(chart.getOffX() > 0);
-        assertEquals(chart.getOffX(), load.getOffX());
+        assertTrue(chart.getOffsetX() > 0);
+        assertEquals(chart.getOffsetX(), load.getOffsetX());
         load.scrollTo(dayPixels(chart), 0);
-        assertEquals(dayPixels(chart), chart.getOffX());
+        assertEquals(dayPixels(chart), chart.getOffsetX());
 
         g.setLoadVisible(false);
         assertTrue(load.isHidden());

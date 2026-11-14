@@ -457,6 +457,15 @@
       ]
     },
     {
+      "id": "node-graph",
+      "category": "Rich components",
+      "name": "Node graph",
+      "description": "Checks the node graph with a group, labeled curved edges, typed ports, the grid and a selected node, in light and dark themes.",
+      "tests": [
+        "NodeGraphThemeScreenshotTest"
+      ]
+    },
+    {
       "id": "native-theme-controls",
       "category": "Themes and styling",
       "name": "Native-theme controls",
@@ -1445,6 +1454,10 @@
     {
       "pattern": "GanttTheme*",
       "test": "GanttThemeScreenshotTest"
+    },
+    {
+      "pattern": "NodeGraphTheme*",
+      "test": "NodeGraphThemeScreenshotTest"
     },
     {
       "pattern": "ToolbarTheme_*",

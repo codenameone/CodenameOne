@@ -30,6 +30,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.surfaces.Surfaces;
 import com.codename1.surfaces.spi.SurfaceBridge;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +60,20 @@ class PushClientTransportTest extends UITestBase {
         Preferences.delete("push_key");
         Preferences.delete("push_v3_subscription");
         implementation.clearQueuedRequests();
+    }
+
+    // The queue is shared by the whole test JVM, and a request another test
+    // left running can land in it after the @BeforeEach clear. Only the push
+    // service's own subscription calls are what these tests assert on.
+    private List<ConnectionRequest> subscriptionRequests() {
+        List<ConnectionRequest> out = new ArrayList<ConnectionRequest>();
+        for (ConnectionRequest r : implementation.getQueuedRequests()) {
+            String url = r.getUrl();
+            if (url != null && url.contains("/subscriptions")) {
+                out.add(r);
+            }
+        }
+        return out;
     }
 
     @FormTest
@@ -102,7 +117,7 @@ class PushClientTransportTest extends UITestBase {
 
         client.unregister();
 
-        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        List<ConnectionRequest> requests = subscriptionRequests();
         assertEquals(1, requests.size());
         assertEquals("DELETE", requests.get(0).getHttpMethod());
         assertTrue(requests.get(0).getUrl().endsWith(
@@ -122,7 +137,7 @@ class PushClientTransportTest extends UITestBase {
 
         assertNotNull(sink.registered);
         assertEquals("managed-token", sink.registered.getToken());
-        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        List<ConnectionRequest> requests = subscriptionRequests();
         assertEquals(1, requests.size());
         assertTrue(requests.get(0).isPost());
         assertTrue(requests.get(0).getUrl().endsWith("/subscriptions"));
@@ -132,7 +147,7 @@ class PushClientTransportTest extends UITestBase {
         activeClient = null;
 
         assertSame(sink.registered, sink.unregistered);
-        requests = implementation.getQueuedRequests();
+        requests = subscriptionRequests();
         assertEquals(2, requests.size());
         assertEquals("DELETE", requests.get(1).getHttpMethod());
         assertTrue(requests.get(1).getUrl().endsWith(
@@ -151,7 +166,7 @@ class PushClientTransportTest extends UITestBase {
         assertNotNull(listener.registration);
         assertEquals("fcm", listener.registration.getTransportId());
         assertEquals("persisted-token", listener.registration.getToken());
-        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        List<ConnectionRequest> requests = subscriptionRequests();
         assertEquals(1, requests.size());
         assertTrue(requests.get(0).isPost());
         assertTrue(requests.get(0).getUrl().endsWith("/subscriptions"));
