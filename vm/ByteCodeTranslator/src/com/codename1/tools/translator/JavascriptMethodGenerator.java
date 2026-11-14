@@ -901,7 +901,11 @@ final class JavascriptMethodGenerator {
                 m = null;
             }
         }
-        if (m == null) {
+        // The cone's one body is a whole-bundle fact. Classes translated later (open world:
+        // the Playground and the browser IDE load user code into this running VM; incremental:
+        // most of the program is not in view) can override it, so only an exact receiver
+        // type is a safe direct call there -- as computeMonomorphicDispatch already rules.
+        if (m == null && !JavascriptOpenWorld.isEnabled() && !JavascriptIncremental.isActive()) {
             m = model.directTarget(invoke.getOwner(), invoke.getName(), invoke.getDesc());
             // Type flow can classify the site synchronous where the cone's one body is
             // a generator (the body is unreachable from here); a direct call would then

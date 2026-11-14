@@ -74,6 +74,40 @@ class JavascriptTargetIntegrationTest {
                 "Host-only animation callback must retain its concrete virtual dispatch entry");
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void openWorldKeepsVirtualCallsWhoseOnlyBodyIsInTheBundle(CompilerHelper.CompilerConfig config) throws Exception {
+        // Lifecycle.start() calling this.runApp(): the bundle holds only the base runApp(),
+        // but in an open-world bundle a class translated later overrides it. A direct call
+        // to the base body ran it instead (the browser IDE showed "You should override
+        // runApp()" for every app).
+        Parser.cleanup();
+        Path sources = Files.createTempDirectory("js-open-world-src");
+        Path classes = Files.createTempDirectory("js-open-world-classes");
+        Path api = Files.createTempDirectory("js-open-world-api");
+        Files.write(sources.resolve("JsOpenWorldApp.java"),
+                ("public class JsOpenWorldApp { public static int ran;"
+                        + " public void start() { runApp(); }"
+                        + " public void runApp() { ran = 1; }"
+                        + " public static void main(String[] args) { new JsOpenWorldApp().start(); } }")
+                        .getBytes(StandardCharsets.UTF_8));
+        compileAgainstJavaApi(config, sources, classes, api);
+        Path output = Files.createTempDirectory("js-open-world-output");
+        JavascriptOpenWorld.setPrefixes("JsOpenWorldApp");
+        try {
+            runJavascriptTranslator(classes, output, "JsOpenWorldApp");
+        } finally {
+            JavascriptOpenWorld.setPrefixes(null);
+        }
+        String bundle = new String(Files.readAllBytes(output.resolve("dist/JsOpenWorldApp-js/translated_app.js")),
+                StandardCharsets.UTF_8);
+        int start = bundle.indexOf("cn1_JsOpenWorldApp_start(");
+        assertTrue(start >= 0, "start() must be emitted");
+        String body = bundle.substring(start, bundle.indexOf("\n}\n", start));
+        assertFalse(body.contains("cn1_JsOpenWorldApp_runApp"),
+                "An open-world call site must dispatch runApp() virtually, not call the base body: " + body);
+    }
+
     @org.junit.jupiter.api.Test
     void writesSymbolMapForMinifiedFunctionsBesideTheBundle() throws Exception {
         Parser.cleanup();
