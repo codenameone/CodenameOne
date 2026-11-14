@@ -62,11 +62,12 @@ public class SharedPreferencesApplyDeferredTest {
             }
         });
         try {
-            // The main thread is the EDT, another thread than this test's,
-            // so the applies and the checks between them run on it: from
-            // here the queued write could run before the next line.
+            // The applies and the checks between them run on the main thread
+            // (the EDT): from any other thread the queued write could run
+            // before the next line. Whether the test thread is the EDT
+            // differs between runs, so onMainThread handles both.
             final int[] seen = new int[1];
-            Display.getInstance().callSeriallyAndWait(new Runnable() {
+            onMainThread(new Runnable() {
                 @Override
                 public void run() {
                     prefs.edit().putString("k", "one").apply();
@@ -81,7 +82,7 @@ public class SharedPreferencesApplyDeferredTest {
             assertEquals("two", ((Map<?, ?>) writes.get(0)).get("k"));
 
             final boolean[] committed = new boolean[1];
-            Display.getInstance().callSeriallyAndWait(new Runnable() {
+            onMainThread(new Runnable() {
                 @Override
                 public void run() {
                     prefs.edit().putString("k", "three").apply();
@@ -96,6 +97,14 @@ public class SharedPreferencesApplyDeferredTest {
             assertEquals("four", ((Map<?, ?>) writes.get(1)).get("k"));
         } finally {
             Storage.setStorageInstance(real);
+        }
+    }
+
+    private static void onMainThread(Runnable r) {
+        if (Display.getInstance().isEdt()) {
+            r.run();
+        } else {
+            Display.getInstance().callSeriallyAndWait(r);
         }
     }
 }
