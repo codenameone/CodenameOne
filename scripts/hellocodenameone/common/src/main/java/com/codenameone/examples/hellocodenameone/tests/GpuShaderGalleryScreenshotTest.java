@@ -113,6 +113,10 @@ public class GpuShaderGalleryScreenshotTest extends BaseTest {
     protected void registerReadyCallback(final Form parent, final Runnable run) {
         UITimer.timer(1200, false, parent, new Runnable() {
             int polls;
+            // frame count when a render was last requested: one request per frame,
+            // so a frame slower than the poll interval never queues another behind
+            // it (on HTML5 that backlog starved the timers and the test timed out)
+            int requested = -1;
 
             public void run() {
                 // capture only once a frame has been drawn after the slow
@@ -121,7 +125,9 @@ public class GpuShaderGalleryScreenshotTest extends BaseTest {
                     UITimer.timer(400, false, parent, run);
                     return;
                 }
-                if (view != null) {
+                int seen = frames.get();
+                if (view != null && seen != requested) {
+                    requested = seen;
                     view.requestRender();
                 }
                 UITimer.timer(200, false, parent, this);
