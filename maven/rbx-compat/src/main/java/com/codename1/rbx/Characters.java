@@ -874,6 +874,20 @@ final class Characters {
         }
     }
 
+    /// In a networked game each player's client drives that player's
+    /// character and the server drives the rest (NPCs); the other side only
+    /// follows what replication tells it. Alone, everything is simulated.
+    static boolean simulatedHere(Engine e, Instance model) {
+        if (e.getRole() == Engine.SOLO || e.getTransport() == null) {
+            return true;
+        }
+        Instance player = ServiceBehaviors.playerFromCharacter(e, model);
+        if (e.getRole() == Engine.SERVER) {
+            return player == null;
+        }
+        return player != null && player == e.getLocalPlayer(); // NOPMD CompareObjectsWithEquals - player identity
+    }
+
     static void step(Engine e, Instance hum, double dt) {
         Instance model = hum.getParent();
         Instance root = hum.ref("RootPart");
@@ -885,6 +899,10 @@ final class Characters {
         }
         Ctl c = ctl(hum);
         Animations.step(model, c.tracks, dt);
+        if (!simulatedHere(e, model)) {
+            syncRig(model);
+            return;
+        }
         if (c.dead || root.bool("Anchored")) {
             syncRig(model);
             return;
