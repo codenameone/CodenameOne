@@ -20,8 +20,12 @@ package com.codenameone.examples.brickyard.engage;
 
 import com.codename1.payment.CommerceManager;
 import com.codename1.payment.Purchase;
+import com.codename1.payment.Receipt;
 import com.codename1.ui.CN;
 import com.codenameone.examples.brickyard.AppConfig;
+import com.codenameone.examples.brickyard.api.ReceiptDto;
+import com.codenameone.examples.brickyard.net.Api;
+import com.codenameone.examples.brickyard.net.Net;
 import com.codenameone.examples.brickyard.net.Session;
 
 /// In-app purchases. Bricks are consumables bought with
@@ -57,7 +61,34 @@ public final class Store {
 
     public static void purchased(String sku) {
         Telemetry.purchase(sku);
+        redeem(sku);
         refresh();
+    }
+
+    /// Hands the store's receipt for `sku` to the server, which validates it
+    /// and credits the wallet. The store's own notification credits it too;
+    /// the server keys both on the transaction id, so it is credited once.
+    static void redeem(String sku) {
+        Purchase p = Purchase.getInAppPurchase();
+        if (p == null || Session.user() == null) {
+            return;
+        }
+        Receipt latest = null;
+        for (Receipt r : p.getReceipts(sku)) {
+            if (latest == null || (r.getPurchaseDate() != null && latest.getPurchaseDate() != null
+                    && r.getPurchaseDate().getTime() > latest.getPurchaseDate().getTime())) {
+                latest = r;
+            }
+        }
+        if (latest == null) {
+            return;
+        }
+        Api.economy().redeemReceipt(new ReceiptDto(latest.getStoreCode(), sku, latest.getTransactionId(),
+                latest.getOrderData()), Net.to(wallet -> {
+                    if (changed != null) {
+                        CN.callSerially(changed);
+                    }
+                }, (status, message) -> { }));
     }
 
     public static void refresh() {

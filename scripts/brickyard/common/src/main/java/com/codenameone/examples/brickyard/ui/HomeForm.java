@@ -22,6 +22,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.brickyard.api.ExperienceDto;
+import com.codenameone.examples.brickyard.api.QuestDto;
 import com.codenameone.examples.brickyard.net.Api;
 import com.codenameone.examples.brickyard.net.Net;
 
@@ -45,6 +46,7 @@ public final class HomeForm {
         Api.experiences().browse(null, Net.to(all -> {
             content.removeAll();
             content.add(Ui.bricks());
+            progress(content, f);
             fill(content, all);
             f.revalidate();
         }, (status, message) -> {
@@ -53,6 +55,38 @@ public final class HomeForm {
             content.add(Ui.secondary("Try again", "retryButton", e -> show()));
             f.revalidate();
         }));
+    }
+
+    /// The login streak and today's quests, above the rows. Silent when the
+    /// call fails: Home still works without them.
+    static void progress(final Container content, final Form f) {
+        final Container box = new Container(BoxLayout.y());
+        box.setName("progress");
+        content.add(box);
+        Api.progression().progress(Net.to(p -> {
+            box.add(Ui.label("Level " + p.level() + " - " + p.streak() + " day streak", "CardMeta"));
+            f.revalidate();
+        }, (status, message) -> { }));
+        Api.progression().quests(Net.to(quests -> {
+            if (quests == null) {
+                return;
+            }
+            for (final QuestDto q : quests) {
+                if (q.claimed() != 0) {
+                    continue;
+                }
+                boolean done = q.progress() >= q.target();
+                box.add(Ui.panel(Ui.label(q.title(), "CardTitle"),
+                        Ui.label(Math.min(q.progress(), q.target()) + " / " + q.target() + " - "
+                                + q.rewardBricks() + " Bricks", "CardMeta"),
+                        done ? Ui.primary("Claim", "claim" + q.id(), e -> Api.progression().claimQuest(q.id(),
+                                Net.to(c -> {
+                                    Ui.toast("Quest claimed");
+                                    show();
+                                }, Ui::failed))) : Ui.label("", "Muted")));
+            }
+            f.revalidate();
+        }, (status, message) -> { }));
     }
 
     static void fill(Container content, List<ExperienceDto> all) {

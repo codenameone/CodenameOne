@@ -24,6 +24,11 @@ import com.codenameone.examples.brickyard.api.BadgeApi;
 import com.codenameone.examples.brickyard.api.DataStoreApi;
 import com.codenameone.examples.brickyard.api.ExperienceApi;
 import com.codenameone.examples.brickyard.api.LeaderboardApi;
+import com.codenameone.examples.brickyard.api.EconomyApi;
+import com.codenameone.examples.brickyard.api.ProgressionApi;
+import com.codenameone.examples.brickyard.api.SocialApi;
+import com.codenameone.examples.brickyard.api.ModerationApi;
+import com.codenameone.examples.brickyard.api.AnalyticsApi;
 
 /// The generated REST clients, one per contract in the shared module, all
 /// pointed at the server [Session] is using.
@@ -33,6 +38,11 @@ public final class Api {
     private static BadgeApi badges;
     private static LeaderboardApi leaderboards;
     private static DataStoreApi data;
+    private static EconomyApi economy;
+    private static ProgressionApi progression;
+    private static SocialApi social;
+    private static ModerationApi moderation;
+    private static AnalyticsApi analytics;
 
     private Api() {
     }
@@ -43,6 +53,11 @@ public final class Api {
         badges = RestClients.create(BadgeApi.class, baseUrl);
         leaderboards = RestClients.create(LeaderboardApi.class, baseUrl);
         data = RestClients.create(DataStoreApi.class, baseUrl);
+        economy = RestClients.create(EconomyApi.class, baseUrl);
+        progression = RestClients.create(ProgressionApi.class, baseUrl);
+        social = RestClients.create(SocialApi.class, baseUrl);
+        moderation = RestClients.create(ModerationApi.class, baseUrl);
+        analytics = RestClients.create(AnalyticsApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -63,5 +78,25 @@ public final class Api {
 
     public static DataStoreApi data() {
         return data;
+    }
+
+    public static EconomyApi economy() {
+        return economy;
+    }
+
+    public static ProgressionApi progression() {
+        return progression;
+    }
+
+    public static SocialApi social() {
+        return social;
+    }
+
+    public static ModerationApi moderation() {
+        return moderation;
+    }
+
+    public static AnalyticsApi analytics() {
+        return analytics;
     }
 }

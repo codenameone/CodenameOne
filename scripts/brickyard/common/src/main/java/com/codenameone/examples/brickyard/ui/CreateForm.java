@@ -67,7 +67,8 @@ public final class CreateForm {
                 list.add(Ui.panel(Ui.label(x.title(), "CardTitle"),
                         Ui.label(x.publishedVersion() > 0 ? "Published, version " + x.publishedVersion()
                                 : "Draft", "CardMeta"),
-                        Ui.secondary("Edit", "edit" + x.id(), e -> Studio.open(x.id()))));
+                        Ui.secondary("Edit", "edit" + x.id(), e -> Studio.open(x.id())),
+                        Ui.link("Dashboard", "dashboard" + x.id(), e -> DashboardForm.show(x))));
             }
             f.revalidate();
         }, Ui::failed));

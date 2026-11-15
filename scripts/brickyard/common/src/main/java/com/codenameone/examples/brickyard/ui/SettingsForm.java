@@ -92,6 +92,9 @@ public final class SettingsForm {
         if (AppConfig.serverSwitchable()) {
             f.add(Ui.link("Server: " + AppConfig.serverUrl(), "serverButton", e -> chooseServer()));
         }
+        if (AdminForm.allowed()) {
+            f.add(Ui.secondary("Admin console", "adminButton", e -> AdminForm.show()));
+        }
         f.add(Ui.secondary("Sign out", "signOutButton", e -> Nav.signOut()));
         f.show();
     }
