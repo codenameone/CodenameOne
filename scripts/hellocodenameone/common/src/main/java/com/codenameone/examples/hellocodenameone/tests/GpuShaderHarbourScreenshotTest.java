@@ -47,6 +47,8 @@ import com.codename1.ui.util.UITimer;
 /// rays and FXAA. The shader clock is pinned so every capture is the same
 /// frame of the waves.
 public class GpuShaderHarbourScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, tvos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     // frames the renderer has started: the first compiles every program and
     // can outlast a fixed timer on a slow emulator, leaving a blank capture
     private final java.util.concurrent.atomic.AtomicInteger frames =
