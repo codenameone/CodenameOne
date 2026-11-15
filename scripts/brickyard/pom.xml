@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.codenameone.examples.brickyard</groupId>
+  <artifactId>brickyard</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>brickyard</name>
+  <description>brickyard</description>
+  <url>https://www.codenameone.com</url>
+  <licenses>
+    <license>
+      <name>MIT No Attribution</name>
+      <url>https://opensource.org/license/mit-0</url>
+      <distribution>repo</distribution>
+      <comments>The same terms as the LICENSE file beside this pom</comments>
+    </license>
+  </licenses>
+  <modules>
+    <!-- The REST contract between the app and the server. -->
+    <module>shared</module>
+    <!-- The app. A placeholder for now: it builds nothing. -->
+    <module>common</module>
+  </modules>
+  <properties>
+    <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
+    <cn1.version>8.0-SNAPSHOT</cn1.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <java.version>1.8</java.version>
+    <java-tests.version>11</java-tests.version>
+    <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <cn1app.name>brickyard</cn1app.name>
+  </properties>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-core</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-luau-runtime</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-rbx-compat</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+  <profiles>
+    <profile>
+      <!--
+        The server. Like every platform module it is only in the reactor when
+        asked for:
+
+          mvn -Dcodename1.platform=backend -pl shared,backend test
+      -->
+      <id>backend</id>
+      <activation>
+        <property>
+          <name>codename1.platform</name>
+          <value>backend</value>
+        </property>
+        <file>
+          <exists>${basedir}/backend/pom.xml</exists>
+        </file>
+      </activation>
+      <modules>
+        <module>backend</module>
+      </modules>
+    </profile>
+  </profiles>
+</project>

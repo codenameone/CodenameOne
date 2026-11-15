@@ -1,0 +1,113 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.brickyard;
+
+import com.codename1.backend.Base64;
+import com.codename1.backend.Json;
+import com.codename1.backend.test.MockMvc;
+import com.codename1.backend.test.MockRequestBuilder;
+import com.codenameone.examples.brickyard.account.Accounts;
+import com.codenameone.examples.brickyard.api.RegisterDto;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
+
+import static com.codename1.backend.test.MockMvcRequestBuilders.post;
+import static com.codename1.backend.test.MockMvcResultMatchers.status;
+import static com.codename1.backend.test.SecurityMockMvcRequestPostProcessors.jwt;
+
+/// The steps most tests take: making an account, calling the API as it, as a
+/// creator or as an engine server, and reading what came back.
+public final class Api {
+    public static final String PASSWORD = "a-long-password";
+    public static final String ENGINE = "engine-server";
+
+    private Api() {
+    }
+
+    /// A fresh adult account of the test's own, so no test meets what another left.
+    public static String player(Accounts accounts, String name) throws Exception {
+        return accounts.register(new RegisterDto(name + "@test.example", PASSWORD, name,
+                Clock.yearOf(Clock.now()) - 30)).username();
+    }
+
+    public static MockRequestBuilder as(MockRequestBuilder request, String username) {
+        return request.with(jwt().subject(username).authorities("ROLE_USER"));
+    }
+
+    public static MockRequestBuilder asCreator(MockRequestBuilder request, String username) {
+        return request.with(jwt().subject(username).authorities("ROLE_USER", "ROLE_CREATOR"));
+    }
+
+    /// The internal identity a game server signs in with.
+    public static MockRequestBuilder asEngine(MockRequestBuilder request) {
+        return request.with(jwt().subject(ENGINE).authorities("ROLE_ENGINE"));
+    }
+
+    public static MockRequestBuilder body(MockRequestBuilder request, String json) {
+        return request.contentType("application/json").content(json);
+    }
+
+    public static Map json(MockMvc mvc, MockRequestBuilder request) throws Exception {
+        return Json.parseObject(mvc.perform(request).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+    }
+
+    public static List list(MockMvc mvc, MockRequestBuilder request) throws Exception {
+        return (List) Json.parse(mvc.perform(request).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+    }
+
+    public static int statusOf(MockMvc mvc, MockRequestBuilder request) throws Exception {
+        return mvc.perform(request).andReturn().getResponse().getStatus();
+    }
+
+    public static long number(Map object, String field) {
+        return ((Number) object.get(field)).longValue();
+    }
+
+    /// Opens a published-ready experience owned by `owner` and answers its id.
+    public static String experience(MockMvc mvc, String owner, String access, String rating) throws Exception {
+        Map e = json(mvc, asCreator(body(post("/api/experiences"),
+                "{\"title\":\"Obby\",\"description\":\"Jump\",\"genre\":\"OBBY\",\"maxPlayers\":12,"
+                        + "\"access\":\"" + access + "\",\"ageRating\":\"" + rating + "\"}"), owner));
+        return (String) e.get("id");
+    }
+
+    /// Publishes the sample place to `id` and answers the version.
+    public static Map publishSample(MockMvc mvc, String owner, String id) throws Exception {
+        return json(mvc, as(body(post("/api/experiences/" + id + "/publish"),
+                "{\"data\":\"" + Base64.encode(sample()) + "\"}"), owner));
+    }
+
+    public static byte[] sample() throws IOException {
+        InputStream in = Api.class.getResourceAsStream("/place/sample.rbxlx");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            out.write(buf, 0, n);
+        }
+        in.close();
+        return out.toByteArray();
+    }
+}
