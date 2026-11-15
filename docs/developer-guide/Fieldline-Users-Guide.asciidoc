@@ -1,0 +1,123 @@
+[[fieldline-users-guide]]
+== Fieldline: A field service app from every side
+
+Fieldline is a sample app with a server behind it, for any contractor that sends
+people to customers' sites: HVAC, electrical, plumbing, elevators, solar, fire
+safety, and inspection teams. A scheduling engine plans every technician's day
+around skills, working hours, time off and travel. Technicians work the day from
+their phone. Dispatchers see the whole crew and move work between people. The app
+and the server are one Maven project, written in Java on both sides.
+
+This chapter is the user's guide: what each kind of user sees and can do. The
+project's `README.adoc` in `scripts/fieldline` explains how the project builds, how
+to test it and how to configure it.
+
+One app serves everyone. The server gives every account a set of roles, and the
+app opens on the screens for the role the account holds.
+
+[cols="1,3"]
+|===
+| Role | What it adds
+
+| Technician
+| Follow the day as a route, check in on site, work a job's checklist, take
+  photos the assistant diagnoses, and finish with a report and the customer's
+  signature. Clock in and out, set working hours and limits, and ask for time off.
+
+| Dispatcher
+| See the crew on a timeline, a Gantt chart and a map, reassign jobs, add new
+  ones, cover an absence, decide time-off requests and run the optimizer.
+
+| Administrator
+| Everything a dispatcher does, plus each technician's limits, the labour rates,
+  rush hours, time tracking and timesheets, and the roles of every account.
+|===
+
+=== Trying it
+
+Start the server on the development profile. It needs
+nothing installed: the database is in memory, push notifications are printed on
+the console, and the assistant answers from rules built into the server:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/fieldline.sh[tag=fieldline-sh-server,indent=0]
+----
+
+Then run the app in the simulator, from another terminal:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/fieldline.sh[tag=fieldline-sh-simulator,indent=0]
+----
+
+The demo is a contractor with a crew of twelve based in Portland and a planned
+working week of jobs. Every demo account has the password `fieldline-demo`:
+
+[cols="2,3"]
+|===
+| `tech@fieldline.example` | a technician with a day of jobs
+| `tech2@fieldline.example` | a second technician
+| `dispatch@fieldline.example` | runs the board and the planner
+| `admin@fieldline.example` | also runs the back office
+|===
+
+Sign in as the technician in one simulator and as the dispatcher in another: a
+change made on one reaches the other as it happens.
+
+=== The technician
+
+The technician's day opens as a numbered route on a map, with the travel time
+between stops.
+
+image::img/fieldline-today.png["The technician's day: the jobs as a numbered route on a map, with the list of stops below",scaledwidth=40%]
+
+Opening a job shows the site, the equipment and the checklist. From there the
+technician:
+
+* starts driving, which shows the dispatcher who is on the way,
+  and checks in on arrival;
+* works through the checklist, which saves after every answer;
+* photographs what they find and asks the assistant to diagnose it, which returns
+  the likely issue, its severity, the probable cause, the recommended action and
+  the parts;
+* asks the assistant about the job in hand, and has it draft the inspection
+  report;
+* has the customer sign on the screen. The signature is sealed with a hash of
+  the signature, the time and the place, so the report can be verified later.
+
+The menu holds the rest: clocking in and out and taking breaks, the working hours
+and limits the planner must respect, time-off requests, and adding the day's jobs
+to the phone's calendar.
+
+=== The dispatcher
+
+The dispatch board shows the crew as rows on a timeline and a Gantt chart against
+the last plan, and a map of where everyone is.
+
+image::img/fieldline-board.png["The dispatch board: the crew as rows of jobs on a timeline, with the map of the crew beside it",scaledwidth=80%]
+
+A job dragged to another technician or time is checked against every rule before
+the move goes through: the technician's skills, hours and time off, the job's time window,
+the travel between jobs. A new job is placed by the planner. When a technician is
+out, one tap covers their jobs, moving as few others as it can.
+
+Optimizing plans the week again. Every run is kept with what it changed and why,
+and with its drive time, deadlines met and overtime against the plan before it.
+The assistant takes the same requests in plain words, such as
+"Dana is out Thursday, cover her jobs."
+
+Time-off requests wait in a queue for the dispatcher to approve or decline.
+
+=== The administrator
+
+The administrator sees everything the dispatcher sees, and the back office adds:
+
+* each technician's skills, weekly hours and maximum drive;
+* the labour rates, overtime and weekend pay, and the rush hours that slow
+  travel;
+* time tracking and the weekly timesheets it produces;
+* the accounts, with the roles each one holds.
+
+Outside the development profile the server creates only one account, the
+administrator named in its settings, who grants everyone else their roles.
