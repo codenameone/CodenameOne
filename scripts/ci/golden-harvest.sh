@@ -20,6 +20,12 @@ list() {
   [ "${#WORKFLOWS[@]}" -gt 0 ] || { log "no workflows read from golden-capture.sh"; return 1; }
   : > "$runs_file"
   for wf in "${WORKFLOWS[@]}"; do
+    # A workflow whose every run here was cancelled has nothing to harvest;
+    # say so, since its suite never reported.
+    if [ "$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?head_sha=$sha&event=pull_request&per_page=20" \
+            --jq '[.workflow_runs[]] | (length > 0 and all(.conclusion == "cancelled"))')" = true ]; then
+      echo "::warning::every $wf run at $sha was cancelled; nothing of it is harvested"
+    fi
     while read -r line; do
       [ -n "$line" ] || continue
       set -- $line
