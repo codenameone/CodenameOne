@@ -23,7 +23,6 @@
  */
 package com.codename1.python.runtime;
 
-import com.codename1.io.Util;
 
 /// `_cn1aes`: the AES block cipher the `cryptography` package's
 /// `hazmat.primitives.ciphers` is written over. It is the platform's own,
@@ -37,14 +36,33 @@ final class PyAes {
     private PyAes() {
     }
 
+    /// The port's AES, `com.codename1.io.Util` on a client, installed by
+    /// Cn1Platform. A server's class library has no cipher, so there it stays
+    /// null and the module reports that rather than failing to compile.
+    interface Cipher {
+        byte[] apply(boolean encrypt, String transformation, byte[] key, byte[] iv, byte[] data);
+    }
+
+    private static Cipher cipher;
+
+    static void setCipher(Cipher c) {
+        cipher = c;
+    }
+
+    private static byte[] run(boolean encrypt, Object[] a) {
+        Cipher c = cipher;
+        if (c == null) {
+            throw Py.error(Py.NOT_IMPLEMENTED_ERROR, "AES is not available on this target");
+        }
+        return c.apply(encrypt, CBC, PyBytes.like(a[0]), PyBytes.like(a[1]), PyBytes.like(a[2]));
+    }
+
     static PyModule module() {
         PyModule m = new PyModule("_cn1aes", new String[0]);
         m.setAttr("cbc_encrypt", PyBuiltin.positional("cbc_encrypt", a ->
-                new PyBytes(Util.aesEncrypt(CBC, PyBytes.like(a[0]), PyBytes.like(a[1]), null,
-                        PyBytes.like(a[2])))));
+                new PyBytes(run(true, a))));
         m.setAttr("cbc_decrypt", PyBuiltin.positional("cbc_decrypt", a ->
-                new PyBytes(Util.aesDecrypt(CBC, PyBytes.like(a[0]), PyBytes.like(a[1]), null,
-                        PyBytes.like(a[2])))));
+                new PyBytes(run(false, a))));
         return m;
     }
 }

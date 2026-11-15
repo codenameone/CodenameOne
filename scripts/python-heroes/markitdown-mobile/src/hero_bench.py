@@ -51,7 +51,9 @@ def work(fixtures, dump=None):
 
 def main():
     fixtures = os.environ["MARKITDOWN_FIXTURES"]
-    rounds = int(sys.argv[1]) if len(sys.argv) > 1 else 5
+    # The application passes the rounds through CN1_HERO_BENCH (main.py);
+    # CPython runs this file directly with them as an argument.
+    rounds = int(os.environ.get("CN1_HERO_BENCH") or (sys.argv[1] if len(sys.argv) > 1 else 5))
     best = first = None
     total = 0.0
     result = None

@@ -311,7 +311,8 @@ public final class PyFunction extends PyObject {
             return body1.run(a);
         }
         return widen(1) ? fill(1, a, null, null, null, null)
-                : starOnly(1) ? star(1, a, null, null, null, null) : call(new Object[] {a}, Py.NO_KW);
+                : starOnly(1) ? star(1, a, null, null, null, null)
+                : slotsFit(1) ? slotsCall(1, a, null, null, null, null) : call(ArgArrays.fallback(new Object[] {a}), Py.NO_KW);
     }
 
     @Override
@@ -320,7 +321,8 @@ public final class PyFunction extends PyObject {
             return body2.run(a, b);
         }
         return widen(2) ? fill(2, a, b, null, null, null)
-                : starOnly(2) ? star(2, a, b, null, null, null) : call(new Object[] {a, b}, Py.NO_KW);
+                : starOnly(2) ? star(2, a, b, null, null, null)
+                : slotsFit(2) ? slotsCall(2, a, b, null, null, null) : call(ArgArrays.fallback(new Object[] {a, b}), Py.NO_KW);
     }
 
     @Override
@@ -329,7 +331,8 @@ public final class PyFunction extends PyObject {
             return body3.run(a, b, c);
         }
         return widen(3) ? fill(3, a, b, c, null, null)
-                : starOnly(3) ? star(3, a, b, c, null, null) : call(new Object[] {a, b, c}, Py.NO_KW);
+                : starOnly(3) ? star(3, a, b, c, null, null)
+                : slotsFit(3) ? slotsCall(3, a, b, c, null, null) : call(ArgArrays.fallback(new Object[] {a, b, c}), Py.NO_KW);
     }
 
     @Override
@@ -338,7 +341,8 @@ public final class PyFunction extends PyObject {
             return body4.run(a, b, c, d);
         }
         return widen(4) ? fill(4, a, b, c, d, null)
-                : starOnly(4) ? star(4, a, b, c, d, null) : call(new Object[] {a, b, c, d}, Py.NO_KW);
+                : starOnly(4) ? star(4, a, b, c, d, null)
+                : slotsFit(4) ? slotsCall(4, a, b, c, d, null) : call(ArgArrays.fallback(new Object[] {a, b, c, d}), Py.NO_KW);
     }
 
     @Override
@@ -347,52 +351,53 @@ public final class PyFunction extends PyObject {
             return body5.run(a, b, c, d, e);
         }
         return widen(5) ? fill(5, a, b, c, d, e)
-                : starOnly(5) ? star(5, a, b, c, d, e) : call(new Object[] {a, b, c, d, e}, Py.NO_KW);
+                : starOnly(5) ? star(5, a, b, c, d, e)
+                : slotsFit(5) ? slotsCall(5, a, b, c, d, e) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e}), Py.NO_KW);
     }
 
     @Override
     public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
-        return body6 != null ? body6.run(a, b, c, d, e, f) : call(new Object[] {a, b, c, d, e, f}, Py.NO_KW);
+        return body6 != null ? body6.run(a, b, c, d, e, f) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f}), Py.NO_KW);
     }
 
     @Override
     public Object call7(Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
-        return body7 != null ? body7.run(a, b, c, d, e, f, g) : call(new Object[] {a, b, c, d, e, f, g}, Py.NO_KW);
+        return body7 != null ? body7.run(a, b, c, d, e, f, g) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g}), Py.NO_KW);
     }
 
     @Override
     public Object call8(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
-        return body8 != null ? body8.run(a, b, c, d, e, f, g, h) : call(new Object[] {a, b, c, d, e, f, g, h}, Py.NO_KW);
+        return body8 != null ? body8.run(a, b, c, d, e, f, g, h) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h}), Py.NO_KW);
     }
 
     @Override
     public Object call9(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
-        return body9 != null ? body9.run(a, b, c, d, e, f, g, h, i) : call(new Object[] {a, b, c, d, e, f, g, h, i}, Py.NO_KW);
+        return body9 != null ? body9.run(a, b, c, d, e, f, g, h, i) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i}), Py.NO_KW);
     }
 
     @Override
     public Object call10(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
-        return body10 != null ? body10.run(a, b, c, d, e, f, g, h, i, j) : call(new Object[] {a, b, c, d, e, f, g, h, i, j}, Py.NO_KW);
+        return body10 != null ? body10.run(a, b, c, d, e, f, g, h, i, j) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j}), Py.NO_KW);
     }
 
     @Override
     public Object call11(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
-        return body11 != null ? body11.run(a, b, c, d, e, f, g, h, i, j, k) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k}, Py.NO_KW);
+        return body11 != null ? body11.run(a, b, c, d, e, f, g, h, i, j, k) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k}), Py.NO_KW);
     }
 
     @Override
     public Object call12(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
-        return body12 != null ? body12.run(a, b, c, d, e, f, g, h, i, j, k, l) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}, Py.NO_KW);
+        return body12 != null ? body12.run(a, b, c, d, e, f, g, h, i, j, k, l) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}), Py.NO_KW);
     }
 
     @Override
     public Object call13(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
-        return body13 != null ? body13.run(a, b, c, d, e, f, g, h, i, j, k, l, m) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}, Py.NO_KW);
+        return body13 != null ? body13.run(a, b, c, d, e, f, g, h, i, j, k, l, m) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}), Py.NO_KW);
     }
 
     @Override
     public Object call14(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n) {
-        return body14 != null ? body14.run(a, b, c, d, e, f, g, h, i, j, k, l, m, n) : call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}, Py.NO_KW);
+        return body14 != null ? body14.run(a, b, c, d, e, f, g, h, i, j, k, l, m, n) : call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}), Py.NO_KW);
     }
 
     /// Whether a positional call with `n` arguments binds as `f(*args)` does:
@@ -427,6 +432,56 @@ public final class PyFunction extends PyObject {
             }
         }
         slots[positional] = items == null ? PyTuple.EMPTY : new PyTuple(items);
+        Object r = body.run(slots);
+        spareSlots = clear(slots);
+        return r;
+    }
+
+    /// Whether a positional call with `n` arguments binds as
+    /// `f(a, b=1, **kwargs)` does when no keyword is passed: plain parameters,
+    /// each one not given defaulted, and an empty `**kwargs`.
+    /// Whether a positional call of `n` arguments binds with no keyword
+    /// matching at all: the missing parameters all have defaults, a `*args`
+    /// gets nothing, and every keyword-only parameter has a default. That is
+    /// most of what reaches here -- `__init__(self, x, *, strict=False)`,
+    /// sqlite-utils' `insert(self, record, pk=DEFAULT, ... )` with a dozen
+    /// defaulted parameters, `table(self, name, **kwargs)` -- and building an
+    /// argument array to hand [#call] was a new array per call for each.
+    private boolean slotsFit(int n) {
+        if (n > positional || positional - defaults.length > n) {
+            return false;
+        }
+        for (int i = 0; i < kwOnly; i++) {
+            if (kwDefaults == null || kwDefaults[i] == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// [#call] of a [#slotsFit] call: the slots are this function's spare
+    /// ones, laid out as [#bindArgs] lays them out and filled straight from
+    /// the arguments and the defaults. `**kwargs` is an empty dict -- the
+    /// shared one when the function never keeps it.
+    private Object slotsCall(int n, Object a, Object b, Object c, Object d, Object e) {
+        Object[] slots = spareSlots;
+        spareSlots = null;
+        if (slots == null) {
+            slots = new Object[positional + (varArgs ? 1 : 0) + kwOnly + (varKw ? 1 : 0)];
+        }
+        for (int i = 0; i < positional; i++) {
+            slots[i] = pick(i, n, i == 0 ? a : i == 1 ? b : i == 2 ? c : i == 3 ? d : e);
+        }
+        int k = positional;
+        if (varArgs) {
+            slots[k++] = PyTuple.EMPTY;
+        }
+        for (int i = 0; i < kwOnly; i++) {
+            slots[k++] = kwDefaults[i];
+        }
+        if (varKw) {
+            slots[k] = kwShared ? NO_KWARGS : new PyDict();
+        }
         Object r = body.run(slots);
         spareSlots = clear(slots);
         return r;
@@ -797,7 +852,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a}), kwNames);
     }
 
     @Override
@@ -814,7 +869,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b}), kwNames);
     }
 
     @Override
@@ -831,7 +886,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c}), kwNames);
     }
 
     @Override
@@ -848,7 +903,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d}), kwNames);
     }
 
     @Override
@@ -865,7 +920,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e}), kwNames);
     }
 
     @Override
@@ -882,7 +937,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e, f}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f}), kwNames);
     }
 
     @Override
@@ -899,7 +954,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e, f, g}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g}), kwNames);
     }
 
     @Override
@@ -916,7 +971,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e, f, g, h}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h}), kwNames);
     }
 
     @Override
@@ -933,7 +988,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e, f, g, h, i}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i}), kwNames);
     }
 
     @Override
@@ -950,7 +1005,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j}), kwNames);
     }
 
     @Override
@@ -967,7 +1022,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k}), kwNames);
     }
 
     @Override
@@ -984,7 +1039,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}), kwNames);
     }
 
     @Override
@@ -1001,7 +1056,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}), kwNames);
     }
 
     @Override
@@ -1018,7 +1073,7 @@ public final class PyFunction extends PyObject {
                 return r;
             }
         }
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}), kwNames);
     }
 
     /// True when a keyword call of `n` arguments can go through
@@ -1031,6 +1086,56 @@ public final class PyFunction extends PyObject {
     /// matched, keyword-only parameters included.
     private String[] plannedKw;
     private int[] plannedSlots;
+    /// The positional count the plan above was made for, and whether a call
+    /// of that shape binds by the template alone: every keyword names a
+    /// distinct parameter past the positional arguments, and every
+    /// parameter without a default is given.
+    private int plannedPos = -1;
+    private boolean plannedSimple;
+    /// The parameters with their defaults in place and null where there is
+    /// none: a simple planned call copies it into the slots in one step,
+    /// where filling each default in turn was most of binding a call to a
+    /// function of many keyword-only parameters (hashlib.blake2b's twelve).
+    /// The default arrays are final and never handed out, so it never goes
+    /// stale.
+    private Object[] template;
+
+    private Object[] template() {
+        Object[] t = template;
+        if (t == null) {
+            int total = positional + kwOnly;
+            int first = positional - defaults.length;
+            t = new Object[total];
+            for (int p = 0; p < total; p++) {
+                t[p] = p < positional ? dflt(p, first) : kwDefaults == null ? null : kwDefaults[p - positional];
+            }
+            template = t;
+        }
+        return t;
+    }
+
+    /// Whether a call of `nPos` positional arguments and these keyword slots
+    /// binds by [#template] alone (see [#plannedSimple]).
+    private boolean simplePlan(int nPos, int[] kwSlots) {
+        int total = positional + kwOnly;
+        boolean[] given = new boolean[total];
+        for (int i = 0; i < nPos; i++) {
+            given[i] = true;
+        }
+        for (int slot : kwSlots) {
+            if (slot < nPos || slot >= total || given[slot]) {
+                return false;
+            }
+            given[slot] = true;
+        }
+        Object[] t = template();
+        for (int p = 0; p < total; p++) {
+            if (!given[p] && t[p] == null) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /// A keyword call of a function [#direct] cannot take -- more than six
     /// parameters, or keyword-only ones: the `n` arguments go straight into
@@ -1063,12 +1168,31 @@ public final class PyFunction extends PyObject {
             }
             plannedKw = kwNames;
             plannedSlots = kwSlots;
+            plannedPos = -1;
+        }
+        if (plannedPos != nPos) {
+            plannedSimple = simplePlan(nPos, kwSlots);
+            plannedPos = nPos;
         }
         int total = positional + kwOnly;
         Object[] slots = spareSlots;
         spareSlots = null;
         if (slots == null) {
             slots = new Object[varKw ? total + 1 : total];
+        }
+        if (plannedSimple) {
+            // Defaults in one copy, then the arguments over them; nothing left
+            // to check, the plan having proved every slot given or defaulted.
+            System.arraycopy(template, 0, slots, 0, total);
+            for (int i = 0; i < n; i++) {
+                slots[i < nPos ? i : kwSlots[i - nPos]] = arg(i, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13);
+            }
+            if (varKw) {
+                slots[total] = kwShared ? NO_KWARGS : new PyDict();
+            }
+            Object r = body.run(slots);
+            spareSlots = clear(slots);
+            return r;
         }
         // `**kwargs` (markitdown's `convert_a(self, el, text, **kwargs)`,
         // called per link): a keyword no parameter takes goes into the dict
@@ -1246,7 +1370,16 @@ public final class PyFunction extends PyObject {
     private int seenNext;
     private String[] pendingKw;
 
+    /// Nulls, copied over a slot array to empty it: one bulk copy, where a
+    /// store per slot paid the collector's write barrier each. Up to 8 slots the
+    /// stores measured cheaper than the bulk barrier's setup. Never written.
+    private static final Object[] NULLS = new Object[64];
+
     private static Object[] clear(Object[] a) {
+        if (a.length > 8 && a.length <= NULLS.length) {
+            System.arraycopy(NULLS, 0, a, 0, a.length);
+            return a;
+        }
         for (int i = 0; i < a.length; i++) {
             a[i] = null;
         }

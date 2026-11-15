@@ -117,115 +117,115 @@ public abstract class PyObject {
     // function binds them in locals, anything else gets the array here.
 
     public Object callKwF(String[] kwNames, Object a) {
-        return call(new Object[] {a}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b) {
-        return call(new Object[] {a, b}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c) {
-        return call(new Object[] {a, b, c}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d) {
-        return call(new Object[] {a, b, c, d}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
-        return call(new Object[] {a, b, c, d, e}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
-        return call(new Object[] {a, b, c, d, e, f}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
-        return call(new Object[] {a, b, c, d, e, f, g}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
-        return call(new Object[] {a, b, c, d, e, f, g, h}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}), kwNames);
     }
 
     public Object callKwF(String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}, kwNames);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}), kwNames);
     }
 
     public Object call1(Object a) {
-        return call(new Object[] {a}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a}), Py.NO_KW);
     }
 
     public Object call2(Object a, Object b) {
-        return call(new Object[] {a, b}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b}), Py.NO_KW);
     }
 
     public Object call3(Object a, Object b, Object c) {
-        return call(new Object[] {a, b, c}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c}), Py.NO_KW);
     }
 
     public Object call4(Object a, Object b, Object c, Object d) {
-        return call(new Object[] {a, b, c, d}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d}), Py.NO_KW);
     }
 
     public Object call5(Object a, Object b, Object c, Object d, Object e) {
-        return call(new Object[] {a, b, c, d, e}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e}), Py.NO_KW);
     }
 
     public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
-        return call(new Object[] {a, b, c, d, e, f}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f}), Py.NO_KW);
     }
 
     public Object call7(Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
-        return call(new Object[] {a, b, c, d, e, f, g}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g}), Py.NO_KW);
     }
 
     public Object call8(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
-        return call(new Object[] {a, b, c, d, e, f, g, h}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h}), Py.NO_KW);
     }
 
     public Object call9(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i}), Py.NO_KW);
     }
 
     public Object call10(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j}), Py.NO_KW);
     }
 
     public Object call11(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k}), Py.NO_KW);
     }
 
     public Object call12(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l}), Py.NO_KW);
     }
 
     public Object call13(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m}), Py.NO_KW);
     }
 
     public Object call14(Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n) {
-        return call(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}, Py.NO_KW);
+        return call(ArgArrays.fallback(new Object[] {a, b, c, d, e, f, g, h, i, j, k, l, m, n}), Py.NO_KW);
     }
 
     // ---- numbers ---------------------------------------------------------

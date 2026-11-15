@@ -9,6 +9,31 @@ the API key and an OpenAI-compatible endpoint (Ollama, LM Studio, a proxy).
 Network calls run on a worker thread; `callSerially` hands every chunk back
 to the event dispatch thread, which owns the components.
 """
+
+import os
+import sys
+
+if os.environ.get("CN1_HERO_BENCH"):
+    # The benchmark (scripts/python-heroes/bench/run_heroes.py) launches this
+    # application as a user's build produces it, with CN1_HERO_BENCH set to a
+    # number of rounds: it runs hero_bench.py's workload, prints the timings
+    # and exits before any form is shown. CPython runs hero_bench.py as it is.
+    # A workload that raises still exits: it prints no RESULT line, which
+    # is what the runner fails on, instead of leaving an idle app running.
+    try:
+        import hero_bench  # noqa: E402,F401
+    except BaseException:  # noqa: BLE001
+        import traceback  # noqa: E402
+
+        traceback.print_exc()
+        print("BENCH-FAILED")
+    finally:
+        sys.stdout.flush()
+        from java.com.codename1.ui import Display as _Display  # noqa: E402
+
+        _Display.getInstance().exitApplication()
+    raise SystemExit(0)
+
 import json
 import os
 import threading

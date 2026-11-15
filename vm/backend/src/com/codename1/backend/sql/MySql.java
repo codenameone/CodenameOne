@@ -639,10 +639,13 @@ public final class MySql {
         readPacket(); // EOF ending the definitions
         if (rows != null) {
             String[] kinds = new String[resultColumns];
+            String[] names = new String[resultColumns];
             for (int iter = 0 ; iter < resultColumns ; iter++) {
                 kinds[iter] = kind(resultDefinitions[iter].type);
+                names[iter] = resultDefinitions[iter].name;
             }
             rows.setColumnTypes(kinds);
+            rows.setColumnNames(names);
         }
         while (true) {
             Packet packet = readPacket();

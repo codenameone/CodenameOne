@@ -39,31 +39,41 @@ final class PyHashlib {
     private PyHashlib() {
     }
 
+    private static Object newHash(Object nameO, Object size, Object key, Object salt, Object person) {
+        String name = Py.toStr(nameO);
+        Hash h;
+        if ("blake2b".equals(name)) {
+            h = Hash.blake2b((int) Py.asLong(size), PyBytes.like(key), PyBytes.like(salt), PyBytes.like(person));
+        } else if ("blake2s".equals(name)) {
+            h = Hash.blake2s((int) Py.asLong(size), PyBytes.like(key), PyBytes.like(salt), PyBytes.like(person));
+        } else {
+            String algorithm = algorithm(name);
+            if (algorithm == null) {
+                throw Py.error(Py.VALUE_ERROR, "unsupported hash type " + name);
+            }
+            h = Hash.create(algorithm);
+        }
+        return new PyJavaObject(h);
+    }
+
     static PyModule module() {
         PyModule m = new PyModule("_cn1hash", new String[0]);
+        // hashlib.py always passes all five; no argument array is built for them.
         m.setAttr("new", PyBuiltin.positional("new", a -> {
-            String name = Py.toStr(a[0]);
-            Hash h;
-            if ("blake2b".equals(name)) {
-                h = Hash.blake2b((int) Py.asLong(a[1]), PyBytes.like(a[2]), PyBytes.like(a[3]), PyBytes.like(a[4]));
-            } else if ("blake2s".equals(name)) {
-                h = Hash.blake2s((int) Py.asLong(a[1]), PyBytes.like(a[2]), PyBytes.like(a[3]), PyBytes.like(a[4]));
-            } else {
-                String algorithm = algorithm(name);
-                if (algorithm == null) {
-                    throw Py.error(Py.VALUE_ERROR, "unsupported hash type " + name);
-                }
-                h = Hash.create(algorithm);
+            if (a.length != 5) {
+                throw Py.typeError("new expected 5 arguments, got " + a.length);
             }
-            return new PyJavaObject(h);
-        }));
+            return newHash(a[0], a[1], a[2], a[3], a[4]);
+        }).with5(PyHashlib::newHash));
         m.setAttr("update", PyBuiltin.fixed2("update", (a0, a1) -> {
             byte[] b = PyBytes.like(a1);
             hash(a0).update(b, 0, b.length);
             return Py.NONE;
         }));
         m.setAttr("copy", PyBuiltin.fixed1("copy", a0 -> new PyJavaObject(hash(a0).copy())));
-        m.setAttr("digest", PyBuiltin.fixed1("digest", a0 -> new PyBytes(hash(a0).copy().digest())));
+        m.setAttr("digest", PyBuiltin.fixed1("digest", a0 -> new PyBytes(hash(a0).peekDigest())));
+        // hexdigest() without the bytes object and the method call between.
+        m.setAttr("hexdigest", PyBuiltin.fixed1("hexdigest", a0 -> Py.str(PyBytes.hexOf(hash(a0).peekDigest()))));
         m.setAttr("pbkdf2", PyBuiltin.positional("pbkdf2", a -> {
             String algorithm = algorithm(Py.toStr(a[0]));
             if (algorithm == null || Hash.SHA3_256.equals(algorithm)) {

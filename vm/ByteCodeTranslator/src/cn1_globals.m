@@ -2008,11 +2008,14 @@ int instanceofFunction(int sourceClass, int destId) {
     if(sourceClass == destId) {
         return JAVA_TRUE;
     }
-    if (sourceClass == cn1_array_1_id_JAVA_INT && destId == cn1_class_id_java_lang_Object) {
-        int foo = 1;
-    }
-    if (destId == cn1_array_1_id_JAVA_INT && sourceClass == cn1_class_id_java_lang_Object) {
-        int foo = 1;
+    /* EVERYTHING IS AN OBJECT, arrays included, so this needs no table. It is
+     * the question the array-store check asks of every store into an Object[]
+     * (backend builds turn that check on), and the walk below answered it by
+     * scanning the stored value's whole supertype list for Object, which it
+     * reaches last: measured as 3.5% of llm's log writer, transpiled Python
+     * storing into Object[] slots on nearly every call. */
+    if(sourceClass == cn1_class_id_java_lang_Object) {
+        return JAVA_TRUE;
     }
     if(sourceClass >= cn1_array_start_offset || destId >= cn1_array_start_offset) {
         
@@ -19318,6 +19321,24 @@ JAVA_OBJECT newStringFromUtf8Len(CODENAME_ONE_THREAD_STATE, const char* str, int
     if(length < 0) {
         length = 0;
     }
+    /* All ASCII -- most text a database or a protocol hands over -- decodes to its
+       own bytes, straight into a compact string: no widening into a unit buffer
+       for cn1StringFromUnits to scan and narrow again. Eight bytes per test. */
+    {
+        int k = 0;
+        unsigned long long high = 0;
+        for(; k + 8 <= length ; k += 8) {
+            unsigned long long w;
+            memcpy(&w, str + k, 8);
+            high |= w;
+        }
+        for(; k < length ; k++) {
+            high |= (unsigned char)str[k];
+        }
+        if((high & 0x8080808080808080ULL) == 0) {
+            return newStringFromAsciiLen(threadStateData, str, length);
+        }
+    }
     /* One UTF-16 unit per input BYTE is always enough: a 1-byte sequence yields 1,
        and the only multi-unit case (a 4-byte sequence yielding a surrogate pair)
        yields 2 units from 4 bytes. An invalid byte yields exactly one U+FFFD. */
@@ -20184,7 +20205,12 @@ static long long cn1StallPercentileUs(int cause, double q) {
 // by omission (see the entry-point note on cn1RecordAllocation). The overflow
 // row is how a reader learns the bound was reached instead of trusting a total
 // that quietly excludes it.
+// A profiling build of a larger app may pass -DCN1_ALLOC_PROFILE_SLOTS=32768:
+// the musl failure above is the static Linux binary's; a dynamic macOS one
+// with 16646 classes prints at 32768.
+#ifndef CN1_ALLOC_PROFILE_SLOTS
 #define CN1_ALLOC_PROFILE_SLOTS 8192
+#endif
 static _Atomic long long cn1AllocProfBytes[CN1_ALLOC_PROFILE_SLOTS];
 static _Atomic long cn1AllocProfCount[CN1_ALLOC_PROFILE_SLOTS];
 // Atomic like the counters beside it. Several mutators allocating the same class
@@ -21235,6 +21261,12 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     return stringToUTF8Len(threadStateData, str, NULL);
 }
 
+/* Encoded straight from the String's own characters into the thread's buffer. It went
+ * through String.getBytes("UTF-8") -- a charset lookup by name and a byte[] per call --
+ * and a database binding a short text paid more for that than for sqlite3_bind_text.
+ * The bytes are getBytes' own: a UTF-16 String goes through the encoder it uses
+ * (an unpaired surrogate becomes U+FFFD), and Latin-1 is one or two bytes a char. */
+extern size_t cn1Utf8EncodeChars(const JAVA_ARRAY_CHAR* src, size_t len, JAVA_ARRAY_BYTE* out);
 const char* stringToUTF8Len(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, JAVA_INT* lengthOut) {
     if(lengthOut != NULL) {
         *lengthOut = 0;
@@ -21242,34 +21274,38 @@ const char* stringToUTF8Len(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, JAVA_INT
     if(str == NULL) {
         return NULL;
     }
-    if (utf8String == JAVA_NULL) {
-        utf8String = newStringFromCString(threadStateData, "UTF-8");
-        removeObjectFromHeapCollection(threadStateData, utf8String);
-        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)utf8String)->java_lang_String_value);
-    }
-
-    JAVA_ARRAY byteArray = (JAVA_ARRAY)java_lang_String_getBytes___java_lang_String_R_byte_1ARRAY(threadStateData, str, utf8String);
-    JAVA_ARRAY_BYTE* data = CN1_ARRAY_DATA(byteArray);
-
-    JAVA_INT len = byteArray->length;
-
-    if(threadStateData->utf8Buffer == 0) {
-        threadStateData->utf8Buffer = malloc(len + 1);
-        threadStateData->utf8BufferSize = len+1;
-    } else {
-        if(threadStateData->utf8BufferSize < len + 1) {
+    JAVA_INT count = ((struct obj__java_lang_String*)str)->java_lang_String_count;
+    int latin1 = cn1StrIsLatin1(str);
+    const void* chars = cn1StrChars(str);
+    size_t need = (size_t)count * (latin1 ? 2 : 3) + 1;
+    if(threadStateData->utf8Buffer == 0 || (size_t)threadStateData->utf8BufferSize < need) {
+        if(threadStateData->utf8Buffer != 0) {
             free(threadStateData->utf8Buffer);
-            threadStateData->utf8Buffer = malloc(len + 1);
-            threadStateData->utf8BufferSize = len+1;
         }
+        threadStateData->utf8Buffer = malloc(need);
+        threadStateData->utf8BufferSize = (JAVA_INT)need;
     }
-    char* cs = threadStateData->utf8Buffer;
-    memcpy(cs, data, len);
-    cs[len] = '\0';
+    unsigned char* out = (unsigned char*)threadStateData->utf8Buffer;
+    JAVA_INT n = 0;
+    if(latin1) {
+        const unsigned char* in = (const unsigned char*)chars;
+        for(JAVA_INT i = 0; i < count; i++) {
+            unsigned int c = in[i];
+            if(c < 0x80) {
+                out[n++] = (unsigned char)c;
+            } else {
+                out[n++] = (unsigned char)(0xC0 | (c >> 6));
+                out[n++] = (unsigned char)(0x80 | (c & 0x3F));
+            }
+        }
+    } else {
+        n = (JAVA_INT)cn1Utf8EncodeChars((const JAVA_ARRAY_CHAR*)chars, (size_t)count, (JAVA_ARRAY_BYTE*)out);
+    }
+    out[n] = '\0';
     if(lengthOut != NULL) {
-        *lengthOut = len;
+        *lengthOut = n;
     }
-    return cs;
+    return (const char*)out;
 }
 
 #if defined(__APPLE__) && defined(__OBJC__)

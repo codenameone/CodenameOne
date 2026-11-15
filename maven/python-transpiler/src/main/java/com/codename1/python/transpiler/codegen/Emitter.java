@@ -6608,9 +6608,52 @@ public final class Emitter {
     }
 
 
+    /// The static [PyDict.Literal] field for a display whose keys are two or
+    /// more distinct str constants with no newline in them, or null. One
+    /// field per distinct key list in the module, so two displays of the
+    /// same keys share it. A display of other keys -- a variable, a
+    /// duplicate, a number -- keeps the put per pair, which is what Python
+    /// means by it: a duplicate key's later value wins in its first place.
+    String dictShape(List<Expr> keys) {
+        if (keys.size() < 2 || keys.size() > 48) {
+            return null;
+        }
+        Set<String> seen = new HashSet<String>();
+        StringBuilder joined = new StringBuilder();
+        for (Expr k : keys) {
+            if (!(k instanceof Constant) || ((Constant) k).kind != Constant.Kind.STR) {
+                return null;
+            }
+            String t = ((Constant) k).text;
+            if (t.indexOf('\n') >= 0 || !seen.add(t)) {
+                return null;
+            }
+            joined.append(joined.length() == 0 ? "" : "\n").append(t);
+        }
+        String key = joined.toString();
+        String f = dictShapes.get(key);
+        if (f == null) {
+            f = "DS" + (++sites);
+            dictShapes.put(key, f);
+            fields.append("    private static final PyDict.Literal ").append(f).append(" = PyDict.Literal.of(")
+                    .append(javaString(key)).append(");\n");
+        }
+        return f;
+    }
+
+    private final Map<String, String> dictShapes = new HashMap<String, String>();
+
     /// A dict display as `new PyDict(n).put(k, v)...`: made at its final size, with no
     /// array of its pairs built for the call, as CPython's BUILD_MAP builds it.
     private String dictLiteral(List<Expr> keys, List<Expr> values) {
+        String shape = dictShape(keys);
+        if (shape != null) {
+            StringBuilder sb = new StringBuilder("PyDict.literal(").append(shape).append(", new Object[] {");
+            for (int i = 0; i < values.size(); i++) {
+                sb.append(i == 0 ? "" : ", ").append(expr(values.get(i)));
+            }
+            return sb.append("})").toString();
+        }
         StringBuilder sb = new StringBuilder("new PyDict(").append(keys.size()).append(')');
         for (int i = 0; i < keys.size(); i++) {
             String k = expr(keys.get(i));

@@ -104,6 +104,20 @@ public class PythonProjectTest {
     }
 
     @Test
+    public void theBuildDirectivesComeWithTheSources() throws Exception {
+        write(new File(project, "src/cn1-python.properties"), "remove=textstats.cli.main\n");
+        write(new File(project, "src/textstats/cn1-python.properties"), "not at the root\n");
+        importer().importProject(project, common, null, null);
+        assertEquals("remove=textstats.cli.main\n", read(new File(python, "cn1-python.properties")));
+        assertFalse("only the root's directives are the build's",
+                new File(python, "textstats/cn1-python.properties").exists());
+        assertTrue(new File(project, "src/cn1-python.properties").delete());
+        importer().importProject(project, common, null, null);
+        assertFalse("a re-import removes directives the project no longer has",
+                new File(python, "cn1-python.properties").exists());
+    }
+
+    @Test
     public void flatProjectsFindTheirEntryModule() throws Exception {
         File flat = tmp.newFolder("flat");
         write(new File(flat, "app.py"), "print(1)\n");

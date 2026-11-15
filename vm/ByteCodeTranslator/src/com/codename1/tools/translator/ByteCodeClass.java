@@ -2969,13 +2969,17 @@ public class ByteCodeClass {
                         // expansion the macro's name is not expanded again.
                         String getter = "get_static_" + clsName + "_" + bf.getFieldName().replace('$', '_').replace('-', '_');
                         String storage = "STATIC_FIELD_" + clsName + "_" + bf.getFieldName();
-                        b.append("#define ").append(getter).append("() ");
+                        // Variadic: hand-written natives call the getter with the thread
+                        // state (IOSNative.m passes threadStateData), which the unprototyped
+                        // declaration accepts; a "()" macro made every such call a
+                        // preprocessor error and broke every iOS and macOS app build.
+                        b.append("#define ").append(getter).append("(...) ");
                         if (eagerInit(clsName)) {
                             b.append("(").append(storage).append(")\n");
                         } else {
                             b.append("(__atomic_load_n(&__").append(clsName)
                                     .append("_LOADED__, __ATOMIC_ACQUIRE) ? ").append(storage)
-                                    .append(" : ").append(getter).append("())\n");
+                                    .append(" : ").append(getter).append("(__VA_ARGS__))\n");
                             b.append("extern int __").append(clsName).append("_LOADED__;\n");
                         }
                     }

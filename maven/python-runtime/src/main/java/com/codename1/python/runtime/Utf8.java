@@ -37,11 +37,10 @@ final class Utf8 {
         // surrogateescape decode can put into a str -- comes out as U+FFFD
         // where CPython's strict handler raises: finding one first would be
         // a scan of every string in Java, which is what this replaces.
-        try {
-            return s.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            return encodeChars(s);
-        }
+        // Through the Charset overload: it declares no checked exception, so
+        // no handler is entered per call (a setjmp on ParparVM), and the
+        // device's String answers a Latin-1 string from it directly.
+        return s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /// The Java encoder, for a platform without a UTF-8 charset.

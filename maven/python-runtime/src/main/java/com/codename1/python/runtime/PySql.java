@@ -23,7 +23,7 @@
  */
 package com.codename1.python.runtime;
 
-import com.codename1.db.SqlFunction;
+import java.util.function.Function;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -99,6 +99,59 @@ public abstract class PySql {
             return null;
         }
 
+        /// The row lists of this connection's cursors that still have rows to
+        /// read, by identity, while [#holdRead(boolean)] is on for them.
+        private Object[] pending = new Object[4];
+        private int pendingCount;
+
+        /// A cursor was handed `rows`, one or more: while it works
+        /// through them the connection may keep its read lock (see
+        /// [#holdRead(boolean)]), as CPython's does under a pending statement.
+        public final void pending(Object rows) {
+            for (int i = 0; i < pendingCount; i++) {
+                if (pending[i] == rows) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    return;
+                }
+            }
+            if (pendingCount == pending.length) {
+                // A cursor left part read never says it is done: the oldest
+                // slot is most likely one, and goes, so it is not kept alive.
+                System.arraycopy(pending, 1, pending, 0, pendingCount - 1);
+                pendingCount--;
+            }
+            pending[pendingCount++] = rows;
+            // Every time, not only on the first: the engine lets go by itself
+            // before a statement the lock would be in the way of.
+            holdRead(true);
+        }
+
+        /// The cursor that was handed `rows` read the last of them, or moved on.
+        public final void drained(Object rows) {
+            for (int i = 0; i < pendingCount; i++) {
+                if (pending[i] == rows) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    pending[i] = pending[--pendingCount];
+                    pending[pendingCount] = null;
+                    if (pendingCount == 0) {
+                        holdRead(false);
+                    }
+                    return;
+                }
+            }
+        }
+
+        /// Whether any cursor's rows are pending: the caller skips the lookup
+        /// when none are.
+        public final boolean anyPending() {
+            return pendingCount > 0;
+        }
+
+        /// Keeps the engine's read lock between statements, or lets it go. Only
+        /// ever a saving -- the rows are read already -- so an engine with no
+        /// such lock, or no way to keep it, leaves this as it is.
+        protected void holdRead(boolean on) {
+            // Nothing to keep by default.
+        }
+
         public abstract void begin() throws IOException;
 
         public abstract void commit() throws IOException;
@@ -111,7 +164,7 @@ public abstract class PySql {
         /// for any number); a later registration of the same name and count
         /// replaces it. Answers false where the engine cannot call back into
         /// the application, which is the default.
-        public boolean createFunction(String name, int nargs, SqlFunction body) throws IOException {
+        public boolean createFunction(String name, int nargs, Function<Object[], Object> body) throws IOException {
             return false;
         }
     }

@@ -58,6 +58,11 @@ public final class Builtins {
             throw Py.notATypeObject("object", a);
         }
         return ((PyType) a[0]).newInstance();
+    }).with1(t -> {
+        if (!(t instanceof PyType)) {
+            throw Py.notATypeObject("object", new Object[] {t});
+        }
+        return ((PyType) t).newInstance();
     });
     /// Marks an optional argument that was not passed.
     private static final Object ABSENT = new PyStr("<absent>");
@@ -109,7 +114,7 @@ public final class Builtins {
     public static final Object ID = PyBuiltin.unary("id", x -> PyInt.of(System.identityHashCode(x)));
     public static final Object ABS = PyBuiltin.unary("abs", x -> abs(x));
     public static final Object CALLABLE = PyBuiltin.unary("callable", x -> Py.bool(isCallable(x)));
-    public static final Object ITER = PyBuiltin.positional("iter", a -> iter(a));
+    public static final Object ITER = PyBuiltin.positional("iter", a -> iter(a)).with1(Py::iter);
     public static final Object NEXT = PyBuiltin.positional("next", a -> next(a))
             .with1(x -> next(x, null, false)).with2((x, d) -> next(x, d, true));
     public static final Object AITER = PyBuiltin.unary("aiter", x -> Py.callMethod(x, "__aiter__"));
@@ -189,8 +194,10 @@ public final class Builtins {
                 m = Py.ltBool(m, z) ? z : m;
                 return Py.ltBool(m, w) ? w : m;
             });
-    public static final Object ANY = PyBuiltin.positional("any", a -> {
-        Object it = Py.iter(one("any", a));
+    public static final Object ANY = PyBuiltin.positional("any", a -> any(one("any", a))).with1(Builtins::any);
+
+    private static Object any(Object iterable) {
+        Object it = Py.iter(iterable);
         if (it instanceof PyGenerator) {
             // A generator expression, the usual argument: stepped under ONE
             // handler (see PyList.extend), not a try per value.
@@ -212,9 +219,11 @@ public final class Builtins {
             }
         }
         return Py.FALSE;
-    });
-    public static final Object ALL = PyBuiltin.positional("all", a -> {
-        Object it = Py.iter(one("all", a));
+    }
+    public static final Object ALL = PyBuiltin.positional("all", a -> all(one("all", a))).with1(Builtins::all);
+
+    private static Object all(Object iterable) {
+        Object it = Py.iter(iterable);
         if (it instanceof PyGenerator) {
             // A generator expression, the usual argument: stepped under ONE
             // handler (see PyList.extend), not a try per value.
@@ -236,7 +245,7 @@ public final class Builtins {
             }
         }
         return Py.TRUE;
-    });
+    }
     public static final Object SORTED = new PyBuiltin("sorted", (args, kw) -> {
         Args a = new Args("sorted", args, kw).check(1, "key", "reverse");
         PyList l = new PyList();
@@ -244,12 +253,20 @@ public final class Builtins {
         Object rev = a.kw("reverse");
         l.sort(a.kw("key"), rev != null && Py.isTrue(rev));
         return l;
+    }).with1(x -> {
+        PyList l = new PyList();
+        l.extend(x);
+        l.sort(null, false);
+        return l;
     });
     public static final Object REVERSED = PyBuiltin.unary("reversed", x -> reversed(x));
     public static final Object ENUMERATE = new PyBuiltin("enumerate", (args, kw) -> {
         Args a = new Args("enumerate", args, kw).check(2, "iterable", "start");
-        final Object it = Py.iter(a.required(0, "iterable"));
-        Object start = a.get(1, "start", PyInt.of(0));
+        return enumerate(a.required(0, "iterable"), a.get(1, "start", PyInt.of(0)));
+    }).with1(x -> enumerate(x, PyInt.of(0))).with2(Builtins::enumerate);
+
+    private static Object enumerate(Object iterable, Object start) {
+        final Object it = Py.iter(iterable);
         final Object[] n = {start};
         return new PyJavaIter(() -> {
             Object v = Py.next(it);
@@ -260,7 +277,7 @@ public final class Builtins {
             n[0] = Py.add(n[0], PyInt.of(1));
             return r;
         });
-    });
+    }
     public static final Object ZIP = new PyBuiltin("zip", (args, kw) -> {
         Args a = new Args("zip", args, kw).check(Integer.MAX_VALUE, "strict");
         Object strictT = a.kw("strict");
@@ -299,7 +316,77 @@ public final class Builtins {
             }
             return new PyTuple(row);
         });
-    });
+    }).with2(Builtins::zip2);
+
+    /// `zip(a, b)`, the usual call: the iterator alone, with none of the
+    /// argument array and keyword binding of the general form. Pulls from
+    /// `a` first, as that form does.
+    private static Object zip2(Object x, Object y) {
+        if ((x instanceof PyTuple || x instanceof PyList && x.getClass() == PyList.class) && y instanceof PyTuple) { //NOPMD CompareObjectsWithEquals - exactly list: a subclass may override __iter__
+            return new PyJavaIter(new ZipSeq(x, ((PyTuple) y).arr()));
+        }
+        final Object i0 = Py.iter(x);
+        final Object i1 = Py.iter(y);
+        return new PyJavaIter(() -> {
+            Object v0 = Py.next(i0);
+            if (v0 == null) {
+                return null;
+            }
+            Object v1 = Py.next(i1);
+            return v1 == null ? null : Py.tuple(v0, v1);
+        });
+    }
+    /// `zip(a, b)` of a tuple or list and a tuple: `dict(zip(keys, row))`,
+    /// the way sqlite-utils makes every row a dict, reads the pairs straight
+    /// out of it ([#drainInto]) rather than through a tuple for each. A list
+    /// is read live, as its iterator reads it, so one that changes size while
+    /// zipped ends where list iteration would.
+    static final class ZipSeq implements PyJavaIter.Source {
+        private final PyList list;
+        private final Object[] keys;
+        private final Object[] values;
+        private int pos;
+
+        ZipSeq(Object x, Object[] values) {
+            this.list = x instanceof PyList ? (PyList) x : null;
+            this.keys = x instanceof PyTuple ? ((PyTuple) x).arr() : null;
+            this.values = values;
+        }
+
+        private Object key(int p) {
+            if (keys != null) {
+                return p < keys.length ? keys[p] : null;
+            }
+            return p < list.size() ? list.get(p) : null;
+        }
+
+        @Override
+        public Object next() {
+            int p = pos;
+            if (p >= values.length) {
+                return null;
+            }
+            Object k = key(p);
+            if (k == null) {
+                return null;
+            }
+            pos = p + 1;
+            return Py.tuple(k, values[p]);
+        }
+
+        /// Stores every pair left into `d`, in order, as `d[k] = v` each.
+        void drainInto(PyDict d) {
+            for (int p = pos; p < values.length; p++) {
+                Object k = key(p);
+                if (k == null) {
+                    break;
+                }
+                pos = p + 1;
+                d.setItem(k, values[p]);
+            }
+        }
+    }
+
     /// `zip(*rows)` over tuples, the transpose pdfplumber's merge_bboxes
     /// does per word: tuples cannot change, so each column is read by index,
     /// with no iterator per argument and no next() call per item. Null
@@ -555,6 +642,15 @@ public final class Builtins {
                 ((PyType) a[0]).setAttrDirect(Py.toStr(a[1]), a[2]);
             } else {
                 Py.obj(a[0]).setAttr(Py.toStr(a[1]), a[2]);
+            }
+            return Py.NONE;
+        }).with3((self, name, value) -> {
+            if (self instanceof PyInstance) {
+                ((PyInstance) self).setAttrObject(Py.toStr(name), value);
+            } else if (self instanceof PyType) {
+                ((PyType) self).setAttrDirect(Py.toStr(name), value);
+            } else {
+                Py.obj(self).setAttr(Py.toStr(name), value);
             }
             return Py.NONE;
         }));

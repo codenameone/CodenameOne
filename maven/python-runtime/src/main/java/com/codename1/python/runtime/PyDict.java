@@ -635,6 +635,84 @@ public class PyDict extends PyObject {
         return v;
     }
 
+    /// The keys of one dict display whose keys are distinct str constants,
+    /// resolved to their shared [Layout] on the display's first evaluation.
+    /// The transpiler makes one per such display, as a static field of the
+    /// module.
+    public static final class Literal {
+        final String[] keys;
+        Layout layout;
+        /// Set when the keys cannot share a layout (past its limits): the
+        /// display then builds its dict a pair at a time, as before.
+        boolean own;
+
+        private Literal(String[] keys) {
+            this.keys = keys;
+        }
+
+        /// The shape of a display's keys, joined by newlines (no key of a
+        /// shape contains one; the transpiler checks).
+        public static Literal of(String joined) {
+            String[] k = Py.names(joined);
+            for (int i = 0; i < k.length; i++) {
+                k[i] = k[i].intern();
+            }
+            return new Literal(k);
+        }
+    }
+
+    /// A dict display of str constant keys: `values` (a new array, in key
+    /// order, which the dict keeps as its own) under the keys' shared
+    /// layout. Measured on sqlite-utils, whose every Table and insert builds
+    /// a display of fifteen keys: one put per pair hashed each key and
+    /// probed the dict and the layout chain for it, 2.1x CPython's
+    /// BUILD_MAP; with the layout resolved once there is nothing to hash or
+    /// probe, and the dict is the array.
+    public static PyDict literal(Literal shape, Object[] values) {
+        Layout l = shape.layout;
+        if (l == null) {
+            l = shape.own ? null : resolve(shape);
+            if (l == null) {
+                PyDict d = new PyDict(values.length);
+                String[] k = shape.keys;
+                for (int i = 0; i < k.length; i++) {
+                    d.setItem(k[i], values[i]);
+                }
+                return d;
+            }
+        }
+        PyDict d = new PyDict();
+        d.values = values;
+        d.keys = l.keys;
+        d.hashes = l.hashes;
+        d.index = l.index;
+        d.layout = l;
+        d.used = l.n;
+        d.size = l.n;
+        return d;
+    }
+
+    /// Walks the layout chain for a shape's keys, taking each step twice
+    /// when it has to: [Layout#step] makes a step a layout only the second
+    /// time a dict takes it.
+    private static Layout resolve(Literal shape) {
+        Layout l = Layout.ROOT;
+        for (String k : shape.keys) {
+            long h = Py.keyHash(k, "a dict key");
+            Layout nl = l.step(k, h);
+            if (nl == null) {
+                nl = l.step(k, h);
+            }
+            if (nl == null) {
+                shape.own = true;
+                return null;
+            }
+            l = nl;
+        }
+        shape.layout = l;
+        return l;
+    }
+
     /// [#setItem] answering the dict: what a literal compiles to, one call per pair on a dict
     /// made at its final size, so building one allocates no array of its pairs.
     public PyDict put(Object key, Object value) {
@@ -934,6 +1012,15 @@ public class PyDict extends PyObject {
         // dict's first growth makes room for: two growths become one.
         reserve(8);
         int n = 0;
+        if (it instanceof PyJavaIter) {
+            PyJavaIter j = (PyJavaIter) it;
+            PyJavaIter.Source s = j.liveSource();
+            if (s instanceof Builtins.ZipSeq) {
+                ((Builtins.ZipSeq) s).drainInto(this);
+                j.finish();
+                return;
+            }
+        }
         if (it instanceof PyGenerator) {
             PyGenerator g = (PyGenerator) it;
             try {

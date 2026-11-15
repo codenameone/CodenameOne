@@ -107,6 +107,68 @@ public final class PyBuiltin extends PyObject {
         });
     }
 
+    /// [#positional] for an implementation that reads its argument array and
+    /// keeps nothing of it once it returns (its elements, yes; the array, no).
+    /// Its usual call, of `n` arguments, is then lent an array ([ArgArrays])
+    /// rather than handed a new one per call. Any other count goes through
+    /// the array form unchanged. Not for a method of a builtin type.
+    static PyBuiltin lending(final String name, final int n, final Positional p) {
+        PyBuiltin b = positional(name, p);
+        switch (n) {
+            case 1:
+                b.one = x0 -> lend(p, ArgArrays.take(1), x0, null, null, null, null, null, null);
+                break;
+            case 2:
+                b.two = (x0, x1) -> lend(p, ArgArrays.take(2), x0, x1, null, null, null, null, null);
+                break;
+            case 3:
+                b.three = (x0, x1, x2) -> lend(p, ArgArrays.take(3), x0, x1, x2, null, null, null, null);
+                break;
+            case 4:
+                b.four = (x0, x1, x2, x3) -> lend(p, ArgArrays.take(4), x0, x1, x2, x3, null, null, null);
+                break;
+            case 5:
+                b.five = (x0, x1, x2, x3, x4) -> lend(p, ArgArrays.take(5), x0, x1, x2, x3, x4, null, null);
+                break;
+            case 6:
+                b.six = (x0, x1, x2, x3, x4, x5) -> lend(p, ArgArrays.take(6), x0, x1, x2, x3, x4, x5, null);
+                break;
+            case 7:
+                b.seven = (x0, x1, x2, x3, x4, x5, x6) -> lend(p, ArgArrays.take(7), x0, x1, x2, x3, x4, x5, x6);
+                break;
+            default:
+                throw new IllegalArgumentException("lending() covers one to seven arguments: " + n);
+        }
+        return b;
+    }
+
+    private static Object lend(Positional p, Object[] a, Object x0, Object x1, Object x2, Object x3, Object x4,
+            Object x5, Object x6) {
+        int n = a.length;
+        a[0] = x0;
+        if (n > 1) {
+            a[1] = x1;
+        }
+        if (n > 2) {
+            a[2] = x2;
+        }
+        if (n > 3) {
+            a[3] = x3;
+        }
+        if (n > 4) {
+            a[4] = x4;
+        }
+        if (n > 5) {
+            a[5] = x5;
+        }
+        if (n > 6) {
+            a[6] = x6;
+        }
+        Object r = p.call(a);
+        ArgArrays.give(a);
+        return r;
+    }
+
     /// A builtin of exactly `n` arguments, whose fixed-arity call runs
     /// without an argument array.
     private static PyBuiltin fixed(final String name, final int n, final Positional p) {

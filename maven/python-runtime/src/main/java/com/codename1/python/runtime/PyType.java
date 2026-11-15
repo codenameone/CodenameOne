@@ -1255,7 +1255,8 @@ public final class PyType extends PyObject {
     /// A positional constructor call of a plain class without an argument
     /// array: `__init__` is a function, or the one a dataclass generated. Null
     /// when the class is neither, and the caller builds the array after all.
-    private Object positionalNew(int n, Object a, Object b, Object c, Object d, Object e) {
+    private Object positionalNew(int n, Object a, Object b, Object c, Object d, Object e, Object f6,
+            Object g7) {
         Object init = plainInitAny();
         if (init instanceof PyFunction) {
             PyFunction f = (PyFunction) init;
@@ -1276,19 +1277,25 @@ public final class PyType extends PyObject {
                 case 4:
                     initReturned(f.call5(o, a, b, c, d));
                     break;
-                default:
+                case 5:
                     initReturned(f.call6(o, a, b, c, d, e));
+                    break;
+                case 6:
+                    initReturned(f.call7(o, a, b, c, d, e, f6));
+                    break;
+                default:
+                    initReturned(f.call8(o, a, b, c, d, e, f6, g7));
                     break;
             }
             return o;
         }
         PyDataclass.Init fields = PyDataclass.initOf(init);
-        if (fields != null && fields.positional(n)) {
+        if (fields != null && n <= 5 && fields.positional(n)) {
             PyInstance o = newInstance();
             fields.fill(o, n, a, b, c, d, e);
             return o;
         }
-        return constructFixed(n, a, b, c, d, e);
+        return constructFixed(n, a, b, c, d, e, f6, g7);
     }
 
     /// [#construct] for a call of `n` positional arguments: `__new__` and
@@ -1297,7 +1304,8 @@ public final class PyType extends PyObject {
     /// str subclass (bs4's NavigableString) and a list subclass are built
     /// this way per element. Null for a call this does not cover, which
     /// then goes through construct exactly as before.
-    private Object constructFixed(int n, Object a, Object b, Object c, Object d, Object e) {
+    private Object constructFixed(int n, Object a, Object b, Object c, Object d, Object e, Object f6,
+            Object g7) {
         if (factory != null || this == Py.TYPE_TYPE || this == Py.OS_ERROR || plainException() //NOPMD CompareObjectsWithEquals - identity is meant
                 || metaDunder("__call__") != null) {
             return null;
@@ -1306,7 +1314,7 @@ public final class PyType extends PyObject {
         Object obj;
         if (newFn != null && newFn != Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
             Object fn = newFn instanceof PyStaticMethod ? ((PyStaticMethod) newFn).func : newFn;
-            obj = callWith(Py.obj(fn), this, n, a, b, c, d, e);
+            obj = callWith(Py.obj(fn), this, n, a, b, c, d, e, f6, g7);
             if (!Py.typeOf(obj).isSubtype(this)) {
                 return obj;
             }
@@ -1315,7 +1323,7 @@ public final class PyType extends PyObject {
         }
         Object init = lookup("__init__");
         if (init != null && init != Builtins.OBJECT_INIT) { //NOPMD CompareObjectsWithEquals - identity is meant
-            initReturned(callWith(Py.obj(init), obj, n, a, b, c, d, e));
+            initReturned(callWith(Py.obj(init), obj, n, a, b, c, d, e, f6, g7));
         } else if (n > 0 && newFn == Builtins.OBJECT_NEW) { //NOPMD CompareObjectsWithEquals - identity is meant
             throw Py.typeError(name + "() takes no arguments");
         }
@@ -1323,7 +1331,8 @@ public final class PyType extends PyObject {
     }
 
     /// `f(first, a, ...)` with the `n` arguments after `first`.
-    private static Object callWith(PyObject f, Object first, int n, Object a, Object b, Object c, Object d, Object e) {
+    private static Object callWith(PyObject f, Object first, int n, Object a, Object b, Object c, Object d, Object e,
+            Object f6, Object g7) {
         switch (n) {
             case 0:
                 return f.call1(first);
@@ -1335,8 +1344,12 @@ public final class PyType extends PyObject {
                 return f.call4(first, a, b, c);
             case 4:
                 return f.call5(first, a, b, c, d);
-            default:
+            case 5:
                 return f.call6(first, a, b, c, d, e);
+            case 6:
+                return f.call7(first, a, b, c, d, e, f6);
+            default:
+                return f.call8(first, a, b, c, d, e, f6, g7);
         }
     }
 
@@ -1348,7 +1361,7 @@ public final class PyType extends PyObject {
 
     @Override
     public Object call0() {
-        Object o = positionalNew(0, null, null, null, null, null);
+        Object o = positionalNew(0, null, null, null, null, null, null, null);
         return o != null ? o : super.call0();
     }
 
@@ -1357,7 +1370,7 @@ public final class PyType extends PyObject {
         if (unary != null) {
             return unary.create(a);
         }
-        Object o = positionalNew(1, a, null, null, null, null);
+        Object o = positionalNew(1, a, null, null, null, null, null, null);
         return o != null ? o : super.call1(a);
     }
 
@@ -1366,26 +1379,38 @@ public final class PyType extends PyObject {
         if (binary != null) {
             return binary.create(a, b);
         }
-        Object o = positionalNew(2, a, b, null, null, null);
+        Object o = positionalNew(2, a, b, null, null, null, null, null);
         return o != null ? o : super.call2(a, b);
     }
 
     @Override
     public Object call3(Object a, Object b, Object c) {
-        Object o = positionalNew(3, a, b, c, null, null);
+        Object o = positionalNew(3, a, b, c, null, null, null, null);
         return o != null ? o : super.call3(a, b, c);
     }
 
     @Override
     public Object call4(Object a, Object b, Object c, Object d) {
-        Object o = positionalNew(4, a, b, c, d, null);
+        Object o = positionalNew(4, a, b, c, d, null, null, null);
         return o != null ? o : super.call4(a, b, c, d);
     }
 
     @Override
     public Object call5(Object a, Object b, Object c, Object d, Object e) {
-        Object o = positionalNew(5, a, b, c, d, e);
+        Object o = positionalNew(5, a, b, c, d, e, null, null);
         return o != null ? o : super.call5(a, b, c, d, e);
+    }
+
+    @Override
+    public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
+        Object o = positionalNew(6, a, b, c, d, e, f, null);
+        return o != null ? o : super.call6(a, b, c, d, e, f);
+    }
+
+    @Override
+    public Object call7(Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        Object o = positionalNew(7, a, b, c, d, e, f, g);
+        return o != null ? o : super.call7(a, b, c, d, e, f, g);
     }
 
     @Override

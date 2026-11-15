@@ -60,6 +60,26 @@ final class PyJson {
         }));
         // dumps(o, ensure_ascii, check_circular, allow_nan, sort_keys, indent,
         //       item_separator, key_separator, skipkeys, other)
+        // options(ensure_ascii, check_circular, allow_nan, sort_keys, indent,
+        //         item_separator, key_separator, skipkeys, other): an encoder's
+        // settings, made once when the encoder is, so that encode() passes two
+        // values per call rather than ten.
+        m.setAttr("options", PyBuiltin.positional("options", a -> new PyJavaObject(new Options(Py.isTrue(a[0]),
+                Py.isTrue(a[1]), Py.isTrue(a[2]), Py.isTrue(a[3]), a[4] == Py.NONE ? null : Py.toStr(a[4]),
+                Py.toStr(a[5]), Py.toStr(a[6]), Py.isTrue(a[7]), a[8]))));
+        m.setAttr("encode", PyBuiltin.fixed2("encode", (o, opts) -> {
+            Object v = opts instanceof PyJavaObject ? ((PyJavaObject) opts).value : opts;
+            if (!(v instanceof Options)) {
+                throw Py.typeError("encode() needs the value options() made");
+            }
+            Options p = (Options) v;
+            Encoder e = Encoder.take(p.ascii, p.circular, p.allowNan, p.sortKeys, p.indent, p.itemSep, p.keySep,
+                    p.skipKeys, p.other);
+            e.value(o, 0);
+            String r = new String(e.buf, 0, e.len);
+            Encoder.give(e);
+            return r;
+        }));
         m.setAttr("dumps", PyBuiltin.positional("dumps", a -> {
             Encoder e = Encoder.take(Py.isTrue(a[1]), Py.isTrue(a[2]), Py.isTrue(a[3]), Py.isTrue(a[4]),
                     a[5] == Py.NONE ? null : Py.toStr(a[5]), Py.toStr(a[6]), Py.toStr(a[7]), Py.isTrue(a[8]), a[9]);
@@ -91,14 +111,38 @@ final class PyJson {
     /// that one value, with the containers open around it so a cycle through
     /// it is still reported. What `isinstance` and `default` decide therefore
     /// stays in Python, exactly as CPython decides it.
+    /// The settings of one json.JSONEncoder, as [Encoder] takes them.
+    private static final class Options {
+        final boolean ascii;
+        final boolean circular;
+        final boolean allowNan;
+        final boolean sortKeys;
+        final String indent;
+        final String itemSep;
+        final String keySep;
+        final boolean skipKeys;
+        final Object other;
+
+        Options(boolean ascii, boolean circular, boolean allowNan, boolean sortKeys, String indent, String itemSep,
+                String keySep, boolean skipKeys, Object other) {
+            this.ascii = ascii;
+            this.circular = circular;
+            this.allowNan = allowNan;
+            this.sortKeys = sortKeys;
+            this.indent = indent;
+            this.itemSep = itemSep;
+            this.keySep = keySep;
+            this.skipKeys = skipKeys;
+            this.other = other;
+        }
+    }
+
     private static final class Encoder {
         /// The output, written straight into an array: a native StringBuilder
         /// append takes the builder's owner lock and the thread's identity
         /// each call, and an encoder appends several times per value.
         char[] buf = new char[256];
         int len;
-        /// The part of a string still to be escaped; see `quote`.
-        private char[] tail = new char[64];
         private boolean ascii;
         private boolean circular;
         private boolean allowNan;
@@ -133,9 +177,6 @@ final class PyJson {
             if (e.buf.length > 4096) {
                 // One large document must not stay held for the life of the program.
                 e.buf = new char[256];
-            }
-            if (e.tail.length > 4096) {
-                e.tail = new char[64];
             }
             e.other = null;
             spare = e;
@@ -232,71 +273,62 @@ final class PyJson {
                 buf[len++] = '"';
                 return;
             }
-            // The rest is read from a copy of what was just written, never from the string:
-            // a character read from a string is a call that asks which form the string is
-            // in, and a prompt with line breaks in it took that call for every character.
-            // Text between two escapes is moved as one block.
-            int t = end - i;
-            char[] src = tail;
-            if (src.length < t) {
-                src = new char[Math.max(t, src.length * 2)];
-                tail = src;
+            // Escaped in place, from the back: one pass counts how much longer the
+            // escapes make the text, a second walks it from its end and writes each
+            // character, or its escape, at its final position. Nothing is read from
+            // the string again -- a character read from a string is a call that asks
+            // which form the string is in -- and no second buffer is copied through.
+            int extra = 0;
+            for (int k = i; k < end; k++) {
+                char c = buf[k];
+                if (c < 0x20 || c == '"' || c == '\\' || c >= limit) {
+                    extra += c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == '\b'
+                            || c == '\f' ? 1 : 5;
+                }
             }
-            System.arraycopy(buf, i, src, 0, t);
-            len = i;
-            int k = 0;
-            while (k < t) {
-                int run = k;
-                while (run < t) {
-                    char r = src[run];
-                    if (r < 0x20 || r == '"' || r == '\\' || r >= limit) {
-                        break;
-                    }
-                    run++;
+            len = end;
+            room(extra + 1);
+            char[] o = buf;
+            int d = end + extra;
+            for (int k = end - 1; k >= i; k--) {
+                char c = o[k];
+                if (c >= 0x20 && c != '"' && c != '\\' && c < limit) {
+                    o[--d] = c;
+                    continue;
                 }
-                if (run > k) {
-                    room(run - k);
-                    System.arraycopy(src, k, buf, len, run - k);
-                    len += run - k;
-                    k = run;
-                    if (k == t) {
-                        break;
-                    }
-                }
-                char c = src[k++];
-                room(6);
-                buf[len++] = '\\';
                 switch (c) {
                     case '"':
-                        buf[len++] = '"';
+                        o[--d] = '"';
                         break;
                     case '\\':
-                        buf[len++] = '\\';
+                        o[--d] = '\\';
                         break;
                     case '\n':
-                        buf[len++] = 'n';
+                        o[--d] = 'n';
                         break;
                     case '\r':
-                        buf[len++] = 'r';
+                        o[--d] = 'r';
                         break;
                     case '\t':
-                        buf[len++] = 't';
+                        o[--d] = 't';
                         break;
                     case '\b':
-                        buf[len++] = 'b';
+                        o[--d] = 'b';
                         break;
                     case '\f':
-                        buf[len++] = 'f';
+                        o[--d] = 'f';
                         break;
                     default:
-                        buf[len++] = 'u';
-                        buf[len++] = HEX[c >> 12 & 15];
-                        buf[len++] = HEX[c >> 8 & 15];
-                        buf[len++] = HEX[c >> 4 & 15];
-                        buf[len++] = HEX[c & 15];
+                        o[--d] = HEX[c & 15];
+                        o[--d] = HEX[c >> 4 & 15];
+                        o[--d] = HEX[c >> 8 & 15];
+                        o[--d] = HEX[c >> 12 & 15];
+                        o[--d] = 'u';
                 }
+                o[--d] = '\\';
             }
-            put('"');
+            len = end + extra;
+            o[len++] = '"';
         }
 
         void value(Object o, int level) {

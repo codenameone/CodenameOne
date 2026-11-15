@@ -622,6 +622,12 @@ static size_t cn1_utf8_encode_chars(const JAVA_ARRAY_CHAR* src, size_t len, JAVA
     return outLen;
 }
 
+/* The same encoder for the runtime's other C files (stringToUTF8Len), so a String
+ * reaches a native as exactly the bytes getBytes("UTF-8") gives. */
+size_t cn1Utf8EncodeChars(const JAVA_ARRAY_CHAR* src, size_t len, JAVA_ARRAY_BYTE* out) {
+    return cn1_utf8_encode_chars(src, len, out);
+}
+
 // JDK-compatible UTF-8 -> UTF-16 decode using the Hoehrmann DFA.
 // On malformed input emits a single U+FFFD per maximal-subpart violation and
 // resumes decoding (matches CodingErrorAction.REPLACE in StandardCharsets).
@@ -1176,13 +1182,23 @@ JAVA_OBJECT java_lang_String_compactBytes___java_lang_String_R_byte_1ARRAY(
     JAVA_ARRAY_CHAR encBuffer[64];
     JAVA_ARRAY_CHAR* encChars = NULL;
     int encLength = 0;
+    cn1_encoding_t enc;
+    if(encoding != JAVA_NULL && cn1StrIsLatin1(encoding)
+            && ((struct obj__java_lang_String*)encoding)->java_lang_String_count == 5
+            && memcmp(cn1StrChars(encoding), "UTF-8", 5) == 0) {
+        // The name nearly every caller passes, matched exactly: the general
+        // resolver below folds the case of every candidate it tries, and that
+        // was a fifth of a short str.encode("utf-8") (measured).
+        enc = CN1_ENC_UTF8;
+    } else {
     if(encoding != JAVA_NULL) {
         encLength = ((struct obj__java_lang_String*)encoding)->java_lang_String_count;
         if(encLength > 64) return JAVA_NULL;
         for(int i = 0; i < encLength; i++) encBuffer[i] = cn1StrCharAtRaw(encoding, i);
         encChars = encBuffer;
     }
-    cn1_encoding_t enc = cn1_resolve_encoding_from_chars(encChars, encLength);
+    enc = cn1_resolve_encoding_from_chars(encChars, encLength);
+    }
     if(enc != CN1_ENC_UTF8 && enc != CN1_ENC_US_ASCII && enc != CN1_ENC_ISO_8859_1) return JAVA_NULL;
     int count = string->java_lang_String_count;
     if(count > INT_MAX / 2) return JAVA_NULL;

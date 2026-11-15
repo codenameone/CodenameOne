@@ -25,6 +25,8 @@ package com.codename1.python.runtime;
 
 /// Python's `bytes`, immutable.
 public final class PyBytes extends PyObject {
+    private static final String HEX_DIGITS = "0123456789abcdef";
+
     final byte[] value;
 
     public PyBytes(byte[] value) {
@@ -314,6 +316,18 @@ public final class PyBytes extends PyObject {
         };
     }
 
+    /// `v.hex()`: two digits a byte, straight from the table (the general
+    /// digit writer measures how many digits each value needs first).
+    /// Measured against ASCII bytes made a str by `new String(byte[])`: the
+    /// constructor's charset handling cost more than the appends.
+    static String hexOf(byte[] v) {
+        StringBuilder sb = new StringBuilder(v.length * 2);
+        for (byte x : v) {
+            sb.append(HEX_DIGITS.charAt(x >> 4 & 15)).append(HEX_DIGITS.charAt(x & 15));
+        }
+        return sb.toString();
+    }
+
     static void install() {
         final PyBuiltin decode = PyBuiltin.methodKw(Py.BYTES_TYPE, "decode", (a, kw) -> {
             // `b.decode()` and `b.decode("utf-8")`, bound without Args.
@@ -333,7 +347,7 @@ public final class PyBytes extends PyObject {
                 ? Codecs.decodeKeep(((PyBytes) b).value, (String) e, "strict")
                 : decode.impl.call(new Object[] {b, e}, Py.NO_KW));
         Py.BYTES_TYPE.define("decode", decode);
-        Py.BYTES_TYPE.define("hex", PyBuiltin.methodKw(Py.BYTES_TYPE, "hex", (args, kw) -> {
+        PyBuiltin hex = PyBuiltin.methodKw(Py.BYTES_TYPE, "hex", (args, kw) -> {
             Object[] p = Args.bind("hex", args, kw, new String[] {"self", "sep", "bytes_per_sep"},
                     new Object[] {null, Py.NONE, PyInt.of(1)});
             byte[] v = self(p[0]).value;
@@ -362,7 +376,11 @@ public final class PyBytes extends PyObject {
                 PyStr.hex(sb, v[i] & 0xff, 2);
             }
             return Py.str(sb.toString());
-        }));
+        });
+        // `b.hex()`, as every hexdigest() asks it: no separator to bind, so no
+        // argument arrays and no defaults built per call.
+        hex.with1(b -> Py.str(hexOf(self(b).value)));
+        Py.BYTES_TYPE.define("hex", hex);
         installLatin1Delegates();
         Py.BYTES_TYPE.define("fromhex", new PyClassMethod(PyBuiltin.fixed2("fromhex", (a0, a1) -> {
             String h = Py.toStr(a1);

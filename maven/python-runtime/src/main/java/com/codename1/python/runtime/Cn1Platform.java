@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation.  Codename One designates this
@@ -20,21 +21,26 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.pyhero;
+package com.codename1.python.runtime;
 
-import com.codename1.impl.JdkHost;
+import com.codename1.io.Util;
+import com.codename1.ui.Display;
 
-/// The host's entropy for a native benchmark binary. An application's port
-/// installs a `JdkHost` that reads the device's secure generator; this binary
-/// has no port, and without one `java.security.SecureRandom` -- `os.urandom`,
-/// `secrets` and `uuid.uuid4` in Python -- has nothing to read.
-public final class HostEntropy extends JdkHost {
-    @Override
-    public void randomBytes(byte[] out) {
-        if (fillImpl(out) != 0) {
-            throw new IllegalStateException("the host has no entropy to give");
-        }
+/// What a client application lends the runtime from the port: its resource
+/// lookup and its AES. The generated bootstrap of a client application calls
+/// [#install]; a server or command-line program never names this class, so its
+/// translation never reaches `Display` or `Util`, which a server's class
+/// library does not have.
+public final class Cn1Platform {
+    private Cn1Platform() {
     }
 
-    private static native int fillImpl(byte[] out);
+    /// Installs the client's resource lookup and cipher.
+    public static void install() {
+        PyPackageData.setOpener(name -> Display.isInitialized()
+                ? Display.getInstance().getResourceAsStream(PyPackageData.class, name) : null);
+        PyAes.setCipher((encrypt, transformation, key, iv, data) -> encrypt
+                ? Util.aesEncrypt(transformation, key, iv, null, data)
+                : Util.aesDecrypt(transformation, key, iv, null, data));
+    }
 }

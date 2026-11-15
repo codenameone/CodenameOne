@@ -22,6 +22,8 @@
  */
 package com.codename1.db;
 
+import java.util.function.Function;
+
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.SQLStatementSplitter;
 import com.codename1.io.FileSystemStorage;
@@ -926,7 +928,7 @@ public abstract class Database {
         }
     }
 
-    /// True when [#createFunction(String, int, SqlFunction)] works on this
+    /// True when [#createFunction(String, int, Function)] works on this
     /// database. Android's framework SQLite has no API for it, and the
     /// browser's database is not SQLite.
     public boolean supportsFunctions() {
@@ -937,6 +939,17 @@ public abstract class Database {
     /// `name` with `argCount` arguments (-1 for any number), replacing a
     /// function of the same name and arity. A `null` function removes it.
     ///
+    /// The function receives the arguments, each `null` (SQL NULL), a `Long`, a
+    /// `Double`, a `String` or a `byte[]`, and answers one of those same types;
+    /// a `Boolean` is stored as 1 or 0, and any other `Number` as a `Long` or a
+    /// `Double`. A `RuntimeException` it throws fails the statement with its
+    /// message. It runs on the thread stepping the statement, once for every
+    /// row the statement evaluates it on.
+    ///
+    /// Check [#supportsFunctions()] first: where the platform's engine can't
+    /// call back into the application (Android's framework SQLite has no API
+    /// for it), this throws and the caller has to compute the value itself.
+    ///
     /// The default implementation reports that the platform cannot do it; it
     /// is concrete rather than abstract because `Database` is subclassed
     /// outside this repository.
@@ -945,7 +958,7 @@ public abstract class Database {
     ///
     /// - `IOException`: if the platform has no SQL functions, or the engine
     ///   refuses the definition
-    public void createFunction(String name, int argCount, SqlFunction function) throws IOException {
+    public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
         throw new IOException("SQL functions are not supported on this platform");
     }
 

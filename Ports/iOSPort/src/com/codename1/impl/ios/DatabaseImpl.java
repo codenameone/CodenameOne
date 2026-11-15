@@ -30,7 +30,7 @@ import com.codename1.impl.AbstractDBCursor;
 import com.codename1.impl.SQLStatementSplitter;
 import com.codename1.impl.SQLText;
 import com.codename1.impl.SqlFunctionBridge;
-import com.codename1.db.SqlFunction;
+import java.util.function.Function;
 
 import java.io.IOException;
 import java.util.Vector;
@@ -122,7 +122,7 @@ class DatabaseImpl extends Database {
     }
 
     @Override
-    public void createFunction(String name, int argCount, SqlFunction function) throws IOException {
+    public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
         checkOpen();
         int id = function == null ? -1 : FUNCTIONS.register(function);
         if (IOSImplementation.nativeInstance.sqlDbCreateFunction(peer, com.codename1.util.StringUtil.getBytes(name), argCount, id) != 0) {

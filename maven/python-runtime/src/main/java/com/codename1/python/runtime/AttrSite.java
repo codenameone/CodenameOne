@@ -101,6 +101,12 @@ public final class AttrSite {
     // type (BUILTIN or NONE). All entries are valid only while getVersion is
     // the current class version.
     private int getVersion = -1;
+    /// A method call on a str receiver -- `s.encode()`, `s.startswith(...)`,
+    /// the commonest receiver of all -- answered from one entry: the general
+    /// path below tested three classes, asked Py.typeOf and scanned the ways,
+    /// which measured as much as the encode itself.
+    private int strVersion = -1;
+    private Object strMethod;
     private int getUsed;
     private PyType[] getTypes;
     private Shape[] getShapes;
@@ -838,6 +844,14 @@ public final class AttrSite {
     /// The function to call with the receiver prepended, when the call needs
     /// no bound method; otherwise null and the caller goes the generic way.
     private Object method(Object o) {
+        if (o instanceof String) {
+            if (strVersion != PyType.version) {
+                Object m = Py.STR_TYPE.lookup(name);
+                strMethod = m instanceof PyBuiltin ? m : null;
+                strVersion = PyType.version;
+            }
+            return strMethod;
+        }
         if (o instanceof PyInstance) {
             PyInstance i = (PyInstance) o;
             if (getVersion == PyType.version) {

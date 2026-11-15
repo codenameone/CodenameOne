@@ -67,6 +67,9 @@ public class DbCheck {
         refusesCleartextPasswordWithoutTls();
         aQueryParksItsVirtualThread(url);
         concurrentPoolOpensDoNotWedgeTheHost(url);
+        if (":memory:".equals(url)) {
+            aHeldReadStaysOutOfTheWay();
+        }
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -791,6 +794,61 @@ public class DbCheck {
             return at < 0 ? null : text.substring(at + 4);
         } finally {
             conn.close();
+        }
+    }
+
+    /**
+     * Database.holdRead keeps SQLite's shared lock between statements, and must
+     * never be visible: it is let go before a statement a pending read would make
+     * fail, and while a second connection is open on the file. A file database,
+     * because an in-memory one takes no locks and is never held. The local Java
+     * SE arm keeps no lock at all and has to give the same answers.
+     */
+    private static void aHeldReadStaysOutOfTheWay() throws Exception {
+        String dir = System.getProperty("java.io.tmpdir");
+        String path = (dir == null || dir.length() == 0 ? "/tmp" : dir) + "/cn1-dbcheck-hold-"
+                + System.currentTimeMillis() + ".db";
+        Database a = Database.open(path);
+        Database b = null;
+        try {
+            a.execute("CREATE TABLE held (v INTEGER)", null);
+            a.execute("INSERT INTO held VALUES (1)", null);
+            a.execute("INSERT INTO held VALUES (2)", null);
+            a.holdRead(true);
+            check("a query runs under a held read", "2", String.valueOf(
+                    a.query("SELECT v FROM held", null).size()));
+            a.execute("SAVEPOINT s", null);
+            a.execute("RELEASE s", null);
+            a.execute("INSERT INTO held VALUES (3)", null);
+            a.holdRead(true);
+            a.execute("CREATE TABLE gone (v INTEGER)", null);
+            a.holdRead(true);
+            a.execute("DROP TABLE gone", null);
+            check("DROP TABLE runs while a read was held", "0", String.valueOf(
+                    a.query("SELECT name FROM sqlite_master WHERE name = 'gone'", null).size()));
+            a.holdRead(true);
+            // A second connection on the file: the first lets go, so this one's
+            // write can commit rather than wait out the busy timeout.
+            b = Database.open(path);
+            b.execute("INSERT INTO held VALUES (4)", null);
+            check("a second connection commits past a held read", "4", String.valueOf(
+                    b.query("SELECT v FROM held", null).size()));
+            check("the first connection sees it", "4", String.valueOf(
+                    a.query("SELECT v FROM held", null).size()));
+            b.close();
+            b = null;
+            a.holdRead(true);
+            a.execute("VACUUM", null);
+            check("VACUUM runs while a read was held", "4", String.valueOf(
+                    a.query("SELECT v FROM held", null).size()));
+            a.holdRead(false);
+            a.holdRead(false);
+        } finally {
+            if (b != null) {
+                b.close();
+            }
+            a.close();
+            new java.io.File(path).delete();
         }
     }
 

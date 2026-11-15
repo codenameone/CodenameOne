@@ -471,6 +471,17 @@ def _parse_duration(s):
 
 
 def _v(tp, val, loc, c):
+    # The common case first: a value already of the exact scalar type its
+    # field declares, which every branch below would hand back unchanged
+    # after a dozen hasattr and typing lookups. A str only when no config
+    # transforms strings.
+    tv = type(val)
+    if tv is tp:
+        if tv is int or tv is float or tv is bool or tv is bytes:
+            return val
+        if tv is str and not (c.cfg.get("str_strip_whitespace") or c.cfg.get("str_to_lower")
+                              or c.cfg.get("str_to_upper")):
+            return val
     if tp is None:
         tp = _NoneType
     if isinstance(tp, str) or hasattr(tp, "__forward_arg__"):
@@ -1238,10 +1249,49 @@ class _Opts:
         self.exclude_none = exclude_none
 
 
+class _Plan:
+    """What validating a class needs that does not change per call: read
+    once per class instead of once per field of every instance. The
+    sqlite-backed llm app validated a model per prompt, and the config
+    lookups, the MRO walk of _is_root and a ValidationInfo per field (with a
+    copy of the values so far) were most of what that cost."""
+    __slots__ = ("fields_obj", "cfg", "by_name", "root", "extra_mode", "fields", "model_decls")
+
+    def __init__(self, cls):
+        cfg = cls.model_config
+        self.fields_obj = cls.model_fields
+        self.cfg = cfg
+        self.by_name = cfg.get("populate_by_name") or cfg.get("validate_by_name")
+        self.root = _is_root(cls)
+        self.extra_mode = cfg.get("extra") or "ignore"
+        fdecls = cls.__pydantic_decorators__["field"]
+        fields = []
+        for name, fi in cls.model_fields.items():
+            alias = fi.validation_alias if fi.validation_alias is not None else fi.alias
+            hooked = False
+            for d in fdecls:
+                if name in d.fields or "*" in d.fields:
+                    hooked = True
+            fields.append((name, fi, alias, hooked))
+        self.fields = fields
+        self.model_decls = cls.__pydantic_decorators__["model"]
+
+
+def _plan(cls):
+    p = cls.__dict__.get("__pydantic_plan__")
+    # Kept while the class still has the same field table and config: a
+    # model_rebuild, or a program that replaces either, gets a new plan.
+    if p is None or p.fields_obj is not cls.model_fields or p.cfg is not cls.model_config:
+        p = _Plan(cls)
+        type.__setattr__(cls, "__pydantic_plan__", p)
+    return p
+
+
 def _fill(cls, data, loc, c):
     """Validates a mapping against cls's fields. Returns (values, fields_set,
     extras) or None, with the problems appended to c.errs."""
-    cfg = cls.model_config
+    plan = _plan(cls)
+    cfg = plan.cfg
     saved_cfg = c.cfg
     saved_cls = c.cls
     c.cfg = cfg
@@ -1250,10 +1300,9 @@ def _fill(cls, data, loc, c):
     values = {}
     fset = set()
     used = set()
-    by_name = cfg.get("populate_by_name") or cfg.get("validate_by_name")
-    root = _is_root(cls)
-    for name, fi in cls.model_fields.items():
-        alias = fi.validation_alias if fi.validation_alias is not None else fi.alias
+    by_name = plan.by_name
+    root = plan.root
+    for name, fi, alias, hooked in plan.fields:
         key = _MISSING_KEY
         if alias is not None and alias in data:
             key = alias
@@ -1269,18 +1318,20 @@ def _fill(cls, data, loc, c):
                 if isinstance(d, (list, dict, set, bytearray)):
                     d = _copy.deepcopy(d)
                 if fi.validate_default or cfg.get("validate_default"):
-                    d = _vfield(cls, fi, name, d, loc + (name,), c, values)
+                    d = _vfield(cls, fi, name, d, loc + (name,), c, values, hooked)
                     if d is _BAD:
                         continue
                 values[name] = d
             continue
         used.add(key)
-        v = _vfield(cls, fi, name, data[key], loc if root else loc + (key,), c, values)
+        v = _vfield(cls, fi, name, data[key], loc if root else loc + (key,), c, values, hooked)
         if v is not _BAD:
             values[name] = v
             fset.add(name)
-    extra_mode = cfg.get("extra") or "ignore"
+    extra_mode = plan.extra_mode
     extras = {}
+    if extra_mode == "ignore":
+        data = ()
     for k in data:
         if k in used:
             continue
@@ -1298,7 +1349,26 @@ def _fill(cls, data, loc, c):
 _MISSING_KEY = _Undefined()
 
 
-def _vfield(cls, fi, name, raw, loc, c, values):
+def _vfield(cls, fi, name, raw, loc, c, values, hooked=True):
+    if not hooked:
+        # No validator names this field: nothing can read a ValidationInfo.
+        was = c.strict
+        if fi.strict is not None:
+            c.strict = fi.strict
+        elif c.cfg.get("strict"):
+            c.strict = True
+        full = fi._full if fi._full is not None else Any
+        v = _v(full, raw, loc, c)
+        c.strict = was
+        if v is _BAD:
+            return _BAD
+        if fi.constraints and v is not None:
+            v = _constrain(v, fi.constraints, loc, c)
+            if v is _BAD:
+                return _BAD
+        if c.cfg.get("use_enum_values") and isinstance(v, _enum.Enum):
+            v = v.value
+        return v
     info = ValidationInfo(c, name, dict(values))
     decls = cls.__pydantic_decorators__["field"]
     v = raw
@@ -1416,8 +1486,8 @@ class BaseModel(metaclass=ModelMetaclass):
         _ensure(cls)
         c = _Ctx()
         c.cls = cls
-        info = ValidationInfo(c)
         decls = cls.__pydantic_decorators__["model"]
+        info = ValidationInfo(c) if decls else None
         v = data
         for d in decls:
             if d.mode == "before":

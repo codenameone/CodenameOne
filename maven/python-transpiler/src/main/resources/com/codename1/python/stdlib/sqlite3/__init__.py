@@ -22,6 +22,15 @@ import datetime as _datetime
 
 import _cn1sql
 
+# The two builtins every execute and fetchone calls, read as globals: a
+# module's attribute is a lookup by name on each call, a global is a slot.
+_fast_execute = _cn1sql.execute
+_fast_fetchone = _cn1sql.fetchone
+# A cursor's rows still to read let the connection keep its read lock between
+# statements, as CPython's pending statement does (PySql.Connection.pending).
+_pending = _cn1sql.pending
+_drained = _cn1sql.drained
+
 apilevel = "2.0"
 threadsafety = 1
 paramstyle = "qmark"
@@ -445,6 +454,8 @@ class Cursor:
 
     def close(self):
         self._closed = True
+        if self._rows and not self.connection._closed:
+            _drained(self.connection._handle, self._rows)
         self._rows = _NO_ROWS
 
     def setinputsizes(self, sizes):
@@ -459,7 +470,7 @@ class Cursor:
         # before changing anything, and the code below does the rest. A failure
         # comes back as the engine's message rather than raised, so this method
         # sets up no handler: a frame with one pays for it on every call.
-        done = _cn1sql.execute(self, sql, parameters)
+        done = _fast_execute(self, sql, parameters)
         if done is self:
             return self
         if done is not None:
@@ -617,6 +628,8 @@ class Cursor:
                                            % (i + 1, type(v).__name__)) from None
             bound = tuple(bound)
         query, control, dml, ddl, inserts, query_word = _kind(stmt)
+        if self._rows:
+            _drained(conn._handle, self._rows)
         self._rows = _NO_ROWS
         self._pos = 0
         if control:
@@ -645,6 +658,8 @@ class Cursor:
         if cols:
             self.description = tuple((self._colname(c), None, None, None, None, None, None) for c in cols)
             self._rows = self._convert(stmt, cols, rows)
+            if self._rows:
+                _pending(conn._handle, self._rows)
             self.rowcount = -1 if query_word else len(rows)
         else:
             self.description = None
@@ -705,13 +720,18 @@ class Cursor:
         return rf(self, values)
 
     def fetchone(self):
-        r = _cn1sql.fetchone(self)
+        r = _fast_fetchone(self)
         if r is not None:
             return r
         self._check()
-        if self._pos >= len(self._rows):
+        rows = self._rows
+        if self._pos >= len(rows):
+            # Asked past the end, which is where CPython's statement finishes
+            # and lets the lock go; a for loop always asks once more.
+            if rows:
+                _drained(self.connection._handle, rows)
             return None
-        r = self._rows[self._pos]
+        r = rows[self._pos]
         self._pos += 1
         return self._make(r)
 
@@ -732,6 +752,8 @@ class Cursor:
         rows = self._rows
         pos = self._pos
         self._pos = len(rows)
+        if rows:
+            _drained(self.connection._handle, rows)
         rest = rows[pos:]
         rf = self.row_factory
         if rf is None:
@@ -744,7 +766,7 @@ class Cursor:
         return self
 
     def __next__(self):
-        r = _cn1sql.fetchone(self)
+        r = _fast_fetchone(self)
         if r is not None:
             return r
         r = self.fetchone()
@@ -877,12 +899,14 @@ class Connection:
 
     def cursor(self, factory=Cursor):
         self._check()
-        c = factory(self)
-        if self.row_factory is not None and c.row_factory is None:
-            pass
-        return c
+        return factory(self)
 
     def execute(self, sql, parameters=()):
+        # CPython calls self.cursor(), which a subclass may override. A plain
+        # Connection skips that call: Cursor.execute checks the connection
+        # itself and raises the same error for a closed one.
+        if type(self) is Connection:
+            return Cursor(self).execute(sql, parameters)
         return self.cursor().execute(sql, parameters)
 
     def executemany(self, sql, parameters):

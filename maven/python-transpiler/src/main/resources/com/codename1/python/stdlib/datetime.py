@@ -9,6 +9,7 @@ asked for its UTC offset at each instant.
 
 import time as _time
 import _time as _clock
+import _cn1obj
 
 __all__ = ["date", "datetime", "time", "timedelta", "timezone", "tzinfo", "MINYEAR", "MAXYEAR", "UTC"]
 
@@ -585,7 +586,7 @@ class tzinfo:
 
 
 class timezone(tzinfo):
-    __slots__ = ("_offset", "_name")
+    __slots__ = ("_offset", "_name", "_secs", "_iso")
 
     _Omitted = object()
 
@@ -608,6 +609,10 @@ class timezone(tzinfo):
         self = tzinfo.__new__(cls)
         self._offset = offset
         self._name = name
+        # The offset as whole seconds when it is one (None otherwise), and
+        # its isoformat text: both read by datetime's fast paths.
+        self._secs = offset.days * 86400 + offset.seconds if not offset.microseconds else None
+        self._iso = _format_offset(offset)
         return self
 
     def __eq__(self, other):
@@ -850,6 +855,11 @@ def _local_fields(t):
 
 
 def _fields(t, off):
+    if type(t) is float and -1e15 < t < 1e15:
+        y, m, d, hh, mm, ss, us = _clock.float_fields(t, off)
+        if not MINYEAR <= y <= MAXYEAR:
+            raise ValueError("year %d is out of range" % y)
+        return y, m, d, hh, mm, ss, us
     if isinstance(t, int):
         secs = t
         us = 0
@@ -865,6 +875,16 @@ def _fields(t, off):
     if not MINYEAR <= y <= MAXYEAR:
         raise ValueError("year %d is out of range" % y)
     return y, m, d, rem // 3600, rem // 60 % 60, rem % 60, us
+
+
+def _new_dt(y, m, d, hh, mm, ss, us, tz, fold):
+    # A datetime of fields already known to be valid -- computed here from a
+    # timestamp or from another datetime -- without the checks of __new__,
+    # and made in one call instead of ten attribute stores (see _cn1obj).
+    return _cn1obj.make(datetime, _DT_FIELDS, y, m, d, hh, mm, ss, us, tz, fold, -1)
+
+
+_DT_FIELDS = "_year\n_month\n_day\n_hour\n_minute\n_second\n_microsecond\n_tzinfo\n_fold\n_hashcode"
 
 
 class datetime(date):
@@ -900,6 +920,13 @@ class datetime(date):
         _check_tzinfo(tz)
         if tz is None:
             return cls(*_local_fields(t))
+        if cls is datetime and type(tz) is timezone and tz._secs is not None:
+            # A fixed whole-second offset: fromutc adds exactly it, so the
+            # fields are the timestamp's at that offset.
+            if isinstance(t, bool) or not isinstance(t, (int, float)):
+                raise TypeError("'%s' object cannot be interpreted as an integer" % type(t).__name__)
+            y, m, d, hh, mm, ss, us = _fields(t, tz._secs)
+            return _new_dt(y, m, d, hh, mm, ss, us, tz, 0)
         y, m, d, hh, mm, ss, us = _fields(t, 0)
         return tz.fromutc(cls(y, m, d, hh, mm, ss, us, tz))
 
@@ -909,6 +936,8 @@ class datetime(date):
 
     @classmethod
     def now(cls, tz=None):
+        if cls is datetime and type(tz) is timezone and tz._secs is not None:
+            return _clock.now_datetime(datetime, _DT_FIELDS, tz._secs, tz)
         return cls.fromtimestamp(_time.time(), tz)
 
     @classmethod
@@ -1041,6 +1070,16 @@ class datetime(date):
                                                   self._day, self._hour, self._minute, self._second, self._year)
 
     def isoformat(self, sep="T", timespec="auto"):
+        tz = self._tzinfo
+        if type(tz) is timezone and timespec == "auto":
+            # The usual call: a fixed-offset zone, whose offset text is
+            # made once per zone instead of by divmods of timedeltas here.
+            us = self._microsecond
+            if us:
+                return "%04d-%02d-%02d%s%02d:%02d:%02d.%06d%s" % (
+                    self._year, self._month, self._day, sep, self._hour, self._minute, self._second, us, tz._iso)
+            return "%04d-%02d-%02d%s%02d:%02d:%02d%s" % (
+                self._year, self._month, self._day, sep, self._hour, self._minute, self._second, tz._iso)
         return ("%04d-%02d-%02d%s" % (self._year, self._month, self._day, sep)
                 + _format_time(self._hour, self._minute, self._second, self._microsecond, timespec)
                 + _format_offset(self._off()))
@@ -1143,6 +1182,8 @@ class datetime(date):
             raise OverflowError("date value out of range")
         y, m, d = _ord2ymd(o)
         s, us = divmod(rem, 1000000)
+        if type(self) is datetime:
+            return _new_dt(y, m, d, s // 3600, s // 60 % 60, s % 60, us, self._tzinfo, 0)
         return type(self).combine(date(y, m, d), time(s // 3600, s // 60 % 60, s % 60, us, self._tzinfo))
 
     __radd__ = __add__

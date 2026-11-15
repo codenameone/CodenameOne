@@ -26,7 +26,7 @@ package com.codename1.python.runtime;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.Row;
-import com.codename1.db.SqlFunction;
+import java.util.function.Function;
 import java.io.IOException;
 
 /// SQLite through Codename One's `Database`: the platform's own engine on
@@ -78,7 +78,7 @@ public final class Cn1Sql extends PySql {
         }
 
         @Override
-        public boolean createFunction(String name, int nargs, SqlFunction body) throws IOException {
+        public boolean createFunction(String name, int nargs, Function<Object[], Object> body) throws IOException {
             if (!db.supportsFunctions()) {
                 return false;
             }

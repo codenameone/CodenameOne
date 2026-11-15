@@ -8,6 +8,9 @@ click-default-group==1.2.4
 click==8.5.0
 condense-json==1.1
 llm==0.37.1
+# The echo model: offline, no key, answers with the prompt. The app offers it
+# for trying llm without an account, and the benchmark drives it.
+llm-echo==0.3a3
 openai==3.46.0
 pluggy==1.7.0
 puremagic==2.2.0

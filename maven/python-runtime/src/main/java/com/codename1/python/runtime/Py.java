@@ -2823,6 +2823,12 @@ public final class Py {
     // ---- modules ---------------------------------------------------------
 
     /// `import name`.
+    /// How many calls so far built an argument array because the callee had
+    /// no fixed-arity path for their shape; see `ArgArrays.fallback`.
+    public static long argArrayFallbacks() {
+        return ArgArrays.fallbacks;
+    }
+
     public static PyModule importModule(String name) {
         return PyModule.load(name);
     }

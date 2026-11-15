@@ -81,7 +81,7 @@ public class PyTuple extends PyObject {
 
     @Override
     public long hash() {
-        return Hashing.ofTuple(arr());
+        return Hashing.ofTuple(this);
     }
 
     @Override

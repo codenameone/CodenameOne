@@ -120,6 +120,8 @@ public final class Database {
         this.mysql = mysql;
         this.describedAs = describedAs;
         this.dialect = dialect;
+        this.boundStatements = boundStatementsFor(dialect);
+        this.gate = sqlite != null ? sqlite : new Object();
     }
 
     /// A unit of work run inside [#transaction].
@@ -252,17 +254,175 @@ public final class Database {
     /// Holding this one first is safe -- the order is always Database then Db,
     /// never the reverse -- and Db's monitor is reentrant for the callbacks.
     public int execute(String sql, Object[] params) throws IOException {
+        enterReady();
+        try {
+            return executeEntered(sql, params);
+        } finally {
+            exit();
+        }
+    }
+
+    /// [#execute(String, Object[])], writing [#lastInsertId()] into
+    /// `lastInsertId[0]` under the same hold of the connection: no other
+    /// statement can come between the two, and the DB-API layer, which reads
+    /// both after every statement, pays for one entry rather than two.
+    public int execute(String sql, Object[] params, long[] lastInsertId) throws IOException {
+        if (sqlite != null && !Tracing.everTraced()) {
+            int changed = sqliteExecuteIfFree(sql, params, lastInsertId);
+            if (changed != GATE_TAKEN) {
+                return changed;
+            }
+        }
+        enterReady();
+        try {
+            int changed = executeEntered(sql, params, lastInsertId);
+            if (sqlite == null) {
+                lastInsertId[0] = lastInsertIdEntered();
+            }
+            return changed;
+        } finally {
+            exit();
+        }
+    }
+
+    private int executeEntered(String sql, Object[] params) throws IOException {
+        return executeEntered(sql, params, null);
+    }
+
+    /// With `lastInsertId`, SQLite fills it under the same engine lock as
+    /// the statement, rather than taking that lock a second time.
+    private int executeEntered(String sql, Object[] params, long[] lastInsertId) throws IOException {
+        // A span per statement when a tracer is installed; see Tracing.startDatabase.
+        Span span = Tracing.startDatabase(dialect.getName(), sql);
+        if (span == null) {
+            return executeUntraced(sql, params, lastInsertId);
+        }
+        Throwable failure = null;
+        try {
+            return executeUntraced(sql, params, lastInsertId);
+        } catch (IOException err) {
+            failure = err;
+            throw err;
+        } catch (RuntimeException err) {
+            failure = err;
+            throw err;
+        } finally {
+            Tracing.endDatabase(span, failure);
+        }
+    }
+
+    /// Keeps an SQLite connection's read lock between statements, or lets it
+    /// go; nothing on a server database. A caller turns it on while it still has
+    /// rows of a query to work through and runs more queries meanwhile -- the
+    /// lock is then taken once instead of once per query, as it is under a
+    /// pending CPython cursor. Purely a saving: the connection lets go by itself
+    /// before any statement the lock would get in the way of, and while another
+    /// connection is open on the same file.
+    public void holdRead(boolean on) {
+        if (sqlite == null) {
+            return;
+        }
         enter();
         try {
-            awaitTransactionOwner();
-            // A span per statement when a tracer is installed; see Tracing.startDatabase.
+            sqlite.holdRead(on);
+        } finally {
+            exit();
+        }
+    }
+
+    /// Registers a scalar SQL function `name` taking `argc` arguments (-1 for
+    /// any number) on this connection; a later registration of the same name
+    /// and count replaces it. The body receives null, `Long`, `Double`,
+    /// `String` or `byte[]` arguments, and may answer any of those, a
+    /// `Boolean` or another `Number`; whatever it throws becomes the
+    /// statement's error.
+    ///
+    /// SQLite only: PostgreSQL and MySQL run functions inside the server and
+    /// cannot call back into this process, so the answer there is false and
+    /// nothing is registered.
+    ///
+    /// The body runs on the thread executing the statement, while this
+    /// connection is held; it must not use the same connection itself.
+    public boolean createFunction(String name, int argc,
+            java.util.function.Function<Object[], Object> body) throws IOException {
+        if (name == null || body == null) {
+            throw new IllegalArgumentException("a function needs a name and a body");
+        }
+        if (sqlite == null) {
+            return false;
+        }
+        enter();
+        try {
+            return sqlite.createFunction(name, argc, body);
+        } finally {
+            exit();
+        }
+    }
+
+    private int executeUntraced(String sql, Object[] params, long[] lastInsertId) throws IOException {
+        // Every engine's failure surfaces as a DataAccessException, which
+        // @Transactional rolls back for; see that class.
+        try {
+            params = portableParameters(params);
+            String rendered = bind(sql, params);
+            if (sqlite != null) {
+                return sqlite.execute(rendered, params, lastInsertId);
+            }
+            if (postgres != null) {
+                return postgres.execute(rendered, params);
+            }
+            return mysql.execute(rendered, params);
+        } catch (IOException err) {
+            throw DataAccessException.of(err);
+        }
+    }
+
+    /// Runs a query and returns every row as a column-name to value map.
+    public List query(String sql, Object[] params) throws IOException {
+        return query(sql, params, false);
+    }
+
+    /// Runs a query and returns every row as an `Object[]` of its values, in the
+    /// order the statement projects them. [#columnNames] and [#columnTypes]
+    /// answer for the result exactly as they do for [#query].
+    ///
+    /// For code that reads rows by position -- a database driver, a
+    /// serializer -- and would otherwise turn each map straight back into an
+    /// array: on SQLite the rows are built that way to begin with, which saves
+    /// a map and its entries per row.
+    public List queryPositional(String sql, Object[] params) throws IOException {
+        return query(sql, params, true);
+    }
+
+    /// [#queryPositional] into `out`, a list the caller owns and reuses,
+    /// answering the column names in projection order. The names are shared
+    /// and must not be changed. Only SQLite answers this way; every other engine
+    /// answers null and adds nothing, and the caller uses [#queryPositional].
+    /// The DB-API layer runs a statement through here: a result list per
+    /// statement, then a copy of its rows into a list of its own, was most of
+    /// what a one-row query allocated.
+    public String[] queryPositionalInto(String sql, Object[] params, List out) throws IOException {
+        if (sqlite == null) {
+            return null;
+        }
+        if (!Tracing.everTraced()) {
+            String[] names = sqliteQueryIfFree(sql, params, out);
+            if (names != null) {
+                return names;
+            }
+        }
+        enterReady();
+        try {
             Span span = Tracing.startDatabase(dialect.getName(), sql);
             if (span == null) {
-                return executeUntraced(sql, params);
+                return queryIntoUntraced(sql, params, out);
             }
             Throwable failure = null;
             try {
-                return executeUntraced(sql, params);
+                int before = out.size();
+                String[] names = queryIntoUntraced(sql, params, out);
+                Tracing.setAttribute(span, "db.response.returned_rows", out.size() - before);
+                return names;
             } catch (IOException err) {
                 failure = err;
                 throw err;
@@ -277,36 +437,66 @@ public final class Database {
         }
     }
 
-    private int executeUntraced(String sql, Object[] params) throws IOException {
-        // Every engine's failure surfaces as a DataAccessException, which
-        // @Transactional rolls back for; see that class.
+    /// What [#sqliteExecuteIfFree] answers when the gate was not free.
+    private static final int GATE_TAKEN = Integer.MIN_VALUE;
+
+    /// The statement in one hold of the gate's monitor when the gate is free for
+    /// the caller (see [#gate]); [#GATE_TAKEN] when it is not, before doing
+    /// anything, and the caller then waits for it as every statement does.
+    private int sqliteExecuteIfFree(String sql, Object[] params, long[] lastInsertId) throws IOException {
+        long virtual = VirtualThread.current();
+        synchronized (gate) {
+            Object me = callerInGate(virtual);
+            if (!gateFreeFor(me)) {
+                return GATE_TAKEN;
+            }
+            gateOwner = me;
+            gateHolds++;
+            try {
+                return executeUntraced(sql, params, lastInsertId);
+            } finally {
+                releaseInGate();
+            }
+        }
+    }
+
+    /// [#sqliteExecuteIfFree] for a query: null when the gate was not free.
+    private String[] sqliteQueryIfFree(String sql, Object[] params, List out) throws IOException {
+        long virtual = VirtualThread.current();
+        synchronized (gate) {
+            Object me = callerInGate(virtual);
+            if (!gateFreeFor(me)) {
+                return null;
+            }
+            gateOwner = me;
+            gateHolds++;
+            try {
+                return queryIntoUntraced(sql, params, out);
+            } finally {
+                releaseInGate();
+            }
+        }
+    }
+
+    private String[] queryIntoUntraced(String sql, Object[] params, List out) throws IOException {
         try {
             params = portableParameters(params);
-            String rendered = bind(sql, params);
-            if (sqlite != null) {
-                return sqlite.execute(rendered, params);
-            }
-            if (postgres != null) {
-                return postgres.execute(rendered, params);
-            }
-            return mysql.execute(rendered, params);
+            return sqlite.queryPositionalInto(bind(sql, params), params, out);
         } catch (IOException err) {
             throw DataAccessException.of(err);
         }
     }
 
-    /// Runs a query and returns every row as a column-name to value map.
-    public List query(String sql, Object[] params) throws IOException {
-        enter();
+    private List query(String sql, Object[] params, boolean positional) throws IOException {
+        enterReady();
         try {
-            awaitTransactionOwner();
             Span span = Tracing.startDatabase(dialect.getName(), sql);
             if (span == null) {
-                return queryUntraced(sql, params);
+                return queryUntraced(sql, params, positional);
             }
             Throwable failure = null;
             try {
-                List rows = queryUntraced(sql, params);
+                List rows = queryUntraced(sql, params, positional);
                 // Through the guarded hook: a tracer that throws here must not turn a
                 // query that succeeded into a failure, and discard its rows.
                 Tracing.setAttribute(span, "db.response.returned_rows", rows.size());
@@ -323,6 +513,15 @@ public final class Database {
         } finally {
             exit();
         }
+    }
+
+    /// The column names of a query, in projection order, even when it returned
+    /// no rows; null for rows this class did not produce.
+    public static String[] columnNames(List rows) {
+        if (rows instanceof QueryRows) {
+            return ((QueryRows) rows).getColumnNames();
+        }
+        return null;
     }
 
     /// The kind of each column of a result `query` returned, in the order the
@@ -343,20 +542,47 @@ public final class Database {
         return null;
     }
 
-    private List queryUntraced(String sql, Object[] params) throws IOException {
+    private List queryUntraced(String sql, Object[] params, boolean positional) throws IOException {
         try {
             params = portableParameters(params);
             String rendered = bind(sql, params);
             if (sqlite != null) {
-                return sqlite.query(rendered, params);
+                return positional ? sqlite.queryPositional(rendered, params) : sqlite.query(rendered, params);
             }
-            if (postgres != null) {
-                return postgres.query(rendered, params);
-            }
-            return mysql.query(rendered, params);
+            List rows = postgres != null ? postgres.query(rendered, params) : mysql.query(rendered, params);
+            return positional ? positional(rows) : rows;
         } catch (IOException err) {
             throw DataAccessException.of(err);
         }
+    }
+
+    // The network engines' rows, as queryPositional answers them. Their
+    // protocols hand rows over one value at a time, so there is no map to save;
+    // this keeps the one API answering one shape on every engine.
+    private static List positional(List rows) {
+        if (!(rows instanceof QueryRows)) {
+            return rows;
+        }
+        QueryRows from = (QueryRows) rows;
+        String[] names = from.getColumnNames();
+        if (names == null) {
+            return rows;
+        }
+        QueryRows out = new QueryRows(from.size());
+        out.setColumnNames(names);
+        out.setColumnTypes(from.getColumnTypes());
+        for (int i = 0; i < from.size(); i++) {
+            Object entry = from.get(i);
+            Object[] values = new Object[names.length];
+            if (entry instanceof Map) {
+                Map row = (Map) entry;
+                for (int c = 0; c < names.length; c++) {
+                    values[c] = row.get(names[c]);
+                }
+            }
+            out.add(values);
+        }
+        return out;
     }
 
     /// The one row a query is expected to return, or null when it returns none.
@@ -412,9 +638,8 @@ public final class Database {
     /// ignored conflict, most often -- or where the engine generated none
     public long insert(String sql, Object[] params, String idColumn)
             throws IOException {
-        enter();
+        enterReady();
         try {
-            awaitTransactionOwner();
             // One span for the insert, whatever it runs to learn its key: the
             // statements it issues through execute and query find this one current
             // and add none of their own.
@@ -606,6 +831,28 @@ public final class Database {
     /// no placeholder at all is passed through untouched, which is what keeps SQL
     /// written for one engine working.
     private String bind(String sql, Object[] params) throws IOException {
+        int paramCount = params == null ? 0 : params.length;
+        BoundCache cache = boundStatements;
+        Bound[] slots = cache.slots;
+        int hash = sql.hashCode();
+        int slot = hash & (BOUND_STATEMENT_CACHE_SIZE - 1);
+        Bound hit = slots[slot];
+        if (hit != null && hit.paramCount == paramCount && hit.sql.equals(sql)) {
+            refuseNulInTextParameters(params);
+            return hit.rendered;
+        }
+        if (sql.indexOf('?') < 0 && atMostOneFinalSemicolon(sql)) {
+            // NEITHER SCAN CAN CHANGE THIS ONE: with no ? there is nothing to
+            // render ([Dialect#bind] passes such a statement through
+            // untouched), and with no ; but a final one there is no second
+            // statement for hasTrailingStatement to find, whatever is quoted.
+            // sqlite-utils names every savepoint afresh -- SAVEPOINT
+            // sqlite_utils_<random> -- so these never repeat, never hit the
+            // cache, and both full scans ran for each, measured at 4% of
+            // llm's log writer.
+            refuseNulInTextParameters(params);
+            return sql;
+        }
         if (dialect.hasTrailingStatement(sql)) {
             // SQLITE RUNS THE FIRST ONE AND DROPS THE REST, reporting success:
             // sqlite3_prepare_v2 is called with a null tail pointer, so
@@ -620,8 +867,115 @@ public final class Database {
                     + "or use inTransaction() to group them: [" + sql + "]");
         }
         refuseNulInTextParameters(params);
-        return dialect.bind(sql, params == null ? 0 : params.length);
+        String rendered = dialect.bind(sql, paramCount);
+        // ADMITTED ON ITS SECOND SIGHTING. A migration sends hundreds of
+        // statements that never come again -- sqlite-utils' table rebuilds
+        // name a fresh random table each time -- and llm runs about 2,000
+        // distinct statements next to a dozen it repeats tens of thousands of
+        // times. Admitting every miss let the one-offs evict the hot ones from
+        // all 256 slots, measured: the cache almost never hit. A statement now
+        // takes a slot only when the same hash missed there before, so a
+        // one-off costs one int and never displaces what repeats.
+        int[] seen = cache.seen;
+        if (seen[slot] == hash) {
+            slots[slot] = new Bound(sql, paramCount, rendered);
+        } else {
+            seen[slot] = hash;
+        }
+        return rendered;
     }
+
+    /// True when `sql` holds no `;`, or exactly one as its last character
+    /// that is not a blank.
+    private static boolean atMostOneFinalSemicolon(String sql) {
+        int semi = sql.indexOf(';');
+        if (semi < 0) {
+            return true;
+        }
+        for (int i = sql.length() - 1; i > semi; i--) {
+            char c = sql.charAt(i);
+            if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// What [#bind] answered for a statement, by its SQL.
+    ///
+    /// Both questions bind asks -- is this one statement, and how does this
+    /// engine spell its placeholders -- depend on nothing but the text and
+    /// the count, and an application sends the same few statements over and
+    /// over. Scanning each one again on every call was a cost CPython's
+    /// sqlite3 does not have, measured on llm's log writer.
+    ///
+    /// DIRECT MAPPED, never locked and never copied: a statement has one slot,
+    /// chosen by its hash, and a newer statement with the same slot replaces
+    /// it. An entry is immutable, so a thread reading a slot another is
+    /// writing sees the old entry or the new one, and either is checked
+    /// against the SQL before it is used; a lost write is only recomputed.
+    /// A synchronized map gave bind a monitor and a full frame on every
+    /// statement, and a copy-on-write map copied itself on every miss -- a
+    /// migration sends hundreds of distinct statements, and that copy was
+    /// measured costing more than the scans the cache saves.
+    ///
+    /// ONE PER DIALECT, shared by every connection that speaks it: the answer
+    /// depends on the text, the count and the dialect, never on the
+    /// connection, and an application that opens a Database per unit of work
+    /// (llm opens one per prompt) otherwise starts every unit with a cold
+    /// cache and scans every statement again.
+    private final BoundCache boundStatements;
+
+    private static final int BOUND_STATEMENT_CACHE_SIZE = 256;
+
+    private static final BoundCache SQLITE_BOUND = new BoundCache();
+    private static final BoundCache POSTGRES_BOUND = new BoundCache();
+    private static final BoundCache MYSQL_BOUND = new BoundCache();
+    private static final BoundCache MARIADB_BOUND = new BoundCache();
+
+    /// The shared cache for a dialect; a dialect outside the four gets one of
+    /// its own, which is only ever colder, never wrong.
+    private static BoundCache boundStatementsFor(Dialect d) {
+        if (d == Dialect.SQLITE) { //NOPMD CompareObjectsWithEquals - the dialects are singletons
+            return SQLITE_BOUND;
+        }
+        if (d == Dialect.POSTGRES) { //NOPMD CompareObjectsWithEquals - the dialects are singletons
+            return POSTGRES_BOUND;
+        }
+        if (d == Dialect.MYSQL) { //NOPMD CompareObjectsWithEquals - the dialects are singletons
+            return MYSQL_BOUND;
+        }
+        if (d == Dialect.MARIADB) { //NOPMD CompareObjectsWithEquals - the dialects are singletons
+            return MARIADB_BOUND;
+        }
+        return new BoundCache();
+    }
+
+    /// The slots of [#bind]'s cache, and beside each the hash of the last
+    /// statement that missed there, which is what admits a statement on its
+    /// second miss. Both arrays are written without a lock, as the slots
+    /// always were: an int is never torn, and a stale one only delays an
+    /// admission by a call.
+    private static final class BoundCache {
+        final Bound[] slots = new Bound[BOUND_STATEMENT_CACHE_SIZE];
+        final int[] seen = new int[BOUND_STATEMENT_CACHE_SIZE];
+    }
+
+    /// One answer of [#bind]: the statement, the parameter count it was
+    /// rendered for, and the text.
+    private static final class Bound {
+        final String sql;
+        final int paramCount;
+        final String rendered;
+
+        Bound(String sql, int paramCount, String rendered) {
+            this.sql = sql;
+            this.paramCount = paramCount;
+            this.rendered = rendered;
+        }
+    }
+
+    /// A power of two: the slot is the hash masked by one less than this.
 
     // Refuses a NUL inside a bound string, on every engine.
     //
@@ -770,7 +1124,14 @@ public final class Database {
     /// at a time, and a transaction reserved to its caller -- is a flag, taken and
     /// given back under a monitor held only for that instant. A virtual thread
     /// waiting for it naps; anything else waits on the monitor, as before.
-    private final Object gate = new Object();
+    ///
+    /// On SQLite the gate's monitor IS the engine's: [Db] synchronizes every
+    /// method on itself, so a statement that finds the gate free takes the flag,
+    /// runs and gives it back inside one hold of that monitor -- the engine call
+    /// inside is a reentrant entry -- instead of three separate monitor entries
+    /// ([#sqliteQueryIfFree], [#sqliteExecuteIfFree]). That is no wider than the
+    /// engine's own lock already was: the statement held it for its whole run.
+    private final Object gate;
     private Object gateOwner;
     private int gateHolds;
 
@@ -787,6 +1148,64 @@ public final class Database {
         acquire(caller(), 1);
     }
 
+    /// [#enter] followed by [#awaitTransactionOwner], as every statement begins,
+    /// in one pass through the gate when nobody else holds it or has a
+    /// transaction open -- one monitor entry instead of three, and the caller's
+    /// boxed id reused from the last statement rather than made again. Any
+    /// contention takes the two steps as before.
+    private void enterReady() {
+        long virtual = VirtualThread.current();
+        synchronized (gate) {
+            Object me = callerInGate(virtual);
+            if (gateFreeFor(me)) {
+                gateOwner = me;
+                gateHolds++;
+                return;
+            }
+        }
+        enter();
+        awaitTransactionOwner();
+    }
+
+    /// [#caller], inside the gate, reusing the last statement's box.
+    private Object callerInGate(long virtual) {
+        if (virtual == 0) {
+            return Thread.currentThread();
+        }
+        if (lastVirtualBox == null || lastVirtual != virtual) {
+            lastVirtual = virtual;
+            lastVirtualBox = Long.valueOf(virtual);
+        }
+        return lastVirtualBox;
+    }
+
+    /// Inside the gate: nobody else holds it or has a transaction open.
+    private boolean gateFreeFor(Object me) {
+        return (gateOwner == null || gateOwner.equals(me))
+                && (transactionOwner == null || transactionOwner.equals(me));
+    }
+
+    /// Inside the gate: gives one hold back, waking platform waiters at the last.
+    private void releaseInGate() {
+        gateHolds--;
+        if (gateHolds <= 0) {
+            gateHolds = 0;
+            gateOwner = null;
+            if (gateWaiters > 0) {
+                gate.notifyAll();
+            }
+        }
+    }
+
+    /// The virtual thread [#enterReady] last boxed, and its box; read and
+    /// written only inside the gate.
+    private long lastVirtual;
+    private Long lastVirtualBox;
+
+    /// Platform threads blocked in `gate.wait`: only they need the
+    /// notification [#exit] sends. A virtual thread polls instead.
+    private int gateWaiters;
+
     private void acquire(Object me, int holds) {
         boolean virtual = VirtualThread.isVirtual();
         boolean interrupted = false;
@@ -799,10 +1218,13 @@ public final class Database {
                     break;
                 }
                 if (!virtual) {
+                    gateWaiters++;
                     try {
                         gate.wait();
                     } catch (InterruptedException error) {
                         interrupted = true;
+                    } finally {
+                        gateWaiters--;
                     }
                     continue;
                 }
@@ -817,12 +1239,7 @@ public final class Database {
 
     private void exit() {
         synchronized (gate) {
-            gateHolds--;
-            if (gateHolds <= 0) {
-                gateHolds = 0;
-                gateOwner = null;
-                gate.notifyAll();
-            }
+            releaseInGate();
         }
     }
 
@@ -845,12 +1262,15 @@ public final class Database {
                 gateOwner = null;
                 gate.notifyAll();
                 if (!virtual) {
+                    gateWaiters++;
                     try {
                         // Bounded: the owner's commit notifies, and the bound only
                         // covers a notification that lands between these lines.
                         gate.wait(50);
                     } catch (InterruptedException error) {
                         interrupted = true;
+                    } finally {
+                        gateWaiters--;
                     }
                 }
             }
@@ -890,9 +1310,8 @@ public final class Database {
     /// Waits for another thread's transaction to finish before checking,
     /// like other operations on this connection.
     public boolean isInTransaction() {
-        enter();
+        enterReady();
         try {
-            awaitTransactionOwner();
             return managedTransaction;
         } finally {
             exit();
@@ -904,9 +1323,8 @@ public final class Database {
     /// thread must complete the transaction; it cannot be handed to another thread.
     /// SQLite's write lock is acquired immediately.
     public void beginTransaction() throws IOException {
-        enter();
+        enterReady();
         try {
-            awaitTransactionOwner();
             if (managedTransaction) {
                 throw new IOException("Transaction already active");
             }
@@ -957,9 +1375,8 @@ public final class Database {
         if (isolation == null) {
             throw new IllegalArgumentException("Isolation is required");
         }
-        enter();
+        enterReady();
         try {
-            awaitTransactionOwner();
             if (managedTransaction) {
                 throw new IOException("Transaction already active");
             }
@@ -1048,9 +1465,8 @@ public final class Database {
 
     /// Commits the transaction opened through this API.
     public void commitTransaction() throws IOException {
-        enter();
+        enterReady();
         try {
-            awaitTransactionOwner();
             if (!managedTransaction) {
                 throw new IOException("No active transaction");
             }
@@ -1063,9 +1479,8 @@ public final class Database {
 
     /// Rolls back the transaction opened through this API.
     public void rollbackTransaction() throws IOException {
-        enter();
+        enterReady();
         try {
-            awaitTransactionOwner();
             if (!managedTransaction) {
                 throw new IOException("No active transaction");
             }
@@ -1137,28 +1552,30 @@ public final class Database {
     /// shutting down, a reconnect -- could therefore run between this reading the
     /// engine and the engine reading its own state.
     public long lastInsertId() {
-        enter();
+        enterReady();
         try {
-            awaitTransactionOwner();
-            if (sqlite != null) {
-                return sqlite.lastInsertId();
-            }
-            if (mysql != null) {
-                return mysql.lastInsertId();
-            }
-            return 0;
+            return lastInsertIdEntered();
         } finally {
             exit();
         }
+    }
+
+    private long lastInsertIdEntered() {
+        if (sqlite != null) {
+            return sqlite.lastInsertId();
+        }
+        if (mysql != null) {
+            return mysql.lastInsertId();
+        }
+        return 0;
     }
 
     /// SQLite-only tuning, ignored elsewhere. Write-ahead logging is what lets
     /// readers run while a writer is active, and it has no counterpart on a server
     /// engine that already does.
     public void tuneForConcurrency(int busyTimeoutMillis) throws IOException {
-        enter();
+        enterReady();
         try {
-            awaitTransactionOwner();
             if (sqlite != null) {
                 sqlite.enableWriteAheadLog();
                 sqlite.setBusyTimeout(busyTimeoutMillis);
@@ -1182,9 +1599,8 @@ public final class Database {
     /// through it. The engines' own close() methods were given this lock already;
     /// the facade that fronts them was not, which left the same race one level up.
     public void close() {
-        enter();
+        enterReady();
         try {
-            awaitTransactionOwner();
             try {
                 if (sqlite != null) {
                     sqliteClosed = true;

@@ -814,6 +814,20 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     /// The string encoded with `charset`. Unlike `getBytes(String)`, this
     /// throws no checked exception, as in the JDK.
     public byte[] getBytes(Charset charset) {
+        if (charset == java.nio.charset.StandardCharsets.UTF_8 && isLatin1()) {
+            // No exception handler to enter: the translator sets one up on
+            // entry to any method with a try block (a setjmp), which was a
+            // measurable share of a short encode -- so the try is in
+            // bytesOf, not here.
+            byte[] compact = compactBytes("UTF-8");
+            if (compact != null) {
+                return compact;
+            }
+        }
+        return bytesOf(charset);
+    }
+
+    private byte[] bytesOf(Charset charset) {
         try {
             return getBytes(charset.name());
         } catch (java.io.UnsupportedEncodingException e) {

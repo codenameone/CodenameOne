@@ -25,7 +25,7 @@ package com.codename1.impl.javase;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.DatabaseConfig;
-import com.codename1.db.SqlFunction;
+import java.util.function.Function;
 import com.codename1.impl.SQLStatementSplitter;
 
 import java.io.File;
@@ -691,7 +691,7 @@ public class SEDatabase extends Database {
     }
 
     @Override
-    public void createFunction(String name, int argCount, final SqlFunction function) throws IOException {
+    public void createFunction(String name, int argCount, final Function<Object[], Object> function) throws IOException {
         checkOpen();
         try {
             if (function == null) {
@@ -722,7 +722,7 @@ public class SEDatabase extends Database {
                     }
                     Object v;
                     try {
-                        v = function.call(args);
+                        v = function.apply(args);
                     } catch (RuntimeException e) {
                         // error() makes the message the statement's; a thrown SQLException
                         // would reach SQLite as its toString().

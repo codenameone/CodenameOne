@@ -114,6 +114,10 @@ public final class StdModules {
             PyModule.registerModule(PyDataclass.module());
             return true;
         }
+        if ("_cn1obj".equals(name)) {
+            PyModule.registerModule(PyObjects.module());
+            return true;
+        }
         if ("_cn1hash".equals(name)) {
             PyModule.registerModule(PyHashlib.module());
             return true;
@@ -752,7 +756,7 @@ public final class StdModules {
         // plain(values): the values as a tuple when every one is None or an exact int, float,
         // str or bytes -- what binds with no adapter -- else None. One call for the check
         // sqlite3's execute makes on each value.
-        m.setAttr("plain", PyBuiltin.positional("plain", a -> {
+        m.setAttr("plain", PyBuiltin.lending("plain", 1, a -> {
             Object[] vs = Py.toArray(a[0]);
             for (Object v : vs) {
                 if (!(v == Py.NONE || v instanceof Long || v instanceof Double || v instanceof String //NOPMD CompareObjectsWithEquals - None is a singleton
@@ -762,7 +766,7 @@ public final class StdModules {
             }
             return a[0] instanceof PyTuple ? a[0] : new PyTuple(vs);
         }));
-        m.setAttr("run", PyBuiltin.positional("run", a -> {
+        m.setAttr("run", PyBuiltin.lending("run", 4, a -> {
             PySql.Connection c = sqlConnection(a[0]);
             Object[] ps = Py.toArray(a[2]);
             Object[] params = new Object[ps.length];
@@ -793,6 +797,22 @@ public final class StdModules {
             }
             return Py.tuple(new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
                 PyInt.of(r.lastRowId), new PyTuple(kinds));
+        }));
+        // pending(handle, rows) / drained(handle, rows): a cursor was handed rows it
+        // has yet to read, or is done with them (PySql.Connection.pending).
+        m.setAttr("pending", PyBuiltin.positional("pending", a -> {
+            PySql.Connection c = SQL.get(Long.valueOf(Py.asLong(a[0])));
+            if (c != null) {
+                c.pending(a[1]);
+            }
+            return Py.NONE;
+        }));
+        m.setAttr("drained", PyBuiltin.positional("drained", a -> {
+            PySql.Connection c = SQL.get(Long.valueOf(Py.asLong(a[0])));
+            if (c != null && c.anyPending()) {
+                c.drained(a[1]);
+            }
+            return Py.NONE;
         }));
         m.setAttr("create_function", PyBuiltin.positional("create_function", a -> {
             PySql.Connection c = sqlConnection(a[0]);
@@ -1018,7 +1038,7 @@ public final class StdModules {
             return Py.NONE;
         }));
         m.setAttr("scan", PyBuiltin.fixed2("scan", (a0, a1) -> sqliteScan(Py.toStr(a0), Py.isTrue(a1))));
-        m.setAttr("plan", PyBuiltin.positional("plan", a -> {
+        m.setAttr("plan", PyBuiltin.lending("plan", 7, a -> {
             if (SQLITE_PLANS.size() >= SQLITE_PLANS_MAX) {
                 SQLITE_PLANS.clear();
             }
@@ -1173,11 +1193,14 @@ public final class StdModules {
             return null;
         }
         // Read in place, a list's storage included: nothing here keeps or changes it.
-        Object[] values;
+        // A small tuple keeps its items in fields, and arr() would allocate an
+        // array to copy them into; get(i) reads them where they are.
+        PyTuple tuple = null;
+        Object[] values = null;
         int count;
         if (parameters instanceof PyTuple) {
-            values = ((PyTuple) parameters).arr();
-            count = values.length;
+            tuple = (PyTuple) parameters;
+            count = tuple.size();
         } else {
             PyList list = (PyList) parameters;
             // A list of only ints or only floats keeps them unboxed, and `items` is unused.
@@ -1189,7 +1212,7 @@ public final class StdModules {
         }
         Object[] bound = sqliteBound(count);
         for (int i = 0; i < count; i++) {
-            Object v = values[i];
+            Object v = tuple != null ? tuple.get(i) : values[i];
             if (v == Py.NONE) { //NOPMD CompareObjectsWithEquals - None is a singleton
                 bound[i] = null;
             } else if (v instanceof Long || v instanceof Double || v instanceof String) {
@@ -1206,6 +1229,10 @@ public final class StdModules {
         }
         // Everything checked: from here on the call is this one's to finish.
         cursor.storeAt(cf[C_POS], "_pos", PyInt.of(0));
+        if (c.anyPending()) {
+            // The rows this cursor was working through, if it was: done with now.
+            c.drained(cursor.ownAt(cf[C_ROWS], "_rows"));
+        }
         // No handler from here down: a failure comes back as the engine's message, which the
         // caller raises. A frame with a handler pays for it on every call, thrown or not.
         if (plan.dml && autocommit instanceof Long && ((Long) autocommit).longValue() == sqliteLegacy
@@ -1224,12 +1251,24 @@ public final class StdModules {
         }
         if (plan.dml) {
             Object total = conn.ownAt(kf[K_TOTAL_CHANGES], "total_changes");
-            conn.storeAt(kf[K_TOTAL_CHANGES], "total_changes", Py.add(total, PyInt.of(Math.max(r.changes, 0))));
+            long add = Math.max(r.changes, 0);
+            Object sum;
+            if (total instanceof Long && ((Long) total).longValue() < Long.MAX_VALUE - add) {
+                // The count is an int in practice: add it without the generic arithmetic.
+                sum = add == 0 ? total : PyInt.of(((Long) total).longValue() + add);
+            } else {
+                sum = Py.add(total, PyInt.of(add));
+            }
+            conn.storeAt(kf[K_TOTAL_CHANGES], "total_changes", sum);
         }
         if (r.columns.length > 0) {
             Object[] rows = sqlRows(r);
             cursor.storeAt(cf[C_DESCRIPTION], "description", sqliteDescription(plan, r.columns));
-            cursor.storeAt(cf[C_ROWS], "_rows", new PyList(rows));
+            PyList list = new PyList(rows);
+            cursor.storeAt(cf[C_ROWS], "_rows", list);
+            if (rows.length > 0) {
+                c.pending(list);
+            }
             cursor.storeAt(cf[C_ROWCOUNT], "rowcount", PyInt.of(plan.queryWord ? -1 : rows.length));
         } else {
             // Only ever read, by the sqlite3 module as well: one shared empty tuple.
@@ -1287,7 +1326,7 @@ public final class StdModules {
     }
 
     private static void sqlControl(PyModule m, String name, int op) {
-        m.setAttr(name, PyBuiltin.positional(name, a -> {
+        m.setAttr(name, PyBuiltin.lending(name, 1, a -> {
             PySql.Connection c = sqlConnection(a[0]);
             try {
                 if (op == 0) {
@@ -2007,11 +2046,68 @@ public final class StdModules {
         return so == null || so == originalStdout || so == Py.NONE ? null : so; //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
+    /// (year, month, day, hour, minute, second, microsecond) of a count of
+    /// seconds since the epoch, by the same civil-from-days algorithm as
+    /// time.py's _civil_from_days.
+    private static PyTuple civilFields(long secs, int us) {
+        return new PyTuple(civilValues(secs, us, 7));
+    }
+
+    /// [#civilFields]'s seven values at the start of an array of `size`.
+    private static Object[] civilValues(long secs, int us, int size) {
+        long days = Math.floorDiv(secs, 86400L);
+        int rem = (int) Math.floorMod(secs, 86400L);
+        long z = days + 719468L;
+        long era = Math.floorDiv(z, 146097L);
+        long doe = z - era * 146097L;
+        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        long mp = (5 * doy + 2) / 153;
+        long d = doy - (153 * mp + 2) / 5 + 1;
+        long mo = mp < 10 ? mp + 3 : mp - 9;
+        long y = yoe + era * 400 + (mo <= 2 ? 1 : 0);
+        Object[] v = new Object[size];
+        v[0] = PyInt.of(y);
+        v[1] = PyInt.of(mo);
+        v[2] = PyInt.of(d);
+        v[3] = PyInt.of(rem / 3600);
+        v[4] = PyInt.of(rem / 60 % 60);
+        v[5] = PyInt.of(rem % 60);
+        v[6] = PyInt.of(us);
+        return v;
+    }
+
     private static PyModule time() {
         PyModule m = new PyModule("_time", new String[0]);
         m.setAttr("utcoffset", PyBuiltin.fixed1("utcoffset", a0 -> PyInt.of(utcOffset(Py.asDouble(a0)))));
         m.setAttr("tzname", PyBuiltin.positional("tzname", a -> Py.str(java.util.TimeZone.getDefault().getID())));
         m.setAttr("time", PyBuiltin.positional("time", a -> Py.ofFloat(System.currentTimeMillis() / 1000.0)));
+        // now(tz) for a fixed whole-second offset, made whole here: the
+        // fields of the clock at that offset, then tz, fold 0 and the unset
+        // hash, stored under the names datetime passes (see _cn1obj).
+        m.setAttr("now_datetime", PyBuiltin.positional("now_datetime", a -> {
+            long ms = System.currentTimeMillis();
+            long secs = Math.floorDiv(ms, 1000L) + Py.asLong(a[2]);
+            Object[] v = civilValues(secs, (int) Math.floorMod(ms, 1000L) * 1000, 10);
+            v[7] = a[3];
+            v[8] = PyInt.of(0);
+            v[9] = PyInt.of(-1);
+            return PyObjects.build((PyType) a[0], (String) a[1], v, 0);
+        }));
+        // fromtimestamp's calendar fields in one call, the 7-tuple _fields
+        // answers: the Python divmods and civil-date arithmetic were most of
+        // datetime.now(timezone.utc), 7x CPython once the checks went.
+        m.setAttr("float_fields", PyBuiltin.fixed2("float_fields", (a0, a1) -> {
+            double t = Py.asDouble(a0);
+            double fl = Math.floor(t);
+            long secs = (long) fl;
+            long us = (long) Math.rint((t - fl) * 1000000.0);
+            if (us >= 1000000L) {
+                secs++;
+                us -= 1000000L;
+            }
+            return civilFields(secs + Py.asLong(a1), (int) us);
+        }));
         m.setAttr("time_ns", PyBuiltin.positional("time_ns", a -> PyInt.of(System.currentTimeMillis() * 1000000L)));
         m.setAttr("perf_counter", PyBuiltin.positional("perf_counter", a -> Py.ofFloat(System.nanoTime() / 1e9)));
         m.setAttr("perf_counter_ns", PyBuiltin.positional("perf_counter_ns", a -> PyInt.of(System.nanoTime())));

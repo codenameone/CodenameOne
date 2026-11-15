@@ -4055,6 +4055,14 @@ final class TypedEmit {
         }
         if (e instanceof DictExpr) {
             DictExpr d = (DictExpr) e;
+            String shape = d.keys.contains(null) ? null : em.dictShape(d.keys);
+            if (shape != null) {
+                StringBuilder sb = new StringBuilder("PyDict.literal(").append(shape).append(", new Object[] {");
+                for (int i = 0; i < d.values.size(); i++) {
+                    sb.append(i == 0 ? "" : ", ").append(box(expr(d.values.get(i))));
+                }
+                return new E(sb.append("})").toString(), Ty.DYN);
+            }
             // Made at its final size, one put per pair: no array of the pairs is built.
             StringBuilder sb = new StringBuilder("new PyDict(").append(d.keys.size()).append(')');
             for (int i = 0; i < d.keys.size(); i++) {

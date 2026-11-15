@@ -182,4 +182,12 @@
         <Method name="reset"/>
         <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
     </Match>
+    <!-- _cn1obj.make's shape cache is keyed by the identity of the caller's
+         constant name string; a miss only rebuilds the shape, and equals()
+         would read the names on every construction it exists to speed up. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PyObjects"/>
+        <Method name="build"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
 </FindBugsFilter>

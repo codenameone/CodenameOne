@@ -86,9 +86,12 @@
 #undef NSLog
 #endif
 
-/* Codename One runs the database from several threads, and serialised mode is what makes that
- * safe without the caller holding a lock. */
-#define SQLITE_THREADSAFE 1
+/* Multi-thread mode: no mutex on a connection or a statement, which serialised mode took on every
+ * call. A Database is not thread safe in Codename One -- ThreadSafeDatabase is the wrapper for
+ * sharing one -- and the backend's Db holds its monitor around every use of a handle. Not 0:
+ * the backend pool keeps connections on several threads at once, and SQLite's global state
+ * (allocator, page cache, VFS list) still needs its own mutexes for that. */
+#define SQLITE_THREADSAFE 2
 
 /* Keep temporary tables and indices in memory: an app sandbox has no useful temp directory. */
 #define SQLITE_TEMP_STORE 2

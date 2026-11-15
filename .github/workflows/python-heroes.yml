@@ -51,6 +51,16 @@ jobs:
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
               -pl core,python-transpiler,compat-testing,backend,build-engine -am
 
+      # What a developer's build of the applications resolves: the archetype,
+      # the Maven plugin and the Linux port it builds the native target with.
+      - name: Build the plugin, the archetype and the Linux port on JDK 8
+        run: |
+          cd maven
+          JAVA_HOME="$JAVA_HOME_8" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Plocal-dev-javase \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -pl codenameone-maven-plugin,cn1app-archetype,linux -am
+
       # The JVM hooks a workload runs behind (file system, SQLite, HTTP) are
       # the transpiler's test classes, so they are compiled and carried over.
       - name: Build the runtime and the transpiler's test classes on JDK 17
@@ -94,7 +104,7 @@ jobs:
     name: heroes
     needs: framework
     runs-on: ubuntu-24.04
-    # Two LTO builds of a whole application each, both workloads three ways,
+    # A native build of each application, both workloads three ways,
     # and both upstream suites twice.
     timeout-minutes: 180
     env:
@@ -102,12 +112,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # clang for the translated C; the native binary reads SQLite through
-      # the system libsqlite3 (bench/native/cn1_hostsql.c).
+      # The native leg is each application as `mvn package` builds it for the
+      # local-linux-device target (bench/build_app.sh): the Linux port's GTK
+      # stack and clang for the translated C. SQLite is the engine the build
+      # bundles, as on a device.
       - name: Install the native toolchain
         run: |
-          bash scripts/ci/apt-get-update.sh
-          sudo apt-get install -y clang libsqlite3-dev
+          bash scripts/ci/install-linux-native-deps.sh
+          bash scripts/ci/apt-get-install.sh clang
+          mkdir -p "$HOME/.codenameone"
+          [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
 
       # The translator runs on JDK 8, the generated Java compiles on JDK 17.
       - name: Set up JDK 8
@@ -163,6 +177,7 @@ jobs:
               --run-cp "maven/python-transpiler/target/test-classes:$repo/codenameone-compat-testing/$v/codenameone-compat-testing-$v.jar:$(cat transpiler-test.cp)" \
               --markitdown-tests "$RUNNER_TEMP/markitdown/packages/markitdown/tests" \
               --llm-tests "$RUNNER_TEMP/llm/tests" \
+              --maven-repo "$GITHUB_WORKSPACE/m2" \
               --python python3 --json python-heroes.json --check | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the report

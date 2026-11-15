@@ -1063,7 +1063,7 @@ final class TypeMethods {
             }
             return Py.str(sb.toString());
         });
-        defKw(t, "format", (args, kw) -> {
+        PyBuiltin format = PyBuiltin.methodKw(t, "format", (args, kw) -> {
             Object[] pos = new Object[args.length - kw.length - 1];
             System.arraycopy(args, 1, pos, 0, pos.length);
             PyDict named = kw.length == 0 ? null : new PyDict();
@@ -1072,6 +1072,44 @@ final class TypeMethods {
             }
             return Py.str(StrFormat.format(s(args[0]), pos, named));
         });
+        // The positional calls, with no argument array per call: StrFormat
+        // reads its arguments and keeps none of them, so they are lent.
+        format.with1(a0 -> Py.str(StrFormat.format(s(a0), Py.NO_ARGS, null)));
+        format.with2((a0, a1) -> {
+            Object[] p = ArgArrays.take(1);
+            p[0] = a1;
+            String r = StrFormat.format(s(a0), p, null);
+            ArgArrays.give(p);
+            return Py.str(r);
+        });
+        format.with3((a0, a1, a2) -> {
+            Object[] p = ArgArrays.take(2);
+            p[0] = a1;
+            p[1] = a2;
+            String r = StrFormat.format(s(a0), p, null);
+            ArgArrays.give(p);
+            return Py.str(r);
+        });
+        format.with4((a0, a1, a2, a3) -> {
+            Object[] p = ArgArrays.take(3);
+            p[0] = a1;
+            p[1] = a2;
+            p[2] = a3;
+            String r = StrFormat.format(s(a0), p, null);
+            ArgArrays.give(p);
+            return Py.str(r);
+        });
+        format.with5((a0, a1, a2, a3, a4) -> {
+            Object[] p = ArgArrays.take(4);
+            p[0] = a1;
+            p[1] = a2;
+            p[2] = a3;
+            p[3] = a4;
+            String r = StrFormat.format(s(a0), p, null);
+            ArgArrays.give(p);
+            return Py.str(r);
+        });
+        t.define("format", format);
         def2(t, "format_map", (a0, a1) -> Py.str(StrFormat.format(s(a0), Py.NO_ARGS, a1)));
         final PyBuiltin encode = PyBuiltin.methodKw(t, "encode", (a, kw) -> {
             // `s.encode()` and `s.encode("utf-8")`, bound without Args.
@@ -1124,14 +1162,26 @@ final class TypeMethods {
                     i++;
                 }
                 Object r;
-                try {
-                    r = Py.obj(a1).getItem(PyInt.of(cp));
-                } catch (PyException e) {
-                    if (!e.matches(Py.LOOKUP_ERROR)) {
-                        throw e;
+                if (a1 instanceof PyDict && a1.getClass() == PyDict.class) {
+                    // The usual table, from str.maketrans: most characters are not in
+                    // it, and asking getItem raised a KeyError -- a filled-in stack
+                    // trace -- for each of them. A dict subclass may define __missing__,
+                    // so only the exact type is looked up directly.
+                    r = ((PyDict) a1).getOrNull(PyInt.of(cp));
+                    if (r == null) {
+                        sb.appendCodePoint(cp);
+                        continue;
                     }
-                    sb.appendCodePoint(cp);
-                    continue;
+                } else {
+                    try {
+                        r = Py.obj(a1).getItem(PyInt.of(cp));
+                    } catch (PyException e) {
+                        if (!e.matches(Py.LOOKUP_ERROR)) {
+                            throw e;
+                        }
+                        sb.appendCodePoint(cp);
+                        continue;
+                    }
                 }
                 if (r == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
                     continue;

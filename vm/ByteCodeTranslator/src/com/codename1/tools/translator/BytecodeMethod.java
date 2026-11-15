@@ -846,6 +846,20 @@ public class BytecodeMethod implements SignatureSet {
                 hasRealInstruction = true;
                 continue;
             }
+            if (i instanceof LambdaCarriers.IndirectCall) {
+                // The call a lambda carrier's interface method makes through its fn
+                // field: arguments taken off the method-local operand array and the
+                // C parameters, the result pushed back -- self-contained exactly as
+                // an Invoke is, and allowed on the same terms. Unrecognized, it gave
+                // EVERY carrier method a full frame, and every transpiled Python call
+                // goes through one (PyFunction.Body1..BodyN): a frame set up and torn
+                // down per call, to load a field and jump.
+                if (!obj) {
+                    return false;
+                }
+                hasRealInstruction = true;
+                continue;
+            }
             if (i instanceof LambdaCarriers.FunctionAddress) {
                 // Pushes a function's address as a long constant -- no call, no object.
                 // It is the one custom instruction of every lambda factory, and treating
@@ -5733,6 +5747,50 @@ public class BytecodeMethod implements SignatureSet {
     // not write are zeroed explicitly by the emitter).
     // Conservative: any deviation from the shape leaves today's memset path.
     // ------------------------------------------------------------------
+    /**
+     * Drops the check from a CHECKCAST whose outcome the code right before it has
+     * already decided: {@code ALOAD n; INSTANCEOF T; IFEQ L; ALOAD n; CHECKCAST T},
+     * where the cast is reached only by falling through the IFEQ. Only line
+     * numbers and labels nothing jumps to may sit between the IFEQ and the second
+     * ALOAD; anything else -- a store, a call, a jump target -- leaves the cast
+     * checked. A null local fails the instanceof, so the cast never sees one.
+     */
+    private void elideProvenCasts() {
+        if (!ByteCodeTranslator.isCheckedCastsEnabled()) {
+            return;
+        }
+        int n = instructions.size();
+        for (int i = 0; i + 4 < n; i++) {
+            Instruction a = instructions.get(i);
+            if (a.getOpcode() != Opcodes.ALOAD || !(a instanceof VarOp)) {
+                continue;
+            }
+            Instruction io = instructions.get(i + 1);
+            Instruction jmp = instructions.get(i + 2);
+            if (io.getOpcode() != Opcodes.INSTANCEOF || !(io instanceof TypeInstruction)
+                    || jmp.getOpcode() != Opcodes.IFEQ || !(jmp instanceof Jump)) {
+                continue;
+            }
+            int j = i + 3;
+            while (j < n && (instructions.get(j) instanceof LineNumber
+                    || instructions.get(j) instanceof LabelInstruction
+                    && !LabelInstruction.isJumpTarget(((LabelInstruction) instructions.get(j)).getLabel()))) {
+                j++;
+            }
+            if (j + 1 >= n) {
+                continue;
+            }
+            Instruction b = instructions.get(j);
+            Instruction cc = instructions.get(j + 1);
+            if (b.getOpcode() == Opcodes.ALOAD && b instanceof VarOp
+                    && ((VarOp) b).getIndex() == ((VarOp) a).getIndex()
+                    && cc.getOpcode() == Opcodes.CHECKCAST && cc instanceof TypeInstruction
+                    && ((TypeInstruction) cc).getTypeName().equals(((TypeInstruction) io).getTypeName())) {
+                ((TypeInstruction) cc).markProvenCast();
+            }
+        }
+    }
+
     private void markInitBeforePublish() {
         for (int idx = 0; idx < instructions.size(); idx++) {
             Instruction ins = instructions.get(idx);
@@ -6366,6 +6424,10 @@ public class BytecodeMethod implements SignatureSet {
         // <init> stays a plain on-stack Invoke or a receiver-on-stack CustomInvoke.
         markInitBeforePublish();
 
+        // A checked cast that an instanceof of the same local has just proven costs a
+        // second instanceofFunction call for nothing; see elideProvenCasts.
+        elideProvenCasts();
+
         // Mark source lines whose every instruction is non-throwing/non-calling as
         // elidable (their per-line line-info store becomes a no-op in release --
         // trace-identical, see analyzeElidableLineInfo). Runs AFTER scalar
@@ -6395,8 +6457,10 @@ public class BytecodeMethod implements SignatureSet {
                     // instruction here means TypeInstruction never gets to emit anything for it,
                     // so implementing the BC_CHECKCAST macro alone would have had no effect.
                     // Under -Dcn1.checkedCasts=true the instruction is kept, at the cost of the
-                    // optimizations this removal was protecting.
-                    if(ByteCodeTranslator.isCheckedCastsEnabled()) {
+                    // optimizations this removal was protecting -- except a cast an
+                    // instanceof has already proved, which is removed either way.
+                    if(ByteCodeTranslator.isCheckedCastsEnabled()
+                            && !(current instanceof TypeInstruction && ((TypeInstruction) current).isProvenCast())) {
                         break;
                     }
                     instructions.remove(iter);

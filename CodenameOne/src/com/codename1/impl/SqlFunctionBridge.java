@@ -22,13 +22,13 @@
  */
 package com.codename1.impl;
 
-import com.codename1.db.SqlFunction;
+import java.util.function.Function;
 import com.codename1.util.StringUtil;
 
 import java.util.ArrayList;
 
 /// What every port whose database is SQLite in C shares to call a
-/// [SqlFunction]: the table that turns the id SQLite holds into the function,
+/// [Function]: the table that turns the id SQLite holds into the function,
 /// and the conversion of arguments and the result. A port supplies only the
 /// natives that read an argument and set the result.
 ///
@@ -45,11 +45,11 @@ public abstract class SqlFunctionBridge {
     /// `sqlite3_value_type`: SQLITE_BLOB.
     public static final int SQLITE_BLOB = 4;
 
-    private final ArrayList<SqlFunction> functions = new ArrayList<SqlFunction>();
+    private final ArrayList<Function<Object[], Object>> functions = new ArrayList<Function<Object[], Object>>();
 
     /// The id the engine is handed for a function. Ids are never reused, so a
     /// statement still holding an old one cannot reach a later function.
-    public int register(SqlFunction function) {
+    public int register(Function<Object[], Object> function) {
         functions.add(function);
         return functions.size() - 1;
     }
@@ -59,7 +59,7 @@ public abstract class SqlFunctionBridge {
     public void call(long ctx, int id, int argc, long argv) {
         // Looked up outside the try: the cast the generic get carries must not
         // sit under a handler (ParparVM does not check it, see check-cast-semantics.sh).
-        SqlFunction f = id >= 0 && id < functions.size() ? functions.get(id) : null;
+        Function<Object[], Object> f = id >= 0 && id < functions.size() ? functions.get(id) : null;
         if (f == null) {
             resultError(ctx, StringUtil.getBytes("no such function"));
             return;
@@ -69,7 +69,7 @@ public abstract class SqlFunctionBridge {
             for (int i = 0; i < argc; i++) {
                 args[i] = argument(argv, i);
             }
-            result(ctx, f.call(args));
+            result(ctx, f.apply(args));
         } catch (Throwable t) { //NOPMD AvoidCatchingThrowable - an exception must not unwind through SQLite's C frames
             String m = t.getMessage();
             resultError(ctx, StringUtil.getBytes(m == null ? t.toString() : m));

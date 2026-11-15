@@ -816,7 +816,11 @@ typedef struct clazz*       JAVA_CLASS;
          * which every application links -- fails to link for those. The macro only
          * expands where an aastore exists, which is exactly where the class is kept
          * alive. The branch hint is the part that carries over. */ \
-        if(__builtin_expect(cn1__comp != NULL && !instanceofFunction(cn1__comp->classId, GET_CLASS_ID(value)), 0)) { \
+        /* An Object[] takes anything and an exact match needs no walk: both are
+         * answered here, so the usual store makes no call at all. */ \
+        if(__builtin_expect(cn1__comp != NULL && cn1__comp->classId != cn1_class_id_java_lang_Object \
+                && cn1__comp->classId != GET_CLASS_ID(value) \
+                && !instanceofFunction(cn1__comp->classId, GET_CLASS_ID(value)), 0)) { \
             cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ArrayStoreException(threadStateData), CN1_CLASS_OF(value)->clsName, NULL); \
         } \
     } \
@@ -825,7 +829,7 @@ typedef struct clazz*       JAVA_CLASS;
 #define BC_CHECKCAST_CHECKED(typeOfCheckCast, targetName) { \
     if(SP[-1].data.o != JAVA_NULL) { \
         int tmpCheckCastId = GET_CLASS_ID(SP[-1].data.o); \
-        if(!instanceofFunction(typeOfCheckCast, tmpCheckCastId)) { \
+        if(tmpCheckCastId != (typeOfCheckCast) && !instanceofFunction(typeOfCheckCast, tmpCheckCastId)) { \
             cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ClassCastException(threadStateData), CN1_CLASS_OF(SP[-1].data.o)->clsName, targetName); \
         } \
     } \
@@ -3383,7 +3387,12 @@ extern JAVA_OBJECT cn1BibopFastNew(CODENAME_ONE_THREAD_STATE, int size, struct c
  * mid-use -> the intermittent Windows WebSocket-reader use-after-free. On platforms with
  * signal-stop this just makes the cheaper cooperative path usable; a no-op when conservative
  * roots are off. */
-#define CN1_YIELD_THREAD do { struct ThreadLocalData* __cn1yts = getThreadLocalData(); CN1_GC_PARK_CAPTURE(__cn1yts); __cn1yts->threadActive = JAVA_FALSE; } while(0)
+/* The _TS forms take the state the native was called with (threadStateData) instead of
+ * looking it up: the same struct getThreadLocalData() answers for the running thread,
+ * virtual or not, without its pthread_once, key read and virtual-thread lookup -- which
+ * cost as much as sqlite3_step itself on a statement of one row. */
+#define CN1_YIELD_THREAD_TS(ts) do { struct ThreadLocalData* __cn1yts = (ts); CN1_GC_PARK_CAPTURE(__cn1yts); __cn1yts->threadActive = JAVA_FALSE; } while(0)
+#define CN1_YIELD_THREAD CN1_YIELD_THREAD_TS(getThreadLocalData())
 /* The capture is cleared through a macro of its own because gcParkCaptured only
  * EXISTS when conservative roots are compiled in. Referencing it unconditionally
  * meant -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS -- the A/B arm vm/CLAUDE.md documents
@@ -3417,7 +3426,8 @@ extern JAVA_OBJECT cn1BibopFastNew(CODENAME_ONE_THREAD_STATE, int size, struct c
    scans every registered virtual thread whether or not it is running.
    Going active is cn1GcTryResumeActive's handshake, retried until the collector is not
    holding this thread; see there for why a plain store of threadActive is not enough. */
-#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); do { while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } } while(__cn1rts->gcPthreadValid && !cn1GcTryResumeActive(__cn1rts)); CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+#define CN1_RESUME_THREAD_TS(ts) do { struct ThreadLocalData* __cn1rts = (ts); CN1_STALL_T0(__cn1rt0); do { while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } } while(__cn1rts->gcPthreadValid && !cn1GcTryResumeActive(__cn1rts)); CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+#define CN1_RESUME_THREAD CN1_RESUME_THREAD_TS(getThreadLocalData())
 
 extern struct ThreadLocalData* getThreadLocalData();
 

@@ -23,6 +23,8 @@
 
 package com.codename1.db;
 
+import java.util.function.Function;
+
 import com.codename1.util.EasyThread;
 import com.codename1.util.RunnableWithResultSync;
 
@@ -346,7 +348,7 @@ public class ThreadSafeDatabase extends Database {
     }
 
     @Override
-    public void createFunction(final String name, final int argCount, final SqlFunction function)
+    public void createFunction(final String name, final int argCount, final Function<Object[], Object> function)
             throws IOException {
         // The function then runs on the worker too, the thread that steps every statement.
         invokeWithException(new RunnableWithIOException() {

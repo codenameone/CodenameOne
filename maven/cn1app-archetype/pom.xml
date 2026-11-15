@@ -132,6 +132,12 @@
                   <fileset dir="${project.basedir}/../build-engine/src/main/resources/com/codename1/project/templates/gradle/backend"
                            includes="Api.java.txt,Greeter.java.txt,application.properties.txt,application-dev.properties.txt"/>
                 </copy>
+                <!-- -DprojectType=cli: the same single module, with a @Command in
+                     place of the controllers. -->
+                <copy todir="${project.build.outputDirectory}/archetype-resources/.cn1-backend-only/cli" overwrite="true">
+                  <fileset dir="${project.basedir}/../build-engine/src/main/resources/com/codename1/project/templates/gradle/cli"
+                           includes="Hello.java.txt,HelloTest.java.txt,application.properties.txt"/>
+                </copy>
                 <loadfile property="cn1.hostedPlatformProfiles"
                           srcFile="${project.basedir}/../../scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml"
                           encoding="UTF-8"/>

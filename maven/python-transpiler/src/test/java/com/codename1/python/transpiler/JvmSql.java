@@ -156,7 +156,7 @@ public final class JvmSql extends PySql {
         }
 
         @Override
-        public boolean createFunction(String name, int nargs, com.codename1.db.SqlFunction body) throws IOException {
+        public boolean createFunction(String name, int nargs, java.util.function.Function<Object[], Object> body) throws IOException {
             try {
                 org.sqlite.Function.create(c, name, new org.sqlite.Function() {
                     @Override
@@ -170,7 +170,7 @@ public final class JvmSql extends PySql {
                         }
                         Object v;
                         try {
-                            v = body.call(args);
+                            v = body.apply(args);
                         } catch (RuntimeException e) {
                             // SQLite reports a failed function as the statement's error,
                             // in CPython's words. error() sets that message; a thrown

@@ -214,6 +214,18 @@ public final class Hash {
         return impl.digest();
     }
 
+    /// The digest of everything fed so far, leaving the hash running: more
+    /// input may follow and [#digest()] still answers for all of it. This is
+    /// `copy().digest()` without the copy where the algorithm can finish
+    /// over its own state and put it back, as BLAKE2 does.
+    ///
+    /// #### Returns
+    ///
+    /// the raw digest bytes (algorithm specific length)
+    public byte[] peekDigest() {
+        return impl.peekDigest();
+    }
+
     /// Convenience: feed `data` then return the digest.
     public byte[] digest(byte[] data) {
         impl.update(data, 0, data.length);

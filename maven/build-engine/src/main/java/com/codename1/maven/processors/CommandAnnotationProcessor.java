@@ -1174,6 +1174,7 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
         sb.append("    /** The application's name, sys.argv[0] for the program. */\n");
         sb.append("    public static final String NAME = ").append(quote(appName)).append(";\n\n");
         sb.append("    public static void main(String[] args) {\n");
+        sb.append("        com.codename1.backend.Backend.prepareRuntime();\n");
         sb.append("        com.codename1.python.runtime.Py.setArgv(NAME, args);\n");
         sb.append("        int code = PythonModules.runMain();\n");
         sb.append("        System.out.flush();\n");
@@ -1188,7 +1189,21 @@ public final class CommandAnnotationProcessor extends AbstractAnnotationProcesso
     /// classpath, or, in the native packager, compiled into the very tree being
     /// translated. An application has neither, and runs its Python from its
     /// Lifecycle instead.
-    private static boolean isBackendModule(ProcessorContext ctx) {
+    /// Set by the native packager, whose class path leaves the backend runtime
+    /// out (BackendPackager.compileClasspathWithoutRuntime) and so cannot answer
+    /// isBackendModule: read from that class path, a Python command-line tool
+    /// got no entry point and every native build of one failed with "No entry
+    /// point". The same reason OrmAnnotationProcessor.setBackendFlavour exists.
+    private boolean backendModule;
+
+    public void setBackendModule(boolean backendModule) {
+        this.backendModule = backendModule;
+    }
+
+    private boolean isBackendModule(ProcessorContext ctx) {
+        if (backendModule) {
+            return true;
+        }
         String entry = "com/codename1/cli/CommandLine.class";
         return new File(ctx.getOutputClassDir(), entry.replace('/', File.separatorChar)).isFile()
                 || onCompileClasspath(ctx, entry);

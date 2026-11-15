@@ -15,6 +15,10 @@ import _cn1hash
 
 
 def _as_bytes(data):
+    # bytes already: handed over as it is. bytes(data) copied it, and every
+    # hash passes its data through here, plus the key, salt and person.
+    if type(data) is bytes:
+        return data
     if isinstance(data, str):
         raise TypeError("Strings must be encoded before hashing")
     return bytes(data)
@@ -42,7 +46,7 @@ class _Hash:
         return _cn1hash.digest(self._s)
 
     def hexdigest(self):
-        return self.digest().hex()
+        return _cn1hash.hexdigest(self._s)
 
 
 class _MD5(_Hash):
@@ -92,16 +96,21 @@ class _Blake2(_Hash):
             digest_size = self.MAX_DIGEST_SIZE
         if not 1 <= digest_size <= self.MAX_DIGEST_SIZE:
             raise ValueError("digest_size must be between 1 and %d bytes" % self.MAX_DIGEST_SIZE)
-        key = _as_bytes(key)
-        salt = _as_bytes(salt)
-        person = _as_bytes(person)
-        if len(key) > self.MAX_KEY_SIZE:
-            raise ValueError("maximum key length is %d bytes" % self.MAX_KEY_SIZE)
-        if len(salt) > self.SALT_SIZE:
-            raise ValueError("maximum salt length is %d bytes" % self.SALT_SIZE)
-        if len(person) > self.PERSON_SIZE:
-            raise ValueError("maximum person length is %d bytes" % self.PERSON_SIZE)
-        if (fanout, depth, leaf_size, node_offset, node_depth, inner_size, last_node) != (1, 1, 0, 0, 0, 0, False):
+        # The usual call names none of the three; empty values need no checks.
+        if key or salt or person:
+            key = _as_bytes(key)
+            salt = _as_bytes(salt)
+            person = _as_bytes(person)
+            if len(key) > self.MAX_KEY_SIZE:
+                raise ValueError("maximum key length is %d bytes" % self.MAX_KEY_SIZE)
+            if len(salt) > self.SALT_SIZE:
+                raise ValueError("maximum salt length is %d bytes" % self.SALT_SIZE)
+            if len(person) > self.PERSON_SIZE:
+                raise ValueError("maximum person length is %d bytes" % self.PERSON_SIZE)
+        else:
+            key = salt = person = b""
+        if (fanout != 1 or depth != 1 or leaf_size != 0 or node_offset != 0 or node_depth != 0
+                or inner_size != 0 or last_node):
             raise ValueError("tree hashing is not supported")
         self.digest_size = digest_size
         self._s = _cn1hash.new(self.name, digest_size, key, salt, person)

@@ -68,6 +68,32 @@ public final class PyPackageData {
         return k;
     }
 
+    /// The archive is an application resource. In an application it comes from
+    /// the port's resource lookup: on ParparVM `Class.getResourceAsStream` reads
+    /// the host file system (a translated command-line program's search path),
+    /// not the bundle, so a shipped iOS or macOS app never found its own
+    /// archive and every package that reads a data file failed. A server or a
+    /// command-line program has no `Display`, and keeps the class lookup.
+    private static InputStream open() {
+        java.util.function.Function<String, InputStream> o = opener;
+        if (o != null) {
+            InputStream in = o.apply(RESOURCE);
+            if (in != null) {
+                return in;
+            }
+        }
+        return PyPackageData.class.getResourceAsStream(RESOURCE);
+    }
+
+    /// How a client application opens a resource, installed by Cn1Platform.
+    /// Not named here: a server's class library has no Display, and naming it
+    /// in this class stopped a Python command-line tool from compiling.
+    private static java.util.function.Function<String, InputStream> opener;
+
+    static void setOpener(java.util.function.Function<String, InputStream> o) {
+        opener = o;
+    }
+
     private static synchronized void load() {
         if (files != null) {
             return;
@@ -75,7 +101,7 @@ public final class PyPackageData {
         Map<String, byte[]> f = new LinkedHashMap<String, byte[]>();
         Map<String, List<String>> d = new HashMap<String, List<String>>();
         d.put("", new ArrayList<String>());
-        InputStream in = PyPackageData.class.getResourceAsStream(RESOURCE);
+        InputStream in = open();
         if (in != null) {
             try (DataInputStream data = new DataInputStream(in)) {
                 int count = data.readInt();

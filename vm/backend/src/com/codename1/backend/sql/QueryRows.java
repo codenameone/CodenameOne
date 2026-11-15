@@ -31,6 +31,7 @@ public final class QueryRows extends ArrayList {
     private static final long serialVersionUID = 1L;
     private int columnCount;
     private String[] columnTypes;
+    private String[] columnNames;
 
     public QueryRows(int columnCount) {
         this.columnCount = columnCount;
@@ -52,5 +53,30 @@ public final class QueryRows extends ArrayList {
 
     public void setColumnTypes(String[] columnTypes) {
         this.columnTypes = columnTypes == null ? null : (String[]) columnTypes.clone();
+    }
+
+    /// The column names in projection order, or null when the driver did not
+    /// record them. Kept apart from the rows because a query that matched
+    /// nothing still has columns, and a caller such as a DB-API cursor's
+    /// `description` must report them.
+    public String[] getColumnNames() {
+        return columnNames == null ? null : (String[]) columnNames.clone();
+    }
+
+    /// The column names themselves, not a copy, for a caller that only reads
+    /// them -- the generated DB-API connection does so on every statement, where
+    /// a copy per call was an allocation per statement. Must not be changed.
+    public String[] sharedColumnNames() {
+        return columnNames;
+    }
+
+    /// Takes `columnNames` as it is rather than copying it; the caller hands over
+    /// an array nothing changes afterwards.
+    public void adoptColumnNames(String[] columnNames) {
+        this.columnNames = columnNames;
+    }
+
+    public void setColumnNames(String[] columnNames) {
+        this.columnNames = columnNames == null ? null : (String[]) columnNames.clone();
     }
 }

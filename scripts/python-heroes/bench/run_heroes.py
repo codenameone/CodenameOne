@@ -5,7 +5,7 @@
 """The hero ports measured: llm and MarkItDown, unmodified from PyPI, run by
 CPython and transpiled to Java.
 
-Each workload under workloads/ is built the way an application is -- its
+Each workload is the application's own src/hero_bench.py, built the way an application is -- its
 requirements resolved from PyPI by the build's own resolver, the program
 and every package transpiled, the package data packed -- and the same file
 runs under CPython in a virtual environment holding the same pins. Both
@@ -16,7 +16,7 @@ resident memory and the size of what each side ships.
     run_heroes.py --java-home J --build-cp B --runtime-jar R --core-jar C
                   --run-cp T --markitdown-tests DIR [--llm-tests DIR]
                   [--rounds 3] [--workload NAME] [--json out.json]
-                  [--work DIR] [--fast]
+                  --maven-repo M2 [--work DIR]
                   [--check | --write-baseline]
     run_heroes.py --fold python-heroes.json
 
@@ -51,9 +51,11 @@ REPO = os.path.dirname(os.path.dirname(HEROES))
 # Each workload runs against the pins of the application it stands for;
 # `extra` is what the workload needs beyond the application.
 WORKLOADS = {
-    "llm_session": {"requirements": os.path.join(HEROES, "llm-mobile", "requirements.txt"),
+    "llm_session": {"app": "llm-mobile",
+                    "requirements": os.path.join(HEROES, "llm-mobile", "requirements.txt"),
                     "extra": ["llm-echo==0.3a3"]},
-    "markitdown_convert": {"requirements": os.path.join(HEROES, "markitdown-mobile", "requirements.txt"),
+    "markitdown_convert": {"app": "markitdown-mobile",
+                           "requirements": os.path.join(HEROES, "markitdown-mobile", "requirements.txt"),
                            "extra": [],
                            # The runtime provides pandas, so requirements.txt
                            # does not name it; CPython's XLSX converter needs it.
@@ -61,6 +63,42 @@ WORKLOADS = {
 }
 
 TIMINGS = ("IMPORT", "BENCH", "COLD", "TOTAL")
+
+
+def program(name):
+    """The workload: the application's own hero_bench.py, which its main.py
+    runs when CN1_HERO_BENCH is set and CPython runs as it is."""
+    return os.path.join(HEROES, WORKLOADS[name]["app"], "src", "hero_bench.py")
+
+
+def native_app(name, work, args):
+    """Builds the application with build_app.sh -- the archetype, the
+    import goal and `mvn package`, as a developer builds theirs -- and
+    answers the executable and what it ships (the stripped file on Linux,
+    the bundle on macOS)."""
+    if sys.platform == "darwin" and not os.environ.get("CI"):
+        # A macOS build is an .app that opens a window on the desktop it runs
+        # on; the native arm is measured headless on the Linux CI leg.
+        raise SystemExit("the native arm opens a window on macOS; run it on Linux (or set CI=1 on a dedicated runner)")
+    out = os.path.join(work, name + "-app")
+    shutil.rmtree(out, ignore_errors=True)
+    proc = subprocess.run([os.path.join(HERE, "build_app.sh"), WORKLOADS[name]["app"], out, args.maven_repo],
+                          capture_output=True, text=True,
+                          env=dict(os.environ, JAVA17_HOME=args.java_home))
+    if proc.returncode != 0:
+        # The build's own words: a bare CalledProcessError names only the
+        # command, and the cause (a compile error) is in the output.
+        sys.stderr.write(proc.stdout[-20000:] + proc.stderr[-20000:])
+        raise SystemExit("build_app.sh %s failed (exit %d)" % (WORKLOADS[name]["app"], proc.returncode))
+    built = proc.stdout
+    app = [line[4:] for line in built.splitlines() if line.startswith("app=")][-1]
+    if app.endswith(".app"):
+        macos = os.path.join(app, "Contents", "MacOS")
+        return os.path.join(macos, os.listdir(macos)[0]), tree_bytes(app)
+    stripped = app + "-stripped"
+    shutil.copy(app, stripped)
+    subprocess.run(["strip", stripped], check=True)
+    return app, os.path.getsize(stripped)
 
 
 # The upstream suites: the driver under tests/, the application's pins, and
@@ -140,13 +178,6 @@ def build(name, program, reqs, work, harness, args, packages=(), rules=None):
     # build generated goes, the resolved packages stay.
     for stale in (os.path.join("common", "src"), "gen", "classes", "fs"):
         shutil.rmtree(os.path.join(dest, stale), ignore_errors=True)
-    # What build_native.sh moved aside two builds ago: gigabytes each, and it keeps
-    # only the one before this for the objects it can use again.
-    native = os.path.join(dest, "native")
-    if os.path.isdir(native):
-        for stale in os.listdir(native):
-            if stale.endswith(".stale"):
-                shutil.rmtree(os.path.join(native, stale), ignore_errors=True)
     if rules:
         # Beside the program, where the application keeps it.
         root = os.path.join(dest, "common", "src", "main", "python")
@@ -319,7 +350,7 @@ def differing_outputs(fs, ours, theirs, work, ours_env, theirs_env):
 
 def measure(name, work, harness, args):
     reqs = requirements(name, work)
-    classes = build(name, os.path.join(HERE, "workloads", name + ".py"), reqs, work, harness, args,
+    classes = build(name, program(name), reqs, work, harness, args,
                     rules=directives(name))
     py, site = cpython_env(name, reqs, work, args, WORKLOADS[name].get("cpython", ()))
     fs = os.path.join(work, name, "fs")
@@ -332,35 +363,28 @@ def measure(name, work, harness, args):
     ours = [java(args, "java"), "-cp", run_cp, "HeroMain", fs, str(args.rounds)]
     # -I keeps the user's site-packages, PYTHONPATH and the current
     # directory out of CPython's path; -B keeps both sides from writing.
-    theirs = [py, "-I", "-B", os.path.join(HERE, "workloads", name + ".py"), str(args.rounds)]
+    theirs = [py, "-I", "-B", program(name), str(args.rounds)]
     sides = {"cpython": side(theirs, work, 1, theirs_env), "cn1_jvm": side(ours, work, 1, ours_env)}
     if sides["cpython"]["result"] != sides["cn1_jvm"]["result"]:
         raise RuntimeError("%s computes something else:\n  cpython %s\n  cn1     %s%s"
                            % (name, sides["cpython"]["result"], sides["cn1_jvm"]["result"],
                               differing_outputs(fs, ours, theirs, work, ours_env, theirs_env)))
     sides["cn1_jvm"]["ship_bytes"] = tree_bytes(classes) + os.path.getsize(args.runtime_jar)
-    # The arm that stands for a device: the same classes translated to C by
-    # ParparVM and compiled ahead of time, as an iOS build is. No JVM, no JIT.
-    binary = os.path.join(work, name, name + "-native")
-    subprocess.run([os.path.join(HERE, "native", "build_native.sh"), os.path.join(work, name), binary],
-                   check=True, env=dict(os.environ, JAVA17_HOME=args.java_home,
-                                        PYBENCH_RUNTIME=args.runtime_jar,
-                                        HERO_NATIVE_LTO="0" if args.fast else "1"))
-    native_env = dict(theirs_env, CN1_RESOURCE_PATH=classes)
-    # The judged pair: CPython and the native binary, interleaved. The JVM
-    # arm above is reported from one launch and never judged.
+    # The arm that stands for a device: the application itself, built by a
+    # developer's build for the host's native desktop target -- translated to
+    # C by ParparVM and compiled ahead of time, as an iOS build is, with the
+    # engine and SQLite it ships. No JVM, no JIT. Its main.py runs the same
+    # hero_bench.py when CN1_HERO_BENCH names the rounds.
+    binary, shipped = native_app(name, work, args)
+    native_env = dict(theirs_env, CN1_HERO_BENCH=str(args.rounds))
+    # The judged pair: CPython and the native application, interleaved. The
+    # JVM arm above is reported from one launch and never judged.
     sides.update(judged({"cpython": (theirs, theirs_env),
-                         "cn1_native": ([binary, str(args.rounds)], native_env)},
+                         "cn1_native": ([binary], native_env)},
                         args.launches, work))
     if sides["cn1_native"]["result"] != sides["cpython"]["result"]:
         raise RuntimeError("%s computes something else natively: %s" % (name, sides["cn1_native"]["result"]))
-    # Counted stripped, as a release build ships it: the symbol table alone
-    # is about a tenth of the unstripped file.
-    stripped = binary + "-stripped"
-    shutil.copy(binary, stripped)
-    subprocess.run(["strip", stripped], check=True)
-    sides["cn1_native"]["ship_bytes"] = os.path.getsize(stripped) + os.path.getsize(
-        os.path.join(classes, "cn1python.dat"))
+    sides["cn1_native"]["ship_bytes"] = shipped
     # What each side needs on a machine with nothing installed. The native
     # binary carries its runtime, standard library and packages; CPython
     # needs the interpreter and its standard library besides the packages.
@@ -375,7 +399,7 @@ def measure(name, work, harness, args):
             sides[label] = {"error": "the requirements do not install"}
             continue
         try:
-            other = side([opy, os.path.join(HERE, "workloads", name + ".py"), str(args.rounds)], work, 1,
+            other = side([opy, program(name), str(args.rounds)], work, 1,
                          theirs_env)
         except RuntimeError as e:
             # Reported, not fatal: GraalPy, for one, has no BLAKE2 with a
@@ -592,6 +616,8 @@ def main():
     p.add_argument("--core-jar", required=True)
     p.add_argument("--run-cp", required=True)
     p.add_argument("--markitdown-tests", required=True)
+    p.add_argument("--maven-repo", required=True,
+                   help="the repository this checkout's framework was installed into, for build_app.sh")
     p.add_argument("--llm-tests")
     p.add_argument("--python", default=sys.executable)
     p.add_argument("--compare", action="append", type=lambda v: tuple(v.split("=", 1)),
@@ -602,9 +628,6 @@ def main():
     p.add_argument("--workload", action="append")
     p.add_argument("--work", help="build here and keep it: the next run reuses the resolved packages and the "
                                   "CPython environments")
-    p.add_argument("--fast", action="store_true",
-                   help="link the native binary without LTO: minutes less to build, a few percent slower to "
-                        "run. For working on the runtime; published numbers come from a run without it")
     p.add_argument("--no-suites", action="store_true",
                    help="measure the workloads only: the upstream suites take most of a run")
     p.add_argument("--json")
@@ -615,14 +638,14 @@ def main():
                    help="record a saved report (--json) as its platform's baseline, and measure nothing: "
                         "how the CI runner's ratios are seeded from its uploaded report")
     args = p.parse_args()
-    for key in ("runtime_jar", "core_jar", "markitdown_tests", "llm_tests"):
+    for key in ("runtime_jar", "core_jar", "markitdown_tests", "llm_tests", "maven_repo"):
         if getattr(args, key):
             setattr(args, key, os.path.abspath(getattr(args, key)))
     for key in ("build_cp", "run_cp"):
         setattr(args, key, os.pathsep.join(os.path.abspath(x) for x in getattr(args, key).split(os.pathsep)))
 
-    if (args.fast or args.no_suites) and (args.check or args.write_baseline):
-        p.error("--fast builds a slower binary than the one the baseline describes")
+    if args.no_suites and (args.check or args.write_baseline):
+        p.error("the baseline describes a run with the upstream suites")
     if args.work:
         work = os.path.abspath(args.work)
         os.makedirs(work, exist_ok=True)

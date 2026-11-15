@@ -26,7 +26,7 @@ import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.DatabaseConfig;
 import com.codename1.db.DatabaseEncryptionException;
-import com.codename1.db.SqlFunction;
+import java.util.function.Function;
 import com.codename1.impl.AbstractDBCursor;
 import com.codename1.impl.SQLStatementSplitter;
 import com.codename1.impl.SqlFunctionBridge;
@@ -346,7 +346,7 @@ class LinuxDatabase extends Database {
     }
 
     @Override
-    public void createFunction(String name, int argCount, SqlFunction function) throws IOException {
+    public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
         checkOpen();
         int id = function == null ? -1 : FUNCTIONS.register(function);
         if (LinuxNative.sqlDbCreateFunction(peer, com.codename1.util.StringUtil.getBytes(name), argCount, id) != 0) {
