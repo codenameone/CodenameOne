@@ -1,0 +1,143 @@
+{
+ "arrayRandom": {
+  "all": {
+   "memory": 0.2,
+   "runs": 2,
+   "time": 1.0,
+   "tolerance": {
+    "time": 0.5
+   }
+  }
+ },
+ "arraySequential": {
+  "all": {
+   "memory": 0.359,
+   "runs": 2,
+   "time": 2.192,
+   "tolerance": {
+    "memory": 0.3,
+    "time": 0.35
+   }
+  }
+ },
+ "hashMapChurn": {
+  "all": {
+   "memory": 0.088,
+   "runs": 2,
+   "time": 1.382,
+   "tolerance": {
+    "memory": 0.3,
+    "time": 0.6
+   }
+  }
+ },
+ "hello": {
+  "all": {
+   "memory": 0.821,
+   "runs": 2,
+   "time": 1.125,
+   "tolerance": {
+    "memory": 0.5,
+    "time": 0.55
+   }
+  }
+ },
+ "intArithmetic": {
+  "all": {
+   "memory": 0.038,
+   "runs": 2,
+   "time": 1.01,
+   "tolerance": {
+    "memory": 0.6,
+    "time": 0.25
+   }
+  }
+ },
+ "longArithmetic": {
+  "all": {
+   "memory": 0.038,
+   "runs": 2,
+   "time": 1.063,
+   "tolerance": {
+    "memory": 0.7,
+    "time": 0.25
+   }
+  }
+ },
+ "mathTranscendental": {
+  "all": {
+   "memory": 0.041,
+   "runs": 2,
+   "time": 1.033,
+   "tolerance": {
+    "memory": 1.0,
+    "time": 0.3
+   }
+  }
+ },
+ "objectAllocation": {
+  "all": {
+   "memory": 0.309,
+   "runs": 2,
+   "time": 1.504,
+   "tolerance": {
+    "memory": 0.7,
+    "time": 0.55
+   }
+  }
+ },
+ "quicksort": {
+  "all": {
+   "memory": 0.099,
+   "runs": 2,
+   "time": 1.099,
+   "tolerance": {
+    "time": 0.25
+   }
+  }
+ },
+ "recursion": {
+  "all": {
+   "memory": 0.039,
+   "runs": 2,
+   "time": 1.386,
+   "tolerance": {
+    "memory": 1.0,
+    "time": 0.25
+   }
+  }
+ },
+ "stringBuilding": {
+  "all": {
+   "memory": 0.268,
+   "runs": 2,
+   "time": 1.54,
+   "tolerance": {
+    "memory": 0.4,
+    "time": 0.25
+   }
+  }
+ },
+ "translator": {
+  "all": {
+   "memory": 0.545,
+   "runs": 2,
+   "time": 0.71,
+   "tolerance": {
+    "memory": 0.6,
+    "time": 0.4
+   }
+  }
+ },
+ "valueEscape": {
+  "all": {
+   "memory": 0.029,
+   "runs": 2,
+   "time": 0.129,
+   "tolerance": {
+    "memory": 0.55,
+    "time": 0.4
+   }
+  }
+ }
+}
