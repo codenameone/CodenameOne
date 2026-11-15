@@ -141,6 +141,15 @@ public class Simulator {
             System.setProperty("cn1.agent.background", "true");
         }
 
+        if ("1".equals(System.getenv("CN1_SIMULATOR_HIDDEN")) || Boolean.getBoolean("cn1.simulator.hidden")) {
+            // No window at all: the simulator lays its window out and renders
+            // into it without ever showing it, for an agent recording a demo
+            // video or taking screenshots while the developer works.
+            System.setProperty("apple.awt.UIElement", "true");
+            System.setProperty("cn1.simulator.hidden", "true");
+            System.setProperty("cn1.agent.background", "true");
+        }
+
         String classPathStr = System.getProperty("java.class.path");
         if (System.getProperty("cn1.class.path") != null) {
             classPathStr += File.pathSeparator + System.getProperty("cn1.class.path");

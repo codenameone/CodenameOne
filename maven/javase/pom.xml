@@ -381,6 +381,23 @@
                                          after this task runs. -->
                                     <arg value="${project.basedir}/../../Themes/AndroidMaterialTheme.res"/>
                                 </java>
+                                <!-- Foldable skins (iPhone Duo), generated for the same
+                                     reason as the watch skins and from the same
+                                     iPhoneX.skin theme. -->
+                                <echo>Generating foldable skins</echo>
+                                <mkdir dir="${project.build.directory}/foldable-skins-classes"/>
+                                <javac srcdir="${project.basedir}/../../tools/foldable-skins"
+                                       destdir="${project.build.directory}/foldable-skins-classes"
+                                       includeantruntime="false"
+                                       fork="true"
+                                       nowarn="true"/>
+                                <java classname="GenerateFoldableSkins" fork="true" failonerror="true">
+                                    <classpath>
+                                        <pathelement location="${project.build.directory}/foldable-skins-classes"/>
+                                    </classpath>
+                                    <arg value="${project.build.directory}/skins/codenameone-skins/OTA/iPhoneX.skin"/>
+                                    <arg value="${project.build.outputDirectory}"/>
+                                </java>
                                 <!-- Bundle every shipped native theme into the
                                      simulator fat jar so JavaSEPort.loadSkinFile can
                                      load the right .res based on the current skin's

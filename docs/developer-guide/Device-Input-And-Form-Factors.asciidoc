@@ -155,6 +155,42 @@ mode, then pick a posture (flat, half-opened or closed), the fold orientation (v
 horizontal) and the hinge angle. The running app receives the same posture changes and listener
 callbacks it would on a real foldable device.
 
+A foldable skin goes further. The bundled *iPhone Duo* skin, or any skin built with the Skin
+Designer's *Fold* tab, describes the hinge and the cover display, so the menu offers that device's
+postures and a hinge-angle slider. A posture change animates the device folding in 3D. Closing it
+switches the app to the cover display, with that display's size, density and safe area, exactly
+as the hardware does. The posture events arrive while the fold moves: half opened below 150
+degrees, closed below 30, the thresholds Android's Jetpack WindowManager uses. The fold button
+beside the rotate buttons in the simulator toolbar steps through the postures, and *Animate fold*
+in the menu turns the animation off when you only want the end state.
+
+Rotating the device animates too, on every skin: the device lifts, turns a quarter and settles
+into the new orientation, still folded if it was.
+
+*Simulate -> Record Device Tour...* turns this into a demo video in one step. It records your app
+while the device closes, opens, half folds, turns to landscape and back, then stops by itself and
+names the saved MP4 (in `~/CodenameOneRecordings`). A skin that doesn't fold gets the turn alone.
+
+The tour and any scripted recording render every video frame for its own moment of the animation,
+at 60 frames a second, so the video plays smoothly however long a frame takes to draw. While such a
+recording runs, the simulator window plays the motion in slow motion; that's expected.
+
+To record without any window on screen, start the simulator hidden: `mvn cn1:agent
+-Dcn1.agent.hidden=true` (Gradle: `./gradlew cn1Agent -Pcn1.agent.hidden=true`), or set
+`CN1_SIMULATOR_HIDDEN=1` in the environment. It renders exactly as it does with a window,
+so screenshots, recordings and the MCP tools all work while you keep using the machine.
+
+Every skin-framed recording is staged: a 16:9 backdrop with the device centered at one constant
+size, so folding, moving to the cover display and rotating never rescale it. To script your own
+clip, the simulator's MCP tools take the fold too: `sim_fold` moves to a posture (`posture` is
+`flat`, `half` or `closed`) or a hinge `angle`, over `animateMs` milliseconds, and
+`sim_record_start` accepts a `script`, a list of steps such as
+`{"at": 2000, "posture": "half", "animateMs": 900}` or `{"at": 6000, "orientation": "landscape"}`
+that it plays from the start of the recording.
+
+TIP: The simulator honors the skin's safe area, so the title stays clear of the camera when the
+form uses a `Toolbar`, as new projects do by default.
+
 Foldable support on Android is opt-in so it never adds weight to apps that don't use it. Enable it
 with the `android.foldableSupport=true` build hint (the version can be overridden with
 `android.windowVersion`). Note that the hinge *angle* isn't available on Android, so

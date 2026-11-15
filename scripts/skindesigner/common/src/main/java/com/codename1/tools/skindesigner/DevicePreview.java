@@ -22,6 +22,11 @@ public final class DevicePreview extends Component {
     private Image bodyImage;
     private final boolean fixedSize;
 
+    public static final String POSTURE_FLAT = "flat";
+    public static final String POSTURE_HALF = "half";
+    public static final String POSTURE_CLOSED = "closed";
+    private String posture = POSTURE_FLAT;
+
     public DevicePreview() {
         this(false);
     }
@@ -35,6 +40,17 @@ public final class DevicePreview extends Component {
     public void setSkin(SkinModel skin) {
         this.skin = skin;
         repaint();
+    }
+
+    /// Which fold posture a foldable skin is previewed in. A flat sketch
+    /// of the fold, not the simulator's 3D rendering.
+    public void setPosture(String posture) {
+        this.posture = posture == null ? POSTURE_FLAT : posture;
+        repaint();
+    }
+
+    public String getPosture() {
+        return posture;
     }
 
     public void setBodyImage(Image bodyImage) {
@@ -142,8 +158,87 @@ public final class DevicePreview extends Component {
             g.setAlpha(hiA);
         }
 
+        if (skin.foldable) {
+            paintFold(g, drawX, drawY, drawW, drawH, screenX, screenY, screenW, screenH, cornerR, bezel, scale);
+        }
+
         g.popClip();
         g.setClip(origClip);
+    }
+
+    private void paintFold(Graphics g, int drawX, int drawY, int drawW, int drawH,
+                           int screenX, int screenY, int screenW, int screenH,
+                           int cornerR, int bezel, float scale) {
+        boolean vertical = skin.foldVertical;
+        int oldA = g.getAlpha();
+        if (POSTURE_CLOSED.equals(posture)) {
+            // Cover the inner display with the folded device seen from the
+            // front: half the body, carrying the cover display if any.
+            g.setColor(0x0b0f16);
+            fillRoundRect(g, drawX, drawY, drawW, drawH, cornerR);
+            int hw = vertical ? drawW / 2 : drawW;
+            int hh = vertical ? drawH : drawH / 2;
+            int hx = drawX + (drawW - hw) / 2;
+            int hy = drawY + (drawH - hh) / 2;
+            g.setColor(0x2a2f3a);
+            fillRoundRect(g, hx, hy, hw, hh, cornerR);
+            if (skin.coverW > 0 && skin.coverH > 0) {
+                float cs = Math.min((hw - bezel * 2) / (float) skin.coverW, (hh - bezel * 2) / (float) skin.coverH);
+                int cw = Math.max(1, Math.round(skin.coverW * cs));
+                int ch = Math.max(1, Math.round(skin.coverH * cs));
+                g.setColor(0x1E3A8A);
+                // A flip's small outer screen sits at the top of the half.
+                int cy = vertical ? hy + (hh - ch) / 2 : hy + bezel;
+                fillRoundRect(g, hx + (hw - cw) / 2, cy, cw, ch,
+                        Math.max(2, cornerR - Math.round(8 * scale)));
+            }
+            return;
+        }
+        if (POSTURE_HALF.equals(posture)) {
+            // Shade the far half and draw it foreshortened, as it would look
+            // tilted 90 degrees away from the viewer.
+            g.setColor(0x000000);
+            g.setAlpha(150);
+            if (vertical) {
+                int mid = drawX + drawW / 2;
+                g.fillRect(mid, drawY, drawX + drawW - mid, drawH);
+                g.setAlpha(255);
+                g.setColor(0x3a4150);
+                int depth = drawW / 6;
+                g.fillPolygon(new int[]{mid, mid + depth, mid + depth, mid},
+                        new int[]{drawY, drawY + drawH / 10, drawY + drawH - drawH / 10, drawY + drawH}, 4);
+            } else {
+                int mid = drawY + drawH / 2;
+                g.fillRect(drawX, drawY, drawW, mid - drawY);
+                g.setAlpha(255);
+                g.setColor(0x3a4150);
+                int depth = drawH / 8;
+                g.fillPolygon(new int[]{drawX, drawX + drawW / 10, drawX + drawW - drawW / 10, drawX + drawW},
+                        new int[]{mid, mid - depth, mid - depth, mid}, 4);
+            }
+            g.setAlpha(oldA);
+            return;
+        }
+        // Flat: the hinge line, a gap for two screens, a faint crease
+        // otherwise.
+        if (skin.foldDualScreen) {
+            g.setColor(0x0b0f16);
+            int gap = Math.max(2, Math.round(6 * scale));
+            if (vertical) {
+                g.fillRect(drawX + drawW / 2 - gap / 2, drawY, gap, drawH);
+            } else {
+                g.fillRect(drawX, drawY + drawH / 2 - gap / 2, drawW, gap);
+            }
+        } else if (skin.foldCrease) {
+            g.setColor(0xffffff);
+            g.setAlpha(60);
+            if (vertical) {
+                g.drawLine(screenX + screenW / 2, screenY, screenX + screenW / 2, screenY + screenH);
+            } else {
+                g.drawLine(screenX, screenY + screenH / 2, screenX + screenW, screenY + screenH / 2);
+            }
+            g.setAlpha(oldA);
+        }
     }
 
     private void drawCutout(Graphics g, SkinModel.Cutout c, float scale, int cx, int screenTopY) {

@@ -91,6 +91,9 @@ public final class DeviceDatabase {
         public final int fontMedium;
         public final int fontLarge;
         public final boolean tablet;
+        /// The fold of a foldable device, from the catalog's optional "fold"
+        /// object; null for every other device.
+        public Fold fold;
 
         Device(String id, String brand, String os, int year, String form, String name,
                int rw, int rh, double screenSize, int ppi,
@@ -214,6 +217,44 @@ public final class DeviceDatabase {
     }
 
     @SuppressWarnings("unchecked")
+    /// The fold of a foldable device. Resolutions a manufacturer has not
+    /// published are estimates, and `estimated` says so.
+    public static final class Fold {
+        public final boolean vertical;
+        public final boolean dualScreen;
+        public final int coverW;
+        public final int coverH;
+        public final int coverPpi;
+        public final double coverInches;
+        public final boolean estimated;
+
+        Fold(boolean vertical, boolean dualScreen, int coverW, int coverH, int coverPpi,
+             double coverInches, boolean estimated) {
+            this.vertical = vertical;
+            this.dualScreen = dualScreen;
+            this.coverW = coverW;
+            this.coverH = coverH;
+            this.coverPpi = coverPpi;
+            this.coverInches = coverInches;
+            this.estimated = estimated;
+        }
+
+        public boolean hasCover() {
+            return coverW > 0 && coverH > 0 && coverPpi > 0;
+        }
+    }
+
+    private static Fold parseFold(Object o) {
+        if (!(o instanceof Map)) {
+            return null;
+        }
+        Map<String, Object> f = (Map<String, Object>) o;
+        return new Fold(!"horizontal".equals(str(f, "orientation", "vertical")),
+                "dualScreen".equals(str(f, "type", "continuous")),
+                num(f, "coverW", 0), num(f, "coverH", 0), num(f, "coverPpi", 0),
+                numDouble(f, "coverInches", 0), bool(f, "estimated", false));
+    }
+
     private static Device parseDevice(Map<String, Object> m) {
         try {
             String id = str(m, "id", "");
@@ -263,10 +304,12 @@ public final class DeviceDatabase {
 
             if (id.isEmpty()) id = (brand + "_" + name).toLowerCase();
             if (w <= 0 || h <= 0 || ppi <= 0) return null;
-            return new Device(id, brand, os, year, form, name, w, h, inches, ppi, platform,
+            Device d = new Device(id, brand, os, year, form, name, w, h, inches, ppi, platform,
                     hasNotch, hasIsland, hasHole, hasHome,
                     safeTop, safeBottom, 0, 0, scale,
                     sysFont, propFont, monoFont, sm, md, lg, tablet);
+            d.fold = parseFold(m.get("fold"));
+            return d;
         } catch (Exception err) {
             Log.e(err);
             return null;
