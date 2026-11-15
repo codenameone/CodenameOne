@@ -79,6 +79,12 @@ public interface OwnerApi {
     @GET("/api/owner/schedule")
     void schedule(@Query("day") String day, OnComplete<Response<List<ScheduleDto>>> callback);
 
+    /// Every provider's schedule for `days` days (at most 31) from `day`
+    /// (`yyyy-MM-dd`), for the staffing plan.
+    @GET("/api/owner/staffing")
+    void staffing(@Query("day") String day, @Query("days") int days,
+            OnComplete<Response<List<ScheduleDto>>> callback);
+
     /// What a day would offer under rules that are not saved yet.
     @POST("/api/owner/preview")
     void preview(@Body PreviewRequestDto request, OnComplete<Response<PreviewDto>> callback);
