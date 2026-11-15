@@ -4366,6 +4366,64 @@ public class LinuxImplementation extends CodenameOneImplementation {
         sheet.show();
     }
 
+    @Override
+    public boolean isAudioOutputSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.audio.AudioOutputPeer openAudioOutput(int sampleRate, int channels,
+            com.codename1.media.audio.AudioRenderCallback callback) {
+        int ch = channels == 1 ? 1 : 2;
+        long h = LinuxNative.audioOutOpen(sampleRate, ch);
+        if (h == 0) {
+            return null;
+        }
+        LinuxAudioOutput out = new LinuxAudioOutput(h, LinuxNative.audioOutRate(h), ch, callback);
+        out.begin();
+        return out;
+    }
+
+    /// Real-time output backed by cn1_linux_audioout.c (PulseAudio): the render thread pushes into a
+    /// native ring that a native worker thread drains to the device.
+    static final class LinuxAudioOutput extends com.codename1.impl.PushAudioOutput {
+        private final long handle;
+
+        LinuxAudioOutput(long handle, int rate, int channels, com.codename1.media.audio.AudioRenderCallback cb) {
+            super(rate, channels, cb);
+            this.handle = handle;
+        }
+
+        void begin() {
+            startThread();
+        }
+
+        @Override
+        protected int offer(float[] pcm, int offset, int frames) {
+            return LinuxNative.audioOutWrite(handle, pcm, offset, frames);
+        }
+
+        @Override
+        protected void nativeStart() {
+            LinuxNative.audioOutStart(handle);
+        }
+
+        @Override
+        protected void nativeStop() {
+            LinuxNative.audioOutStop(handle);
+        }
+
+        @Override
+        protected void nativeClose() {
+            LinuxNative.audioOutClose(handle);
+        }
+
+        @Override
+        public double getOutputLatency() {
+            return LinuxNative.audioOutLatency(handle);
+        }
+    }
+
     /* ---------------------------------------------------- audio recording
      * waveIn-backed PCM WAV recorder (cn1_linux_audiorec.c). createMediaRecorder
      * returns a Media whose play() starts capturing from the default microphone

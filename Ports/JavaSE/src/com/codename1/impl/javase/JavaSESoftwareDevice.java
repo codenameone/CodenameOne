@@ -37,10 +37,15 @@ import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderEvaluator;
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
 import com.codename1.ui.Image;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
+import java.util.HashMap;
+import java.util.Map;
 
 /// Pure Java software rasterizer that implements the Codename One 3D
 /// `GraphicsDevice` for the JavaSE simulator. It renders into a `BufferedImage`
@@ -166,6 +171,7 @@ class JavaSESoftwareDevice extends GraphicsDevice {
         int posOff = offsetOf(fmt, VertexAttribute.Usage.POSITION);
         int normOff = offsetOf(fmt, VertexAttribute.Usage.NORMAL);
         int uvOff = offsetOf(fmt, VertexAttribute.Usage.TEXCOORD);
+        prepareShader(material);
 
         int[] indices;
         int count;
@@ -298,7 +304,7 @@ class JavaSESoftwareDevice extends GraphicsDevice {
         // as a gradient with the sun's glow. Shadows, clouds and the post
         // chain are GPU only (GpuCapabilities says so).
         Environment env = getEnvironment();
-        boolean fog = env.isFog() && material.getType() != Material.Type.SKYBOX;
+        boolean fog = env.isFog() && material.getType() != Material.Type.SKYBOX && material.isFogged();
         float fogR = ((env.getFogColor() >> 16) & 0xff) / 255.0f;
         float fogG = ((env.getFogColor() >> 8) & 0xff) / 255.0f;
         float fogB = (env.getFogColor() & 0xff) / 255.0f;
@@ -386,6 +392,54 @@ class JavaSESoftwareDevice extends GraphicsDevice {
                     b *= (sample & 0xff) / 255.0f;
                     a *= ta;
                 }
+                float shR = 0f;
+                float shG = 0f;
+                float shB = 0f;
+                if (baseHook != null || emissiveHook != null || discardHook != null) {
+                    float wx = b0 * world[0][0] + b1 * world[1][0] + b2 * world[2][0];
+                    float wy = b0 * world[0][1] + b1 * world[1][1] + b2 * world[2][1];
+                    float wz = b0 * world[0][2] + b1 * world[1][2] + b2 * world[2][2];
+                    float vx = eyeX - wx;
+                    float vy = eyeY - wy;
+                    float vz = eyeZ - wz;
+                    float vl = (float) Math.sqrt(vx * vx + vy * vy + vz * vz);
+                    if (vl > 0) {
+                        vx /= vl;
+                        vy /= vl;
+                        vz /= vl;
+                    }
+                    float nx = b0 * norm[0][0] + b1 * norm[1][0] + b2 * norm[2][0];
+                    float ny = b0 * norm[0][1] + b1 * norm[1][1] + b2 * norm[2][1];
+                    float nz = b0 * norm[0][2] + b1 * norm[1][2] + b2 * norm[2][2];
+                    float nl = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+                    if (nl > 0) {
+                        nx /= nl;
+                        ny /= nl;
+                        nz /= nl;
+                    }
+                    shaderEval.setInput("worldPos", wx, wy, wz);
+                    shaderEval.setInput("worldNormal", nx, ny, nz);
+                    shaderEval.setInput("viewDir", vx, vy, vz);
+                    shaderEval.setInput("uv", b0 * uv[0][0] + b1 * uv[1][0] + b2 * uv[2][0],
+                            b0 * uv[0][1] + b1 * uv[1][1] + b2 * uv[2][1]);
+                    shaderEval.setInput("baseColor", r, g, b, a);
+                    if (discardHook != null && shaderEval.evaluateFloat(discardHook) > 0.5f) {
+                        continue;
+                    }
+                    if (baseHook != null) {
+                        shaderEval.evaluate(baseHook, shaderOut);
+                        r = shaderOut[0];
+                        g = shaderOut[1];
+                        b = shaderOut[2];
+                        a = shaderOut[3];
+                    }
+                    if (emissiveHook != null) {
+                        shaderEval.evaluate(emissiveHook, shaderOut);
+                        shR = shaderOut[0];
+                        shG = shaderOut[1];
+                        shB = shaderOut[2];
+                    }
+                }
 
                 if (lit) {
                     float nx = b0 * norm[0][0] + b1 * norm[1][0] + b2 * norm[2][0];
@@ -454,6 +508,9 @@ class JavaSESoftwareDevice extends GraphicsDevice {
                     g += emG;
                     b += emB;
                 }
+                r += shR;
+                g += shG;
+                b += shB;
                 if (tone) {
                     r = aces(r * exposure);
                     g = aces(g * exposure);
@@ -506,12 +563,94 @@ class JavaSESoftwareDevice extends GraphicsDevice {
         }
     }
 
+    // The material's ShaderMaterial, run through the CPU evaluator: the
+    // vertex offset per vertex, base colour, emissive and discard per pixel.
+    // Normal, metallic and roughness are not, as the lighting here is only
+    // Lambert and Blinn-Phong.
+    private final Map<ShaderMaterial, ShaderEvaluator> evaluators = new HashMap<ShaderMaterial, ShaderEvaluator>();
+    private ShaderEvaluator shaderEval;
+    private ShaderNode vertexOffset;
+    private ShaderNode baseHook;
+    private ShaderNode emissiveHook;
+    private ShaderNode discardHook;
+    private final float[] shaderOut = new float[4];
+
+    private void prepareShader(Material material) {
+        final ShaderMaterial sm = material.getEffectiveShader();
+        if (sm == null) {
+            shaderEval = null;
+            vertexOffset = null;
+            baseHook = null;
+            emissiveHook = null;
+            discardHook = null;
+            return;
+        }
+        ShaderEvaluator ev = evaluators.get(sm);
+        if (ev == null) {
+            ev = new ShaderEvaluator(sm);
+            ev.setTextureSampler(new ShaderEvaluator.TextureSampler() {
+                public void sample(int slot, float u, float v, float[] out) {
+                    Texture t = sm.getTexture(slot);
+                    if (t == null || !(t.getHandle() instanceof TexData)) {
+                        out[0] = 1f;
+                        out[1] = 1f;
+                        out[2] = 1f;
+                        out[3] = 1f;
+                        return;
+                    }
+                    int c = sampleTexture((TexData) t.getHandle(), u, v, t.getFilter() == Texture.Filter.LINEAR,
+                            t.getWrap() == Texture.Wrap.REPEAT);
+                    out[0] = channel(c, 16);
+                    out[1] = channel(c, 8);
+                    out[2] = channel(c, 0);
+                    out[3] = ((c >>> 24) & 0xff) / 255f;
+                }
+            });
+            evaluators.put(sm, ev);
+        }
+        shaderEval = ev;
+        vertexOffset = sm.get(ShaderMaterial.Hook.VERTEX_OFFSET);
+        baseHook = sm.get(ShaderMaterial.Hook.BASE_COLOR);
+        emissiveHook = sm.get(ShaderMaterial.Hook.EMISSIVE);
+        discardHook = sm.get(ShaderMaterial.Hook.DISCARD);
+        Light light = getLight();
+        float lx = -light.getDirectionX();
+        float ly = -light.getDirectionY();
+        float lz = -light.getDirectionZ();
+        float ll = (float) Math.sqrt(lx * lx + ly * ly + lz * lz);
+        if (ll > 0) {
+            lx /= ll;
+            ly /= ll;
+            lz /= ll;
+        }
+        Camera cam = getCamera();
+        ev.setInput("time", getTime());
+        ev.setInput("sunDir", lx, ly, lz);
+        ev.setInput("sunColor", channel(light.getColor(), 16), channel(light.getColor(), 8),
+                channel(light.getColor(), 0));
+        ev.setInput("cameraPos", cam != null ? cam.getEyeX() : 0f, cam != null ? cam.getEyeY() : 0f,
+                cam != null ? cam.getEyeZ() : 0f);
+    }
+
     private void loadVertex(int slot, int idx, float[] data, int stride,
                             int posOff, int normOff, int uvOff, float[] model) {
         int base = idx * stride;
         float ox = data[base + posOff];
         float oy = data[base + posOff + 1];
         float oz = data[base + posOff + 2];
+        if (vertexOffset != null) {
+            shaderEval.setInput("position", ox, oy, oz);
+            shaderEval.setInput("normal", normOff >= 0 ? data[base + normOff] : 0f,
+                    normOff >= 0 ? data[base + normOff + 1] : 1f, normOff >= 0 ? data[base + normOff + 2] : 0f);
+            shaderEval.setInput("uv", uvOff >= 0 ? data[base + uvOff] : 0f, uvOff >= 0 ? data[base + uvOff + 1] : 0f);
+            shaderEval.setInput("worldPos", model[0] * ox + model[4] * oy + model[8] * oz + model[12],
+                    model[1] * ox + model[5] * oy + model[9] * oz + model[13],
+                    model[2] * ox + model[6] * oy + model[10] * oz + model[14]);
+            shaderEval.evaluate(vertexOffset, shaderOut);
+            ox += shaderOut[0];
+            oy += shaderOut[1];
+            oz += shaderOut[2];
+        }
         // clip = mvp * position
         clip[slot][0] = mvp[0] * ox + mvp[4] * oy + mvp[8] * oz + mvp[12];
         clip[slot][1] = mvp[1] * ox + mvp[5] * oy + mvp[9] * oz + mvp[13];

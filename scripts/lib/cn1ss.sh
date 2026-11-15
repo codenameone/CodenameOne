@@ -275,6 +275,10 @@ cn1ss_start_ws_server() {
   fi
   local log_file bind_port="${CN1SS_WS_BIND_PORT:-8765}"
   log_file="$(mktemp)"
+  # A 4K tvOS capture of a noisy scene (GpuShaderHarbour) is ~12 MB as PNG,
+  # past the backend's default 8 MB WebSocket message cap; the session was
+  # dropped and the screenshot silently went missing.
+  export CN1_WS_MAX_MESSAGE_MB="${CN1_WS_MAX_MESSAGE_MB:-32}"
   if [ -n "$(cn1ss_server_dist)" ]; then
     "$(cn1ss_server_script)" exec-dist "$(cn1ss_server_dist)" --port "$bind_port" --out "$out_dir" \
       >"$log_file" 2>&1 &

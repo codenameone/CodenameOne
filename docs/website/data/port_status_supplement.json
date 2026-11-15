@@ -57,6 +57,20 @@
       ]
     },
     {
+      "test": "NodeGraphThemeScreenshotTest",
+      "reason": "The node graph baseline is a diagram of five connected nodes in a group. A watch face has no room for it, so the capture there would only record how the diagram fails to fit.",
+      "platform_support": "The NodeGraph component compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the graph in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "node-graph-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "GanttThemeScreenshotTest",
       "reason": "The Gantt chart baseline is a task table beside a timeline of bars and dependency arrows. A watch face has no room for either, so the capture there would only record how the chart fails to fit.",
       "platform_support": "The Gantt component compiles and runs on watchOS; it is a planning view for phones, tablets and desktops, and only this baseline does not apply to the watch form factor.",

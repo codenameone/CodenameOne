@@ -194,6 +194,10 @@ public class UIManager {
     /// hands the whole theme back in, these included, and without this they
     /// would read as the application's own styles and never be replaced.
     private final HashMap<String, Object> schedulingDefaults = new HashMap<String, Object>();
+    // Stale keys of theme-owned scheduling UIIDs, refilled by the next pass.
+    private final java.util.HashSet<String> schedulingRefill = new java.util.HashSet<String>();
+    // The UIIDs the theme being installed styles itself, for one pass.
+    private java.util.HashSet<String> schedulingThemed;
     private final java.util.Set<String> nativeFontKeys = new java.util.HashSet<String>();
     private final java.util.Set<String> nativeColorKeys = new java.util.HashSet<String>();
     private final java.util.Set<String> nativeBorderKeys = new java.util.HashSet<String>();
@@ -2126,6 +2130,9 @@ public class UIManager {
     private void installSchedulingDefaults(HashMap<String, Object> installedTheme, boolean darkMode,
                                            Font plain, Font bold) {
         java.util.HashSet<String> themed = new java.util.HashSet<String>();
+        schedulingThemed = themed;
+        // Left from a pass that didn't finish, a key would be refilled here.
+        schedulingRefill.clear();
         boolean dark = darkMode;
         // A theme that carries its dark styles as `$Dark` entries turns dark
         // with the device and has no `darkModeBool` to say so. The defaults
@@ -2158,6 +2165,18 @@ public class UIManager {
                     int dot = key.indexOf('.');
                     if (dot > 0) {
                         themed.add(key.substring(0, dot));
+                    }
+                }
+            }
+            if (stale != null) {
+                // A stale key of a UIID the theme owns is refilled with this
+                // pass's default (schedulingStyle): without it a transparent
+                // grid, whose transparency 0 equals the default, kept its
+                // bgColor and lost its transparency, and painted black.
+                for (String key : stale) {
+                    int dot = key.indexOf('.');
+                    if (dot > 0 && themed.contains(key.substring(0, dot))) {
+                        schedulingRefill.add(key);
                     }
                 }
             }
@@ -2205,107 +2224,109 @@ public class UIManager {
         }
 
         // painted surfaces: only the colours are read
-        schedulingStyle(themed, "Scheduler", onSurface, surface, "255", "0,0,0,0", null);
-        schedulingStyle(themed, "SchedulerGrid", line, surface, "0", null, null);
-        schedulingStyle(themed, "SchedulerOffHours", variant, offHours, "255", null, null);
-        schedulingStyle(themed, "SchedulerHeader", variant, surface, "255", null, small);
-        schedulingStyle(themed, "SchedulerHeaderToday", onPrimary, primary, "255", null, small);
-        schedulingStyle(themed, "SchedulerTimeLabel", variant, surface, "255", null, small);
-        schedulingStyle(themed, "SchedulerItem", onPrimary, primary, "255", null, small);
-        schedulingStyle(themed, "SchedulerBackgroundItem", onTint, tint, "120", null, small);
-        schedulingStyle(themed, "SchedulerBlocked", variant, line, "140", null, small);
-        schedulingStyle(themed, "SchedulerNow", error, error, "255", null, null);
-        schedulingStyle(themed, "SchedulerSelection", primary, primary, "60", null, null);
-        schedulingStyle(themed, "SchedulerMonthDay", onSurface, surface, "255", null, small);
-        schedulingStyle(themed, "SchedulerMonthOther", variant, offHours, "255", null, small);
-        schedulingStyle(themed, "SchedulerAgendaItem", onSurface, surface, "255", null, null);
-        schedulingStyle(themed, "Gantt", onSurface, surface, "255", "0,0,0,0", null);
-        schedulingStyle(themed, "GanttHeader", variant, surface, "255", null, small);
-        if (schedulingStyle(themed, "GanttRow", onSurface, surface, "255", null, null)) {
+        schedulingStyle("Scheduler", onSurface, surface, "255", "0,0,0,0", null);
+        schedulingStyle("SchedulerGrid", line, surface, "0", null, null);
+        schedulingStyle("SchedulerOffHours", variant, offHours, "255", null, null);
+        schedulingStyle("SchedulerHeader", variant, surface, "255", null, small);
+        schedulingStyle("SchedulerHeaderToday", onPrimary, primary, "255", null, small);
+        schedulingStyle("SchedulerTimeLabel", variant, surface, "255", null, small);
+        schedulingStyle("SchedulerItem", onPrimary, primary, "255", null, small);
+        schedulingStyle("SchedulerBackgroundItem", onTint, tint, "120", null, small);
+        schedulingStyle("SchedulerBlocked", variant, line, "140", null, small);
+        schedulingStyle("SchedulerNow", error, error, "255", null, null);
+        schedulingStyle("SchedulerSelection", primary, primary, "60", null, null);
+        schedulingStyle("SchedulerMonthDay", onSurface, surface, "255", null, small);
+        schedulingStyle("SchedulerMonthOther", variant, offHours, "255", null, small);
+        schedulingStyle("SchedulerAgendaItem", onSurface, surface, "255", null, null);
+        schedulingStyle("Gantt", onSurface, surface, "255", "0,0,0,0", null);
+        schedulingStyle("GanttHeader", variant, surface, "255", null, small);
+        if (schedulingStyle("GanttRow", onSurface, surface, "255", null, null)) {
             schedulingState("GanttRow", "sel#", onTint, tint, "255");
         }
-        schedulingStyle(themed, "GanttSummaryRow", onSurface, offHours, "255", null, bold);
-        schedulingStyle(themed, "GanttBar", onSurface, dark ? "0842a0" : "a8c7fa", "255", null, small);
-        schedulingStyle(themed, "GanttBarProgress", onPrimary, primary, "255", null, small);
-        schedulingStyle(themed, "GanttBarCritical", onSurface, error, "255", null, small);
-        schedulingStyle(themed, "GanttSummaryBar", surface, variant, "255", null, small);
-        schedulingStyle(themed, "GanttMilestone", surface, onSurface, "255", null, small);
-        schedulingStyle(themed, "GanttBaseline", variant, line, "255", null, null);
-        schedulingStyle(themed, "GanttLink", variant, surface, "0", null, null);
-        schedulingStyle(themed, "GanttLinkCritical", error, surface, "0", null, null);
-        schedulingStyle(themed, "GanttLoad", onPrimary, primary, "255", null, small);
-        schedulingStyle(themed, "GanttOverload", onPrimary, error, "255", null, small);
+        schedulingStyle("GanttSummaryRow", onSurface, offHours, "255", null, bold);
+        schedulingStyle("GanttBar", onSurface, dark ? "0842a0" : "a8c7fa", "255", null, small);
+        schedulingStyle("GanttBarProgress", onPrimary, primary, "255", null, small);
+        schedulingStyle("GanttBarCritical", onSurface, error, "255", null, small);
+        schedulingStyle("GanttSummaryBar", surface, variant, "255", null, small);
+        schedulingStyle("GanttMilestone", surface, onSurface, "255", null, small);
+        schedulingStyle("GanttBaseline", variant, line, "255", null, null);
+        schedulingStyle("GanttLink", variant, surface, "0", null, null);
+        schedulingStyle("GanttLinkCritical", error, surface, "0", null, null);
+        schedulingStyle("GanttLoad", onPrimary, primary, "255", null, small);
+        schedulingStyle("GanttOverload", onPrimary, error, "255", null, small);
 
         // the toolbar the scheduler and the chart share
-        schedulingStyle(themed, "SchedulerToolbar", onSurface, surface, "255", "1,1,1,1", null);
-        schedulingStyle(themed, "SchedulerTitle", onSurface, surface, "0", "1,1,2,2", bold);
-        if (schedulingStyle(themed, "SchedulerViewButton", primary, surface, "0", "1,1,2,2", null)) {
-            themeProps.put("SchedulerViewButton.align", Integer.valueOf(Component.CENTER));
+        schedulingStyle("SchedulerToolbar", onSurface, surface, "255", "1,1,1,1", null);
+        schedulingStyle("SchedulerTitle", onSurface, surface, "0", "1,1,2,2", bold);
+        if (schedulingStyle("SchedulerViewButton", primary, surface, "0", "1,1,2,2", null)) {
+            schedulingDefault("SchedulerViewButton", "SchedulerViewButton.align", Integer.valueOf(Component.CENTER));
             schedulingState("SchedulerViewButton", "sel#", primary, surface, "0");
             // a toggle that is down draws its pressed style
             schedulingState("SchedulerViewButton", "press#", onTint, tint, "255");
         }
 
         // Material pickers
-        schedulingStyle(themed, "PickerMaterial", onSurface, raised, "255", "0,0,0,0", null);
-        if (schedulingStyle(themed, "PickerMaterialDialog", onSurface, raised, "255", "2,2,2,2", null)) {
-            themeProps.put("PickerMaterialDialog.border", RoundRectBorder.create().cornerRadius(4f));
+        schedulingStyle("PickerMaterial", onSurface, raised, "255", "0,0,0,0", null);
+        if (schedulingStyle("PickerMaterialDialog", onSurface, raised, "255", "2,2,2,2", null)) {
+            schedulingDefault("PickerMaterialDialog", "PickerMaterialDialog.border", RoundRectBorder.create().cornerRadius(4f));
         }
-        schedulingStyle(themed, "PickerMaterialHeader", onSurface, raised, "0", "2,2,3,3", null);
-        schedulingStyle(themed, "PickerMaterialOverline", variant, raised, "0", "0,0,0,0", small);
-        schedulingStyle(themed, "PickerMaterialHeadline", onSurface, raised, "0", "1,0,0,0", large);
-        if (schedulingStyle(themed, "PickerMaterialButton", primary, raised, "0", "1.5,1.5,2,2", null)) {
-            themeProps.put("PickerMaterialButton.align", Integer.valueOf(Component.CENTER));
+        schedulingStyle("PickerMaterialHeader", onSurface, raised, "0", "2,2,3,3", null);
+        schedulingStyle("PickerMaterialOverline", variant, raised, "0", "0,0,0,0", small);
+        schedulingStyle("PickerMaterialHeadline", onSurface, raised, "0", "1,0,0,0", large);
+        if (schedulingStyle("PickerMaterialButton", primary, raised, "0", "1.5,1.5,2,2", null)) {
+            schedulingDefault("PickerMaterialButton", "PickerMaterialButton.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialButton", "sel#", primary, raised, "0");
             schedulingState("PickerMaterialButton", "press#", onTint, tint, "255");
         }
-        schedulingStyle(themed, "PickerMaterialButtons", onSurface, raised, "0", "1,1,2,2", null);
-        schedulingStyle(themed, "PickerMaterialDays", onSurface, raised, "0", "0,1,2,2", null);
-        if (schedulingStyle(themed, "PickerMaterialDay", onSurface, raised, "0", null, null)) {
+        schedulingStyle("PickerMaterialButtons", onSurface, raised, "0", "1,1,2,2", null);
+        schedulingStyle("PickerMaterialDays", onSurface, raised, "0", "0,1,2,2", null);
+        if (schedulingStyle("PickerMaterialDay", onSurface, raised, "0", null, null)) {
             // the circle under the chosen day, and the number on it
             schedulingState("PickerMaterialDay", "sel#", onPrimary, primary, "255");
             schedulingState("PickerMaterialDay", "dis#", dark ? "6f6a75" : "b0acb5", raised, "0");
         }
-        schedulingStyle(themed, "PickerMaterialWeekday", variant, raised, "0", null, small);
-        if (schedulingStyle(themed, "PickerMaterialYear", onSurface, raised, "0", "1.5,1.5,1,1", null)) {
-            themeProps.put("PickerMaterialYear.align", Integer.valueOf(Component.CENTER));
+        schedulingStyle("PickerMaterialWeekday", variant, raised, "0", null, small);
+        if (schedulingStyle("PickerMaterialYear", onSurface, raised, "0", "1.5,1.5,1,1", null)) {
+            schedulingDefault("PickerMaterialYear", "PickerMaterialYear.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialYear", "sel#", onSurface, raised, "0");
             schedulingState("PickerMaterialYear", "press#", onTint, tint, "255");
         }
-        if (schedulingStyle(themed, "PickerMaterialYearSelected", onPrimary, primary, "255", "1.5,1.5,1,1", null)) {
-            themeProps.put("PickerMaterialYearSelected.align", Integer.valueOf(Component.CENTER));
+        if (schedulingStyle("PickerMaterialYearSelected", onPrimary, primary, "255", "1.5,1.5,1,1", null)) {
+            schedulingDefault("PickerMaterialYearSelected", "PickerMaterialYearSelected.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialYearSelected", "sel#", onPrimary, primary, "255");
             schedulingState("PickerMaterialYearSelected", "press#", onPrimary, primary, "255");
         }
         if (!themed.contains("PickerMaterialField")) {
-            themeProps.put("PickerMaterialField.derive", "TextField");
-            themeProps.put("PickerMaterialField.sel#derive", "TextField.sel");
-            themeProps.put("PickerMaterialField.press#derive", "TextField.press");
-            themeProps.put("PickerMaterialField.dis#derive", "TextField.dis");
+            schedulingDefault("PickerMaterialField", "PickerMaterialField.derive", "TextField");
+            schedulingDefault("PickerMaterialField", "PickerMaterialField.sel#derive", "TextField.sel");
+            schedulingDefault("PickerMaterialField", "PickerMaterialField.press#derive", "TextField.press");
+            schedulingDefault("PickerMaterialField", "PickerMaterialField.dis#derive", "TextField.dis");
         }
-        schedulingStyle(themed, "PickerMaterialError", error, raised, "0", "0,1,3,3", small);
-        if (schedulingStyle(themed, "PickerMaterialTimeField", onSurface, well, "255", "2,2,3,3", large)) {
-            themeProps.put("PickerMaterialTimeField.align", Integer.valueOf(Component.CENTER));
+        schedulingStyle("PickerMaterialError", error, raised, "0", "0,1,3,3", small);
+        if (schedulingStyle("PickerMaterialTimeField", onSurface, well, "255", "2,2,3,3", large)) {
+            schedulingDefault("PickerMaterialTimeField", "PickerMaterialTimeField.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialTimeField", "sel#", onSurface, well, "255");
             schedulingState("PickerMaterialTimeField", "press#", onTint, tint, "255");
         }
-        schedulingStyle(themed, "PickerMaterialTimeSeparator", onSurface, raised, "0", "0,0,1,1", large);
-        if (schedulingStyle(themed, "PickerMaterialPeriod", variant, well, "255", "1,1,2,2", null)) {
-            themeProps.put("PickerMaterialPeriod.align", Integer.valueOf(Component.CENTER));
+        schedulingStyle("PickerMaterialTimeSeparator", onSurface, raised, "0", "0,0,1,1", large);
+        if (schedulingStyle("PickerMaterialPeriod", variant, well, "255", "1,1,2,2", null)) {
+            schedulingDefault("PickerMaterialPeriod", "PickerMaterialPeriod.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialPeriod", "sel#", variant, well, "255");
             schedulingState("PickerMaterialPeriod", "press#", onTint, tint, "255");
         }
-        schedulingStyle(themed, "PickerMaterialDialPane", onSurface, raised, "0", "1,1,2,2", null);
-        if (schedulingStyle(themed, "PickerMaterialDial", onSurface, well, "255", null, null)) {
+        schedulingStyle("PickerMaterialDialPane", onSurface, raised, "0", "1,1,2,2", null);
+        if (schedulingStyle("PickerMaterialDial", onSurface, well, "255", null, null)) {
             // the hand and the number under it
             schedulingState("PickerMaterialDial", "sel#", onPrimary, primary, "255");
             schedulingState("PickerMaterialDial", "dis#", dark ? "6f6a75" : "b0acb5", well, "255");
         }
-        if (schedulingStyle(themed, "PickerMaterialTab", variant, raised, "0", "1.5,1.5,2,2", null)) {
-            themeProps.put("PickerMaterialTab.align", Integer.valueOf(Component.CENTER));
+        if (schedulingStyle("PickerMaterialTab", variant, raised, "0", "1.5,1.5,2,2", null)) {
+            schedulingDefault("PickerMaterialTab", "PickerMaterialTab.align", Integer.valueOf(Component.CENTER));
             schedulingState("PickerMaterialTab", "sel#", variant, raised, "0");
             schedulingState("PickerMaterialTab", "press#", onTint, tint, "255");
         }
+        schedulingRefill.clear();
+        schedulingThemed = null;
         schedulingDefaults.clear();
         for (Map.Entry<String, Object> e : themeProps.entrySet()) {
             String key = e.getKey();
@@ -2317,33 +2338,44 @@ public class UIManager {
 
     /// One default style, unless the theme has the UIID. `padding` is in
     /// millimetres, top, bottom, left, right; null leaves the theme's default.
-    private boolean schedulingStyle(java.util.HashSet<String> themed, String id, String fg, String bg,
+    private boolean schedulingStyle(String id, String fg, String bg,
                                     String transparency, String padding, Font font) {
-        if (themed.contains(id)) {
-            return false;
-        }
-        themeProps.put(id + ".fgColor", fg);
-        themeProps.put(id + ".bgColor", bg);
-        themeProps.put(id + ".transparency", transparency);
-        themeProps.put(id + ".margin", "0,0,0,0");
+        schedulingDefault(id, id + ".fgColor", fg);
+        schedulingDefault(id, id + ".bgColor", bg);
+        schedulingDefault(id, id + ".transparency", transparency);
+        schedulingDefault(id, id + ".margin", "0,0,0,0");
         if (padding != null) {
-            themeProps.put(id + ".padding", padding);
-            themeProps.put(id + ".padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS,
+            schedulingDefault(id, id + ".padding", padding);
+            schedulingDefault(id, id + ".padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS,
                     Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
         }
         if (font != null) {
-            themeProps.put(id + ".font", font);
+            schedulingDefault(id, id + ".font", font);
         }
+        // The states are passed through as well: on a theme's own UIID they
+        // only refill what went stale.
         return true;
+    }
+
+    // Writes a default, or on a UIID the theme owns only puts back a key of
+    // it that was dropped as a stale default from the last pass.
+    private void schedulingDefault(String id, String key, Object value) {
+        if (schedulingThemed != null && schedulingThemed.contains(id)) {
+            if (schedulingRefill.remove(key)) {
+                themeProps.put(key, value);
+            }
+            return;
+        }
+        themeProps.put(key, value);
     }
 
     /// A state of a default style. It derives the unselected one, so it keeps
     /// the padding, alignment and font and changes the colours alone.
     private void schedulingState(String id, String state, String fg, String bg, String transparency) {
-        themeProps.put(id + "." + state + "derive", id);
-        themeProps.put(id + "." + state + "fgColor", fg);
-        themeProps.put(id + "." + state + "bgColor", bg);
-        themeProps.put(id + "." + state + "transparency", transparency);
+        schedulingDefault(id, id + "." + state + "derive", id);
+        schedulingDefault(id, id + "." + state + "fgColor", fg);
+        schedulingDefault(id, id + "." + state + "bgColor", bg);
+        schedulingDefault(id, id + "." + state + "transparency", transparency);
     }
 
     /// Adds the given theme properties on top of the existing properties without
@@ -3534,6 +3566,27 @@ public class UIManager {
         }
         Boolean darkMode = CN.isDarkMode();
         return darkMode != null && darkMode.booleanValue() && hasStyleDefinition("$Dark" + id);
+    }
+
+    /// Whether the installed theme declares a style for a UIID, in any state.
+    /// A `$Dark` declaration counts only while dark mode is on. A component
+    /// that paints with defaults of its own uses them for a UIID the theme
+    /// says nothing about, instead of the blank style `getComponentStyle`
+    /// builds for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the UIID
+    ///
+    /// #### Returns
+    ///
+    /// true when the theme has an entry for that UIID
+    public boolean isThemeStyleDefined(String id) {
+        ensureBaseTheme();
+        if (themeProps == null || id == null || id.length() == 0) {
+            return false;
+        }
+        return hasStyleDefinition(id + ".") || shouldUseDarkStyle(id) && hasStyleDefinition("$Dark" + id + ".");
     }
 
     /// Answers a prefix query against an immutable sorted index of the current theme.

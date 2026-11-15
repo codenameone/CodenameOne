@@ -368,6 +368,19 @@ public final class GltfLoader {
             if (pbr != null && pbr.get("roughnessFactor") instanceof Number) {
                 materials[i].roughness = clamp01(((Number) pbr.get("roughnessFactor")).floatValue());
             }
+            materials[i].normalImage = textureImage(m.get("normalTexture"), textureList);
+            if (m.get("normalTexture") instanceof Map
+                    && ((Map) m.get("normalTexture")).get("scale") instanceof Number) {
+                materials[i].normalScale = ((Number) ((Map) m.get("normalTexture")).get("scale")).floatValue();
+            }
+            materials[i].occlusionImage = textureImage(m.get("occlusionTexture"), textureList);
+            if (m.get("occlusionTexture") instanceof Map
+                    && ((Map) m.get("occlusionTexture")).get("strength") instanceof Number) {
+                materials[i].occlusionStrength = ((Number) ((Map) m.get("occlusionTexture")).get("strength")).floatValue();
+            }
+            materials[i].emissiveImage = textureImage(m.get("emissiveTexture"), textureList);
+            materials[i].metallicRoughnessImage = textureImage(pbr == null ? null
+                    : pbr.get("metallicRoughnessTexture"), textureList);
             float[] em = floats(m.get("emissiveFactor"), new float[]{0f, 0f, 0f});
             if (em.length >= 3) {
                 materials[i].emissive = 0xff000000 | (channel(em[0]) << 16) | (channel(em[1]) << 8) | channel(em[2]);
@@ -512,6 +525,18 @@ public final class GltfLoader {
     /// depending on its settings; accept both.
     private static boolean isTrue(Object o) {
         return Boolean.TRUE.equals(o) || "true".equals(o);
+    }
+
+    private static int textureImage(Object ref, List textureList) {
+        if (!(ref instanceof Map)) {
+            return -1;
+        }
+        int ti = asInt(((Map) ref).get("index"));
+        if (ti < 0 || ti >= textureList.size()) {
+            return -1;
+        }
+        Map tex = (Map) textureList.get(ti);
+        return tex.containsKey("source") ? asInt(tex.get("source")) : -1;
     }
 
     private static float clamp01(float f) {

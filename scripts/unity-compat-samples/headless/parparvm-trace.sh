@@ -111,13 +111,13 @@ PY
 
 # Of the core, only the physics engine: it is plain Java, and the rest of the
 # core needs a port under it, which is why the classes that reach it -- the
-# view and the other UnityGame* classes beside it, and the application shell --
-# stay out.
+# view and the other UnityGame* classes beside it, UnityGraphAudio (the audio
+# graph output the view installs), and the application shell -- stay out.
 cp -R "$CORE/com/codename1/gaming/physics/box2d" "$DIR/box/com/codename1/gaming/physics/"
 HOST_SOURCE=()
 [ ! -f "$DIR/host-source" ] || HOST_SOURCE=("$(cat "$DIR/host-source")")
 find "$RUNTIME_SRC" "$OUT/gen" "$DIR/src" "${HOST_SOURCE[@]}" -name '*.java' -not -name 'UnityGame*.java' \
-  -not -path '*/com/codename1/unitycompat/app/*' > "$DIR/sources"
+  -not -name 'UnityGraphAudio.java' -not -path '*/com/codename1/unitycompat/app/*' > "$DIR/sources"
 echo "$HERE/java/headless/HeadlessTrace.java" >> "$DIR/sources"
 echo "$HERE/java/headless/HeadlessAudio.java" >> "$DIR/sources"
 javac -nowarn -source 8 -target 8 -bootclasspath "$API" -Xlint:-options -cp "$OUT/app:$DIR/box" -d "$DIR/classes" \

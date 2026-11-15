@@ -553,7 +553,7 @@ public class AndroidCameraImpl extends CameraImpl {
     }
 
     @Override
-    public void startVideoRecording(String filePath, final boolean audio) throws IOException {
+    public void startVideoRecording(final String filePath, final boolean audio) throws IOException {
         // CameraX records through VideoCapture<Recorder> (androidx.camera:
         // camera-video, which the build injects with the rest of CameraX).
         //

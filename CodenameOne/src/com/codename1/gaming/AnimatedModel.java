@@ -105,6 +105,9 @@ public class AnimatedModel {
     private final float[] rot = new float[16];
     private final float[] skinMatrix = new float[16];
     private final float[] jointMatrices;
+    // GPU skinning: per skin, the joint rows its parts' materials read
+    // (Material.setSkinning); null when the device skins on the CPU
+    private final float[][] skinRows;
     private final float[] key = new float[4];
 
     private GltfScene.Animation clip;
@@ -161,13 +164,30 @@ public class AnimatedModel {
             maxJoints = Math.max(maxJoints, scene.getSkin(i).getJoints().length);
         }
         jointMatrices = new float[maxJoints * 16];
+        boolean gpu = maxJoints > 0 && maxJoints <= Material.MAX_JOINTS && device.isGpuSkinning();
+        if (gpu) {
+            skinRows = new float[scene.getSkinCount()][];
+            for (int i = 0; i < skinRows.length; i++) {
+                skinRows[i] = new float[Math.max(1, scene.getSkin(i).getJoints().length) * 12];
+            }
+        } else {
+            skinRows = null;
+        }
 
         int count = scene.getPrimitiveCount();
         parts = new Model[count];
         hidden = new boolean[count];
         for (int i = 0; i < count; i++) {
             GltfScene.Primitive p = scene.getPrimitive(i);
-            VertexBuffer vb = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, p.getVertexCount());
+            int skinIndex = gpu && p.isSkinned() ? scene.getNode(p.getNode()).getSkin() : -1;
+            VertexBuffer vb;
+            if (skinIndex >= 0) {
+                vb = new VertexBuffer(VertexFormat.SKINNED, p.getVertexCount());
+                writeBindPose(p, scene.getSkin(skinIndex).getJoints().length, vb.getData());
+                vb.setDirty();
+            } else {
+                vb = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, p.getVertexCount());
+            }
             IndexBuffer ib = new IndexBuffer(p.getIndices().length);
             ib.setData(p.getIndices());
             Material material = new Material(Material.Type.LAMBERT);
@@ -181,6 +201,7 @@ public class AnimatedModel {
                 if (t != null) {
                     material.setTexture(t);
                 }
+                info.applyMaps(scene, device, material);
                 if (info.isDoubleSided()) {
                     state.setCullMode(RenderState.CullMode.NONE);
                 }
@@ -189,6 +210,10 @@ public class AnimatedModel {
                 }
             }
             material.setRenderState(state);
+            if (skinIndex >= 0) {
+                float[] rows = skinRows[skinIndex];
+                material.setSkinning(rows, rows.length / 12);
+            }
             parts[i] = new Model(new Mesh(vb, ib, PrimitiveType.TRIANGLES), material);
         }
         pose();
@@ -214,8 +239,61 @@ public class AnimatedModel {
     }
 
     /// The models that draw this instance, one per primitive.
+    ///
+    /// Do not measure a pose from their vertex buffers: where the device
+    /// skins on the GPU (`GraphicsDevice.isGpuSkinning`) a skinned part's
+    /// buffer is `VertexFormat.SKINNED` and holds the bind pose, and the pose
+    /// is applied in the vertex stage. `getBounds` measures the pose on every
+    /// device.
     public Model[] getParts() {
         return parts;
+    }
+
+    /// The bounds of the current pose in the model's own space, node
+    /// transforms and skinning applied, over the visible parts:
+    /// `minX, minY, minZ, maxX, maxY, maxZ`. It poses the model first and gives
+    /// the same answer whether the device skins on the GPU or the CPU.
+    ///
+    /// #### Returns
+    ///
+    /// a new array of six floats, or null when no part is visible
+    public float[] getBounds() {
+        pose();
+        float[] b = {Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE,
+            -Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE};
+        VertexBuffer scratch = null;
+        int skinned = -1;
+        for (int i = 0; i < parts.length; i++) {
+            if (hidden[i] || !parts[i].isVisible()) {
+                continue;
+            }
+            GltfScene.Primitive p = scene.getPrimitive(i);
+            VertexBuffer vb = parts[i].getMesh().getVertices();
+            int skin = scene.getNode(p.getNode()).getSkin();
+            if (skinRows != null && p.isSkinned() && skin >= 0) {
+                // the buffer is the bind pose: skin a copy on the CPU to measure it
+                if (skinned != skin) {
+                    computeJoints(scene.getSkin(skin));
+                    skinned = skin;
+                }
+                if (scratch == null || scratch.getVertexCount() < p.getVertexCount()) {
+                    scratch = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, p.getVertexCount());
+                }
+                skin(p, scratch);
+                vb = scratch;
+            }
+            float[] d = vb.getData();
+            int stride = vb.getFormat().getStrideBytes() / 4;
+            int count = p.getVertexCount();
+            for (int v = 0; v < count; v++) {
+                int o = v * stride;
+                for (int k = 0; k < 3; k++) {
+                    b[k] = Math.min(b[k], d[o + k]);
+                    b[k + 3] = Math.max(b[k + 3], d[o + k]);
+                }
+            }
+        }
+        return b[0] > b[3] ? null : b;
     }
 
     /// Adds every part to `view`.
@@ -507,9 +585,14 @@ public class AnimatedModel {
             if (p.isSkinned() && skin >= 0) {
                 if (skinned != skin) {
                     computeJoints(scene.getSkin(skin));
+                    if (skinRows != null) {
+                        writeRows(scene.getSkin(skin).getJoints().length, skinRows[skin]);
+                    }
                     skinned = skin;
                 }
-                skin(p, parts[i].getMesh().getVertices());
+                if (skinRows == null) {
+                    skin(p, parts[i].getMesh().getVertices());
+                }
             } else {
                 rigid(p, p.getNode(), parts[i].getMesh().getVertices());
             }
@@ -646,6 +729,52 @@ public class AnimatedModel {
             float b3 = b[bo + c * 4 + 3];
             for (int r = 0; r < 4; r++) {
                 dst[d + c * 4 + r] = a[ao + r] * b0 + a[ao + 4 + r] * b1 + a[ao + 8 + r] * b2 + a[ao + 12 + r] * b3;
+            }
+        }
+    }
+
+    // The first three rows of each joint matrix (column major), the layout
+    // Material.setSkinning takes.
+    private void writeRows(int joints, float[] rows) {
+        for (int j = 0; j < joints; j++) {
+            int o = j * 16;
+            int d = j * 12;
+            for (int row = 0; row < 3; row++) {
+                rows[d + row * 4] = jointMatrices[o + row];
+                rows[d + row * 4 + 1] = jointMatrices[o + 4 + row];
+                rows[d + row * 4 + 2] = jointMatrices[o + 8 + row];
+                rows[d + row * 4 + 3] = jointMatrices[o + 12 + row];
+            }
+        }
+    }
+
+    // A GPU skinned part's buffer never changes: the bind pose with its
+    // joints and weights, in VertexFormat.SKINNED. A joint outside the skin
+    // loses its weight, as the CPU path skips it.
+    private static void writeBindPose(GltfScene.Primitive p, int jointCount, float[] out) {
+        float[] pos = p.getPositions();
+        float[] nor = p.getNormals();
+        float[] uv = p.getTexcoords();
+        int[] joints = p.getJoints();
+        float[] weights = p.getWeights();
+        int count = p.getVertexCount();
+        for (int v = 0; v < count; v++) {
+            int o = v * 16;
+            out[o] = pos[v * 3];
+            out[o + 1] = pos[v * 3 + 1];
+            out[o + 2] = pos[v * 3 + 2];
+            out[o + 3] = nor[v * 3];
+            out[o + 4] = nor[v * 3 + 1];
+            out[o + 5] = nor[v * 3 + 2];
+            if (uv != null) {
+                out[o + 6] = uv[v * 2];
+                out[o + 7] = uv[v * 2 + 1];
+            }
+            for (int k = 0; k < 4; k++) {
+                int j = joints[v * 4 + k];
+                boolean ok = j >= 0 && j < jointCount;
+                out[o + 8 + k] = ok ? j : 0;
+                out[o + 12 + k] = ok ? weights[v * 4 + k] : 0f;
             }
         }
     }

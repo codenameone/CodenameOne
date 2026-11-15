@@ -141,6 +141,11 @@ public class OwnerEndpoint implements OwnerApiServer {
     }
 
     @Override
+    public List<ScheduleDto> staffing(String day, int days) throws Exception {
+        return schedules.days(day, days);
+    }
+
+    @Override
     public PreviewDto preview(PreviewRequestDto body) throws Exception {
         return availability.preview(body);
     }

@@ -204,7 +204,11 @@ public final class EntityManager {
         if (transactionScoped) {
             throw new IllegalStateException("Open a session on the outer manager; the session owns its transaction");
         }
-        return new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(pool, pinned, dialect));
+        com.codename1.impl.orm.SessionImpl session = new com.codename1.impl.orm.SessionImpl(
+                new com.codename1.impl.orm.BackendSqlAccess(pool, pinned, dialect));
+        // Inside a server, @Searchable entities are reindexed after each commit.
+        session.setCommitObserver(com.codename1.backend.search.SearchIndexer.forServer());
+        return session;
     }
 
     /// Creates the table of every registered entity that has none.

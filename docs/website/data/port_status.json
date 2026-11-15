@@ -457,6 +457,15 @@
       ]
     },
     {
+      "id": "node-graph",
+      "category": "Rich components",
+      "name": "Node graph",
+      "description": "Checks the node graph with a group, labeled curved edges, typed ports, the grid and a selected node, in light and dark themes.",
+      "tests": [
+        "NodeGraphThemeScreenshotTest"
+      ]
+    },
+    {
       "id": "native-theme-controls",
       "category": "Themes and styling",
       "name": "Native-theme controls",
@@ -580,8 +589,9 @@
       "id": "audio-media-playback",
       "category": "Media and graphics",
       "name": "Audio and media playback",
-      "description": "Checks media playback and the audio mixer API.",
+      "description": "Checks media playback and the audio mixer and audio graph APIs.",
       "tests": [
+        "AudioGraphApiTest",
         "AudioMixerApiTest",
         "MediaPlaybackScreenshotTest"
       ]
@@ -596,6 +606,20 @@
         "Gpu3DCubeScreenshotTest",
         "Gpu3DModelScreenshotTest",
         "Gpu3DTexturedCubeScreenshotTest"
+      ]
+    },
+    {
+      "id": "gpu-shaders",
+      "category": "Media and graphics",
+      "name": "GPU shaders and effects",
+      "description": "Checks custom shader materials, the shader library, image based lighting, render targets, GPU skinning, depth post effects and custom full screen passes.",
+      "tests": [
+        "GpuPostDepthScreenshotTest",
+        "GpuPostPassScreenshotTest",
+        "GpuRenderTargetScreenshotTest",
+        "GpuShaderGalleryScreenshotTest",
+        "GpuShaderHarbourScreenshotTest",
+        "GpuSkinningScreenshotTest"
       ]
     },
     {
@@ -1447,6 +1471,10 @@
       "test": "GanttThemeScreenshotTest"
     },
     {
+      "pattern": "NodeGraphTheme*",
+      "test": "NodeGraphThemeScreenshotTest"
+    },
+    {
       "pattern": "ToolbarTheme_*",
       "test": "ToolbarThemeScreenshotTest"
     },
@@ -1557,6 +1585,30 @@
     {
       "pattern": "Gpu3DAnimation",
       "test": "Gpu3DAnimationTest"
+    },
+    {
+      "pattern": "GpuPostDepth",
+      "test": "GpuPostDepthScreenshotTest"
+    },
+    {
+      "pattern": "GpuPostPass",
+      "test": "GpuPostPassScreenshotTest"
+    },
+    {
+      "pattern": "GpuRenderTarget",
+      "test": "GpuRenderTargetScreenshotTest"
+    },
+    {
+      "pattern": "GpuShaderGallery",
+      "test": "GpuShaderGalleryScreenshotTest"
+    },
+    {
+      "pattern": "GpuShaderHarbour",
+      "test": "GpuShaderHarbourScreenshotTest"
+    },
+    {
+      "pattern": "GpuSkinning",
+      "test": "GpuSkinningScreenshotTest"
     },
     {
       "pattern": "landscape",

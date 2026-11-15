@@ -260,9 +260,13 @@ jobs:
           RETRY_ONLY_MATCHING: transient
           RETRY_ATTEMPTS: '5'
           RETRY_DELAY_SECONDS: '60'
+        # -U: a "could not find" answer from Central is cached in the restored
+        # Maven cache as a .lastUpdated marker, and every retry then fails in
+        # milliseconds on it (maven-dependency-plugin 3.6.1, five attempts).
+        # -U makes Maven ask Central again instead of trusting the marker.
         run: |
           cd maven
-          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B -U install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
       - name: Unit tests of the builder and the goals
         working-directory: maven
         run: xvfb-run -a mvn -B -Plocal-dev-javase -pl build-engine,codenameone-maven-plugin test -Dtest='Unity*Test,CompileUnityMojoTest' -Dsurefire.failIfNoSpecifiedTests=false

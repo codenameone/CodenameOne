@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.scheduler;
 
+import com.codename1.ui.ScrollSurface;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.printing.PrintResult;
@@ -76,10 +77,10 @@ class SchedulePrinterTest extends UITestBase {
         form.add(BorderLayout.CENTER, g);
         form.revalidate();
         GanttChart chart = g.surface();
-        chart.layoutNow();
+        chart.refreshLayout();
         double dayPx = TimeMath.DAY / chart.axis().getMillisPerPixel();
         chart.zoom((float) (60 / dayPx));
-        chart.layoutNow();
+        chart.refreshLayout();
         return g;
     }
 
@@ -96,7 +97,7 @@ class SchedulePrinterTest extends UITestBase {
         s.setView(Scheduler.View.WEEK);
         form.add(BorderLayout.CENTER, s);
         form.revalidate();
-        ((ScrollSurface) s.surface()).layoutNow();
+        ((ScrollSurface) s.surface()).refreshLayout();
         return s;
     }
 
@@ -121,7 +122,7 @@ class SchedulePrinterTest extends UITestBase {
         int h = chart.getHeight();
         int x = chart.getX();
         int y = chart.getY();
-        int offX = chart.getOffX();
+        int offX = chart.getOffsetX();
         double scale = chart.axis().getMillisPerPixel();
         int rows = chart.rows().size();
 
@@ -136,7 +137,7 @@ class SchedulePrinterTest extends UITestBase {
         assertEquals(h, chart.getHeight());
         assertEquals(x, chart.getX());
         assertEquals(y, chart.getY());
-        assertEquals(offX, chart.getOffX());
+        assertEquals(offX, chart.getOffsetX());
         assertEquals(scale, chart.axis().getMillisPerPixel(), 0.0001);
         assertEquals(rows, chart.rows().size());
 
@@ -145,7 +146,7 @@ class SchedulePrinterTest extends UITestBase {
         printer.setPageSize(20000, 400);
         printer.renderPage(0);
         assertEquals(scale, chart.axis().getMillisPerPixel(), 0.0001, "printing does not zoom the screen");
-        assertEquals(offX, chart.getOffX());
+        assertEquals(offX, chart.getOffsetX());
     }
 
     @FormTest
@@ -196,7 +197,7 @@ class SchedulePrinterTest extends UITestBase {
     void aMonthIsOnePageWithNoBandWhenThereIsNothingToSayInIt() {
         Scheduler s = week();
         s.setView(Scheduler.View.MONTH);
-        ((ScrollSurface) s.surface()).layoutNow();
+        ((ScrollSurface) s.surface()).refreshLayout();
         SchedulePrinter printer = new SchedulePrinter(s);
         assertEquals(1, printer.getPageCount(), "a month fits the page it is given");
         printer.setTitle("");
