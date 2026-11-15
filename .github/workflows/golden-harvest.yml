@@ -79,6 +79,13 @@ jobs:
             echo "::error::secrets.CN1SS_GH_TOKEN is not set; golden harvest cannot push."
             exit 1
           fi
+          # Set is not enough: an expired or narrowed token would pass the check
+          # above and fail only at the push, after the PR's runs were cancelled.
+          push="$(GH_TOKEN="$CN1SS_GH_TOKEN" gh api "repos/$GITHUB_REPOSITORY" --jq .permissions.push 2>/dev/null || true)"
+          if [ "$push" != true ]; then
+            echo "::error::secrets.CN1SS_GH_TOKEN cannot push to $GITHUB_REPOSITORY (expired, revoked or lacking Contents: write); golden harvest cannot push. Regenerate it (see the note in scripts-android.yml)."
+            exit 1
+          fi
       - uses: actions/checkout@v6
         if: steps.list.outputs.ready == '1'
         with:
