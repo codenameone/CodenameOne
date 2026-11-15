@@ -86,6 +86,11 @@ public final class Scheduler {
         this.out = out;
     }
 
+    /// The current output sink.
+    public Output getOutput() {
+        return out;
+    }
+
     /// Instructions one resume may run before it is killed.
     public void setBudget(long steps) {
         budget = steps;
