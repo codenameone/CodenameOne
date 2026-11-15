@@ -67,6 +67,7 @@ on:
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
       - 'scripts/slate/**'
+      - 'scripts/fieldline/**'
       - 'scripts/splat/**'
       - 'scripts/skirmish/**'
       - 'scripts/dash/**'

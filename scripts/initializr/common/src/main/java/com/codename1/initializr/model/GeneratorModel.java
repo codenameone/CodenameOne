@@ -111,12 +111,21 @@ public class GeneratorModel {
     /// generated.
     static final String SLATE_SINCE = "7.0.282";
 
+    /// The first release with everything the field service template's app is
+    /// built on: the resource timeline and the Gantt baseline of
+    /// `com.codename1.ui.scheduler`, write-only calendar access, the camera API
+    /// it photographs equipment with and the round map markers its route draws.
+    /// Older releases lack some of it, so it is neither offered nor generated
+    /// before then.
+    static final String FIELDLINE_SINCE = "7.0.283";
+
     /// The first release a template can be generated against.
     static String templateSince(Template template) {
         return template == Template.BASTION ? BASTION_SINCE
                 : template == Template.REEL ? REEL_SINCE
                 : template == Template.SPLAT ? SPLAT_SINCE
-                : template == Template.SLATE ? SLATE_SINCE : JAVA_TIME_ENTITIES_SINCE;
+                : template == Template.SLATE ? SLATE_SINCE
+                : template == Template.FIELDLINE ? FIELDLINE_SINCE : JAVA_TIME_ENTITIES_SINCE;
     }
 
     /// The brand colour of the full-stack template as it ships: the `--brand` its
@@ -151,6 +160,9 @@ public class GeneratorModel {
     /// The booking template's `--brand`, held to its theme.css the same way.
     public static final int SLATE_BRAND = 0xdb3416;
 
+    /// The field service template's `--brand`, held to its theme.css the same way.
+    public static final int FIELDLINE_BRAND = 0x4f46e5;
+
     /// The brand colour `template` ships with: the one its icon is painted with
     /// when the developer keeps the template's own scheme.
     public static int brandOf(Template template) {
@@ -165,6 +177,9 @@ public class GeneratorModel {
         }
         if (template == Template.SLATE) {
             return SLATE_BRAND;
+        }
+        if (template == Template.FIELDLINE) {
+            return FIELDLINE_BRAND;
         }
         if (template == Template.BASTION) {
             return BASTION_BRAND;
@@ -1194,7 +1209,7 @@ public class GeneratorModel {
                 "dependency on the shared module");
         requirePomFragment("backend/pom.xml", normalizedPom(entries, "backend/pom.xml"), dependency,
                 "dependency on the shared module");
-        if (template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT) {
+        if (template.hasRules()) {
             // The rules pom takes its group and version from the parent, so its
             // coordinates are the parent's and its artifact id.
             requirePomFragment("rules/pom.xml", normalizedPom(entries, "rules/pom.xml"),
@@ -1680,8 +1695,7 @@ public class GeneratorModel {
             content = replaceTagValue(content, "cn1.plugin.version", pluginVersion);
             content = replaceTagValue(content, "cn1.version", pluginVersion);
             if (template.isFullStack() && !options.isGradle() && !isMavenBackendOnly()) {
-                content = addSharedModule(content, template == Template.SKIRMISH || template == Template.DASH
-                        || template == Template.SPLAT);
+                content = addSharedModule(content, template.hasRules());
             }
             if (mavenLayoutsEnabled() && !isMavenBackendOnly()) {
                 content = guardModuleProfiles(content, !includesPlatformModules());
@@ -2162,6 +2176,8 @@ public class GeneratorModel {
                     .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
         } else if (template == Template.BASTION) {
             appendBankSection(out, toLowerCaseInvariant(appName));
+        } else if (template == Template.FIELDLINE) {
+            appendFieldSection(out, toLowerCaseInvariant(appName));
         } else if (template.isFullStack()) {
             boolean food = template == Template.SAVOR;
             boolean chat = template == Template.PARLEY;
@@ -2325,6 +2341,36 @@ public class GeneratorModel {
 
     /// The README section of the banking template: what the project is, how to run
     /// it and the accounts its development profile creates.
+    private static void appendFieldSection(StringBuilder out, String lower) {
+        out.append("## The app and its server\n\n")
+                .append("This project is a working field service app: a technician and a dispatch mode in one ")
+                .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
+                .append("- `rules/` is the scheduling engine: regret insertion, then adaptive large ")
+                .append("neighbourhood search, over technicians' skills, hours, time off and travel time. It ")
+                .append("depends on nothing, and is seeded, so one seed gives one plan.\n")
+                .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
+                .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
+                .append("- `backend/` is the server: accounts and roles, technicians and their availability, ")
+                .append("sites and jobs, checklists, photos and sealed signatures, the optimizer runs and ")
+                .append("re-plans, the assistant, the live channel and the database migrations.\n")
+                .append("- `common/` is the app. `src/main/css/theme.css` opens with the colours and corner ")
+                .append("radius every screen takes its look from.\n\n")
+                .append("Start the server, then, in a second terminal, the app:\n\n```\n")
+                .append("./run-server.sh\n")
+                .append("./run.sh\n```\n\n")
+                .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
+                .append("\"Run Server\" and the simulator.\n\n")
+                .append("On the `dev` profile the server creates demonstration accounts, all with the ")
+                .append("password `").append(lower).append("-demo`: `tech@").append(lower)
+                .append(".example` and `tech2@").append(lower).append(".example`, technicians with a day ")
+                .append("of jobs, `dispatch@").append(lower).append(".example`, who runs the board, and `admin@")
+                .append(lower).append(".example`.\n\n")
+                .append("The assistant answers from a built-in demo source until the server is given a ")
+                .append("model to call; `backend/application.properties` says how.\n\n")
+                .append("`./mvnw -pl rules,shared,backend -am -Dcodename1.platform=backend test` runs the ")
+                .append("engine's and the server's tests.\n\n");
+    }
+
     private static void appendBankSection(StringBuilder out, String lower) {
         out.append("## The app and its server\n\n")
                 .append("This project is a working bank: a customer and an admin mode in one app, chosen by the ")
