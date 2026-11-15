@@ -19,6 +19,7 @@
 package com.codenameone.examples.slate;
 
 import com.codenameone.examples.slate.client.Times;
+import com.codename1.ui.scheduler.Gantt;
 import com.codenameone.examples.slate.ui.Timeline;
 
 import java.util.Map;
@@ -45,6 +46,11 @@ public class DesktopTest extends E2e {
                 && OwnerTest.booked((Timeline) findByName("board-grid")), 20000,
                 "the day's bookings on the board");
         shot("desktop-owner-board");
+        place("menu-staffing", "Staffing");
+        until(() -> findByName("staffing-gantt") instanceof Gantt
+                && OwnerTest.staffed((Gantt) findByName("staffing-gantt")), 20000,
+                "the week's shifts and their bookings on the staffing plan");
+        shot("desktop-owner-staffing");
         place("menu-services", "Catalog");
         // The list on the left, the first row's editor beside it.
         until(() -> findByName("detail") != null && has("save"), 20000,

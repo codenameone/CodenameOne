@@ -49,6 +49,7 @@ OUT = os.path.join(NATIVE_DIR, "cn1_windows_uwp_stubs.cpp")
 # `!defined(CN1_WINDOWS_UWP)` guard; keep the two lists together.
 DESKTOP_ONLY = [
     "cn1_windows_accessibility.cpp",
+    "cn1_windows_audioout.c",
     "cn1_windows_audiorec.c",
     "cn1_windows_camera.cpp",
     "cn1_windows_chrome.cpp",

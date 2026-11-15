@@ -2248,13 +2248,29 @@ public final class SceneCompiler {
                             + f(p.get("m_Pitch"), "1") + ", " + "1".equals(text(p.get("Loop"))) + ", "
                             + "1".equals(text(p.get("Mute"))) + ", " + !"0".equals(text(p.get("m_PlayOnAwake")))
                             + ");");
+                    // spatialBlend is a curve over distance; Unity's inspector
+                    // slider writes one key, whose value is the blend. A real
+                    // curve is heard at its first key.
+                    String blend = "0";
+                    List<Object> keys = list(map(p.get("panLevelCustomCurve")).get("m_Curve"));
+                    if (!keys.isEmpty()) {
+                        blend = number(map(keys.get(0)).get("value"), "0");
+                    }
+                    String pan2d = number(p.get("Pan2D"), "0");
+                    String rolloff = integer(p.get("rolloffMode"), "0");
+                    String minD = number(p.get("MinDistance"), "1");
+                    String maxD = number(p.get("MaxDistance"), "500");
+                    if (Double.parseDouble(blend) != 0d || Double.parseDouble(pan2d) != 0d) {
+                        line(sb, v + ".$spatial(" + blend + "f, " + pan2d + "f, " + rolloff + ", " + minD + "f, "
+                                + maxD + "f);");
+                    }
                     // A note and not a warning: what a script reads of the
                     // source is what Unity answers, and only the ear differs.
                     if (Double.parseDouble(number(p.get("m_Pitch"), "1")) != 1d) {
                         notes.add(origin + ": the " + the("audio source", origin, n.doc.fileId) + " has a pitch of "
-                                + number(p.get("m_Pitch"), "1") + "; the source keeps time at that pitch, and the"
-                                + " clip is heard at the speed it was recorded at, since the device's media player"
-                                + " cannot change it");
+                                + number(p.get("m_Pitch"), "1") + "; the source keeps time at that pitch, and a WAV"
+                                + " clip is heard at it where the device has a real-time audio graph; a compressed"
+                                + " clip, or one on a device without, plays at the speed it was recorded at");
                     }
                     break;
                 }

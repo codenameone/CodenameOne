@@ -68,7 +68,14 @@ public final class MainThreadRule implements TestRule {
         return new Statement() {
             @Override
             public void evaluate() throws Throwable {
-                if (!Display.isInitialized() || Display.getInstance().isEdt()) {
+                // Start the display before deciding where the test runs. A
+                // test that starts it itself (AndroidTestSupport.context())
+                // after this check used to run off the EDT whenever it was
+                // the first in its JVM, and race the EDT over every post it
+                // made: SharedPreferencesApplyDeferredTest saw a queued
+                // apply() write land between its own two statements.
+                HeadlessImplementation.install();
+                if (Display.getInstance().isEdt()) {
                     base.evaluate();
                     return;
                 }

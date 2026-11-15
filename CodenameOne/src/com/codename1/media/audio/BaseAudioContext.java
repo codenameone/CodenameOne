@@ -1,0 +1,541 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+/// What [AudioContext] (real time, to the speaker) and [OfflineAudioContext]
+/// (as fast as possible, to memory) share: the clock, the destination and the
+/// factory methods for every node, the Web Audio `BaseAudioContext`.
+///
+/// The graph is rendered in quanta of 128 frames. Building and changing it is
+/// allowed from any thread; every change is queued and applied by the renderer
+/// at the start of its next quantum, so the renderer never waits on a lock.
+public abstract class BaseAudioContext {
+    /// Frames rendered at a time, fixed by the specification.
+    static final int RENDER_QUANTUM = 128;
+
+    private static final Runnable[] NONE = new Runnable[0];
+
+    private final float sampleRate;
+    private final AtomicLong renderedFrames = new AtomicLong();
+    private final AtomicReference<Runnable[]> pending = new AtomicReference<Runnable[]>(NONE);
+    private final AudioDestinationNode destination;
+    private final AudioListener listener;
+    private final PeriodicWave[] standardWaves = new PeriodicWave[4];
+
+    // ---- render side ----
+    private final AudioBus silent = new AudioBus(1);
+    private final ArrayList<AudioNode> rActive = new ArrayList<AudioNode>();
+    private final ArrayList<AudioScheduledSourceNode> rEndedNow = new ArrayList<AudioScheduledSourceNode>();
+    private long rQuantum;
+
+    BaseAudioContext(float sampleRate, int destinationChannels, int maxChannels) {
+        checkSampleRate(sampleRate);
+        this.sampleRate = sampleRate;
+        destination = new AudioDestinationNode(this, destinationChannels, maxChannels);
+        listener = new AudioListener(this);
+    }
+
+    /// Times reach the renderer as `float` seconds more often than not
+    /// (`200 / 48000f`), which lands a hair past the frame meant. A frame
+    /// position within a thousandth of a frame of a whole frame is taken as
+    /// that frame.
+    static double snapFrames(double frames) {
+        double r = Math.floor(frames + 0.5);
+        return Math.abs(frames - r) < 1e-3 ? r : frames;
+    }
+
+    static boolean nonNegativeFinite(double v) {
+        return v >= 0 && !Double.isInfinite(v);
+    }
+
+    static boolean positiveFinite(double v) {
+        return v > 0 && !Double.isInfinite(v);
+    }
+
+    static void checkSampleRate(float sampleRate) {
+        if (!(sampleRate >= 3000f && sampleRate <= 768000f)) {
+            throw new IllegalArgumentException("sampleRate must be between 3000 and 768000: " + sampleRate);
+        }
+    }
+
+    /// The sample rate every node of this context renders at.
+    ///
+    /// #### Returns
+    ///
+    /// frames per second
+    public float getSampleRate() {
+        return sampleRate;
+    }
+
+    /// The time of the next frame to be rendered: the clock every scheduling
+    /// method is measured against. It starts at 0 and advances one render
+    /// quantum at a time.
+    ///
+    /// #### Returns
+    ///
+    /// seconds
+    public double getCurrentTime() {
+        return renderedFrames.get() / (double) sampleRate;
+    }
+
+    /// The node whose input is heard (or recorded, offline).
+    ///
+    /// #### Returns
+    ///
+    /// the destination
+    public AudioDestinationNode getDestination() {
+        return destination;
+    }
+
+    /// The listener every [PannerNode] of this context is heard from.
+    ///
+    /// #### Returns
+    ///
+    /// the listener
+    public AudioListener getListener() {
+        return listener;
+    }
+
+    /// Creates a curve distortion node with no curve.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public WaveShaperNode createWaveShaper() {
+        return new WaveShaperNode(this);
+    }
+
+    /// Creates a spectrum and waveform analyser.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public AnalyserNode createAnalyser() {
+        return new AnalyserNode(this);
+    }
+
+    /// Creates a compressor with the specification's default settings.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public DynamicsCompressorNode createDynamicsCompressor() {
+        return new DynamicsCompressorNode(this);
+    }
+
+    /// Creates a convolver with no impulse response.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public ConvolverNode createConvolver() {
+        return new ConvolverNode(this);
+    }
+
+    /// Creates a 3D panner, equal-power with the inverse distance model until changed.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public PannerNode createPanner() {
+        return new PannerNode(this);
+    }
+
+    /// Creates a node running custom Java DSP, the counterpart of
+    /// `new AudioWorkletNode(...)`. There is no module to load: the processor
+    /// is an ordinary object, called on the render thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `processor`: the DSP
+    ///
+    /// - `numberOfInputs`: inputs the node has
+    ///
+    /// - `numberOfOutputs`: outputs the node has
+    ///
+    /// - `outputChannelCount`: channels of each output; null gives every output one
+    ///
+    /// - `parameters`: the parameters to create, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public AudioProcessorNode createAudioProcessor(AudioProcessor processor, int numberOfInputs,
+            int numberOfOutputs, int[] outputChannelCount, AudioParamDescriptor[] parameters) {
+        return new AudioProcessorNode(this, processor, numberOfInputs, numberOfOutputs,
+                outputChannelCount, parameters);
+    }
+
+    /// Creates a one input, one output processor node with one output channel
+    /// per input channel up to two, and no parameters.
+    ///
+    /// #### Parameters
+    ///
+    /// - `processor`: the DSP
+    ///
+    /// - `outputChannels`: the output's channel count
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public AudioProcessorNode createAudioProcessor(AudioProcessor processor, int outputChannels) {
+        return createAudioProcessor(processor, 1, 1, new int[]{outputChannels}, null);
+    }
+
+    /// Whether [#createAudioProcessor] runs custom DSP here. It is always
+    /// true, since the whole graph is rendered by portable code; the method
+    /// exists so code written for the Web Audio worklet's spotty support can ask.
+    ///
+    /// #### Returns
+    ///
+    /// true
+    public boolean isAudioProcessorSupported() {
+        return true;
+    }
+
+    /// Creates a source that plays live capture, the counterpart of
+    /// `createMediaStreamSource` for a microphone. Record with
+    /// `MediaRecorderBuilder.redirectToAudioBuffer(true)` and pass the buffer
+    /// from `MediaManager.getAudioBuffer(path, true, size)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `capture`: the buffer the recorder fills
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public MicrophoneSourceNode createMicrophoneSource(com.codename1.media.AudioBuffer capture) {
+        return new MicrophoneSourceNode(this, capture);
+    }
+
+    /// Whether the platform can capture to an `AudioBuffer`, which
+    /// [#createMicrophoneSource] plays. Recording still needs the user's
+    /// permission, which the recorder asks for.
+    ///
+    /// #### Returns
+    ///
+    /// true where capture to a buffer is implemented
+    public boolean isMicrophoneSourceSupported() {
+        return com.codename1.ui.Display.getInstance().isAudioBufferCaptureSupported();
+    }
+
+    /// Decodes an encoded audio file into an [AudioData] for an
+    /// [AudioBufferSourceNode], the counterpart of `decodeAudioData`.
+    ///
+    /// The decoder is portable code and reads RIFF WAVE (integer PCM of 8 to
+    /// 32 bits, float of 32 or 64 bits). It answers null for anything else;
+    /// convert compressed audio to WAVE ahead of time. The result keeps the
+    /// file's sample rate, and a buffer source resamples it as it plays.
+    ///
+    /// #### Parameters
+    ///
+    /// - `encoded`: the file's bytes
+    ///
+    /// #### Returns
+    ///
+    /// the audio, or null when the format is not one this decoder reads
+    public AudioData decodeAudioData(byte[] encoded) {
+        return WavDecoder.decode(encoded);
+    }
+
+    /// Whether [PanningModel#HRTF] renders binaurally on this platform. It is
+    /// always true: the head model is portable code. The method exists so code
+    /// written for platforms where HRTF might fall back to equal-power can ask.
+    ///
+    /// #### Returns
+    ///
+    /// true
+    public boolean isHrtfSupported() {
+        return true;
+    }
+
+    /// The life cycle state.
+    ///
+    /// #### Returns
+    ///
+    /// the state
+    public abstract AudioContextState getState();
+
+    /// Creates silent [AudioData] to fill in and play.
+    ///
+    /// #### Parameters
+    ///
+    /// - `numberOfChannels`: 1 to 32
+    ///
+    /// - `length`: frames
+    ///
+    /// - `sampleRate`: frames per second; need not match the context
+    ///
+    /// #### Returns
+    ///
+    /// the new data
+    public AudioData createBuffer(int numberOfChannels, int length, float sampleRate) {
+        return new AudioData(numberOfChannels, length, sampleRate);
+    }
+
+    /// Creates a node that multiplies its input by a gain.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public GainNode createGain() {
+        return new GainNode(this);
+    }
+
+    /// Creates a delay line of up to one second.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public DelayNode createDelay() {
+        return new DelayNode(this, 1);
+    }
+
+    /// Creates a delay line.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxDelayTime`: the longest delay in seconds, more than 0 and less than 180
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public DelayNode createDelay(double maxDelayTime) {
+        return new DelayNode(this, maxDelayTime);
+    }
+
+    /// Creates a node that plays [AudioData].
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public AudioBufferSourceNode createBufferSource() {
+        return new AudioBufferSourceNode(this);
+    }
+
+    /// Creates a node whose output is a constant, or automated, value.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public ConstantSourceNode createConstantSource() {
+        return new ConstantSourceNode(this);
+    }
+
+    /// Creates a band-limited oscillator, a 440 Hz sine until changed.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public OscillatorNode createOscillator() {
+        return new OscillatorNode(this);
+    }
+
+    /// Creates a second order filter, a 350 Hz low pass until changed.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public BiquadFilterNode createBiquadFilter() {
+        return new BiquadFilterNode(this);
+    }
+
+    /// Creates a general IIR filter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `feedforward`: the numerator coefficients, 1 to 20 of them, not all 0
+    ///
+    /// - `feedback`: the denominator coefficients, 1 to 20 of them, the first not 0
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public IIRFilterNode createIIRFilter(double[] feedforward, double[] feedback) {
+        return new IIRFilterNode(this, feedforward, feedback);
+    }
+
+    /// Creates an equal-power stereo panner.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public StereoPannerNode createStereoPanner() {
+        return new StereoPannerNode(this);
+    }
+
+    /// Creates a node that splits 6 channels into 6 mono outputs.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public ChannelSplitterNode createChannelSplitter() {
+        return new ChannelSplitterNode(this, 6);
+    }
+
+    /// Creates a node that splits channels into mono outputs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `numberOfOutputs`: 1 to 32
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public ChannelSplitterNode createChannelSplitter(int numberOfOutputs) {
+        return new ChannelSplitterNode(this, numberOfOutputs);
+    }
+
+    /// Creates a node that merges 6 mono inputs into one 6 channel output.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public ChannelMergerNode createChannelMerger() {
+        return new ChannelMergerNode(this, 6);
+    }
+
+    /// Creates a node that merges mono inputs into one output.
+    ///
+    /// #### Parameters
+    ///
+    /// - `numberOfInputs`: 1 to 32
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public ChannelMergerNode createChannelMerger(int numberOfInputs) {
+        return new ChannelMergerNode(this, numberOfInputs);
+    }
+
+    /// Creates a normalized custom waveform for an [OscillatorNode].
+    ///
+    /// #### Parameters
+    ///
+    /// - `real`: cosine coefficients; index 0, the DC term, is ignored
+    ///
+    /// - `imag`: sine coefficients, the same length as `real`
+    ///
+    /// #### Returns
+    ///
+    /// the waveform
+    public PeriodicWave createPeriodicWave(float[] real, float[] imag) {
+        return new PeriodicWave(real, imag, false);
+    }
+
+    /// Creates a custom waveform for an [OscillatorNode].
+    ///
+    /// #### Parameters
+    ///
+    /// - `real`: cosine coefficients; index 0, the DC term, is ignored
+    ///
+    /// - `imag`: sine coefficients, the same length as `real`
+    ///
+    /// - `disableNormalization`: true to keep the coefficients' own amplitude
+    ///   rather than scaling the peak to 1
+    ///
+    /// #### Returns
+    ///
+    /// the waveform
+    public PeriodicWave createPeriodicWave(float[] real, float[] imag, boolean disableNormalization) {
+        return new PeriodicWave(real, imag, disableNormalization);
+    }
+
+    PeriodicWave standardWave(OscillatorType type) {
+        int i = type.ordinal();
+        PeriodicWave w = standardWaves[i];
+        if (w == null) {
+            w = PeriodicWave.standard(type);
+            standardWaves[i] = w;
+        }
+        return w;
+    }
+
+    /// Queues a change for the renderer.
+    void post(Runnable r) {
+        for (;;) {
+            Runnable[] cur = pending.get();
+            Runnable[] next = new Runnable[cur.length + 1];
+            System.arraycopy(cur, 0, next, 0, cur.length);
+            next[cur.length] = r;
+            if (pending.compareAndSet(cur, next)) {
+                return;
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- render
+
+    AudioBus silentBus() {
+        return silent;
+    }
+
+    void rActivate(AudioNode n) {
+        if (!rActive.contains(n)) {
+            rActive.add(n);
+        }
+    }
+
+    void rEnded(AudioScheduledSourceNode n) {
+        rEndedNow.add(n);
+    }
+
+    /// Renders the next quantum and returns the destination's output. Render
+    /// thread only.
+    final AudioBus renderQuantum() {
+        Runnable[] changes = pending.getAndSet(NONE);
+        for (Runnable change : changes) {
+            change.run();
+        }
+        long q = rQuantum;
+        AudioBus out = destination.pull(0, q);
+        // Sources not (yet) connected to the destination still advance in time.
+        for (int i = 0; i < rActive.size(); i++) { // NOPMD ForLoopCanBeForeach - no iterator on the render thread
+            AudioNode n = rActive.get(i);
+            if (!n.renderedQuantum(q)) {
+                n.pull(0, q);
+            }
+        }
+        rQuantum = q + 1;
+        renderedFrames.set(rQuantum * RENDER_QUANTUM);
+        int ended = rEndedNow.size();
+        if (ended > 0) {
+            for (int i = 0; i < ended; i++) {
+                AudioScheduledSourceNode n = rEndedNow.get(i);
+                rActive.remove(n);
+                n.dispatchEnded(dispatchesEndedInline());
+            }
+            rEndedNow.clear();
+        }
+        return out;
+    }
+
+    /// Whether `onended` callbacks run on the rendering thread (offline) or are
+    /// handed to the EDT (real time).
+    abstract boolean dispatchesEndedInline();
+}

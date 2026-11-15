@@ -1117,11 +1117,21 @@ There are four places it speaks up:
 
 ==== Audio and asset notes
 
-* *Formats.* Clips are played by each platform's own media player, so try
-  the game's sound files on every target you build for.
-* *Pitch and looping.* A clip plays at its recorded speed whatever
-  `AudioSource.pitch` says, and a looped clip restarts when it ends, which can
+* *Formats.* On a platform with a real-time audio graph (see
+  <<audio-graph>>), WAV clips play through it. Other clips, and every clip on
+  a platform without the graph, are played by the platform's own media
+  player, so try the game's compressed sound files on every target you build
+  for.
+* *Pitch and looping.* A WAV clip on the audio graph plays at
+  `AudioSource.pitch` and loops without a gap. A clip played by the media
+  player plays at its recorded speed, and restarts when it loops, which can
   leave a short gap.
+* *3D sound.* `spatialBlend`, `panStereo`, `rolloffMode`, `minDistance` and
+  `maxDistance` work as in Unity: a source is attenuated by its distance to
+  the `AudioListener` and panned by where it lies to the listener's side, and
+  `PlayClipAtPoint` places its sound. A custom rolloff curve is heard as the
+  logarithmic one, and Doppler and spread aren't applied. The media player
+  can't pan, so a clip it plays gets the attenuation only.
 * *`Resources`.* `Resources.Load` finds text assets, single-sprite images,
   audio clips and prefabs. `LoadAll` isn't in the API. An image sliced into
   several sprites isn't found by `Resources.Load`, with a note; refer to its

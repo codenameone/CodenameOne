@@ -51,6 +51,38 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_accessibilityEnd___int(CODENA
 JAVA_VOID com_codename1_impl_windows_WindowsNative_accessibilityNode___long_long_java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG id, JAVA_LONG parent, JAVA_OBJECT role, JAVA_OBJECT label, JAVA_OBJECT description, JAVA_OBJECT value, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height, JAVA_INT flags) {
 }
 
+/* cn1_windows_audioout.c */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_audioOutClose___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+}
+
+/* cn1_windows_audioout.c */
+JAVA_DOUBLE com_codename1_impl_windows_WindowsNative_audioOutLatency___long_R_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    return 0;
+}
+
+/* cn1_windows_audioout.c */
+JAVA_LONG com_codename1_impl_windows_WindowsNative_audioOutOpen___int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT sampleRate, JAVA_INT channels) {
+    return 0;
+}
+
+/* cn1_windows_audioout.c */
+JAVA_INT com_codename1_impl_windows_WindowsNative_audioOutRate___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    return 0;
+}
+
+/* cn1_windows_audioout.c */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_audioOutStart___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+}
+
+/* cn1_windows_audioout.c */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_audioOutStop___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+}
+
+/* cn1_windows_audioout.c */
+JAVA_INT com_codename1_impl_windows_WindowsNative_audioOutWrite___long_float_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT pcm, JAVA_INT offset, JAVA_INT frames) {
+    return 0;
+}
+
 /* cn1_windows_audiorec.c */
 JAVA_LONG com_codename1_impl_windows_WindowsNative_audioRecStart___java_lang_String_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT pathObj, JAVA_INT sampleRate, JAVA_INT channels) {
     return 0;
