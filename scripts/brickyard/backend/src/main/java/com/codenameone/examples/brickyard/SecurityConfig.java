@@ -109,6 +109,10 @@ public class SecurityConfig {
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             StoreNotifications.PATH)).permitAll()
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
+                            StoreNotifications.APPLE_PATH)).permitAll()
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
+                            StoreNotifications.GOOGLE_PATH)).permitAll()
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/leaderboards/*/scores")).hasRole(Roles.ENGINE)
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/badges/*/award")).hasRole(Roles.ENGINE)

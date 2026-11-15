@@ -110,6 +110,39 @@ class OperationsTest {
         assertEquals(404, notify("apple", "bricks.400", "t-both-3", "nobody@test.example"));
     }
 
+    private static String b64url(String json) throws Exception {
+        return com.codename1.backend.Base64Url.encode(json.getBytes("UTF-8"));
+    }
+
+    private int postRaw(String path, String body) throws Exception {
+        return Api.statusOf(mvc, Api.body(post(path), body));
+    }
+
+    @Test
+    void storeRefundNotificationsTakeTheBricksBackOnce() throws Exception {
+        String u = Api.player(accounts, "refunds");
+        assertEquals(200, receipt(u, "apple", "bricks.400", "t-ref-1"));
+        assertEquals(200, receipt(u, "google", "bricks.400", "t-ref-2"));
+        long paid = balance(u);
+        // The simulated store vouches for "sim:<id>", so that is the id its refund names.
+        String txn = "x." + b64url("{\"transactionId\":\"sim:t-ref-1\"}") + ".sig";
+        String apple = "{\"signedPayload\":\"h." + b64url("{\"notificationType\":\"REFUND\","
+                + "\"data\":{\"signedTransactionInfo\":\"" + txn + "\"}}") + ".sig\"}";
+        assertEquals(200, postRaw(StoreNotifications.APPLE_PATH, apple));
+        assertEquals(paid - 400, balance(u));
+        // The store retries: the second delivery changes nothing.
+        assertEquals(200, postRaw(StoreNotifications.APPLE_PATH, apple));
+        assertEquals(paid - 400, balance(u));
+        String data = java.util.Base64.getEncoder().encodeToString(
+                "{\"voidedPurchaseNotification\":{\"orderId\":\"sim:t-ref-2\"}}".getBytes("UTF-8"));
+        assertEquals(200, postRaw(StoreNotifications.GOOGLE_PATH, "{\"message\":{\"data\":\"" + data + "\"}}"));
+        assertEquals(paid - 800, balance(u));
+        // A renewal or a purchase is not acted on here; the app's receipt credits it.
+        String renewal = "{\"signedPayload\":\"h." + b64url("{\"notificationType\":\"DID_RENEW\"}") + ".s\"}";
+        assertEquals(200, postRaw(StoreNotifications.APPLE_PATH, renewal));
+        assertEquals(paid - 800, balance(u));
+    }
+
     // -- bans --------------------------------------------------------------
 
     private static MockRequestBuilder form(String path, String... pairs) {

@@ -29,38 +29,29 @@ import com.codenameone.examples.brickyard.api.ChatDto;
 import com.codenameone.examples.brickyard.api.FollowDto;
 import com.codenameone.examples.brickyard.api.FriendDto;
 import com.codenameone.examples.brickyard.api.FriendRequestDto;
-import com.codenameone.examples.brickyard.api.InviteDto;
 import com.codenameone.examples.brickyard.api.PartyDto;
 import com.codenameone.examples.brickyard.api.PresenceDto;
-import com.codenameone.examples.brickyard.api.WalletDto;
-import com.codenameone.examples.brickyard.domain.Account;
 import com.codenameone.examples.brickyard.domain.ChatMessage;
 import com.codenameone.examples.brickyard.domain.Follow;
-import com.codenameone.examples.brickyard.domain.FraudFlag;
 import com.codenameone.examples.brickyard.domain.FriendRequest;
-import com.codenameone.examples.brickyard.domain.Invite;
 import com.codenameone.examples.brickyard.domain.Party;
 import com.codenameone.examples.brickyard.domain.PartyMember;
 import com.codenameone.examples.brickyard.domain.Presence;
-import com.codenameone.examples.brickyard.domain.Referral;
 import com.codenameone.examples.brickyard.domain.UserBlock;
-import com.codenameone.examples.brickyard.economy.Wallet;
 import com.codenameone.examples.brickyard.moderation.Sanctions;
 import com.codenameone.examples.brickyard.repository.ChatMessageRepository;
 import com.codenameone.examples.brickyard.repository.FollowRepository;
-import com.codenameone.examples.brickyard.repository.FraudFlagRepository;
 import com.codenameone.examples.brickyard.repository.FriendRequestRepository;
-import com.codenameone.examples.brickyard.repository.InviteRepository;
 import com.codenameone.examples.brickyard.repository.PartyMemberRepository;
 import com.codenameone.examples.brickyard.repository.PartyRepository;
 import com.codenameone.examples.brickyard.repository.PresenceRepository;
-import com.codenameone.examples.brickyard.repository.ReferralRepository;
 import com.codenameone.examples.brickyard.repository.UserBlockRepository;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/// Friend requests, follows, presence, blocks, parties, chat, DMs and referrals.
+/// Friend requests, follows, presence, blocks, parties, chat and DMs; invites
+/// and referrals are [com.codenameone.examples.brickyard.referral.Referrals].
 @Component
 public class Social {
     public static final int PARTY_SIZE = 6;
@@ -71,14 +62,14 @@ public class Social {
     public static final int CHAT_BURST = 10;
     public static final long CHAT_BURST_MILLIS = 10000;
     public static final long REFERRAL_BRICKS = 50;
-    /// At most this many redemptions of one inviter's codes per day.
+    /// At most this many redemptions of one inviter's codes per day
+    /// (enforced by the referral ledger).
     public static final int REFERRALS_PER_DAY = 5;
     /// Only an account this young may redeem an invite.
     public static final long REFERRAL_WINDOW = 7 * Clock.DAY;
 
     private final Accounts accounts;
     private final Sanctions sanctions;
-    private final Wallet wallet;
     private final FriendRequestRepository requests;
     private final FollowRepository follows;
     private final PresenceRepository presence;
@@ -86,20 +77,16 @@ public class Social {
     private final PartyRepository parties;
     private final PartyMemberRepository members;
     private final ChatMessageRepository chat;
-    private final InviteRepository invites;
-    private final ReferralRepository referrals;
-    private final FraudFlagRepository fraud;
     /// Chat on or off for the account, checked on every line sent.
     private final Limits limits;
 
-    public Social(Accounts accounts, Sanctions sanctions, Wallet wallet, FriendRequestRepository requests,
+    public Social(Accounts accounts, Sanctions sanctions, FriendRequestRepository requests,
             FollowRepository follows, PresenceRepository presence, UserBlockRepository blocks,
             PartyRepository parties, PartyMemberRepository members, ChatMessageRepository chat,
-            InviteRepository invites, ReferralRepository referrals, FraudFlagRepository fraud, Limits limits) {
+            Limits limits) {
         this.limits = limits;
         this.accounts = accounts;
         this.sanctions = sanctions;
-        this.wallet = wallet;
         this.requests = requests;
         this.follows = follows;
         this.presence = presence;
@@ -107,9 +94,6 @@ public class Social {
         this.parties = parties;
         this.members = members;
         this.chat = chat;
-        this.invites = invites;
-        this.referrals = referrals;
-        this.fraud = fraud;
     }
 
     public List<FriendRequestDto> incoming(String username) {
@@ -453,77 +437,6 @@ public class Social {
     }
 
     @Transactional(rollbackFor = IOException.class)
-    public InviteDto createInvite(String username, InviteDto request) throws IOException {
-        Invite i = new Invite();
-        i.setId(Ids.next().substring(0, 12));
-        i.setInviter(username);
-        i.setDeviceHash(deviceHash(request));
-        i.setCreatedAt(Clock.now());
-        invites.insert(i);
-        return new InviteDto(i.getId(), "");
-    }
-
-    private static String deviceHash(InviteDto request) throws IOException {
-        if (request == null || request.deviceId() == null || request.deviceId().trim().length() < 8) {
-            throw new ResponseStatusException(400, "An invite needs the device id");
-        }
-        return Ids.sha256(request.deviceId().trim()).substring(0, 64);
-    }
-
-    /// Redeems an invite: both sides get [#REFERRAL_BRICKS]. Refused, and
-    /// flagged for staff, when the code is the caller's own, when the
-    /// redeeming device is the one that made the code, or when the inviter
-    /// passed [#REFERRALS_PER_DAY] today. An account redeems once, and only
-    /// within [#REFERRAL_WINDOW] of opening.
-    ///
-    /// Deliberately not one transaction: a refusal must keep the fraud flag
-    /// it wrote. The referral row goes in first, keyed by the invited
-    /// account, so a second redemption fails before any Bricks move.
-    public WalletDto redeem(String username, InviteDto request) throws IOException {
-        String device = deviceHash(request);
-        Invite i = request.code() == null ? null : invites.findById(request.code().trim());
-        if (i == null) {
-            throw new ResponseStatusException(404, "No such invite");
-        }
-        if (referrals.findById(username) != null) {
-            throw new ResponseStatusException(409, "You already redeemed an invite");
-        }
-        Account me = accounts.account(username);
-        if (me.getCreatedAt() < Clock.now() - REFERRAL_WINDOW) {
-            throw new ResponseStatusException(409, "Invites are for new accounts");
-        }
-        if (i.getInviter().equals(username)) {
-            throw flag(username, "SELF_REFERRAL", "own code " + i.getId());
-        }
-        if (i.getDeviceHash().equals(device)) {
-            throw flag(username, "SAME_DEVICE", "code " + i.getId() + " from " + i.getInviter());
-        }
-        if (referrals.byInviterSince(i.getInviter(), Clock.now() - Clock.DAY).size() >= REFERRALS_PER_DAY) {
-            throw flag(i.getInviter(), "REFERRAL_VELOCITY", "redeemed by " + username);
-        }
-        Referral r = new Referral();
-        r.setId(username);
-        r.setInviter(i.getInviter());
-        r.setCode(i.getId());
-        r.setDeviceHash(device);
-        r.setCreatedAt(Clock.now());
-        referrals.insert(r);
-        wallet.post(username, REFERRAL_BRICKS, "REFERRAL", i.getInviter());
-        wallet.post(i.getInviter(), REFERRAL_BRICKS, "REFERRAL", username);
-        return wallet.describe(username);
-    }
-
-    /// Writes the flag and answers the refusal to throw.
-    private ResponseStatusException flag(String username, String kind, String detail) throws IOException {
-        FraudFlag f = new FraudFlag();
-        f.setId(Ids.next());
-        f.setUsername(username);
-        f.setKind(kind);
-        f.setDetail(detail.length() > 400 ? detail.substring(0, 400) : detail);
-        f.setCreatedAt(Clock.now());
-        fraud.insert(f);
-        return new ResponseStatusException(403, "That invite cannot be redeemed");
-    }
 
     private static PresenceDto toDto(Presence p) {
         return new PresenceDto(p.getId(), p.getStatus(), p.getExperienceId(), p.getServerId(), p.getUpdatedAt());

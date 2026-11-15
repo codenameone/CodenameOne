@@ -553,6 +553,12 @@ public class Economy {
         return wallet.describe(username);
     }
 
+    /// True when `purchaseId` names a purchase made here and not yet refunded.
+    public boolean isRefundable(String purchaseId) {
+        StorePurchase p = purchases.findById(purchaseId);
+        return p != null && p.getRefunded() == 0;
+    }
+
     /// Refunds a store purchase: the Bricks it granted are taken back, even
     /// below zero, since the money is going back to the player.
     @Transactional(rollbackFor = IOException.class)

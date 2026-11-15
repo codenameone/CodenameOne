@@ -23,6 +23,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.PostMapping;
 import com.codename1.backend.annotations.RequestBody;
 import com.codename1.backend.annotations.RequestHeader;
+import com.codename1.backend.annotations.RequestParam;
 import com.codename1.backend.annotations.RestController;
 import com.codename1.backend.annotations.Value;
 import com.codename1.backend.security.oauth2.core.OAuth2Parameters;
@@ -40,6 +41,10 @@ import com.codenameone.examples.brickyard.api.WalletDto;
 public class StoreNotifications {
     public static final String PATH = "/api/store/notifications";
     public static final String SECRET_HEADER = "X-Store-Notification-Secret";
+    /// Where App Store Server Notifications V2 are sent, with `?secret=`.
+    public static final String APPLE_PATH = PATH + "/apple";
+    /// Where the Pub/Sub push subscription for Google Play sends, with `?secret=`.
+    public static final String GOOGLE_PATH = PATH + "/google";
 
     private final Economy economy;
     private final String secret;
@@ -64,5 +69,42 @@ public class StoreNotifications {
             throw new ResponseStatusException(401, "Not the store");
         }
         return economy.notified(notification);
+    }
+
+    /// An App Store Server Notification; a refund takes the Bricks back.
+    @PostMapping(APPLE_PATH)
+    public String apple(@RequestParam(value = "secret", required = false) String presented,
+            @RequestBody String body) throws Exception {
+        check(presented);
+        return refund(StoreRefunds.apple(body));
+    }
+
+    /// A Google Play notification pushed by Pub/Sub; a voided purchase takes the Bricks back.
+    @PostMapping(GOOGLE_PATH)
+    public String google(@RequestParam(value = "secret", required = false) String presented,
+            @RequestBody String body) throws Exception {
+        check(presented);
+        return refund(StoreRefunds.google(body));
+    }
+
+    /// Answers 200 for anything handled or deliberately ignored, so the store
+    /// does not retry it; a refund of a purchase never seen here is ignored.
+    private String refund(String purchaseId) throws Exception {
+        if (purchaseId == null || !economy.isRefundable(purchaseId)) {
+            return "ignored";
+        }
+        economy.refund(purchaseId, "store refund");
+        return "refunded";
+    }
+
+    private void check(String presented) {
+        if (secret.length() == 0) {
+            if (!dev) {
+                throw new ResponseStatusException(503,
+                        "Store notifications are not configured: set brickyard.iap.notification-secret");
+            }
+        } else if (!OAuth2Parameters.equalsConstantTime(secret, presented)) {
+            throw new ResponseStatusException(401, "Not the store");
+        }
     }
 }
