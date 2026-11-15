@@ -122,6 +122,7 @@
         <!-- Java 8 like dart-transpiler; its runtime is in flutter-modules. -->
         <module>python-transpiler</module>
         <module>luau-runtime</module>
+        <module>rbx-compat</module>
         <module>sqlite-jdbc</module>
         <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
         <module>backend</module>

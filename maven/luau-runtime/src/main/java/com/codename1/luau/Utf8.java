@@ -25,7 +25,7 @@ package com.codename1.luau;
 
 /// Luau strings are byte strings. Here each byte is one Java char in the
 /// range 0-255, so UTF-8 text is held as its encoded bytes.
-final class Utf8 {
+public final class Utf8 {
     private Utf8() {
     }
 
@@ -48,7 +48,7 @@ final class Utf8 {
     }
 
     /// Host text (UTF-16) to a Luau byte string.
-    static String fromJava(String s) {
+    public static String fromJava(String s) {
         boolean ascii = true;
         for (int i = 0; i < s.length(); i++) {
             if (s.charAt(i) >= 0x80) {
@@ -75,7 +75,7 @@ final class Utf8 {
     }
 
     /// A Luau byte string to host text; malformed bytes become U+FFFD.
-    static String toJava(String s) {
+    public static String toJava(String s) {
         boolean ascii = true;
         for (int i = 0; i < s.length(); i++) {
             if (s.charAt(i) >= 0x80) {
