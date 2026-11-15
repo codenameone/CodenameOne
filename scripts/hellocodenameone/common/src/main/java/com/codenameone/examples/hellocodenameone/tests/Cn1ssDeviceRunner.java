@@ -457,6 +457,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SchedulerMonthThemeScreenshotTest(),
             new SchedulerResourceThemeScreenshotTest(),
             new GanttThemeScreenshotTest(),
+            new NodeGraphThemeScreenshotTest(),
             new ToolbarThemeScreenshotTest(),
             new TabsThemeScreenshotTest(),
             new MultiButtonThemeScreenshotTest(),
