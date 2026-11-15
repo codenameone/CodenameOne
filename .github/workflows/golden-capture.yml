@@ -112,6 +112,7 @@ jobs:
         run: scripts/ci/golden-capture.sh wait "$RUNS"
 
       - name: Collect, commit and push the goldens
+        id: push
         run: |
           set -euo pipefail
           # Pull the branch again first: someone may have pushed while the legs
@@ -129,6 +130,7 @@ jobs:
           git commit -m "Capture goldens for $TESTS" \
             -m "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           git push origin "HEAD:$HEAD_REF"
+          echo "pushed=1" >> "$GITHUB_OUTPUT"
           if [ "$ok" != 1 ]; then
             echo "::error::At least one capture leg failed; see the log above for which."
             exit 1
@@ -137,7 +139,8 @@ jobs:
       # A capture that never pushed would leave the PR's other checks cancelled
       # for good; start them again.
       - name: Re-run what was cancelled
-        if: failure()
+        # Not after a push: that started CI on the new head already.
+        if: failure() && steps.push.outputs.pushed != '1'
         env:
           IDS: ${{ steps.cancel1.outputs.ids }} ${{ steps.cancel2.outputs.ids }}
         run: |

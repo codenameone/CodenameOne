@@ -60,6 +60,6 @@ jobs:
           if [ "$run" = false ]; then
             # Red, not skipped: a skipped required check counts as passing, and
             # this PR has not passed anything. The goldens push re-runs it.
-            echo "::error::No goldens yet for $missing. Golden capture is recording them and will push them to this branch."
+            echo "::error::No goldens yet for $missing. The Golden capture workflow records them and pushes them to this branch; if that run failed, re-run it."
             exit 1
           fi

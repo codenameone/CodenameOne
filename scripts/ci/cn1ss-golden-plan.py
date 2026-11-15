@@ -173,8 +173,9 @@ def candidate_names(name, classes):
     for suffix in SUFFIXES:
         if name.endswith(suffix) and len(name) > len(suffix):
             names.add(name[:-len(suffix)])
-    if name in classes:
-        names.update(LITERAL.findall(classes[name][1]))
+    # The image name may be a literal in a base class the test inherits.
+    for c in chain(name, classes):
+        names.update(LITERAL.findall(classes[c][1]))
     return names
 
 

@@ -56,6 +56,13 @@ class GoldenPlanTest(unittest.TestCase):
     def test_suffixes_literals_and_any_directory_cover(self):
         self.assertEqual(self.run_plan({"a": ["Foo_dark", "bar-image"], "b": ["MaybeScreenshotTest", "Child", "kotlin"]}), [])
 
+    def test_literal_in_base_class_names_the_image(self):
+        SOURCES["ParentForm.java"] = 'abstract class ParentForm extends BaseTest { void r(){ emitCurrentFormScreenshot("parent-shot"); } }'
+        try:
+            self.assertNotIn("ChildTest", self.run_plan({"a": ["parent-shot"]}))
+        finally:
+            SOURCES["ParentForm.java"] = "abstract class ParentForm extends BaseTest { void r(){ emitCurrentFormScreenshot(name()); } }"
+
     def test_prefix_needs_a_separator(self):
         self.assertIn("FooScreenshotTest", self.run_plan({"a": ["Foobar"]}))
 
@@ -90,7 +97,7 @@ class CollectTest(unittest.TestCase):
             self.assertEqual(sorted(os.listdir(os.path.join(dest, "g"))), ["Foo_dark.png"])
             put("2", "cn1ss-capture-b", "Foo_dark.png", "y")
             os.remove(os.path.join(dest, "g", "Foo_dark.png"))
-            self.assertFalse(col.collect(dl, dest, ["FooScreenshotTest"], classes))
+            self.assertTrue(col.collect(dl, dest, ["FooScreenshotTest"], classes))
 
 
 if __name__ == "__main__":

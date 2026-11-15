@@ -5,7 +5,7 @@ Usage: golden-capture-collect.py DOWNLOADS DEST TESTS
 
 DOWNLOADS/<run>/<artifact>/<repo path>.png. Keeps only images that belong to
 one of TESTS (comma separated) by the detector's own naming rules, never
-overwrites a golden DEST already has, and fails when two legs that share a
+overwrites a golden DEST already has, and warns when two legs that share a
 golden directory captured different bytes for the same image.
 """
 import filecmp
@@ -38,8 +38,9 @@ def collect(dl, dest, tests, classes):
                     target = os.path.join(dest, rel)
                     if rel in added:
                         if not filecmp.cmp(added[rel], src, shallow=False):
-                            print("::error::%s differs between %s and the leg captured first" % (rel, art))
-                            ok = False
+                            # Shared dir, so one file wins either way; the
+                            # follow-up CI compares both legs against it.
+                            print("::warning::%s differs between %s and the leg captured first; kept the first" % (rel, art))
                         continue
                     if os.path.exists(target):
                         print("[golden-capture] kept existing %s (%s)" % (rel, art), file=sys.stderr)
