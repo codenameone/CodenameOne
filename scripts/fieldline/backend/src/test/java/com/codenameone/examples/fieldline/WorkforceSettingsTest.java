@@ -186,6 +186,38 @@ class WorkforceSettingsTest {
     }
 
     @Test
+    void overlappingShiftsOweTheBreakOfTheWholeSpan() throws Exception {
+        // Neither piece alone runs past the default 180 minutes, together
+        // they run four hours: one break is owed, not none.
+        String username = People.technician(accounts, "overlap");
+        String tech = crew.of(username).getId();
+        long now = System.currentTimeMillis();
+        long[][] spans = {{now - 240 * 60000L, now - 130 * 60000L}, {now - 140 * 60000L, 0}};
+        for (int i = 0; i < spans.length; i++) {
+            TimeEntry e = new TimeEntry();
+            e.setId("teoverlap" + i);
+            e.setTechId(tech);
+            e.setKind("SHIFT");
+            e.setJobId("");
+            e.setStartAt(spans[i][0]);
+            e.setEndAt(spans[i][1]);
+            entries.insert(e);
+        }
+        Map sheet = Http.json(mvc, as(get("/api/admin/timesheets?week=0"), admin()));
+        boolean seen = false;
+        for (Object o : (List) sheet.get("rows")) {
+            Map row = (Map) o;
+            if (tech.equals(row.get("techId"))) {
+                seen = true;
+                long shift = Http.number(row, "shiftMinutes");
+                assertTrue(shift >= 239 && shift <= 241, "merged span: " + shift);
+                assertEquals(30, Http.number(row, "breakMinutes"));
+            }
+        }
+        assertTrue(seen);
+    }
+
+    @Test
     void lastWeeksTimesheetIsCostedWithOvertime() throws Exception {
         long lastWeek = System.currentTimeMillis() - 7L * 24 * 3600000L;
         Map sheet = Http.json(mvc, as(get("/api/admin/timesheets?week=" + lastWeek), admin()));

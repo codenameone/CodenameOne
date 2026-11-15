@@ -272,6 +272,17 @@ public class Timekeeping {
 
     /// The Monday on or before `day`. Spelled out because the server's
     /// compiled class library has no temporal adjusters.
+    /// One merged shift's minutes, its unpaid break and its paid weekend
+    /// minutes. The meal break is owed once a shift runs past the point the
+    /// rules say it is taken by; a shift that crosses midnight into or out of a
+    /// weekend is split there, and the break comes off in proportion.
+    private static int[] shiftSpan(long start, long end, PlannerPolicy p, ZoneId zone) {
+        int minutes = (int) ((end - start) / 60000L);
+        int unpaid = minutes > p.getBreakAfterMinutes() ? p.getBreakMinutes() : 0;
+        int onWeekend = weekendMinutes(start, end, zone);
+        return new int[] {minutes, unpaid, onWeekend - (minutes == 0 ? 0 : unpaid * onWeekend / minutes)};
+    }
+
     static LocalDate monday(LocalDate day) {
         return day.minusDays(day.getDayOfWeek().getValue() - 1);
     }
@@ -355,36 +366,54 @@ public class Timekeeping {
             int breaks = 0;
             int weekend = 0;
             List<TimeEntryDto> list = new ArrayList<TimeEntryDto>();
-            // Shifts are counted once even if two were opened together (a
-            // double tap racing a status change): only time past the end of
-            // the shifts already counted is added.
-            long covered = 0;
+            // Time is counted once even if two entries of a kind were opened
+            // together (a double tap racing a status change): overlapping
+            // entries of one kind are merged into one span first, so the break
+            // rule sees the whole shift and travel or job time is not doubled.
+            // The entries come ordered by start.
+            long shiftFrom = -1;
+            long shiftTo = -1;
+            long travelCovered = 0;
+            long jobCovered = 0;
             for (TimeEntry e : worked) {
                 long end = e.getEndAt() > 0 ? e.getEndAt()
                         : Math.min(now, e.getStartAt() + p.getAutoClockOutHours() * 3600000L);
-                int minutes = (int) Math.max(0, (end - e.getStartAt()) / 60000L);
                 list.add(new TimeEntryDto(e.getKind(), e.getStartAt(), e.getEndAt(), e.getJobId()));
                 if (SHIFT.equals(e.getKind())) {
-                    long start = Math.max(e.getStartAt(), covered);
-                    if (end <= start) {
+                    if (end <= e.getStartAt()) {
                         continue;
                     }
-                    covered = end;
-                    minutes = (int) ((end - start) / 60000L);
-                    // The meal break is unpaid, and owed once a shift runs
-                    // past the point the rules say it is taken by.
-                    int unpaid = minutes > p.getBreakAfterMinutes() ? p.getBreakMinutes() : 0;
-                    shift += minutes;
-                    breaks += unpaid;
-                    // A shift that crosses midnight into or out of a weekend
-                    // is split there; the break comes off in proportion.
-                    int onWeekend = weekendMinutes(start, end, zone);
-                    weekend += onWeekend - (minutes == 0 ? 0 : unpaid * onWeekend / minutes);
+                    if (shiftTo >= 0 && e.getStartAt() <= shiftTo) {
+                        shiftTo = Math.max(shiftTo, end);
+                        continue;
+                    }
+                    if (shiftTo >= 0) {
+                        int[] span = shiftSpan(shiftFrom, shiftTo, p, zone);
+                        shift += span[0];
+                        breaks += span[1];
+                        weekend += span[2];
+                    }
+                    shiftFrom = e.getStartAt();
+                    shiftTo = end;
                 } else if (TRAVEL.equals(e.getKind())) {
-                    travel += minutes;
+                    long start = Math.max(e.getStartAt(), travelCovered);
+                    if (end > start) {
+                        travel += (int) ((end - start) / 60000L);
+                        travelCovered = end;
+                    }
                 } else {
-                    onJob += minutes;
+                    long start = Math.max(e.getStartAt(), jobCovered);
+                    if (end > start) {
+                        onJob += (int) ((end - start) / 60000L);
+                        jobCovered = end;
+                    }
                 }
+            }
+            if (shiftTo >= 0) {
+                int[] span = shiftSpan(shiftFrom, shiftTo, p, zone);
+                shift += span[0];
+                breaks += span[1];
+                weekend += span[2];
             }
             int paid = shift - breaks;
             int weekday = paid - weekend;

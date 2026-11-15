@@ -86,7 +86,8 @@ technician:
 * has the customer sign on the screen. The signature is sealed with a hash of
   the signature, the time and the place, so the report can be verified later.
 
-The menu holds the rest: clocking in and out and taking breaks, the working hours
+The menu holds the rest: clocking in and out (the unpaid meal break comes off the
+timesheet by the pay rules), the working hours
 and limits the planner must respect, time-off requests, and adding the day's jobs
 to the phone's calendar.
 
