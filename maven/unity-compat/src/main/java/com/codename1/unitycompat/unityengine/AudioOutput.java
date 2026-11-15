@@ -74,6 +74,14 @@ public interface AudioOutput {
     /// that is heard, and a restart would be heard too.
     void loop(int voice, boolean loop);
 
+    /// Where a voice is heard from: `gain`, 0..1, is the distance
+    /// attenuation, multiplied in beside the voice's volume and the
+    /// listener's, and `pan`, -1 (left) to 1 (right), the stereo position.
+    /// Both are Unity's, worked out by [AudioSource] from `spatialBlend`,
+    /// the rolloff and `panStereo`. A voice never placed is at 1 and 0. An
+    /// output that cannot pan applies the gain alone.
+    void place(int voice, float gain, float pan);
+
     /// `AudioListener.pause`. While held nothing sounds: every voice
     /// stops where it is, one that is started or unpaused meanwhile
     /// waits, and the release lets each go on from its place -- except

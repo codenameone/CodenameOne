@@ -5156,6 +5156,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public boolean isAudioBufferCaptureSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isAudioOutputSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.audio.AudioOutputPeer openAudioOutput(int sampleRate, int channels,
+            com.codename1.media.audio.AudioRenderCallback callback) {
+        return AndroidAudioOutput.open(sampleRate, channels, callback);
+    }
+
+    @Override
     public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
         return createMediaRecorder(builder.getPath(), builder.getMimeType(), builder.getSamplingRate(), builder.getBitRate(), builder.getAudioChannels(), 0, builder.isRedirectToAudioBuffer());
     }

@@ -901,15 +901,21 @@ public abstract class MediaManager {
         };
     }
 
-    /// Returns the cross platform `MediaManager` based `SoundPoolPeer` fallback,
-    /// used by `com.codename1.gaming.SoundPool` when the platform provides no native
-    /// low latency backend. Applications should use `com.codename1.gaming.SoundPool`
+    /// Returns the cross platform `SoundPoolPeer` fallback, used by
+    /// `com.codename1.gaming.SoundPool` when the platform provides no native low
+    /// latency backend: one on the audio graph where `AudioContext.isSupported()`,
+    /// otherwise one over `Media`. Applications should use `com.codename1.gaming.SoundPool`
     /// rather than calling this directly.
     ///
     /// #### Parameters
     ///
     /// - `maxStreams`: the maximum number of simultaneously playing voices
     public static SoundPoolPeer createFallbackSoundPoolPeer(int maxStreams) {
+        // A platform with a real-time audio graph mixes on it, with pan and
+        // rate; otherwise every voice is a Media.
+        if (com.codename1.media.audio.AudioContext.isSupported()) {
+            return new GraphSoundPoolPeer(maxStreams);
+        }
         return new MediaSoundPoolPeer(maxStreams);
     }
 

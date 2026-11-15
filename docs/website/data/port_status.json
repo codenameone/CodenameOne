@@ -580,8 +580,9 @@
       "id": "audio-media-playback",
       "category": "Media and graphics",
       "name": "Audio and media playback",
-      "description": "Checks media playback and the audio mixer API.",
+      "description": "Checks media playback and the audio mixer and audio graph APIs.",
       "tests": [
+        "AudioGraphApiTest",
         "AudioMixerApiTest",
         "MediaPlaybackScreenshotTest"
       ]

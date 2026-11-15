@@ -142,6 +142,16 @@ final class HeadlessAudio implements AudioOutput {
         }
     }
 
+    /// A placement is recorded as `place clip gain pan`, both in percent,
+    /// so that a trace holds the attenuation and pan a spatial scene gets.
+    @Override
+    public void place(int voice, float gain, float pan) {
+        Voice v = find(voice);
+        if (v != null) {
+            lines.add("place " + v.clip + " " + percent(gain) + " " + (int) (pan * 100f + (pan < 0f ? -0.5f : 0.5f)));
+        }
+    }
+
     @Override
     public void hold(boolean held) {
         // Not counted: see the head of this class.
