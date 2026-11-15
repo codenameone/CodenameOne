@@ -96,10 +96,14 @@ class AccountTest {
     }
 
     @Test
-    void friendsAreMutual() throws Exception {
+    void friendsAreMutualOnceTheRequestIsAccepted() throws Exception {
         String a = Api.player(accounts, "alice");
         String b = Api.player(accounts, "bobby");
         Api.json(mvc, Api.as(Api.body(post("/api/me/friends"), "{\"username\":\"" + b + "\"}"), a));
+        assertEquals(0, Api.list(mvc, Api.as(get("/api/me/friends"), b)).size());
+        List requests = Api.list(mvc, Api.as(get("/api/me/friends/requests"), b));
+        assertEquals(a, ((Map) requests.get(0)).get("from"));
+        Api.json(mvc, Api.as(post("/api/me/friends/requests/" + a + "/accept"), b));
         List ofB = Api.list(mvc, Api.as(get("/api/me/friends"), b));
         assertEquals(1, ofB.size());
         assertEquals(a, ((Map) ofB.get(0)).get("username"));

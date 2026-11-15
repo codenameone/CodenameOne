@@ -36,6 +36,10 @@ import com.codenameone.examples.brickyard.domain.Account;
 import com.codenameone.examples.brickyard.domain.Friend;
 import com.codenameone.examples.brickyard.repository.AccountRepository;
 import com.codenameone.examples.brickyard.repository.FriendRepository;
+import com.codenameone.examples.brickyard.repository.FriendRequestRepository;
+import com.codenameone.examples.brickyard.repository.UserBlockRepository;
+import com.codenameone.examples.brickyard.domain.FriendRequest;
+import com.codenameone.examples.brickyard.economy.Wallet;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -50,15 +54,26 @@ public class Accounts {
     /// The youngest a player may be to open an account.
     public static final int MINIMUM_AGE = 13;
 
+    public static final String PENDING = "PENDING";
+    /// At most this many friend requests an hour from one account.
+    public static final int REQUESTS_PER_HOUR = 20;
+
     private final AccountRepository accounts;
     private final FriendRepository friends;
+    private final FriendRequestRepository requests;
+    private final UserBlockRepository blocks;
+    private final Wallet wallet;
     private final JdbcUserDetailsManager users;
     private final PasswordEncoder encoder;
 
     public Accounts(AccountRepository accounts, FriendRepository friends,
+            FriendRequestRepository requests, UserBlockRepository blocks, Wallet wallet,
             JdbcUserDetailsManager users, PasswordEncoder encoder) {
         this.accounts = accounts;
         this.friends = friends;
+        this.requests = requests;
+        this.blocks = blocks;
+        this.wallet = wallet;
         this.users = users;
         this.encoder = encoder;
     }
@@ -94,9 +109,9 @@ public class Accounts {
         a.setUsername(username);
         a.setDisplayName(name);
         a.setBirthYear(birthYear);
-        a.setBricks(START_BRICKS);
         a.setCreatedAt(Clock.now());
         accounts.insert(a);
+        wallet.post(username, START_BRICKS, "WELCOME", "");
     }
 
     public boolean exists(String username) {
@@ -128,17 +143,65 @@ public class Accounts {
         return toDto(a);
     }
 
-    /// Friends are mutual and immediate in this template: adding one writes both directions.
+    /// Asks `friend` to be friends. A request the other side already sent is
+    /// accepted instead, and a request to or from a blocked account is
+    /// answered as if the account did not exist.
     @Transactional(rollbackFor = IOException.class)
     public FriendDto addFriend(String username, String friend) {
         account(username);
         String other = email(friend == null ? null : friend);
-        if (other.equals(username) || accounts.findById(other) == null) {
+        if (other.equals(username) || accounts.findById(other) == null || blockedEitherWay(username, other)) {
             throw new ResponseStatusException(404, "No such account");
         }
-        link(username, other);
-        link(other, username);
+        if (friends.findById(username + "|" + other) != null) {
+            return new FriendDto(other);
+        }
+        FriendRequest reverse = requests.findById(other + "|" + username);
+        if (reverse != null && PENDING.equals(reverse.getStatus())) {
+            reverse.setStatus("ACCEPTED");
+            requests.save(reverse);
+            befriend(username, other);
+            return new FriendDto(other);
+        }
+        if (requests.sentSince(username, Clock.now() - 60 * Clock.MINUTE).size() >= REQUESTS_PER_HOUR) {
+            throw new ResponseStatusException(429, "Too many friend requests; try again later");
+        }
+        String id = username + "|" + other;
+        FriendRequest r = requests.findById(id);
+        boolean fresh = r == null;
+        if (fresh) {
+            r = new FriendRequest();
+            r.setId(id);
+            r.setFromUser(username);
+            r.setToUser(other);
+        }
+        r.setStatus(PENDING);
+        r.setCreatedAt(Clock.now());
+        if (fresh) {
+            requests.insert(r);
+        } else {
+            requests.save(r);
+        }
         return new FriendDto(other);
+    }
+
+    /// Writes a friendship both ways.
+    public void befriend(String a, String b) {
+        link(a, b);
+        link(b, a);
+    }
+
+    public void unfriend(String a, String b) {
+        for (String id : new String[] {a + "|" + b, b + "|" + a}) {
+            Friend f = friends.findById(id);
+            if (f != null) {
+                friends.delete(f);
+            }
+        }
+    }
+
+    public boolean blockedEitherWay(String a, String b) {
+        return blocks.findById(a + "|" + b) != null || blocks.findById(b + "|" + a) != null;
     }
 
     private void link(String a, String b) {

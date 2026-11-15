@@ -99,6 +99,17 @@ public final class Api {
                 "{\"data\":\"" + Base64.encode(sample()) + "\"}"), owner));
     }
 
+    /// Makes `a` and `b` friends: a request from `a`, accepted by `b`.
+    public static void befriend(MockMvc mvc, String a, String b) throws Exception {
+        json(mvc, as(body(post("/api/me/friends"), "{\"username\":\"" + b + "\"}"), a));
+        json(mvc, as(post("/api/me/friends/requests/" + a + "/accept"), b));
+    }
+
+    /// A staff member holding `role` (ADMIN, MODERATOR or SUPPORT).
+    public static MockRequestBuilder asStaff(MockRequestBuilder request, String username, String role) {
+        return request.with(jwt().subject(username).authorities("ROLE_USER", "ROLE_" + role));
+    }
+
     public static byte[] sample() throws IOException {
         InputStream in = Api.class.getResourceAsStream("/place/sample.rbxlx");
         ByteArrayOutputStream out = new ByteArrayOutputStream();

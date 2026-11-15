@@ -100,6 +100,8 @@ public class SecurityConfig {
                             "/api/leaderboards/*/scores")).hasRole(Roles.ENGINE)
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/badges/*/award")).hasRole(Roles.ENGINE)
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("/api/engine/**"))
+                            .hasRole(Roles.ENGINE)
                     .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(
                     AccountSecurity.tokenDecoder(signingKeys, issuer, AUDIENCE))

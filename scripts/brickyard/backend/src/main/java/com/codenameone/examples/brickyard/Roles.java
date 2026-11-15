@@ -26,6 +26,8 @@ public final class Roles {
     public static final String CREATOR = "CREATOR";
     public static final String MODERATOR = "MODERATOR";
     public static final String ADMIN = "ADMIN";
+    /// Customer support: reads the queues, refunds purchases; see `Staff`.
+    public static final String SUPPORT = "SUPPORT";
     public static final String ENGINE = "ENGINE";
 
     private Roles() {

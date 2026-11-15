@@ -72,7 +72,7 @@ class LeaderboardTest {
                 a)).size());
         assertEquals(3, Api.list(mvc, Api.as(get("/api/leaderboards/" + id + "/Wins?period=weekly&limit=10"),
                 a)).size());
-        Api.json(mvc, Api.as(Api.body(post("/api/me/friends"), "{\"username\":\"" + c + "\"}"), a));
+        Api.befriend(mvc, a, c);
         List friends = Api.list(mvc, Api.as(get("/api/leaderboards/" + id + "/Wins/friends?period=all"), a));
         assertEquals(2, friends.size());
         assertTrue(!friends.toString().contains(b));

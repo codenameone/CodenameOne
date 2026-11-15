@@ -22,7 +22,7 @@ import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 
-/// One direction of a friendship; adding a friend writes both.
+/// One direction of a friendship; accepting a friend request writes both.
 @Entity
 public class Friend {
     @Id(autoIncrement = false)
