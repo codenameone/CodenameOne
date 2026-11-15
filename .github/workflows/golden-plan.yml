@@ -62,6 +62,9 @@ jobs:
           # A fork cannot be captured into (no branch here, no token): its
           # suite runs, and the golden gate fails it on the missing images,
           # which the run uploads (cn1ss-capture-<leg>) for a maintainer.
+          if [ -n "$missing" ] && [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" != "$REPO" ]; then
+            echo "::warning::No goldens yet for $missing. A fork cannot be captured into: a maintainer pushes this PR to a branch of $REPO and opens a PR from it, and Golden capture commits them there (or takes the cn1ss-capture-* artifacts of this run)."
+          fi
           if [ -n "$missing" ] && [ -z "$CAPTURE" ] && [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" = "$REPO" ]; then
             run=false
           fi

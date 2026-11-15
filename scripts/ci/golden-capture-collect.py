@@ -91,7 +91,9 @@ def collect(dl, dest, base=None, harvest=False, **plan_args):
                             # neither, so no leg is left failing against the
                             # other's image.
                             print("::error::%s differs between %s and the leg captured first; the legs "
-                                  "sharing this directory do not render it alike" % (rel, art))
+                                  "sharing this directory do not render it alike, so neither is committed; make the "
+                                  "test render identically on both, or give one leg its own golden "
+                                  "directory" % (rel, art))
                             os.remove(os.path.join(dest, rel))
                             added[rel] = None
                             ok = False

@@ -313,14 +313,15 @@ def plan(root=ROOT, sources_dir=SOURCES, runner=RUNNER, dir_ports=DIR_PORTS,
         raise PlanError("no goldens found under %s" % ", ".join(dir_ports))
     lost = deleted_goldens(root, base, dir_ports, mappings, stems) if base is not None else {}
     if lost:
-        # A golden deleted together with a change to its test is the test
+        # A golden deleted together with a change to its own test class (not
+        # a shared base class, which would excuse every subclass) is the test
         # dropping an image: it is not predicted missing. Should the suite
         # still render it, the run's own gate fails on it and
         # golden-harvest.yml commits it back. A golden deleted with its test
         # untouched is a gap, captured before anything else runs.
         changed = changed_files(root, base)
         lost = {k: v for k, v in lost.items()
-                if not any(classes[c][3] in changed for c in chain(k[0], classes) if c in classes)}
+                if not (k[0] in classes and classes[k[0]][3] in changed)}
     if lost_out is not None:
         lost_out.update(lost)
     gaps, problems = [], []

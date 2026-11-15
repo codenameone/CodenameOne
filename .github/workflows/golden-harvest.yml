@@ -10,6 +10,10 @@ name: Golden harvest
 # completed, this commits those images to the branch with CN1SS_GH_TOKEN, and
 # the push starts CI again on a head that has them.
 #
+# workflow_run always runs the default branch's copy of this file, so the
+# harvest does nothing for any PR until it is on master, including the PR
+# that adds it.
+#
 # Only the default branch's scripts run here (workflow_run), and the PR's
 # artifacts are data: only .png files under a golden directory, owned by a
 # screenshot_mappings entry, absent from the branch, are taken. Review them in
@@ -31,14 +35,15 @@ on:
 permissions:
   contents: read
 
-# One per head: the last run to complete is the one that harvests, and a
-# second completion queued behind it finds the images already there.
+# One per branch: the last run to complete is the one that harvests, a second
+# completion queued behind it finds the images already there, and harvests of
+# two heads of one branch never push at once.
 #
 # The images were rendered from the pull_request merge commit and land on the
 # head branch. That is the commit the next run compares on as well, so the
 # golden matches what CI will render.
 concurrency:
-  group: golden-harvest-${{ github.event.workflow_run.head_sha }}
+  group: golden-harvest-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 jobs:
@@ -85,9 +90,18 @@ jobs:
         run: |
           set -euo pipefail
           cd pr
-          # The branch may have moved past HEAD_SHA, and the push that moved
-          # it may run no screenshot workflow at all (paths filters), so
-          # collect onto the head anyway: nothing existing is overwritten.
+          # The branch may have moved past HEAD_SHA. If the move touched
+          # anything that decides what the suite renders, these images may be
+          # stale: leave it to the new head's own runs. Otherwise (a docs fix
+          # the paths filters skip) nobody else will harvest, so collect onto
+          # the head: nothing existing is overwritten.
+          if [ "$(git rev-parse HEAD)" != "$HEAD_SHA" ]; then
+            git fetch --no-tags origin "$HEAD_SHA"
+            if git diff --name-only "$HEAD_SHA" HEAD | grep -E '^(scripts/|docs/website/data/|Ports/|CodenameOne/|maven/|vm/)' ; then
+              echo "The branch moved past $HEAD_SHA with changes that affect rendering; its own runs will harvest."
+              exit 0
+            fi
+          fi
           ok=1
           ../trusted/scripts/ci/golden-harvest.sh collect ../runs.txt "$PWD" || ok=0
           git add -A -- scripts
