@@ -1391,7 +1391,7 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvTimelineNoShow { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
     SvTimelineNow { color: var(--danger-dark); }
     Scheduler { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    SchedulerGrid { color: var(--line-strong-dark); background-color: transparent; }
+    SchedulerGrid { color: var(--line-strong-dark); background-color: var(--surface-alt-dark); }
     SchedulerOffHours { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
     SchedulerHeader { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
     SchedulerHeaderToday { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
@@ -1513,7 +1513,9 @@ SvTimelineNow { color: var(--danger); }
    from these styles rather than from components: the closed hours are its
    own background, the lines its grid's color. */
 Scheduler { color: var(--text); background-color: var(--surface-alt); padding: 0; margin: 0; }
-SchedulerGrid { color: var(--line-strong); background-color: transparent; }
+/* The grid's own colour, not transparent: under a desktop's native theme a
+   transparent grid came out opaque black. */
+SchedulerGrid { color: var(--line-strong); background-color: var(--surface-alt); }
 SchedulerOffHours { color: var(--text-muted); background-color: var(--surface-alt); }
 SchedulerHeader { color: var(--text-muted); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.2mm; }
 SchedulerHeaderToday { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainBold"; font-size: 2.2mm; }

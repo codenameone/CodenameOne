@@ -370,7 +370,12 @@ public final class ProjectScheduler {
             free = Math.min(free, child.freeSlack);
             critical |= child.critical;
             violated |= child.constraintViolated;
-            long d = child.getDuration();
+            // A manual task's length is its dates, whatever duration it was
+            // given: it weighs that much in the summary's progress. Its own
+            // duration is left alone for when it is scheduled again.
+            long d = child.isManuallyScheduled() && !child.isSummary()
+                    ? Math.max(0, cal.workingTimeBetween(child.earlyStart, child.earlyFinish))
+                    : child.getDuration();
             work += d;
             done += d * child.getPercentComplete();
         }
@@ -384,6 +389,14 @@ public final class ProjectScheduler {
         t.setDuration(Math.max(0, cal.workingTimeBetween(t.earlyStart, t.earlyFinish)));
         if (work > 0) {
             t.setPercentComplete((int) (done / work));
+        } else if (!t.children.isEmpty()) {
+            // Nothing to weigh by (manual tasks in hours off, milestones):
+            // every child counts the same rather than leaving it stale.
+            int sum = 0;
+            for (int c = 0; c < t.children.size(); c++) {
+                sum += t.children.get(c).getPercentComplete();
+            }
+            t.setPercentComplete(sum / t.children.size());
         }
     }
 
