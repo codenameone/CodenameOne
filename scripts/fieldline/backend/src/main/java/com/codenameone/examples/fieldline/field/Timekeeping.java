@@ -270,6 +270,12 @@ public class Timekeeping {
         }
     }
 
+    /// The Monday on or before `day`. Spelled out because the server's
+    /// compiled class library has no temporal adjusters.
+    static LocalDate monday(LocalDate day) {
+        return day.minusDays(day.getDayOfWeek().getValue() - 1);
+    }
+
     /// Minutes of `[start, end)` that fall on a local Saturday or Sunday.
     static int weekendMinutes(long start, long end, ZoneId zone) {
         int total = 0;
@@ -296,8 +302,8 @@ public class Timekeeping {
     /// The Monday 00:00 of the week holding `millis` (now when 0).
     public long weekStart(long millis) {
         ZoneId zone = planner.zone();
-        LocalDate d = Instant.ofEpochMilli(millis <= 0 ? System.currentTimeMillis() : millis)
-                .atZone(zone).toLocalDate().with(DayOfWeek.MONDAY);
+        LocalDate d = monday(Instant.ofEpochMilli(millis <= 0 ? System.currentTimeMillis() : millis)
+                .atZone(zone).toLocalDate());
         return d.atStartOfDay(zone).toInstant().toEpochMilli();
     }
 
@@ -453,7 +459,7 @@ public class Timekeeping {
         ZoneId zone = planner.zone();
         Random random = new Random(4241L + index);
         LocalDate today = LocalDate.now(zone);
-        LocalDate monday = today.with(DayOfWeek.MONDAY).minusWeeks(1);
+        LocalDate monday = monday(today).minusWeeks(1);
         for (LocalDate d = monday; d.isBefore(today); d = d.plusDays(1)) {
             DayOfWeek dow = d.getDayOfWeek();
             boolean saturday = dow == DayOfWeek.SATURDAY && index == 4;
