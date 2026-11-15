@@ -9748,7 +9748,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             + "NumericProperty|Paint|Painter|PeerComponent|PickerComponent|PreferencesObject|Property|"
             + "PropertyBase|PropertyBusinessObject|PropertyChangeListener|PropertyIndex|RGBImage|"
             + "RadialGradient|RadioButton|ReleasableComponent|RichTextArea|RichTextClipboardData|"
-            + "RichTextComponent|RichTextFormat|SQLMap|SelectableIconHolder|SetProperty|Sheet|SideMenuBar|"
+            + "RichTextComponent|RichTextFormat|SQLMap|ScrollSurface|SelectableIconHolder|SetProperty|Sheet|SideMenuBar|"
             + "Slider|SpanLabel|Stroke|SwipeableContainer|TableLayout|Tabs|TextArea|TextComponent|"
             + "TextComponentPassword|TextField|TextHolder|TextInputClient|TextInputConfig|TextInputGeometry|"
             + "TextInputState|TextModeLayout|TextSelection|Toolbar|TooltipManager|TopLevelContainer|Transform|"

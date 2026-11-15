@@ -28,6 +28,7 @@ import com.codename1.scheduling.ScheduleModel;
 import com.codename1.scheduling.ScheduleResource;
 import com.codename1.scheduling.TimeMath;
 import com.codename1.scheduling.WorkCalendar;
+import com.codename1.ui.ScrollSurface;
 import com.codename1.ui.Button;
 import com.codename1.ui.ButtonGroup;
 import com.codename1.ui.Component;
@@ -515,7 +516,7 @@ public class Scheduler extends Container {
     private void show(Component c) {
         if (animationTime >= 0 && c instanceof ScrollSurface) {
             // A view made after the clock was stopped stands at that time too.
-            ((ScrollSurface) c).setFixedClock(animationTime);
+            ((ScrollSurface) c).setAnimationTime(animationTime);
         }
         if (current == c) { //NOPMD CompareObjectsWithEquals - the same component, not an equal one
             return;
@@ -824,16 +825,16 @@ public class Scheduler extends Container {
     public void setAnimationTime(long millis) {
         animationTime = millis;
         if (dayGrid != null) {
-            dayGrid.setFixedClock(millis);
+            dayGrid.setAnimationTime(millis);
         }
         if (monthGrid != null) {
-            monthGrid.setFixedClock(millis);
+            monthGrid.setAnimationTime(millis);
         }
         if (agenda != null) {
-            agenda.setFixedClock(millis);
+            agenda.setAnimationTime(millis);
         }
         if (timeline != null) {
-            timeline.setFixedClock(millis);
+            timeline.setAnimationTime(millis);
         }
     }
 
