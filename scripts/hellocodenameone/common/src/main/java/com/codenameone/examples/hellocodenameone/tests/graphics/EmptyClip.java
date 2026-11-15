@@ -29,6 +29,8 @@ import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreensho
  * empty clip.
  */
 public class EmptyClip extends AbstractGraphicsScreenshotTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
 
     private Image marker;
 

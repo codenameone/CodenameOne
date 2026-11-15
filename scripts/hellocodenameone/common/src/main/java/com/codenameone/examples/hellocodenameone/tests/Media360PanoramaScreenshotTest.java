@@ -17,6 +17,8 @@ import com.codename1.vr.Media360View;
 /// without a 3D backend the screenshot is skipped; unlike the stereo VR test
 /// this one still runs on tvOS, where panning a 360 image is a sensible use.
 public class Media360PanoramaScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private Media360View view;
 
     @Override

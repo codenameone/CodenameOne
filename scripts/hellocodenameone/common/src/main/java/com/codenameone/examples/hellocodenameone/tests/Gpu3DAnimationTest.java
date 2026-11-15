@@ -26,6 +26,8 @@ import com.codename1.ui.util.UITimer;
 /// platform compares against its own baseline, so a backend whose native
 /// viewport origin differs only flips the vertical cell order.
 public class Gpu3DAnimationTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private static final int FRAMES = 6;
     private static final int COLS = 2;
     private static final int ROWS = 3;

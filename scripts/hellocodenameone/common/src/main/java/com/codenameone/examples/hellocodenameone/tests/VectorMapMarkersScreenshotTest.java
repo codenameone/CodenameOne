@@ -12,6 +12,8 @@ import com.codename1.ui.layouts.BorderLayout;
 /// Exercises marker overlays (the default Material map-pin rendering) on the
 /// real San Francisco basemap at a few well-known waterfront landmarks.
 public class VectorMapMarkersScreenshotTest extends VectorMapScreenshotBaseTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
 
     @Override
     public boolean runTest() {

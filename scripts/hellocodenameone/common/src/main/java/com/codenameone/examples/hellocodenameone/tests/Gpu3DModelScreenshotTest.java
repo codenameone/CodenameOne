@@ -26,6 +26,8 @@ import java.io.InputStream;
 /// The BoomBox is authored at roughly 2 cm across, so it is scaled up and drawn
 /// at a fixed orientation for a stable capture.
 public class Gpu3DModelScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private RenderView view;
 
     @Override

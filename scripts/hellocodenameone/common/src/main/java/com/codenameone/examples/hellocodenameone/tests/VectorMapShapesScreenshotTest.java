@@ -15,6 +15,8 @@ import com.codename1.ui.layouts.BorderLayout;
 /// basemap: a walking route along the waterfront, a highlighted area and a
 /// radius circle around a point of interest.
 public class VectorMapShapesScreenshotTest extends VectorMapScreenshotBaseTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
 
     @Override
     public boolean runTest() {

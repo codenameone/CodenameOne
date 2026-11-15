@@ -18,6 +18,8 @@ import com.codename1.ui.util.UITimer;
 /// the test has no asset dependency, and the cube is drawn at a fixed
 /// orientation for a deterministic capture.
 public class Gpu3DTexturedCubeScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private RenderView view;
 
     @Override

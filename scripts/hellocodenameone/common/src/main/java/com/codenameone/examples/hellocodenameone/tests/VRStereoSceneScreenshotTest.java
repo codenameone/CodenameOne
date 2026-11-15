@@ -24,6 +24,8 @@ import com.codename1.vr.VRView;
 /// screenshot is skipped, and on tvOS side-by-side stereo has no use (no
 /// headset), so the test is skipped there.
 public class VRStereoSceneScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, tvos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private VRView view;
 
     @Override

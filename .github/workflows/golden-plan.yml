@@ -3,8 +3,8 @@ name: Golden plan
 # The first job of every hellocodenameone screenshot workflow. It reads the
 # suite's source (scripts/ci/cn1ss-golden-plan.py) and answers `run`:
 #
-#   false  (and this job fails) this is a same-repository pull request whose suite has a screenshot
-#          test with no golden anywhere. Every job of the calling workflow is
+#   false  (and this job fails) this is a same-repository pull request where some
+#          screenshot test has no golden in a directory whose port runs it. Every job of the calling workflow is
 #          gated on `run` and skips; golden-capture.yml runs the suite in
 #          capture mode instead and pushes the goldens, which starts CI again.
 #   true   anything else: the goldens are complete, or this IS the capture run
@@ -43,6 +43,7 @@ jobs:
           sparse-checkout: |
             scripts/ci
             scripts/hellocodenameone/common/src/main
+            docs/website/data
       - id: plan
         env:
           CAPTURE: ${{ inputs.capture }}

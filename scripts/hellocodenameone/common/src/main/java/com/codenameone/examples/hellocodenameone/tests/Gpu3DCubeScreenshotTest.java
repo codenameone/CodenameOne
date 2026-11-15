@@ -18,6 +18,8 @@ import com.codename1.ui.util.UITimer;
 /// fixed orientation so the capture is deterministic. On platforms without a 3D
 /// backend the view shows its placeholder, which still screenshots cleanly.
 public class Gpu3DCubeScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private RenderView view;
 
     @Override

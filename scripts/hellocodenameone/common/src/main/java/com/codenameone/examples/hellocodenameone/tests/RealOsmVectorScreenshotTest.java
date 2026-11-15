@@ -13,6 +13,8 @@ import com.codename1.ui.layouts.BorderLayout;
 /// water, parks, buildings and place labels. Deterministic and offline (the
 /// tiles are shipped as resources), so it produces a stable screenshot baseline.
 public class RealOsmVectorScreenshotTest extends VectorMapScreenshotBaseTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
 
     @Override
     public boolean runTest() {

@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       cn1ss_capture:
-        description: Golden capture only (golden-capture.yml) - comma separated test class names
+        description: Golden capture only (golden-capture.yml) - the tests without goldens, for the log; the full suite runs
         required: false
         default: ''
         type: string

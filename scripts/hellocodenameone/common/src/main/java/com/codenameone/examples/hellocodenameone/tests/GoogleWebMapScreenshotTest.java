@@ -50,6 +50,8 @@ import java.io.InputStream;
 /// resource is absent (local builds, forks, no secret) the test skips rather
 /// than baseline an error overlay.
 public class GoogleWebMapScreenshotTest extends BaseTest {
+    // cn1ss-skip: mac-catalyst, macos, javascript, linux-x64, linux-arm64, windows-x64, windows-arm64, tvos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
 
     /// Attempts per wait (500ms each): 24s -- nearly the runner's whole 30s
     /// per-test budget. A healthy load fires tilesloaded in 3-8s; a starved

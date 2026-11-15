@@ -1,13 +1,15 @@
 name: Golden capture
 
-# A pull request that adds a hellocodenameone screenshot test needs that
-# test's goldens on every platform, and until now the only way to get them was
-# a whole CI round per attempt, run for one image.
+# A pull request that adds a hellocodenameone screenshot test, or deletes a
+# golden, needs images on every platform that runs the test, and until now the
+# only way to get them was a whole CI round per attempt, run for one image.
 #
-# This workflow reads the suite's source (scripts/ci/cn1ss-golden-plan.py)
-# and finds screenshot tests that no golden directory has an image for. The
-# tree's golden set is otherwise complete, so that is the whole signal: no
-# marker, no diff. When there are any, it:
+# This workflow reads the suite's source (scripts/ci/cn1ss-golden-plan.py) and
+# checks every golden directory on its own: a screenshot test with no image in
+# a directory whose port runs it is a gap. Which ports a test skips is declared
+# in the test (`// cn1ss-skip: <ports>`) and held to the tree both ways, so
+# the tree's goldens are complete and a gap is the whole signal: no marker, no
+# diff. When there is any gap, it:
 #   1. cancels every other run of this PR. The screenshot workflows already
 #      skip every job (their first job, golden-plan.yml, runs the same
 #      detector); the rest would only spend runners on a head about to move;
@@ -18,8 +20,10 @@ name: Golden capture
 #   3. commits the images to the branch and pushes with CN1SS_GH_TOKEN, so the
 #      push starts the normal CI, where the detector now finds nothing.
 #
-# If a leg failed, the images that did arrive are still committed and this
-# job fails; the next push captures whatever is still missing.
+# Only images that fill a gap are committed. A gap still open afterwards fails
+# this job by name: its leg failed, or the test captures nothing there and
+# needs a cn1ss-skip declaration. What did arrive is still committed, so the
+# next push captures only what is left.
 #
 # Pull requests from forks are skipped: the dispatches need the branch in this
 # repository and the push needs a token a fork run does not get. Review the
@@ -119,7 +123,7 @@ jobs:
           # ran. A capture only adds files, so it applies on top of any head.
           git pull --ff-only origin "$HEAD_REF"
           ok=1
-          scripts/ci/golden-capture.sh collect "$RUNS" "$GITHUB_WORKSPACE" "$TESTS" || ok=0
+          scripts/ci/golden-capture.sh collect "$RUNS" "$GITHUB_WORKSPACE" || ok=0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A -- scripts

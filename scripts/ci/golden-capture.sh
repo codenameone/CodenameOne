@@ -4,7 +4,7 @@
 #
 #   golden-capture.sh dispatch REF TESTS RUNS_FILE   start every workflow, record run ids
 #   golden-capture.sh wait RUNS_FILE                 block until all have completed
-#   golden-capture.sh collect RUNS_FILE DEST TESTS   merge cn1ss-capture-* artifacts into DEST
+#   golden-capture.sh collect RUNS_FILE DEST         merge cn1ss-capture-* artifacts into DEST
 #
 # Needs GH_TOKEN (actions: write) and GITHUB_REPOSITORY. Each dispatch is a run
 # of its own, so the workflows' concurrency groups and fixed artifact names
@@ -20,6 +20,7 @@ WORKFLOWS=(
   scripts-javascript.yml
   linux-build-run.yml
   parparvm-tests-windows.yml
+  windows-cross-build-run.yml
   scripts-macos.yml
 )
 
@@ -68,7 +69,7 @@ wait_all() {
 }
 
 collect() {
-  local runs_file="$1" dest="$2" tests="$3" wf id conclusion failed=0 dl
+  local runs_file="$1" dest="$2" wf id conclusion failed=0 dl
   dl="$(mktemp -d)"
   while read -r wf id; do
     conclusion="$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)"
@@ -77,18 +78,15 @@ collect() {
     gh run download "$id" --repo "$GITHUB_REPOSITORY" -p 'cn1ss-capture-*' -D "$dl/$id" 2>/dev/null \
       || log "$wf run $id uploaded no capture"
   done < "$runs_file"
-  # Each artifact holds goldens at their repository paths. Only images of the
-  # tests being captured are taken: a capture run exports every image without
-  # a golden, and an existing test missing one on some leg is not this
-  # commit's business. A golden the branch already has is never overwritten,
-  # and two legs that share a directory (Windows x64 and arm64) must agree.
-  python3 "$(dirname "$0")/golden-capture-collect.py" "$dl" "$dest" "$tests" || failed=1
+  # Each artifact holds goldens at their repository paths; only images that
+  # fill a gap the detector finds are taken (see golden-capture-collect.py).
+  python3 "$(dirname "$0")/golden-capture-collect.py" "$dl" "$dest" || failed=1
   return "$failed"
 }
 
 case "${1:-}" in
   dispatch) dispatch "$2" "$3" "$4" ;;
   wait) wait_all "$2" ;;
-  collect) collect "$2" "$3" "$4" ;;
+  collect) collect "$2" "$3" ;;
   *) echo "usage: $0 dispatch|wait|collect ..." >&2; exit 2 ;;
 esac

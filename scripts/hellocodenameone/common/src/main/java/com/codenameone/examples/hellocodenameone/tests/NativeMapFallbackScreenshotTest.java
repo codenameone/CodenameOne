@@ -20,6 +20,8 @@ import com.codename1.ui.layouts.BorderLayout;
 /// `ios.maps.provider=apple`) the fallback path is not exercised, so this test
 /// skips and the provider test captures the native render instead.
 public class NativeMapFallbackScreenshotTest extends VectorMapScreenshotBaseTest {
+    // cn1ss-skip: ios-metal, mac-catalyst, tvos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
 
     @Override
     public boolean runTest() {
