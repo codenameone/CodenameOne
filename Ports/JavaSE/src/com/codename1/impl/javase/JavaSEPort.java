@@ -11887,6 +11887,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public FoldAction() {
             super("", foldActionIcon());
             putValue(SHORT_DESCRIPTION, "Fold or unfold the device");
+            putValue(com.codename1.impl.javase.simulator.AppPanel.HIDE_WHEN_DISABLED, Boolean.TRUE);
             update();
         }
 

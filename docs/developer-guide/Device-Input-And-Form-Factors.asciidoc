@@ -172,7 +172,7 @@ while the device closes, opens, half folds, turns to landscape and back, then st
 names the saved MP4 (in `~/CodenameOneRecordings`). A skin that doesn't fold gets the turn alone.
 
 The tour and any scripted recording render every video frame for its own moment of the animation,
-at 60 frames a second, so the video plays smoothly however long a frame takes to draw. While such a
+at 60 frames a second, so the video plays without stutter however long a frame takes to draw. While such a
 recording runs, the simulator window plays the motion in slow motion; that's expected.
 
 To record without any window on screen, start the simulator hidden: `mvn cn1:agent
