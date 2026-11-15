@@ -20,6 +20,7 @@ package com.codenameone.examples.brickyard.studio;
 
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
+import com.codename1.ui.CodeEditor;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -49,7 +50,9 @@ final class DesktopShell {
     private Label bottomTitle;
     private Button bottomOutputTab;
     private Button bottomScriptTab;
-    private TextArea source;
+    private Container header;
+    private Button saveButton;
+    private CodeEditor source;
     private TextArea output;
     private Form form;
     private int activeTool = 1;
@@ -58,7 +61,7 @@ final class DesktopShell {
         this.studio = studio;
     }
 
-    void install(Form f, Container viewport, Container explorer, Container properties, TextArea src,
+    void install(Form f, Container viewport, Container explorer, Container properties, CodeEditor src,
             TextArea out) {
         form = f;
         source = src;
@@ -76,8 +79,12 @@ final class DesktopShell {
         bottomBody = new Container(new BorderLayout());
         bottomOutputTab = headerTab("Output", "dockOutput", ev -> studio.showTab(3));
         bottomScriptTab = headerTab("Script", "dockScript", ev -> studio.showTab(2));
-        Container header = new Container(new BorderLayout());
+        header = new Container(new BorderLayout());
         header.setUIID("StudioPaneHeader");
+        saveButton = new Button("Save", "StudioMiniButton");
+        saveButton.setName("saveScript");
+        FontImage.setMaterialIcon(saveButton, FontImage.MATERIAL_SAVE, 2.6f);
+        saveButton.addActionListener(ev -> studio.saveScript());
         header.add(BorderLayout.WEST, BoxLayout.encloseX(bottomOutputTab, bottomScriptTab));
         bottomTitle = new Label("", "StudioPaneHeaderHint");
         header.add(BorderLayout.EAST, bottomTitle);
@@ -116,18 +123,31 @@ final class DesktopShell {
                 source.remove();
             }
             bottomBody.add(BorderLayout.CENTER, source);
-            Button save = new Button("Save script", "StudioMiniButton");
-            save.setName("saveScript");
-            save.addActionListener(ev -> studio.saveScript());
-            bottomBody.add(BorderLayout.EAST, save);
-            bottomTitle.setText("Script");
+            // Code wants room: the dock grows to half the window while a
+            // script is open, and Save sits in the header like an IDE's.
+            bottom.setPreferredH(CN.getDisplayHeight() * 45 / 100);
+            swapHeaderEnd(saveButton);
         } else {
             bottomBody.add(BorderLayout.CENTER, scroll(output));
+            bottom.setPreferredH(CN.convertToPixels(34));
+            swapHeaderEnd(bottomTitle);
             bottomTitle.setText("");
         }
         if (bottom.isHidden()) {
             bottom.setHidden(false);
         }
+    }
+
+    /// Puts `c` at the dock header's right end in place of what is there.
+    private void swapHeaderEnd(Component c) {
+        if (c.getParent() == header) { // NOPMD CompareObjectsWithEquals - tree identity
+            return;
+        }
+        Component end = ((BorderLayout) header.getLayout()).getEast();
+        if (end != null) {
+            header.removeComponent(end);
+        }
+        header.add(BorderLayout.EAST, c);
     }
 
     // ---- menu bar ----
@@ -156,6 +176,8 @@ final class DesktopShell {
             "Output", (Runnable) () -> toggle(bottom)}));
         bar.add(menu("Insert", new Object[] {
             "Part", (Runnable) studio::addPart,
+            "Ball", (Runnable) () -> studio.addPart("Ball"),
+            "Cylinder", (Runnable) () -> studio.addPart("Cylinder"),
             "Script", (Runnable) studio::addScript}));
         bar.add(menu("Test", new Object[] {
             "Play", (Runnable) studio::playtest,
@@ -204,16 +226,18 @@ final class DesktopShell {
         toolButtons.setUIID("Container");
         rebuildTools();
         Container actions = BoxLayout.encloseX(
-                icon(FontImage.MATERIAL_VIEW_IN_AR, "studioPart", studio::addPart),
-                icon(FontImage.MATERIAL_NOTE_ADD, "studioScript", studio::addScript),
+                icon(FontImage.MATERIAL_VIEW_IN_AR, "Insert part", "studioPart", studio::addPart),
+                icon(FontImage.MATERIAL_NOTE_ADD, "Insert script", "studioScript", studio::addScript),
                 separator(),
-                icon(FontImage.MATERIAL_UNDO, "studioUndo", studio::undo),
-                icon(FontImage.MATERIAL_REDO, "studioRedo", studio::redo),
+                icon(FontImage.MATERIAL_CENTER_FOCUS_STRONG, "Focus selection", "studioFocus", studio::frameSelection),
                 separator(),
-                icon(FontImage.MATERIAL_PLAY_ARROW, "studioPlay", studio::playtest),
-                icon(FontImage.MATERIAL_STOP, "studioStop", studio::stopPlaytest),
+                icon(FontImage.MATERIAL_UNDO, "Undo", "studioUndo", studio::undo),
+                icon(FontImage.MATERIAL_REDO, "Redo", "studioRedo", studio::redo),
                 separator(),
-                icon(FontImage.MATERIAL_ROCKET_LAUNCH, "studioPublish", studio::askPublish));
+                icon(FontImage.MATERIAL_PLAY_ARROW, "Play test", "studioPlay", studio::playtest),
+                icon(FontImage.MATERIAL_STOP, "Stop", "studioStop", studio::stopPlaytest),
+                separator(),
+                icon(FontImage.MATERIAL_ROCKET_LAUNCH, "Publish", "studioPublish", studio::askPublish));
         strip.add(BorderLayout.WEST, BoxLayout.encloseX(toolButtons, separator(), actions));
         return strip;
     }
@@ -227,6 +251,8 @@ final class DesktopShell {
             Button b = new Button("", i == activeTool ? "StudioIconSelected" : "StudioIcon");
             FontImage.setMaterialIcon(b, TOOL_ICONS[i], 3.2f);
             b.setName("tool" + TOOLS[i]);
+            b.setAccessibilityText(TOOLS[i] + " tool");
+            b.setTooltip(TOOLS[i]);
             b.addActionListener(ev -> {
                 activeTool = k;
                 rebuildTools();
@@ -237,10 +263,14 @@ final class DesktopShell {
         }
     }
 
-    private static Button icon(char glyph, String name, final Runnable run) {
+    private static Button icon(char glyph, String label, String name, final Runnable run) {
         Button b = new Button("", "StudioIcon");
         FontImage.setMaterialIcon(b, glyph, 3.2f);
         b.setName(name);
+        // An icon-only button still says what it does, to a screen reader
+        // and as the tool tip a desktop shows.
+        b.setAccessibilityText(label);
+        b.setTooltip(label);
         b.addActionListener(ev -> run.run());
         return b;
     }

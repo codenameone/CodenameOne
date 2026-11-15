@@ -59,13 +59,14 @@ final class TemplateGallery {
                 + "on the spot.", "Body"));
         Container grid = new Container(new GridLayout(2));
         for (final String id : Templates.ids()) {
-            Button pick = new Button("", "Hidden");
+            // The title is the card's button: a real, visible hit area, so a
+            // screen reader or a test that activates it taps this card and
+            // never the gap between two.
+            Button pick = new Button(title(id), "CardTitle");
             pick.setName("template-" + id);
             pick.setAccessibilityText(title(id) + " template: " + blurb(id));
             pick.addActionListener(ev -> name(id, previous));
-            Container card = Ui.panel(new Picture(id), Ui.label(title(id), "CardTitle"),
-                    Ui.text(blurb(id), "CardMeta"));
-            card.add(pick);
+            Container card = Ui.panel(new Picture(id), pick, Ui.text(blurb(id), "CardMeta"));
             card.setLeadComponent(pick);
             grid.add(card);
         }
@@ -96,6 +97,9 @@ final class TemplateGallery {
     }
 
     static String title(String id) {
+        if ("baseplate".equals(id)) {
+            return "Baseplate";
+        }
         if ("obby".equals(id)) {
             return "Obby";
         }
@@ -116,10 +120,16 @@ final class TemplateGallery {
 
     /// The genre an experience made from `id` is listed under.
     static String genre(String id) {
+        if ("baseplate".equals(id)) {
+            return "Adventure";
+        }
         return "arena".equals(id) ? "Fighting" : title(id);
     }
 
     static String blurb(String id) {
+        if ("baseplate".equals(id)) {
+            return "An empty world. Build your own game from the first brick.";
+        }
         if ("obby".equals(id)) {
             return "Pads over lava, a spinner and a trophy at the top.";
         }

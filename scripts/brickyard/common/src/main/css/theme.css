@@ -678,9 +678,9 @@ StudioMiniButton {
     color: var(--bg);
     background-color: var(--yellow);
     font-family: "native:MainBold";
-    font-size: 2.4mm;
-    padding: 1mm 2mm;
-    margin: 1mm;
+    font-size: 2.3mm;
+    padding: 0.5mm 2mm;
+    margin: 0 1mm;
     border-radius: 1mm;
     border: none;
 }
@@ -821,4 +821,14 @@ CreatorCardText {
     cn1-background-type: cn1-none;
     padding: 0 0 0 2.4mm;
     margin: 0;
+}
+
+GameHud {
+    color: #ffd54a;
+    background-color: rgba(18, 24, 48, 0.72);
+    border-radius: 2mm;
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 1.2mm 3mm;
+    margin: 2mm 3mm;
 }

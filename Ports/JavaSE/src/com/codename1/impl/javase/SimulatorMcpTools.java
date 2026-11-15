@@ -209,6 +209,34 @@ final class SimulatorMcpTools {
                     }
                 }));
 
+        server.addTool(new Tool("sim_key_type",
+                "Types text through hardware key events on the focused component, one key per "
+                        + "character, as someone at the Mac keyboard would -- for a code editor or a "
+                        + "desktop field, which the simulated on-screen keyboard does not drive. \\n is "
+                        + "enter, \\t tab and \\b backspace; the component's own behaviour (auto "
+                        + "indent, closing brackets, completion) applies to every key.",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"text\":{\"type\":\"string\"},"
+                        + "\"perKeyDelayMs\":{\"type\":\"integer\",\"description\":\"Pause between keys, default 70\"}},"
+                        + "\"required\":[\"text\"]}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        Map<String, Object> a = parse(argumentsJson);
+                        String text = str(a, "text");
+                        if (text == null) {
+                            throw new IllegalArgumentException("text is required");
+                        }
+                        long delay = clamp(num(a, "perKeyDelayMs", 70), 0, 2000);
+                        for (int i = 0; i < text.length(); i++) {
+                            int[] code = hardwareKey(text.substring(i, i + 1));
+                            port.dispatchSimulatedKey(KeyEvent.KEY_PRESSED, code[0], (char) code[1]);
+                            port.dispatchSimulatedKey(KeyEvent.KEY_RELEASED, code[0], (char) code[1]);
+                            Thread.sleep(delay);
+                        }
+                        return ok("typed", text.length(), "released", 1);
+                    }
+                }));
+
         server.addTool(new Tool("sim_key",
                 "Presses and/or releases a hardware key (the Mac keyboard, not the simulated "
                         + "one) on the focused component: space, enter, up, down, left, right, or one "
@@ -502,9 +530,35 @@ final class SimulatorMcpTools {
             if (c >= '0' && c <= '9') {
                 return new int[]{KeyEvent.VK_0 + (c - '0'), c};
             }
+            if (c == '\n') {
+                return new int[]{KeyEvent.VK_ENTER, '\n'};
+            }
+            if (c == '\t') {
+                return new int[]{KeyEvent.VK_TAB, '\t'};
+            }
+            if (c == '\b') {
+                return new int[]{KeyEvent.VK_BACK_SPACE, '\b'};
+            }
+            if (c == ' ') {
+                return new int[]{KeyEvent.VK_SPACE, ' '};
+            }
+            if (c > ' ' && c < 127) {
+                // Punctuation: the key code AWT gives the character, which is
+                // never one of the arrow or fire codes the cases above map.
+                return new int[]{KeyEvent.getExtendedKeyCodeForChar(c), c};
+            }
+        }
+        if ("backspace".equals(name)) {
+            return new int[]{KeyEvent.VK_BACK_SPACE, '\b'};
+        }
+        if ("tab".equals(name)) {
+            return new int[]{KeyEvent.VK_TAB, '\t'};
+        }
+        if ("escape".equals(name)) {
+            return new int[]{KeyEvent.VK_ESCAPE, (char) 27};
         }
         throw new IllegalArgumentException("Unknown key: " + name
-                + " (space, enter, up, down, left, right, or one letter or digit)");
+                + " (space, enter, up, down, left, right, backspace, tab, escape, or one printable character)");
     }
 
     private int[] point(Map<String, Object> a, String xKey, String yKey, String nodeKey) {

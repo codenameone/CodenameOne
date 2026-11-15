@@ -19,6 +19,10 @@
 package com.codenameone.examples.brickyard.play;
 
 import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.util.UITimer;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 
@@ -199,6 +203,26 @@ public final class PlaySession {
         f.getToolbar().setUIID("GameToolbar");
         f.getToolbar().getTitleComponent().setUIID("GameTitle");
         f.add(BorderLayout.CENTER, view);
+        // The local player's leaderstats, always on screen the way players
+        // expect a score to be; the Players menu lists everyone's.
+        final Label hud = new Label("", "GameHud");
+        hud.setName("leaderstatsHud");
+        hud.setVisible(false);
+        Container hudLayer = new Container(new FlowLayout(Component.RIGHT));
+        hudLayer.add(hud);
+        f.getLayeredPane(PlaySession.class, true).setLayout(new BorderLayout());
+        f.getLayeredPane(PlaySession.class, true).add(BorderLayout.NORTH, hudLayer);
+        UITimer.timer(400, true, f, new Runnable() {
+            @Override
+            public void run() {
+                String text = statsLine(engine.getLocalPlayer());
+                if (!text.equals(hud.getText())) {
+                    hud.setText(text);
+                    hud.setVisible(text.length() > 0);
+                    f.getLayeredPane(PlaySession.class, true).revalidate();
+                }
+            }
+        });
         Friends.presence(title);
         final Runnable leave = new Runnable() {
             @Override
@@ -249,6 +273,27 @@ public final class PlaySession {
         });
         f.show();
         return f;
+    }
+
+    /// "Coins 3   Level 2" for a player's leaderstats, empty without any.
+    private static String statsLine(Instance p) {
+        Instance ls = p == null ? null : p.findFirstChild("leaderstats");
+        if (ls == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Instance v : ls.getChildren()) {
+            if (sb.length() > 0) {
+                sb.append("   ");
+            }
+            Object val = v.prop("Value");
+            String t = String.valueOf(val);
+            if (val instanceof Double && ((Double) val).doubleValue() == Math.floor(((Double) val).doubleValue())) {
+                t = String.valueOf(((Double) val).longValue());
+            }
+            sb.append(v.getName()).append(' ').append(t);
+        }
+        return sb.toString();
     }
 
     private static void showPlayers(Engine engine) {

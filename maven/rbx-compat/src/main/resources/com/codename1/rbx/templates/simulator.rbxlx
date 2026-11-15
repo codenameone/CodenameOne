@@ -128,17 +128,18 @@ local function spawnGem()
     g.CanCollide = false
     g.Material = Enum.Material.Glass
     g.Color = Color3.fromHSV(rng:NextNumber(), 0.8, 1)
-    g.Position = Vector3.new(rng:NextInteger(-50, 50), 1, rng:NextInteger(-50, 50))
+    g.Position = Vector3.new(rng:NextInteger(-32, 32), 1, rng:NextInteger(-32, 32))
     g.Touched:Connect(function(hit)
         local p = playerOf(hit)
         if p and g.Parent then
             p.leaderstats.Gems.Value += p.leaderstats.Power.Value
             g:Destroy()
+            task.delay(3, spawnGem)
         end
     end)
     g.Parent = gems
 end
-for i = 1, 40 do spawnGem() end
+for i = 1, 60 do spawnGem() end
 workspace.SellPad.Touched:Connect(function(hit)
     local p = playerOf(hit)
     if p then

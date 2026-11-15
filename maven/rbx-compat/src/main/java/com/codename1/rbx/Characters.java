@@ -1049,8 +1049,16 @@ final class Characters {
             if (Math.abs(l.x) > hs.x + 0.5 || Math.abs(l.y) > hs.y + 0.5 || Math.abs(l.z) > hs.z + 0.5) {
                 continue;
             }
-            double ey = Math.abs(c.r10) * hs.x + Math.abs(c.r11) * hs.y + Math.abs(c.r12) * hs.z;
-            double top = c.y + ey;
+            double top;
+            if (p.isA("WedgePart")) {
+                // The slope, not the bounding box: a ramp is walked up, never
+                // stood on top of at its full height from the low end.
+                double lz = Math.max(-hs.z, Math.min(hs.z, l.z));
+                double lx = Math.max(-hs.x, Math.min(hs.x, l.x));
+                top = c.y + c.r10 * lx + c.r11 * wedgeTop(hs, lz) + c.r12 * lz;
+            } else {
+                top = c.y + Math.abs(c.r10) * hs.x + Math.abs(c.r11) * hs.y + Math.abs(c.r12) * hs.z;
+            }
             if (top <= y - 3 + Pathfinder.STEP && top > best) {
                 best = top;
             }
@@ -1062,11 +1070,28 @@ final class Characters {
     static boolean wall(Engine e, Instance model, double x, double y, double z) {
         List<Instance> ss = solids(e, model);
         for (int i = 0; i < ss.size(); i++) { // NOPMD ForLoopCanBeForeach - per-frame code; no iterator, and the list may change while walked
-            if (inside(ss.get(i), x, y, z, 0.5)) {
+            Instance p = ss.get(i);
+            if (inside(p, x, y, z, 0.5) && (!p.isA("WedgePart") || underSlope(p, x, y, z, 0.5))) {
                 return true;
             }
         }
         return false;
+    }
+
+    /// The local height of a wedge's sloped face at local `lz`: the face
+    /// rises from the bottom of the front (-Z) to the top of the back (+Z),
+    /// as the renderer draws it.
+    static double wedgeTop(Vector3 hs, double lz) {
+        return hs.z < 1e-9 ? hs.y : hs.y * lz / hs.z;
+    }
+
+    /// Whether a point inside a wedge's box is also under its slope; the
+    /// space above the slope is air a character walks through.
+    static boolean underSlope(Instance p, double x, double y, double z, double pad) {
+        CFrame c = Behaviors.cf(p);
+        Vector3 hs = Behaviors.size(p).scale(0.5);
+        Vector3 l = c.pointToObject(new Vector3(x, y, z));
+        return l.y <= wedgeTop(hs, Math.max(-hs.z, Math.min(hs.z, l.z))) + pad;
     }
 
     /// Touched / TouchEnded between the character's parts and the world.

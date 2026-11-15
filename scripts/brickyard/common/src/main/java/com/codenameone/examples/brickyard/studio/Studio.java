@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.brickyard.studio;
 
+import com.codename1.components.InteractionDialog;
 import com.codename1.components.SpanLabel;
 import com.codename1.rbx.AgentMcp;
 import com.codename1.rbx.AgentTools;
@@ -35,6 +36,7 @@ import com.codename1.rbx.place.RbxlxWriter;
 import com.codename1.rbx.place.Templates;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
+import com.codename1.ui.CodeEditor;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -42,6 +44,7 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.ui.util.UITimer;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
@@ -61,8 +64,10 @@ import com.codenameone.examples.brickyard.ui.Ui;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /// The creator's editor. Every edit -- from a button here or from an AI
 /// agent through the app's MCP server -- goes through the same
@@ -96,9 +101,16 @@ public final class Studio implements AgentTools.Studio {
     private final Form form;
     private final Container explorer = new Container(BoxLayout.y());
     private final Container properties = new Container(BoxLayout.y());
-    private final TextArea source = new TextArea(12, 40);
+    private final CodeEditor source = LuauLanguage.editor();
     private final TextArea output = new TextArea(12, 40);
     private final List<byte[]> redo = new ArrayList<byte[]>();
+    /// Folders and models the creator opened in the Explorer; the rest stay
+    /// folded, as an engine editor starts them, so a backdrop of fifty trees
+    /// is one row.
+    private int inserted;
+    private static final String[] PART_PROPS = {"Shape", "Size", "CFrame", "Color", "Material", "Anchored",
+        "CanCollide", "Transparency"};
+    private final Set<Instance> expanded = new HashSet<Instance>();
     /// A desktop editor's layout (menu bar, tool strip, docked panes) on a
     /// desktop, a tablet or any window wide enough; the phone keeps tabs.
     private final boolean desktop;
@@ -379,12 +391,19 @@ public final class Studio implements AgentTools.Studio {
     /// A bright block beside the spawn (or at the viewport's pivot), which
     /// the viewport then frames, so the creator sees what was added.
     void addPart() {
+        addPart("Block");
+    }
+
+    /// Inserts an anchored part of `shape` (Block, Ball or Cylinder) beside
+    /// the spawn, each one a step along from the last so they do not stack.
+    void addPart(String shape) {
+        inserted++;
         Vector3 at = new Vector3(0, 6, 0);
         Instance spawn = firstOf(engine.getWorkspace(), "SpawnLocation");
         Object scf = spawn == null ? null : spawn.prop("CFrame");
         if (scf instanceof CFrame) {
             CFrame f = (CFrame) scf;
-            at = new Vector3(f.x + 6, f.y + 4, f.z - 6);
+            at = new Vector3(f.x + 6 * (inserted % 5) - 12, f.y + 1.9, f.z - 10 - 6 * (inserted / 5));
         } else if (engine.getWorkspace().prop("CurrentCamera") instanceof Instance) {
             Object focus = ((Instance) engine.getWorkspace().prop("CurrentCamera")).prop("Focus");
             if (focus instanceof CFrame) {
@@ -392,7 +411,8 @@ public final class Studio implements AgentTools.Studio {
             }
         }
         edit("create_instance", "{\"class\":\"Part\",\"parent\":\"Workspace\",\"properties\":{\"Anchored\":true,"
-                + "\"Size\":[4,4,4],\"Color\":\"#ffc43c\",\"CFrame\":[" + at.x + "," + at.y + "," + at.z + "]}}");
+                + "\"Shape\":" + q(shape) + ",\"Size\":[4,4,4],\"Color\":\"#ffc43c\",\"CFrame\":[" + at.x + ","
+                + at.y + "," + at.z + "]}}");
         List<Instance> kids = engine.getWorkspace().getChildren();
         if (!kids.isEmpty()) {
             select(kids.get(kids.size() - 1));
@@ -416,7 +436,14 @@ public final class Studio implements AgentTools.Studio {
         final TextField notes = new TextField("", "What changed", 30, TextField.ANY);
         notes.setUIID("StudioField");
         notes.setName("publishNotes");
-        final Dialog d = darkDialog("Publish");
+        // An in-form dialog, not a modal one: a modal Dialog is a form of
+        // its own, and the 3D viewport behind it stops rendering and shows
+        // as a grey slab for as long as the prompt is open.
+        final InteractionDialog d = new InteractionDialog("Publish", new BorderLayout());
+        d.setUIID("StudioDialog");
+        d.getTitleComponent().setUIID("StudioDialogTitle");
+        d.getContentPane().setUIID("StudioDialogBody");
+        d.setAnimateShow(false);
         Container buttons = new Container(new GridLayout(1, 2));
         Button cancel = new Button("Cancel", "StudioDialogButton");
         cancel.addActionListener(ev -> d.dispose());
@@ -430,7 +457,14 @@ public final class Studio implements AgentTools.Studio {
         buttons.add(cancel).add(go);
         d.add(BorderLayout.CENTER, BoxLayout.encloseY(Ui.label("Release notes", "StudioPropName"), notes));
         d.add(BorderLayout.SOUTH, buttons);
-        d.show();
+        int fw = CN.getDisplayWidth();
+        int fh = CN.getDisplayHeight();
+        int w = Math.min(fw - CN.convertToPixels(8), CN.convertToPixels(90));
+        int h = d.getPreferredH();
+        int side = (fw - w) / 2;
+        int top = Math.max(0, (fh - h) / 2);
+        d.show(top, Math.max(0, fh - h - top), side, side);
+        notes.startEditingAsync();
     }
 
     /// A dialog in the editor's dark palette rather than the native theme's.
@@ -579,12 +613,52 @@ public final class Studio implements AgentTools.Studio {
     private void edit(String tool, String args) {
         byte[] before = RbxlxWriter.writeBytes(PlaceSaver.save(engine));
         try {
-            log(tool + " -> " + tools.call(tool, args));
+            tools.call(tool, args);
+            log(describe(tool, args));
             pushUndo(before);
         } catch (RuntimeException err) {
             Ui.toast(String.valueOf(err.getMessage()));
         }
         refresh();
+    }
+
+    /// One readable Output line for an edit, as an editor's history reads.
+    static String describe(String tool, String args) {
+        String what = field(args, "path");
+        if (what == null) {
+            what = field(args, "name");
+        }
+        if (what == null) {
+            what = field(args, "class");
+        }
+        String name = what == null ? "" : what.substring(what.lastIndexOf('.') + 1);
+        if ("create_instance".equals(tool)) {
+            return "Inserted " + name;
+        }
+        if ("set_properties".equals(tool)) {
+            int at = args.indexOf("\"properties\":{\"");
+            String key = at < 0 ? null : field("{\"k\":" + args.substring(at + 14), "k");
+            return "Set " + (key == null ? "properties" : key) + " of " + name;
+        }
+        if ("write_script".equals(tool)) {
+            return "Saved script " + name;
+        }
+        if ("delete_instance".equals(tool)) {
+            return "Deleted " + name;
+        }
+        return tool.replace('_', ' ') + " " + name;
+    }
+
+    /// The string value of `key` at the top of a flat JSON object, or null.
+    private static String field(String json, String key) {
+        String k = "\"" + key + "\":\"";
+        int s = json.indexOf(k);
+        if (s < 0) {
+            return null;
+        }
+        s += k.length();
+        int e = json.indexOf('"', s);
+        return e < 0 ? null : json.substring(s, e);
     }
 
     private void pushUndo(byte[] before) {
@@ -647,6 +721,13 @@ public final class Studio implements AgentTools.Studio {
                 + ",\"properties\":" + props + "}");
     }
 
+    /// Points the viewport at the selection, sized to fit it.
+    void frameSelection() {
+        if (selected != null && (selected.isA("BasePart") || "Model".equals(selected.getClassName()))) {
+            frame(selected);
+        }
+    }
+
     void deleteSelected() {
         if (selected != null) {
             edit("delete_instance", "{\"path\":" + q(selected.fullName()) + "}");
@@ -654,7 +735,18 @@ public final class Studio implements AgentTools.Studio {
     }
 
     void addScript() {
-        edit("write_script", "{\"parent\":\"ServerScriptService\",\"name\":\"Script\",\"source\":\"print('hello')\"}");
+        Instance sss = engine.service("ServerScriptService");
+        String name = "Script";
+        for (int i = 2; sss != null && sss.findFirstChild(name) != null; i++) {
+            name = "Script" + i;
+        }
+        edit("write_script", "{\"parent\":\"ServerScriptService\",\"name\":" + q(name)
+                + ",\"source\":" + q("-- " + name + ": runs on the server when the experience starts\n") + "}");
+        Instance created = sss == null ? null : sss.findFirstChild(name);
+        if (created != null) {
+            select(created, false);
+            showTab(2);
+        }
     }
 
     void compatReport() {
@@ -737,9 +829,13 @@ public final class Studio implements AgentTools.Studio {
             Ui.toast("Select a script first");
             return;
         }
-        Instance parent = selected.getParent();
-        edit("write_script", "{\"parent\":" + q(parent == null ? "game" : parent.fullName()) + ",\"name\":"
-                + q(selected.getName()) + ",\"source\":" + q(source.getText()) + "}");
+        final Instance script = selected;
+        source.getText(text -> {
+            Instance parent = script.getParent();
+            edit("write_script", "{\"parent\":" + q(parent == null ? "game" : parent.fullName()) + ",\"name\":"
+                    + q(script.getName()) + ",\"source\":" + q(text == null ? "" : text) + "}");
+            log("Saved " + script.getName());
+        });
     }
 
     void playtest() {
@@ -827,18 +923,30 @@ public final class Studio implements AgentTools.Studio {
             Button b = new Button(copies > 1 ? i.getName() + "  x" + copies : i.getName(),
                     i == selected ? "StudioNodeSelected" : "StudioNode"); // NOPMD CompareObjectsWithEquals - tree identity
             b.setName("node-" + i.getName());
-            b.addActionListener(ev -> select(target));
+            final boolean folds = folds(i);
+            b.addActionListener(ev -> {
+                if (folds && !expanded.remove(target)) {
+                    expanded.add(target);
+                }
+                select(target);
+            });
             FontImage.setMaterialIcon(b, icon(i), 3);
             b.setGap(CN.convertToPixels(1));
             b.getAllStyles().setPaddingLeft(CN.convertToPixels(2 + 3 * (depth - 1)));
             b.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-            Label cls = new Label(i.getClassName(), "StudioNodeClass");
+            if (folds) {
+                b.setText((expanded.contains(i) ? "- " : "+ ") + b.getText());
+            }
+            // A service is named after its class; saying it twice only
+            // truncates the name.
+            Label cls = new Label(i.getName().equals(i.getClassName()) ? "" : i.getClassName(),
+                    "StudioNodeClass");
             Container row = BorderLayout.centerEastWest(null, cls, null);
             row.add(BorderLayout.CENTER, b);
             row.setLeadComponent(b);
             explorer.add(row);
         }
-        if (depth < 6 && copies == 1) {
+        if (depth < 6 && copies == 1 && (depth < 2 || !folds(i) || expanded.contains(i))) {
             List<Instance> kids = i.getChildren();
             int k = 0;
             while (k < kids.size()) {
@@ -856,6 +964,13 @@ public final class Studio implements AgentTools.Studio {
                 k += run;
             }
         }
+    }
+
+    /// True for a container the Explorer folds: a folder or a model with
+    /// something in it, below the services.
+    private static boolean folds(Instance i) {
+        String c = i.getClassName();
+        return ("Folder".equals(c) || "Model".equals(c)) && !i.getChildren().isEmpty();
     }
 
     /// The Explorer's glyph for a class, as an engine editor draws one.
@@ -931,17 +1046,52 @@ public final class Studio implements AgentTools.Studio {
             properties.add(hint);
             return;
         }
-        properties.add(Ui.label(selected.fullName(), "RowTitle"));
-        for (Map.Entry<String, Object> p : selected.storedProps().entrySet()) {
-            final String key = p.getKey();
-            if ("Source".equals(key)) {
-                continue;
+        properties.add(Ui.label(selected.getName(), "RowTitle"));
+        properties.add(Ui.label(selected.getClassName(), "StudioPropName"));
+        // The properties a creator reaches for first, always, as an editor
+        // lists them -- a new part has stored only its size and colour --
+        // and then whatever else this instance has set.
+        List<String> keys = new ArrayList<String>();
+        keys.add("Name");
+        if (selected.isA("BasePart")) {
+            for (String k : PART_PROPS) {
+                keys.add(k);
             }
-            final TextField f = new TextField(AgentTools.json(p.getValue()), key, 20, TextField.ANY);
+        }
+        for (String k : selected.storedProps().keySet()) {
+            if (!"Source".equals(k) && !keys.contains(k)) {
+                keys.add(k);
+            }
+        }
+        for (final String key : keys) {
+            Object value = "Name".equals(key) ? selected.getName() : selected.prop(key);
+            String text = AgentTools.json(value);
+            if (text.length() > 1 && text.charAt(0) == '"') {
+                // A name or an enum reads as itself; literal() quotes it back.
+                text = text.substring(1, text.length() - 1);
+            }
+            final TextField f = new TextField(text, key, 20, TextField.ANY);
             f.setUIID("StudioField");
             f.setName("prop-" + key);
-            f.addActionListener(ev -> edit("set_properties", "{\"path\":" + q(selected.fullName())
-                    + ",\"properties\":{" + q(key) + ":" + literal(f.getText()) + "}}"));
+            final Instance target = selected;
+            final String shown = f.getText();
+            final Runnable commit = () -> {
+                String now = f.getText();
+                if (!now.equals(shown) && target.getParent() != null) {
+                    edit("set_properties", "{\"path\":" + q(target.fullName())
+                            + ",\"properties\":{" + q(key) + ":" + literal(now) + "}}");
+                }
+            };
+            f.addActionListener(ev -> commit.run());
+            // Live, as an inspector is: a value applies once the typing
+            // pauses, without hunting for a return key on a touch screen.
+            final UITimer[] pause = new UITimer[1];
+            f.addDataChangedListener((type, index) -> {
+                if (pause[0] != null) {
+                    pause[0].cancel();
+                }
+                pause[0] = UITimer.timer(700, false, form, commit);
+            });
             Container row = new Container(new BorderLayout());
             Label name = Ui.label(key, "StudioPropName");
             // One column for every name, so the values line up.

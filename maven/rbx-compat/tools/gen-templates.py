@@ -212,15 +212,18 @@ def obby():
     ws.append(part(pl, "SignStripe", (8.5, 4.6, -13.35), (5, 0.8, 0.1), 0xffc400, "Neon"))
     # Stage 1: stepping pads over the lava.
     pads = [0x2196f3, 0xffc107, 0xe91e63, 0x00bcd4, 0x8bc34a]
+    # The first stage teaches the jump, so the drums are wide, in a straight
+    # line and rising gently to the deck: run and jump, nothing else. The later stages
+    # bring the zigzags and the climbs.
     for i in range(5):
-        x = (-4, 3, -2, 4, 0)[i]
-        y = 0.5 + i * 0.8
-        ws.append(part(pl, "Step%d" % (i + 1), (x, y, -22 - i * 9), (1, 7, 7), 0x3b3532,
+        x = 0
+        y = 0.75 + i * 0.75  # the last drum tops out level with the deck
+        ws.append(part(pl, "Step%d" % (i + 1), (x, y, -22 - i * 10), (1, 8, 8), 0x3b3532,
                        "Basalt", shape=2, rot=UPRIGHT))
         # A glowing band around the drum's side, just under its top face.
-        ws.append(part(pl, "StepRim%d" % (i + 1), (x, y + 0.22, -22 - i * 9), (0.18, 7.25, 7.25), pads[i],
+        ws.append(part(pl, "StepRim%d" % (i + 1), (x, y + 0.22, -22 - i * 10), (0.18, 8.25, 8.25), pads[i],
                        "Neon", shape=2, rot=UPRIGHT, collide=False))
-    ws.append(part(pl, "Lava1", (0, -2, -40), (24, 1, 36), 0xff3d00, "CrackedLava", tags=("KillBrick",)))
+    ws.append(part(pl, "Lava1", (0, -2, -44), (24, 1, 44), 0xff3d00, "CrackedLava", tags=("KillBrick",)))
     # Checkpoint 1.
     cp1z = -76
     ws.append(part(pl, "Stage1", (0, 3, cp1z), (14, 2, 14), 0x4a4440, "Slate"))
@@ -538,17 +541,18 @@ local function spawnGem()
     g.CanCollide = false
     g.Material = Enum.Material.Glass
     g.Color = Color3.fromHSV(rng:NextNumber(), 0.8, 1)
-    g.Position = Vector3.new(rng:NextInteger(-50, 50), 1, rng:NextInteger(-50, 50))
+    g.Position = Vector3.new(rng:NextInteger(-32, 32), 1, rng:NextInteger(-32, 32))
     g.Touched:Connect(function(hit)
         local p = playerOf(hit)
         if p and g.Parent then
             p.leaderstats.Gems.Value += p.leaderstats.Power.Value
             g:Destroy()
+            task.delay(3, spawnGem)
         end
     end)
     g.Parent = gems
 end
-for i = 1, 40 do spawnGem() end
+for i = 1, 60 do spawnGem() end
 workspace.SellPad.Touched:Connect(function(hit)
     local p = playerOf(hit)
     if p then
@@ -648,9 +652,23 @@ print("TEMPLATE READY racing")
             service(pl, "ServerScriptService", script(pl, "Racing", src))]
     return place(ws, rest)
 
+def baseplate():
+    """An empty world to build in from scratch: a baseplate, a spawn and a sky."""
+    pl = Place()
+    ws = [part(pl, "Baseplate", (0, -0.5, 0), (240, 1, 240), 0x5f9e4f, "Grass"),
+          part(pl, "Spawn", (0, 0.1, 30), (8, 0.2, 8), 0x9e9e9e, "Concrete", cls="SpawnLocation")]
+    # The horizon in one folder, so the Explorer starts with what you build.
+    scenery = []
+    hills(pl, scenery, 200, -1)
+    ws.append(folder(pl, "Scenery", "\n".join(scenery)))
+    rest = [lighting(pl, 14.8, bloom(pl, 0.5, 1.2) + atmosphere(pl, 0.08, 0xdbe9ff) + color_correction(pl, 0.1, 0.1),
+                     2.8),
+            service(pl, "ServerScriptService")]
+    return place(ws, rest)
+
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "main", "resources", "com", "codename1",
                    "rbx", "templates")
-for name, fn in (("obby", obby), ("tycoon", tycoon), ("arena", arena), ("simulator", simulator),
+for name, fn in (("baseplate", baseplate), ("obby", obby), ("tycoon", tycoon), ("arena", arena), ("simulator", simulator),
                  ("racing", racing)):
     with open(os.path.join(OUT, name + ".rbxlx"), "w") as f:
         f.write(fn())

@@ -31,7 +31,7 @@ import java.io.InputStream;
 /// The starter places the studio offers. Each is an original `.rbxlx`
 /// shipped in this jar, written by `tools/gen-templates.py`.
 public final class Templates {
-    private static final String[] IDS = {"obby", "tycoon", "arena", "simulator", "racing"};
+    private static final String[] IDS = {"baseplate", "obby", "tycoon", "arena", "simulator", "racing"};
 
     private Templates() {
     }

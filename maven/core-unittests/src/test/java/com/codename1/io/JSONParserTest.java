@@ -53,6 +53,14 @@ class JSONParserTest {
     }
 
     @Test
+    void decodesEveryStringEscapeTheSpecDefines() throws IOException {
+        // \b and \f were read as the letters b and f.
+        String json = "{\"s\":\"a\\bb\\fc\\nd\\te\\rf\\\"g\\\\h\\/i\\u0041\"}";
+        Map<String, Object> result = parser.parseJSON(new StringReader(json));
+        assertEquals("a\bb\fc\nd\te\rf\"g\\h/iA", result.get("s"));
+    }
+
+    @Test
     void omitsNullValuesWhenIncludeNullsDisabled() throws IOException {
         parser.setIncludeNullsInstance(false);
         parser.setUseBooleanInstance(true);
