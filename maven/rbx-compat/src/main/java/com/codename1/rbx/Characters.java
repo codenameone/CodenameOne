@@ -204,8 +204,14 @@ final class Characters {
         }
         Instance s = spawns.get((int) (Math.random() * spawns.size()));
         CFrame c = Behaviors.cf(s);
-        double top = c.y + Behaviors.size(s).y / 2;
-        return CFrame.at(c.x, top + 3, c.z);
+        Vector3 size = Behaviors.size(s);
+        double top = c.y + size.y / 2;
+        // Anywhere on the pad, a stud in from its edges: players who all
+        // spawned on the centre stood inside one another and the physics
+        // stacked them into a tower.
+        double ox = (Math.random() - 0.5) * Math.max(0, size.x - 2);
+        double oz = (Math.random() - 0.5) * Math.max(0, size.z - 2);
+        return CFrame.at(c.x + c.r00 * ox + c.r02 * oz, top + 3, c.z + c.r20 * ox + c.r22 * oz);
     }
 
     /// `Player:LoadCharacter()`: removes the old character, builds a rig,

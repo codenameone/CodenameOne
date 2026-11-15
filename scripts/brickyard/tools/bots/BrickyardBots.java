@@ -24,6 +24,7 @@ import com.codename1.rbx.Instance;
 import com.codename1.rbx.ReplicaClient;
 import com.codename1.rbx.ReplicaServer;
 import com.codename1.rbx.RigidBodies;
+import com.codename1.rbx.Vector3;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -59,6 +60,11 @@ import java.util.regex.Pattern;
 public final class BrickyardBots {
     private static final String CLIENT_ID = "brickyard-app";
     private static final String REDIRECT = "http://127.0.0.1/callback";
+    /// The obby template's course, start to finish: the parts a player
+    /// lands on, in order.
+    static final String[] COURSE = {"Step1", "Step2", "Step3", "Step4", "Step5", "Stage1", "Ramp", "Beam",
+        "Checkpoint2", "SpinDeck", "Mover", "Landing", "Spiral1", "Spiral2", "Spiral3", "Spiral4", "Spiral5",
+        "Spiral6", "Spiral7", "Spiral8", "Finish"};
     private static final String[] GREETINGS = {"hey!", "hi everyone", "yo"};
     private static final String[] REPLIES = {"nice", "lol", "let's go", "same", "haha"};
 
@@ -212,6 +218,10 @@ public final class BrickyardBots {
         int stuck;
         int jumpUntil;
         double wanderAngle;
+        /// The course stop the bot is running to, or -1 when it is not
+        /// racing; a human saying "race" starts it.
+        int leg = -1;
+        int raceFrom;
 
         Bot(int index, String ticketServer) {
             this.index = index;
@@ -304,6 +314,9 @@ public final class BrickyardBots {
             if (cam instanceof Instance) {
                 ((Instance) cam).put("CFrame", new CFrame(at[0], at[1] + 4, at[2] + 10, 1, 0, 0, 0, 1, 0, 0, 0, 1));
             }
+            if (leg >= 0 && race(at)) {
+                return;
+            }
             double[] goal = null;
             double best = Double.MAX_VALUE;
             for (Instance p : engine.service("Players").getChildren()) {
@@ -336,7 +349,8 @@ public final class BrickyardBots {
                 dz = Math.cos(wanderAngle);
             }
             double len = Math.sqrt(dx * dx + dz * dz);
-            boolean moving = goal == null || len > 2.5;
+            // Stop a few studs short of the player: closer, a bot climbs onto them.
+            boolean moving = goal == null || len > 6;
             if (moving) {
                 Input.move(engine, dx / len, -dz / len);
             } else {
@@ -359,6 +373,77 @@ public final class BrickyardBots {
             }
         }
 
+        /// Runs the obby: to the top of each stop in [#COURSE] in turn,
+        /// jumping up to the next one and across the gaps between them. A
+        /// fall respawns the bot at its checkpoint, and it picks the course
+        /// up from the stop nearest to where it landed. Returns false when
+        /// the place has no course to run.
+        boolean race(double[] at) {
+            if (frame < raceFrom) {
+                Input.move(engine, 0, 0);
+                return true;
+            }
+            Instance stop = leg < COURSE.length ? find(COURSE[leg]) : null;
+            if (stop == null) {
+                leg = -1;
+                return false;
+            }
+            double jumpedTo = Math.abs(at[0] - lastX) + Math.abs(at[2] - lastZ);
+            if (jumpedTo > 15) {
+                // Respawned: carry on from the closest stop.
+                double best = Double.MAX_VALUE;
+                for (int i = 0; i < COURSE.length; i++) {
+                    Instance p = find(COURSE[i]);
+                    if (p != null) {
+                        double[] q = Behaviors.position(p);
+                        double d = Math.abs(q[0] - at[0]) + Math.abs(q[1] - at[1]) + Math.abs(q[2] - at[2]);
+                        if (d < best) {
+                            best = d;
+                            leg = i;
+                        }
+                    }
+                }
+                stop = find(COURSE[leg]);
+            }
+            double[] q = Behaviors.position(stop);
+            Object sz = stop.prop("Size");
+            double top = q[1] + (sz instanceof Vector3 ? ((Vector3) sz).y / 2 : 0.5);
+            double feet = at[1] - 3;
+            double dx = q[0] - at[0];
+            double dz = q[2] - at[2];
+            double len = Math.sqrt(dx * dx + dz * dz);
+            lastX = at[0];
+            lastZ = at[2];
+            if (len < 1.8 && feet > top - 1.5) {
+                leg++;
+                if (leg >= COURSE.length) {
+                    leg = -1;
+                    say(index == 0 ? "made it! gg" : "gg, that spinner got me");
+                    Input.move(engine, 0, 0);
+                }
+                return true;
+            }
+            Input.move(engine, dx / Math.max(len, 1e-6), -dz / Math.max(len, 1e-6));
+            boolean up = top > feet + 0.6;
+            boolean gap = len > 3.5 && len < 11;
+            if ((up || gap) && frame > jumpUntil + 20) {
+                Input.key(engine, "Space", true);
+                jumpUntil = frame + 8;
+            } else if (frame == jumpUntil) {
+                Input.key(engine, "Space", false);
+            }
+            return true;
+        }
+
+        Instance find(String name) {
+            for (Instance d : engine.getWorkspace().descendants()) {
+                if (name.equals(d.getName()) && d.isA("BasePart")) {
+                    return d;
+                }
+            }
+            return null;
+        }
+
         /// Bots answer people, not each other, and one at a time.
         void hear(Instance from, String text) {
             if (from == null || from == engine.getLocalPlayer() || isBot(from)) { // NOPMD CompareObjectsWithEquals
@@ -367,10 +452,15 @@ public final class BrickyardBots {
             String t = text.toLowerCase(java.util.Locale.ROOT);
             String name = from.str("DisplayName");
             String first = name == null || name.isEmpty() ? from.getName() : name.split(" ")[0];
-            if (t.contains("hi") || t.contains("hello") || t.contains("hey")) {
+            if (t.contains("race") || t.contains("go!")) {
+                // Leo is off at once, Sam a beat later: a race, not a parade.
+                leg = 0;
+                raceFrom = frame + 60 + index * 100;
+            }
+            if (t.contains("race") || t.contains("follow")) {
+                reply = index == 0 ? "you're on! 3.. 2.. 1.." : "right behind you";
+            } else if (t.contains("hi") || t.contains("hello") || t.contains("hey")) {
                 reply = index == 0 ? "hi " + first + "!" : "hey " + first;
-            } else if (t.contains("race") || t.contains("follow")) {
-                reply = index == 0 ? "you're on!" : "right behind you";
             } else if (t.contains("?")) {
                 reply = index == 0 ? "yes!" : "for sure";
             } else {

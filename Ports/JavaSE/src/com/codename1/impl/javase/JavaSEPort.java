@@ -4391,6 +4391,49 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
+        /// Paints the window's Swing children -- the native text editor -- over
+        /// a frame for the recorder, where paint() puts them over `buffer`. The
+        /// kept frame is copied when the EDT finishes a pass, but the editor is
+        /// only painted later, on the AWT thread, into the window's buffer, so a
+        /// recording showed the simulated keyboard typing into an empty field.
+        /// Runs on the AWT thread, the only one that may paint a Swing component.
+        void paintChildrenForRecording(final BufferedImage frame) {
+            if (getComponentCount() == 0) {
+                return;
+            }
+            Runnable r = new Runnable() {
+                public void run() {
+                    Rectangle sc = getScreenCoordinates();
+                    if (sc == null) {
+                        return;
+                    }
+                    Graphics2D bg = frame.createGraphics();
+                    try {
+                        if (zoomLevel != 1) {
+                            bg.translate(-(sc.x + x) * zoomLevel, -(sc.y + y) * zoomLevel);
+                        } else {
+                            bg.translate(-sc.x - x, -sc.y - y);
+                        }
+                        paintChildrenIntoBuffer(bg);
+                    } finally {
+                        bg.dispose();
+                    }
+                }
+            };
+            if (EventQueue.isDispatchThread()) {
+                r.run();
+                return;
+            }
+            try {
+                EventQueue.invokeAndWait(r);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                // A frame without the editor beats a recording that stops.
+                Log.e(e);
+            }
+        }
+
         /// A copy of the last complete frame for the recorder, or null when no
         /// frame has been kept yet.
         BufferedImage presentedFrame() {
@@ -12954,6 +12997,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         BufferedImage buf = canvas.presentedFrame();
         if (buf == null) {
             buf = canvas.buffer;
+        } else {
+            // A private copy: the editor can be painted into it.
+            canvas.paintChildrenForRecording(buf);
         }
         Rectangle sc = getScreenCoordinates();
         if (buf == null) {

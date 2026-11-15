@@ -292,11 +292,22 @@ public final class PlaySession {
         input.setUIID("GameChatInput");
         input.setName("chatInput");
         input.setVisible(false);
-        input.setDoneListener(ev -> {
-            String text = input.getText();
+        final Button send = new Button("", "GameChatButton");
+        send.setName("chatSend");
+        send.setAccessibilityText("Send");
+        FontImage.setMaterialIcon(send, FontImage.MATERIAL_SEND, 4);
+        send.setVisible(false);
+        final com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent> submit = ev -> {
+            if (input.isEditing()) {
+                input.stopEditing();
+            }
+            String text = input.getText().trim();
             input.setText("");
             input.setVisible(false);
-            engine.sendChat(text);
+            send.setVisible(false);
+            if (text.length() > 0) {
+                engine.sendChat(text);
+            }
             f.getLayeredPane(PlaySession.class, true).revalidate();
             // Back to the game: keys move the character again.
             CN.callSerially(() -> {
@@ -305,13 +316,16 @@ public final class PlaySession {
                     ((PlayView) v).focusControls();
                 }
             });
-        });
+        };
+        input.setDoneListener(submit);
+        send.addActionListener(submit);
         Button open = new Button("", "GameChatButton");
         open.setName("chatButton");
         open.setAccessibilityText("Chat");
         FontImage.setMaterialIcon(open, FontImage.MATERIAL_CHAT_BUBBLE, 4);
         open.addActionListener(ev -> {
             input.setVisible(true);
+            send.setVisible(true);
             f.getLayeredPane(PlaySession.class, true).revalidate();
             input.startEditingAsync();
         });
@@ -330,7 +344,7 @@ public final class PlaySession {
                 f.getLayeredPane(PlaySession.class, true).revalidate();
             }
         });
-        Container col = BoxLayout.encloseY(BorderLayout.centerEastWest(input, null, open), lines);
+        Container col = BoxLayout.encloseY(BorderLayout.centerEastWest(input, send, open), lines);
         col.setName("chat");
         return col;
     }
