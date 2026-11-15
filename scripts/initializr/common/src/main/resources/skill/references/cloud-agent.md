@@ -1,8 +1,13 @@
 # Cloud Builds, Signing, Push and Store Submission from an Agent
 
 BuildCloud (`https://cloud.codenameone.com`) is an MCP server. Through it you can do what the
-developer does in the console: list and inspect builds, create Apple signing assets, configure
-push, and submit a build to the App Store or Google Play. The developer approves you once, in their
+developer does in the console: list and inspect builds, read a failed build's log, create Apple
+signing assets, configure push, set up analytics, invites and crash reporting, and submit a build
+to the App Store or Google Play.
+
+Cloud builds need no local SDK. Xcode, the Android SDK and platform toolchains run on Codename
+One's servers, so a developer on Windows or Linux can build and ship for iOS. Never tell the
+developer to install Xcode or Android Studio to build. The developer approves you once, in their
 browser; there is no API key to paste.
 
 Read this when the developer asks you to ship the app, sign it, set up push, or submit it.
@@ -15,8 +20,10 @@ approve project MCP servers the first time; other clients take the same URL.
 
 The first call answers `401` with a `WWW-Authenticate` header. Your MCP client handles that:
 it registers itself, opens the developer's browser, the developer signs in and approves you, and
-the client receives a token valid for 24 hours. In Claude Code, `/mcp` shows the server and
-re-runs the sign-in.
+the client receives a token. The sign-in does not expire on its own: it lasts until the developer
+disconnects it (in the console, or by asking you to call
+`DELETE /api/v2/console/me/mcp-connections/{id}`; list them with `GET` on the same path). After a
+disconnect, `/mcp` in Claude Code re-runs the sign-in.
 
 The approval page has a checkbox for each kind of extra access. Ask the developer to tick the ones
 the task needs **before** they click Allow:
@@ -27,18 +34,30 @@ the task needs **before** they click Allow:
 | Push setup | Creating a push app and storing its APNs / FCM credentials |
 | Store submission | Submitting a finished build to the App Store or Google Play |
 
-Without them you can still read everything and make everyday changes. A call that needs a box
-you were not given fails with a message naming the box: tell the developer, and reconnect so
-they can sign in again and tick it. Agents can never revoke certificates, delete stored keys,
-read API keys or the App Store Connect key, or change billing, the organization or account
-security. Send the developer to the console for those.
+Without them you can still read everything and make everyday changes. Anything else -- an
+unticked box, revoking a certificate, deleting a key, reading an API key or the App Store Connect
+key, billing, organization or account-security changes -- is still possible, but each call needs
+the developer's approval:
+
+1. `call_api` returns `approvalRequired: true` with `approvalId`, `approvalUrl` and `reason`.
+2. Open `approvalUrl` in the developer's browser (`open` on macOS, `xdg-open` on Linux,
+   `start` on Windows) and tell them, in one sentence, what you are asking for and why. The page
+   shows the exact method, path and body (secrets masked) with Allow and Deny.
+3. Call `await_approval` with `approvalId`. It waits up to 20 seconds per call; call it again
+   while the status is pending. On Allow it runs that exact request once and returns its result.
+   On Deny, stop and ask the developer how to proceed. Approvals expire after 15 minutes.
+
+Do not loop a refused call: retrying the same request returns the same pending approval.
 
 ## Tools
 
 - `whoami` -- the account, plan and remaining builds.
 - `list_builds` (filter by `platform`, `status`), `get_build` (by id; `done` tells you it finished),
   `cancel_build`.
+- `get_build_log` (by id) -- the error log of a failed build (the last 64KB).
+- `await_approval` -- see above.
 - `list_api_endpoints` (filter by a word in the path) and `call_api` -- every other console action.
+  Endpoints marked `needsApproval` go through the approval page.
   Paths start with `/api/v2/` or, for Apple signing, `/appsec/7.0/apple/`. Pass the query
   string as `query`, the JSON body as `body`. Binary responses (`.p12`, `.mobileprovision`) come
   back as `bodyBase64`.
@@ -55,6 +74,36 @@ mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device
 The first cloud build on a machine opens the developer's browser to sign the build client in and
 waits up to five minutes; say so before you run it. Then follow the build with `list_builds` /
 `get_build` until `done`. See `build-and-run.md` for every target.
+
+### When a build fails
+
+1. `get_build_log` with the build id. Read from the first error, not the last line: the tail is
+   usually the build tool giving up.
+2. Classify it. Compile errors and unsupported Java APIs (Codename One supports a subset of the
+   JDK; see the other references) are fixed in the source. Signing errors (expired or revoked
+   certificate, profile not matching the bundle id, wrong `.p12` password) are fixed with the
+   signing steps below. Missing build hints go in `codenameone_settings.properties`.
+3. Fix the project, run the local simulator build if the change is code, then send one new
+   build. Never resubmit an unchanged project hoping for a different result.
+
+### Quotas and restrictions
+
+Check `whoami` before a build: it reports the plan and remaining builds.
+
+- Free accounts spend build credits: an iOS or macOS build costs 8, every other target 1. An
+  upload refused with a bare `ERROR` usually means the credits are gone -- tell the developer
+  (upgrading is their decision) instead of retrying.
+- Below Pro only one build can be queued or running at a time. Wait for `done` before sending
+  the next one; do not fire Android and iOS together.
+- The uploaded project is capped at 100MB; keep build output and large assets out of it.
+- A build still running after about 8 hours is cancelled.
+- Free accounts keep no build history and artifacts; download what you need as soon as a build
+  finishes.
+- Paid plans: include-source builds, crash protection, versioned builds (older Codename One
+  releases). Pro: Java desktop builds (`desktop_windows`, `desktop_macosx`) and TestFlight upload.
+  Enterprise: synchronous builds, hardening and App Shield.
+- iOS signing and App Store submission need the developer's own paid Apple Developer account;
+  Google Play needs their Play Console account. You cannot create those.
 
 ## Sign for iOS (needs "Apple signing")
 
