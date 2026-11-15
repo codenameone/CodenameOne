@@ -158,12 +158,17 @@ class Cn1AppArchetypeCertificateWizardTest {
                 "the root AGENTS.md pointer must be staged into the archetype");
         assertTrue(pom.contains("archetype-resources/.claude/skills/codename-one/SKILL.md"),
                 "the Claude stub must be staged at its single-file path");
+        assertTrue(new File(initializrResources, "agent-mcp-json.json").isFile(),
+                "the archetype pom stages .mcp.json from " + initializrResources);
+        assertTrue(pom.contains("archetype-resources/.mcp.json"),
+                "the BuildCloud MCP server list must be staged into the archetype, as the Initializr ships it");
 
         String metadata = archetypeFile("src/main/resources/META-INF/maven/archetype-metadata.xml");
         for (String declared : new String[] {
                 "<directory>.agent-skills</directory>",
                 "<directory>.claude</directory>",
-                "<include>AGENTS.md</include>" }) {
+                "<include>AGENTS.md</include>",
+                "<include>.mcp.json</include>" }) {
             assertTrue(metadata.contains(declared),
                     "archetype-metadata.xml must extract " + declared);
         }

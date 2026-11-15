@@ -274,6 +274,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertNull(entries.get("icon.png"), label + "a backend has no icon");
             assertNull(entries.get("src/main/css/theme.css"), label + "a backend has no theme");
             assertNull(entries.get("AGENTS.md"), label + "the UI authoring skill is not shipped with a backend");
+            assertNull(entries.get(".mcp.json"), label + "the BuildCloud MCP server is for apps, not a backend");
             assertNotNull(entries.get("application.properties"), label + "backend settings belong at the root");
             assertContains(getText(entries, "build.gradle.kts"), "runBackend",
                     label + "a backend-only root build script is the backend template");
@@ -319,6 +320,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             }
             assertContains(getText(entries, "AGENTS.md"), "./gradlew run", label + "AGENTS.md should use Gradle");
             assertNotNull(entries.get(".agent-skills/codename-one/SKILL.md"), label + "the skill ships with Gradle apps");
+            assertContains(getText(entries, ".mcp.json"), "https://cloud.codenameone.com/api/v1/mcp",
+                    label + "apps name the BuildCloud MCP server for agents");
             apiPath = "backend/src/main/java/" + packagePath + "/Api.java";
             if (type == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
                 assertNotNull(entries.get("backend/application.properties"), label + "backend settings");
