@@ -104,6 +104,21 @@ class ConstraintTest {
     }
 
     @Test
+    void rushHoursFollowTheLocalDayAcrossDaylightSaving() {
+        List<Job> one = jobs(job("J", 0, 24 * 60).build());
+        Problem p = new Problem(list(tech("A").build()), one, Instances.travel(), new Weights())
+                .rushHours(50, 7 * 60, 9 * 60);
+        // Without day starts days are 1440 minutes, negative minutes included.
+        assertEquals(8 * 60, p.minuteOfDay(24 * 60 + 8 * 60));
+        assertEquals(23 * 60, p.minuteOfDay(-60));
+        // Day 1 is 23 hours long (clocks went forward), so day 2 starts at
+        // horizon minute 47 * 60 and 08:00 on it is 55 * 60, not 56 * 60.
+        p.dayStarts(0, 24 * 60, 47 * 60);
+        assertEquals(8 * 60, p.minuteOfDay(55 * 60));
+        assertEquals(9 * 60, p.minuteOfDay(56 * 60));
+    }
+
+    @Test
     void theCustomerCanExcludeATechnician() {
         Plan plan = solve(list(tech("A").build(), tech("B").build()),
                 jobs(job("J", 9 * 60, 12 * 60).preferredTech("A").exclude("A").build()), new Weights());

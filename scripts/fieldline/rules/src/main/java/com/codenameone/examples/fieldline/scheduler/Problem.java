@@ -50,6 +50,10 @@ public final class Problem {
     /// a drive that sets off takes `rushPct` percent longer.
     private int[] rush = new int[0];
     private int rushPct;
+    /// Horizon minute at which each local day begins. A day is not always
+    /// 1440 minutes (daylight saving), so the minute of day of a departure
+    /// is measured from the start of its own day, never by a remainder.
+    private int[] dayStarts = new int[0];
 
     /// Makes drives that start inside any of `windows` (minute-of-day pairs,
     /// from inclusive, to exclusive) take `pct` percent longer. Travel then
@@ -64,6 +68,33 @@ public final class Problem {
         return this;
     }
 
+    /// The horizon minute each local day starts at, in order. Without them
+    /// days are taken as 1440 minutes from minute 0.
+    public Problem dayStarts(int... starts) {
+        dayStarts = starts.clone();
+        return this;
+    }
+
+    /// The minute of its own local day at which horizon minute `t` falls.
+    int minuteOfDay(int t) {
+        int start = 0;
+        if (dayStarts.length == 0) {
+            int day = t / (24 * 60);
+            if (t < 0 && t % (24 * 60) != 0) {
+                day--;
+            }
+            start = day * 24 * 60;
+        } else {
+            start = dayStarts[0] > t ? dayStarts[0] - 24 * 60 : dayStarts[0];
+            for (int d : dayStarts) {
+                if (d <= t) {
+                    start = d;
+                }
+            }
+        }
+        return t - start;
+    }
+
     public int getRushPct() {
         return rushPct;
     }
@@ -75,7 +106,7 @@ public final class Problem {
         if (rushPct == 0 || base == 0) {
             return base;
         }
-        int minute = depart % (24 * 60);
+        int minute = minuteOfDay(depart);
         for (int i = 0; i < rush.length; i += 2) {
             if (minute >= rush[i] && minute < rush[i + 1]) {
                 return base + (base * rushPct + 99) / 100;

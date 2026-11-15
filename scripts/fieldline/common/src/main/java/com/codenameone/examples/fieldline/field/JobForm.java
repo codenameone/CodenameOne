@@ -93,7 +93,13 @@ public final class JobForm {
         form = Ui.form("Job", "Job");
         Ui.back(form, () -> {
             saveChecklist(null);
-            previous.showBack();
+            close();
+        });
+        form.addShowListener(e -> {
+            if (stale && job != null) {
+                stale = false;
+                check(form);
+            }
         });
         bar.setUIID("FlActionBar");
         bar.setSafeArea(true);
@@ -132,14 +138,31 @@ public final class JobForm {
     /// arrives, and the technician should not be told about their own tap.
     private static long localChangeAt;
 
+    /// A live frame arrived while another form covered this one.
+    private boolean stale;
+
+    /// Leaves the standalone job form for good.
+    private void close() {
+        LiveChannel.unlisten(form);
+        previous.showBack();
+    }
+
     /// Records that this device is about to change a job.
     static void touched() {
         localChangeAt = System.currentTimeMillis();
     }
 
     private void check(final Component owner) {
-        if (owner.getComponentForm() == null && owner != form
-                || owner == form && CN.getCurrentForm() != form) {
+        if (owner == form) {
+            // The job form opens sign-off, the assistant and the camera over
+            // itself, so not being current is not being gone: skip this
+            // frame, keep listening, and re-read on return. The back
+            // handlers stop the listener when the form really closes.
+            if (CN.getCurrentForm() != form) {
+                stale = true;
+                return;
+            }
+        } else if (owner.getComponentForm() == null) {
             LiveChannel.unlisten(owner);
             return;
         }
@@ -698,7 +721,7 @@ public final class JobForm {
                     fill(updated);
                     changed.run();
                 } else if ("COMPLETED".equals(to)) {
-                    previous.showBack();
+                    close();
                 } else {
                     fill(updated);
                 }

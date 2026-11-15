@@ -201,7 +201,8 @@ public class Planner {
                 : wanted.timeRoundingMinutes();
         int autoOut = wanted.autoClockOutHours() == 0 ? stored.getAutoClockOutHours()
                 : wanted.autoClockOutHours();
-        if (rounding < 1 || rounding > 30 || 60 % rounding != 0) {
+        if (rounding != 1 && rounding != 5 && rounding != 6 && rounding != 10 && rounding != 15
+                && rounding != 30) {
             throw new ResponseStatusException(400, "Round clocked time to 1, 5, 6, 10, 15 or 30 minutes");
         }
         if (autoOut < 4 || autoOut > 24) {
@@ -242,6 +243,13 @@ public class Planner {
     static Problem problem(Model m, List<com.codenameone.examples.fieldline.scheduler.Job> work) {
         PlannerPolicy p = m.policy;
         Problem problem = new Problem(m.crew, work, m.travel, m.weights);
+        if (m.horizon != null) {
+            int[] starts = new int[m.horizon.days() + 1];
+            for (int d = 0; d < starts.length; d++) {
+                starts[d] = m.horizon.minute(m.horizon.dayStart(d));
+            }
+            problem.dayStarts(starts);
+        }
         return p == null ? problem : problem.rushHours(p.getRushExtraPct(), p.getRushAmFrom(), p.getRushAmTo(),
                 p.getRushPmFrom(), p.getRushPmTo());
     }

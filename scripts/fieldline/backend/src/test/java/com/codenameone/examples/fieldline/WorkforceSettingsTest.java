@@ -24,7 +24,9 @@ import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.fieldline.account.Accounts;
 import com.codenameone.examples.fieldline.account.DemoAccounts;
+import com.codenameone.examples.fieldline.domain.TimeEntry;
 import com.codenameone.examples.fieldline.field.Crew;
+import com.codenameone.examples.fieldline.repository.TimeEntryRepository;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,8 @@ class WorkforceSettingsTest {
     private Accounts accounts;
     @Autowired
     private Crew crew;
+    @Autowired
+    private TimeEntryRepository entries;
 
     private MockRequestBuilder as(MockRequestBuilder request, String token) {
         return request.header("Host", SignIn.HOST).header("Authorization", "Bearer " + token);
@@ -147,6 +151,38 @@ class WorkforceSettingsTest {
             }
         }
         assertTrue(found);
+    }
+
+    @Test
+    void twoShiftsOpenedTogetherAreCountedOnce() throws Exception {
+        String username = People.technician(accounts, "doubletap");
+        String tech = crew.of(username).getId();
+        long start = System.currentTimeMillis() - 2 * 3600000L;
+        for (int i = 0; i < 2; i++) {
+            TimeEntry e = new TimeEntry();
+            e.setId("tedouble" + i);
+            e.setTechId(tech);
+            e.setKind("SHIFT");
+            e.setJobId("");
+            e.setStartAt(start + i * 60000L);
+            entries.insert(e);
+        }
+        Map sheet = Http.json(mvc, as(get("/api/admin/timesheets?week=0"), admin()));
+        for (Object o : (List) sheet.get("rows")) {
+            Map row = (Map) o;
+            if (tech.equals(row.get("techId"))) {
+                long shift = Http.number(row, "shiftMinutes");
+                assertTrue(shift >= 119 && shift <= 121, "counted once, not twice: " + shift);
+            }
+        }
+        // Reading the clock closes the later duplicate.
+        Map day = Http.json(mvc, People.asTechnician(get("/api/my/day"), username));
+        assertEquals(start, Http.number(day, "clockedInAt"));
+        int open = 0;
+        for (TimeEntry e : entries.open(tech)) {
+            open += "SHIFT".equals(e.getKind()) ? 1 : 0;
+        }
+        assertEquals(1, open);
     }
 
     @Test

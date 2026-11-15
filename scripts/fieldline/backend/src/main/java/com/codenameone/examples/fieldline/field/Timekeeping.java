@@ -219,10 +219,18 @@ public class Timekeeping {
     }
 
     private TimeEntry openShift(String techId, PlannerPolicy p) throws IOException {
+        // Entries come oldest first. Two racing clock-ins can open two
+        // shifts; the earliest stands and any later one closes empty.
         TimeEntry shift = null;
         for (TimeEntry e : entries.open(techId)) {
-            if (SHIFT.equals(e.getKind())) {
+            if (!SHIFT.equals(e.getKind())) {
+                continue;
+            }
+            if (shift == null) {
                 shift = e;
+            } else {
+                e.setEndAt(e.getStartAt());
+                entries.save(e);
             }
         }
         if (shift == null) {
@@ -262,6 +270,22 @@ public class Timekeeping {
         }
     }
 
+    /// Minutes of `[start, end)` that fall on a local Saturday or Sunday.
+    static int weekendMinutes(long start, long end, ZoneId zone) {
+        int total = 0;
+        long at = start;
+        while (at < end) {
+            java.time.ZonedDateTime here = Instant.ofEpochMilli(at).atZone(zone);
+            long next = Math.min(end, here.toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli());
+            DayOfWeek day = here.getDayOfWeek();
+            if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
+                total += (int) ((next - at) / 60000L);
+            }
+            at = next;
+        }
+        return total;
+    }
+
     static long round(long millis, PlannerPolicy p) {
         long step = Math.max(1, p.getTimeRoundingMinutes()) * 60000L;
         return (millis + step / 2) / step * step;
@@ -277,6 +301,13 @@ public class Timekeeping {
         return d.atStartOfDay(zone).toInstant().toEpochMilli();
     }
 
+    /// One week of clocked time and its cost. The pay rules are the simple
+    /// ones most crews start with, and the place to change them for local
+    /// law: overtime is the weekday time past the technician's regular
+    /// weekly hours (weekend time is paid at its own premium and does not
+    /// count toward it), the unpaid break comes off any shift long enough to
+    /// owe one, and a shift belongs to the week it starts in. There is no
+    /// daily overtime threshold.
     @Transactional(readOnly = true)
     public TimesheetDto timesheets(long week) throws IOException {
         PlannerPolicy p = planner.policy();
@@ -293,7 +324,9 @@ public class Timekeeping {
         List<TimesheetRowDto> rows = new ArrayList<TimesheetRowDto>();
         long total = 0;
         for (Technician t : crew) {
-            if (!t.isActive()) {
+            // Someone deactivated mid-week still gets paid for the hours they
+            // worked: only an inactive technician with no entries is left out.
+            if (!t.isActive() && entries.ofTechnician(t.getId(), from, to).isEmpty()) {
                 continue;
             }
             // Rostered: the hours the technician's working week holds, less
@@ -315,21 +348,31 @@ public class Timekeeping {
             int breaks = 0;
             int weekend = 0;
             List<TimeEntryDto> list = new ArrayList<TimeEntryDto>();
+            // Shifts are counted once even if two were opened together (a
+            // double tap racing a status change): only time past the end of
+            // the shifts already counted is added.
+            long covered = 0;
             for (TimeEntry e : entries.ofTechnician(t.getId(), from, to)) {
                 long end = e.getEndAt() > 0 ? e.getEndAt()
                         : Math.min(now, e.getStartAt() + p.getAutoClockOutHours() * 3600000L);
                 int minutes = (int) Math.max(0, (end - e.getStartAt()) / 60000L);
                 list.add(new TimeEntryDto(e.getKind(), e.getStartAt(), e.getEndAt(), e.getJobId()));
                 if (SHIFT.equals(e.getKind())) {
+                    long start = Math.max(e.getStartAt(), covered);
+                    if (end <= start) {
+                        continue;
+                    }
+                    covered = end;
+                    minutes = (int) ((end - start) / 60000L);
                     // The meal break is unpaid, and owed once a shift runs
                     // past the point the rules say it is taken by.
                     int unpaid = minutes > p.getBreakAfterMinutes() ? p.getBreakMinutes() : 0;
                     shift += minutes;
                     breaks += unpaid;
-                    DayOfWeek day = Instant.ofEpochMilli(e.getStartAt()).atZone(zone).getDayOfWeek();
-                    if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
-                        weekend += minutes - unpaid;
-                    }
+                    // A shift that crosses midnight into or out of a weekend
+                    // is split there; the break comes off in proportion.
+                    int onWeekend = weekendMinutes(start, end, zone);
+                    weekend += onWeekend - (minutes == 0 ? 0 : unpaid * onWeekend / minutes);
                 } else if (TRAVEL.equals(e.getKind())) {
                     travel += minutes;
                 } else {

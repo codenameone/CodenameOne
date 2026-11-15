@@ -146,8 +146,15 @@ public class Jobs {
         if (job == null) {
             throw new ResponseStatusException(404, "No such job");
         }
-        if (!user.dispatcher() && !job.getTechId().equals(user.techId())) {
-            throw new ResponseStatusException(403, "That job is not assigned to you");
+        if (!user.dispatcher()) {
+            // A job nobody holds has techId "", as does an account with no
+            // technician row, so an empty id never matches. A technician who
+            // was demoted keeps the row but not the access.
+            String mine = user.techId();
+            Technician me = mine == null || mine.length() == 0 ? null : technicians.findById(mine);
+            if (me == null || !me.isActive() || !mine.equals(job.getTechId())) {
+                throw new ResponseStatusException(403, "That job is not assigned to you");
+            }
         }
         return job;
     }
@@ -168,7 +175,9 @@ public class Jobs {
 
     /// Today for the signed-in technician: the route in driving order, with
     /// the drive before each stop.
-    @Transactional(readOnly = true)
+    // Not read-only: the clock closes a shift left open past the automatic
+    // clock-out when the day is read.
+    @Transactional(rollbackFor = IOException.class)
     public TodayDto today(String username) throws IOException {
         Technician tech = technicians.findByUsername(username);
         if (tech == null) {

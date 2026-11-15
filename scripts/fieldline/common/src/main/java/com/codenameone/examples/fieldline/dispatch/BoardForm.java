@@ -279,6 +279,8 @@ public final class BoardForm implements Nav.Home {
                     TechnicianDto t = tech(techId);
                     if (t != null) {
                         people.put(techId, person(t, lat, lng));
+                    } else {
+                        people.remove(techId);
                     }
                 }
             }
