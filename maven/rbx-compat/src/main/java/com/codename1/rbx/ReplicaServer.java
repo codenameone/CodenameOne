@@ -197,10 +197,15 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
                         }
                         break;
                     }
-                    case Wire.MOVE:
-                        move(p, (CFrame) Wire.value(in, engine, this), (Vector3) Wire.value(in, engine, this),
-                                in.readBoolean());
+                    case Wire.MOVE: {
+                        Object cf = Wire.value(in, engine, this);
+                        Object dir = Wire.value(in, engine, this);
+                        boolean jump = in.readBoolean();
+                        if (cf instanceof CFrame) {
+                            move(p, (CFrame) cf, dir instanceof Vector3 ? (Vector3) dir : null, jump);
+                        }
                         break;
+                    }
                     case Wire.CHAT: {
                         String text = in.readUTF();
                         String channel = in.readUTF();
@@ -211,7 +216,10 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
                         return;
                 }
             }
-        } catch (IOException | RuntimeException bad) {
+        } catch (IOException bad) {
+            // Only reading is guarded: a cast that failed would not throw on
+            // iOS, so every value is tested with instanceof instead. A script
+            // error in a remote handler is the scheduler's to report.
             engine.getScheduler().error(null, "Dropped a malformed message from " + p.player.getName()
                     + ": " + bad.getMessage());
         }

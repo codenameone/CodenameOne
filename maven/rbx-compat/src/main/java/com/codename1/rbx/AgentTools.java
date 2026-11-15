@@ -422,21 +422,26 @@ public final class AgentTools {
                 out.add(type + ": " + text);
             }
         });
+        Object[] r = null;
+        String error = null;
         try {
-            Object[] r = e.runCommand(src);
-            List<String> vals = new ArrayList<String>();
-            if (r != null) {
-                for (Object o : r) {
-                    vals.add(value(o));
-                }
-            }
-            return "{\"results\":" + rawList(vals) + ",\"output\":" + list(out.toArray(new String[0])) + "}";
+            r = e.runCommand(src);
         } catch (RuntimeException ex) {
-            return "{\"error\":" + quote(String.valueOf(ex.getMessage())) + ",\"output\":"
-                    + list(out.toArray(new String[0])) + "}";
+            error = String.valueOf(ex.getMessage());
         } finally {
             e.getScheduler().setOutput(prev);
         }
+        String output = list(out.toArray(new String[0]));
+        if (error != null) {
+            return "{\"error\":" + quote(error) + ",\"output\":" + output + "}";
+        }
+        List<String> vals = new ArrayList<String>();
+        if (r != null) {
+            for (Object o : r) {
+                vals.add(value(o));
+            }
+        }
+        return "{\"results\":" + rawList(vals) + ",\"output\":" + output + "}";
     }
 
     /// Plays a saved copy, so the edited place is never changed by its scripts.

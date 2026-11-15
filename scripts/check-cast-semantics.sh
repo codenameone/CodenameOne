@@ -47,6 +47,10 @@ DEFAULT_ROOTS=(
   # The Python runtime ships inside every application with Python sources.
   "maven/python-runtime/target/classes"
   "maven/compose-compat/target/classes"
+  # The Luau interpreter and the engine API over it ship inside every
+  # application that plays place files (scripts/brickyard).
+  "maven/luau-runtime/target/classes"
+  "maven/rbx-compat/target/classes"
 )
 # Translated too, but built only under the unity-compat Maven profile, which
 # needs the .NET SDK: maven/unity-compat, the runtime an application with Unity
