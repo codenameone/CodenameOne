@@ -914,13 +914,9 @@ final class Characters {
                 hum.put("MoveDirection", dir);
             }
         }
-        if (e.getPhysics() != null) {
-            // The 3D layer integrates the root part; it reads MoveDirection,
-            // Jump and WalkSpeed and calls Characters.landed with the result.
-            syncRig(model);
-            touches(e, hum, model, c);
-            return;
-        }
+        // Characters stay kinematic with a physics world too: the world
+        // simulates loose parts (RigidBodies skips humanoid models), and a
+        // platformer controller that answers input exactly is what players expect.
         CFrame cf = Behaviors.cf(root);
         double speed = hum.num("WalkSpeed");
         double nx = cf.x + dir.x * speed * dt;

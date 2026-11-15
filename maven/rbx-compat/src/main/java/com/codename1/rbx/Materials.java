@@ -76,6 +76,13 @@ final class Materials {
         }
     }
 
+    /// Bounciness, 0..1.
+    static double elasticity(Instance p) {
+        Object m = p.prop("Material");
+        String n = m instanceof Enums.EnumItem ? ((Enums.EnumItem) m).name : "Plastic";
+        return "Rubber".equals(n) ? 0.8 : 0.3;
+    }
+
     /// Friction coefficient.
     static double friction(Instance p) {
         Object m = p.prop("Material");

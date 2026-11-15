@@ -1,0 +1,84 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4">
+<Item class="Workspace" referent="RBX0"><Properties><string name="Name">Workspace</string><float name="Gravity">196.2</float><float name="FallenPartsDestroyHeight">-100</float></Properties>
+<Item class="SpawnLocation" referent="RBX1"><Properties><string name="Name">Spawn</string><bool name="Anchored">true</bool><bool name="CanCollide">true</bool><CoordinateFrame name="CFrame"><X>0</X><Y>0</Y><Z>20</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>10</X><Y>1</Y><Z>10</Z></Vector3><Color3uint8 name="Color3uint8">4284513675</Color3uint8><token name="Material">816</token></Properties></Item>
+<Item class="Part" referent="RBX2"><Properties><string name="Name">Floor</string><bool name="Anchored">true</bool><bool name="CanCollide">true</bool><CoordinateFrame name="CFrame"><X>0</X><Y>-1</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>80</X><Y>1</Y><Z>80</Z></Vector3><Color3uint8 name="Color3uint8">4287349578</Color3uint8><token name="Material">1280</token><token name="shape">0</token></Properties></Item>
+<Item class="Part" referent="RBX3"><Properties><string name="Name">Dropper</string><bool name="Anchored">true</bool><bool name="CanCollide">true</bool><CoordinateFrame name="CFrame"><X>-20</X><Y>10</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>4</X><Y>4</Y><Z>4</Z></Vector3><Color3uint8 name="Color3uint8">4282735204</Color3uint8><token name="Material">1088</token><token name="shape">0</token></Properties></Item>
+<Item class="Part" referent="RBX4"><Properties><string name="Name">Conveyor</string><bool name="Anchored">true</bool><bool name="CanCollide">true</bool><CoordinateFrame name="CFrame"><X>-10</X><Y>1</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>24</X><Y>1</Y><Z>4</Z></Vector3><Color3uint8 name="Color3uint8">4280361249</Color3uint8><token name="Material">1056</token><token name="shape">0</token><Vector3 name="AssemblyLinearVelocity"><X>12</X><Y>0</Y><Z>0</Z></Vector3></Properties></Item>
+<Item class="Part" referent="RBX5"><Properties><string name="Name">Collector</string><bool name="Anchored">true</bool><bool name="CanCollide">false</bool><CoordinateFrame name="CFrame"><X>4</X><Y>2</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>4</X><Y>3</Y><Z>6</Z></Vector3><Color3uint8 name="Color3uint8">4278238420</Color3uint8><token name="Material">288</token><token name="shape">0</token><float name="Transparency">0.4</float></Properties></Item>
+<Item class="Part" referent="RBX6"><Properties><string name="Name">BuyDropper</string><bool name="Anchored">true</bool><bool name="CanCollide">false</bool><CoordinateFrame name="CFrame"><X>-6</X><Y>0.6</Y><Z>12</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>4</X><Y>0.2</Y><Z>4</Z></Vector3><Color3uint8 name="Color3uint8">4283215696</Color3uint8><token name="Material">288</token><token name="shape">0</token><BinaryString name="AttributesSerialize">AQAAAAUAAABQcmljZQYAAAAAAAA5QA==</BinaryString></Properties></Item>
+<Item class="Part" referent="RBX7"><Properties><string name="Name">BuyUpgrade</string><bool name="Anchored">true</bool><bool name="CanCollide">false</bool><CoordinateFrame name="CFrame"><X>2</X><Y>0.6</Y><Z>12</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>4</X><Y>0.2</Y><Z>4</Z></Vector3><Color3uint8 name="Color3uint8">4294951175</Color3uint8><token name="Material">288</token><token name="shape">0</token><BinaryString name="AttributesSerialize">AQAAAAUAAABQcmljZQYAAAAAAABOQA==</BinaryString></Properties></Item>
+</Item>
+<Item class="Lighting" referent="RBX8"><Properties><string name="Name">Lighting</string><float name="ClockTime">15</float><float name="Brightness">2.5</float></Properties></Item>
+<Item class="ServerScriptService" referent="RBX10"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="RBX9"><Properties><string name="Name">Tycoon</string><ProtectedString name="Source"><![CDATA[local function stats(player, fields)
+    local ls = Instance.new("Folder")
+    ls.Name = "leaderstats"
+    for _, f in ipairs(fields) do
+        local v = Instance.new("IntValue")
+        v.Name = f
+        v.Parent = ls
+    end
+    ls.Parent = player
+    return ls
+end
+local function playerOf(hit)
+    local model = hit.Parent
+    if model == nil then return nil end
+    return game:GetService("Players"):GetPlayerFromCharacter(model)
+end
+
+local Players = game:GetService("Players")
+local owner = nil
+local droppers = 1
+local value = 5
+local function claim(p)
+    if owner == nil then owner = p end
+    stats(p, {"Cash"})
+end
+Players.PlayerAdded:Connect(claim)
+for _, p in ipairs(Players:GetPlayers()) do claim(p) end
+local ws = workspace
+local drops = Instance.new("Folder")
+drops.Name = "Drops"
+drops.Parent = ws
+ws.Collector.Touched:Connect(function(hit)
+    if hit.Parent == drops and owner then
+        owner.leaderstats.Cash.Value += hit:GetAttribute("Value") or value
+        hit:Destroy()
+    end
+end)
+local function pad(part, onBuy)
+    local busy = false
+    part.Touched:Connect(function(hit)
+        local p = playerOf(hit)
+        if p == nil or p ~= owner or busy then return end
+        local price = part:GetAttribute("Price")
+        if p.leaderstats.Cash.Value >= price then
+            busy = true
+            p.leaderstats.Cash.Value -= price
+            onBuy()
+            part:SetAttribute("Price", price * 2)
+            task.wait(1)
+            busy = false
+        end
+    end)
+end
+pad(ws.BuyDropper, function() droppers += 1 end)
+pad(ws.BuyUpgrade, function() value *= 2 end)
+task.spawn(function()
+    while true do
+        for i = 1, droppers do
+            local d = Instance.new("Part")
+            d.Size = Vector3.new(1, 1, 1)
+            d.Color = Color3.fromRGB(255, 200, 40)
+            d.Material = Enum.Material.Neon
+            d.CFrame = ws.Dropper.CFrame * CFrame.new((i - 1) * 0.3, -3, 0)
+            d:SetAttribute("Value", value)
+            d.Parent = drops
+            game:GetService("Debris"):AddItem(d, 30)
+        end
+        task.wait(1.5)
+    end
+end)
+print("TEMPLATE READY tycoon")
+]]></ProtectedString></Properties></Item></Item>
+</roblox>

@@ -28,4 +28,10 @@
             <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
         </Or>
     </Match>
+    <!-- A snapshot item is read by whoever consumes the frame: picking, the
+         creator's stats panel, tests. Its fields are public data for them. -->
+    <Match>
+        <Class name="com.codename1.rbx.SceneSnapshot$Item"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
 </FindBugsFilter>
