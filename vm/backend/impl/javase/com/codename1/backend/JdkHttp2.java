@@ -96,6 +96,16 @@ final class JdkHttp2 {
         }
     }
 
+    /// Whether this JVM has `java.net.http` (Java 11 and newer).
+    static boolean available() {
+        try {
+            type("HttpClient");
+            return true;
+        } catch (IOException missing) {
+            return false;
+        }
+    }
+
     private static Class type(String name) throws IOException {
         try {
             return ClassLoader.getSystemClassLoader().loadClass(P + name);
@@ -236,8 +246,17 @@ final class JdkHttp2 {
         Class handlerType = type("HttpResponse$BodyHandler");
         Object handler = call(null, handlers, "ofInputStream", new Class[0]);
         Class responseType = type("HttpResponse");
-        Object response = call(http, type("HttpClient"), "send",
-                new Class[] {requestType, handlerType}, request, handler);
+        Object response;
+        try {
+            response = call(http, type("HttpClient"), "send",
+                    new Class[] {requestType, handlerType}, request, handler);
+        } catch (IOException err) {
+            // java.net.http raises a refused connection as a ConnectException
+            // with no message at all; say which request failed and how, as the
+            // HttpURLConnection path and the packaged arm do.
+            throw new IOException("Request to " + Urls.forMessage(url) + " failed: "
+                    + (err.getMessage() != null ? err.getMessage() : err.getClass().getName()), err);
+        }
         InputStream in = (InputStream) call(response, responseType, "body", new Class[0]);
         java.util.concurrent.atomic.AtomicBoolean expired =
                 new java.util.concurrent.atomic.AtomicBoolean();

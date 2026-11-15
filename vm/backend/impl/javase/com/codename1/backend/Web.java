@@ -468,7 +468,10 @@ public final class Web {
             return JdkHttp2.perform(client, ((Transport) client.transport(TRANSPORTS)).http2,
                     method, url, headers, body, trace, maxResponseBytes());
         }
-        if (method != null && !URL_CONNECTION_VERBS.contains(method)) {
+        // On Java 8 there is no java.net.http, so such a verb falls through to
+        // the HttpURLConnection path below, which refuses it with an
+        // explanation rather than the JDK's bare "Invalid HTTP method".
+        if (method != null && !URL_CONNECTION_VERBS.contains(method) && JdkHttp2.available()) {
             // HttpURLConnection has a FIXED set of verbs and PATCH is not in it,
             // on every JDK; reflecting over its private field throws on 21+. The
             // JDK's other client sends any verb, so such a request goes through
