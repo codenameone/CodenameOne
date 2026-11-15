@@ -1,0 +1,139 @@
+{
+ "calibrate": {
+  "linux-x64@intel-xeon-6975p-c": {
+   "arrayRandom": {
+    "all": {
+     "memory": 0.2,
+     "runs": 1,
+     "time": 0.999,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   },
+   "arraySequential": {
+    "all": {
+     "memory": 0.359,
+     "runs": 1,
+     "time": 2.148,
+     "tolerance": {
+      "time": 0.3
+     }
+    }
+   },
+   "hashMapChurn": {
+    "all": {
+     "memory": 0.087,
+     "runs": 1,
+     "time": 1.402,
+     "tolerance": {
+      "time": 0.55
+     }
+    }
+   },
+   "hello": {
+    "all": {
+     "memory": 0.83,
+     "runs": 1,
+     "time": 1.102,
+     "tolerance": {
+      "memory": 0.45,
+      "time": 0.5
+     }
+    }
+   },
+   "intArithmetic": {
+    "all": {
+     "memory": 0.039,
+     "runs": 1,
+     "time": 1.01,
+     "tolerance": {
+      "memory": 0.55
+     }
+    }
+   },
+   "longArithmetic": {
+    "all": {
+     "memory": 0.038,
+     "runs": 1,
+     "time": 1.061,
+     "tolerance": {
+      "memory": 0.65
+     }
+    }
+   },
+   "mathTranscendental": {
+    "all": {
+     "memory": 0.041,
+     "runs": 1,
+     "time": 1.033,
+     "tolerance": {
+      "memory": 1.0,
+      "time": 0.3
+     }
+    }
+   },
+   "objectAllocation": {
+    "all": {
+     "memory": 0.306,
+     "runs": 1,
+     "time": 1.496,
+     "tolerance": {
+      "memory": 0.65,
+      "time": 0.5
+     }
+    }
+   },
+   "quicksort": {
+    "all": {
+     "memory": 0.099,
+     "runs": 1,
+     "time": 1.098
+    }
+   },
+   "recursion": {
+    "all": {
+     "memory": 0.039,
+     "runs": 1,
+     "time": 1.385,
+     "tolerance": {
+      "memory": 1.0
+     }
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "memory": 0.267,
+     "runs": 1,
+     "time": 1.539,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "memory": 0.45,
+     "runs": 1,
+     "time": 0.73,
+     "tolerance": {
+      "memory": 0.35,
+      "time": 0.35
+     }
+    }
+   },
+   "valueEscape": {
+    "all": {
+     "memory": 0.029,
+     "runs": 1,
+     "time": 0.129,
+     "tolerance": {
+      "memory": 0.55,
+      "time": 0.4
+     }
+    }
+   }
+  }
+ },
+ "pr": 6229
+}

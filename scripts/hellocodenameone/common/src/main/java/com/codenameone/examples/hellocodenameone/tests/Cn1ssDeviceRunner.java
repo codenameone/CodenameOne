@@ -517,6 +517,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
             new LottieAnimatedScreenshotTest(),
             new AudioMixerApiTest(),
+            new AudioGraphApiTest(),
             // Portable 3D / shader API (com.codename1.gpu): a Phong-lit cube, a
             // textured cube, a loaded glTF model, and a behavioral animation-loop
             // test. Positioned immediately before OrientationLock on purpose, to

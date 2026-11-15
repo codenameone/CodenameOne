@@ -1451,7 +1451,8 @@ public class ByteCodeTranslator {
                 // shell32: ShellExecuteW (execute/dial/sendSMS/sendMessage launches).
                 // comdlg32: GetOpenFileNameW/GetSaveFileNameW (native file picker).
                 // crypt32: CryptProtectData/CryptUnprotectData (DPAPI secure storage).
-                // winmm: waveIn audio recording (cn1_windows_audiorec.c).
+                // winmm: waveIn audio recording (cn1_windows_audiorec.c) and waveOut
+                //   real-time playback for AudioContext (cn1_windows_audioout.c).
                 // runtimeobject: WinRT activation (RoGetActivationFactory) for the
                 //   biometric / location / contacts / share natives (cn1_windows_winrt.cpp).
                 //   The WinRT ABI headers + this import lib ship in every Windows SDK the

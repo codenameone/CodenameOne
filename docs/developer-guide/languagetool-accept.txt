@@ -914,3 +914,6 @@ gamepad
 Gerstner
 Fresnel
 toon
+detune
+rolloff
+worklet

@@ -69,6 +69,9 @@ public final class UnityGameAudio implements AudioOutput {
     /// the next loop, audible while muted. The listener's volume is not in
     /// it; the `Media` is set to the product of the two.
     private final HashMap volumes = new HashMap();
+    /// A voice to its distance attenuation, a `Float`, from [#place]. A
+    /// `Media` has no pan, so the pan is not heard here.
+    private final HashMap gains = new HashMap();
     /// `AudioListener.volume`, which multiplies every voice's.
     private float listener = 1f;
     /// The voices paused by themselves, which a release leaves paused.
@@ -115,7 +118,7 @@ public final class UnityGameAudio implements AudioOutput {
             if (loop) {
                 looping.put(key, Boolean.TRUE);
             }
-            media.setVolume(percent(volume * listener));
+            media.setVolume(percent(volume * listener * gain(key)));
             // Started while everything is held, it is ready and waits for
             // the release.
             if (!held) {
@@ -138,7 +141,31 @@ public final class UnityGameAudio implements AudioOutput {
             ((Media) media).cleanup();
         }
         if (looping.containsKey(key) && level instanceof Float) {
+            float g = gain(key);
             play(key.intValue(), clip, ((Float) level).floatValue(), 1f, true);
+            if (g != 1f) {
+                place(key.intValue(), g, 0f);
+            }
+        }
+    }
+
+    private float gain(Object key) {
+        Object g = gains.get(key);
+        return g instanceof Float ? ((Float) g).floatValue() : 1f;
+    }
+
+    /// The attenuation is multiplied into the volume; the pan has nowhere
+    /// to go on a `Media`.
+    @Override
+    public void place(int voice, float gain, float pan) {
+        Integer key = Integer.valueOf(voice);
+        Object media = playing.get(key);
+        if (media instanceof Media) {
+            gains.put(key, Float.valueOf(gain));
+            Object level = volumes.get(key);
+            if (level instanceof Float) {
+                ((Media) media).setVolume(percent(((Float) level).floatValue() * listener * gain));
+            }
         }
     }
 
@@ -153,6 +180,7 @@ public final class UnityGameAudio implements AudioOutput {
         looping.remove(key);
         paused.remove(key);
         volumes.remove(key);
+        gains.remove(key);
         Object media = playing.remove(key);
         if (media instanceof Media) {
             ((Media) media).cleanup();
@@ -226,7 +254,7 @@ public final class UnityGameAudio implements AudioOutput {
         Object media = playing.get(key);
         if (media instanceof Media) {
             volumes.put(key, Float.valueOf(volume));
-            ((Media) media).setVolume(percent(volume * listener));
+            ((Media) media).setVolume(percent(volume * listener * gain(key)));
         }
     }
 
@@ -241,7 +269,7 @@ public final class UnityGameAudio implements AudioOutput {
             Object media = playing.get(key);
             Object level = volumes.get(key);
             if (media instanceof Media && level instanceof Float) {
-                ((Media) media).setVolume(percent(((Float) level).floatValue() * listener));
+                ((Media) media).setVolume(percent(((Float) level).floatValue() * listener * gain(key)));
             }
         }
     }
