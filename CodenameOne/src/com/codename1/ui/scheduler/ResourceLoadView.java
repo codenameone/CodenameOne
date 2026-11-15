@@ -26,6 +26,7 @@ import com.codename1.scheduling.ProjectModel;
 import com.codename1.scheduling.ResourceLeveler;
 import com.codename1.scheduling.ScheduleResource;
 import com.codename1.scheduling.TimeMath;
+import com.codename1.ui.ScrollSurface;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Dimension;
@@ -69,7 +70,7 @@ final class ResourceLoadView extends ScrollSurface {
 
     void chartScrolled() {
         if (!syncing) {
-            setOffsets(chart.getOffX(), getOffY());
+            setOffsets(chart.getOffsetX(), getOffsetY());
             repaint();
         }
     }
@@ -90,22 +91,22 @@ final class ResourceLoadView extends ScrollSurface {
     }
 
     @Override
-    void prepare(int width, int height) {
+    protected void layoutSurface(int width, int height) {
         Style row = Look.style("GanttRow");
         rowH = Math.max(Look.mm(7), row.getFont().getHeight() * 2 + Look.mm(1.5f));
-        headerW = chart.headerW;
-        headerH = 0;
+        setHeaderSize(chart.getHeaderWidth(), getHeaderHeight());
+        setHeaderSize(getHeaderWidth(), 0);
         // The chart is the one that knows where time is.
-        setOffsets(chart.getOffX(), getOffY());
+        setOffsets(chart.getOffsetX(), getOffsetY());
     }
 
     @Override
-    int contentWidth() {
+    protected int getContentWidth() {
         return chart.axis().width();
     }
 
     @Override
-    int contentHeight() {
+    protected int getContentHeight() {
         ProjectModel model = owner.getModel();
         return model == null ? 0 : model.getResources().size() * rowH;
     }
@@ -121,14 +122,14 @@ final class ResourceLoadView extends ScrollSurface {
     }
 
     @Override
-    void scrolled() {
+    protected void scrollChanged() {
         syncing = true;
-        chart.scrollTo(getOffX(), chart.getOffY());
+        chart.scrollTo(getOffsetX(), chart.getOffsetY());
         syncing = false;
     }
 
     @Override
-    boolean zoomBy(float factor, int x, int y) {
+    protected boolean zoomBy(float factor, int x, int y) {
         return chart.zoomBy(factor, x, y);
     }
 
@@ -171,7 +172,7 @@ final class ResourceLoadView extends ScrollSurface {
     }
 
     @Override
-    void paintBody(Graphics g, int x, int y) {
+    protected void paintContent(Graphics g, int x, int y) {
         Style row = Look.style("GanttRow");
         Style loadStyle = Look.style("GanttLoad");
         Style over = Look.style("GanttOverload");
@@ -232,7 +233,7 @@ final class ResourceLoadView extends ScrollSurface {
             }
             g.setColor(line);
             g.drawLine(cx, base, cx + cw, base);
-            if (headerW == 0) {
+            if (getHeaderWidth() == 0) {
                 // No table to name the row in.
                 Font f = row.getFont();
                 g.setFont(f);
@@ -248,12 +249,12 @@ final class ResourceLoadView extends ScrollSurface {
     }
 
     @Override
-    void paintLeftHeader(Graphics g, int x, int y) {
+    protected void paintLeftHeader(Graphics g, int x, int y) {
         Style row = Look.style("GanttRow");
         Style over = Look.style("GanttOverload");
         int cy = g.getClipY();
         int ch = g.getClipHeight();
-        Look.fill(g, row, x, cy, headerW, ch);
+        Look.fill(g, row, x, cy, getHeaderWidth(), ch);
         ProjectModel model = owner.getModel();
         if (model == null || rowH <= 0) {
             return;
@@ -277,20 +278,20 @@ final class ResourceLoadView extends ScrollSurface {
             int textH = detail == null ? f.getHeight() : 2 * f.getHeight();
             int ty = top + (rowH - textH) / 2;
             g.setColor(row.getFgColor());
-            g.drawString(Look.fit(res.getName(), f, headerW - 2 * pad), x + pad, ty);
+            g.drawString(Look.fit(res.getName(), f, getHeaderWidth() - 2 * pad), x + pad, ty);
             if (detail != null) {
                 if (tooMuch) {
                     g.setColor(over.getBgColor());
                 } else {
                     g.setAlpha(alpha * 150 / 255);
                 }
-                g.drawString(Look.fit(detail, f, headerW - 2 * pad), x + pad, ty + f.getHeight());
+                g.drawString(Look.fit(detail, f, getHeaderWidth() - 2 * pad), x + pad, ty + f.getHeight());
                 g.setAlpha(alpha);
             }
             g.setColor(line);
-            g.drawLine(x, top + rowH - 1, x + headerW, top + rowH - 1);
+            g.drawLine(x, top + rowH - 1, x + getHeaderWidth(), top + rowH - 1);
         }
         g.setColor(Look.mix(row.getBgColor(), row.getFgColor(), 60));
-        g.drawLine(x + headerW - 1, cy, x + headerW - 1, cy + ch);
+        g.drawLine(x + getHeaderWidth() - 1, cy, x + getHeaderWidth() - 1, cy + ch);
     }
 }

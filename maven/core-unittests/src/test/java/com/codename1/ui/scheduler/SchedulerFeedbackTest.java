@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.scheduler;
 
+import com.codename1.ui.ScrollSurface;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.scheduling.DefaultScheduleModel;
@@ -72,7 +73,7 @@ class SchedulerFeedbackTest extends UITestBase {
         s.setOpenOnTap(false);
         form.add(BorderLayout.CENTER, s);
         form.revalidate();
-        ((ScrollSurface) s.surface()).layoutNow();
+        ((ScrollSurface) s.surface()).refreshLayout();
         return s;
     }
 
@@ -88,8 +89,8 @@ class SchedulerFeedbackTest extends UITestBase {
         for (DayGrid.Box b : grid.boxes()) {
             if (b.item.getId().equals(id)) {
                 grid.boxRect(b, r);
-                r[0] += grid.headerW - grid.getOffX();
-                r[1] += grid.headerH - grid.getOffY();
+                r[0] += grid.getHeaderWidth() - grid.getOffsetX();
+                r[1] += grid.getHeaderHeight() - grid.getOffsetY();
                 return r;
             }
         }
@@ -108,24 +109,24 @@ class SchedulerFeedbackTest extends UITestBase {
         s.setAnimationTime(1000);
         hover(grid, r[0] + r[2] / 2, r[1] + r[3] / 2);
 
-        assertEquals("a", grid.hovered());
+        assertEquals("a", grid.getHoverTarget());
         assertNotNull(grid.getTooltip());
         assertTrue(grid.getTooltip().startsWith("Review"), "the tooltip names the item: " + grid.getTooltip());
-        assertEquals(0f, grid.hoverLevel("a"), 0.001f, "the light comes up from nothing");
+        assertEquals(0f, grid.getHoverLevel("a"), 0.001f, "the light comes up from nothing");
         s.setAnimationTime(1070);
-        assertEquals(0.5f, grid.hoverLevel("a"), 0.01f);
+        assertEquals(0.5f, grid.getHoverLevel("a"), 0.01f);
         s.setAnimationTime(1140);
-        assertEquals(1f, grid.hoverLevel("a"), 0.001f);
+        assertEquals(1f, grid.getHoverLevel("a"), 0.001f);
 
         grid.setHovered(false);
-        assertNull(grid.hovered());
+        assertNull(grid.getHoverTarget());
         assertNull(grid.getTooltip(), "no tooltip for an item the pointer has left");
-        assertEquals("a", grid.fading());
-        assertEquals(1f, grid.hoverLevel("a"), 0.001f, "and goes down from where it was");
+        assertEquals("a", grid.getFadingHoverTarget());
+        assertEquals(1f, grid.getHoverLevel("a"), 0.001f, "and goes down from where it was");
         s.setAnimationTime(1210);
-        assertEquals(0.5f, grid.hoverLevel("a"), 0.01f);
+        assertEquals(0.5f, grid.getHoverLevel("a"), 0.01f);
         s.setAnimationTime(1280);
-        assertEquals(0f, grid.hoverLevel("a"), 0.001f);
+        assertEquals(0f, grid.getHoverLevel("a"), 0.001f);
         s.setAnimationTime(-1);
     }
 
@@ -144,14 +145,14 @@ class SchedulerFeedbackTest extends UITestBase {
         assertEquals(Component.N_RESIZE_CURSOR, grid.getCursor());
 
         hover(grid, x, r[1] + r[3] + Math.round(grid.getHourHeight()));
-        assertTrue(grid.hovered() instanceof Long, "free time is marked by its slot: " + grid.hovered());
+        assertTrue(grid.getHoverTarget() instanceof Long, "free time is marked by its slot: " + grid.getHoverTarget());
         assertNull(grid.getTooltip());
 
         s.setEditable(false);
         hover(grid, x, r[1] + r[3] - 1);
         assertEquals(Component.HAND_CURSOR, grid.getCursor(), "an item that cannot be changed can still be opened");
         hover(grid, x, r[1] + r[3] + Math.round(grid.getHourHeight()));
-        assertNull(grid.hovered(), "nothing can be made in a schedule that is read only");
+        assertNull(grid.getHoverTarget(), "nothing can be made in a schedule that is read only");
         assertEquals(Component.DEFAULT_CURSOR, grid.getCursor());
     }
 
@@ -164,7 +165,7 @@ class SchedulerFeedbackTest extends UITestBase {
         int y = grid.getAbsoluteY() + r[1] + r[3] + 2 * Math.round(grid.getHourHeight());
         grid.pointerPressed(x, y);
         hover(grid, r[0] + r[2] / 2, r[1] + r[3] / 2);
-        assertNull(grid.hovered());
+        assertNull(grid.getHoverTarget());
         grid.pointerReleased(x, y);
     }
 
@@ -178,34 +179,34 @@ class SchedulerFeedbackTest extends UITestBase {
         int down = 2 * Math.round(grid.getHourHeight());
 
         s.setAnimationTime(1000);
-        assertEquals(0f, grid.liftLevel(), 0.001f, "nothing is held");
+        assertEquals(0f, grid.getLiftLevel(), 0.001f, "nothing is held");
         grid.pointerPressed(x, y);
         grid.pointerDragged(x, y + down / 2);
         grid.pointerDragged(x, y + down);
-        assertEquals(0f, grid.liftLevel(), 0.001f);
+        assertEquals(0f, grid.getLiftLevel(), 0.001f);
         s.setAnimationTime(1080);
-        assertEquals(0.5f, grid.liftLevel(), 0.01f);
+        assertEquals(0.5f, grid.getLiftLevel(), 0.01f);
         s.setAnimationTime(1160);
-        assertEquals(1f, grid.liftLevel(), 0.001f);
+        assertEquals(1f, grid.getLiftLevel(), 0.001f);
 
         int[] held = new int[4];
         assertTrue(grid.editRect(held));
         s.setAnimationTime(2000);
         grid.pointerReleased(x, y + down);
-        assertEquals(0f, grid.liftLevel(), 0.001f);
+        assertEquals(0f, grid.getLiftLevel(), 0.001f);
         assertEquals(at(5, 11, 0), ((DefaultScheduleModel) s.getModel()).getItem("a").getStart());
 
-        grid.layoutNow();
+        grid.refreshLayout();
         int[] placed = new int[4];
         for (DayGrid.Box b : grid.boxes()) {
             grid.boxRect(b, placed);
         }
         int[] now = placed.clone();
-        assertTrue(grid.settle("a", now));
+        assertTrue(grid.applySettle("a", now));
         assertArrayEquals(held, now, "it starts from where it was let go");
         s.setAnimationTime(2110);
         now = placed.clone();
-        assertTrue(grid.settle("a", now));
+        assertTrue(grid.applySettle("a", now));
         for (int i = 0; i < 4; i++) {
             int lo = Math.min(held[i], placed[i]);
             int hi = Math.max(held[i], placed[i]);
@@ -213,7 +214,7 @@ class SchedulerFeedbackTest extends UITestBase {
         }
         s.setAnimationTime(2220);
         now = placed.clone();
-        assertFalse(grid.settle("a", now), "and is where it belongs when the time is up");
+        assertFalse(grid.applySettle("a", now), "and is where it belongs when the time is up");
         assertArrayEquals(placed, now);
         s.setAnimationTime(-1);
     }
@@ -268,37 +269,37 @@ class SchedulerFeedbackTest extends UITestBase {
         form.add(BorderLayout.CENTER, g);
         form.revalidate();
         GanttChart chart = g.surface();
-        chart.layoutNow();
+        chart.refreshLayout();
         double dayPx = TimeMath.DAY / chart.axis().getMillisPerPixel();
         chart.zoom((float) (48 / dayPx));
-        chart.layoutNow();
+        chart.refreshLayout();
         chart.scrollTo(0, 0);
 
         int[] r = new int[4];
         chart.barRect(a, chart.rows().indexOf(a), r);
-        int x = r[0] + chart.headerW - chart.getOffX();
-        int y = r[1] + chart.headerH - chart.getOffY() + r[3] / 2;
+        int x = r[0] + chart.getHeaderWidth() - chart.getOffsetX();
+        int y = r[1] + chart.getHeaderHeight() - chart.getOffsetY() + r[3] / 2;
 
         g.setAnimationTime(1000);
         hover(chart, x + r[2] / 2, y);
-        assertSame(a, chart.hovered());
+        assertSame(a, chart.getHoverTarget());
         assertEquals(Component.MOVE_CURSOR, chart.getCursor());
         assertTrue(chart.getTooltip().startsWith("Alpha"), chart.getTooltip());
         g.setAnimationTime(1140);
-        assertEquals(1f, chart.hoverLevel(a), 0.001f);
+        assertEquals(1f, chart.getHoverLevel(a), 0.001f);
 
         hover(chart, x + r[2] - 1, y);
         assertEquals(Component.E_RESIZE_CURSOR, chart.getCursor(), "the end of a bar is what makes it longer");
 
         chart.barRect(group, chart.rows().indexOf(group), r);
-        hover(chart, r[0] + chart.headerW - chart.getOffX() + r[2] / 2,
-                r[1] + chart.headerH - chart.getOffY() + r[3] / 2);
-        assertSame(group, chart.hovered());
+        hover(chart, r[0] + chart.getHeaderWidth() - chart.getOffsetX() + r[2] / 2,
+                r[1] + chart.getHeaderHeight() - chart.getOffsetY() + r[3] / 2);
+        assertSame(group, chart.getHoverTarget());
         assertEquals(Component.HAND_CURSOR, chart.getCursor(), "a summary is where its tasks are and cannot be moved");
 
         // Beside the bars, the row itself.
-        hover(chart, chart.headerW + chart.getWidth() - chart.headerW - 2, y);
-        assertTrue(chart.hovered() instanceof Integer, "the row: " + chart.hovered());
+        hover(chart, chart.getHeaderWidth() + chart.getWidth() - chart.getHeaderWidth() - 2, y);
+        assertTrue(chart.getHoverTarget() instanceof Integer, "the row: " + chart.getHoverTarget());
         assertNull(chart.getTooltip());
 
         // The handle a dependency is drawn from, past the end of the bar
@@ -313,7 +314,7 @@ class SchedulerFeedbackTest extends UITestBase {
         assertTrue(offered, "a selected bar offers its link handle");
 
         chart.setHovered(false);
-        assertNull(chart.hovered());
+        assertNull(chart.getHoverTarget());
         assertEquals(Component.DEFAULT_CURSOR, chart.getCursor());
         g.setAnimationTime(-1);
     }

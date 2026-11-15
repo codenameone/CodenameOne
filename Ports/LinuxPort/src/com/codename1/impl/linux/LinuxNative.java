@@ -1034,6 +1034,29 @@ public final class LinuxNative {
     /** Stops recording, finalizes the WAV header and frees the peer. */
     public static native void audioRecStop(long peer);
 
+    // ---- real-time PCM output (com.codename1.media.audio.AudioContext), cn1_linux_audioout.c ----
+    /// Opens the default output; 0 when there is none.
+    public static native long audioOutOpen(int sampleRate, int channels);
+
+    /// The rate the output runs at.
+    public static native int audioOutRate(long handle);
+
+    /// Queues up to `frames` interleaved frames from frame `offsetFrames`
+    /// without blocking; answers the frames taken.
+    public static native int audioOutWrite(long handle, float[] pcm, int offsetFrames, int frames);
+
+    /// Starts or resumes playback.
+    public static native void audioOutStart(long handle);
+
+    /// Pauses playback.
+    public static native void audioOutStop(long handle);
+
+    /// Releases the output.
+    public static native void audioOutClose(long handle);
+
+    /// Seconds between queueing a frame and hearing it.
+    public static native double audioOutLatency(long handle);
+
     /* ------------------------------------------- biometric (Linux Hello) */
 
     /**
@@ -1250,10 +1273,21 @@ public final class LinuxNative {
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap, int shadowMap);
 
-    /** Binds a size x size packed-depth shadow target and clears it. */
-    public static native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    /** Binds a ShaderMaterial texture on unit `index` for the next draw. */
+    public static native void gl3dBindTexture(long contextPeer, int index, long texturePeer, int texFilter,
+            int texWrap);
+
+    /** Binds a width x size packed-depth shadow target (one size x size square per cascade) and clears it. */
+    public static native boolean gl3dBeginShadowPass(long contextPeer, int width, int size);
     /** Restores the target and viewport that were bound at gl3dBeginShadowPass. */
     public static native void gl3dEndShadowPass(long contextPeer);
+    /** Creates a sampleable colour texture a pass can draw into; 0 when it cannot. */
+    public static native long gl3dCreateRenderTarget(long contextPeer, int width, int height);
+    /** Draws into the target texture (width x height, with its own depth) cleared to argb, until gl3dEndRenderTarget. */
+    public static native boolean gl3dBeginRenderTarget(long contextPeer, long texturePeer, int width, int height,
+            int argb);
+    /** Restores the target and viewport that were bound at gl3dBeginRenderTarget. */
+    public static native void gl3dEndRenderTarget(long contextPeer);
     /** Redirects subsequent draws into an offscreen scene target the size of the viewport. */
     public static native boolean gl3dBeginPost(long contextPeer, boolean bloom);
     /**

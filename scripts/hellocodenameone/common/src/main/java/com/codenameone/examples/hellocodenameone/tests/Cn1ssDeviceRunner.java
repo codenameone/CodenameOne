@@ -161,6 +161,19 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 && testClass instanceof DualAppearanceBaseTest) {
             return TEST_TIMEOUT_MS_NATIVE * 2;
         }
+        // The frame-gated GPU scenes wait for real frames before capturing,
+        // and the browser leg renders through a software GPU: one frame of the
+        // depth post chain takes seconds there and holds the main thread, so
+        // three of them never fit the 10s HTML5 default (GpuPostDepth timed
+        // out with no capture). They get the native budget, which
+        // BaseTest.maxPolls() is sized inside.
+        if (testClass instanceof GpuPostDepthScreenshotTest
+                || testClass instanceof GpuRenderTargetScreenshotTest
+                || testClass instanceof GpuShaderGalleryScreenshotTest
+                || testClass instanceof GpuShaderHarbourScreenshotTest
+                || testClass instanceof GpuSkinningScreenshotTest) {
+            return TEST_TIMEOUT_MS_NATIVE;
+        }
         if (testClass instanceof BackendClientTest) {
             // A backend client test fails a step that hears nothing after
             // BackendClientTest.STEP_TIMEOUT_MILLIS, naming the request. That only
@@ -457,6 +470,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SchedulerMonthThemeScreenshotTest(),
             new SchedulerResourceThemeScreenshotTest(),
             new GanttThemeScreenshotTest(),
+            new NodeGraphThemeScreenshotTest(),
             new ToolbarThemeScreenshotTest(),
             new TabsThemeScreenshotTest(),
             new MultiButtonThemeScreenshotTest(),
@@ -517,6 +531,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
             new LottieAnimatedScreenshotTest(),
             new AudioMixerApiTest(),
+            new AudioGraphApiTest(),
             // Portable 3D / shader API (com.codename1.gpu): a Phong-lit cube, a
             // textured cube, a loaded glTF model, and a behavioral animation-loop
             // test. Positioned immediately before OrientationLock on purpose, to
@@ -539,6 +554,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Gpu3DTexturedCubeScreenshotTest(),
             new Gpu3DModelScreenshotTest(),
             new Gpu3DAnimationTest(),
+            new GpuShaderHarbourScreenshotTest(),
+            new GpuShaderGalleryScreenshotTest(),
+            new GpuRenderTargetScreenshotTest(),
+            new GpuPostDepthScreenshotTest(),
+            new GpuSkinningScreenshotTest(),
+            new GpuPostPassScreenshotTest(),
             // Keep this as the last portrait screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             // Rotates under a native modal and restores portrait itself (#6080).

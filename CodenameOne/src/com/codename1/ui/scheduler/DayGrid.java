@@ -26,6 +26,8 @@ import com.codename1.scheduling.ScheduleItem;
 import com.codename1.scheduling.ScheduleResource;
 import com.codename1.scheduling.TimeMath;
 import com.codename1.scheduling.WorkCalendar;
+import com.codename1.ui.ScrollSurface;
+import com.codename1.ui.ScrollSurface.EditTrigger;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.plaf.Style;
@@ -193,7 +195,7 @@ final class DayGrid extends ScrollSurface {
     // ------------------------------------------------------------- layout
 
     @Override
-    void prepare(int width, int height) {
+    protected void layoutSurface(int width, int height) {
         int gen = UIManager.getThemeGeneration();
         if (!dirty && width == laidW && height == laidH && gen == laidGen) {
             return;
@@ -208,7 +210,7 @@ final class DayGrid extends ScrollSurface {
         Style time = Look.style("SchedulerTimeLabel");
         Style header = Look.style("SchedulerHeader");
         Font hf = header.getFont();
-        headerW = time.getFont().stringWidth(Dates.time(22 * 60, owner.is24Hours(), true)) + Look.mm(2.5f);
+        setHeaderSize(time.getFont().stringWidth(Dates.time(22 * 60, owner.is24Hours(), true)) + Look.mm(2.5f), getHeaderHeight());
         if (resources != null) {
             boolean detail = false;
             for (ScheduleResource r : resources) {
@@ -222,9 +224,9 @@ final class DayGrid extends ScrollSurface {
         }
         chipH = Look.style("SchedulerItem").getFont().getHeight() + Look.mm(1.2f);
         allDayH = allDayRows == 0 ? 0 : Math.min(allDayRows, MAX_ALL_DAY_ROWS) * chipH + Look.mm(1);
-        headerH = colHeaderH + allDayH;
-        int bodyW = Math.max(0, width - headerW);
-        int bodyH = Math.max(0, height - headerH);
+        setHeaderSize(getHeaderWidth(), colHeaderH + allDayH);
+        int bodyW = Math.max(0, width - getHeaderWidth());
+        int bodyH = Math.max(0, height - getHeaderHeight());
         int minCol = Look.mm(resources != null ? 18 : 7);
         contentW = Math.max(bodyW, days.length * minCol);
         float least = Math.max(Look.mm(4), bodyH / 24f);
@@ -236,28 +238,32 @@ final class DayGrid extends ScrollSurface {
             // Half a label higher than the hour asked for: its label is
             // centred on its line, and would be cut in two by the header.
             int room = Look.style("SchedulerTimeLabel").getFont().getHeight() / 2 + Look.mm(0.5f);
-            setOffsets(getOffX(), Math.max(0, Math.round(pendingScrollMinute * hourH / 60f) - room));
+            setOffsets(getOffsetX(), Math.max(0, Math.round(pendingScrollMinute * hourH / 60f) - room));
             pendingScrollMinute = -1;
         }
     }
 
     @Override
-    double[] saveZoom() {
+    protected Object saveZoomState() {
         return new double[]{hourH};
     }
 
     @Override
-    void restoreZoom(double[] saved) {
+    protected void restoreZoomState(Object state) {
+        if (!(state instanceof double[])) {
+            return;
+        }
+        double[] saved = (double[]) state;
         hourH = (float) saved[0];
     }
 
     @Override
-    int contentWidth() {
+    protected int getContentWidth() {
         return contentW;
     }
 
     @Override
-    int contentHeight() {
+    protected int getContentHeight() {
         return Math.round(24 * hourH);
     }
 
@@ -534,7 +540,7 @@ final class DayGrid extends ScrollSurface {
     // -------------------------------------------------------------- paint
 
     @Override
-    void paintBody(Graphics g, int x, int y) {
+    protected void paintContent(Graphics g, int x, int y) {
         Style grid = Look.style("SchedulerGrid");
         Style off = Look.style("SchedulerOffHours");
         int cx = g.getClipX();
@@ -542,7 +548,7 @@ final class DayGrid extends ScrollSurface {
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
         Look.fill(g, grid, cx, cy, cw, ch);
-        int height = contentHeight();
+        int height = getContentHeight();
         ZoneId zone = owner.getZone();
 
         for (int c = 0; c < days.length; c++) {
@@ -568,8 +574,8 @@ final class DayGrid extends ScrollSurface {
             }
         }
 
-        paintSlot(g, x, y, hovered(), grid.getFgColor());
-        paintSlot(g, x, y, fading(), grid.getFgColor());
+        paintSlot(g, x, y, getHoverTarget(), grid.getFgColor());
+        paintSlot(g, x, y, getFadingHoverTarget(), grid.getFgColor());
 
         // A background band is part of the grid, as the shading of the hours
         // off is: the hour lines are drawn over it, so an hour can still be
@@ -607,17 +613,17 @@ final class DayGrid extends ScrollSurface {
 
         ScheduleItem selected = owner.getSelectedItem();
         Box selectedBox = null;
-        boolean lit = anyHover();
-        float lift = mode == MOVE || mode == RESIZE_START || mode == RESIZE_END ? liftLevel() : 0;
+        boolean lit = hasHoverFeedback();
+        float lift = mode == MOVE || mode == RESIZE_START || mode == RESIZE_END ? getLiftLevel() : 0;
         int alpha = g.getAlpha();
         for (Box b : boxes) {
             boxRect(b, rect);
-            settle(b.item.getId(), rect);
+            applySettle(b.item.getId(), rect);
             if (y + rect[1] > cy + ch || y + rect[1] + rect[3] < cy) {
                 continue;
             }
             int state = 0;
-            float over = lit ? hoverLevel(b.item.getId()) : 0;
+            float over = lit ? getHoverLevel(b.item.getId()) : 0;
             if (over > 0) {
                 state |= ScheduleItemRenderer.HOVERED;
             }
@@ -683,7 +689,7 @@ final class DayGrid extends ScrollSurface {
                 continue;
             }
             int top = editStart <= ds ? 0 : minuteY(TimeMath.minuteOfDay(editStart, zone));
-            int bottom = editEnd >= de ? contentHeight() : minuteY(TimeMath.minuteOfDay(editEnd, zone));
+            int bottom = editEnd >= de ? getContentHeight() : minuteY(TimeMath.minuteOfDay(editEnd, zone));
             int x0 = x + colX(c) + 1;
             int w = colX(c + 1) - colX(c) - 2;
             int h = Math.max(Look.mm(2.6f), bottom - top);
@@ -702,7 +708,7 @@ final class DayGrid extends ScrollSurface {
                             y + top + 1);
                 }
             } else {
-                Look.shadow(g, x0, y + top, w, h, liftLevel());
+                Look.shadow(g, x0, y + top, w, h, getLiftLevel());
                 owner.getItemRenderer().paintItem(g, owner, editItem, x0, y + top, w, h,
                         ScheduleItemRenderer.DRAGGED | ScheduleItemRenderer.SELECTED);
                 // The time it would land on, over the item: in the colour
@@ -715,7 +721,7 @@ final class DayGrid extends ScrollSurface {
                 g.setColor(label.getFgColor());
                 String s = owner.formatRange(editStart, editEnd);
                 int ty = y + top - f.getHeight();
-                if (ty > y + getOffY()) {
+                if (ty > y + getOffsetY()) {
                     g.drawString(Look.fit(s, f, w), x0, ty);
                 }
             }
@@ -752,14 +758,14 @@ final class DayGrid extends ScrollSurface {
     }
 
     @Override
-    void paintTopHeader(Graphics g, int x, int y) {
+    protected void paintTopHeader(Graphics g, int x, int y) {
         Style header = Look.style("SchedulerHeader");
         Style todaySt = Look.style("SchedulerHeaderToday");
         Font f = header.getFont();
         int fh = f.getHeight();
         int cx = g.getClipX();
         int cw = g.getClipWidth();
-        Look.fill(g, header, cx, y, cw, headerH);
+        Look.fill(g, header, cx, y, cw, getHeaderHeight());
         long today = TimeMath.epochDay(owner.now(), owner.getZone());
         g.setFont(f);
         int alpha = g.getAlpha();
@@ -825,7 +831,7 @@ final class DayGrid extends ScrollSurface {
                 if (c.endsAfter) {
                     state |= ScheduleItemRenderer.ENDS_AFTER;
                 }
-                float over = hoverLevel(c.item.getId());
+                float over = getHoverLevel(c.item.getId());
                 if (over > 0) {
                     state |= ScheduleItemRenderer.HOVERED;
                 }
@@ -845,42 +851,42 @@ final class DayGrid extends ScrollSurface {
             }
         }
         g.setColor(Look.mix(header.getBgColor(), header.getFgColor(), 50));
-        g.drawLine(cx, y + headerH - 1, cx + cw, y + headerH - 1);
+        g.drawLine(cx, y + getHeaderHeight() - 1, cx + cw, y + getHeaderHeight() - 1);
     }
 
     @Override
-    void paintLeftHeader(Graphics g, int x, int y) {
+    protected void paintLeftHeader(Graphics g, int x, int y) {
         Style st = Look.style("SchedulerTimeLabel");
         Font f = st.getFont();
         int fh = f.getHeight();
-        Look.fill(g, st, x, g.getClipY(), headerW, g.getClipHeight());
+        Look.fill(g, st, x, g.getClipY(), getHeaderWidth(), g.getClipHeight());
         g.setFont(f);
         g.setColor(st.getFgColor());
         int every = hourH < fh * 1.3f ? 2 : 1;
         boolean h24 = owner.is24Hours();
         for (int h = every; h < 24; h += every) {
             String s = Dates.time(h * 60, h24, true);
-            g.drawString(s, x + headerW - f.stringWidth(s) - Look.mm(1), y + minuteY(h * 60) - fh / 2);
+            g.drawString(s, x + getHeaderWidth() - f.stringWidth(s) - Look.mm(1), y + minuteY(h * 60) - fh / 2);
         }
     }
 
     @Override
-    void paintCorner(Graphics g, int x, int y) {
+    protected void paintCorner(Graphics g, int x, int y) {
         Style header = Look.style("SchedulerHeader");
-        Look.fill(g, header, x, y, headerW, headerH);
+        Look.fill(g, header, x, y, getHeaderWidth(), getHeaderHeight());
         g.setColor(Look.mix(header.getBgColor(), header.getFgColor(), 50));
-        g.drawLine(x, y + headerH - 1, x + headerW, y + headerH - 1);
+        g.drawLine(x, y + getHeaderHeight() - 1, x + getHeaderWidth(), y + getHeaderHeight() - 1);
     }
 
     // ------------------------------------------------------------ pointer
 
     /// The box at a point of the component, or null.
     Box boxAt(int px, int py) {
-        if (px < headerW || py < headerH) {
+        if (px < getHeaderWidth() || py < getHeaderHeight()) {
             return null;
         }
-        int cx = px - headerW + getOffX();
-        int cy = py - headerH + getOffY();
+        int cx = px - getHeaderWidth() + getOffsetX();
+        int cy = py - getHeaderHeight() + getOffsetY();
         for (int i = boxes.size() - 1; i >= 0; i--) {
             Box b = boxes.get(i);
             boxRect(b, rect);
@@ -892,7 +898,7 @@ final class DayGrid extends ScrollSurface {
     }
 
     private Chip chipAt(int px, int py) {
-        int cx = px - headerW + getOffX();
+        int cx = px - getHeaderWidth() + getOffsetX();
         for (Chip c : chips) {
             if (chipHidden(c)) {
                 continue;
@@ -920,12 +926,13 @@ final class DayGrid extends ScrollSurface {
     }
 
     @Override
-    boolean beginEdit(int x, int y, boolean handlesOnly) {
-        if (!owner.isEditable() || x < headerW || y < headerH || days.length == 0) {
+    protected boolean editStarted(int x, int y, EditTrigger trigger) {
+        boolean handlesOnly = trigger == EditTrigger.HANDLE_DRAG;
+        if (!owner.isEditable() || x < getHeaderWidth() || y < getHeaderHeight() || days.length == 0) {
             return false;
         }
-        int cx = x - headerW + getOffX();
-        int cy = y - headerH + getOffY();
+        int cx = x - getHeaderWidth() + getOffsetX();
+        int cy = y - getHeaderHeight() + getOffsetY();
         ZoneId zone = owner.getZone();
         Box b = boxAt(x, y);
         if (b == null && handlesOnly) {
@@ -973,13 +980,13 @@ final class DayGrid extends ScrollSurface {
     }
 
     @Override
-    void editDragged(int x, int y) {
+    protected void editMoved(int x, int y) {
         if (mode == 0) {
             return;
         }
         ZoneId zone = owner.getZone();
-        int cx = Math.max(0, Math.min(contentW - 1, x - headerW + getOffX()));
-        int cy = Math.max(0, Math.min(contentHeight(), y - headerH + getOffY()));
+        int cx = Math.max(0, Math.min(contentW - 1, x - getHeaderWidth() + getOffsetX()));
+        int cy = Math.max(0, Math.min(getContentHeight(), y - getHeaderHeight() + getOffsetY()));
         int col = colAt(cx);
         int minute = minuteAt(cy);
         long step = Math.max(1, owner.getSnapMinutes()) * TimeMath.MINUTE;
@@ -1011,13 +1018,13 @@ final class DayGrid extends ScrollSurface {
     }
 
     @Override
-    void endEdit(boolean commit) {
+    protected void editEnded(boolean commit) {
         int m = mode;
         ScheduleItem item = editItem;
         if (item != null && editRect(rect)) {
             // From where it was let go to where it belongs, which is the
             // place it came from when the move is refused or given up.
-            settleFrom(item.getId(), rect[0], rect[1], rect[2], rect[3]);
+            startSettle(item.getId(), rect[0], rect[1], rect[2], rect[3]);
         }
         mode = 0;
         editItem = null;
@@ -1053,7 +1060,7 @@ final class DayGrid extends ScrollSurface {
             return false;
         }
         int top = editStart <= ds ? 0 : minuteY(TimeMath.minuteOfDay(editStart, zone));
-        int bottom = editEnd >= de ? contentHeight() : minuteY(TimeMath.minuteOfDay(editEnd, zone));
+        int bottom = editEnd >= de ? getContentHeight() : minuteY(TimeMath.minuteOfDay(editEnd, zone));
         out[0] = colX(col) + 1;
         out[1] = top;
         out[2] = colX(col + 1) - colX(col) - 2;
@@ -1074,7 +1081,7 @@ final class DayGrid extends ScrollSurface {
         }
         int top = minuteY(minute);
         Look.wash(g, rgb, x + colX(col) + 1, y + top, colX(col + 1) - colX(col) - 1,
-                minuteY(Math.min(TimeMath.MINUTES_PER_DAY, minute + slotMinutes())) - top, hoverLevel(key));
+                minuteY(Math.min(TimeMath.MINUTES_PER_DAY, minute + slotMinutes())) - top, getHoverLevel(key));
     }
 
     // A slot is a step of the snap, and half an hour when the steps are
@@ -1084,18 +1091,18 @@ final class DayGrid extends ScrollSurface {
     }
 
     @Override
-    void hoverAt(int x, int y) {
-        if (days.length == 0 || x < headerW) {
-            hover(null, DEFAULT_CURSOR);
+    protected void hoverAt(int x, int y) {
+        if (days.length == 0 || x < getHeaderWidth()) {
+            setHoverTarget(null, DEFAULT_CURSOR);
             return;
         }
-        if (y < headerH) {
+        if (y < getHeaderHeight()) {
             Chip chip = chipAt(x, y);
-            hover(chip == null ? null : chip.item.getId(), chip == null ? DEFAULT_CURSOR : HAND_CURSOR);
-            tip(chip == null ? null : chip.item.getTitle());
+            setHoverTarget(chip == null ? null : chip.item.getId(), chip == null ? DEFAULT_CURSOR : HAND_CURSOR);
+            setHoverTooltip(chip == null ? null : chip.item.getTitle());
             return;
         }
-        int cy = y - headerH + getOffY();
+        int cy = y - getHeaderHeight() + getOffsetY();
         Box b = boxAt(x, y);
         if (b != null) {
             int cursor = HAND_CURSOR;
@@ -1110,20 +1117,20 @@ final class DayGrid extends ScrollSurface {
                     cursor = MOVE_CURSOR;
                 }
             }
-            hover(b.item.getId(), cursor);
-            tip(b.item.getTitle() + ", " + owner.formatRange(b.item.getStart(), b.item.getEnd()));
+            setHoverTarget(b.item.getId(), cursor);
+            setHoverTooltip(b.item.getTitle() + ", " + owner.formatRange(b.item.getStart(), b.item.getEnd()));
             return;
         }
-        tip(null);
+        setHoverTooltip(null);
         if (!owner.isEditable()) {
-            hover(null, DEFAULT_CURSOR);
+            setHoverTarget(null, DEFAULT_CURSOR);
             return;
         }
         // An empty slot, which a drag or a double click would fill.
-        int col = colAt(Math.max(0, Math.min(contentW - 1, x - headerW + getOffX())));
+        int col = colAt(Math.max(0, Math.min(contentW - 1, x - getHeaderWidth() + getOffsetX())));
         int slot = slotMinutes();
         int minute = Math.max(0, Math.min(TimeMath.MINUTES_PER_DAY - 1, minuteAt(cy))) / slot * slot;
-        hover(Long.valueOf(col * SLOT_KEY + minute), DEFAULT_CURSOR);
+        setHoverTarget(Long.valueOf(col * SLOT_KEY + minute), DEFAULT_CURSOR);
     }
 
     private static boolean same(String a, String b) {
@@ -1131,12 +1138,12 @@ final class DayGrid extends ScrollSurface {
     }
 
     @Override
-    void tapped(int x, int y, boolean doubleTap) {
-        if (days.length == 0 || x < headerW) {
+    protected void tapped(int x, int y, boolean doubleTap) {
+        if (days.length == 0 || x < getHeaderWidth()) {
             return;
         }
-        int cx = x - headerW + getOffX();
-        if (y < headerH) {
+        int cx = x - getHeaderWidth() + getOffsetX();
+        if (y < getHeaderHeight()) {
             Chip chip = chipAt(x, y);
             if (chip != null) {
                 pick(chip.item, doubleTap);
@@ -1154,7 +1161,7 @@ final class DayGrid extends ScrollSurface {
             owner.viewSelected(null);
         } else if (doubleTap && owner.isEditable()) {
             int col = colAt(cx);
-            int minute = snapMinute(minuteAt(y - headerH + getOffY()), true);
+            int minute = snapMinute(minuteAt(y - getHeaderHeight() + getOffsetY()), true);
             long start = TimeMath.at(days[col], minute, owner.getZone());
             owner.viewRange(start, start + owner.getDefaultMinutes() * TimeMath.MINUTE,
                     resources != null && resources.length > 0 ? resources[col].getId() : null);
@@ -1169,17 +1176,17 @@ final class DayGrid extends ScrollSurface {
     }
 
     @Override
-    boolean zoomBy(float factor, int x, int y) {
+    protected boolean zoomBy(float factor, int x, int y) {
         float before = hourH;
-        float least = Math.max(Look.mm(4), bodyHeight() / 24f);
+        float least = Math.max(Look.mm(4), getBodyHeight() / 24f);
         float next = Math.max(least, Math.min(Look.mm(40), hourH * factor));
         if (Math.abs(next - before) < 0.01f) {
             return false;
         }
         // The minute under the pointer stays under it.
-        float minute = (y - headerH + getOffY()) * 60f / before;
+        float minute = (y - getHeaderHeight() + getOffsetY()) * 60f / before;
         hourH = next;
-        setOffsets(getOffX(), Math.round(minute * next / 60f) - (y - headerH));
+        setOffsets(getOffsetX(), Math.round(minute * next / 60f) - (y - getHeaderHeight()));
         repaint();
         return true;
     }

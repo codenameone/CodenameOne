@@ -323,6 +323,15 @@ public class IOSNative {
     native void nativeUnloadSound(long pool, long sound);
     native void nativeReleaseSoundPool(long pool);
 
+    // ---- real-time PCM output (com.codename1.media.audio.AudioContext), CN1AudioOutput.m ----
+    native long audioOutOpen(int sampleRate, int channels);
+    native int audioOutRate(long handle);
+    native int audioOutWrite(long handle, float[] pcm, int offsetFrames, int frames);
+    native void audioOutStart(long handle);
+    native void audioOutStop(long handle);
+    native void audioOutClose(long handle);
+    native double audioOutLatency(long handle);
+
     native float getVolume();
 
     native void setVolume(float vol);
@@ -834,9 +843,17 @@ public class IOSNative {
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap);
 
-    native boolean gl3dBeginShadowPass(long contextPeer, int size);
+    // binds a texture and its sampler at a fragment slot for the next draw
+    native void gl3dBindTexture(long contextPeer, int index, long texturePeer, int texFilter, int texWrap);
+
+    native boolean gl3dBeginShadowPass(long contextPeer, int width, int size);
     native void gl3dEndShadowPass(long contextPeer);
+    // a sampleable colour texture passes can draw into, and the pass itself
+    native long gl3dCreateRenderTarget(long contextPeer, int width, int height);
+    native boolean gl3dBeginRenderTarget(long contextPeer, long texturePeer, int width, int height, int argb);
+    native void gl3dEndRenderTarget(long contextPeer);
     native boolean gl3dBeginPostProcess(long contextPeer, String mslSource, boolean bloom);
+    native void gl3dSetPostLut(long contextPeer, long texturePeer);
     native void gl3dEndPostProcess(long contextPeer, float[] params);
 
     native void destroyAudioUnit(long peer);

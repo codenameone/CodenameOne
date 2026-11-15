@@ -32,7 +32,16 @@ import java.util.ArrayList;
 /// the voice is still playing is worked out from the clip's length and the
 /// game's clock, not asked of the device, so that a script that waits for
 /// a sound to finish behaves the same on every target, with or without
-/// sound. Everything is 2D: there is no distance attenuation or panning.
+/// sound.
+///
+/// Sound is placed relative to the scene's [AudioListener] as Unity places
+/// it: `spatialBlend` mixes between the 2D sound, panned by `panStereo`,
+/// and the 3D one, attenuated by `rolloffMode` between `minDistance` and
+/// `maxDistance` and panned by where the source lies to the listener's
+/// side. The attenuation and pan go to the output beside the volume (see
+/// [AudioOutput#place]), worked out once a frame here, so that every
+/// output hears the same numbers. A custom rolloff curve is heard as the
+/// logarithmic one; Doppler and spread are not applied.
 ///
 /// Every start is also recorded in a log a test or a trace can read, in
 /// the order it happened, and so is every move of the voice within its
@@ -63,6 +72,19 @@ public final class AudioSource extends Behaviour {
     boolean loop;
     boolean mute;
     boolean playOnAwake = true;
+    float spatialBlend;
+    float panStereo;
+    int rolloffMode;
+    float minDistance = 1f;
+    float maxDistance = 500f;
+    /// The attenuation and pan last given to the output, for this source's
+    /// voice and its shots alike.
+    private float placedGain = 1f;
+    private float placedPan;
+    /// `AudioRolloffMode.Linear`; `Logarithmic` is 0 and `Custom` 2.
+    static final int ROLLOFF_LINEAR = 1;
+    /// The listener the scene is heard from: the live one that ticked last.
+    static AudioListener listener;
     private int voice;
     /// The one-shots this source started that may still be sounding, with
     /// the scale each was played at and when it ends on [#now()]. Unity's
@@ -159,6 +181,7 @@ public final class AudioSource extends Behaviour {
             log.add("revoice " + clip.name + " " + (int) (at * 1000f + 0.5f));
         }
         o.play(voice, clip, level(1f), pitch, loop);
+        placeOn(o, voice);
         if (at > 0f) {
             o.seek(voice, at);
         }
@@ -182,6 +205,7 @@ public final class AudioSource extends Behaviour {
             int v = newVoice();
             shots[i] = v;
             o.play(v, shotClip[i], level(shotScale[i]), pitch, false);
+            placeOn(o, v);
             float at = shotClip[i].get_length() - shotClipLeft(i, t);
             if (at > 0f) {
                 o.seek(v, at);
@@ -264,6 +288,7 @@ public final class AudioSource extends Behaviour {
 
     static void resetAll() {
         log.clear();
+        listener = null;
         voiced.clear();
         listenerVolume = 1f;
         if (output != null) {
@@ -640,6 +665,7 @@ public final class AudioSource extends Behaviour {
         record(loop ? "loop" : "play", clip);
         if (output != null) {
             output.play(voice, clip, level(1f), pitch, loop);
+            placeOn(output, voice);
         }
         if (from > 0f) {
             if (logging) {
@@ -724,6 +750,7 @@ public final class AudioSource extends Behaviour {
         int v = newVoice();
         if (output != null) {
             output.play(v, c, level(volumeScale), pitch, false);
+            placeOn(output, v);
             if (shotsPaused) {
                 output.pause(v, true);
             }
@@ -842,7 +869,167 @@ public final class AudioSource extends Behaviour {
         }
         record("shot", c);
         if (output != null) {
-            output.play(newVoice(), c, volume, 1f, false);
+            // Unity's temporary source: fully 3D, logarithmic, 1 to 500.
+            int v = newVoice();
+            output.play(v, c, volume, 1f, false);
+            float gain = 1f;
+            float pan = 0f;
+            AudioListener l = listener;
+            if (l != null && l.live() && position != null) {
+                Transform t = l.get_transform();
+                float dx = position.x - t.$worldX();
+                float dy = position.y - t.$worldY();
+                float dz = position.z - t.$worldZ();
+                float d = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+                gain = attenuation(0, d, 1f, 500f);
+                pan = sidePan(dx, dy, d, t.$worldTurn());
+            }
+            if (gain != 1f || pan != 0f) {
+                output.place(v, gain, pan);
+            }
         }
+    }
+
+    /// The live listener says where the scene is heard from, once a frame.
+    static void heardFrom(AudioListener l) {
+        listener = l;
+    }
+
+    /// Unity's distance attenuation: logarithmic is `minDistance / d`, held
+    /// at its value at `maxDistance` beyond it; linear falls from 1 at
+    /// `minDistance` to 0 at `maxDistance`. Package private for the tests.
+    static float attenuation(int mode, float d, float min, float max) {
+        if (mode == ROLLOFF_LINEAR) {
+            if (d <= min) {
+                return 1f;
+            }
+            if (d >= max) {
+                return 0f;
+            }
+            return 1f - (d - min) / (max - min);
+        }
+        float at = d > max ? max : d;
+        return at <= min || at <= 0f ? 1f : min / at;
+    }
+
+    /// How far to the listener's right a point lies, -1 to 1: the sideways
+    /// part of the direction to it, in the listener's frame (turned by its
+    /// rotation about z, the one a 2D scene has).
+    static float sidePan(float dx, float dy, float d, float turnDegrees) {
+        if (!(d > 1e-6f)) { // NOPMD LogicInversion - NaN reads as centred
+            return 0f;
+        }
+        double r = Math.toRadians(turnDegrees);
+        float side = (float) (dx * Math.cos(r) + dy * Math.sin(r));
+        float pan = side / d;
+        return pan < -1f ? -1f : pan > 1f ? 1f : pan;
+    }
+
+    /// The attenuation and pan this source is heard with now.
+    private void computePlacement() {
+        float blend = spatialBlend;
+        float gain = 1f;
+        float pan3 = 0f;
+        AudioListener l = listener;
+        if (blend > 0f && l != null && l.live()) {
+            Transform me = get_transform();
+            Transform t = l.get_transform();
+            float dx = me.$worldX() - t.$worldX();
+            float dy = me.$worldY() - t.$worldY();
+            float dz = me.$worldZ() - t.$worldZ();
+            float d = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+            gain = attenuation(rolloffMode, d, minDistance, maxDistance);
+            pan3 = sidePan(dx, dy, d, t.$worldTurn());
+        } else {
+            blend = 0f;
+        }
+        placedGain = 1f + (gain - 1f) * blend;
+        placedPan = panStereo * (1f - blend) + pan3 * blend;
+    }
+
+    private void placeOn(AudioOutput o, int v) {
+        computePlacement();
+        if (placedGain != 1f || placedPan != 0f) {
+            o.place(v, placedGain, placedPan);
+        }
+    }
+
+    @Override
+    public int $roles() {
+        return super.$roles() | TICKS_LATE;
+    }
+
+    /// Follows the source and the listener as they move: a voice or shot
+    /// still sounding gets the new placement when it changed.
+    @Override
+    public void $lateTick(float dt) {
+        AudioOutput o = output;
+        if (o == null || !(playing || paused || shotCount > 0)) {
+            return;
+        }
+        float g = placedGain;
+        float p = placedPan;
+        computePlacement();
+        if (g == placedGain && p == placedPan) {
+            return;
+        }
+        if (playing || paused) {
+            o.place(voice, placedGain, placedPan);
+        }
+        float t = shotNow();
+        for (int i = 0; i < shotCount; i++) {
+            if (shotEnd[i] > t) {
+                o.place(shots[i], placedGain, placedPan);
+            }
+        }
+    }
+
+    /// What a scene file sets of the 3D settings.
+    public void $spatial(float blend, float pan, int rolloff, float min, float max) {
+        set_spatialBlend(blend);
+        set_panStereo(pan);
+        set_rolloffMode(rolloff);
+        set_minDistance(min);
+        set_maxDistance(max);
+    }
+
+    public float get_spatialBlend() {
+        return spatialBlend;
+    }
+
+    public void set_spatialBlend(float value) {
+        spatialBlend = value < 0f ? 0f : value > 1f ? 1f : value;
+    }
+
+    public float get_panStereo() {
+        return panStereo;
+    }
+
+    public void set_panStereo(float value) {
+        panStereo = value < -1f ? -1f : value > 1f ? 1f : value;
+    }
+
+    public int get_rolloffMode() {
+        return rolloffMode;
+    }
+
+    public void set_rolloffMode(int value) {
+        rolloffMode = value;
+    }
+
+    public float get_minDistance() {
+        return minDistance;
+    }
+
+    public void set_minDistance(float value) {
+        minDistance = value < 0f ? 0f : value;
+    }
+
+    public float get_maxDistance() {
+        return maxDistance;
+    }
+
+    public void set_maxDistance(float value) {
+        maxDistance = value < minDistance ? minDistance : value;
     }
 }

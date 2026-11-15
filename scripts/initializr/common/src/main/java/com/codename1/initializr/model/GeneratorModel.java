@@ -306,6 +306,9 @@ public class GeneratorModel {
     // maven/cn1app-archetype stages agent-skill-agents-md.md verbatim, so a token
     // there would reach every archetype-generated Maven project unrendered.
     private static final String AGENTS_MD_GRADLE_RESOURCE = "/agent-skill-agents-md-gradle.md";
+    // The project's MCP server list: BuildCloud, so an agent can sign, configure push and submit
+    // after one browser approval. A file for the same reason as AGENTS.md: the archetype stages it.
+    private static final String MCP_JSON_RESOURCE = "/agent-mcp-json.json";
     // Both shared with maven/cn1app-archetype, which stages them from this directory.
     private static final String HOSTED_PROFILES_RESOURCE = "/common-hosted-platform-profiles.xml";
     private static final String BACKEND_ONLY_POM_RESOURCE = "/backend-only-pom.xml";
@@ -1401,6 +1404,8 @@ public class GeneratorModel {
         // discover the skill without having to know our directory layout.
         copySingleTextEntryToMap("AGENTS.md",
                 readResourceToString(options.isGradle() ? AGENTS_MD_GRADLE_RESOURCE : AGENTS_MD_RESOURCE),
+                mergedEntries, ZipEntryType.COMMON);
+        copySingleTextEntryToMap(".mcp.json", readResourceToString(MCP_JSON_RESOURCE),
                 mergedEntries, ZipEntryType.COMMON);
         // Claude Code stub. Frontmatter so the skill shows up in /skills, body redirects
         // to the canonical vendor-neutral content.

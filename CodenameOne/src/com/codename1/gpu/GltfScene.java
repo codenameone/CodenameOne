@@ -298,6 +298,12 @@ public final class GltfScene {
         float metallic = 1f;
         float roughness = 1f;
         int emissive = 0xff000000;
+        int normalImage = -1;
+        float normalScale = 1f;
+        int occlusionImage = -1;
+        float occlusionStrength = 1f;
+        int emissiveImage = -1;
+        int metallicRoughnessImage = -1;
 
         MaterialInfo(String name, int baseColor, int image, boolean doubleSided, boolean blend) {
             this.name = name;
@@ -335,6 +341,65 @@ public final class GltfScene {
         /// The index of the base color image, or -1.
         public int getImage() {
             return image;
+        }
+
+        /// The index of the normal map image, or -1.
+        public int getNormalImage() {
+            return normalImage;
+        }
+
+        /// The normal map's scale; glTF's default is 1.
+        public float getNormalScale() {
+            return normalScale;
+        }
+
+        /// The index of the occlusion image, or -1.
+        public int getOcclusionImage() {
+            return occlusionImage;
+        }
+
+        /// The occlusion strength; glTF's default is 1.
+        public float getOcclusionStrength() {
+            return occlusionStrength;
+        }
+
+        /// The index of the emissive image, or -1.
+        public int getEmissiveImage() {
+            return emissiveImage;
+        }
+
+        /// The index of the metallic-roughness image, or -1.
+        public int getMetallicRoughnessImage() {
+            return metallicRoughnessImage;
+        }
+
+        /// Applies every map of this material that `scene` could decode to
+        /// `material`: normal, occlusion, emissive and metallic-roughness.
+        ///
+        /// #### Parameters
+        ///
+        /// - `scene`: the scene this material came from
+        ///
+        /// - `device`: the device to upload the images to
+        ///
+        /// - `material`: the material to configure
+        public void applyMaps(GltfScene scene, GraphicsDevice device, Material material) {
+            Texture n = scene.getTexture(device, normalImage);
+            if (n != null) {
+                material.setNormalMap(n, normalScale);
+            }
+            Texture o = scene.getTexture(device, occlusionImage);
+            if (o != null) {
+                material.setOcclusionMap(o, occlusionStrength);
+            }
+            Texture e = scene.getTexture(device, emissiveImage);
+            if (e != null) {
+                material.setEmissiveMap(e);
+            }
+            Texture mr = scene.getTexture(device, metallicRoughnessImage);
+            if (mr != null) {
+                material.setMetallicRoughnessMap(mr);
+            }
         }
 
         /// True when back faces must not be culled.

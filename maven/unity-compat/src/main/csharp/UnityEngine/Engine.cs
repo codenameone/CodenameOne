@@ -746,6 +746,11 @@ namespace UnityEngine
         public bool playOnAwake { get { throw null; } set { throw null; } }
         public bool isPlaying { get { throw null; } }
         public float time { get { throw null; } set { throw null; } }
+        public float spatialBlend { get { throw null; } set { throw null; } }
+        public float panStereo { get { throw null; } set { throw null; } }
+        public AudioRolloffMode rolloffMode { get { throw null; } set { throw null; } }
+        public float minDistance { get { throw null; } set { throw null; } }
+        public float maxDistance { get { throw null; } set { throw null; } }
         public void Play() { throw null; }
         public void PlayDelayed(float delay) { throw null; }
         public void Stop() { throw null; }

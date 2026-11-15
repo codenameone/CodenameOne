@@ -62,6 +62,7 @@ public final class Environment {
     private int sunColor;
     private float cloudCover;
     private int version;
+    private Texture environmentMap;
 
     /// Turns fog on. A density of 0 turns it off.
     ///
@@ -282,6 +283,36 @@ public final class Environment {
         return exposure;
     }
 
+    /// Sets the environment map image based lighting reads, baked by
+    /// `EnvironmentMaps.fromSky` or `EnvironmentMaps.fromImage`. With one set,
+    /// lit materials take their ambient light from it along their normal
+    /// instead of from the flat ambient or the hemisphere, and `PBR` materials
+    /// reflect it, sharply when smooth and blurred when rough -- the single
+    /// largest step from "computer graphics" to a believable scene.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the baked map, or null to go back to the ambient colours
+    ///
+    /// #### Returns
+    ///
+    /// this environment for chaining
+    public Environment setEnvironmentMap(Texture map) {
+        this.environmentMap = map;
+        version++;
+        return this;
+    }
+
+    /// Returns the environment map set with `setEnvironmentMap`, or null.
+    public Texture getEnvironmentMap() {
+        return environmentMap;
+    }
+
+    /// Returns true if an environment map is set.
+    public boolean isEnvironmentMap() {
+        return environmentMap != null;
+    }
+
     /// Returns a number that changes whenever a setting does, so a backend can
     /// tell that a shader variant or a uniform it cached is stale.
     public int getVersion() {
@@ -289,11 +320,11 @@ public final class Environment {
     }
 
     /// Returns the part of the shader variant key that depends on this
-    /// environment: whether fog, hemisphere lighting, tone mapping and the
-    /// open sky are on.
+    /// environment: whether fog, hemisphere lighting, tone mapping, the
+    /// open sky and the environment map are on.
     /// Values such as the fog colour are uniforms and are not part of it.
     public String getShaderKey() {
         return (isFog() ? "F" : "f") + (hemisphere ? "H" : "h") + (toneMapping ? "T" : "t")
-                + (sky ? "K" : "k");
+                + (sky ? "K" : "k") + (environmentMap != null ? "E" : "");
     }
 }

@@ -3899,6 +3899,64 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return new WindowsMedia(peer, onCompletion);
     }
 
+    @Override
+    public boolean isAudioOutputSupported() {
+        return true;
+    }
+
+    @Override
+    public com.codename1.media.audio.AudioOutputPeer openAudioOutput(int sampleRate, int channels,
+            com.codename1.media.audio.AudioRenderCallback callback) {
+        int ch = channels == 1 ? 1 : 2;
+        long h = WindowsNative.audioOutOpen(sampleRate, ch);
+        if (h == 0) {
+            return null;
+        }
+        WindowsAudioOutput out = new WindowsAudioOutput(h, WindowsNative.audioOutRate(h), ch, callback);
+        out.begin();
+        return out;
+    }
+
+    /// Real-time output backed by cn1_windows_audioout.c (waveOut): the render thread pushes into a
+    /// native ring that a native worker thread drains to the device.
+    static final class WindowsAudioOutput extends com.codename1.impl.PushAudioOutput {
+        private final long handle;
+
+        WindowsAudioOutput(long handle, int rate, int channels, com.codename1.media.audio.AudioRenderCallback cb) {
+            super(rate, channels, cb);
+            this.handle = handle;
+        }
+
+        void begin() {
+            startThread();
+        }
+
+        @Override
+        protected int offer(float[] pcm, int offset, int frames) {
+            return WindowsNative.audioOutWrite(handle, pcm, offset, frames);
+        }
+
+        @Override
+        protected void nativeStart() {
+            WindowsNative.audioOutStart(handle);
+        }
+
+        @Override
+        protected void nativeStop() {
+            WindowsNative.audioOutStop(handle);
+        }
+
+        @Override
+        protected void nativeClose() {
+            WindowsNative.audioOutClose(handle);
+        }
+
+        @Override
+        public double getOutputLatency() {
+            return WindowsNative.audioOutLatency(handle);
+        }
+    }
+
     /* ---------------------------------------------------- audio recording
      * waveIn-backed PCM WAV recorder (cn1_windows_audiorec.c). createMediaRecorder
      * returns a Media whose play() starts capturing from the default microphone

@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.scheduler;
 
+import com.codename1.ui.ScrollSurface;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.scheduling.DefaultScheduleModel;
@@ -76,7 +77,7 @@ class SchedulerTest extends UITestBase {
         form.add(BorderLayout.CENTER, s);
         form.revalidate();
         ScrollSurface surface = (ScrollSurface) s.surface();
-        surface.layoutNow();
+        surface.refreshLayout();
         return s;
     }
 
@@ -175,8 +176,8 @@ class SchedulerTest extends UITestBase {
 
         int[] r = new int[4];
         grid.boxRect(box(grid, "a"), r);
-        int x = grid.headerW + r[0] + r[2] / 2 - grid.getOffX();
-        int y = grid.headerH + r[1] + r[3] / 2 - grid.getOffY();
+        int x = grid.getHeaderWidth() + r[0] + r[2] / 2 - grid.getOffsetX();
+        int y = grid.getHeaderHeight() + r[1] + r[3] / 2 - grid.getOffsetY();
         // Two hours and ten minutes down snaps to two hours and a quarter.
         int down = Math.round(grid.getHourHeight() * 130 / 60f);
         drag(grid, x, y, x, y + down);
@@ -203,8 +204,8 @@ class SchedulerTest extends UITestBase {
         DayGrid grid = (DayGrid) s.surface();
         int[] r = new int[4];
         grid.boxRect(box(grid, "a"), r);
-        int x = grid.headerW + r[0] + r[2] / 2 - grid.getOffX();
-        int y = grid.headerH + r[1] + r[3] / 2 - grid.getOffY();
+        int x = grid.getHeaderWidth() + r[0] + r[2] / 2 - grid.getOffsetX();
+        int y = grid.getHeaderHeight() + r[1] + r[3] / 2 - grid.getOffsetY();
         drag(grid, x, y, x, y + Math.round(grid.getHourHeight() * 2));
 
         assertEquals(1, asked.size());
@@ -219,8 +220,8 @@ class SchedulerTest extends UITestBase {
         DayGrid grid = (DayGrid) show(model, Scheduler.View.DAY).surface();
         int[] r = new int[4];
         grid.boxRect(box(grid, "a"), r);
-        int x = grid.headerW + r[0] + r[2] / 2 - grid.getOffX();
-        int y = grid.headerH + r[1] + r[3] - 1 - grid.getOffY();
+        int x = grid.getHeaderWidth() + r[0] + r[2] / 2 - grid.getOffsetX();
+        int y = grid.getHeaderHeight() + r[1] + r[3] - 1 - grid.getOffsetY();
         drag(grid, x, y, x, y + Math.round(grid.getHourHeight()));
 
         assertEquals(at(5, 9, 0), a.getStart());
@@ -242,9 +243,9 @@ class SchedulerTest extends UITestBase {
         });
         DayGrid grid = (DayGrid) s.surface();
         float hour = grid.getHourHeight();
-        int x = grid.headerW + grid.bodyWidth() / 2;
-        int from = grid.headerH + Math.round(hour * 13) + 1 - grid.getOffY();
-        int to = grid.headerH + Math.round(hour * 15) + 1 - grid.getOffY();
+        int x = grid.getHeaderWidth() + grid.getBodyWidth() / 2;
+        int from = grid.getHeaderHeight() + Math.round(hour * 13) + 1 - grid.getOffsetY();
+        int to = grid.getHeaderHeight() + Math.round(hour * 15) + 1 - grid.getOffsetY();
         drag(grid, x, from, x, to);
 
         assertEquals(at(5, 13, 0), range[0]);
@@ -274,15 +275,15 @@ class SchedulerTest extends UITestBase {
         DayGrid grid = (DayGrid) s.surface();
         int[] r = new int[4];
         grid.boxRect(box(grid, "a"), r);
-        int x = grid.headerW + r[0] + r[2] / 2 - grid.getOffX();
-        int y = grid.headerH + r[1] + r[3] / 2 - grid.getOffY();
+        int x = grid.getHeaderWidth() + r[0] + r[2] / 2 - grid.getOffsetX();
+        int y = grid.getHeaderHeight() + r[1] + r[3] / 2 - grid.getOffsetY();
         tap(grid, x, y);
         assertEquals("[selected a]", events.toString());
         tap(grid, x, y);
         assertEquals("[selected a, opened a]", events.toString());
 
         // A tap on empty time lets go of the selection.
-        tap(grid, x, grid.headerH + Math.round(grid.getHourHeight() * 20) - grid.getOffY());
+        tap(grid, x, grid.getHeaderHeight() + Math.round(grid.getHourHeight() * 20) - grid.getOffsetY());
         assertNull(s.getSelectedItem());
     }
 
@@ -296,8 +297,8 @@ class SchedulerTest extends UITestBase {
         DayGrid grid = (DayGrid) s.surface();
         int[] r = new int[4];
         grid.boxRect(box(grid, "a"), r);
-        int x = grid.headerW + r[0] + r[2] / 2 - grid.getOffX();
-        int y = grid.headerH + r[1] + r[3] / 2 - grid.getOffY();
+        int x = grid.getHeaderWidth() + r[0] + r[2] / 2 - grid.getOffsetX();
+        int y = grid.getHeaderHeight() + r[1] + r[3] / 2 - grid.getOffsetY();
         drag(grid, x, y, x, y + Math.round(grid.getHourHeight() * 2));
         assertEquals(at(5, 9, 0), a.getStart());
     }
@@ -403,9 +404,9 @@ class SchedulerTest extends UITestBase {
 
         // Drag the item of the second room up into the first.
         line.scrollTo(Math.max(0, rc[0] - 10), 0);
-        int x = line.headerW + rc[0] + rc[2] / 2 - line.getOffX();
-        int y = line.headerH + rc[1] + rc[3] / 2 - line.getOffY();
-        drag(line, x, y, x, line.headerH + ra[1] + 1 - line.getOffY());
+        int x = line.getHeaderWidth() + rc[0] + rc[2] / 2 - line.getOffsetX();
+        int y = line.getHeaderHeight() + rc[1] + rc[3] / 2 - line.getOffsetY();
+        drag(line, x, y, x, line.getHeaderHeight() + ra[1] + 1 - line.getOffsetY());
         assertEquals("r1", c.getResourceId());
         assertEquals(at(5, 9, 0), c.getStart(), "a move straight up changes the resource and not the time");
     }
@@ -425,9 +426,9 @@ class SchedulerTest extends UITestBase {
 
         int[] r = new int[4];
         grid.boxRect(grid.boxes().get(0), r);
-        int x = grid.headerW + r[0] + r[2] / 2 - grid.getOffX();
-        int y = grid.headerH + r[1] + r[3] / 2 - grid.getOffY();
-        drag(grid, x, y, grid.headerW + 2, y);
+        int x = grid.getHeaderWidth() + r[0] + r[2] / 2 - grid.getOffsetX();
+        int y = grid.getHeaderHeight() + r[1] + r[3] / 2 - grid.getOffsetY();
+        drag(grid, x, y, grid.getHeaderWidth() + 2, y);
         assertEquals("r1", a.getResourceId());
         assertEquals(at(5, 9, 0), a.getStart());
     }

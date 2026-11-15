@@ -38,6 +38,7 @@ import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
@@ -62,6 +63,9 @@ import java.util.Map;
 /// application `Renderer` callbacks from inside the `GLEventListener` hooks.
 class JavaSEGLDevice extends GraphicsDevice {
     private GL2ES2 gl;
+    // chromatic aberration, FXAA, god rays and the sun, for the composite
+    private final float[] postFx = new float[6];
+    private final float[] depthFx = new float[12];
 
     private final Map<String, Program> programs = new HashMap<String, Program>();
     private GpuCapabilities caps;
@@ -81,6 +85,9 @@ class JavaSEGLDevice extends GraphicsDevice {
         int aPosition;
         int aNormal;
         int aTexcoord;
+        int aJoints = -1;
+        int aWeights = -1;
+        int uJoints = -1;
         int uMvp;
         int uModel;
         int uNormalMatrix;
@@ -100,6 +107,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         int fbo;
         int tex;
         int depth;
+        boolean depthTex;
         int width;
         int height;
     }
@@ -116,6 +124,11 @@ class JavaSEGLDevice extends GraphicsDevice {
     private boolean inShadowPass;
     private boolean shadowReady;
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, and the cascade count and square size of the
+    // shadow pass in progress (the map is shadowCascades squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private int shadowCascades = 1;
+    private int shadowSize;
     private PostProcess activePost;
     private final int[] savedFbo = new int[1];
     private final int[] savedViewport = new int[4];
@@ -173,6 +186,13 @@ class JavaSEGLDevice extends GraphicsDevice {
         pixels.position(0);
         gl.glTexImage2D(GL2ES2.GL_TEXTURE_2D, 0, GL2ES2.GL_RGBA, w, h, 0,
                 GL2ES2.GL_RGBA, GL2ES2.GL_UNSIGNED_BYTE, pixels);
+        // no mipmaps are uploaded, so the default mipmapped minification would
+        // leave the texture incomplete (black) wherever nothing re-sets it --
+        // the post chain's colour LUT is bound without touching its filters
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MIN_FILTER, GL2ES2.GL_LINEAR);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, GL2ES2.GL_LINEAR);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_S, GL2ES2.GL_CLAMP_TO_EDGE);
+        gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_T, GL2ES2.GL_CLAMP_TO_EDGE);
         gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, 0);
         t.setHandle(new TexHandle(id));
         return t;
@@ -214,9 +234,21 @@ class JavaSEGLDevice extends GraphicsDevice {
         boolean shadowed = shadowReady && isShadowMapCurrent() && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         Program program = getProgram(material, fmt, env, shadowed);
+        drawWith(mesh, material, modelMatrix, program, cameraViewProjection(),
+                shadowed, false);
+    }
+
+    // One draw of a mesh through a program. vp is the camera's view projection,
+    // or the light's for a caster whose material needs its own depth program;
+    // a caster draws with depth on, no blending and both faces.
+    private void drawWith(Mesh mesh, Material material, float[] modelMatrix, Program program, float[] vp,
+            boolean shadowed, boolean caster) {
         if (program.handle == 0) {
             return;
         }
+        VertexBuffer vb = mesh.getVertices();
+        VertexFormat fmt = vb.getFormat();
+        Environment env = getEnvironment();
         gl.glUseProgram(program.handle);
 
         if (modelMatrix != null) {
@@ -225,7 +257,6 @@ class JavaSEGLDevice extends GraphicsDevice {
             Matrix4.setIdentity(model);
         }
         Camera cam = getCamera();
-        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         Matrix4.multiply(vp, model, mvp);
         float[] nm = Matrix4.normalMatrix(model);
         for (int i = 0; i < 16; i++) {
@@ -292,7 +323,14 @@ class JavaSEGLDevice extends GraphicsDevice {
             }
         }
 
-        applyRenderState(material.getRenderState());
+        if (caster) {
+            gl.glEnable(GL2ES2.GL_DEPTH_TEST);
+            gl.glDepthMask(true);
+            gl.glDisable(GL2ES2.GL_BLEND);
+            gl.glDisable(GL2ES2.GL_CULL_FACE);
+        } else {
+            applyRenderState(material.getRenderState());
+        }
 
         int vbo = uploadVertexBuffer(vb);
         gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, vbo);
@@ -300,6 +338,11 @@ class JavaSEGLDevice extends GraphicsDevice {
         bindAttribute(program.aPosition, fmt, VertexAttribute.Usage.POSITION, strideBytes);
         bindAttribute(program.aNormal, fmt, VertexAttribute.Usage.NORMAL, strideBytes);
         bindAttribute(program.aTexcoord, fmt, VertexAttribute.Usage.TEXCOORD, strideBytes);
+        bindAttribute(program.aJoints, fmt, VertexAttribute.Usage.JOINTS, strideBytes);
+        bindAttribute(program.aWeights, fmt, VertexAttribute.Usage.WEIGHTS, strideBytes);
+        if (program.uJoints >= 0 && material.isSkinned()) {
+            gl.glUniform4fv(program.uJoints, material.getJointCount() * 3, material.getJointRows(), 0);
+        }
 
         int glMode = toGlPrimitive(mesh.getPrimitiveType());
         if (mesh.isIndexed()) {
@@ -315,6 +358,8 @@ class JavaSEGLDevice extends GraphicsDevice {
         disableAttribute(program.aPosition);
         disableAttribute(program.aNormal);
         disableAttribute(program.aTexcoord);
+        disableAttribute(program.aJoints);
+        disableAttribute(program.aWeights);
         gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, 0);
     }
 
@@ -380,7 +425,7 @@ class JavaSEGLDevice extends GraphicsDevice {
             gl.glDisable(GL2ES2.GL_CULL_FACE);
         } else {
             gl.glEnable(GL2ES2.GL_CULL_FACE);
-            gl.glFrontFace(GL2ES2.GL_CCW);
+            gl.glFrontFace(inRenderTarget ? GL2ES2.GL_CW : GL2ES2.GL_CCW);
             gl.glCullFace(cull == RenderState.CullMode.FRONT
                     ? GL2ES2.GL_FRONT : GL2ES2.GL_BACK);
         }
@@ -485,6 +530,17 @@ class JavaSEGLDevice extends GraphicsDevice {
         return p;
     }
 
+    private Program getDepthProgram(Material material, VertexFormat fmt) {
+        String key = "depth|" + material.getShaderKey() + "|" + System.identityHashCode(fmt);
+        Program p = programs.get(key);
+        if (p == null) {
+            GlslShaderGenerator gen = GlslShaderGenerator.depthOnly(material, fmt);
+            p = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
+            programs.put(key, p);
+        }
+        return p;
+    }
+
     private Program buildProgram(String vertexSrc, String fragmentSrc) {
         int handle = linkProgram(vertexSrc, fragmentSrc);
         Program p = new Program();
@@ -493,6 +549,9 @@ class JavaSEGLDevice extends GraphicsDevice {
             p.aPosition = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_POSITION);
             p.aNormal = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_NORMAL);
             p.aTexcoord = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_TEXCOORD);
+            p.aJoints = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_JOINTS);
+            p.aWeights = gl.glGetAttribLocation(handle, GlslShaderGenerator.A_WEIGHTS);
+            p.uJoints = gl.glGetUniformLocation(handle, GlslShaderGenerator.U_JOINTS);
             p.uMvp = gl.glGetUniformLocation(handle, "u_mvp");
             p.uModel = gl.glGetUniformLocation(handle, "u_model");
             p.uNormalMatrix = gl.glGetUniformLocation(handle, "u_normalMatrix");
@@ -538,6 +597,13 @@ class JavaSEGLDevice extends GraphicsDevice {
         }
     }
 
+    private void uniform4(Program p, String name, float a, float b, float c, float d) {
+        int l = loc(p, name);
+        if (l >= 0) {
+            gl.glUniform4f(l, a, b, c, d);
+        }
+    }
+
     private void uniform3(Program p, String name, float a, float b, float c) {
         int l = loc(p, name);
         if (l >= 0) {
@@ -553,6 +619,77 @@ class JavaSEGLDevice extends GraphicsDevice {
             gl.glUniform1i(l, unit);
             gl.glActiveTexture(GL2ES2.GL_TEXTURE0);
         }
+    }
+
+
+    // custom shading uniform names, so a draw does not build strings
+    private static final String[] CU_NAMES = new String[ShaderMaterial.MAX_UNIFORMS];
+    private static final String[] CT_NAMES = new String[ShaderMaterial.MAX_TEXTURES];
+
+    static {
+        for (int i = 0; i < CU_NAMES.length; i++) {
+            CU_NAMES[i] = "u_cu[" + i + "]";
+        }
+        for (int i = 0; i < CT_NAMES.length; i++) {
+            CT_NAMES[i] = "u_ct" + i;
+        }
+    }
+
+    // Custom shading (Material.getShader()): the clock, the uniform array and
+    // the material's own textures on units 2 and up -- 0 is the base texture,
+    // 1 the shadow map.
+    private void applyShader(Program p, Material material) {
+        ShaderMaterial sm = material.getEffectiveShader();
+        if (sm == null) {
+            return;
+        }
+        uniform1(p, "u_time", getTime());
+        float[] v = sm.getUniformValues();
+        for (int i = 0; i < sm.getUniformCount(); i++) {
+            int l = loc(p, CU_NAMES[i]);
+            if (l >= 0) {
+                gl.glUniform4f(l, v[i * 4], v[i * 4 + 1], v[i * 4 + 2], v[i * 4 + 3]);
+            }
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            int l = loc(p, CT_NAMES[i]);
+            if (l >= 0 && t.getHandle() instanceof TexHandle) {
+                gl.glActiveTexture(GL2ES2.GL_TEXTURE0 + 2 + i);
+                gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
+                int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GL2ES2.GL_REPEAT : GL2ES2.GL_CLAMP_TO_EDGE;
+                int filter = t.getFilter() == Texture.Filter.NEAREST ? GL2ES2.GL_NEAREST : GL2ES2.GL_LINEAR;
+                gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_S, wrap);
+                gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_T, wrap);
+                gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MIN_FILTER, filter);
+                gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, filter);
+                gl.glUniform1i(l, 2 + i);
+            }
+        }
+        gl.glActiveTexture(GL2ES2.GL_TEXTURE0);
+    }
+
+    // Binds the environment map image based lighting reads (unit 6) when the
+    // program declares it.
+    private void applyEnvironmentMap(Program p) {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null) {
+            return;
+        }
+        int l = loc(p, "u_envMap");
+        if (l >= 0 && t.getHandle() instanceof TexHandle) {
+            gl.glActiveTexture(GL2ES2.GL_TEXTURE0 + 6);
+            gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
+            int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GL2ES2.GL_REPEAT : GL2ES2.GL_CLAMP_TO_EDGE;
+            int filter = t.getFilter() == Texture.Filter.NEAREST ? GL2ES2.GL_NEAREST : GL2ES2.GL_LINEAR;
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_S, wrap);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_T, wrap);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MIN_FILTER, filter);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, filter);
+            gl.glUniform1i(l, 6);
+        }
+        gl.glActiveTexture(GL2ES2.GL_TEXTURE0);
     }
 
     private void applyEnvironment(Program p, Material material, Environment env, boolean shadowed) {
@@ -573,14 +710,16 @@ class JavaSEGLDevice extends GraphicsDevice {
             }
         }
         uniformColor(p, "u_emissive", material.getEmissive());
+        applyShader(p, material);
+        applyEnvironmentMap(p);
         if (shadowed) {
             int l = loc(p, "u_shadowMatrix");
             if (l >= 0) {
                 gl.glUniformMatrix4fv(l, 1, false, shadowMatrix, 0);
             }
             Light light = getLight();
-            uniform3(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
-                    1f / shadowTarget.width);
+            uniform4(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
+                    light.getShadowSoftness() / shadowTarget.height, light.getShadowCascadeRatio());
             sampler(p, "u_shadowMap", 1, shadowTarget.tex);
         }
     }
@@ -616,6 +755,27 @@ class JavaSEGLDevice extends GraphicsDevice {
         gl.glFramebufferTexture2D(GL2ES2.GL_FRAMEBUFFER, GL2ES2.GL_COLOR_ATTACHMENT0,
                 GL2ES2.GL_TEXTURE_2D, n.tex, 0);
         if (depth) {
+            // a depth texture, so the composite can read the scene's depth
+            // for ambient occlusion, depth of field and outlines
+            gl.glGenTextures(1, ids, 0);
+            n.depth = ids[0];
+            gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, n.depth);
+            gl.glTexImage2D(GL2ES2.GL_TEXTURE_2D, 0, GL2ES2.GL_DEPTH_COMPONENT, w, h, 0,
+                    GL2ES2.GL_DEPTH_COMPONENT, GL2ES2.GL_UNSIGNED_INT, null);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MIN_FILTER, GL2ES2.GL_NEAREST);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_MAG_FILTER, GL2ES2.GL_NEAREST);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_S, GL2ES2.GL_CLAMP_TO_EDGE);
+            gl.glTexParameteri(GL2ES2.GL_TEXTURE_2D, GL2ES2.GL_TEXTURE_WRAP_T, GL2ES2.GL_CLAMP_TO_EDGE);
+            gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, 0);
+            gl.glFramebufferTexture2D(GL2ES2.GL_FRAMEBUFFER, GL2ES2.GL_DEPTH_ATTACHMENT,
+                    GL2ES2.GL_TEXTURE_2D, n.depth, 0);
+            if (gl.glCheckFramebufferStatus(GL2ES2.GL_FRAMEBUFFER) == GL2ES2.GL_FRAMEBUFFER_COMPLETE) {
+                n.depthTex = true;
+                return n;
+            }
+            gl.glFramebufferTexture2D(GL2ES2.GL_FRAMEBUFFER, GL2ES2.GL_DEPTH_ATTACHMENT,
+                    GL2ES2.GL_TEXTURE_2D, 0, 0);
+            gl.glDeleteTextures(1, new int[]{n.depth}, 0);
             gl.glGenRenderbuffers(1, ids, 0);
             n.depth = ids[0];
             gl.glBindRenderbuffer(GL2ES2.GL_RENDERBUFFER, n.depth);
@@ -633,7 +793,9 @@ class JavaSEGLDevice extends GraphicsDevice {
         }
         gl.glDeleteFramebuffers(1, new int[]{t.fbo}, 0);
         gl.glDeleteTextures(1, new int[]{t.tex}, 0);
-        if (t.depth != 0) {
+        if (t.depthTex) {
+            gl.glDeleteTextures(1, new int[]{t.depth}, 0);
+        } else if (t.depth != 0) {
             gl.glDeleteRenderbuffers(1, new int[]{t.depth}, 0);
         }
     }
@@ -664,14 +826,17 @@ class JavaSEGLDevice extends GraphicsDevice {
         saveTarget();
         int size = light.getShadowMapSize();
         // packed depth must not be interpolated between texels
-        shadowTarget = target(shadowTarget, size, size, true, GL2ES2.GL_NEAREST);
+        shadowCascades = light.getShadowCascades();
+        shadowSize = size;
+        shadowTarget = target(shadowTarget, size * shadowCascades, size, true, GL2ES2.GL_NEAREST);
         gl.glBindFramebuffer(GL2ES2.GL_FRAMEBUFFER, shadowTarget.fbo);
-        gl.glViewport(0, 0, size, size);
+        gl.glViewport(0, 0, size * shadowCascades, size);
         gl.glClearColor(1f, 1f, 1f, 1f);
         gl.glClearDepthf(1f);
         gl.glDepthMask(true);
         gl.glClear(GL2ES2.GL_COLOR_BUFFER_BIT | GL2ES2.GL_DEPTH_BUFFER_BIT);
-        light.computeShadowMatrix(shadowMatrix);
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -686,20 +851,38 @@ class JavaSEGLDevice extends GraphicsDevice {
         restoreTarget();
     }
 
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        if (shadowCascades < 2) {
+            drawShadowCascade(mesh, material, modelMatrix, shadowMatrix);
+            return;
+        }
+        gl.glViewport(0, 0, shadowSize, shadowSize);
+        drawShadowCascade(mesh, material, modelMatrix, shadowMatrix);
+        gl.glViewport(shadowSize, 0, shadowSize, shadowSize);
+        drawShadowCascade(mesh, material, modelMatrix, farShadowMatrix);
+        gl.glViewport(0, 0, shadowSize * 2, shadowSize);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix, float[] lightMatrix) {
         if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
             return;
         }
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawWith(mesh, material, modelMatrix, getDepthProgram(material, fmt), lightMatrix, false, true);
+            return;
+        }
         gl.glUseProgram(shadowProgram.handle);
         if (modelMatrix != null) {
             Matrix4.copy(modelMatrix, model);
         } else {
             Matrix4.setIdentity(model);
         }
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(lightMatrix, model, mvp);
         gl.glUniformMatrix4fv(shadowProgram.uMvp, 1, false, mvp, 0);
         gl.glEnable(GL2ES2.GL_DEPTH_TEST);
         gl.glDepthMask(true);
@@ -722,7 +905,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         gl.glBindBuffer(GL2ES2.GL_ARRAY_BUFFER, 0);
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (gl == null || effects == null) {
             return false;
         }
@@ -752,7 +935,7 @@ class JavaSEGLDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;
@@ -797,6 +980,26 @@ class JavaSEGLDevice extends GraphicsDevice {
         uniform1(c, "u_grain", pp.getGrain());
         uniform1(c, "u_time", timeSeconds);
         uniform2(c, "u_resolution", sceneTarget.width, sceneTarget.height);
+        packPostEffects(pp, postFx, 0);
+        uniform3(c, "u_fx", postFx[0], postFx[1], postFx[2]);
+        uniform2(c, "u_sun", postFx[3], postFx[4]);
+        packDepthEffects(pp, depthFx, 0);
+        if (!sceneTarget.depthTex) {
+            depthFx[0] = 0f;
+            depthFx[3] = 0f;
+            depthFx[4] = 0f;
+        }
+        sampler(c, "u_depth", 2, sceneTarget.depthTex ? sceneTarget.depth : 0);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof TexHandle) {
+            sampler(c, "u_lut", 3, ((TexHandle) lut.getHandle()).id);
+        } else {
+            depthFx[7] = 0f;
+            sampler(c, "u_lut", 3, 0);
+        }
+        uniform4(c, "u_dfx", depthFx[0], depthFx[1], depthFx[2], depthFx[3]);
+        uniform4(c, "u_dfx2", depthFx[4], depthFx[5], depthFx[6], depthFx[7]);
+        uniform3(c, "u_ocol", depthFx[8], depthFx[9], depthFx[10]);
         drawQuad(c);
         gl.glDepthMask(true);
     }
@@ -917,7 +1120,80 @@ class JavaSEGLDevice extends GraphicsDevice {
         }
     }
 
+
+    // Render targets: each is a colour texture with a depth buffer of its own.
+    // GL stores a target's rows bottom up while an uploaded image starts at
+    // the top, so draws into a target flip clip space Y (and with it the
+    // winding) to leave the texture upright, as Metal and Direct3D have it.
+    private final Map<Texture, Target> renderTargets = new HashMap<Texture, Target>();
+    private boolean inRenderTarget;
+    private final int[] rtSavedFbo = new int[1];
+    private final int[] rtSavedViewport = new int[4];
+    private final float[] flippedVp = new float[16];
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
+
+    public Texture createRenderTarget(int width, int height) {
+        if (gl == null || width <= 0 || height <= 0) {
+            return null;
+        }
+        // creating the framebuffer binds it; drawing stays where it was
+        int[] bound = new int[1];
+        gl.glGetIntegerv(GL2ES2.GL_FRAMEBUFFER_BINDING, bound, 0);
+        Target t = target(null, width, height, true);
+        gl.glBindFramebuffer(GL2ES2.GL_FRAMEBUFFER, bound[0]);
+        Texture tex = new Texture(width, height);
+        tex.setHandle(new TexHandle(t.tex));
+        renderTargets.put(tex, t);
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        Target t = target == null ? null : renderTargets.get(target);
+        if (t == null || inRenderTarget || inShadowPass || activePost != null) {
+            return false;
+        }
+        gl.glGetIntegerv(GL2ES2.GL_FRAMEBUFFER_BINDING, rtSavedFbo, 0);
+        gl.glGetIntegerv(GL2ES2.GL_VIEWPORT, rtSavedViewport, 0);
+        gl.glBindFramebuffer(GL2ES2.GL_FRAMEBUFFER, t.fbo);
+        gl.glViewport(0, 0, t.width, t.height);
+        inRenderTarget = true;
+        clear(clearArgb, true, true);
+        return true;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        gl.glBindFramebuffer(GL2ES2.GL_FRAMEBUFFER, rtSavedFbo[0]);
+        gl.glViewport(rtSavedViewport[0], rtSavedViewport[1], rtSavedViewport[2], rtSavedViewport[3]);
+    }
+
+    // the camera's view projection, flipped in Y inside a render target
+    private float[] cameraViewProjection() {
+        Camera cam = getCamera();
+        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
+        if (!inRenderTarget) {
+            return vp;
+        }
+        for (int i = 0; i < 16; i++) {
+            flippedVp[i] = (i & 3) == 1 ? -vp[i] : vp[i];
+        }
+        return flippedVp;
+    }
+
     public void dispose(Texture texture) {
+        Target rt = renderTargets.remove(texture);
+        if (rt != null) {
+            releaseTarget(rt);
+            texture.setHandle(null);
+            return;
+        }
         TexHandle h = (TexHandle) texture.getHandle();
         if (h != null && gl != null) {
             gl.glDeleteTextures(1, new int[]{h.id}, 0);

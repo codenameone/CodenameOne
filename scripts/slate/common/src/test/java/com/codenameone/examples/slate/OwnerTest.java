@@ -18,9 +18,12 @@
  */
 package com.codenameone.examples.slate;
 
+import com.codename1.scheduling.GanttTask;
+import com.codename1.ui.scheduler.Gantt;
 import com.codenameone.examples.slate.ui.Timeline;
 
-/// The owner opens the dashboard, the day board and the booking rules, and
+/// The owner opens the dashboard, the day board, the staffing plan and the
+/// booking rules, and
 /// previews what tomorrow looks like under them without saving anything.
 public class OwnerTest extends E2e {
     @Override
@@ -35,6 +38,13 @@ public class OwnerTest extends E2e {
                 && ((Timeline) findByName("board-grid")).lanes().size() >= 2
                 && booked((Timeline) findByName("board-grid")), 20000, "the day's bookings on the board");
         shot("owner-board");
+        back();
+        click("open-staffing");
+        waitForForm("Staffing");
+        until(() -> findByName("staffing-gantt") instanceof Gantt
+                && staffed((Gantt) findByName("staffing-gantt")), 20000,
+                "the week's shifts and their bookings on the staffing plan");
+        shot("owner-staffing");
         back();
         click("menu-open");
         click("menu-policy");
@@ -53,6 +63,19 @@ public class OwnerTest extends E2e {
         for (int iter = 0; iter < t.lanes().size(); iter++) {
             if (t.lanes().get(iter).bookings() > 0) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    // The demo books every provider today, so some shift this week is partly
+    // booked once the plan has loaded.
+    static boolean staffed(Gantt g) {
+        for (GanttTask person : g.getModel().getTasks()) {
+            for (GanttTask shift : person.getChildren()) {
+                if (shift.getPercentComplete() > 0) {
+                    return true;
+                }
             }
         }
         return false;

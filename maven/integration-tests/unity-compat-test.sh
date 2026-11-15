@@ -437,11 +437,11 @@ PS="$WORKDIR/scene2d-parparvm"
 mkdir -p "$PS/classes" "$PS/box/com/codename1/gaming/physics"
 # Of the core, only the physics engine: it is plain Java, and the rest of the
 # core needs a port under it. That is also why the classes that reach it --
-# the view and the other UnityGame* classes beside it, and the application
-# shell -- stay out.
+# the view and the other UnityGame* classes beside it, UnityGraphAudio (the
+# audio graph output the view installs), and the application shell -- stay out.
 cp -R "$CORE/com/codename1/gaming/physics/box2d" "$PS/box/com/codename1/gaming/physics/"
 find "$RUNTIME_SRC" "$SC/gen" "$SAMPLES/scene2d/java" -name '*.java' -not -name 'UnityGame*.java' \
-  -not -path '*/com/codename1/unitycompat/app/*' > "$PS/sources"
+  -not -name 'UnityGraphAudio.java' -not -path '*/com/codename1/unitycompat/app/*' > "$PS/sources"
 run_logged "$PS/javac.log" "scene2d: javac of the runtime and scene against vm/JavaAPI" \
   javac -nowarn -source 8 -target 8 -bootclasspath "$API" -Xlint:-options -cp "$SC/app:$PS/box" -d "$PS/classes" "@$PS/sources"
 cp -R "$SC/app/." "$PS/classes/"

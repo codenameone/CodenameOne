@@ -3043,6 +3043,73 @@ public class OrmAnnotationProcessorTest {
     }
 
     @Test
+    public void sortKeyNamesOneColumnOfATwoColumnIdentifier() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("sortkey.Message","package sortkey; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity public class Message { @Id(autoIncrement=false) public String channel; @Id(autoIncrement=false) @SortKey public long sentAt; public String text; }");
+        sources.put("sortkey.Plain","package sortkey; import com.codename1.annotations.*; @Entity public class Plain { @Id public long id; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                com.codename1.impl.orm.EntityModel message=(com.codename1.impl.orm.EntityModel)loader.loadClass("sortkey.Message"+suffix).newInstance();
+                org.junit.Assert.assertEquals("sentAt",message.attributes()[message.sortKeyIndex()].field);
+                com.codename1.impl.orm.EntityModel plain=(com.codename1.impl.orm.EntityModel)loader.loadClass("sortkey.Plain"+suffix).newInstance();
+                org.junit.Assert.assertEquals(-1,plain.sortKeyIndex());
+            }
+        }
+    }
+
+    @Test
+    public void sortKeyIsRejectedOffATwoColumnIdentifier() throws Exception {
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("badsort.Single","package badsort; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity public class Single { @Id(autoIncrement=false) @SortKey public long id; }");
+        rejectsMappingForBothRuntimes(sources,"@SortKey requires an identifier of exactly two columns");
+        sources.clear();
+        sources.put("badsort.NotId","package badsort; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity public class NotId { @Id(autoIncrement=false) public String a; @Id(autoIncrement=false) public long b; @SortKey public long c; }");
+        rejectsMappingForBothRuntimes(sources,"@SortKey marks an identifier column");
+    }
+
+    @Test
+    public void searchableNamesItsIndexAndFields() throws Exception {
+        File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("search.Product","package search; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity @Searchable(index=\"products\") public class Product { @Id public long id; @SearchField public String name; public String secret; }");
+        sources.put("search.Note","package search; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity(table=\"Field_Notes\") @Searchable public class Note { @Id public long id; public String body; }");
+        sources.put("search.Plain","package search; import com.codename1.annotations.*; @Entity public class Plain { @Id public long id; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                com.codename1.impl.orm.EntityModel product=(com.codename1.impl.orm.EntityModel)loader.loadClass("search.Product"+suffix).newInstance();
+                org.junit.Assert.assertEquals("products",product.searchIndex());
+                for(int i=0;i<product.attributes().length;i++) {
+                    String field=product.attributes()[i].field;
+                    org.junit.Assert.assertEquals(field,!"secret".equals(field),product.searchField(i));
+                }
+                com.codename1.impl.orm.EntityModel note=(com.codename1.impl.orm.EntityModel)loader.loadClass("search.Note"+suffix).newInstance();
+                org.junit.Assert.assertEquals("field_notes",note.searchIndex());
+                org.junit.Assert.assertTrue(note.searchField(1));
+                org.junit.Assert.assertNull(((com.codename1.impl.orm.EntityModel)loader.loadClass("search.Plain"+suffix).newInstance()).searchIndex());
+            }
+        }
+    }
+
+    @Test
+    public void searchableRejectsABadIndexAndAStraySearchField() throws Exception {
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("badsearch.Upper","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity @Searchable(index=\"Products\") public class Upper { @Id public long id; }");
+        rejectsMappingForBothRuntimes(sources,"@Searchable index 'Products'");
+        sources.clear();
+        sources.put("badsearch.Stray","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity public class Stray { @Id public long id; @SearchField public String name; }");
+        rejectsMappingForBothRuntimes(sources,"@SearchField name needs @Searchable");
+        sources.clear();
+        sources.put("badsearch.Money","package badsearch; import com.codename1.annotations.db.*; @Embeddable public class Money { public long cents; public String currency; }");
+        sources.put("badsearch.Order","package badsearch; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import com.codename1.backend.annotations.Searchable; import com.codename1.backend.annotations.SearchField; import com.codename1.backend.annotations.SortKey; @Entity @Searchable public class Order { @Id public long id; @Embedded @SearchField public Money total; }");
+        rejectsMappingForBothRuntimes(sources,"@SearchField goes on the fields of the @Embeddable");
+    }
+
+    @Test
     public void siblingOnlyCollectionsDoNotDirtyUnchangedEntities() throws Exception {
         File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("cleansibling.Base","package cleansibling; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity(table=\"clean_sibling\") @Inheritance public abstract class Base { @Id public long id; @Version public long version; @DbTransient public int updates; @PostUpdate public void updated() { updates++; } }");
