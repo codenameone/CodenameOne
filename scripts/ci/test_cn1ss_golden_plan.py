@@ -68,5 +68,30 @@ class GoldenPlanTest(unittest.TestCase):
         self.assertEqual(plan.missing(from_git=True), [])
 
 
+class CollectTest(unittest.TestCase):
+    def test_filters_keeps_existing_and_compares_shared_dirs(self):
+        spec = importlib.util.spec_from_file_location("collect", os.path.join(HERE, "golden-capture-collect.py"))
+        col = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(col)
+        classes = {"FooScreenshotTest": ("BaseTest", "")}
+        with tempfile.TemporaryDirectory() as t:
+            dl, dest = os.path.join(t, "dl"), os.path.join(t, "dest")
+
+            def put(run, art, name, data):
+                d = os.path.join(dl, run, art, "g")
+                os.makedirs(d, exist_ok=True)
+                with open(os.path.join(d, name), "w") as fh:
+                    fh.write(data)
+            put("1", "cn1ss-capture-a", "Foo_dark.png", "x")
+            put("1", "cn1ss-capture-a", "Other.png", "x")
+            put("2", "cn1ss-capture-b", "Foo_dark.png", "x")
+            os.makedirs(os.path.join(dest, "g"))
+            self.assertTrue(col.collect(dl, dest, ["FooScreenshotTest"], classes))
+            self.assertEqual(sorted(os.listdir(os.path.join(dest, "g"))), ["Foo_dark.png"])
+            put("2", "cn1ss-capture-b", "Foo_dark.png", "y")
+            os.remove(os.path.join(dest, "g", "Foo_dark.png"))
+            self.assertFalse(col.collect(dl, dest, ["FooScreenshotTest"], classes))
+
+
 if __name__ == "__main__":
     unittest.main()

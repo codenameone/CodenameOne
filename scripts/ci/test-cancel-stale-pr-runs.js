@@ -125,6 +125,6 @@ test('golden capture cancels the current head too, but never itself', async () =
   };
   const n = await cancelForCapture({github, context: {repo: {owner: 'o', repo: 'r'}, payload: {pull_request: pr}},
     core: {info: () => {}}, keepRunId: 12});
-  assert.equal(n, 1);
+  assert.deepEqual(n, [11]);
   assert.deepEqual(cancelled, [11]);
 });

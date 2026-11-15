@@ -3,7 +3,7 @@ name: Golden plan
 # The first job of every hellocodenameone screenshot workflow. It reads the
 # suite's source (scripts/ci/cn1ss-golden-plan.py) and answers `run`:
 #
-#   false  this is a same-repository pull request whose suite has a screenshot
+#   false  (and this job fails) this is a same-repository pull request whose suite has a screenshot
 #          test with no golden anywhere. Every job of the calling workflow is
 #          gated on `run` and skips; golden-capture.yml runs the suite in
 #          capture mode instead and pushes the goldens, which starts CI again.
@@ -55,6 +55,11 @@ jobs:
           run=true
           if [ -n "$missing" ] && [ -z "$CAPTURE" ] && [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" = "$REPO" ]; then
             run=false
-            echo "::notice::No goldens yet for $missing; skipping this workflow, Golden capture records them."
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" = false ]; then
+            # Red, not skipped: a skipped required check counts as passing, and
+            # this PR has not passed anything. The goldens push re-runs it.
+            echo "::error::No goldens yet for $missing. Golden capture is recording them and will push them to this branch."
+            exit 1
+          fi

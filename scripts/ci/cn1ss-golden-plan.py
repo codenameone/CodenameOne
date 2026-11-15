@@ -30,6 +30,18 @@ allocated. It follows the suite's naming conventions:
     set is complete, so presence anywhere is the reliable signal and absence
     everywhere is the only thing that means "never captured".
 
+Two limits, both deliberate:
+
+  * Presence anywhere means an author who commits a new test's golden for ONE
+    platform (from a local run) turns capture off for it; the other legs then
+    fail on the PR as they always did. Per-directory checking would need a
+    hand-kept table of which tests each port skips, which is exactly the
+    knowledge the source does not state.
+  * A stripped name matches with a separator after it, so a new FooTest is
+    "covered" by an older Foo_dark.png of a different test. Two tests that
+    share a stem would also share golden files at run time, so that clash is
+    already a bug of its own.
+
 The test of this script is that the current tree reports nothing; see
 test_cn1ss_golden_plan.py.
 """

@@ -121,6 +121,6 @@ async function cancelForCapture({github, context, core, keepRunId}) {
       if (error.status !== 409) throw error;
     }
   }
-  return runs.size;
+  return [...runs.keys()];
 }
 module.exports = {belongsTo, stale, cancelStale, cancelForCapture};

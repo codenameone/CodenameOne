@@ -4,7 +4,7 @@
 #
 #   golden-capture.sh dispatch REF TESTS RUNS_FILE   start every workflow, record run ids
 #   golden-capture.sh wait RUNS_FILE                 block until all have completed
-#   golden-capture.sh collect RUNS_FILE DEST         merge cn1ss-capture-* artifacts into DEST
+#   golden-capture.sh collect RUNS_FILE DEST TESTS   merge cn1ss-capture-* artifacts into DEST
 #
 # Needs GH_TOKEN (actions: write) and GITHUB_REPOSITORY. Each dispatch is a run
 # of its own, so the workflows' concurrency groups and fixed artifact names
@@ -26,17 +26,21 @@ WORKFLOWS=(
 log() { echo "[golden-capture] $*" >&2; }
 
 dispatch() {
-  local ref="$1" tests="$2" runs_file="$3" wf since id tries
+  local ref="$1" tests="$2" runs_file="$3" wf since seen id tries
   : > "$runs_file"
   for wf in "${WORKFLOWS[@]}"; do
-    since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    # A minute early: the runner's clock is not GitHub's. Runs that already
+    # existed are excluded by id instead.
+    since="$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)"
+    seen="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
+              --event workflow_dispatch --limit 20 --json databaseId --jq '[.[].databaseId] | join(",")')"
     gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"
     # The dispatch API answers without a run id; find the run it created.
     id=""
     for tries in $(seq 1 30); do
       id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
               --event workflow_dispatch --limit 5 --json databaseId,createdAt \
-              --jq "[.[] | select(.createdAt >= \"$since\")] | .[0].databaseId // empty")"
+              --jq "[.[] | select(.createdAt >= \"$since\") | select(.databaseId | tostring | IN(\"$seen\" | split(\",\")[]) | not)] | .[0].databaseId // empty")"
       [ -n "$id" ] && break
       sleep 10
     done
@@ -64,7 +68,7 @@ wait_all() {
 }
 
 collect() {
-  local runs_file="$1" dest="$2" wf id conclusion failed=0 dl
+  local runs_file="$1" dest="$2" tests="$3" wf id conclusion failed=0 dl
   dl="$(mktemp -d)"
   while read -r wf id; do
     conclusion="$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)"
@@ -73,32 +77,18 @@ collect() {
     gh run download "$id" --repo "$GITHUB_REPOSITORY" -p 'cn1ss-capture-*' -D "$dl/$id" 2>/dev/null \
       || log "$wf run $id uploaded no capture"
   done < "$runs_file"
-  # Each artifact holds goldens at their repository paths. Never overwrite a
-  # golden the branch already has, and keep the first capture when two legs
-  # share a directory (Windows x64 and arm64 do).
-  python3 - "$dl" "$dest" <<'PY'
-import os, shutil, sys
-dl, dest = sys.argv[1], sys.argv[2]
-for run in sorted(os.listdir(dl)):
-    for art in sorted(os.listdir(os.path.join(dl, run))):
-        base = os.path.join(dl, run, art)
-        for d, _, files in os.walk(base):
-            for f in sorted(files):
-                rel = os.path.relpath(os.path.join(d, f), base)
-                target = os.path.join(dest, rel)
-                if os.path.exists(target):
-                    print("[golden-capture] kept existing %s (%s)" % (rel, art), file=sys.stderr)
-                    continue
-                os.makedirs(os.path.dirname(target), exist_ok=True)
-                shutil.copyfile(os.path.join(d, f), target)
-                print("[golden-capture] added %s (%s)" % (rel, art), file=sys.stderr)
-PY
+  # Each artifact holds goldens at their repository paths. Only images of the
+  # tests being captured are taken: a capture run exports every image without
+  # a golden, and an existing test missing one on some leg is not this
+  # commit's business. A golden the branch already has is never overwritten,
+  # and two legs that share a directory (Windows x64 and arm64) must agree.
+  python3 "$(dirname "$0")/golden-capture-collect.py" "$dl" "$dest" "$tests" || failed=1
   return "$failed"
 }
 
 case "${1:-}" in
   dispatch) dispatch "$2" "$3" "$4" ;;
   wait) wait_all "$2" ;;
-  collect) collect "$2" "$3" ;;
+  collect) collect "$2" "$3" "$4" ;;
   *) echo "usage: $0 dispatch|wait|collect ..." >&2; exit 2 ;;
 esac
