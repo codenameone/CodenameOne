@@ -1,0 +1,276 @@
+name: Brickyard (game platform sample)
+
+# scripts/brickyard is a user-generated-content game platform: players play
+# experiences built from Luau scripts and place files, creators build and
+# publish them in an in-app studio, admins moderate. Its engine is two
+# framework modules -- maven/luau-runtime (a pure-Java Luau interpreter) and
+# maven/rbx-compat (the engine API, place file I/O, 3D, physics and
+# multiplayer replication over it) -- and the project itself has a `shared`
+# module of transfer objects and @RestClient contracts, the Codename One
+# client (`common`) and a Codename One Backend.
+#
+# Checked here:
+#
+#   engine            both engine modules' tests: the Luau conformance
+#                     suite, the five starter templates played headless,
+#                     place round trips, replication between a server and
+#                     two clients
+#   backend           the server's tests on the JVM, on in-memory SQLite
+#   backend-database  the same tests on PostgreSQL and MySQL
+#   app               the client compiles and its unit tests compile
+#
+# The engine modules' static analysis (SpotBugs, PMD, Checkstyle) and the
+# cast-semantics check run in pr.yml with the rest of the framework.
+#
+# Not here yet: the server is not compiled by ParparVM (rbx-compat needs the
+# client core at run time, which a native backend does not have), and there
+# is no simulator or device leg, because the project has no javase module.
+
+on:
+  # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
+  # fails), and on a pull request only when this workflow's own tree changes.
+  pull_request:
+    paths:
+      - 'scripts/brickyard/**'
+      - 'maven/luau-runtime/**'
+      - 'maven/rbx-compat/**'
+      - '.github/workflows/brickyard.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '11 0 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: Engine tests (Luau runtime and engine API)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+
+      - name: Test both engine modules
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core -am install -DskipTests \
+            -Plocal-dev-javase -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+          mvn -B -pl luau-runtime,rbx-compat install \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          RETRY_ONLY_MATCHING: transient
+
+      - name: Upload the test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: brickyard-engine-tests
+          path: |
+            maven/luau-runtime/target/surefire-reports/**
+            maven/rbx-compat/target/surefire-reports/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  backend:
+    name: Server tests (JVM)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Save JDK 8 Path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Save JDK 17 Path
+        run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Install the framework, the engine, the backend runtime and the plugin
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
+            -pl core,backend,backend-test,codenameone-maven-plugin,luau-runtime,rbx-compat \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          RETRY_ONLY_MATCHING: transient
+
+      - name: Run the server tests
+        working-directory: scripts/brickyard
+        run: |
+          mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+
+      - name: Check that the tests reported
+        working-directory: scripts/brickyard/backend/target/surefire-reports
+        run: |
+          n=$(find . -maxdepth 1 -name 'TEST-*.xml' | wc -l)
+          echo "reports: $n"
+          [ "$n" -gt 0 ] || { echo "::error::the server tests produced no reports"; exit 1; }
+
+      - name: Upload the test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: brickyard-backend-tests
+          path: scripts/brickyard/backend/target/surefire-reports/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  backend-database:
+    name: Server tests on ${{ matrix.database }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # The backend job runs on in-memory SQLite, which accepts any declared
+    # column type for any value. PostgreSQL and MySQL are what a deployment
+    # runs on, and where the ORM's schema validation refuses a mapping that
+    # disagrees with its migration.
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [postgresql, mysql]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cn1
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: cn1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cn1" --health-interval 5s
+          --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Start MySQL
+        if: matrix.database == 'mysql'
+        run: |
+          sudo systemctl start mysql.service
+          sudo mysql -uroot -proot -e "CREATE USER 'cn1'@'%' IDENTIFIED WITH mysql_native_password BY 'secret'; GRANT ALL ON *.* TO 'cn1'@'%'; CREATE DATABASE cn1;"
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Save JDK 8 Path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Save JDK 17 Path
+        run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Install the framework, the engine, the backend runtime and the plugin
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
+            -pl core,backend,backend-test,codenameone-maven-plugin,luau-runtime,rbx-compat \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          RETRY_ONLY_MATCHING: transient
+
+      - name: Run the server tests on ${{ matrix.database }}
+        run: |
+          if [ "${{ matrix.database }}" = mysql ]; then
+            export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+          else
+            export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+          fi
+          scripts/ci/sample-server-tests-on-database.sh scripts/brickyard \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
+
+      - name: Upload the test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: brickyard-backend-${{ matrix.database }}-tests
+          path: scripts/brickyard/backend/target/surefire-reports/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  app:
+    name: Client compiles
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Save JDK 8 Path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Save JDK 17 Path
+        run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Install the framework, the engine and the plugin
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
+            -pl core,css-compiler,codenameone-maven-plugin,backend,luau-runtime,rbx-compat \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          RETRY_ONLY_MATCHING: transient
+
+      - name: Compile the client and its tests
+        working-directory: scripts/brickyard
+        run: |
+          mvn -B -pl common -am test-compile -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
