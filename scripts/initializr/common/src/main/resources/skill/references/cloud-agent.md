@@ -43,9 +43,9 @@ the developer's approval:
 2. Open `approvalUrl` in the developer's browser (`open` on macOS, `xdg-open` on Linux,
    `start` on Windows) and tell them, in one sentence, what you are asking for and why. The page
    shows the exact method, path and body (secrets masked) with Allow and Deny.
-3. Call `await_approval` with `approvalId`. It waits up to 20 seconds per call; call it again
+3. Call `await_approval` with `approvalId`. It waits up to a minute per call; keep calling it
    while the status is pending. On Allow it runs that exact request once and returns its result.
-   On Deny, stop and ask the developer how to proceed. Approvals expire after 15 minutes.
+   On Deny, stop and ask the developer how to proceed. A request stays open for 24 hours: if the developer is away or may be looking at another window, remind them or open the link again, and keep waiting.
 
 Do not loop a refused call: retrying the same request returns the same pending approval.
 
