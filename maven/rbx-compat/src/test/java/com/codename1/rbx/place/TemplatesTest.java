@@ -82,10 +82,10 @@ class TemplatesTest {
     }
 
     /// A character dropped onto a kill brick dies on it and its body stays
-    /// on the surface. It once hovered over the obby's lava pool, standing on
+    /// on the surface. It once hovered over the obby's first pool, standing on
     /// a pad 11 studs away whose side-turned axis was never bounds-checked.
     @org.junit.jupiter.api.Test
-    void aBodyDroppedOnLavaDiesAndStaysOnIt() throws IOException {
+    void aBodyDroppedInThePoolDiesAndStaysOnIt() throws IOException {
         final List<String> out = new ArrayList<String>();
         Engine e = new Engine(Engine.SOLO);
         e.setPhysics(new RigidBodies());
@@ -102,7 +102,7 @@ class TemplatesTest {
         s.put("Source", "local P = game:GetService('Players')\n"
                 + "task.wait(1)\n"
                 + "local c = P:GetPlayers()[1].Character\n"
-                + "local lava = workspace:FindFirstChild('Lava1', true)\n"
+                + "local lava = workspace:FindFirstChild('Pool1', true)\n"
                 + "c:PivotTo(CFrame.new(lava.Position + Vector3.new(9, 6, 0)))\n"
                 + "local rp = RaycastParams.new() rp.FilterDescendantsInstances = {c} rp.FilterType = Enum.RaycastFilterType.Exclude\n"
                 + "local r = workspace:Raycast(c.HumanoidRootPart.Position, Vector3.new(0, -50, 0), rp)\n"
@@ -125,9 +125,9 @@ class TemplatesTest {
         assertTrue(line != null, all);
         // A raycast that hits reports its part and distance: building the
         // result once cast the hit's material to a distance and threw.
-        assertTrue(all.contains("HIT Lava1 5"), all);
+        assertTrue(all.contains("HIT Pool1 5"), all);
         String[] f = line.substring(line.indexOf("DROP")).split(" ");
-        assertTrue(Double.parseDouble(f[1]) == 0, "still alive on the lava: " + line);
+        assertTrue(Double.parseDouble(f[1]) == 0, "still alive in the pool: " + line);
         assertTrue(Double.parseDouble(f[2]) >= Double.parseDouble(f[3]), "sank through the lava: " + line);
     }
 

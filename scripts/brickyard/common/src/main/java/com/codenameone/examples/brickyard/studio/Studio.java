@@ -20,6 +20,8 @@ package com.codenameone.examples.brickyard.studio;
 
 import com.codename1.components.InteractionDialog;
 import com.codename1.components.SpanLabel;
+import com.codename1.mcp.MCPClientDescriptor;
+import com.codename1.mcp.MCPClientRegistrar;
 import com.codename1.rbx.AgentMcp;
 import com.codename1.rbx.AgentTools;
 import com.codename1.rbx.Engine;
@@ -237,7 +239,7 @@ public final class Studio implements AgentTools.Studio {
                 exportPlace();
             }
         });
-        form.getToolbar().addCommandToOverflowMenu(new Command("AI agent mode") {
+        form.getToolbar().addCommandToOverflowMenu(new Command("Connect AI agent") {
             @Override
             public void actionPerformed(ActionEvent evt) {
                 agentMode();
@@ -363,7 +365,7 @@ public final class Studio implements AgentTools.Studio {
     }
 
     /// Grows `b` (min xyz, max xyz) by every part under `i`. The whole place
-    /// skips parts larger than 400 studs a side -- a lava sea or a baseplate
+    /// skips parts larger than 400 studs a side -- a sea or a baseplate
     /// would otherwise frame the course as a speck -- and parts tagged
     /// Scenery.
     private static void bounds(Instance i, double[] b, boolean skipHuge) {
@@ -394,22 +396,65 @@ public final class Studio implements AgentTools.Studio {
         addPart("Block");
     }
 
-    /// Inserts an anchored part of `shape` (Block, Ball or Cylinder) beside
-    /// the spawn, each one a step along from the last so they do not stack.
-    void addPart(String shape) {
+    /// Where the next insert goes: beside the spawn, each one a step along
+    /// from the last so they do not stack, or at the viewport's pivot.
+    private Vector3 insertPoint(double lift) {
         inserted++;
         Vector3 at = new Vector3(0, 6, 0);
         Instance spawn = firstOf(engine.getWorkspace(), "SpawnLocation");
         Object scf = spawn == null ? null : spawn.prop("CFrame");
         if (scf instanceof CFrame) {
             CFrame f = (CFrame) scf;
-            at = new Vector3(f.x + 6 * (inserted % 5) - 12, f.y + 1.9, f.z - 10 - 6 * (inserted / 5));
+            at = new Vector3(f.x + 6 * (inserted % 5) - 12, f.y + lift, f.z - 10 - 6 * (inserted / 5));
         } else if (engine.getWorkspace().prop("CurrentCamera") instanceof Instance) {
             Object focus = ((Instance) engine.getWorkspace().prop("CurrentCamera")).prop("Focus");
             if (focus instanceof CFrame) {
                 at = new Vector3(((CFrame) focus).x, ((CFrame) focus).y, ((CFrame) focus).z);
             }
         }
+        return at;
+    }
+
+    /// Inserts toolbox model `i`, built by its Luau, and selects it.
+    void addModel(int i) {
+        Vector3 at = insertPoint(-0.5);
+        String code = Models.luau(i, Math.round(at.x), Math.round(at.y * 10) / 10.0, Math.round(at.z));
+        edit("run_luau", "{\"source\":" + q(code) + "}");
+        log(code, false);
+        List<Instance> kids = engine.getWorkspace().getChildren();
+        if (!kids.isEmpty()) {
+            select(kids.get(kids.size() - 1));
+            frameSelection();
+        }
+    }
+
+    /// Adds snippet `i` as a new script: inside the selected part when one
+    /// is selected (a kill brick, a moving platform act on their parent),
+    /// otherwise in ServerScriptService, and opens it in the editor.
+    void addSnippet(int i) {
+        Instance parent = selected != null && selected.isA("BasePart") ? selected
+                : engine.service("ServerScriptService");
+        if (parent == null) {
+            return;
+        }
+        String base = Models.snippetName(i).replace(" ", "");
+        String name = base;
+        for (int n = 2; parent.findFirstChild(name) != null; n++) {
+            name = base + n;
+        }
+        edit("write_script", "{\"parent\":" + q(parent.fullName()) + ",\"name\":" + q(name)
+                + ",\"source\":" + q(Models.snippet(i)) + "}");
+        Instance created = parent.findFirstChild(name);
+        if (created != null) {
+            select(created, false);
+            showTab(2);
+        }
+    }
+
+    /// Inserts an anchored part of `shape` (Block, Ball or Cylinder) beside
+    /// the spawn, each one a step along from the last so they do not stack.
+    void addPart(String shape) {
+        Vector3 at = insertPoint(1.9);
         edit("create_instance", "{\"class\":\"Part\",\"parent\":\"Workspace\",\"properties\":{\"Anchored\":true,"
                 + "\"Shape\":" + q(shape) + ",\"Size\":[4,4,4],\"Color\":\"#ffc43c\",\"CFrame\":[" + at.x + ","
                 + at.y + "," + at.z + "]}}");
@@ -613,8 +658,13 @@ public final class Studio implements AgentTools.Studio {
     private void edit(String tool, String args) {
         byte[] before = RbxlxWriter.writeBytes(PlaceSaver.save(engine));
         try {
-            tools.call(tool, args);
-            log(describe(tool, args));
+            String r = tools.call(tool, args);
+            if (r != null && r.startsWith("{\"error\":")) {
+                // Luau that failed reports it as a result, not a throw.
+                log("Error: " + field(r, "error"), true);
+            } else {
+                log(describe(tool, args));
+            }
             pushUndo(before);
         } catch (RuntimeException err) {
             Ui.toast(String.valueOf(err.getMessage()));
@@ -645,6 +695,10 @@ public final class Studio implements AgentTools.Studio {
         }
         if ("delete_instance".equals(tool)) {
             return "Deleted " + name;
+        }
+        if ("run_luau".equals(tool)) {
+            int t = args.indexOf("-- Toolbox: ");
+            return t < 0 ? "Ran Luau" : "Inserted model " + args.substring(t + 12, args.indexOf('\\', t));
         }
         return tool.replace('_', ' ') + " " + name;
     }
@@ -883,9 +937,104 @@ public final class Studio implements AgentTools.Studio {
                 }
             });
         }
-        Dialog.show("AI agent mode", "The studio's tools are registered with this app's MCP server. Connect "
-                + "an agent to it and ask it to build: it can read the place, create parts and scripts, add "
-                + "effects, playtest and publish. Edits show here as it works.", "OK", null);
+        // Every call an agent makes lands in Output, the same way the
+        // studio's own buttons do, so the creator watches the AI build.
+        AgentMcp.setActivity((tool, args, result, failed) -> {
+            Studio s = current;
+            if (s == null) {
+                return;
+            }
+            s.log((failed ? "AI  failed: " : "AI  ") + agentLine(tool, args)
+                    + (failed ? " -- " + result : ""), true);
+            s.refresh();
+        });
+        showConnectAgent();
+    }
+
+    /// What an agent's call did, in the words of Output's own history.
+    static String agentLine(String tool, String args) {
+        if ("run_luau".equals(tool) || "playtest".equals(tool) || "screenshot".equals(tool)
+                || "place_tree".equals(tool) || "compat_report".equals(tool)) {
+            return tool.replace('_', ' ');
+        }
+        return describe(tool, args);
+    }
+
+    /// The MCP port this app's server listens on: the simulator sets
+    /// `cn1.mcp.port`, and the default is what the bridge attaches to.
+    static String mcpPort() {
+        String p = System.getProperty("cn1.mcp.port");
+        return p == null || p.length() == 0 ? "8765" : p;
+    }
+
+    /// How a desktop AI host reaches this app's MCP server: a stdio bridge
+    /// that attaches to the running simulator, as the simulator's own MCP
+    /// menu writes it.
+    static MCPClientDescriptor bridgeDescriptor() {
+        List<String> args = new ArrayList<String>();
+        args.add("-cp");
+        args.add(System.getProperty("java.class.path"));
+        args.add("com.codename1.impl.javase.MCPStdioLauncher");
+        args.add("--attach");
+        args.add(mcpPort());
+        return new MCPClientDescriptor("brickyard-studio",
+                System.getProperty("java.home") + "/bin/java", args);
+    }
+
+    /// The connect sheet: the server, every AI host found on this machine
+    /// with a button that adds the studio to it, and what an agent can do.
+    private void showConnectAgent() {
+        Dialog d = darkDialog("Connect an AI agent");
+        d.setName("agentDialog");
+        Container body = new Container(BoxLayout.y());
+        body.setScrollableY(true);
+        Label status = new Label("MCP server running on localhost:" + mcpPort(), "StudioAgentOn");
+        FontImage.setMaterialIcon(status, FontImage.MATERIAL_HUB, 3);
+        body.add(status);
+        body.add(new SpanLabel("Any MCP host -- Claude, Codex, Cursor -- can drive this studio. It reads "
+                + "the place, inserts parts and models, writes Luau, adds effects, playtests and publishes, "
+                + "and every edit shows in Output and can be undone.", "StudioDialogText"));
+        body.add(new Label("AI hosts on this computer", "StudioDialogHeading"));
+        MCPClientRegistrar reg = MCPClientRegistrar.getInstance();
+        List<MCPClientRegistrar.MCPClient> hosts = reg.isSupported() ? reg.detectClients()
+                : new ArrayList<MCPClientRegistrar.MCPClient>();
+        if (hosts.isEmpty()) {
+            body.add(new SpanLabel("No AI host found. Add this server to yours by hand:\n"
+                    + "java -cp <app class path> com.codename1.impl.javase.MCPStdioLauncher --attach "
+                    + mcpPort(), "StudioDialogText"));
+        }
+        for (final MCPClientRegistrar.MCPClient h : hosts) {
+            final Button connect = new Button("Connect", "StudioDialogButton");
+            connect.setName("connect-" + h.getId());
+            connect.setEnabled(h.isWritable());
+            connect.addActionListener(ev -> {
+                List<MCPClientRegistrar.MCPClient> one = new ArrayList<MCPClientRegistrar.MCPClient>();
+                one.add(h);
+                reg.register(bridgeDescriptor(), one);
+                connect.setText("Connected");
+                connect.setEnabled(false);
+                log("Connected " + h.getDisplayName() + " to the studio; restart it to load the tools", true);
+            });
+            Label name = new Label(h.getDisplayName(), "StudioDialogText");
+            FontImage.setMaterialIcon(name, FontImage.MATERIAL_SMART_TOY, 3);
+            body.add(BorderLayout.centerEastWest(name, connect, null));
+        }
+        body.add(new Label(AgentTools.toolCount() + " studio tools", "StudioDialogHeading"));
+        Container grid = new Container(new GridLayout(2));
+        for (int i = 0; i < AgentTools.toolCount(); i++) {
+            grid.add(new Label("brickyard_" + AgentTools.tool(i)[0], "StudioDialogMono"));
+        }
+        body.add(grid);
+        body.add(new Label("Try asking", "StudioDialogHeading"));
+        body.add(new SpanLabel("\"Add a ring of six torches around the spawn, make it night, and write "
+                + "a script that gives a coin every time a player touches the gold block.\"",
+                "StudioDialogQuote"));
+        d.add(BorderLayout.CENTER, body);
+        Button done = new Button("Done", "StudioDialogButton");
+        done.setName("agentDone");
+        done.addActionListener(ev -> d.dispose());
+        d.add(BorderLayout.SOUTH, done);
+        d.showPacked(BorderLayout.CENTER, true);
     }
 
     private static Studio studio() {

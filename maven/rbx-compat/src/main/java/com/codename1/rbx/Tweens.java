@@ -79,6 +79,16 @@ final class Tweens {
         while (goals.next(k, kv)) {
             k = kv[0];
             Object v = kv[1];
+            if ("Position".equals(k) && v instanceof Vector3 && target.isA("BasePart")) {
+                // A part's Position is its CFrame's translation, not a
+                // property of its own: tween the CFrame to the goal, keeping
+                // the rotation, which is what moving a part's Position does.
+                Vector3 p = (Vector3) v;
+                CFrame f = Behaviors.cf(target);
+                s.goals.put("CFrame", new CFrame(p.x, p.y, p.z, f.r00, f.r01, f.r02, f.r10, f.r11, f.r12,
+                        f.r20, f.r21, f.r22));
+                continue;
+            }
             if (!(k instanceof String) || !target.hasProp((String) k)) {
                 throw LuaError.rt("TweenService:Create property named '" + k + "' cannot be tweened due to type "
                         + "mismatch (property is a 'nil', but given type is '" + com.codename1.luau.Interp.typeName(v) + "')");

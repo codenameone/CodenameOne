@@ -79,6 +79,10 @@ public interface ModerationApi {
     @GET("/api/admin/kpis")
     void kpis(OnComplete<Response<KpiDto>> callback);
 
+    /// The last `days` days of platform traction, oldest first.
+    @GET("/api/admin/traction")
+    void traction(@Query("days") int days, OnComplete<Response<List<TractionDayDto>>> callback);
+
     @POST("/api/admin/economy/adjust")
     void adjust(@Body AdjustDto adjust, OnComplete<Response<WalletDto>> callback);
 

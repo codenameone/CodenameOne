@@ -258,6 +258,11 @@ public class Accounts {
     }
 
     @Transactional(readOnly = true)
+    /// Accounts created at or after `from`, for the signup trend.
+    public List<Account> createdSince(long from) {
+        return accounts.createdSince(from);
+    }
+
     public Account account(String username) {
         Account a = username == null ? null : accounts.findById(username);
         if (a == null || !users.userExists(username)) {

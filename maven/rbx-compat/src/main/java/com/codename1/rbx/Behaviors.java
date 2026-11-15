@@ -1115,9 +1115,10 @@ final class Behaviors {
     static final Behavior SCRIPT = new Behavior() {
         @Override
         public boolean set(Instance self, Interp in, String key, Object v) {
-            if ("Source".equals(key)) {
+            if ("Source".equals(key) && (self.engine == null || !self.engine.inCommand())) {
                 // Scripts cannot rewrite code at run time in the engine this is
-                // compatible with; the studio writes Source through put().
+                // compatible with; the studio writes Source through put(), and
+                // its command bar (where an editor's plugins run) may set it.
                 throw LuaError.rt("The current thread cannot write 'Source' (lacking capability PluginOrOpenCloud)");
             }
             return false;

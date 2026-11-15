@@ -109,5 +109,17 @@ class ModerationTest {
         Map k = Api.json(mvc, Api.asStaff(get("/api/admin/kpis"), admin, Roles.ADMIN));
         assertTrue(Api.number(k, "dau") >= 1 && Api.number(k, "ccu") >= 1);
         assertEquals(403, Api.statusOf(mvc, Api.asStaff(get("/api/admin/kpis"), admin, Roles.SUPPORT)));
+        // The traction series: one row per day, oldest first, today's visit
+        // and signups in the last row.
+        Api.json(mvc, Api.as(Api.body(post("/api/experiences/" + game + "/visit"), "{}"), u));
+        String t = mvc.perform(Api.asStaff(get("/api/admin/traction?days=7"), admin, Roles.ADMIN)).andReturn()
+                .getResponse().getContentAsString();
+        java.util.List rows = (java.util.List) new com.codename1.io.JSONParser().parseJSON(
+                new java.io.StringReader("{\"r\":" + t + "}")).get("r");
+        assertEquals(7, rows.size(), t);
+        Map today = (Map) rows.get(6);
+        assertTrue(Api.number(today, "visits") >= 1 && Api.number(today, "activePlayers") >= 1, t);
+        assertTrue(Api.number(today, "signups") >= 2, t);
+        assertEquals(403, Api.statusOf(mvc, Api.asStaff(get("/api/admin/traction?days=7"), admin, Roles.SUPPORT)));
     }
 }

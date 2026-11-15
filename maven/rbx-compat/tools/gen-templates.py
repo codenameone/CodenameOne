@@ -41,7 +41,7 @@ def rgb(c):
     return 0xff000000 | c
 
 def part(pl, name, pos, size, color=0xa3a2a5, mat="Plastic", cls="Part", anchored=True, collide=True,
-         transparency=0, tags=(), attrs=None, shape=1, extra="", rot=IDENTITY):
+         transparency=0, tags=(), attrs=None, shape=1, extra="", rot=IDENTITY, children=""):
     p = ['<Item class="%s" referent="%s"><Properties>' % (cls, pl.ref()),
          '<string name="Name">%s</string>' % escape(name),
          '<bool name="Anchored">%s</bool>' % ("true" if anchored else "false"),
@@ -65,8 +65,43 @@ def part(pl, name, pos, size, color=0xa3a2a5, mat="Plastic", cls="Part", anchore
         p.append('<BinaryString name="Tags">%s</BinaryString>'
                  % base64.b64encode("\0".join(tags).encode()).decode())
     p.append(extra)
-    p.append('</Properties></Item>')
+    p.append('</Properties>' + children + '</Item>')
     return "".join(p)
+
+def c3(name, c):
+    return '<Color3 name="%s"><R>%g</R><G>%g</G><B>%g</B></Color3>' % (
+        name, ((c >> 16) & 255) / 255.0, ((c >> 8) & 255) / 255.0, (c & 255) / 255.0)
+
+def fire(pl, size=4, heat=9, color=0xff8a2a, secondary=0xffd36b):
+    return ('<Item class="Fire" referent="%s"><Properties><string name="Name">Fire</string>'
+            '<float name="size_xml">%g</float><float name="heat_xml">%g</float>%s%s</Properties></Item>'
+            % (pl.ref(), size, heat, c3("Color", color), c3("SecondaryColor", secondary)))
+
+def smoke(pl, color=0x9e9e9e, size=3, rise=2):
+    return ('<Item class="Smoke" referent="%s"><Properties><string name="Name">Smoke</string>'
+            '<float name="size_xml">%g</float><float name="riseVelocity_xml">%g</float>%s</Properties></Item>'
+            % (pl.ref(), size, rise, c3("Color", color)))
+
+def sparkles(pl, color):
+    return ('<Item class="Sparkles" referent="%s"><Properties><string name="Name">Sparkles</string>%s'
+            '</Properties></Item>' % (pl.ref(), c3("SparkleColor", color)))
+
+def emitter(pl, a, b, rate=20, speed=(4, 7), life=(1, 2), size=0.6, accel=0):
+    return ('<Item class="ParticleEmitter" referent="%s"><Properties><string name="Name">Particles</string>'
+            '<float name="Rate">%g</float><NumberRange name="Speed">%g %g </NumberRange>'
+            '<NumberRange name="Lifetime">%g %g </NumberRange>'
+            '<ColorSequence name="Color">0 %g %g %g 0 1 %g %g %g 0 </ColorSequence>'
+            '<NumberSequence name="Size">0 %g 0 1 %g 0 </NumberSequence>'
+            '<Vector3 name="Acceleration"><X>0</X><Y>%g</Y><Z>0</Z></Vector3></Properties></Item>'
+            % (pl.ref(), rate, speed[0], speed[1], life[0], life[1],
+               ((a >> 16) & 255) / 255.0, ((a >> 8) & 255) / 255.0, (a & 255) / 255.0,
+               ((b >> 16) & 255) / 255.0, ((b >> 8) & 255) / 255.0, (b & 255) / 255.0, size, size, accel))
+
+def torch(pl, ws, x, y, z):
+    """A post with a flame on it: a real Fire effect, not a glowing ball."""
+    ws.append(part(pl, "TorchPost", (x, y + 2, z), (4, 0.5, 0.5), 0x4e342e, "Wood", shape=2, rot=UPRIGHT))
+    ws.append(part(pl, "TorchBowl", (x, y + 4.2, z), (0.6, 1.4, 1.4), 0x37474f, "Metal", shape=2, rot=UPRIGHT,
+                   children=fire(pl, 2.2, 8)))
 
 def script(pl, name, src, cls="Script"):
     return ('<Item class="%s" referent="%s"><Properties><string name="Name">%s</string>'
@@ -194,8 +229,9 @@ def trim(pl, ws, name, pos, size, color):
 def obby():
     pl = Place()
     ws = []
-    # The world under the course: a lava sea with rock stacks rising from it.
-    ws.append(part(pl, "LavaSea", (0, -14, -90), (700, 2, 700), 0xff4d00, "CrackedLava", tags=("KillBrick",)))
+    # The world under the course: open sea with rock stacks rising from it.
+    # Falling in is the obby's fail state, so the sea is a kill brick too.
+    ws.append(part(pl, "Sea", (0, -14, -90), (700, 2, 700), 0x1d6f93, "Water", tags=("KillBrick",)))
     for i, (x, z, h, w) in enumerate([(-40, -20, 30, 12), (38, -60, 44, 16), (-52, -110, 52, 14),
                                        (46, -150, 36, 18), (-30, -190, 60, 20), (70, -10, 24, 10),
                                        (-80, -70, 40, 22), (90, -120, 56, 24), (10, -240, 70, 26)]):
@@ -208,6 +244,8 @@ def obby():
     ws.append(part(pl, "Start", (0, 0.5, 4), (8, 1, 8), 0x8c8580, "Slate", cls="SpawnLocation"))
     for x, z in ((-10, 8), (10, 10), (-11, -6), (11, -4)):
         tree(pl, ws, x, z, 0)
+    for x, z in ((-6, -13), (6, -13)):
+        torch(pl, ws, x, 0, z)
     ws.append(part(pl, "Sign", (8.5, 4, -13), (6, 4, 0.6), 0x3a2a1e, "Wood"))
     ws.append(part(pl, "SignStripe", (8.5, 4.6, -13.35), (5, 0.8, 0.1), 0xffc400, "Neon"))
     # Stage 1: stepping pads over the lava.
@@ -223,18 +261,20 @@ def obby():
         # A glowing band around the drum's side, just under its top face.
         ws.append(part(pl, "StepRim%d" % (i + 1), (x, y + 0.22, -22 - i * 10), (0.18, 8.25, 8.25), pads[i],
                        "Neon", shape=2, rot=UPRIGHT, collide=False))
-    ws.append(part(pl, "Lava1", (0, -2, -44), (24, 1, 44), 0xff3d00, "CrackedLava", tags=("KillBrick",)))
+    ws.append(part(pl, "Pool1", (0, -2, -44), (24, 1, 44), 0x1d7fa0, "Water", tags=("KillBrick",)))
     # Checkpoint 1.
     cp1z = -76
     ws.append(part(pl, "Stage1", (0, 3, cp1z), (14, 2, 14), 0x4a4440, "Slate"))
     trim(pl, ws, "Stage1Trim", (0, 3, cp1z), (14, 2, 14), 0xffa040)
+    for x in (-6, 6):
+        torch(pl, ws, x, 4, cp1z + 6)
     ws.append(part(pl, "Checkpoint1", (0, 4.1, cp1z), (6, 0.2, 6), 0x00e676, "Neon", collide=False,
                    tags=("Checkpoint",), attrs={"Stage": 1}))
     # Stage 2: a ramp, then a narrow beam.
     ws.append(part(pl, "Ramp", (0, 6, cp1z - 12), (6, 4, 10), 0x5a524c, "Slate", cls="WedgePart",
                    rot=yaw(180)))
     ws.append(part(pl, "Beam", (0, 7.5, cp1z - 30), (2, 1, 26), 0x8a6a4a, "WoodPlanks"))
-    ws.append(part(pl, "Lava2", (0, 3, cp1z - 30), (16, 1, 26), 0xff3d00, "CrackedLava", tags=("KillBrick",)))
+    ws.append(part(pl, "Pool2", (0, 3, cp1z - 30), (16, 1, 26), 0x1d7fa0, "Water", tags=("KillBrick",)))
     # Stage 3: a platform with a spinning kill bar.
     sp = cp1z - 54
     ws.append(part(pl, "SpinDeck", (0, 7, sp), (18, 2, 18), 0x4a4440, "Slate"))
@@ -246,7 +286,7 @@ def obby():
     # Stage 4: a platform that glides across the gap.
     mv = sp - 22
     ws.append(part(pl, "Mover", (-8, 7.5, mv), (7, 1, 7), 0x6d7378, "DiamondPlate", tags=("Glide",)))
-    ws.append(part(pl, "Lava3", (0, 2, mv - 6), (40, 1, 30), 0xff3d00, "CrackedLava", tags=("KillBrick",)))
+    ws.append(part(pl, "Pool3", (0, 2, mv - 6), (40, 1, 30), 0x1d7fa0, "Water", tags=("KillBrick",)))
     # Stage 5: a spiral climb around a pillar.
     top = mv - 24
     ws.append(part(pl, "Pillar", (0, 12, top), (40, 6, 6), 0x8d6e63, "Slate", shape=2, rot=UPRIGHT))
@@ -266,7 +306,11 @@ def obby():
         ws.append(part(pl, "ArchPost", (x, fy + 5, top - 17), (1.2, 10, 1.2), 0xfff176, "Neon"))
     ws.append(part(pl, "ArchTop", (0, fy + 10.4, top - 17), (13.2, 1.2, 1.2), 0xfff176, "Neon"))
     ws.append(part(pl, "TrophyBase", (0, fy + 1, top - 12), (1.2, 2, 2), 0x5d4037, "Wood", shape=2, rot=UPRIGHT))
-    ws.append(part(pl, "Trophy", (0, fy + 3, top - 12), (2.4, 2.4, 2.4), 0xffd54f, "Metal", shape=0))
+    ws.append(part(pl, "Trophy", (0, fy + 3, top - 12), (2.4, 2.4, 2.4), 0xffd54f, "Metal", shape=0,
+                   children=sparkles(pl, 0xfff59d)))
+    for x in (-6, 6):
+        ws.append(part(pl, "Confetti", (x, fy + 10.4, top - 17), (1, 1, 1), 0xffffff, "Neon", transparency=1,
+                       collide=False, children=emitter(pl, 0xff4081, 0x40c4ff, 14, (3, 6), (1.5, 2.5), 0.5, -6)))
     src = LEADER + """
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
@@ -315,10 +359,10 @@ for _, m in ipairs(CollectionService:GetTagged("Glide")) do
 end
 print("TEMPLATE READY obby")
 """
-    # Late afternoon over a volcano: a low warm sun, an ash haze, and enough
-    # bloom that the lava and the trims glow without washing out the course.
-    rest = [lighting(pl, 17.6, bloom(pl, 1.1, 0.95) + atmosphere(pl, 0.38, 0xd98a5c)
-                     + color_correction(pl, 0.05, 0.14) + sun_rays(pl, 0.18), 2.6),
+    # Golden hour at sea: a low sun over the water, a light salt haze, and
+    # torches lit for the evening.
+    rest = [lighting(pl, 17.8, bloom(pl, 0.9, 0.95) + atmosphere(pl, 0.25, 0xf2b38a)
+                     + color_correction(pl, 0.12, 0.12) + sun_rays(pl, 0.2), 2.6),
             service(pl, "ServerScriptService", script(pl, "Obby", src))]
     return place(ws, rest)
 
@@ -341,6 +385,8 @@ def tycoon():
         ws.append(part(pl, "Beam", (x, 12.5, 0), (1, 1, 26), 0x5d4037, "Wood"))
     ws.append(part(pl, "Roof", (-12, 13.2, -6), (28, 0.4, 14), 0x3e4a52, "Slate"))
     ws.append(part(pl, "Chimney", (-22, 17, -9), (3, 10, 3), 0x8d4a3a, "Brick"))
+    ws.append(part(pl, "ChimneyTop", (-22, 22.4, -9), (1, 1, 1), 0xffffff, transparency=1, collide=False,
+                   children=smoke(pl, 0xb0b0b0, 3, 3)))
     ws.append(part(pl, "Path", (0, -0.45, 14), (6, 0.1, 22), 0xbcaaa4, "Concrete"))
     fence(pl, ws, -38, -38, 38, -38, -0.5)
     fence(pl, ws, -38, 38, -38, -38, -0.5)
@@ -416,9 +462,10 @@ print("TEMPLATE READY tycoon")
 def arena():
     pl = Place()
     ws = [part(pl, "Ring", (0, 0, 0), (60, 2, 60), 0x37474f, "Slate"),
+          part(pl, "RingEdge", (0, 1.05, 0), (61, 0.15, 61), 0x00e5ff, "Neon", collide=False, transparency=0.6),
           part(pl, "SpawnA", (-20, 1.5, 0), (6, 1, 6), 0xe53935, "Neon", cls="SpawnLocation"),
           part(pl, "SpawnB", (20, 1.5, 0), (6, 1, 6), 0x1e88e5, "Neon", cls="SpawnLocation"),
-          part(pl, "Lava", (0, -6, 0), (200, 1, 200), 0xff3d00, "CrackedLava", tags=("KillBrick",)),
+          part(pl, "Lake", (0, -6, 0), (400, 1, 400), 0x14324a, "Water", tags=("KillBrick",)),
           part(pl, "Spinner", (0, 2.5, 0), (40, 1, 2), 0xffeb3b, "Neon", tags=("Spinner",)),
           part(pl, "Pad", (0, 1.1, 18), (5, 0.2, 5), 0x76ff03, "ForceField", collide=False, tags=("JumpPad",))]
     # Stone columns and torches around the ring, rocks in the lava.
@@ -428,7 +475,8 @@ def arena():
         x = math.sin(a) * 33
         z = math.cos(a) * 33
         ws.append(part(pl, "Column", (x, -2, z), (16, 3, 3), 0x9e9e9e, "Concrete", shape=2, rot=UPRIGHT))
-        ws.append(part(pl, "Torch", (x, 6.6, z), (1.4, 1.4, 1.4), 0xff9100, "Neon", shape=0))
+        ws.append(part(pl, "Brazier", (x, 6.6, z), (1, 2.4, 2.4), 0x263238, "Metal", shape=2, rot=UPRIGHT,
+                       children=fire(pl, 3, 10)))
     for x, c in ((-20, 0xe53935), (20, 0x1e88e5)):
         ws.append(part(pl, "BannerPole", (x, 6, -6), (0.5, 10, 0.5), 0x424242, "Metal"))
         ws.append(part(pl, "Banner", (x, 8.5, -4.9), (0.2, 4, 2.4), c, "Fabric"))
@@ -487,10 +535,10 @@ task.spawn(function()
 end)
 print("TEMPLATE READY arena")
 """
-    # Dusk over the lava: the sun just down, a violet sky, torches and lava
-    # carrying the light.
-    rest = [lighting(pl, 18.3, bloom(pl, 1.1, 0.85) + atmosphere(pl, 0.2, 0x6a4a7a) + color_correction(pl, 0.08, 0.14)
-                     + sun_rays(pl, 0.15), 2.4),
+    # Night over a lake: moonlight, the braziers' flames and the neon ring
+    # carry the light, and bloom makes them glow.
+    rest = [lighting(pl, 22.5, bloom(pl, 1.4, 0.8) + atmosphere(pl, 0.25, 0x203050) + color_correction(pl, 0.1, 0.18),
+                     1.6),
             service(pl, "ServerScriptService", script(pl, "Arena", src))]
     return place(ws, rest)
 
@@ -513,7 +561,8 @@ def simulator():
         for k in range(3):
             h = 5 + ((i + k) * 3) % 6
             ws.append(part(pl, "Crystal", (x + (k - 1) * 2, 2 + h / 2, z + ((k * 7) % 3 - 1)), (1.6, h, 1.6),
-                           crystals[(i + k) % 4], "Neon", rot=yaw(i * 17 + k * 40)))
+                           crystals[(i + k) % 4], "Neon", rot=yaw(i * 17 + k * 40),
+                           children=sparkles(pl, crystals[(i + k) % 4]) if k == 1 else ""))
     ws.append(part(pl, "Shop", (0, 3.5, -30), (14, 7, 8), 0xd7ccc8, "WoodPlanks" if "WoodPlanks" in MAT else "Wood"))
     ws.append(part(pl, "ShopRoof", (0, 8, -30), (16, 2, 10), 0xc62828, "SmoothPlastic", cls="WedgePart"))
     ws.append(part(pl, "ShopSign", (0, 5.5, -25.9), (8, 1.6, 0.3), 0x00e5ff, "Neon"))
@@ -598,6 +647,8 @@ def racing():
     # Infield, grandstand, a start arch, tyre stacks and hills.
     import math
     ws.append(part(pl, "Infield", (0, -0.45, 0), (70, 0.1, 70), 0x7cb342, "Grass"))
+    # The bay the loop runs around: a pond in the infield.
+    ws.append(part(pl, "Bay", (0, -0.5, 0), (44, 0.2, 44), 0x2a86b0, "Water", shape=2, rot=UPRIGHT))
     for i in range(8):
         a = math.radians(i * 45 + 20)
         tree(pl, ws, math.sin(a) * 22, math.cos(a) * 22, -0.5)

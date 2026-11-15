@@ -65,4 +65,31 @@ class CharacterWalkTest {
         assertTrue(at.z < -21, "walked past the ramp onto the deck, at z=" + at.z);
         assertTrue(at.y > 6, "standing on the deck 4 studs up, at y=" + at.y);
     }
+
+    /// Something lower than the hips but taller than a step is a wall. The
+    /// controller probed only the root part, at hip height, so a character
+    /// walked straight through crates and counters on the ground.
+    @Test
+    void stopsAtALowCrate() {
+        Engine e = new Engine(Engine.SOLO);
+        e.setPhysics(new RigidBodies());
+        part(e, "Part", 0, -1, 0, 100, 2, 100, 1, 1);
+        part(e, "SpawnLocation", 0, 0.5, 0, 6, 1, 6, 1, 1);
+        // 2.4 studs tall: over the 2.1 step and under the hip probe's reach,
+        // the band the miner's rock outcrops sat in.
+        part(e, "Part", 0, 1.2, -12, 8, 2.4, 4, 1, 1);
+        e.addPlayer(1, "Walker", null);
+        for (int i = 0; i < 60; i++) {
+            e.step(1 / 60.0);
+        }
+        Instance character = (Instance) e.service("Players").getChildren().get(0).prop("Character");
+        Instance root = character.findFirstChild("HumanoidRootPart");
+        Input.key(e, "W", true);
+        for (int i = 0; i < 90; i++) {
+            e.step(1 / 60.0);
+        }
+        CFrame at = Behaviors.cf(root);
+        assertTrue(at.z > -10.5, "stopped in front of the crate, at z=" + at.z);
+        assertTrue(at.y < 5, "still on the floor, not on top of the crate, at y=" + at.y);
+    }
 }

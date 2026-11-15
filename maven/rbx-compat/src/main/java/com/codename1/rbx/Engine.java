@@ -139,6 +139,21 @@ public final class Engine {
         void chat(Instance from, String text, String channel);
     }
 
+    /// An [EngineListener] for a chat window: hears chat lines only.
+    public abstract static class ChatListener implements EngineListener {
+        @Override
+        public void propertyChanged(Instance i, String prop) {
+        }
+
+        @Override
+        public void ancestryChanged(Instance i) {
+        }
+
+        @Override
+        public void destroyed(Instance i) {
+        }
+    }
+
     /// The simulation the engine steps every frame (set by the 3D layer).
     public interface PhysicsWorld {
         void step(Engine e, double dt);
@@ -265,6 +280,21 @@ public final class Engine {
 
     public void setPlatform(String p) {
         platform = p;
+    }
+
+    /// Sends a chat line as the local player, from a chat window: filtered
+    /// by the host, shown to this engine's listeners, sent to the server on
+    /// a client, and heard by `Player.Chatted`.
+    public void sendChat(String text) {
+        if (text == null || text.trim().length() == 0) {
+            return;
+        }
+        Instance lp = localPlayer;
+        String t = getHost().filter(text, lp == null ? 0 : (long) lp.num("UserId"));
+        chat(lp, t, "RBXGeneral");
+        if (lp != null) {
+            lp.fireEvent("Chatted", t);
+        }
     }
 
     /// A chat line, for the host's chat window and moderation log.
@@ -501,10 +531,13 @@ public final class Engine {
             final Instance script = s;
             // Scripts start on the next timer pass, as a place expects:
             // every sibling has been parented by then.
+            queued.add(script);
             later(0, new Runnable() {
                 @Override
                 public void run() {
-                    startScript(script);
+                    if (queued.remove(script)) {
+                        startScript(script);
+                    }
                 }
             });
         } else if (!should && running.contains(s)) {
@@ -560,6 +593,12 @@ public final class Engine {
     /// fires and its character loads, so neither scripts nor the rig see the
     /// player without them. `attributes` may be null.
     public Instance addPlayer(long userId, String name, String displayName, Map<String, Object> attributes) {
+        // Every script that is waiting to start runs before a player
+        // arrives (and before it is in GetPlayers): a server's scripts have all started by the time anyone
+        // joins, so a PlayerAdded handler never misses the first player.
+        while (!queued.isEmpty()) {
+            startScript(queued.remove(0));
+        }
         Instance players = services.get("Players");
         Instance p = create("Player");
         p.setName(name);
@@ -724,11 +763,27 @@ public final class Engine {
         Behaviors.purchaseFinished(this, player, kind, id, purchased);
     }
 
+    private int commands;
+    /// Scripts that will start on the next timer pass, oldest first.
+    private final List<Instance> queued = new ArrayList<Instance>();
+
     /// Runs a chunk of code in the server context (studio command bar,
     /// agent tools). Returns the printed or returned text.
     public Object[] runCommand(String source) {
         LuaClosure fn = in.load(com.codename1.luau.Utf8.fromJava(source), "command", in.getGlobals());
-        return in.call(fn);
+        commands++;
+        try {
+            return in.call(fn);
+        } finally {
+            commands--;
+        }
+    }
+
+    /// True while [#runCommand] runs: the studio's command bar holds the
+    /// capability an editor plugin has, so it may write a script's Source.
+    /// A coroutine the command starts and that resumes later does not.
+    boolean inCommand() {
+        return commands > 0;
     }
 
     /// The default [Host]: in-memory data, everything owned, nothing sent.

@@ -38,6 +38,7 @@ import com.codenameone.examples.brickyard.api.ReportDto;
 import com.codenameone.examples.brickyard.api.RoleDto;
 import com.codenameone.examples.brickyard.api.SanctionDto;
 import com.codenameone.examples.brickyard.api.SeasonDto;
+import com.codenameone.examples.brickyard.api.TractionDayDto;
 import com.codenameone.examples.brickyard.api.WalletDto;
 import com.codenameone.examples.brickyard.economy.Economy;
 import com.codenameone.examples.brickyard.progress.Progression;
@@ -138,6 +139,11 @@ public class ModerationEndpoint implements ModerationApiServer {
     @Override
     public KpiDto kpis() throws Exception {
         return moderation.kpis();
+    }
+
+    @Override
+    public List<TractionDayDto> traction(int days) throws Exception {
+        return moderation.traction(days);
     }
 
     @Override

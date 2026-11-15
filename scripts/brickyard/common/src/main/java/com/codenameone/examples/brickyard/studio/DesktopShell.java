@@ -163,7 +163,7 @@ final class DesktopShell {
             "Publish...", (Runnable) studio::askPublish,
             "Capture thumbnail", (Runnable) studio::captureThumbnail,
             "Compatibility report", (Runnable) studio::compatReport,
-            "AI agent mode", (Runnable) studio::agentMode,
+            "Connect AI agent...", (Runnable) studio::agentMode,
             "Exit", (Runnable) studio::exit}));
         bar.add(menu("Edit", new Object[] {
             "Undo", (Runnable) studio::undo,
@@ -179,6 +179,20 @@ final class DesktopShell {
             "Ball", (Runnable) () -> studio.addPart("Ball"),
             "Cylinder", (Runnable) () -> studio.addPart("Cylinder"),
             "Script", (Runnable) studio::addScript}));
+        Object[] models = new Object[Models.count() * 2];
+        for (int i = 0; i < Models.count(); i++) {
+            final int m = i;
+            models[i * 2] = Models.name(i);
+            models[i * 2 + 1] = (Runnable) () -> studio.addModel(m);
+        }
+        bar.add(menu("Models", models));
+        Object[] snippets = new Object[Models.snippetCount() * 2];
+        for (int i = 0; i < Models.snippetCount(); i++) {
+            final int m = i;
+            snippets[i * 2] = Models.snippetName(i);
+            snippets[i * 2 + 1] = (Runnable) () -> studio.addSnippet(m);
+        }
+        bar.add(menu("Scripts", snippets));
         bar.add(menu("Test", new Object[] {
             "Play", (Runnable) studio::playtest,
             "Stop", (Runnable) studio::stopPlaytest}));
@@ -228,6 +242,8 @@ final class DesktopShell {
         Container actions = BoxLayout.encloseX(
                 icon(FontImage.MATERIAL_VIEW_IN_AR, "Insert part", "studioPart", studio::addPart),
                 icon(FontImage.MATERIAL_NOTE_ADD, "Insert script", "studioScript", studio::addScript),
+                separator(),
+                icon(FontImage.MATERIAL_SMART_TOY, "Connect AI agent", "studioAgent", studio::agentMode),
                 separator(),
                 icon(FontImage.MATERIAL_CENTER_FOCUS_STRONG, "Focus selection", "studioFocus", studio::frameSelection),
                 separator(),

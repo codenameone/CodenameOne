@@ -130,6 +130,60 @@ public final class SceneSnapshot {
     }
 
     public final List<Figure> figures = new ArrayList<Figure>();
+
+    /// A `Fire`.
+    public static final int FIRE = 0;
+    /// A `Smoke`.
+    public static final int SMOKE = 1;
+    /// A `Sparkles`.
+    public static final int SPARKLES = 2;
+    /// A `ParticleEmitter`.
+    public static final int PARTICLES = 3;
+
+    /// A continuous effect under a part, emitting this frame: where, what
+    /// kind and its look, read from the effect's own properties.
+    public static final class Emitter {
+        public final int kind;
+        public final float x;
+        public final float y;
+        public final float z;
+        /// The part's half extents, which a `ParticleEmitter` emits across.
+        public final float hx;
+        public final float hz;
+        public final int rgb;
+        public final int rgb2;
+        /// Particles a second.
+        public final float rate;
+        public final float size;
+        public final float speedMin;
+        public final float speedMax;
+        public final float lifeMin;
+        public final float lifeMax;
+        /// Upward acceleration, studs/s^2 (negative falls).
+        public final float rise;
+
+        Emitter(int kind, CFrame c, Vector3 size, int rgb, int rgb2, float rate, float psize, float speedMin,
+                float speedMax, float lifeMin, float lifeMax, float rise) {
+            this.kind = kind;
+            this.x = (float) c.x;
+            this.y = (float) c.y;
+            this.z = (float) c.z;
+            this.hx = (float) size.x / 2;
+            this.hz = (float) size.z / 2;
+            this.rgb = rgb;
+            this.rgb2 = rgb2;
+            this.rate = rate;
+            this.size = psize;
+            this.speedMin = speedMin;
+            this.speedMax = speedMax;
+            this.lifeMin = lifeMin;
+            this.lifeMax = lifeMax;
+            this.rise = rise;
+        }
+    }
+
+    /// The enabled effects under the workspace's parts.
+    public final List<Emitter> emitters = new ArrayList<Emitter>();
     /// Eye position and look-at target, and the vertical field of view in degrees.
     public final float[] eye = new float[3];
     public final float[] target = new float[3];
@@ -162,6 +216,7 @@ public final class SceneSnapshot {
             if ("HumanoidRootPart".equals(p.getName())) {
                 figure(s, p);
             }
+            emitters(s, p);
             float tr = (float) p.num("Transparency");
             if (tr >= 1 || p.isA("Terrain")) {
                 continue;
@@ -198,6 +253,53 @@ public final class SceneSnapshot {
             effects(s, l);
         }
         return s;
+    }
+
+    /// The effects directly under `p`; an invisible part still emits, as a
+    /// hidden emitter brick is the usual way to place a fire.
+    private static void emitters(SceneSnapshot s, Instance p) {
+        List<Instance> kids = p.getChildren();
+        for (int i = 0; i < kids.size(); i++) { // NOPMD ForLoopCanBeForeach - per-frame code; no iterator
+            Instance c = kids.get(i);
+            if (!c.bool("Enabled")) {
+                continue;
+            }
+            if (c.isA("Fire")) {
+                double size = Math.max(0.5, c.num("Size"));
+                double heat = Math.max(1, c.num("Heat"));
+                s.emitters.add(new Emitter(FIRE, Behaviors.cf(p), Behaviors.size(p), rgb(c.prop("Color")),
+                        rgb(c.prop("SecondaryColor")), (float) (12 * size), (float) (size * 0.22), (float) (heat * 0.2),
+                        (float) (heat * 0.45), 0.45f, 0.9f, (float) (heat * 0.3)));
+            } else if (c.isA("Smoke")) {
+                double size = Math.max(0.3, c.num("Size"));
+                int col = rgb(c.prop("Color"));
+                s.emitters.add(new Emitter(SMOKE, Behaviors.cf(p), Behaviors.size(p), col, col, 6, (float) (size * 0.6),
+                        (float) c.num("RiseVelocity"), (float) c.num("RiseVelocity") + 0.8f, 2f, 3.2f, 0));
+            } else if (c.isA("Sparkles")) {
+                int col = rgb(c.prop("SparkleColor"));
+                s.emitters.add(new Emitter(SPARKLES, Behaviors.cf(p), Behaviors.size(p), col, 0xffffff, 18, 0.22f,
+                        1.5f, 3.5f, 0.5f, 1.0f, 0));
+            } else if (c.isA("ParticleEmitter")) {
+                Object col = c.prop("Color");
+                int a = 0xffffff;
+                int b = 0xffffff;
+                if (col instanceof Sequence && ((Sequence) col).color) {
+                    a = rgb(((Sequence) col).sampleColor(0));
+                    b = rgb(((Sequence) col).sampleColor(1));
+                }
+                Object sz = c.prop("Size");
+                double psize = sz instanceof Sequence ? ((Sequence) sz).sampleNumber(0) : 1;
+                Object sp = c.prop("Speed");
+                Object lt = c.prop("Lifetime");
+                NumberRange speed = sp instanceof NumberRange ? (NumberRange) sp : new NumberRange(5, 5);
+                NumberRange life = lt instanceof NumberRange ? (NumberRange) lt : new NumberRange(1, 2);
+                Object acc = c.prop("Acceleration");
+                double rise = acc instanceof Vector3 ? ((Vector3) acc).y : 0;
+                s.emitters.add(new Emitter(PARTICLES, Behaviors.cf(p), Behaviors.size(p), a, b,
+                        (float) Math.min(80, c.num("Rate")), (float) (psize * 0.5), (float) speed.min,
+                        (float) speed.max, (float) Math.min(4, life.min), (float) Math.min(4, life.max), (float) rise));
+            }
+        }
     }
 
     private static void effects(SceneSnapshot s, Instance owner) {

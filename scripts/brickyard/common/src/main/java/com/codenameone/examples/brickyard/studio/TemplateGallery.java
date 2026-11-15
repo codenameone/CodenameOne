@@ -131,7 +131,7 @@ final class TemplateGallery {
             return "An empty world. Build your own game from the first brick.";
         }
         if ("obby".equals(id)) {
-            return "Pads over lava, a spinner and a trophy at the top.";
+            return "Islands over the bay, a spinner and a trophy at the top.";
         }
         if ("tycoon".equals(id)) {
             return "Droppers, conveyors and upgrades that pay out.";

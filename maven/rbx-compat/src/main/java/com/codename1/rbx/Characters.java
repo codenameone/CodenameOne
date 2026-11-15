@@ -964,7 +964,7 @@ final class Characters {
         double nz = cf.z + dir.z * speed * dt;
         double half = Behaviors.size(root).y / 2 + 2 + hum.num("HipHeight");
         double ground = groundBelow(e, model, nx, cf.y, nz);
-        if (wall(e, model, nx, cf.y, nz)) {
+        if (wall(e, model, nx, cf.y, nz, half)) {
             nx = cf.x;
             nz = cf.z;
             ground = groundBelow(e, model, nx, cf.y, nz);
@@ -1067,12 +1067,22 @@ final class Characters {
     }
 
     /// Whether a collidable part blocks the torso at (x, y, z).
-    static boolean wall(Engine e, Instance model, double x, double y, double z) {
+    /// Whether the body standing at (x, z), its root at `y` and `half` above
+    /// its feet, would be inside something solid. The whole column from just
+    /// over a step to the head is probed: testing the root alone, at hip
+    /// height, let a character walk straight through anything lower than
+    /// its hips and taller than a step -- a crate, a counter, a low wall.
+    static boolean wall(Engine e, Instance model, double x, double y, double z, double half) {
+        double feet = y - half;
+        double[] probes = {feet + Pathfinder.STEP + 0.1, (feet + Pathfinder.STEP + y) / 2, y, y + 1.5};
         List<Instance> ss = solids(e, model);
         for (int i = 0; i < ss.size(); i++) { // NOPMD ForLoopCanBeForeach - per-frame code; no iterator, and the list may change while walked
             Instance p = ss.get(i);
-            if (inside(p, x, y, z, 0.5) && (!p.isA("WedgePart") || underSlope(p, x, y, z, 0.5))) {
-                return true;
+            for (int k = 0; k < probes.length; k++) {
+                double py = probes[k];
+                if (inside(p, x, py, z, 0.5) && (!p.isA("WedgePart") || underSlope(p, x, py, z, 0.5))) {
+                    return true;
+                }
             }
         }
         return false;

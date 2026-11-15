@@ -222,7 +222,11 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
                     case Wire.CHAT: {
                         String text = in.readUTF();
                         String channel = in.readUTF();
-                        engine.chat(p.player, text, channel);
+                        // The server filters what it relays (a client's own
+                        // filter is not trusted) and its scripts hear it.
+                        String clean = engine.getHost().filter(text, (long) p.player.num("UserId"));
+                        engine.chat(p.player, clean, channel);
+                        p.player.fireEvent("Chatted", clean);
                         break;
                     }
                     default:

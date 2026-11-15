@@ -1,6 +1,6 @@
 task.wait(6)
 check(ls.Points.Value >= 1, "survival points")
-go(workspace.Lava, 1)
+go(workspace.Lake, 1)
 task.wait(0.2)
 check(ls.KOs.Value == 1, "lava KO " .. ls.KOs.Value)
 print("DONE")

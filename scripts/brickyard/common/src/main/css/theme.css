@@ -832,3 +832,257 @@ GameHud {
     padding: 1.2mm 3mm;
     margin: 2mm 3mm;
 }
+
+/* The connect-an-agent sheet. */
+StudioDialogText {
+    color: #c9d1ea;
+    background-color: transparent;
+    font-size: 2.3mm;
+    padding: 0.6mm 1mm;
+    margin: 0;
+}
+
+StudioDialogHeading {
+    color: #8fa3e8;
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    padding: 2mm 1mm 0.6mm 1mm;
+    margin: 0;
+}
+
+StudioAgentOn {
+    color: #5ee6a0;
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    padding: 0.6mm 1mm;
+    margin: 0;
+}
+
+StudioDialogMono {
+    color: #ffd27a;
+    background-color: transparent;
+    font-family: "native:MainLight";
+    font-size: 2mm;
+    padding: 0.3mm 1mm;
+    margin: 0;
+}
+
+StudioDialogQuote {
+    color: #ffffff;
+    background-color: #252d4d;
+    font-size: 2.3mm;
+    padding: 1.5mm;
+    margin: 0.5mm 1mm;
+    border-radius: 1.5mm;
+}
+
+/* In-game chat. */
+GameChatButton {
+    color: #ffffff;
+    background-color: rgba(18, 24, 48, 0.72);
+    border-radius: 2mm;
+    padding: 1.2mm 1.6mm;
+    margin: 2mm 1mm 1mm 3mm;
+}
+
+GameChatInput {
+    color: #ffffff;
+    background-color: rgba(18, 24, 48, 0.9);
+    border: 1px solid #5c6bc0;
+    border-radius: 2mm;
+    font-size: 2.8mm;
+    padding: 1.2mm 2mm;
+    margin: 2mm 0 1mm 0;
+}
+
+GameChatLine, GameChatSystem {
+    color: #ffffff;
+    background-color: rgba(18, 24, 48, 0.55);
+    font-size: 2.5mm;
+    padding: 0.5mm 2mm;
+    margin: 0 0 0 3mm;
+}
+
+GameChatSystem {
+    color: #ffd54a;
+}
+
+/* The desktop operations console. */
+ConsoleForm, ConsoleMain {
+    background-color: #0f1324;
+    padding: 0;
+    margin: 0;
+}
+
+ConsoleToolbar {
+    background-color: #0b0f1d;
+    border-bottom: 1px solid #262e4c;
+    padding: 0.5mm 1mm;
+}
+
+ConsoleTitle {
+    background-color: transparent;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+}
+
+ConsoleSidebar {
+    background-color: #0b0f1d;
+    border-right: 1px solid #262e4c;
+    padding: 3mm 2mm;
+    margin: 0;
+}
+
+ConsoleBrand {
+    background-color: transparent;
+    color: #ffc43c;
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    padding: 0 2mm;
+    margin: 0;
+}
+
+ConsoleBrandSub {
+    background-color: transparent;
+    color: #7e88aa;
+    font-size: 2.1mm;
+    padding: 0 2mm 3mm 2mm;
+    margin: 0;
+}
+
+ConsoleNav, ConsoleNavSelected {
+    color: #c9d1ea;
+    background-color: transparent;
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 1.6mm 3mm;
+    margin: 0.3mm 0;
+    border-radius: 1.5mm;
+}
+
+ConsoleNavSelected {
+    color: #ffffff;
+    background-color: #24305a;
+    font-family: "native:MainBold";
+}
+
+ConsoleHeader {
+    background-color: #0f1324;
+    border-bottom: 1px solid #262e4c;
+    padding: 2mm 4mm;
+    margin: 0;
+}
+
+ConsoleHeading {
+    background-color: transparent;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 0;
+    margin: 0;
+}
+
+ConsoleWho {
+    background-color: transparent;
+    color: #aab3cf;
+    font-size: 2.3mm;
+    padding: 1mm 2mm;
+    margin: 0;
+}
+
+ConsoleAction {
+    color: #ffffff;
+    background-color: #2b3766;
+    font-size: 2.3mm;
+    padding: 1mm 2.5mm;
+    margin: 0;
+    border-radius: 1.5mm;
+}
+
+ConsoleBody {
+    background-color: transparent;
+    padding: 2mm;
+    margin: 0;
+}
+
+ConsoleCard {
+    background-color: #161b2e;
+    border: 1px solid #262e4c;
+    border-radius: 2mm;
+    padding: 2mm 2.5mm;
+    margin: 1.2mm;
+}
+
+ConsoleCardTitle {
+    background-color: transparent;
+    color: #8fa3e8;
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 0 0 1.5mm 0;
+    margin: 0;
+}
+
+ConsoleKpi {
+    background-color: #161b2e;
+    border: 1px solid #262e4c;
+    border-radius: 2mm;
+    padding: 2mm 2.5mm;
+    margin: 1.2mm;
+}
+
+ConsoleKpiName {
+    background-color: transparent;
+    color: #7e88aa;
+    font-size: 2.1mm;
+    padding: 0;
+    margin: 0;
+}
+
+ConsoleKpiValue {
+    background-color: transparent;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    padding: 0.5mm 0 0 0;
+    margin: 0;
+}
+
+ConsoleTableHead {
+    background-color: transparent;
+    color: #7e88aa;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 0.8mm 1.5mm;
+    margin: 0;
+    border-bottom: 1px solid #262e4c;
+}
+
+ConsoleCell, ConsoleCellMuted {
+    background-color: transparent;
+    color: #e6eaf7;
+    font-size: 2.3mm;
+    padding: 0.8mm 1.5mm;
+    margin: 0;
+}
+
+ConsoleCellMuted {
+    color: #8e97b8;
+}
+
+ConsoleAttention, ConsoleAttentionClear {
+    color: #ffd27a;
+    background-color: #241f2e;
+    font-size: 2.5mm;
+    text-align: left;
+    padding: 1.5mm 2mm;
+    margin: 0.6mm 0;
+    border-radius: 1.5mm;
+}
+
+ConsoleAttentionClear {
+    color: #5ee6a0;
+    background-color: #15261f;
+}

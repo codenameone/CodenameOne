@@ -36,7 +36,21 @@ import com.codename1.ui.CN;
 /// for its answer. Names are prefixed `brickyard_` to keep them apart from
 /// the server's own UI tools.
 public final class AgentMcp {
+    /// Hears every tool call an agent makes, after it ran, so an editor can
+    /// show the agent's work as it happens.
+    public interface Activity {
+        /// `result` is the tool's answer, or the error's message when `failed`.
+        void called(String tool, String args, String result, boolean failed);
+    }
+
+    private static Activity activity;
+
     private AgentMcp() {
+    }
+
+    /// The listener told about each call; null for none.
+    public static void setActivity(Activity a) {
+        activity = a;
     }
 
     /// Registers every tool against `studio`.
@@ -55,6 +69,30 @@ public final class AgentMcp {
     }
 
     static String onEdt(final AgentTools tools, final String name, final String args) {
+        String out;
+        try {
+            out = run(tools, name, args);
+        } catch (RuntimeException ex) {
+            tell(name, args, String.valueOf(ex.getMessage()), true);
+            throw ex;
+        }
+        tell(name, args, out, false);
+        return out;
+    }
+
+    private static void tell(final String name, final String args, final String result, final boolean failed) {
+        final Activity a = activity;
+        if (a != null) {
+            CN.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    a.called(name, args, result, failed);
+                }
+            });
+        }
+    }
+
+    private static String run(final AgentTools tools, final String name, final String args) {
         if (CN.isEdt()) {
             return tools.call(name, args);
         }

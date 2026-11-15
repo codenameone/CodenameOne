@@ -136,6 +136,34 @@ class MultiplayerTest {
     }
 
     @Test
+    void chatReachesEveryoneOnceAndTheServerHearsIt() {
+        server = new ReplicaServer(place());
+        final List<String> heard = new ArrayList<String>();
+        ReplicaClient alice = join("Alice");
+        ReplicaClient bob = join("Bob");
+        frames(10);
+        final List<String> aliceSaw = new ArrayList<String>();
+        final List<String> bobSaw = new ArrayList<String>();
+        alice.getEngine().addListener(chatLog(aliceSaw));
+        bob.getEngine().addListener(chatLog(bobSaw));
+        server.getEngine().addListener(chatLog(heard));
+        alice.getEngine().sendChat("hi bob");
+        frames(4);
+        assertEquals("[Alice: hi bob]", aliceSaw.toString(), "the sender sees its line once");
+        assertEquals("[Alice: hi bob]", bobSaw.toString());
+        assertEquals("[Alice: hi bob]", heard.toString());
+    }
+
+    private static Engine.EngineListener chatLog(final List<String> into) {
+        return new Engine.ChatListener() {
+            @Override
+            public void chat(Instance from, String text, String channel) {
+                into.add((from == null ? "System" : from.getName()) + ": " + text);
+            }
+        };
+    }
+
+    @Test
     void serviceOwnPropertiesReachClients() {
         Engine e = place();
         e.service("Lighting").put("ClockTime", 17.6);

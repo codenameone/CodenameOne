@@ -59,6 +59,11 @@ import java.util.concurrent.atomic.AtomicReference;
 /// the renderer never reads the instance tree itself.
 public final class PartRenderer implements Renderer, Engine.EffectSink {
     private static final int MAX_PARTICLES = 2048;
+    /// Floats a live particle keeps: position, velocity, age, colour bits,
+    /// life, upward acceleration, size, and whether it grows (smoke) or
+    /// shrinks (sparks and flames) as it ages.
+    private static final int STRIDE = 12;
+    private int frameNo;
 
     private final AtomicReference<SceneSnapshot> next = new AtomicReference<SceneSnapshot>();
     private final AtomicReference<float[]> bursts = new AtomicReference<float[]>(new float[0]);
@@ -87,7 +92,7 @@ public final class PartRenderer implements Renderer, Engine.EffectSink {
     private final Map<String, Material> materials = new HashMap<String, Material>();
     private Mesh particleMesh;
     private Material sparks;
-    private final float[] particles = new float[MAX_PARTICLES * 8]; // NOPMD SingularField - particles live across frames
+    private final float[] particles = new float[MAX_PARTICLES * STRIDE]; // NOPMD SingularField - particles live across frames
     private int particleCount;
     private int width = 1;
     private int height = 1;
@@ -697,54 +702,58 @@ public final class PartRenderer implements Renderer, Engine.EffectSink {
 
     /// Integrates and draws the live particles: x,y,z, vx,vy,vz, age, colour.
     private void particles(GraphicsDevice device) {
+        frameNo++;
+        float dt = 1 / 60f;
         float[] b = bursts.getAndSet(new float[0]);
         for (int i = 0; i + 4 < b.length; i += 5) {
             int n = (int) b[i + 3];
-            for (int k = 0; k < n && particleCount < MAX_PARTICLES; k++) {
-                int o = particleCount * 8;
+            for (int k = 0; k < n; k++) {
                 double th = hash(k * 7 + i) * Math.PI * 2;
                 double ph = hash(k * 13 + i + 1) * Math.PI;
                 double sp = 6 + hash(k * 3 + i + 2) * 10;
-                particles[o] = b[i];
-                particles[o + 1] = b[i + 1];
-                particles[o + 2] = b[i + 2];
-                particles[o + 3] = (float) (Math.cos(th) * Math.sin(ph) * sp);
-                particles[o + 4] = (float) (Math.cos(ph) * sp);
-                particles[o + 5] = (float) (Math.sin(th) * Math.sin(ph) * sp);
-                particles[o + 6] = 0;
-                particles[o + 7] = b[i + 4];
-                particleCount++;
+                spawn(b[i], b[i + 1], b[i + 2], (float) (Math.cos(th) * Math.sin(ph) * sp), (float) (Math.cos(ph) * sp),
+                        (float) (Math.sin(th) * Math.sin(ph) * sp), Float.floatToRawIntBits(b[i + 4]), 1.2f, -9.8f,
+                        0.48f, false);
             }
+        }
+        List<SceneSnapshot.Emitter> es = scene.emitters;
+        for (int i = 0; i < es.size(); i++) { // NOPMD ForLoopCanBeForeach - per frame; no iterator
+            emit(es.get(i), i, dt);
         }
         if (particleCount == 0) {
             return;
         }
-        float dt = 1 / 60f;
         float[] m = new float[particleCount * 16];
         int[] c = new int[particleCount];
         int live = 0;
         for (int p = 0; p < particleCount; p++) {
-            int o = p * 8;
+            int o = p * STRIDE;
             float age = particles[o + 6] + dt;
-            if (age > 1.2f) {
+            float life = particles[o + 8];
+            if (age > life) {
                 continue;
             }
-            int d = live * 8;
+            int d = live * STRIDE;
             particles[d] = particles[o] + particles[o + 3] * dt;
             particles[d + 1] = particles[o + 1] + particles[o + 4] * dt;
             particles[d + 2] = particles[o + 2] + particles[o + 5] * dt;
             particles[d + 3] = particles[o + 3] * 0.96f;
-            particles[d + 4] = particles[o + 4] * 0.96f - 9.8f * dt;
+            particles[d + 4] = particles[o + 4] * 0.96f + particles[o + 9] * dt;
             particles[d + 5] = particles[o + 5] * 0.96f;
             particles[d + 6] = age;
             particles[d + 7] = particles[o + 7];
-            float sz = 0.4f * (1.2f - age);
+            particles[d + 8] = life;
+            particles[d + 9] = particles[o + 9];
+            particles[d + 10] = particles[o + 10];
+            particles[d + 11] = particles[o + 11];
+            float f = age / life;
+            float sz = particles[d + 10] * (particles[d + 11] > 0 ? 0.5f + f : 1 - f);
             float[] t = Matrix4.translation(particles[d], particles[d + 1], particles[d + 2]);
             t[0] = sz;
             t[5] = sz;
             t[10] = sz;
             System.arraycopy(t, 0, m, live * 16, 16);
-            int a = Math.round(255 * (1.2f - age) / 1.2f);
+            int a = Math.round(255 * (1 - f));
             c[live] = (a << 24) | (Float.floatToRawIntBits(particles[d + 7]) & 0xffffff);
             live++;
         }
@@ -752,6 +761,70 @@ public final class PartRenderer implements Renderer, Engine.EffectSink {
         if (live > 0) {
             device.drawInstanced(particleMesh, sparks, m, c, live);
         }
+    }
+
+    /// This frame's share of a continuous effect, with the fraction carried
+    /// by a hash of the frame so a rate under one a frame still emits.
+    private void emit(SceneSnapshot.Emitter e, int index, float dt) {
+        float want = e.rate * dt;
+        int n = (int) want;
+        if (hash(frameNo * 31 + index * 977) < want - n) {
+            n++;
+        }
+        for (int k = 0; k < n; k++) {
+            int seed = frameNo * 131 + index * 7919 + k * 17;
+            float r1 = (float) hash(seed);
+            float r2 = (float) hash(seed + 1);
+            float r3 = (float) hash(seed + 2);
+            float r4 = (float) hash(seed + 3);
+            float speed = e.speedMin + (e.speedMax - e.speedMin) * r1;
+            float life = e.lifeMin + (e.lifeMax - e.lifeMin) * r2;
+            switch (e.kind) {
+                case SceneSnapshot.FIRE:
+                    spawn(e.x + (r3 - 0.5f) * e.size * 2, e.y, e.z + (r4 - 0.5f) * e.size * 2, (r4 - 0.5f) * 0.8f,
+                            speed, (r3 - 0.5f) * 0.8f, r1 < 0.65f ? e.rgb : e.rgb2, life, e.rise, e.size, false);
+                    break;
+                case SceneSnapshot.SMOKE:
+                    spawn(e.x + (r3 - 0.5f), e.y, e.z + (r4 - 0.5f), (r4 - 0.5f) * 0.6f, speed, (r3 - 0.5f) * 0.6f,
+                            e.rgb, life, 0, e.size, true);
+                    break;
+                case SceneSnapshot.SPARKLES: {
+                    double th = r3 * Math.PI * 2;
+                    double ph = r4 * Math.PI;
+                    spawn(e.x, e.y, e.z, (float) (Math.cos(th) * Math.sin(ph) * speed), (float) (Math.cos(ph) * speed),
+                            (float) (Math.sin(th) * Math.sin(ph) * speed), r1 < 0.7f ? e.rgb : e.rgb2, life, 0, e.size,
+                            false);
+                    break;
+                }
+                default:
+                    // A ParticleEmitter: from anywhere on the part's top,
+                    // upward with a little spread.
+                    spawn(e.x + (r3 * 2 - 1) * e.hx, e.y, e.z + (r4 * 2 - 1) * e.hz, (r4 - 0.5f) * speed * 0.3f, speed,
+                            (r3 - 0.5f) * speed * 0.3f, r1 < 0.5f ? e.rgb : e.rgb2, life, e.rise, e.size, false);
+                    break;
+            }
+        }
+    }
+
+    private void spawn(float x, float y, float z, float vx, float vy, float vz, int rgb, float life, float rise,
+            float size, boolean grows) {
+        if (particleCount >= MAX_PARTICLES) {
+            return;
+        }
+        int o = particleCount * STRIDE;
+        particles[o] = x;
+        particles[o + 1] = y;
+        particles[o + 2] = z;
+        particles[o + 3] = vx;
+        particles[o + 4] = vy;
+        particles[o + 5] = vz;
+        particles[o + 6] = 0;
+        particles[o + 7] = Float.intBitsToFloat(rgb);
+        particles[o + 8] = life;
+        particles[o + 9] = rise;
+        particles[o + 10] = size;
+        particles[o + 11] = grows ? 1 : 0;
+        particleCount++;
     }
 
     private static double hash(int n) {

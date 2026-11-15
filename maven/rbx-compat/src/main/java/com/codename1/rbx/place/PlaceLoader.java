@@ -50,6 +50,8 @@ public final class PlaceLoader {
     private static final String[][] ALIASES = {
         {"Color3uint8", "Color"}, {"size", "Size"}, {"shape", "Shape"}, {"Health_XML", "Health"},
         {"WorldPivotData", "WorldPivot"}, {"CustomPhysicalProperties", "CustomPhysicalProperties"},
+        // Fire and Smoke keep these under their legacy XML names in a saved place.
+        {"size_xml", "Size"}, {"heat_xml", "Heat"}, {"opacity_xml", "Opacity"}, {"riseVelocity_xml", "RiseVelocity"},
     };
 
     private static final String[] IGNORED = {"formFactorRaw", "FormFactor", "SourceAssetId", "UniqueId",

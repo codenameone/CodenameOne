@@ -60,14 +60,33 @@ public class PlayView extends Container {
     private TransformListener transformListener;
     private final Gizmo gizmo = new Gizmo();
     private boolean savedMultiKey;
+    /// The last chat line of each player and when it was said, for the
+    /// bubble over their head.
+    private final java.util.Map<Instance, Object[]> said = new java.util.HashMap<Instance, Object[]>();
+    /// How long a speech bubble stays over a head.
+    static final long BUBBLE_MS = 7000;
 
     public PlayView(Engine engine) {
         super(new LayeredLayout());
         this.engine = engine;
+        engine.addListener(new Engine.ChatListener() {
+            @Override
+            public void chat(Instance from, String text, String channel) {
+                if (from != null) {
+                    said.put(from, new Object[] {text, Long.valueOf(System.currentTimeMillis())});
+                }
+            }
+        });
         engine.setEffectSink(renderer);
         view = new RenderView(renderer);
         view.setContinuous(true);
         add(view).add(overlay);
+    }
+
+    /// Gives the keyboard back to the character, after a chat field or a
+    /// dialog had it.
+    public void focusControls() {
+        overlay.requestFocus();
     }
 
     public Engine getEngine() {
@@ -350,6 +369,90 @@ public class PlayView extends Container {
     }
 
     /// GUI, joystick and jump button; routes pointers to the place first.
+    /// Where world point (`x`, `y`, `z`) lands in a `w` by `h` view, as
+    /// {sx, sy, depth}; null behind the camera. The inverse of [#pick].
+    static double[] project(Engine e, double x, double y, double z, int w, int h) {
+        Object c = e.getWorkspace().prop("CurrentCamera");
+        if (!(c instanceof Instance) || w <= 0 || h <= 0) {
+            return null;
+        }
+        Instance cam = (Instance) c;
+        CFrame f = Behaviors.cf(cam);
+        double fov = cam.num("FieldOfView");
+        double ty = Math.tan(Math.toRadians(fov <= 0 ? 70 : fov) / 2);
+        double tx = ty * w / h;
+        double vx = x - f.x;
+        double vy = y - f.y;
+        double vz = z - f.z;
+        double cx = vx * f.r00 + vy * f.r10 + vz * f.r20;
+        double cy = vx * f.r01 + vy * f.r11 + vz * f.r21;
+        double depth = -(vx * f.r02 + vy * f.r12 + vz * f.r22);
+        if (depth < 0.5) {
+            return null;
+        }
+        return new double[] {(cx / (depth * tx) + 1) / 2 * w, (1 - cy / (depth * ty)) / 2 * h, depth};
+    }
+
+    /// Every other player's name over their head, and what they last said
+    /// in a bubble above it: the way players see who is around and talk.
+    void paintNames(Graphics g, int w, int h) {
+        long now = System.currentTimeMillis();
+        Instance me = engine.getLocalPlayer();
+        com.codename1.ui.Font font = com.codename1.ui.Font.createSystemFont(com.codename1.ui.Font.FACE_SYSTEM,
+                com.codename1.ui.Font.STYLE_BOLD, com.codename1.ui.Font.SIZE_SMALL);
+        g.setFont(font);
+        for (Instance p : engine.service("Players").getChildren()) {
+            Instance ch = p.ref("Character");
+            Instance head = ch == null ? null : ch.findFirstChild("Head");
+            if (head == null) {
+                head = ch == null ? null : ch.findFirstChild("HumanoidRootPart");
+            }
+            if (head == null || !head.isA("BasePart")) {
+                continue;
+            }
+            CFrame hf = Behaviors.cf(head);
+            double[] at = project(engine, hf.x, hf.y + 1.6, hf.z, w, h);
+            if (at == null || at[2] > 140) {
+                continue;
+            }
+            int x = (int) at[0];
+            int y = (int) at[1];
+            if (p != me) { // NOPMD CompareObjectsWithEquals - player identity
+                String name = p.str("DisplayName");
+                if (name == null || name.length() == 0) {
+                    name = p.getName();
+                }
+                int nw = font.stringWidth(name);
+                g.setAlpha(255);
+                g.setColor(0x000000);
+                g.drawString(name, x - nw / 2 + 1, y - font.getHeight() + 1);
+                g.setColor(0xffffff);
+                g.drawString(name, x - nw / 2, y - font.getHeight());
+                y -= font.getHeight() + CN.convertToPixels(1);
+            }
+            Object[] line = said.get(p);
+            if (line != null && now - ((Long) line[1]).longValue() < BUBBLE_MS) {
+                String text = (String) line[0];
+                if (text.length() > 40) {
+                    text = text.substring(0, 39) + "...";
+                }
+                int pad = CN.convertToPixels(1.5f);
+                int tw = font.stringWidth(text);
+                int bw = tw + pad * 2;
+                int bh = font.getHeight() + pad;
+                int bx = x - bw / 2;
+                int by = y - bh - CN.convertToPixels(1);
+                g.setAlpha(235);
+                g.setColor(0xffffff);
+                g.fillRoundRect(bx, by, bw, bh, bh / 2, bh / 2);
+                g.fillTriangle(x - pad, by + bh, x + pad, by + bh, x, by + bh + pad);
+                g.setColor(0x1b2138);
+                g.drawString(text, bx + pad, by + pad / 2);
+            }
+        }
+        g.setAlpha(255);
+    }
+
     final class Overlay extends Component {
         double stickX;
         double stickY;
@@ -388,6 +491,7 @@ public class PlayView extends Container {
 
         /// The GUI, the jump button and the joystick, at the origin.
         void paintHud(Graphics g) {
+            paintNames(g, getWidth(), getHeight());
             gui.paint(g, engine, scale());
             int r = jumpR();
             g.setAlpha(70);

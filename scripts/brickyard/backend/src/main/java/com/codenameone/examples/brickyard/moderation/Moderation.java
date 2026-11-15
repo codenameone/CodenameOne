@@ -41,6 +41,7 @@ import com.codenameone.examples.brickyard.api.KpiDto;
 import com.codenameone.examples.brickyard.api.ReportDto;
 import com.codenameone.examples.brickyard.api.RoleDto;
 import com.codenameone.examples.brickyard.api.SanctionDto;
+import com.codenameone.examples.brickyard.api.TractionDayDto;
 import com.codenameone.examples.brickyard.domain.AnalyticsEvent;
 import com.codenameone.examples.brickyard.domain.Appeal;
 import com.codenameone.examples.brickyard.domain.AuditLog;
@@ -52,6 +53,7 @@ import com.codenameone.examples.brickyard.domain.Presence;
 import com.codenameone.examples.brickyard.domain.Report;
 import com.codenameone.examples.brickyard.domain.Sanction;
 import com.codenameone.examples.brickyard.domain.StorePurchase;
+import com.codenameone.examples.brickyard.domain.Account;
 import com.codenameone.examples.brickyard.repository.AnalyticsEventRepository;
 import com.codenameone.examples.brickyard.repository.AppealRepository;
 import com.codenameone.examples.brickyard.repository.AuditLogRepository;
@@ -499,6 +501,61 @@ public class Moderation {
         long errors = countSince(events.kindSince("ERROR", since), dayAgo);
         return new KpiDto(daily.size(), ccu, revenue, count, sessions, errors,
                 sessions == 0 ? 0 : errors * 1000 / sessions);
+    }
+
+    /// The last `days` days (1 to 90) of platform traction, oldest first,
+    /// bucketed by the day each event, purchase and signup happened on.
+    public List<TractionDayDto> traction(int days) {
+        Staff.require(Staff.ADMINISTER);
+        int n = Math.max(1, Math.min(90, days));
+        long first = Clock.dayOf(Clock.now()) - (n - 1) * Clock.DAY;
+        long[] visits = new long[n];
+        long[] sessions = new long[n];
+        long[] bricks = new long[n];
+        long[] signups = new long[n];
+        List<Set<String>> active = new ArrayList<Set<String>>();
+        for (int i = 0; i < n; i++) {
+            active.add(new HashSet<String>());
+        }
+        for (AnalyticsEvent v : events.kindSince("VISIT", first)) {
+            int d = bucket(v.getCreatedAt(), first, n);
+            if (d >= 0) {
+                visits[d]++;
+                active.get(d).add(v.getUsername());
+            }
+        }
+        for (AnalyticsEvent v : events.kindSince("SESSION", first)) {
+            int d = bucket(v.getCreatedAt(), first, n);
+            if (d >= 0) {
+                sessions[d]++;
+            }
+        }
+        for (StorePurchase p : purchases.since(first)) {
+            int d = bucket(p.getCreatedAt(), first, n);
+            if (d >= 0 && p.getRefunded() == 0) {
+                bricks[d] += p.getBricks();
+            }
+        }
+        for (Account a : accounts.createdSince(first)) {
+            int d = bucket(a.getCreatedAt(), first, n);
+            if (d >= 0) {
+                signups[d]++;
+            }
+        }
+        List<TractionDayDto> out = new ArrayList<TractionDayDto>();
+        for (int i = 0; i < n; i++) {
+            out.add(new TractionDayDto(first + i * Clock.DAY, active.get(i).size(), visits[i], sessions[i], bricks[i],
+                    signups[i]));
+        }
+        return out;
+    }
+
+    private static int bucket(long at, long first, int n) {
+        if (at < first) {
+            return -1;
+        }
+        long d = (at - first) / Clock.DAY;
+        return d < n ? (int) d : -1;
     }
 
     private static long countSince(List<AnalyticsEvent> list, long from) {

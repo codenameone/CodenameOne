@@ -181,7 +181,11 @@ public final class ReplicaClient implements Network.Transport, Engine.EngineList
                 Instance from = Wire.ref(in, engine, this);
                 String text = in.readUTF();
                 String channel = in.readUTF();
-                engine.chat(from, text, channel);
+                // The local player's own line was shown when it was sent;
+                // the server's relay of it is not a second message.
+                if (from == null || from != engine.getLocalPlayer()) { // NOPMD CompareObjectsWithEquals - player identity
+                    engine.chat(from, text, channel);
+                }
                 break;
             }
             case Wire.TAG: {

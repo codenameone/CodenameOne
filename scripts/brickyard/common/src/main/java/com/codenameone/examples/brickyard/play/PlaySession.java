@@ -18,7 +18,10 @@
  */
 package com.codenameone.examples.brickyard.play;
 
+import com.codename1.ui.Button;
 import com.codename1.ui.Command;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.TextField;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.layouts.FlowLayout;
@@ -208,8 +211,11 @@ public final class PlaySession {
         final Label hud = new Label("", "GameHud");
         hud.setName("leaderstatsHud");
         hud.setVisible(false);
-        Container hudLayer = new Container(new FlowLayout(Component.RIGHT));
-        hudLayer.add(hud);
+        Container hudLayer = new Container(new BorderLayout());
+        Container stats = new Container(new FlowLayout(Component.RIGHT));
+        stats.add(hud);
+        hudLayer.add(BorderLayout.EAST, stats);
+        hudLayer.add(BorderLayout.WEST, chat(engine, f));
         f.getLayeredPane(PlaySession.class, true).setLayout(new BorderLayout());
         f.getLayeredPane(PlaySession.class, true).add(BorderLayout.NORTH, hudLayer);
         UITimer.timer(400, true, f, new Runnable() {
@@ -273,6 +279,60 @@ public final class PlaySession {
         });
         f.show();
         return f;
+    }
+
+    /// The chat window: the last few lines everyone said, and a button that
+    /// opens a field to say something. What is sent goes through the
+    /// engine, so the server filters it and every player sees it, over the
+    /// speaker's head too.
+    private static Container chat(final Engine engine, final Form f) {
+        final Container lines = new Container(BoxLayout.y());
+        lines.setName("chatLog");
+        final TextField input = new TextField("", "Say something", 24, TextField.ANY);
+        input.setUIID("GameChatInput");
+        input.setName("chatInput");
+        input.setVisible(false);
+        input.setDoneListener(ev -> {
+            String text = input.getText();
+            input.setText("");
+            input.setVisible(false);
+            engine.sendChat(text);
+            f.getLayeredPane(PlaySession.class, true).revalidate();
+            // Back to the game: keys move the character again.
+            CN.callSerially(() -> {
+                Component v = f.getContentPane().getComponentAt(0);
+                if (v instanceof PlayView) {
+                    ((PlayView) v).focusControls();
+                }
+            });
+        });
+        Button open = new Button("", "GameChatButton");
+        open.setName("chatButton");
+        open.setAccessibilityText("Chat");
+        FontImage.setMaterialIcon(open, FontImage.MATERIAL_CHAT_BUBBLE, 4);
+        open.addActionListener(ev -> {
+            input.setVisible(true);
+            f.getLayeredPane(PlaySession.class, true).revalidate();
+            input.startEditingAsync();
+        });
+        engine.addListener(new Engine.ChatListener() {
+            @Override
+            public void chat(Instance from, String text, String channel) {
+                String who = from == null ? "Server" : from.str("DisplayName");
+                if (who == null || who.length() == 0) {
+                    who = from.getName();
+                }
+                Label l = new Label(who + ": " + text, from == null ? "GameChatSystem" : "GameChatLine");
+                lines.add(l);
+                while (lines.getComponentCount() > 6) {
+                    lines.removeComponent(lines.getComponentAt(0));
+                }
+                f.getLayeredPane(PlaySession.class, true).revalidate();
+            }
+        });
+        Container col = BoxLayout.encloseY(BorderLayout.centerEastWest(input, null, open), lines);
+        col.setName("chat");
+        return col;
     }
 
     /// "Coins 3   Level 2" for a player's leaderstats, empty without any.

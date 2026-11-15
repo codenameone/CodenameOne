@@ -46,8 +46,14 @@ public final class AvatarForm {
 
     public static void show() {
         final Form f = Ui.section("Me", "profile", 4);
-        f.getToolbar().addMaterialCommandToRightBar("", com.codename1.ui.FontImage.MATERIAL_SETTINGS,
-                e -> SettingsForm.show());
+        com.codename1.ui.Command settings = f.getToolbar().addMaterialCommandToRightBar("",
+                com.codename1.ui.FontImage.MATERIAL_SETTINGS, e -> SettingsForm.show());
+        // An icon-only button still needs a name: a screen reader (and an
+        // agent driving the app over MCP) has nothing else to go by.
+        com.codename1.ui.Button gear = f.getToolbar().findCommandComponent(settings);
+        if (gear != null) {
+            gear.setAccessibilityText("Settings");
+        }
         Container content = Ui.content(f);
         final Avatar[] current = {Avatar.load()};
 
