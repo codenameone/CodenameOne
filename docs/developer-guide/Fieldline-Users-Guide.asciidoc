@@ -29,7 +29,7 @@ app opens on the screens for the role the account holds.
   ones, cover an absence, decide time-off requests and run the optimizer.
 
 | Administrator
-| Everything a dispatcher does, plus each technician's limits, the labour rates,
+| Everything a dispatcher does, plus each technician's limits, the labor rates,
   rush hours, time tracking and timesheets, and the roles of every account.
 |===
 
@@ -115,7 +115,7 @@ Time-off requests wait in a queue for the dispatcher to approve or decline.
 The administrator sees everything the dispatcher sees, and the back office adds:
 
 * each technician's skills, weekly hours and maximum drive;
-* the labour rates, overtime and weekend pay, and the rush hours that slow
+* the labor rates, overtime and weekend pay, and the rush hours that slow
   travel;
 * time tracking and the weekly timesheets it produces;
 * the accounts, with the roles each one holds.
