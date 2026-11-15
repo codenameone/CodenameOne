@@ -96,6 +96,7 @@ public final class JobForm {
             close();
         });
         form.addShowListener(e -> {
+            covering = false;
             if (stale && job != null) {
                 stale = false;
                 check(form);
@@ -141,6 +142,14 @@ public final class JobForm {
     /// A live frame arrived while another form covered this one.
     private boolean stale;
 
+    /// One of this form's own screens (sign-off, the assistant) is over it.
+    private boolean covering;
+
+    private void cover(Runnable open) {
+        covering = true;
+        open.run();
+    }
+
     /// Leaves the standalone job form for good.
     private void close() {
         LiveChannel.unlisten(form);
@@ -159,7 +168,12 @@ public final class JobForm {
             // frame, keep listening, and re-read on return. The back
             // handlers stop the listener when the form really closes.
             if (CN.getCurrentForm() != form) {
-                stale = true;
+                if (covering) {
+                    stale = true;
+                } else {
+                    // Left some other way (sign-out, a notification): gone.
+                    LiveChannel.unlisten(owner);
+                }
                 return;
             }
         } else if (owner.getComponentForm() == null) {
@@ -267,7 +281,7 @@ public final class JobForm {
         ai.add(Ui.row(FontImage.MATERIAL_AUTO_AWESOME, "Ask about this job",
                 "The assistant knows the equipment, the checklist and your photos", null));
         Container aiButtons = new Container(new GridLayout(1, 2));
-        aiButtons.add(Ui.secondary("Ask", "askJob", e -> AssistantForm.show(form, job.id())));
+        aiButtons.add(Ui.secondary("Ask", "askJob", e -> cover(() -> AssistantForm.show(form, job.id()))));
         aiButtons.add(Ui.secondary("Draft report", "draftReport", e -> draftReport()));
         ai.add(aiButtons);
         report.removeAll();
@@ -311,7 +325,7 @@ public final class JobForm {
                 e -> CN.execute("https://www.google.com/maps/dir/?api=1&destination="
                         + job.lat() + "," + job.lng())));
         actions.add(Ui.action(FontImage.MATERIAL_AUTO_AWESOME, "Assistant", "heroAssistant",
-                e -> AssistantForm.show(form, job.id())));
+                e -> cover(() -> AssistantForm.show(form, job.id()))));
         hero.add(actions);
         Container who = Ui.row(FontImage.MATERIAL_PERSON, job.customer(),
                 job.contactPhone(), null);
@@ -418,6 +432,7 @@ public final class JobForm {
     }
 
     private void refill() {
+        stale = false;
         Api.field().job(job.id(), Net.to(this::fill, Ui::fail));
     }
 
@@ -652,7 +667,7 @@ public final class JobForm {
                 onSite ? "The customer signs on your screen; the record is sealed with a hash"
                         : "Available once you have checked in on site", null));
         Button sign = Ui.primary("Get signature", "getSignature",
-                e -> SignOffForm.show(form, job, this::refill));
+                e -> cover(() -> SignOffForm.show(form, job, this::refill)));
         sign.setEnabled(onSite);
         card.add(sign);
         signature.add(card);

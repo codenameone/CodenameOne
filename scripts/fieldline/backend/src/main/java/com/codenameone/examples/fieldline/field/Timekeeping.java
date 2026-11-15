@@ -326,7 +326,8 @@ public class Timekeeping {
         for (Technician t : crew) {
             // Someone deactivated mid-week still gets paid for the hours they
             // worked: only an inactive technician with no entries is left out.
-            if (!t.isActive() && entries.ofTechnician(t.getId(), from, to).isEmpty()) {
+            List<TimeEntry> worked = entries.ofTechnician(t.getId(), from, to);
+            if (!t.isActive() && worked.isEmpty()) {
                 continue;
             }
             // Rostered: the hours the technician's working week holds, less
@@ -352,7 +353,7 @@ public class Timekeeping {
             // double tap racing a status change): only time past the end of
             // the shifts already counted is added.
             long covered = 0;
-            for (TimeEntry e : entries.ofTechnician(t.getId(), from, to)) {
+            for (TimeEntry e : worked) {
                 long end = e.getEndAt() > 0 ? e.getEndAt()
                         : Math.min(now, e.getStartAt() + p.getAutoClockOutHours() * 3600000L);
                 int minutes = (int) Math.max(0, (end - e.getStartAt()) / 60000L);
