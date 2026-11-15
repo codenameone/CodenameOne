@@ -109,13 +109,12 @@ public abstract class BaseTest extends AbstractTest {
     }
 
     /// How many 200ms polls a GPU test's frame gate makes before it captures
-    /// anyway. The gate starts after 1200ms and captures 400ms after it ends, so
-    /// it must finish well inside Cn1ssDeviceRunner's per-test budget: 10s on
-    /// HTML5 (25 polls, about 6.6s in all) and 30s elsewhere (90 polls, about
-    /// 19.6s, which the Android emulator's first program compiles need). At 90
-    /// on HTML5 a scene that rendered slowly was killed before any capture.
+    /// anyway. The gate starts after 1200ms and captures 400ms after it ends,
+    /// about 19.6s in all, which the Android emulator's first program compiles
+    /// need. It must finish inside Cn1ssDeviceRunner's per-test budget, so the
+    /// gated tests get the 30s native budget on every platform, HTML5 included.
     protected static int maxPolls() {
-        return "HTML5".equals(com.codename1.ui.Display.getInstance().getPlatformName()) ? 25 : 90;
+        return 90;
     }
 
     /// Wraps a component so a callback can run after its subtree has actually PAINTED, a
