@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      cn1ss_capture:
+        description: Golden capture only (golden-capture.yml) - comma separated test class names
+        required: false
+        default: ''
+        type: string
   schedule:
   - cron: 15 1 * * *
   pull_request:
@@ -158,15 +163,24 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
+  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
+  # here; Golden capture (golden-capture.yml) records them instead.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    with:
+      capture: ${{ inputs.cn1ss_capture || '' }}
+
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
-    needs: select
-    if: needs.select.outputs.any == 'true'
+    needs: [golden-plan, select]
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.any == 'true') }}
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   select:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     outputs:
       ios: ${{ steps.plan.outputs.ios }}
@@ -182,19 +196,19 @@ jobs:
         run: python3 scripts/ci/select-apple-checks.py
 
   build-port:
-    needs: select
-    if: needs.select.outputs.any == 'true'
+    needs: [golden-plan, select]
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.any == 'true') }}
     uses: ./.github/workflows/_build-ios-port.yml
     with:
       # One test server for every suite job of the run; see the step there.
       test_server: true
 
   build-ios-metal:
-    if: ${{ !inputs.watch_only && needs.select.outputs.ios == 'true' }}
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.ios == 'true') }}
     # The iOS renderer job. Metal is the only iOS rendering backend -- the
     # OpenGL ES 2 pipeline and the job that exercised it are gone -- so this
     # runs on every pull request rather than only on the nightly schedule.
-    needs: [select, build-port, unity-gallery]
+    needs: [golden-plan, select, build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -338,6 +352,12 @@ jobs:
       # application is built; this job has no .NET SDK (see the action).
       - name: Unpack the Unity gallery prebuilt
         uses: ./.github/actions/unity-gallery-prebuilt
+
+      - name: Enter golden capture mode
+        if: inputs.cn1ss_capture != ''
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
 
       - name: Build sample iOS app and compile workspace (Metal)
         id: build-ios-app
@@ -582,9 +602,17 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload golden capture
+        if: always() && inputs.cn1ss_capture != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-ios-metal
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore
+
 
   build-ios-metal-27:
-    if: ${{ !inputs.watch_only && needs.select.outputs.ios == 'true' }}
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.ios == 'true') }}
     # The SAME suite as build-ios-metal, on the Xcode 27 / iOS 27 hosted image and
     # against its own baselines. A copy rather than a move: build-ios-metal keeps
     # gating the toolchain we actually pin (CN1_XCODE_MAJOR=26), which is what
@@ -599,7 +627,7 @@ jobs:
     # `xcode-27` is a PUBLIC PREVIEW image (actions/runner-images#14404) whose
     # capacity is still being balanced, so read a queue here as the image rather
     # than as a fault in the change under test.
-    needs: [select, build-port, unity-gallery]
+    needs: [golden-plan, select, build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -621,6 +649,9 @@ jobs:
       # ships only Xcode 27 fails resolution outright instead of quietly using
       # the wrong one.
       CN1_XCODE_MAJOR: '27'
+      # The image carries 27.0, 27.1 and 27.2 side by side; the 27 baselines are
+      # measured on 27.1, so take exactly that rather than the newest.
+      CN1_XCODE_VERSION_PIN: '27.1'
       # Build the sample against the iOS 27 theme generation. helloworld installs
       # the modern theme itself (DualAppearanceBaseTest.pickModernThemeResource)
       # and now asks the port which generation this build carries, so this hint is
@@ -754,6 +785,12 @@ jobs:
       # application is built; this job has no .NET SDK (see the action).
       - name: Unpack the Unity gallery prebuilt
         uses: ./.github/actions/unity-gallery-prebuilt
+
+      - name: Enter golden capture mode
+        if: inputs.cn1ss_capture != ''
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
 
       - name: Build sample iOS app and compile workspace (Metal)
         id: build-ios-app
@@ -1022,8 +1059,16 @@ jobs:
             artifacts/ios-ui-tests-metal-27/native-warnings.json
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Upload golden capture
+        if: always() && inputs.cn1ss_capture != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-ios-metal-27
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore
   build-ios-watch:
-    if: needs.select.outputs.ios == 'true'
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.ios == 'true') }}
     # Native Apple Watch (watchOS) screenshot pipeline. The watch slice
     # auto-enables from codename1.watchMain in the sample, so build-ios-app.sh
     # generates the <Main>Watch target alongside the iOS app. This job renders
@@ -1032,7 +1077,7 @@ jobs:
     # WS sink the iOS jobs use, and compares against scripts/ios/screenshots-watch.
     # Isolated in its own job (like build-ios-metal) so the watch result is a
     # distinct check and a regression there doesn't mask the iOS path.
-    needs: [select, build-port, unity-gallery]
+    needs: [golden-plan, select, build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -1134,6 +1179,12 @@ jobs:
       - name: Unpack the Unity gallery prebuilt
         uses: ./.github/actions/unity-gallery-prebuilt
 
+      - name: Enter golden capture mode
+        if: inputs.cn1ss_capture != ''
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+
       - name: Build sample iOS app (generates the watch target)
         id: build-ios-app
         run: ./scripts/build-ios-app.sh -q -DskipTests
@@ -1195,8 +1246,16 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload golden capture
+        if: always() && inputs.cn1ss_capture != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-ios-watch
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore
+
   build-ios-tv:
-    if: ${{ !inputs.watch_only && needs.select.outputs.ios == 'true' }}
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.ios == 'true') }}
     # Native Apple TV (tvOS) screenshot pipeline. The tvOS slice auto-enables
     # from codename1.tvMain in the sample, so build-ios-app.sh generates the
     # <Main>TV target alongside the iOS app. tvOS reuses the iOS UIApplicationMain
@@ -1208,7 +1267,7 @@ jobs:
     # BLOCKING (a hard golden gate, like build-ios-watch): the tvOS slice
     # compiles end-to-end and the golden set is seeded from a CI capture (see
     # Ports/iOSPort/nativeSources/TVOS_PORT.md). A mismatch fails the job.
-    needs: [select, build-port, unity-gallery]
+    needs: [golden-plan, select, build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -1309,6 +1368,12 @@ jobs:
       - name: Unpack the Unity gallery prebuilt
         uses: ./.github/actions/unity-gallery-prebuilt
 
+      - name: Enter golden capture mode
+        if: inputs.cn1ss_capture != ''
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+
       - name: Build sample iOS app (generates the tvOS target)
         id: build-ios-app
         run: ./scripts/build-ios-app.sh -q -DskipTests
@@ -1390,9 +1455,18 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload golden capture
+        if: always() && inputs.cn1ss_capture != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-ios-tv
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore
+
   native:
-    needs: [select, build-port, unity-gallery]
-    if: ${{ !inputs.watch_only && needs.select.outputs.native == 'true' }}
+    needs: [golden-plan, select, build-port, unity-gallery]
+    # Not a screenshot suite: a golden capture skips it.
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.native == 'true') }}
     uses: ./.github/workflows/scripts-ios-native.yml
     with:
       port_prepared: true
@@ -1400,8 +1474,9 @@ jobs:
     secrets: inherit
 
   packaging:
-    needs: [select, build-port, unity-gallery]
-    if: ${{ !inputs.watch_only && needs.select.outputs.packaging == 'true' }}
+    needs: [golden-plan, select, build-port, unity-gallery]
+    # Not a screenshot suite: a golden capture skips it.
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.packaging == 'true') }}
     uses: ./.github/workflows/ios-packaging.yml
     with:
       port_prepared: true
@@ -1413,10 +1488,11 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    needs: [select, build-port, unity-gallery]
-    if: ${{ !inputs.watch_only && needs.select.outputs.catalyst == 'true' }}
+    needs: [golden-plan, select, build-port, unity-gallery]
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.catalyst == 'true') }}
     uses: ./.github/workflows/scripts-mac-catalyst.yml
     with:
       port_prepared: true
       unity_prepared: true
+      cn1ss_capture: ${{ inputs.cn1ss_capture }}
     secrets: inherit

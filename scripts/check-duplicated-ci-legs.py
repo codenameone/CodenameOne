@@ -43,6 +43,8 @@ PAIRS = [
             # matched a line the copy also still carried at ios-sim-debug, so the
             # guard saw no drift while the leg silently used the iOS 26 ratchet.
             ("CN1_WARNING_LEG: ios-sim-debug-xcode27", "CN1_WARNING_LEG: ios-sim-debug"),
+            # Each leg's golden capture lands under its own artifact name.
+            ("name: cn1ss-capture-ios-metal-27", "name: cn1ss-capture-ios-metal"),
         ],
         # Lines the COPY must contain, checked before any substitution. The
         # subs list cannot do this job: it describes differences that are
@@ -53,6 +55,9 @@ PAIRS = [
         # screenshot, and this guard reported the legs identical throughout.
         "required_in_copy": [
             "CN1_WARNING_LEG: ios-sim-debug-xcode27",
+            # The image carries three 27 releases; without the pin the selector
+            # takes the newest and the 27.1 baselines score a 27.2 build.
+            "CN1_XCODE_VERSION_PIN: '27.1'",
             "SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal-27",
             # The simulator this leg captures on. Both lines, because each alone
             # is a silent fallback: no boot step and the destination names a
@@ -66,6 +71,7 @@ PAIRS = [
         ],
         "only_in_copy": [
             "CN1_XCODE_MAJOR: '27'",
+            "CN1_XCODE_VERSION_PIN: '27.1'",
             "IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'",
             "IOS_SIM_DESTINATION: 'platform=iOS Simulator,id=${{ steps.sim27.outputs.udid }}'",
         ],

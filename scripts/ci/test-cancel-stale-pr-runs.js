@@ -23,7 +23,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {stale, cancelStale} = require('./cancel-stale-pr-runs');
+const {stale, cancelStale, cancelForCapture} = require('./cancel-stale-pr-runs');
 const pr = {number: 7, state: 'open', head: {sha: 'new', ref: 'patch-1', repo: {id: 9}}, merge_commit_sha: 'merge'};
 const run = {id: 11, name: 'CI', event: 'pull_request', status: 'queued', head_sha: 'old', pull_requests: [{number: 7}]};
 
@@ -113,4 +113,18 @@ test('409 finish race is tolerated, authorization failures are not hidden', asyn
     if (status === 409) await cancelStale(client);
     else await assert.rejects(cancelStale(client), /API/);
   }
+});
+test('golden capture cancels the current head too, but never itself', async () => {
+  const current = {...run, head_sha: 'new'};
+  const self = {...run, id: 12, head_sha: 'new'};
+  const cancelled = [];
+  const github = {
+    paginate: async (_, params) => params.status === 'queued' ? [current, self, {...run, id: 13, event: 'workflow_dispatch'}] : [],
+    rest: {pulls: {get: async () => ({data: pr})},
+      actions: {listWorkflowRunsForRepo: () => {}, cancelWorkflowRun: async ({run_id}) => cancelled.push(run_id)}}
+  };
+  const n = await cancelForCapture({github, context: {repo: {owner: 'o', repo: 'r'}, payload: {pull_request: pr}},
+    core: {info: () => {}}, keepRunId: 12});
+  assert.equal(n, 1);
+  assert.deepEqual(cancelled, [11]);
 });

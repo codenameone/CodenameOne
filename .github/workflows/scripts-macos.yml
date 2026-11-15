@@ -18,6 +18,12 @@ name: Test macOS UI build scripts
 
 on:
   workflow_dispatch:
+    inputs:
+      cn1ss_capture:
+        description: Golden capture only (golden-capture.yml) - comma separated test class names
+        required: false
+        default: ''
+        type: string
   schedule:
     - cron: '25 1 * * *'
   pull_request:
@@ -153,19 +159,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
+  # here; Golden capture (golden-capture.yml) records them instead.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    with:
+      capture: ${{ inputs.cn1ss_capture || '' }}
+
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   build-port:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     # AppKit has its own source hash and producer; it does not invalidate
     # the iOS coordinator's bundle.
     uses: ./.github/workflows/_build-mac-port.yml
 
   build-macos:
-    needs: [build-port, unity-gallery]
+    if: needs.golden-plan.outputs.run == 'true'
+    needs: [golden-plan, build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write
@@ -276,6 +294,12 @@ jobs:
       # application is built; this job has no .NET SDK (see the action).
       - name: Unpack the Unity gallery prebuilt
         uses: ./.github/actions/unity-gallery-prebuilt
+
+      - name: Enter golden capture mode
+        if: inputs.cn1ss_capture != ''
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
 
       - name: Build sample macOS app and compile workspace
         id: build-macos-app
@@ -394,3 +418,11 @@ jobs:
       - name: Fail on a ParparVM performance regression
         if: success() || failure()
         run: vm/selfhost/ci-perf-gate.sh verdict artifacts/macos-ui-tests/perf
+
+      - name: Upload golden capture
+        if: always() && inputs.cn1ss_capture != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-macos
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore

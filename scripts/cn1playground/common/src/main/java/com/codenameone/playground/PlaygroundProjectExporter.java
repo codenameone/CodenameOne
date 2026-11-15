@@ -268,6 +268,7 @@ final class PlaygroundProjectExporter {
         return "codename1.arg.java.version=17\n"
                 + "codename1.arg.nativeTheme=modern\n"
                 + "codename1.arg.ios.themeMode=modern\n"
+                + "codename1.arg.ios.themeGeneration=27\n"
                 + "codename1.arg.and.themeMode=modern\n"
                 + "codename1.mainName=" + appName + "\n"
                 + "codename1.packageName=" + PACKAGE_NAME + "\n"

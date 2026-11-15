@@ -554,6 +554,38 @@ print(sum(1 for r in results if isinstance(r, dict) and r.get("status") == "miss
 PY
 }
 
+# Copy each "missing_expected" actual into CAPTURE_DIR/<golden path relative to
+# the repository root>. Usage: cn1ss_capture_export COMPARE_JSON REF_DIR CAPTURE_DIR
+cn1ss_capture_export() {
+  local json="$1" ref_dir="$2" capture_dir="$3" root
+  root="$(git -C "$ref_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -z "$root" ]; then
+    cn1ss_log "FATAL: golden capture cannot place $ref_dir inside a repository"
+    return 19
+  fi
+  python3 - "$json" "$root" "$capture_dir" <<'PY'
+import json, os, shutil, sys
+data = json.load(open(sys.argv[1]))
+root, out = os.path.realpath(sys.argv[2]), sys.argv[3]
+count = 0
+for r in data.get("results", []) if isinstance(data, dict) else []:
+    if not isinstance(r, dict) or r.get("status") != "missing_expected":
+        continue
+    actual, expected = r.get("actual_path"), r.get("expected_path")
+    if not actual or not expected or not os.path.isfile(actual):
+        continue
+    rel = os.path.relpath(os.path.realpath(expected), root)
+    if rel.startswith(".."):
+        sys.exit("golden %s is outside the repository" % expected)
+    dest = os.path.join(out, rel)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.copyfile(actual, dest)
+    print("[cn1ss] captured " + rel)
+    count += 1
+print("[cn1ss] golden capture: %d new screenshot(s)" % count)
+PY
+}
+
 # Write the machine-readable report consumed by /port-status/. Callers opt in
 # with CN1SS_PORT_ID and provide up to three suite logs. Screenshot comparison
 # results come from the same JSON that drives the strict golden gate below.
@@ -660,6 +692,16 @@ cn1ss_process_and_report() {
   if ! cn1ss_java_run "$CN1SS_PROCESS_CLASS" "${compare_args[@]}" > "$compare_json_out"; then
     cn1ss_log "FATAL: Screenshot comparison helper failed"
     return 13
+  fi
+
+  # Golden capture (.github/workflows/golden-capture.yml). The run was built
+  # with only the PR's new tests, so there is nothing to gate and nobody to
+  # comment to: hand every screenshot that has no golden to the capture job,
+  # filed under its golden's repository path, and stop. Existing goldens are
+  # never copied, so a capture can only add files.
+  if [ -n "${CN1SS_CAPTURE_DIR:-}" ]; then
+    cn1ss_capture_export "$compare_json_out" "$ref_dir" "$CN1SS_CAPTURE_DIR"
+    return $?
   fi
 
   # Run RenderScreenshotReport

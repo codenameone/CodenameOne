@@ -48,6 +48,7 @@ jobs:
         run: |
           python3 scripts/ci/test_select_cn1lib_checks.py
           python3 scripts/ci/test_select_apple_checks.py
+          python3 scripts/ci/test_cn1ss_golden_plan.py
           node --test scripts/ci/test-cancel-stale-pr-runs.js
 
       # Same reasoning one level up: build-ios-metal-27 and fidelity-ios-metal-27

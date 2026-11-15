@@ -1,0 +1,60 @@
+name: Golden plan
+
+# The first job of every hellocodenameone screenshot workflow. It reads the
+# suite's source (scripts/ci/cn1ss-golden-plan.py) and answers `run`:
+#
+#   false  this is a same-repository pull request whose suite has a screenshot
+#          test with no golden anywhere. Every job of the calling workflow is
+#          gated on `run` and skips; golden-capture.yml runs the suite in
+#          capture mode instead and pushes the goldens, which starts CI again.
+#   true   anything else: the goldens are complete, or this IS the capture run
+#          (`capture` set), or the PR is from a fork, where no capture can push
+#          and the suite must fail on the missing golden as it always has.
+#
+# Only names are read (git ls-tree on a blobless, sparse checkout), so this
+# costs a few seconds and never downloads an image.
+
+on:
+  workflow_call:
+    inputs:
+      capture:
+        description: The calling run's cn1ss_capture input.
+        type: string
+        default: ''
+    outputs:
+      run:
+        description: "'true' when the calling workflow should run its jobs."
+        value: ${{ jobs.plan.outputs.run }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout: |
+            scripts/ci
+            scripts/hellocodenameone/common/src/main
+      - id: plan
+        env:
+          CAPTURE: ${{ inputs.capture }}
+          EVENT: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          missing="$(python3 scripts/ci/cn1ss-golden-plan.py --verbose --from-git)"
+          run=true
+          if [ -n "$missing" ] && [ -z "$CAPTURE" ] && [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" = "$REPO" ]; then
+            run=false
+            echo "::notice::No goldens yet for $missing; skipping this workflow, Golden capture records them."
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"

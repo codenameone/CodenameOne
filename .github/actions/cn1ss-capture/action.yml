@@ -1,0 +1,42 @@
+name: Enter golden capture mode
+description: >-
+  Switches a hellocodenameone screenshot job into golden capture: the whole
+  suite runs as usual, and cn1ss_process_and_report files every screenshot
+  that has no golden under $CN1SS_CAPTURE_DIR instead of gating or commenting.
+
+# Called by .github/workflows/golden-capture.yml through each screenshot
+# workflow's `cn1ss_capture` input. Every step that uses it is guarded by
+# `if: inputs.cn1ss_capture != ''`, so a normal run never reaches it.
+#
+# The suite is never filtered: tests leak state into one another, so an image
+# captured from a partial run can differ from what the full run then compares.
+#
+# Where it goes in a job:
+#   - In the job that runs cn1ss_process_and_report, before it (Linux and
+#     Windows compare in a job of their own; the step is harmless elsewhere).
+#   - Followed, at the end of the comparing job, by an upload of
+#     $CN1SS_CAPTURE_DIR named `cn1ss-capture-<leg>` with `if: always()`.
+#
+# It also sets CN1SS_SKIP_COUNT_CHECK=1, the existing seeding bypass: the
+# floor is counted from the golden set, which the new tests are not in yet.
+
+inputs:
+  tests:
+    description: The tests that have no golden, for the log only.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        CAPTURE_TESTS: ${{ inputs.tests }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$GITHUB_WORKSPACE/artifacts/cn1ss-capture"
+        {
+          echo "CN1SS_CAPTURE_DIR=$GITHUB_WORKSPACE/artifacts/cn1ss-capture"
+          echo "CN1SS_SKIP_COUNT_CHECK=1"
+        } >> "$GITHUB_ENV"
+        echo "Golden capture (full suite); tests without goldens: $CAPTURE_TESTS"
