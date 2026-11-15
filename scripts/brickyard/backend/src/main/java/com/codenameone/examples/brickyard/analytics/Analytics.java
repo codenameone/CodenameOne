@@ -46,6 +46,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 /// Creator analytics: what engines report, and the dashboard over it.
 /// Revenue is read from the purchases themselves, not from reported
@@ -95,7 +96,7 @@ public class Analytics {
         a.setAmount(Math.max(0, e.amount()));
         a.setDetail(clip(e.detail(), 4000));
         a.setVersion(e.version());
-        long now = Clock.now();
+        long now = stamp();
         a.setDayStart(Clock.dayOf(now));
         a.setCreatedAt(now);
         events.insert(a);
@@ -116,10 +117,28 @@ public class Analytics {
         a.setDetail("");
         Experience e = experiences.findById(experienceId);
         a.setVersion(e == null ? 0 : e.getPublishedVersion());
-        long now = Clock.now();
+        long now = stamp();
         a.setDayStart(Clock.dayOf(now));
         a.setCreatedAt(now);
         events.insert(a);
+    }
+
+    /// The last `createdAt` this process handed out.
+    private static final AtomicLong LAST_STAMP = new AtomicLong();
+
+    /// The clock, made strictly increasing within this process. Events are read
+    /// back `order by createdAt, id` and the id is random, so two events in one
+    /// millisecond came back in a random order and "the latest stack" of an error
+    /// group was a coin toss -- a native server records several per millisecond.
+    /// A stamp at most a few ms ahead of the clock under a burst costs nothing.
+    private static long stamp() {
+        while (true) {
+            long last = LAST_STAMP.get();
+            long next = Math.max(Clock.now(), last + 1);
+            if (LAST_STAMP.compareAndSet(last, next)) {
+                return next;
+            }
+        }
     }
 
     private static String clip(String s, int max) {
