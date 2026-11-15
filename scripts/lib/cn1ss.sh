@@ -712,9 +712,14 @@ cn1ss_process_and_report() {
   # to comment to, so stop; a harvest (every other run) gates as before, and
   # golden-harvest.yml commits the images.
   if [ -n "${CN1SS_CAPTURE_DIR:-}" ]; then
-    cn1ss_capture_export "$compare_json_out" "$ref_dir" "$CN1SS_CAPTURE_DIR" || return $?
+    local export_rc=0
+    cn1ss_capture_export "$compare_json_out" "$ref_dir" "$CN1SS_CAPTURE_DIR" || export_rc=$?
     if [ "${CN1SS_CAPTURE_MODE:-capture}" != harvest ]; then
-      return 0
+      return "$export_rc"
+    fi
+    # A harvest is a by-product: the gate and the PR comment still run.
+    if [ "$export_rc" -ne 0 ]; then
+      cn1ss_log "golden harvest export failed ($export_rc); gating as usual"
     fi
   fi
 

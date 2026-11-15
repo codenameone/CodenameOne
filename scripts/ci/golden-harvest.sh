@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The two halves of .github/workflows/golden-harvest.yml; see that file.
 #
-#   golden-harvest.sh list SHA RUNS_FILE    the screenshot runs at SHA; sets
+#   golden-harvest.sh list SHA RUNS_FILE    the newest uncancelled run of each screenshot workflow at SHA; sets
 #                                           ready=1 in GITHUB_OUTPUT when all completed
 #   golden-harvest.sh collect RUNS_FILE DEST   take their unowned-golden images into DEST
 #
@@ -28,7 +28,7 @@ list() {
       fi
       printf '%s %s\n' "$wf" "$1" >> "$runs_file"
     done < <(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?head_sha=$sha&event=pull_request&per_page=20" \
-               --jq '.workflow_runs[] | "\(.id) \(.status)"')
+               --jq '[.workflow_runs[] | select(.conclusion != "cancelled")] | sort_by(.id) | last // empty | "\(.id) \(.status)"')
   done
   if [ "$pending" = 0 ] && [ -s "$runs_file" ]; then
     echo "ready=1" >> "$GITHUB_OUTPUT"

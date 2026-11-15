@@ -48,11 +48,8 @@ def collect(dl, dest, base=None, harvest=False, **plan_args):
     if harvest:
         gaps, lost = [], {}
     else:
-        gaps, _ = plan.plan(root=dest, base=base, **plan_args)
         lost = {}
-        if base is not None:
-            stems = {d: plan.golden_stems(dest, d) for d in dir_ports}
-            lost = plan.deleted_goldens(dest, base, dir_ports, mappings, stems)
+        gaps, _ = plan.plan(root=dest, base=base, lost_out=lost, **plan_args)
     open_gaps = set(gaps)
     added, emitted = {}, {}
     for run in sorted(os.listdir(dl)):
@@ -89,10 +86,14 @@ def collect(dl, dest, base=None, harvest=False, **plan_args):
                         print("[golden-capture] ignored %s (%s): fills no gap" % (rel, art), file=sys.stderr)
                         continue
                     if rel in added:
-                        if not filecmp.cmp(added[rel], src, shallow=False):
-                            # One file cannot be a golden for both legs.
+                        if added[rel] and not filecmp.cmp(added[rel], src, shallow=False):
+                            # One file cannot be a golden for both legs: take
+                            # neither, so no leg is left failing against the
+                            # other's image.
                             print("::error::%s differs between %s and the leg captured first; the legs "
                                   "sharing this directory do not render it alike" % (rel, art))
+                            os.remove(os.path.join(dest, rel))
+                            added[rel] = None
                             ok = False
                         continue
                     target = os.path.join(dest, rel)
@@ -103,9 +104,11 @@ def collect(dl, dest, base=None, harvest=False, **plan_args):
                     added[rel] = src
                     print("[golden-capture] added %s (%s)" % (rel, art), file=sys.stderr)
     for t, gd in sorted(open_gaps):
+        dropped = [r for r, src in added.items() if src is None and os.path.dirname(r) == gd]
         want = lost.get((t, gd))
         if want:
             gone = {s for s in want if not os.path.exists(os.path.join(dest, gd, s + ".png"))}
+            gone |= {os.path.basename(r)[:-4] for r in dropped} & want
             if gd in emitted:
                 for s in sorted(gone & emitted[gd]):
                     print("::error::%s/%s.png was deleted, the suite still renders it and no leg "
@@ -120,7 +123,7 @@ def collect(dl, dest, base=None, harvest=False, **plan_args):
             print("::error::%s: %s not restored in %s; no leg writing it reported in"
                   % (t, ", ".join(sorted(gone)), gd))
             ok = False
-        elif not any(os.path.dirname(r) == gd and owner_of(os.path.basename(r)[:-4], mappings) == t
+        elif not any(added[r] and os.path.dirname(r) == gd and owner_of(os.path.basename(r)[:-4], mappings) == t
                      for r in added):
             print("::error::%s produced no image for %s: its leg failed, or it captures nothing "
                   "there and needs a `// cn1ss-skip: <ports>` declaration" % (t, gd))

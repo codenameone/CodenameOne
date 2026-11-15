@@ -161,6 +161,16 @@ class GoldenPlanTest(unittest.TestCase):
         self.assertEqual(f.plan(), ([], []))  # the tree alone cannot tell
         self.assertEqual(f.plan(base=base), ([("FooScreenshotTest", "g/phone")], []))
 
+    def test_golden_deleted_with_a_change_to_its_test_is_not_a_gap(self):
+        g = complete()
+        g["g/phone"].append("FooScreenshotTest_light")
+        f = Fixture(g)
+        base = f.commit()
+        os.remove(os.path.join(f.root, "g/phone/FooScreenshotTest_light.png"))
+        with open(os.path.join(f.src, "FooScreenshotTest.java"), "a") as fh:
+            fh.write("\n// dropped the light variant\n")
+        self.assertEqual(f.plan(base=base), ([], []))
+
     def test_alias_declares_both_metal_directories(self):
         dirs = {"g/phone": {"ios-metal"}, "g/phone27": {"ios-metal-27"}}
         src = dict(BASE_SOURCES)
@@ -215,6 +225,7 @@ class CollectTest(unittest.TestCase):
         self.put(dl, "1", "cn1ss-capture-a", "g/win/bar-image.png", "x")
         self.put(dl, "2", "cn1ss-capture-b", "g/win/bar-image.png", "y")
         self.assertFalse(col.collect(dl, f.root, **f.args()))
+        self.assertFalse(os.path.exists(os.path.join(f.root, "g/win/bar-image.png")))
 
     def emit(self, dl, run, art, listing):
         path = os.path.join(dl, run, art, "cn1ss-emitted.json")

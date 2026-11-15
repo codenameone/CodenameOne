@@ -26,6 +26,16 @@ WORKFLOWS=(
 
 log() { echo "[golden-capture] $*" >&2; }
 
+# A transient API error must not abandon a capture whose runs are fine.
+gh_retry() {
+  local i
+  for i in 1 2 3 4 5; do
+    "$@" && return 0
+    sleep $((i * 15))
+  done
+  return 1
+}
+
 dispatch() {
   local ref="$1" tests="$2" runs_file="$3" wf since seen id tries
   : > "$runs_file"
@@ -55,14 +65,22 @@ dispatch() {
 }
 
 wait_all() {
-  local runs_file="$1" wf id pending status
+  local runs_file="$1" wf id pending status deadline
+  # Well inside the job's timeout-minutes, so a run that never finishes ends
+  # as a failure, which the workflow's re-run and cancel steps then handle; a
+  # job timeout would skip both.
+  deadline=$(( $(date +%s) + ${CN1SS_CAPTURE_WAIT_MINUTES:-300} * 60 ))
   while :; do
     pending=0
     while read -r wf id; do
-      status="$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json status --jq .status)"
+      status="$(gh_retry gh run view "$id" --repo "$GITHUB_REPOSITORY" --json status --jq .status)" || status=unknown
       [ "$status" = "completed" ] || pending=$((pending + 1))
     done < "$runs_file"
     [ "$pending" -eq 0 ] && break
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      log "$pending run(s) did not finish in time"
+      return 1
+    fi
     log "$pending run(s) still going"
     sleep 120
   done
@@ -72,7 +90,7 @@ collect() {
   local runs_file="$1" dest="$2" base="${3:-}" wf id conclusion failed=0 dl
   dl="$(mktemp -d)"
   while read -r wf id; do
-    conclusion="$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)"
+    conclusion="$(gh_retry gh run view "$id" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)" || conclusion=unknown
     log "$wf run $id: $conclusion"
     [ "$conclusion" = "success" ] || failed=1
     gh run download "$id" --repo "$GITHUB_REPOSITORY" -p 'cn1ss-capture-*' -D "$dl/$id" 2>/dev/null \

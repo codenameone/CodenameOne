@@ -32,7 +32,11 @@ permissions:
   contents: read
 
 # One per head: the last run to complete is the one that harvests, and a
-# second completion queued behind it finds the head already moved.
+# second completion queued behind it finds the images already there.
+#
+# The images were rendered from the pull_request merge commit and land on the
+# head branch. That is the commit the next run compares on as well, so the
+# golden matches what CI will render.
 concurrency:
   group: golden-harvest-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: false
@@ -81,10 +85,9 @@ jobs:
         run: |
           set -euo pipefail
           cd pr
-          if [ "$(git rev-parse HEAD)" != "$HEAD_SHA" ]; then
-            echo "The branch moved past $HEAD_SHA; its own runs will harvest."
-            exit 0
-          fi
+          # The branch may have moved past HEAD_SHA, and the push that moved
+          # it may run no screenshot workflow at all (paths filters), so
+          # collect onto the head anyway: nothing existing is overwritten.
           ok=1
           ../trusted/scripts/ci/golden-harvest.sh collect ../runs.txt "$PWD" || ok=0
           git add -A -- scripts

@@ -59,17 +59,16 @@ jobs:
           if [ "$EVENT" = pull_request ]; then base=(--base=HEAD^1); fi
           missing="$(python3 scripts/ci/cn1ss-golden-plan.py --verbose --from-git "${base[@]}")"
           run=true
-          if [ -n "$missing" ] && [ -z "$CAPTURE" ] && [ "$EVENT" = pull_request ]; then
+          # A fork cannot be captured into (no branch here, no token): its
+          # suite runs, and the golden gate fails it on the missing images,
+          # which the run uploads (cn1ss-capture-<leg>) for a maintainer.
+          if [ -n "$missing" ] && [ -z "$CAPTURE" ] && [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" = "$REPO" ]; then
             run=false
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
           if [ "$run" = false ]; then
             # Red, not skipped: a skipped required check counts as passing, and
             # this PR has not passed anything. The goldens push re-runs it.
-            if [ "$HEAD_REPO" = "$REPO" ]; then
-              echo "::error::No goldens yet for $missing. The Golden capture workflow records them and pushes them to this branch; if that run failed, re-run it."
-            else
-              echo "::error::No goldens yet for $missing. Golden capture cannot push to a fork: a maintainer has to capture them on a branch of this repository."
-            fi
+            echo "::error::No goldens yet for $missing. The Golden capture workflow records them and pushes them to this branch; if that run failed, re-run it."
             exit 1
           fi

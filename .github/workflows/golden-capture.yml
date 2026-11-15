@@ -161,7 +161,7 @@ jobs:
 
       # Superseded (a new push) or timed out: the dispatched suites are ours.
       - name: Cancel the capture runs
-        if: cancelled()
+        if: cancelled() || failure()
         run: |
           [ -f "$RUNS" ] || exit 0
           while read -r wf id; do

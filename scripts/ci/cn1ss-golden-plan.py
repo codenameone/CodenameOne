@@ -173,7 +173,7 @@ def index_sources(sources_dir):
                     m = cand
                     break
             sup = m.group(2).rsplit(".", 1)[-1] if m and m.group(2) else None
-            classes[name] = (sup, src, SKIP_DECL.findall(raw))
+            classes[name] = (sup, src, SKIP_DECL.findall(raw), os.path.realpath(os.path.join(d, f)))
     return classes, added
 
 
@@ -256,6 +256,16 @@ def owns(test, stems, mappings):
     return any(fnmatch.fnmatchcase(stem, pat) for stem in stems for pat in patterns)
 
 
+def changed_files(root, base):
+    """Real paths of the files that differ between base and the working tree."""
+    import subprocess
+    top = subprocess.run(["git", "-C", root, "rev-parse", "--show-toplevel"], check=True,
+                         capture_output=True, text=True).stdout.strip()
+    out = subprocess.run(["git", "-C", root, "diff", "--name-only", base, "--"], check=True,
+                         capture_output=True, text=True).stdout
+    return {os.path.realpath(os.path.join(top, l)) for l in out.splitlines() if l}
+
+
 def deleted_goldens(root, base, dir_ports, mappings, stems):
     """{(test, dir): {stem}} for goldens base has and the tree lacks, by owner."""
     lost = {}
@@ -283,7 +293,7 @@ def declared_skips(test, classes):
 
 
 def plan(root=ROOT, sources_dir=SOURCES, runner=RUNNER, dir_ports=DIR_PORTS,
-         manifest=MANIFEST, from_git=False, base=None):
+         manifest=MANIFEST, from_git=False, base=None, lost_out=None):
     """(gaps, problems): gaps are (test, dir) pairs with no golden on a leg that
     runs the test; problems are declarations the tree contradicts.
 
@@ -302,6 +312,17 @@ def plan(root=ROOT, sources_dir=SOURCES, runner=RUNNER, dir_ports=DIR_PORTS,
         # An empty set means the listing failed, not that nothing is captured.
         raise PlanError("no goldens found under %s" % ", ".join(dir_ports))
     lost = deleted_goldens(root, base, dir_ports, mappings, stems) if base is not None else {}
+    if lost:
+        # A golden deleted together with a change to its test is the test
+        # dropping an image: it is not predicted missing. Should the suite
+        # still render it, the run's own gate fails on it and
+        # golden-harvest.yml commits it back. A golden deleted with its test
+        # untouched is a gap, captured before anything else runs.
+        changed = changed_files(root, base)
+        lost = {k: v for k, v in lost.items()
+                if not any(classes[c][3] in changed for c in chain(k[0], classes) if c in classes)}
+    if lost_out is not None:
+        lost_out.update(lost)
     gaps, problems = [], []
     for t in suite:
         if t not in classes or opted_out(t, classes):
