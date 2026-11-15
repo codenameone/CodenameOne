@@ -238,11 +238,11 @@ public final class Engine {
     private final Map<String, Object> extras = new HashMap<String, Object>();
 
     /// Per-engine state of the behaviour classes, by key.
-    Object extra(String key) {
+    public Object extra(String key) {
         return extras.get(key);
     }
 
-    void extra(String key, Object v) {
+    public void extra(String key, Object v) {
         extras.put(key, v);
     }
 
@@ -426,7 +426,7 @@ public final class Engine {
         }
     }
 
-    void addTag(Instance i, String t) {
+    public void addTag(Instance i, String t) {
         if (i.hasTag(t)) {
             return;
         }
