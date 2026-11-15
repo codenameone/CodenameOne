@@ -63,4 +63,8 @@ public interface ExperienceApi {
 
     @POST("/api/experiences/{id}/vote")
     void vote(@Path("id") String id, @Body VoteDto vote, OnComplete<Response<ExperienceDto>> callback);
+
+    /// Seats the caller on a server of the experience and answers a socket ticket.
+    @POST("/api/experiences/{id}/join")
+    void join(@Path("id") String id, @Body JoinDto join, OnComplete<Response<JoinTicketDto>> callback);
 }

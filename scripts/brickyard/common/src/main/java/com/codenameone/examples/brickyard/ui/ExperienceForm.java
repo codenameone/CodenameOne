@@ -126,7 +126,7 @@ public final class ExperienceForm {
             Telemetry.played(e.id());
             Friends.presence(e.title());
             Api.experiences().visit(e.id(), Net.to(v -> { }, (s, m) -> { }));
-            PlaySession.start(e.id(), e.title(), bytes);
+            PlaySession.start(e.id(), e.title(), bytes, e.maxPlayers(), "");
         }, Ui::failed));
     }
 
