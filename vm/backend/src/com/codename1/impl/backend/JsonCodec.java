@@ -81,8 +81,22 @@ public final class JsonCodec {
 
     /// The installed registry, or null in a binary whose build wrote none.
     public static Registry registry() {
-        return REGISTRY.get();
+        Registry installed = REGISTRY.get();
+        if (installed == null && !DEFAULT_LOOKED.get()) {
+            // Only where nothing installed one -- a JVM unit test that started no
+            // context. Looked up once; ParparVM's default answers null.
+            DEFAULT_LOOKED.set(true);
+            Registry found = JsonCodecDefault.find();
+            if (found != null) {
+                REGISTRY.compareAndSet(null, found);
+            }
+            installed = REGISTRY.get();
+        }
+        return installed;
     }
+
+    private static final java.util.concurrent.atomic.AtomicBoolean DEFAULT_LOOKED =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     /// How deep the codecs follow one object into another: [#MAX_DEPTH] unless
     /// `cn1.json.maxDepth` says otherwise.

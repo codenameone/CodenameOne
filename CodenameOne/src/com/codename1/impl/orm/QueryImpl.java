@@ -378,15 +378,43 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             if (dot < 0) {
                 throw new IllegalArgumentException("Unknown attribute: " + path);
             }
+            int foreignKey = foreignKeyOf(join.model, remaining.substring(0, dot), remaining.substring(dot + 1));
+            if (foreignKey >= 0) {
+                // `t.owner.id` is the key column `t` already holds, so it needs no
+                // join -- as Hibernate reads it. That is also what lets a bulk
+                // DELETE or UPDATE, which cannot join, name it (issue 6240).
+                return new Field(join, foreignKey);
+            }
             offset += dot;
             join = ensureJoin(path.substring(0, offset), false);
             offset++;
             remaining = path.substring(offset);
         }
     }
+    /// The attribute index of the foreign key `relation` keeps in `owner`'s own
+    /// table, when `rest` is the single-column key of its target; otherwise -1.
+    private int foreignKeyOf(EntityModel owner, String relation, String rest) {
+        for (Relationship r : owner.relationships()) {
+            // column >= 0 is the owning side holding a foreign key (see ensureJoin).
+            if (!r.field.equals(relation) || r.many || r.column < 0) {
+                continue;
+            }
+            EntityModel target = session.model(r.target);
+            int id = target.idIndex();
+            if (id >= 0 && target.attributes()[id].field.equals(rest)
+                    && owner.attributes()[r.column].kind == target.attributes()[id].kind) {
+                return owner.queryIndex(owner.attributes()[r.column].field);
+            }
+        }
+        return -1;
+    }
     boolean association(String field) {
         Field resolved = resolveField(field);
         String name = resolved.join.model.attributes()[resolved.index].field;
+        if (!field.equals(name) && !field.endsWith("." + name)) {
+            // `t.owner.id` read through the foreign key: the related key, a scalar.
+            return false;
+        }
         for (Relationship relation : resolved.join.model.relationships()) {
             if (relation.field.equals(name)) {
                 return true;
@@ -408,7 +436,9 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     }
     Object parameter(String field, Object value) {
         Field resolved = validatePath(field, true);
-        return resolved.join.model.parameter(resolved.index, value);
+        // An entity compared with a relationship (`t.owner = :owner`) stands for
+        // its key, as in JPA (issue 6240).
+        return resolved.join.model.parameter(resolved.index, session.entityKey(value));
     }
     void requireIntegralRange(String field, Object value) {
         Field resolved = validatePath(field, true);

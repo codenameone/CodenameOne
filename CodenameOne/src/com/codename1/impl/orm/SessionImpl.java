@@ -179,6 +179,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     String nextAlias() {
         return "q" + (aliasSequence++);
     }
+    /// True when name is a registered entity's binary or simple name; tells
+    /// an entity join ("JOIN Person p ON ...") from a relationship path join.
+    boolean hasModel(String name) {
+        for (EntityModel candidate : models.values()) {
+            String binary = candidate.type().getName();
+            if (binary.equals(name) || binary.substring(binary.lastIndexOf('.') + 1).equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
     EntityModel model(String name) {
         EntityModel result = null;
         for (EntityModel candidate : models.values()) {
@@ -3063,6 +3074,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
 
+    /// The key of `value` when it is a mapped entity, otherwise `value` itself:
+    /// what a bound entity parameter compares as.
+    Object entityKey(Object value) {
+        if (value == null) {
+            return null;
+        }
+        EntityModel model = models.get(value.getClass().getName());
+        return model == null ? value : model.identifier(current(value));
+    }
     <T> EntityModel<T> model(Class<T> type) {
         EntityModel<T> model = (EntityModel<T>) models.get(type.getName());
         if (model == null) {

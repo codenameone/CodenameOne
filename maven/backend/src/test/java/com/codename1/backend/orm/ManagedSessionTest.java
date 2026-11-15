@@ -328,6 +328,22 @@ class ManagedSessionTest {
         } finally { session.close();db.close(); }
     }
 
+    @Test void theInjectedSessionReadsOutsideATransaction() throws Exception {
+        // Issue 6240: the Session a bean is injected threw on a read made outside
+        // any @Transactional method; Spring's shared EntityManager reads there.
+        Models.register(new Model());
+        Database db=Database.open(":memory:");
+        try {
+            EntityManager em=EntityManager.open(db);
+            Session setup=em.openSession();
+            try { setup.createTables();setup.beginTransaction();Record r=new Record();r.name="x";setup.persist(r);setup.commitTransaction(); }
+            finally { setup.close(); }
+            Session injected=new com.codename1.impl.backend.TransactionSession(em);
+            assertEquals(1,injected.query(Record.class).count());
+            assertEquals(1,injected.createQuery("select r from "+Record.class.getName()+" r").list().size());
+        } finally { db.close(); }
+    }
+
     @Test void mergeDoesNotResurrectMissingAssignedVersionedRows() throws Exception {
         for(boolean composite:new boolean[]{false,true}) {
             Database db=Database.open(":memory:");

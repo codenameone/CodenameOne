@@ -441,6 +441,22 @@ public final class Web {
         return space < 0 ? statusLine : statusLine.substring(0, space);
     }
 
+    /// The verbs HttpURLConnection accepts.
+    private static final java.util.Set URL_CONNECTION_VERBS = new java.util.HashSet(
+            java.util.Arrays.asList(new String[] {"GET", "POST", "HEAD", "OPTIONS", "PUT",
+                "DELETE", "TRACE"}));
+
+    private static WebClient defaultClient;
+
+    /// The client a request made without one is sent with, for the verbs only
+    /// the JDK's other client sends.
+    private static synchronized WebClient defaultClient() {
+        if (defaultClient == null) {
+            defaultClient = new WebClient();
+        }
+        return defaultClient;
+    }
+
     /// @param trace the trace-context lines, or null. Sent, but not counted as the
     /// caller's headers when deciding whether to follow a redirect --
     /// the translated twin's rule, for the translated twin's reason.
@@ -451,6 +467,16 @@ public final class Web {
             // negotiates HTTP/2 and is refused if it does not get it.
             return JdkHttp2.perform(client, ((Transport) client.transport(TRANSPORTS)).http2,
                     method, url, headers, body, trace, maxResponseBytes());
+        }
+        if (method != null && !URL_CONNECTION_VERBS.contains(method)) {
+            // HttpURLConnection has a FIXED set of verbs and PATCH is not in it,
+            // on every JDK; reflecting over its private field throws on 21+. The
+            // JDK's other client sends any verb, so such a request goes through
+            // it over HTTP/1.1, as the packaged arm sends it through libcurl
+            // (issue 6240).
+            WebClient sender = client != null ? client : defaultClient();
+            return JdkHttp2.perform(sender, ((Transport) sender.transport(TRANSPORTS)).http2,
+                    method, url, headers, body, trace, maxResponseBytes(), false);
         }
         int connectTimeout = 30000;
         int readTimeout = 30000;

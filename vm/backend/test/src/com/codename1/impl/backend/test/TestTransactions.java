@@ -42,6 +42,22 @@ public final class TestTransactions {
     /// Spring's rule too.
     public static void rollingBack(final Body body) throws Throwable {
         final Throwable[] thrown = new Throwable[1];
+        try {
+            execute(body, thrown);
+        } catch (Exception rollback) {
+            // A test that failed inside the transaction usually leaves it unusable,
+            // and ending it then throws too; the test's own failure is the one
+            // worth reporting, so it wins over the rollback's (#6240).
+            if (thrown[0] == null) {
+                throw rollback;
+            }
+        }
+        if (thrown[0] != null) {
+            throw thrown[0];
+        }
+    }
+
+    private static void execute(final Body body, final Throwable[] thrown) throws Exception {
         Transactions.execute(new Transactions.Work() {
             @Override
             public Object run() {
@@ -54,8 +70,5 @@ public final class TestTransactions {
                 return null;
             }
         });
-        if (thrown[0] != null) {
-            throw thrown[0];
-        }
     }
 }

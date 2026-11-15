@@ -95,9 +95,16 @@ public final class BackendSqlAccess implements SqlAccess {
         // no such collations), and naming it would fail every describe.
         String collation = mysql ? "c.collation_name"
                 : "CASE WHEN EXISTS (SELECT 1 FROM pg_catalog.pg_collation pc INNER JOIN pg_catalog.pg_namespace cn ON cn.oid = pc.collnamespace WHERE pc.collname = c.collation_name AND cn.nspname = c.collation_schema AND to_jsonb(pc) ->> 'collisdeterministic' = 'false') THEN 'nondeterministic ' || c.collation_name ELSE c.collation_name END";
-        String statement = "SELECT c.column_name," + (mysql ? "c.column_type" : "c.data_type || COALESCE('(' || c.character_maximum_length || ')', CASE WHEN c.data_type LIKE 'time%' THEN '(' || c.datetime_precision || ')' END, '')") + ",CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key, " + filled + " AS filled, " + collation + ", " + keyGenerated + " AS key_generated, " + readOnly + " AS read_only "
-                + "FROM information_schema.columns c LEFT JOIN (SELECT u.table_schema,u.table_name,u.column_name FROM information_schema.key_column_usage u INNER JOIN information_schema.table_constraints t ON t.constraint_schema=u.constraint_schema AND t.table_name=u.table_name AND t.constraint_name=u.constraint_name WHERE t.constraint_type='PRIMARY KEY') k "
-                + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema=" + schema + " AND c.table_name=?"
+        String statement = "SELECT c.column_name," + (mysql ? "c.column_type" : "c.data_type || COALESCE('(' || c.character_maximum_length || ')', CASE WHEN c.data_type LIKE 'time%' THEN '(' || c.datetime_precision || ')' END, '')") + ",CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, " + (mysql ? "CASE WHEN c.column_key = 'PRI' THEN 1 ELSE 0 END" : "CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END") + " AS primary_key, " + filled + " AS filled, " + collation + ", " + keyGenerated + " AS key_generated, " + readOnly + " AS read_only "
+                // The key: MySQL and MariaDB mark it on the column itself. The
+                // derived table that finds it elsewhere is filtered to this one
+                // table INSIDE, because MariaDB does not push the outer WHERE
+                // into a derived information_schema table and read the key
+                // usage of every table on the server, per entity (#6240).
+                + (mysql ? "FROM information_schema.columns c "
+                        : "FROM information_schema.columns c LEFT JOIN (SELECT u.table_schema,u.table_name,u.column_name FROM information_schema.key_column_usage u INNER JOIN information_schema.table_constraints t ON t.constraint_schema=u.constraint_schema AND t.table_name=u.table_name AND t.constraint_name=u.constraint_name WHERE t.constraint_type='PRIMARY KEY' AND u.table_schema=" + schema + " AND u.table_name=?) k "
+                        + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name ")
+                + "WHERE c.table_schema=" + schema + " AND c.table_name=?"
                 // MySQL compares catalog strings without case, while
                 // lower_case_table_names=0 (the Linux default) resolves table
                 // names with it: only the table the ORM's SQL reads may match.

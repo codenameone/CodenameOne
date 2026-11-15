@@ -2408,6 +2408,18 @@ public class OrmAnnotationProcessorTest {
                     org.junit.Assert.assertEquals(ownerType.getField("id").get(owner),session.createQuery("select t.owner.id from scalarprojections.Ticket t",Long.class).first());
                     org.junit.Assert.assertEquals("Paris",session.createQuery("select o.address.city from scalarprojections.Ticket t join t.owner o",String.class).first());
                     org.junit.Assert.assertEquals(active,session.createQuery("select (select max(o.status) from scalarprojections.Owner o) from scalarprojections.Ticket t",stateType).first());
+                    // #6240: an entity bound as a parameter, theta and ad-hoc entity joins,
+                    // and a relationship id path in a bulk delete.
+                    org.junit.Assert.assertEquals(1,session.createQuery("select t from scalarprojections.Ticket t where t.owner = :o").setParameter("o",owner).list().size());
+                    org.junit.Assert.assertEquals(1,session.createQuery("select t from scalarprojections.Ticket t, scalarprojections.Person p where t.owner.id = p.id and p.active = true").list().size());
+                    org.junit.Assert.assertEquals(1,session.createQuery("select t from scalarprojections.Ticket t join scalarprojections.Person p on t.owner.id = p.id where p.active = true").list().size());
+                    org.junit.Assert.assertEquals(0,session.createQuery("select t from scalarprojections.Ticket t join scalarprojections.Person p on t.owner.id = p.id where p.active = false").list().size());
+                    session.beginTransaction();
+                    org.junit.Assert.assertEquals(1,session.createQuery("delete from scalarprojections.Ticket t where t.owner.id = :oid").setParameter("oid",ownerType.getField("id").get(owner)).executeUpdate());
+                    session.rollbackTransaction();
+                    session.beginTransaction();
+                    org.junit.Assert.assertEquals(1,session.createQuery("delete from scalarprojections.Ticket t where t.owner = :o").setParameter("o",owner).executeUpdate());
+                    session.rollbackTransaction();
                 } finally { session.close();db.close(); }
             }
         }
