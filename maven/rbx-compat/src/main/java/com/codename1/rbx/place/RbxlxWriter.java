@@ -33,7 +33,6 @@ import com.codename1.rbx.UDim;
 import com.codename1.rbx.UDim2;
 import com.codename1.rbx.Vector2;
 import com.codename1.rbx.Vector3;
-import com.codename1.util.Base64;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -67,7 +66,7 @@ public final class RbxlxWriter {
             w.out.append("\t<SharedStrings>\n");
             for (int i = 0; i < w.shared.size(); i++) {
                 w.out.append("\t\t<SharedString md5=\"").append(w.sharedKeys.get(i)).append("\">");
-                w.out.append(Base64.encodeNoNewline(w.shared.get(i))).append("</SharedString>\n");
+                w.out.append(PlaceBase64.encode(w.shared.get(i))).append("</SharedString>\n");
             }
             w.out.append("\t</SharedStrings>\n");
         }
@@ -162,7 +161,7 @@ public final class RbxlxWriter {
                 }
                 break;
             case "BinaryString":
-                out.append(Base64.encodeNoNewline((byte[]) v));
+                out.append(PlaceBase64.encode((byte[]) v));
                 break;
             case "SharedString":
                 out.append(sharedKey((byte[]) v));

@@ -33,7 +33,6 @@ import com.codename1.rbx.UDim;
 import com.codename1.rbx.UDim2;
 import com.codename1.rbx.Vector2;
 import com.codename1.rbx.Vector3;
-import com.codename1.util.Base64;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -333,11 +332,7 @@ public final class RbxlxReader {
         if (b.length() == 0) {
             return new byte[0];
         }
-        try {
-            return Base64.decode(b.toString().getBytes("UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException("UTF-8 is required", e);
-        }
+        return PlaceBase64.decode(b.toString());
     }
 
     static String utf8(byte[] d, int off, int len) {

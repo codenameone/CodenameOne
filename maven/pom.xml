@@ -123,6 +123,7 @@
         <module>python-transpiler</module>
         <module>luau-runtime</module>
         <module>rbx-compat</module>
+        <module>rbx-view</module>
         <module>sqlite-jdbc</module>
         <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
         <module>backend</module>

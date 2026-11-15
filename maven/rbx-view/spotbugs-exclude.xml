@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Engine objects have Luau reference semantics: an Instance's children,
+         a CFrame's parts and the runtime's tables are the objects scripts share, and a
+         defensive copy would change what a program observes (setting a
+         field on getmetatable(t) must be visible through t). -->
+    <Match>
+        <Package name="com.codename1.rbx"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+    <!-- A Luau call returns its values as an Object[], and null is the
+         interpreter's "no values"; a zero-length array per call would be an
+         allocation on every void call a frame makes. -->
+    <Match>
+        <Package name="com.codename1.rbx"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+    <!-- Datatype equality is Luau's __eq: exact component comparison of the
+         doubles, as scripts observe it (Vector3.new(1,2,3) == Vector3.new(1,2,3)),
+         and equals() delegates to that same instanceof-checked eq(). -->
+    <Match>
+        <Package name="com.codename1.rbx"/>
+        <Or>
+            <Bug pattern="EQ_UNUSUAL"/>
+            <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
+        </Or>
+    </Match>
+</FindBugsFilter>

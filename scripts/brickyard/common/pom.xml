@@ -29,6 +29,11 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-rbx-compat</artifactId>
         </dependency>
+        <!-- The renderer, play view and studio agent tools over that engine. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-rbx-view</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-luau-runtime</artifactId>

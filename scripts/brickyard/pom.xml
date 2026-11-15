@@ -87,6 +87,11 @@
         <artifactId>codenameone-rbx-compat</artifactId>
         <version>${cn1.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-rbx-view</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>

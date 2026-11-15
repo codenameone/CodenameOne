@@ -22,9 +22,11 @@ name: Brickyard (game platform sample)
 # The engine modules' static analysis (SpotBugs, PMD, Checkstyle) and the
 # cast-semantics check run in pr.yml with the rest of the framework.
 #
-# Not here yet: the server is not compiled by ParparVM (rbx-compat needs the
-# client core at run time, which a native backend does not have), and there
-# is no simulator or device leg, because the project has no javase module.
+# The engine (rbx-compat) names nothing of the client framework -- its
+# ServerSafeTest holds that -- so the server can run it compiled natively; the
+# renderer, play view and agent tools are rbx-view, which only the app uses.
+# Not here yet: a simulator or device leg, because the project has no javase
+# module.
 
 on:
   # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
@@ -34,6 +36,7 @@ on:
       - 'scripts/brickyard/**'
       - 'maven/luau-runtime/**'
       - 'maven/rbx-compat/**'
+      - 'maven/rbx-view/**'
       - '.github/workflows/brickyard.yml'
   workflow_dispatch:
   schedule:
@@ -67,7 +70,7 @@ jobs:
           bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core -am install -DskipTests \
             -Plocal-dev-javase -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
-          mvn -B -pl luau-runtime,rbx-compat install \
+          mvn -B -pl luau-runtime,rbx-compat,rbx-view install \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
         env:
@@ -81,6 +84,7 @@ jobs:
           path: |
             maven/luau-runtime/target/surefire-reports/**
             maven/rbx-compat/target/surefire-reports/**
+            maven/rbx-view/target/surefire-reports/**
           if-no-files-found: warn
           retention-days: 14
 
@@ -258,7 +262,7 @@ jobs:
         working-directory: maven
         run: |
           bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
-            -pl core,css-compiler,codenameone-maven-plugin,backend,luau-runtime,rbx-compat \
+            -pl core,css-compiler,codenameone-maven-plugin,backend,luau-runtime,rbx-compat,rbx-view \
             -am install -DskipTests -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true \

@@ -52,6 +52,7 @@ public class PlayView extends Container {
     private UITimer timer;
     private long last;
     private boolean paused;
+    private Runnable afterStep;
 
     public PlayView(Engine engine) {
         super(new LayeredLayout());
@@ -73,6 +74,13 @@ public class PlayView extends Container {
     /// True when this device can draw the 3D view.
     public boolean isSupported() {
         return view.isSupported();
+    }
+
+    /// Runs `r` on the EDT right after every engine step, before the frame
+    /// is drawn: a multiplayer client sends its movement here, so what it
+    /// sends is exactly the frame the player sees.
+    public void setAfterStep(Runnable r) {
+        afterStep = r;
     }
 
     /// Pauses or resumes simulation (the in-experience menu).
@@ -154,6 +162,9 @@ public class PlayView extends Container {
         }
         Input.move(engine, overlay.stickX, overlay.stickY);
         engine.step(dt);
+        if (afterStep != null) {
+            afterStep.run();
+        }
         camera.update(engine);
         renderer.submit(SceneSnapshot.of(engine));
         overlay.repaint();
