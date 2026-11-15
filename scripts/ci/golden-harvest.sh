@@ -3,6 +3,7 @@
 #
 #   golden-harvest.sh list SHA RUNS_FILE    the newest uncancelled run of each screenshot workflow at SHA; sets
 #                                           ready=1 in GITHUB_OUTPUT when all completed
+#   golden-harvest.sh count SHA             how many screenshot runs exist at SHA
 #   golden-harvest.sh collect RUNS_FILE DEST   take their unowned-golden images into DEST
 #
 # Needs GH_TOKEN (actions: read) and GITHUB_REPOSITORY.
@@ -31,10 +32,10 @@ list() {
                --jq '[.workflow_runs[] | select(.conclusion != "cancelled")] | sort_by(.id) | last // empty | "\(.id) \(.status)"')
   done
   if [ "$pending" = 0 ] && [ -s "$runs_file" ]; then
-    echo "ready=1" >> "$GITHUB_OUTPUT"
+    echo "ready=1" >> "${GITHUB_OUTPUT:-/dev/null}"
   else
     log "not every screenshot run at $sha has completed; the last one harvests"
-    echo "ready=0" >> "$GITHUB_OUTPUT"
+    echo "ready=0" >> "${GITHUB_OUTPUT:-/dev/null}"
   fi
 }
 
@@ -51,7 +52,18 @@ collect() {
     "--manifest=$dest/docs/website/data/port_status.json" "$dl" "$dest"
 }
 
+# How many screenshot runs exist at SHA, any status.
+count() {
+  local sha="$1" wf n total=0
+  for wf in "${WORKFLOWS[@]}"; do
+    n="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/runs?head_sha=$sha&event=pull_request&per_page=1" --jq .total_count)"
+    total=$((total + n))
+  done
+  echo "$total"
+}
+
 case "${1:-}" in
+  count) count "$2" ;;
   list) list "$2" "$3" ;;
   collect) collect "$2" "$3" ;;
   *) echo "usage: $0 list|collect ..." >&2; exit 2 ;;

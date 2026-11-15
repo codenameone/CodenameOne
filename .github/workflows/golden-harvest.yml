@@ -43,7 +43,7 @@ permissions:
 # head branch. That is the commit the next run compares on as well, so the
 # golden matches what CI will render.
 concurrency:
-  group: golden-harvest-${{ github.event.workflow_run.head_branch }}
+  group: golden-harvest-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 jobs:
@@ -90,18 +90,25 @@ jobs:
         run: |
           set -euo pipefail
           cd pr
-          # The branch may have moved past HEAD_SHA. If the move touched
-          # anything that decides what the suite renders, these images may be
-          # stale: leave it to the new head's own runs. Otherwise (a docs fix
-          # the paths filters skip) nobody else will harvest, so collect onto
-          # the head: nothing existing is overwritten.
-          if [ "$(git rev-parse HEAD)" != "$HEAD_SHA" ]; then
-            git fetch --no-tags origin "$HEAD_SHA"
-            if git diff --name-only "$HEAD_SHA" HEAD | grep -E '^(scripts/|docs/website/data/|Ports/|CodenameOne/|maven/|vm/)' ; then
-              echo "The branch moved past $HEAD_SHA with changes that affect rendering; its own runs will harvest."
+          # The branch may have moved past HEAD_SHA. When the new head has
+          # screenshot runs of its own, they render the current code and will
+          # harvest; these images may be stale. When it has none (the paths
+          # filters skipped them all), nobody else will, so collect onto the
+          # head: nothing existing is overwritten.
+          now="$(git rev-parse HEAD)"
+          if [ "$now" != "$HEAD_SHA" ]; then
+            if ! own="$(../trusted/scripts/ci/golden-harvest.sh count "$now")"; then
+              echo "::error::could not list the screenshot runs at $now"
+              exit 1
+            fi
+            if [ "$own" -gt 0 ]; then
+              echo "The branch moved to $now, which has $own screenshot run(s) of its own; they harvest."
               exit 0
             fi
           fi
+          # Again at collect time: a leg that completed after the listing
+          # step queued a harvest this group may have replaced.
+          ../trusted/scripts/ci/golden-harvest.sh list "$HEAD_SHA" ../runs.txt
           ok=1
           ../trusted/scripts/ci/golden-harvest.sh collect ../runs.txt "$PWD" || ok=0
           git add -A -- scripts
