@@ -127,6 +127,8 @@
         <include>.gitignore</include>
         <!-- Root pointer to .agent-skills/; see the skill fileSets above. -->
         <include>AGENTS.md</include>
+        <!-- BuildCloud's MCP server for agents (signing, push, submission); staged like AGENTS.md. -->
+        <include>.mcp.json</include>
         <include>*.sh</include>
         <include>*.bat</include>
         <include>*.adoc</include>

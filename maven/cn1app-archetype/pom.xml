@@ -119,6 +119,9 @@
                 <copy file="${project.basedir}/../../scripts/initializr/common/src/main/resources/agent-skill-agents-md.md"
                       tofile="${project.build.outputDirectory}/archetype-resources/AGENTS.md"
                       overwrite="true"/>
+                <copy file="${project.basedir}/../../scripts/initializr/common/src/main/resources/agent-mcp-json.json"
+                      tofile="${project.build.outputDirectory}/archetype-resources/.mcp.json"
+                      overwrite="true"/>
                 <copy file="${project.basedir}/../../scripts/initializr/common/src/main/resources/agent-skill-claude-stub.md"
                       tofile="${project.build.outputDirectory}/archetype-resources/.claude/skills/codename-one/SKILL.md"
                       overwrite="true"/>
