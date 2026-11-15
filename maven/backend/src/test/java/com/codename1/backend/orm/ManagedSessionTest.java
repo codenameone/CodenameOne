@@ -308,6 +308,26 @@ class ManagedSessionTest {
         }
     }
 
+    @Test void saveOfANewEntityManagesTheArgumentItself() throws Exception {
+        // Issue 6240: save merged a new entity, so the argument stayed detached,
+        // never got its generated key, and saving it again inserted a second row.
+        Database db=Database.open(":memory:");
+        java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),new Model());
+        Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+        try {
+            session.createTables();session.beginTransaction();
+            Record r=new Record();r.name="x";
+            assertSame(r,session.save(r));assertTrue(session.contains(r));
+            session.commitTransaction();assertTrue(r.id!=0);
+            session.beginTransaction();r.name="y";assertSame(r,session.save(r));session.commitTransaction();
+            assertEquals(1,session.query(Record.class).count());
+            session.clear();session.beginTransaction();
+            Record detached=new Record();detached.id=r.id;detached.version=r.version;detached.name="z";
+            Record merged=session.save(detached);assertNotSame(detached,merged);session.commitTransaction();
+            assertEquals(1,session.query(Record.class).count());
+        } finally { session.close();db.close(); }
+    }
+
     @Test void mergeDoesNotResurrectMissingAssignedVersionedRows() throws Exception {
         for(boolean composite:new boolean[]{false,true}) {
             Database db=Database.open(":memory:");

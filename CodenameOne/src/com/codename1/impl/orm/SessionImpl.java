@@ -612,6 +612,33 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         return entity;
     }
     @Override
+    public <T> T save(T entity) {
+        if (entity == null) {
+            throw new IllegalArgumentException("entity is null");
+        }
+        if (entries.containsKey(entity)) {
+            return merge(entity);
+        }
+        EntityModel<T> model = model((Class<T>) entity.getClass());
+        if (!model.immutable() && isNewEntity(model, entity)) {
+            // Spring Data persists a new entity rather than merging it: merging
+            // would copy it into a fresh managed instance and leave the caller's
+            // object detached and without its generated key, so a second save
+            // of the same object inserted a second row (issue 6240).
+            persist(entity);
+            return entity;
+        }
+        return merge(entity);
+    }
+    private static <T> boolean isNewEntity(EntityModel<T> model, T entity) {
+        Object id = model.identifier(entity);
+        if (id == null) {
+            return true;
+        }
+        boolean generated = model.attributes()[model.idIndex()].generated || model.generation() != 0;
+        return generated && id instanceof Number && ((Number) id).longValue() == 0;
+    }
+    @Override
     public <T> T merge(T entity) {
         // Relationship lookups must not flush a partially copied merge graph.
         T merged;

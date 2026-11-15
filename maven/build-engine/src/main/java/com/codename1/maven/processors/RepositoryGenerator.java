@@ -140,7 +140,7 @@ final class RepositoryGenerator {
         // wrapper that runs it REQUIRED (see wrap).
         String[][] defaults = {
             {"findById", e, k, "return session.find(" + e + ".class,p0);", "true"},
-            {"save", e, e, "return session.merge(p0);", "false"},
+            {"save", e, e, "return session.save(p0);", "false"},
             {"insert", "void", e, "session.persist(p0);", "false"},
             {"deleteById", "void", k, "requireTransaction(); " + e + " value=session.find(" + e + ".class,p0); if(value!=null) session.remove(value);", "false"},
             {"findAll", list, "", "return session.query(" + e + ".class).list();", "true"},
@@ -149,7 +149,7 @@ final class RepositoryGenerator {
             {"delete", "void", e, "requireTransaction(); if(p0==null) throw new IllegalArgumentException(\"entity is null\"); if(session.contains(p0)) { session.remove(p0); return; } " + e + " value=session.merge(p0); if(value!=null) session.remove(value);", "false"},
             {"deleteAll", "void", "", "requireTransaction(); for(" + e + " value : session.query(" + e + ".class).list()) session.remove(value);", "false"},
             {"deleteAll", "void", "Iterable<? extends " + e + ">", "requireTransaction(); if(p0==null) throw new IllegalArgumentException(\"entities is null\"); for(" + e + " value : p0) delete$cn1Tx(value);", "false"},
-            {"saveAll", list, "Iterable<? extends " + e + ">", "if(p0==null) throw new IllegalArgumentException(\"entities is null\"); " + list + " out=new java.util.ArrayList<" + e + ">(); for(" + e + " value : p0) out.add(session.merge(value)); return out;", "false"},
+            {"saveAll", list, "Iterable<? extends " + e + ">", "if(p0==null) throw new IllegalArgumentException(\"entities is null\"); " + list + " out=new java.util.ArrayList<" + e + ">(); for(" + e + " value : p0) out.add(session.save(value)); return out;", "false"},
             {"findAllById", list, "Iterable<" + k + ">", "if(p0==null) throw new IllegalArgumentException(\"ids is null\"); " + list + " out=new java.util.ArrayList<" + e + ">(); for(" + k + " id : p0) { " + e + " value=session.find(" + e + ".class,id); if(value!=null) out.add(value); } return out;", "true"},
             {"flush", "void", "", "session.flush();", "false"}
         };

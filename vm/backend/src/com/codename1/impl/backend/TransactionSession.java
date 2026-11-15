@@ -148,6 +148,11 @@ public final class TransactionSession implements Session {
     }
 
     @Override
+    public <T> T save(T entity) {
+        return current().save(entity);
+    }
+
+    @Override
     public void remove(Object entity) {
         current().remove(entity);
     }
