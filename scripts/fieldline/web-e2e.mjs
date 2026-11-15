@@ -230,9 +230,11 @@ try {
   await click(await waitFor('the usage statistics question', stepSeconds, button('Not now')));
   say('declined usage statistics');
 
-  // 3. The home screen.
+  // 3. The home screen. Its map button is always there; the route list sits
+  //    in the bottom sheet, which a phone-sized page keeps collapsed, and the
+  //    rest of the screen depends on how much of the day is left.
   await waitFor('the home screen', stepSeconds, async () =>
-      (await screenText()).includes('Your route'));
+      (await screenText()).includes('Show the whole route'));
   await page.screenshot({ path: path.join(out, '3-home.png') });
   say('signed in: the home screen is up');
 
