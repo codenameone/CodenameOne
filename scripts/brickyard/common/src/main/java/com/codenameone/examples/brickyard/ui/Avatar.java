@@ -37,9 +37,21 @@ public final class Avatar {
     private static final int[] DEFAULTS = {0xf5cd7a, 0x3caaff, 0xf5cd7a, 0xf5cd7a, 0x5ac86e, 0x5ac86e};
     private static final String KEY = "brickyard.avatar";
 
+    /// The character bodies, as the game draws them (`AvatarBody`).
+    public static final String[] BODIES = {"knight", "barbarian", "mage", "rogue"};
+    /// What each body is called in the editor.
+    public static final String[] BODY_NAMES = {"Knight", "Barbarian", "Mage", "Rogue"};
+
     private final int[] colors;
+    private final String body;
 
     public Avatar(int[] colors) {
+        this(colors, null);
+    }
+
+    /// `body` is one of [#BODIES], or null for the first.
+    public Avatar(int[] colors, String body) {
+        this.body = known(body);
         this.colors = new int[PARTS.length];
         for (int i = 0; i < PARTS.length; i++) {
             this.colors[i] = colors != null && i < colors.length ? colors[i] & 0xffffff : DEFAULTS[i];
@@ -54,10 +66,30 @@ public final class Avatar {
         int[] copy = new int[colors.length];
         System.arraycopy(colors, 0, copy, 0, colors.length);
         copy[part] = color & 0xffffff;
-        return new Avatar(copy);
+        return new Avatar(copy, body);
     }
 
-    /// The colours as comma separated six digit hex, head first.
+    /// The body the character plays as; never null.
+    public String body() {
+        return body;
+    }
+
+    /// This avatar wearing `b` instead.
+    public Avatar withBody(String b) {
+        return new Avatar(colors, b);
+    }
+
+    private static String known(String b) {
+        for (String k : BODIES) {
+            if (k.equals(b)) {
+                return k;
+            }
+        }
+        return BODIES[0];
+    }
+
+    /// The colours as comma separated six digit hex, head first, then `;`
+    /// and the body.
     public String encode() {
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < colors.length; i++) {
@@ -67,13 +99,20 @@ public final class Avatar {
             String hex = Integer.toHexString(colors[i] | 0x1000000);
             b.append(hex.substring(1));
         }
-        return b.toString();
+        return b.append(';').append(body).toString();
     }
 
     /// Reads [#encode]'s form; a missing or malformed part keeps its default.
-    public static Avatar decode(String text) {
+    public static Avatar decode(String encoded) {
+        String text = encoded;
         int[] out = new int[PARTS.length];
         System.arraycopy(DEFAULTS, 0, out, 0, out.length);
+        String body = null;
+        int semi = text == null ? -1 : text.indexOf(';');
+        if (semi >= 0) {
+            body = text.substring(semi + 1);
+            text = text.substring(0, semi);
+        }
         if (text != null) {
             int part = 0;
             int start = 0;
@@ -90,7 +129,7 @@ public final class Avatar {
                 start = end + 1;
             }
         }
-        return new Avatar(out);
+        return new Avatar(out, body);
     }
 
     private static int hex(String s, int from, int to) {

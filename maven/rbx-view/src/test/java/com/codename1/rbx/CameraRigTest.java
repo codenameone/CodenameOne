@@ -24,6 +24,7 @@
 package com.codename1.rbx;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -56,6 +57,63 @@ class CameraRigTest {
         CFrame r = Behaviors.cf(root);
         double dist = Math.sqrt((f.x - r.x) * (f.x - r.x) + (f.y - r.y - 1.5) * (f.y - r.y - 1.5)
                 + (f.z - r.z) * (f.z - r.z));
-        assertEquals(16, dist, 1e-6);
+        assertEquals(12.5, dist, 1e-6);
+    }
+
+    private static Engine spawned() {
+        Engine e = new Engine(Engine.SOLO);
+        e.setPhysics(new RigidBodies());
+        e.addPlayer(1, "Tester", null);
+        for (int i = 0; i < 30; i++) {
+            e.step(1 / 60.0);
+        }
+        return e;
+    }
+
+    private static CFrame eye(Engine e) {
+        return (CFrame) ((Instance) e.getWorkspace().prop("CurrentCamera")).prop("CFrame");
+    }
+
+    @Test
+    void startsBehindTheCharacterLookingWhereItFaces() {
+        // The camera used to start in front of a spawned character, looking
+        // at its face with the course behind the camera.
+        Engine e = spawned();
+        new CameraRig().update(e);
+        CFrame root = Behaviors.cf(((Instance) e.getLocalPlayer().prop("Character")).findFirstChild("HumanoidRootPart"));
+        CFrame f = eye(e);
+        Vector3 facing = root.look();
+        double ox = f.x - root.x;
+        double oz = f.z - root.z;
+        assertTrue(ox * facing.x + oz * facing.z < -10, "the eye is behind the character");
+        assertTrue(f.look().x * facing.x + f.look().z * facing.z > 0, "and looks the same way");
+    }
+
+    @Test
+    void pullsInFrontOfAWallInsteadOfGoingThroughIt() {
+        Engine e = spawned();
+        CameraRig rig = new CameraRig();
+        rig.update(e);
+        CFrame before = eye(e);
+        CFrame root = Behaviors.cf(((Instance) e.getLocalPlayer().prop("Character")).findFirstChild("HumanoidRootPart"));
+        double mx = (before.x + root.x) / 2;
+        double mz = (before.z + root.z) / 2;
+        Instance wall = e.create("Part");
+        wall.put("Anchored", Boolean.TRUE);
+        wall.put("Size", new Vector3(40, 40, 1));
+        wall.put("CFrame", new CFrame(mx, root.y, mz, 1, 0, 0, 0, 1, 0, 0, 0, 1));
+        wall.setParent(e.getWorkspace());
+        rig.update(e);
+        CFrame f = eye(e);
+        double d = Math.sqrt((f.x - root.x) * (f.x - root.x) + (f.z - root.z) * (f.z - root.z));
+        double wallD = Math.sqrt((mx - root.x) * (mx - root.x) + (mz - root.z) * (mz - root.z));
+        assertTrue(d < wallD, "the eye sits between the character and the wall: " + d + " vs " + wallD);
+    }
+
+    @Test
+    void theCameraNeverDropsBelowTheHead() {
+        CameraRig rig = new CameraRig();
+        rig.orbit(0, -10);
+        assertEquals(CameraRig.MIN_PITCH, rig.pitch(), 1e-9);
     }
 }

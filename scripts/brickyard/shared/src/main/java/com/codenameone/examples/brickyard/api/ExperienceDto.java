@@ -22,5 +22,5 @@ import com.codename1.annotations.Mapped;
 
 /// An experience as the browser lists it. publishedVersion is 0 until a version is published.
 @Mapped
-public record ExperienceDto(String id, String owner, String title, String description, String genre, int maxPlayers, String access, String ageRating, int publishedVersion, long visits, long favourites, long upVotes, long downVotes) {
+public record ExperienceDto(String id, String owner, String ownerName, String title, String description, String genre, int maxPlayers, String access, String ageRating, int publishedVersion, long visits, long favourites, long upVotes, long downVotes) {
 }

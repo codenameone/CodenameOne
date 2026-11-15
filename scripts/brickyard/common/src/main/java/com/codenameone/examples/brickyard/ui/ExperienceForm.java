@@ -57,9 +57,9 @@ public final class ExperienceForm {
 
     static void fill(final Form f, final ExperienceDto e) {
         f.setTitle(e.title());
-        f.add(new Thumbnail(e.id(), 80));
+        f.add(new Thumbnail(e, 80));
         f.add(Ui.label(e.title(), "Logo"));
-        f.add(Ui.label("by " + e.owner(), "Muted"));
+        f.add(Ui.label("by " + e.ownerName(), "Muted"));
         if (e.description() != null && e.description().length() > 0) {
             f.add(Ui.text(e.description(), "Body"));
         }
@@ -67,7 +67,7 @@ public final class ExperienceForm {
         stats.setName("stats");
         f.add(stats);
         f.add(Ui.primary("Play", "playButton", ev -> play(e)));
-        Container votes = BoxLayout.encloseX(
+        Container votes = com.codename1.ui.layouts.GridLayout.encloseIn(3,
                 Ui.secondary("Like", "likeButton", ev -> Api.experiences().vote(e.id(), new VoteDto(1),
                         Net.to(updated -> refresh(f, stats, updated), Ui::failed))),
                 Ui.secondary("Dislike", "dislikeButton", ev -> Api.experiences().vote(e.id(), new VoteDto(-1),
@@ -101,8 +101,12 @@ public final class ExperienceForm {
 
     static String stats(ExperienceDto e) {
         int rating = Experiences.rating(e);
-        return (rating < 0 ? "No votes yet" : rating + "% liked") + "  -  " + e.visits() + " visits  -  "
-                + e.favourites() + " favourites  -  up to " + e.maxPlayers() + " players";
+        return (rating < 0 ? "No votes yet" : rating + "% liked") + "  -  " + count(e.visits(), "visit") + "  -  "
+                + count(e.favourites(), "favourite") + "  -  up to " + count(e.maxPlayers(), "player");
+    }
+
+    static String count(long n, String noun) {
+        return n + " " + noun + (n == 1 ? "" : "s");
     }
 
     private static void refresh(Form f, com.codename1.ui.Label stats, ExperienceDto updated) {

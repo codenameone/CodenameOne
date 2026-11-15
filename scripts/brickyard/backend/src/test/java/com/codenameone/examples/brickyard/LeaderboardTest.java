@@ -65,7 +65,14 @@ class LeaderboardTest {
         score(id, c, 1);
         List all = Api.list(mvc, Api.as(get("/api/leaderboards/" + id + "/Wins?period=all&limit=2"), a));
         assertEquals(2, all.size());
-        assertEquals(a, ((Map) all.get(0)).get("userId"));
+        assertEquals(com.codenameone.examples.brickyard.leaderboard.Leaderboards.publicId(a),
+                ((Map) all.get(0)).get("userId"));
+        // A username is an e-mail address; what other players are shown is the display name.
+        String shown = String.valueOf(((Map) all.get(0)).get("name"));
+        assertTrue(shown.length() > 0 && shown.indexOf('@') < 0, shown);
+        Map experience = Api.json(mvc, Api.as(get("/api/experiences/" + id), a));
+        String by = String.valueOf(experience.get("ownerName"));
+        assertTrue(by.length() > 0 && by.indexOf('@') < 0, by);
         assertEquals(7L, Api.number((Map) all.get(0), "value"));
         assertEquals(2L, Api.number((Map) all.get(1), "rank"));
         assertEquals(3, Api.list(mvc, Api.as(get("/api/leaderboards/" + id + "/Wins?period=daily&limit=10"),

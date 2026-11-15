@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 /// The pure logic behind home, the avatar and the parental limit.
 class HomeLogicTest {
     private static ExperienceDto x(String id, String genre, long visits, long up, long down) {
-        return new ExperienceDto(id, "owner", id, "", genre, 8, "public", "all", 1, visits, 0, up, down);
+        return new ExperienceDto(id, "owner", "Owner", id, "", genre, 8, "public", "all", 1, visits, 0, up, down);
     }
 
     @Test
@@ -58,6 +58,10 @@ class HomeLogicTest {
         assertEquals(0x8a5cf0, Avatar.decode(a.encode()).color(Avatar.TORSO));
         Avatar bad = Avatar.decode("zz,12");
         assertEquals(Avatar.decode("").color(Avatar.HEAD), bad.color(Avatar.HEAD));
+        assertEquals("knight", Avatar.decode("").body(), "no choice: the first body");
+        assertEquals("rogue", Avatar.decode(a.withBody("rogue").encode()).body());
+        assertEquals(0x8a5cf0, Avatar.decode(a.withBody("rogue").encode()).color(Avatar.TORSO));
+        assertEquals("knight", Avatar.decode("ff0000;dragon").body(), "an unknown body is not drawn");
     }
 
     @Test

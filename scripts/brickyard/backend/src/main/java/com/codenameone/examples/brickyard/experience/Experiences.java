@@ -43,6 +43,7 @@ import com.codenameone.examples.brickyard.repository.ReactionRepository;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /// Experiences and their versions. Exactly one version is PUBLISHED at a time
 /// and the experience's publishedVersion names it; a version superseded by a
@@ -63,8 +64,15 @@ public class Experiences {
     private final Accounts accounts;
     private final Places places;
 
+    private final com.codenameone.examples.brickyard.analytics.Analytics analytics;
+    private final com.codenameone.examples.brickyard.progress.Progression progression;
+
     public Experiences(ExperienceRepository experiences, ExperienceVersionRepository versions,
-            ReactionRepository reactions, Accounts accounts, Places places) {
+            ReactionRepository reactions, Accounts accounts, Places places,
+            com.codenameone.examples.brickyard.analytics.Analytics analytics,
+            com.codenameone.examples.brickyard.progress.Progression progression) {
+        this.analytics = analytics;
+        this.progression = progression;
         this.experiences = experiences;
         this.versions = versions;
         this.reactions = reactions;
@@ -103,22 +111,23 @@ public class Experiences {
     @Transactional(readOnly = true)
     public List<ExperienceDto> browse(String genre) {
         int age = accounts.age(Caller.name());
-        List<ExperienceDto> out = new ArrayList<ExperienceDto>();
+        List<Experience> shown = new ArrayList<Experience>();
         for (Experience e : experiences.published(0)) {
             if (PUBLIC.equals(e.getAccessLevel()) && age >= minimumAge(e.getAgeRating())
                     && (genre == null || genre.length() == 0 || genre.equals(e.getGenre()))) {
-                out.add(toDto(e));
+                shown.add(e);
             }
         }
-        return out;
+        return toDtos(shown);
     }
 
     /// Everything `owner` created, drafts and unpublished ones included.
     @Transactional(readOnly = true)
     public List<ExperienceDto> mine(String owner) {
         List<ExperienceDto> out = new ArrayList<ExperienceDto>();
+        String name = accounts.publicName(owner);
         for (Experience e : experiences.findByOwner(owner)) {
-            out.add(toDto(e));
+            out.add(toDto(e, name));
         }
         return out;
     }
@@ -232,10 +241,22 @@ public class Experiences {
     }
 
     @Transactional(rollbackFor = IOException.class)
-    public ExperienceDto visit(String id) {
+    public ExperienceDto visit(String id) throws IOException {
         Experience e = visible(id);
         e.setVisits(e.getVisits() + 1);
         experiences.save(e);
+        // Every play, solo or online, starts here, so this is the one place
+        // the dashboard's VISIT is recorded. Rooms recorded it before, and a
+        // solo play never reached the dashboard at all.
+        String me = Caller.name();
+        boolean firstToday = !analytics.visitedSince(id, me, Clock.dayOf(Clock.now()));
+        boolean firstEver = firstToday && !analytics.visitedSince(id, me, 0);
+        analytics.record(id, me, "VISIT", 1);
+        // XP for playing is earned here, where the server sees the play
+        // start, and once per experience per day (see Progression.played).
+        if (firstToday && !Access.isOwner(e)) {
+            progression.played(me, firstEver);
+        }
         return toDto(e);
     }
 
@@ -331,8 +352,34 @@ public class Experiences {
         throw new ResponseStatusException(400, "A rating is ALL, 9+, 13+ or 17+");
     }
 
-    static ExperienceDto toDto(Experience e) {
-        return new ExperienceDto(e.getId(), e.getOwner(), e.getTitle(), e.getDescription(), e.getGenre(),
+    ExperienceDto toDto(Experience e) {
+        return toDto(e, accounts.publicName(e.getOwner()));
+    }
+
+    /// Converts a list with one display-name query for all of its owners.
+    private List<ExperienceDto> toDtos(List<Experience> list) {
+        List<String> owners = new ArrayList<String>();
+        for (Experience e : list) {
+            if (e.getOwner() != null && !owners.contains(e.getOwner())) {
+                owners.add(e.getOwner());
+            }
+        }
+        Map<String, String> names = accounts.publicNames(owners);
+        List<ExperienceDto> out = new ArrayList<ExperienceDto>();
+        for (Experience e : list) {
+            String name = names.get(e.getOwner());
+            out.add(toDto(e, name == null ? "Player" : name));
+        }
+        return out;
+    }
+
+    static ExperienceDto toDto(Experience e, String ownerName) {
+        // The owner's username is an e-mail address: only the owner gets it
+        // back (the app picks out its own experiences by it); everyone else
+        // sees the display name.
+        String caller = Caller.name();
+        String owner = caller != null && caller.equals(e.getOwner()) ? e.getOwner() : "";
+        return new ExperienceDto(e.getId(), owner, ownerName, e.getTitle(), e.getDescription(), e.getGenre(),
                 e.getMaxPlayers(), e.getAccessLevel(), e.getAgeRating(), e.getPublishedVersion(),
                 e.getVisits(), e.getFavourites(), e.getUpVotes(), e.getDownVotes());
     }

@@ -65,27 +65,28 @@ public final class HomeForm {
         final Container box = new Container(BoxLayout.y());
         box.setName("progress");
         content.add(box);
-        Api.progression().progress(Net.to(p -> {
-            box.add(Ui.label("Level " + p.level() + " - " + p.streak() + " day streak", "CardMeta"));
-            f.revalidate();
+        Api.progression().dailyLogin(Net.to(p -> {
+            if (p != null) {
+                box.addComponent(0, ProgressViews.hero(p, null));
+                f.revalidate();
+            }
         }, (status, message) -> { }));
         Api.progression().quests(Net.to(quests -> {
             if (quests == null) {
                 return;
             }
-            for (final QuestDto q : quests) {
-                if (q.claimed() != 0) {
-                    continue;
+            // Two at most, ready-to-claim first: Home is for the games, and
+            // the Me page lists every quest.
+            int shown = 0;
+            for (int pass = 0; pass < 2 && shown < 2; pass++) {
+                for (final QuestDto q : quests) {
+                    boolean ready = q.claimed() == 0 && q.progress() >= q.target();
+                    boolean open = q.claimed() == 0 && q.progress() < q.target();
+                    if (shown < 2 && (pass == 0 ? ready : open)) {
+                        box.add(ProgressViews.quest(q, HomeForm::show));
+                        shown++;
+                    }
                 }
-                boolean done = q.progress() >= q.target();
-                box.add(Ui.panel(Ui.label(q.title(), "CardTitle"),
-                        Ui.label(Math.min(q.progress(), q.target()) + " / " + q.target() + " - "
-                                + q.rewardBricks() + " Bricks", "CardMeta"),
-                        done ? Ui.primary("Claim", "claim" + q.id(), e -> Api.progression().claimQuest(q.id(),
-                                Net.to(c -> {
-                                    Ui.toast("Quest claimed");
-                                    show();
-                                }, Ui::failed))) : Ui.label("", "Muted")));
             }
             f.revalidate();
         }, (status, message) -> { }));
@@ -96,6 +97,8 @@ public final class HomeForm {
     static void friendsPlaying(final Container content, final Form f, final List<ExperienceDto> all) {
         final Container row = new Container(BoxLayout.x());
         row.setScrollableX(true);
+        // A swipeable row; the scroll thumb drew as a thin white line under it.
+        row.setScrollVisible(false);
         row.setName("rowFriendsPlaying");
         final com.codename1.ui.Label title = Ui.label("", "RowTitle");
         content.add(title);
@@ -151,6 +154,8 @@ public final class HomeForm {
         content.add(Ui.label(title, "RowTitle"));
         Container row = new Container(BoxLayout.x());
         row.setScrollableX(true);
+        // A swipeable row; the scroll thumb drew as a thin white line under it.
+        row.setScrollVisible(false);
         row.setName("row" + title);
         for (ExperienceDto e : items) {
             row.add(card(e));
@@ -160,18 +165,20 @@ public final class HomeForm {
 
     static Container card(final ExperienceDto e) {
         com.codename1.ui.Button open = Ui.button("", "Card", "open" + e.id(), ev -> ExperienceForm.show(e.id()));
-        Container card = BoxLayout.encloseY(new Thumbnail(e.id(), 32),
+        Container card = BoxLayout.encloseY(new Thumbnail(e, 32),
                 Ui.label(e.title(), "CardTitle"),
                 Ui.label(meta(e), "CardMeta"));
         card.setUIID("Card");
         card.setLeadComponent(open);
         card.add(open);
         open.setHidden(true);
+        // The hidden lead button is what a screen reader activates; give it a name.
+        open.setAccessibilityText("Open " + e.title());
         return card;
     }
 
     static String meta(ExperienceDto e) {
         int rating = Experiences.rating(e);
-        return (rating < 0 ? "New" : rating + "% liked") + "  -  " + e.visits() + " visits";
+        return (rating < 0 ? "New" : rating + "% liked") + "  -  " + ExperienceForm.count(e.visits(), "visit");
     }
 }

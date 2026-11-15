@@ -200,6 +200,12 @@ public class Progression {
     @Transactional(rollbackFor = IOException.class)
     public ProgressDto report(ProgressEventDto event) throws IOException {
         Access.requireEngine();
+        return credit(event);
+    }
+
+    /// [#report] without the caller check: for [DevProgress], which has its
+    /// own (staff, development profile only).
+    ProgressDto credit(ProgressEventDto event) throws IOException {
         if (event == null || event.eventName() == null || event.amount() < 1 || event.amount() > MAX_UNITS) {
             throw new ResponseStatusException(400, "An event needs a name and 1 to " + MAX_UNITS + " units");
         }
@@ -215,6 +221,25 @@ public class Progression {
             }
         }
         return toDto(p, 0);
+    }
+
+    /// Units a day's first play of an experience is worth, and the extra for
+    /// an experience the player never played before.
+    static final long PLAY_UNITS = 5;
+
+    /// Credits a play the server itself saw start (`Experiences.visit`): the
+    /// `PLAY` event, plus `PLAY_NEW` for an experience new to the player.
+    /// The caller credits only the first play of each experience per day,
+    /// so replaying the same one cannot farm XP.
+    @Transactional(rollbackFor = IOException.class)
+    public void played(String username, boolean firstEver) throws IOException {
+        if (username == null || accounts.findById(username) == null) {
+            return;
+        }
+        credit(new ProgressEventDto(username, "PLAY", PLAY_UNITS));
+        if (firstEver) {
+            credit(new ProgressEventDto(username, "PLAY_NEW", PLAY_UNITS));
+        }
     }
 
     @Transactional(rollbackFor = IOException.class)

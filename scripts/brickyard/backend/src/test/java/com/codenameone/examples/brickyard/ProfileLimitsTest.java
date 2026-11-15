@@ -24,6 +24,7 @@ import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.brickyard.account.Accounts;
+import com.codenameone.examples.brickyard.account.Limits;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,8 @@ class ProfileLimitsTest {
     private Accounts accounts;
     @Autowired
     private PushSender pushes;
+    @Autowired
+    private Limits limits;
 
     @Test
     void avatarColoursAreKeptOnTheServer() throws Exception {
@@ -53,6 +56,17 @@ class ProfileLimitsTest {
         assertEquals("avatarer", p.get("displayName"), "an avatar-only save keeps the name");
         assertEquals(400, Api.statusOf(mvc, Api.as(Api.body(post("/api/me/profile"),
                 "{\"avatar\":\"red; drop\"}"), u)));
+    }
+
+    @Test
+    void theChosenBodyIsWhatThePlayServersDress() throws Exception {
+        String u = Api.player(accounts, "bodied");
+        assertEquals(null, limits.avatarBody(u), "no choice yet: the default figure");
+        Api.json(mvc, Api.as(Api.body(post("/api/me/profile"), "{\"avatar\":\"ff0000,00ff00;mage\"}"), u));
+        assertEquals("mage", limits.avatarBody(u));
+        assertEquals(400, Api.statusOf(mvc, Api.as(Api.body(post("/api/me/profile"),
+                "{\"avatar\":\"ff0000;dragon\"}"), u)), "only bodies the client can draw");
+        assertEquals("mage", limits.avatarBody(u), "a refused save keeps the last body");
     }
 
     @Test

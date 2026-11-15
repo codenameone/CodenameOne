@@ -33,4 +33,10 @@ public interface AnalyticsEventRepository extends CrudRepository<AnalyticsEvent,
 
     @Query("select a from AnalyticsEvent a where a.kind = :k and a.dayStart >= :from")
     List<AnalyticsEvent> kindSince(@Param("k") String kind, @Param("from") long from);
+
+    /// One player's events of a kind in one experience since a day: the
+    /// visit that earns progression is the first of each day.
+    @Query("select a from AnalyticsEvent a where a.experienceId = :e and a.username = :u and a.kind = :k and a.dayStart >= :from")
+    List<AnalyticsEvent> byPlayer(@Param("e") String experienceId, @Param("u") String username,
+            @Param("k") String kind, @Param("from") long from);
 }

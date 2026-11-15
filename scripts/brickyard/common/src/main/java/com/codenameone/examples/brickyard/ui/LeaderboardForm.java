@@ -95,7 +95,7 @@ public final class LeaderboardForm {
                 list.add(Ui.label("No scores yet. Be the first.", "Muted"));
             } else {
                 for (LeaderDto r : rows) {
-                    list.add(Ui.panel(Ui.label("#" + r.rank() + "  " + r.userId() + "  " + r.value(),
+                    list.add(Ui.panel(Ui.label("#" + r.rank() + "  " + r.name() + "  " + r.value(),
                             "CardTitle")));
                 }
             }

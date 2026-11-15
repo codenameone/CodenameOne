@@ -41,9 +41,12 @@ public final class AppConfig {
     public static final String PUSH_APP_KEY = "";
     // Google's public test units: they always fill and never pay.
     public static final String REWARDED_AD_UNIT = "ca-app-pub-3940256099942544/5224354917";
-    public static final String SKU_BRICKS_400 = "brickyard.bricks_400";
-    public static final String SKU_BRICKS_1000 = "brickyard.bricks_1000";
-    public static final String SKU_PLUS = "brickyard.plus_monthly";
+    // The store product ids. They must be exactly the SKUs the backend's
+    // Economy.packBricks credits (and Economy.PLUS_SKU): a receipt for any
+    // other id validates and then grants nothing.
+    public static final String SKU_BRICKS_400 = "bricks.400";
+    public static final String SKU_BRICKS_1000 = "bricks.1000";
+    public static final String SKU_PLUS = "plus.monthly";
     public static final String ENTITLEMENT_PLUS = "plus";
 
     private static final String SERVER_KEY = "brickyard.server";

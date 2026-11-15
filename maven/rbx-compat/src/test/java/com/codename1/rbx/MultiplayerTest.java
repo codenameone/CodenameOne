@@ -26,6 +26,7 @@ package com.codename1.rbx;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -135,6 +136,22 @@ class MultiplayerTest {
     }
 
     @Test
+    void serviceOwnPropertiesReachClients() {
+        Engine e = place();
+        e.service("Lighting").put("ClockTime", 17.6);
+        server = new ReplicaServer(e);
+        ReplicaClient alice = join("Alice");
+        frames(5);
+        Engine a = alice.getEngine();
+        assertEquals(17.6, a.service("Lighting").num("ClockTime"), 1e-9, "the place's time of day on join");
+        Object cam = a.getWorkspace().prop("CurrentCamera");
+        assertTrue(cam instanceof Instance, "the client keeps its own camera");
+        e.service("Lighting").put("ClockTime", 6.25);
+        frames(2);
+        assertEquals(6.25, a.service("Lighting").num("ClockTime"), 1e-9, "a day/night script's change");
+    }
+
+    @Test
     void replicatesWorldEventsAndCalls() {
         server = new ReplicaServer(place());
         ReplicaClient alice = join("Alice");
@@ -172,6 +189,9 @@ class MultiplayerTest {
         frames(60);
         Instance mine = alice.getEngine().getLocalPlayer().ref("Character");
         assertNotNull(mine, "Alice's character replicated and bound");
+        Instance cam = (Instance) alice.getEngine().getWorkspace().prop("CurrentCamera");
+        assertSame(mine.findFirstChildOfClass("Humanoid", false), cam.ref("CameraSubject"),
+                "the camera follows the replicated character, or it never leaves the place's default view");
         Instance root = mine.findFirstChild("HumanoidRootPart");
         CFrame start = (CFrame) root.prop("CFrame");
         root.put("CFrame", CFrame.at(start.x + 0.2, start.y, start.z));
@@ -187,5 +207,35 @@ class MultiplayerTest {
         assertTrue(server.getRejectedMoves() > 0, "a teleport is refused");
         assertTrue(((CFrame) onServer.prop("CFrame")).x < start.x + 100);
         assertTrue(((CFrame) root.prop("CFrame")).x < start.x + 100, "and the client is corrected");
+    }
+
+    @Test
+    void theServerSeesWhatAClientsCharacterTouches() {
+        Engine place = place();
+        Instance lava = add(place, place.getWorkspace(), "Part", "Lava");
+        lava.put("Anchored", Boolean.TRUE);
+        lava.put("Size", new Vector3(6, 1, 6));
+        lava.put("CFrame", CFrame.at(12, 1, 0));
+        add(place, lava, "Script", "Kill").put("Source",
+                "script.Parent.Touched:Connect(function(hit)\n"
+                + "  local h = hit.Parent and hit.Parent:FindFirstChildOfClass('Humanoid')\n"
+                + "  if h then h.Health = 0 end\n"
+                + "end)\n");
+        server = new ReplicaServer(place);
+        ReplicaClient alice = join("Alice");
+        frames(60);
+        Instance root = alice.getEngine().getLocalPlayer().ref("Character").findFirstChild("HumanoidRootPart");
+        CFrame start = (CFrame) root.prop("CFrame");
+        // Walk onto the lava at a speed the server accepts.
+        for (int i = 1; i <= 40; i++) {
+            CFrame at = (CFrame) root.prop("CFrame");
+            root.put("CFrame", CFrame.at(start.x + (12 - start.x) * i / 40.0, at.y, start.z + (0 - start.z) * i / 40.0));
+            frames(1);
+        }
+        frames(5);
+        Instance onServer = server.getEngine().service("Players").findFirstChild("Alice").ref("Character")
+                .findFirstChildOfClass("Humanoid", false);
+        assertEquals(0.0, onServer.num("Health"), 1e-9,
+                "a kill brick's Touched runs on the server for a character its client moves");
     }
 }

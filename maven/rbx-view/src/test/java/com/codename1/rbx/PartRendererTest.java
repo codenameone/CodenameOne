@@ -65,7 +65,12 @@ class PartRendererTest {
         assertEquals(3f, red.model[14], 1e-6);
         assertEquals(1f, s.bloomIntensity, 1e-6);
         assertEquals(18.5f, s.clockTime, 1e-6);
-        assertEquals(0xe08850, PartRenderer.sky(s.clockTime));
+        // Dusk is the warm horizon; noon the blue one; midnight dark.
+        assertEquals(0xf0a066, PartRenderer.sky(s.clockTime));
+        assertEquals(0xb8d4f0, PartRenderer.sky(12));
+        assertEquals(0x101828, PartRenderer.sky(0));
+        assertEquals(0f, PartRenderer.golden(12), 1e-6);
+        assertEquals(1f, PartRenderer.golden(18), 1e-6);
     }
 
     @Test
@@ -81,6 +86,18 @@ class PartRendererTest {
         glass.setParent(e.getWorkspace());
         List<String> keys = new PartRenderer().batchKeys(SceneSnapshot.of(e));
         assertEquals(2, keys.size(), keys.toString());
+    }
+
+    @Test
+    void colourCorrectionTintMultipliesAndNeverLifts() {
+        Engine e = new Engine(Engine.SOLO);
+        Instance cc = e.create("ColorCorrectionEffect");
+        cc.setParent(e.service("Lighting"));
+        PartRenderer r = new PartRenderer();
+        r.lighting(SceneSnapshot.of(e));
+        // A lift of the default white tint made every frame solid white.
+        assertEquals(0xff000000, r.postProcess().getShadowTint());
+        assertEquals(0xffffffff, r.postProcess().getHighlightTint());
     }
 
     @Test

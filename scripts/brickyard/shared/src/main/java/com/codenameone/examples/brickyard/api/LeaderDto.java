@@ -22,5 +22,5 @@ import com.codename1.annotations.Mapped;
 
 /// One row of a leaderboard.
 @Mapped
-public record LeaderDto(int rank, String userId, long value) {
+public record LeaderDto(int rank, String userId, String name, long value) {
 }

@@ -118,6 +118,13 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
     /// which every client learns of at the next flush. Answers the handle
     /// [#receive] and [#disconnect] take.
     public int connect(Link link, long userId, String name, String displayName) {
+        return connect(link, userId, name, displayName, null);
+    }
+
+    /// [#connect(Link, long, String, String)] with the player's platform
+    /// attributes, as [Engine#addPlayer(long, String, String, java.util.Map)]
+    /// takes them; `attributes` may be null.
+    public int connect(Link link, long userId, String name, String displayName, Map<String, Object> attributes) {
         long joined = seq;
         Wire.Writer w = new Wire.Writer();
         Set<Integer> sent = new HashSet<Integer>();
@@ -129,11 +136,17 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
                     }
                 }
             }
+            // A service's own properties -- Lighting's ClockTime, Brightness
+            // and Ambient -- belong to no replicated child, so without these
+            // every client drew the place at the default noon.
+            for (String s : Wire.SERVICES) {
+                writeServiceProps(w, engine.service(s));
+            }
         } catch (IOException impossible) {
             throw new IllegalStateException(impossible.getMessage(), impossible);
         }
         link.send(w.done());
-        Peer p = new Peer(link, joined, engine.addPlayer(userId, name, displayName));
+        Peer p = new Peer(link, joined, engine.addPlayer(userId, name, displayName, attributes));
         p.lastMoveFrame = engine.getFrames();
         peers.add(p);
         return peers.size() - 1;
@@ -301,6 +314,14 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
             case Wire.PROP: {
                 String key = (String) op[2];
                 Integer id = ids.get(i);
+                int service = Wire.serviceRef(engine, i);
+                if (id == null && service != 0) {
+                    DataOutputStream out = w.op(Wire.PROP); // NOPMD CloseResource - in-memory stream; nothing to close
+                    out.writeInt(service);
+                    out.writeUTF(key);
+                    Wire.value(out, engine, this, i.prop(key));
+                    break;
+                }
                 if (id == null || sent.contains(id) || i.isDestroyed() || ownMotion(p, i, key)) {
                     return;
                 }
@@ -422,6 +443,28 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
         // with it (Character, Team) must still follow.
     }
 
+    /// Whether a service property is sent: a plain value. An instance ref
+    /// (Workspace.CurrentCamera) names something of the server's own that
+    /// the client has its own of, and sending it would clear the client's.
+    private static boolean serviceProp(String k, Object v) {
+        return !"Parent".equals(k) && !"Name".equals(k) && !k.startsWith("@") && !(v instanceof Instance)
+                && Wire.encodable(v);
+    }
+
+    private void writeServiceProps(Wire.Writer w, Instance service) throws IOException {
+        int ref = Wire.serviceRef(engine, service);
+        for (Map.Entry<String, Object> e : service.storedProps().entrySet()) {
+            String k = e.getKey();
+            if (!serviceProp(k, e.getValue())) {
+                continue;
+            }
+            DataOutputStream out = w.op(Wire.PROP); // NOPMD CloseResource - in-memory stream; nothing to close
+            out.writeInt(ref);
+            out.writeUTF(k);
+            Wire.value(out, engine, this, e.getValue());
+        }
+    }
+
     private void writeTree(DataOutputStream out, Instance i, Set<Integer> sent) throws IOException {
         Integer id = ids.get(i);
         sent.add(id);
@@ -524,6 +567,11 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
 
     @Override
     public void propertyChanged(Instance i, String prop) {
+        if (!ids.containsKey(i) && serviceProp(prop, i.prop(prop)) && Wire.serviceRef(engine, i) != 0) {
+            // a service's own property: a day/night script turning ClockTime
+            queue(Wire.PROP, i, prop, null, null);
+            return;
+        }
         if (!ids.containsKey(i) || "Parent".equals(prop)) {
             return;
         }

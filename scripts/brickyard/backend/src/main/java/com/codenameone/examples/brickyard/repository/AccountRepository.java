@@ -31,4 +31,7 @@ import java.util.List;
 public interface AccountRepository extends CrudRepository<Account, String> {
     @Query("select a from Account a where a.username = :u")
     List<Account> named(@Param("u") String username);
+
+    @Query("select a from Account a where a.username in :u")
+    List<Account> namedAny(@Param("u") List<String> usernames);
 }

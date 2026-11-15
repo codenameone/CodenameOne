@@ -56,16 +56,24 @@ public class Limits {
         return new ProfileDto(a.getDisplayName(), s == null ? "" : s.getAvatar());
     }
 
-    /// Saves the avatar colours: up to 200 characters of six-digit hex
-    /// colours separated by commas.
+    /// The character bodies the client can draw, as `AvatarBody` names.
+    static final String[] BODIES = {"knight", "barbarian", "mage", "rogue"};
+
+    /// Saves the avatar: up to 200 characters of six-digit hex colours
+    /// separated by commas, optionally followed by `;` and one of [#BODIES].
     @Transactional(rollbackFor = IOException.class)
     public void saveAvatar(String username, String avatar) {
         String v = avatar == null ? "" : avatar.trim();
         if (v.length() > MAX_AVATAR) {
             throw new ResponseStatusException(400, "Too many avatar colours");
         }
-        for (int i = 0; i < v.length(); i++) {
-            char c = v.charAt(i);
+        int semi = v.indexOf(';');
+        String colours = semi < 0 ? v : v.substring(0, semi);
+        if (semi >= 0 && body(v) == null) {
+            throw new ResponseStatusException(400, "Unknown avatar body");
+        }
+        for (int i = 0; i < colours.length(); i++) {
+            char c = colours.charAt(i);
             boolean ok = c == '#' || c == ',' || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
                     || (c >= 'A' && c <= 'F');
             if (!ok) {
@@ -75,6 +83,29 @@ public class Limits {
         AccountSettings s = row(username);
         s.setAvatar(v);
         write(s);
+    }
+
+    /// The body `username` chose, or null for none: what the play servers
+    /// give the player's character, so every client draws that figure.
+    @Transactional(readOnly = true)
+    public String avatarBody(String username) {
+        AccountSettings s = username == null ? null : settings.findById(username);
+        return s == null ? null : body(s.getAvatar());
+    }
+
+    /// The known body after the `;` of a saved avatar, or null.
+    static String body(String avatar) {
+        int semi = avatar == null ? -1 : avatar.indexOf(';');
+        if (semi < 0) {
+            return null;
+        }
+        String b = avatar.substring(semi + 1);
+        for (String known : BODIES) {
+            if (known.equals(b)) {
+                return known;
+            }
+        }
+        return null;
     }
 
     @Transactional(readOnly = true)

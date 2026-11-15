@@ -295,12 +295,18 @@ final class Behaviors {
 
     // ------------------------------------------------------------------ world queries
 
-    static Object result(Object[] hit) {
+    /// A physics hit ({part, position, normal, material}) as the script's
+    /// RaycastResult. Slot 3 is the material, not a distance: casting it to
+    /// one threw on every raycast that hit, so the distance is measured here.
+    static Object result(Object[] hit, Vector3 origin) {
         if (hit == null) {
             return null;
         }
-        return new RaycastResult((Instance) hit[0], (Vector3) hit[1], (Vector3) hit[2],
-                hit.length > 3 ? (Double) hit[3] : Args.n(0));
+        if (!(hit[0] instanceof Instance) || !(hit[1] instanceof Vector3) || !(hit[2] instanceof Vector3)) {
+            return null;
+        }
+        Vector3 at = (Vector3) hit[1];
+        return new RaycastResult((Instance) hit[0], at, (Vector3) hit[2], Args.n(at.sub(origin).magnitude()));
     }
 
     static final Behavior WORLD = new Behavior() {
@@ -314,7 +320,8 @@ final class Behaviors {
                     if (w == null) {
                         return ret(null);
                     }
-                    return ret(result(w.raycast(e, Args.vec3(a, 1, m), Args.vec3(a, 2, m), f)));
+                    Vector3 from = Args.vec3(a, 1, m);
+                    return ret(result(w.raycast(e, from, Args.vec3(a, 2, m), f), from));
                 }
                 case "Spherecast":
                 case "Blockcast":
@@ -326,7 +333,7 @@ final class Behaviors {
                     Vector3 origin = sphere ? Args.vec3(a, 1, m) : Args.cframe(a, 1, m).position();
                     Vector3 dir = Args.vec3(a, 3, m);
                     Engine.RaycastFilter f = Args.at(a, 4) instanceof QueryParams ? (QueryParams) a[4] : ALL;
-                    return ret(result(w.raycast(e, origin, dir, f)));
+                    return ret(result(w.raycast(e, origin, dir, f), origin));
                 }
                 case "FindPartOnRay":
                 case "FindPartOnRayWithIgnoreList": {

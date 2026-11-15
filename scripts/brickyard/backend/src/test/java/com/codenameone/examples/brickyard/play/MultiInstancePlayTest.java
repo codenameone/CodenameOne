@@ -140,14 +140,13 @@ class MultiInstancePlayTest {
             public void send(byte[] message) {
             }
         };
-        room.connect(link, 7, a, a);
-        long until = System.currentTimeMillis() + 5000;
-        while (System.currentTimeMillis() < until && count(id, "VISIT") == 0) {
-            Thread.sleep(20);
-        }
+        // The VISIT is the app's visit call, made before any play, solo or
+        // online; the room records only the session it held.
+        Api.json(mvc, Api.as(Api.body(post("/api/experiences/" + id + "/visit"), "{}"), a));
         assertEquals(1, count(id, "VISIT"));
+        room.connect(link, 7, a, a);
         room.disconnect(link);
-        until = System.currentTimeMillis() + 5000;
+        long until = System.currentTimeMillis() + 5000;
         while (System.currentTimeMillis() < until && count(id, "SESSION") == 0) {
             Thread.sleep(20);
         }

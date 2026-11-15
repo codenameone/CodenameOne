@@ -22,6 +22,7 @@ import com.codename1.backend.WebSocket;
 import com.codename1.backend.WebSocketSession;
 import com.codename1.backend.annotations.WebSocketMapping;
 import com.codenameone.examples.brickyard.account.Accounts;
+import com.codenameone.examples.brickyard.account.Limits;
 import java.io.IOException;
 
 /// The game socket. A valid ticket seats the session on its room; from then
@@ -35,11 +36,13 @@ public class PlaySocket implements WebSocket {
     private final PlayTickets tickets;
     private final PlayServers servers;
     private final Accounts accounts;
+    private final Limits limits;
 
-    public PlaySocket(PlayTickets tickets, PlayServers servers, Accounts accounts) {
+    public PlaySocket(PlayTickets tickets, PlayServers servers, Accounts accounts, Limits limits) {
         this.tickets = tickets;
         this.servers = servers;
         this.accounts = accounts;
+        this.limits = limits;
     }
 
     /// The session's seat: its room and the link the room writes to.
@@ -80,9 +83,10 @@ public class PlaySocket implements WebSocket {
         }
         Bound b = new Bound(room, session);
         session.setAttachment(b);
-        String display = accounts.describe(seat.username).displayName();
+        // The username is an e-mail address; the room keys seats by it, but the
+        // engine Name every other client sees is the display name.
         room.connect(b, Math.abs((long) seat.username.hashCode()) + 1, seat.username,
-                display == null || display.length() == 0 ? seat.username : display);
+                accounts.publicName(seat.username), limits.avatarBody(seat.username));
     }
 
     @Override

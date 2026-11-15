@@ -24,9 +24,11 @@ import com.codename1.charts.models.XYSeries;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
 import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.views.BarChart;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.brickyard.api.DayCountDto;
@@ -56,6 +58,12 @@ public final class DashboardForm {
         final Form f = Ui.form(x.title(), "dashboard");
         Ui.back(f, CreateForm::show);
         final String id = x.id();
+        // The two numbers a creator opens this for, before any chart.
+        final Label visitTotal = Ui.label("-", "StatFigure");
+        final Label brickTotal = Ui.label("-", "StatFigure");
+        f.add(com.codename1.ui.layouts.GridLayout.encloseIn(2,
+                Ui.panel(visitTotal, Ui.label("visits in " + DAYS + " days", "CardMeta")),
+                Ui.panel(brickTotal, Ui.label("Bricks earned", "CardMeta"))));
         f.add(Ui.label("Visits, last " + DAYS + " days", "RowTitle"));
         final Container visits = box("visitsChart", f);
         f.add(Ui.label("Retention", "RowTitle"));
@@ -77,19 +85,34 @@ public final class DashboardForm {
 
         Api.analytics().visits(id, DAYS, Net.to(days -> {
             visits.add(chart(days));
+            long sum = 0;
+            if (days != null) {
+                for (DayCountDto d : days) {
+                    sum += d.count();
+                }
+            }
+            visitTotal.setText(String.valueOf(sum));
             f.revalidate();
         }, Ui::failed));
         Api.analytics().retention(id, Net.to(r -> {
-            retention.add(Ui.label("D1 " + percent(r.d1(), r.cohortD1()) + " of " + r.cohortD1()
-                    + ", D7 " + percent(r.d7(), r.cohortD7()) + " of " + r.cohortD7(), "Body"));
+            retention.add(com.codename1.ui.layouts.GridLayout.encloseIn(2,
+                    tile(percent(r.d1(), r.cohortD1()), "came back the next day", r.cohortD1()),
+                    tile(percent(r.d7(), r.cohortD7()), "came back a week later", r.cohortD7())));
             f.revalidate();
         }, Ui::failed));
         Api.analytics().revenue(id, Net.to(rows -> {
             empty(revenue, rows);
+            long bricks = 0;
             if (rows != null) {
                 for (RevenueDto r : rows) {
-                    revenue.add(Ui.label(r.name() + ": " + r.sales() + " sales, " + r.bricks() + " Bricks",
-                            "Body"));
+                    bricks += r.bricks();
+                }
+            }
+            brickTotal.setText(String.valueOf(bricks));
+            if (rows != null) {
+                for (RevenueDto r : rows) {
+                    revenue.add(Ui.panel(Ui.label(r.name(), "CardTitle"),
+                            Ui.label(r.sales() + " sales  -  " + r.bricks() + " Bricks", "CardMeta")));
                 }
             }
             f.revalidate();
@@ -118,12 +141,26 @@ public final class DashboardForm {
 
     static void empty(Container c, List<?> rows) {
         if (rows == null || rows.isEmpty()) {
-            c.add(Ui.label("Nothing yet.", "Muted"));
+            c.add(Ui.panel(Ui.label("Nothing yet.", "Muted")));
         }
+    }
+
+    /// A figure in large type over what it measures and the cohort behind it.
+    static Container tile(String figure, String caption, long cohort) {
+        return Ui.panel(Ui.label(figure, "StatFigure"), Ui.label(caption, "CardMeta"),
+                Ui.label("of " + cohort + " players", "Muted"));
     }
 
     static String percent(long part, long whole) {
         return whole <= 0 ? "-" : (part * 100 / whole) + "%";
+    }
+
+    /// "Nov 14" for a day start in milliseconds.
+    static String dayLabel(long dayStart) {
+        java.util.Calendar c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+        c.setTime(new java.util.Date(dayStart));
+        String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        return months[c.get(java.util.Calendar.MONTH)] + " " + c.get(java.util.Calendar.DAY_OF_MONTH);
     }
 
     static ChartComponent chart(List<DayCountDto> days) {
@@ -146,6 +183,31 @@ public final class DashboardForm {
         renderer.setYAxisMin(0);
         renderer.setBarSpacing(0.3);
         renderer.setShowLegend(false);
+        // The chart library paints black margins and grey labels by default,
+        // which read as a hole in the page: it takes the theme's colours.
+        int bg = 0xff161b2e;
+        renderer.setApplyBackgroundColor(true);
+        renderer.setBackgroundColor(bg);
+        renderer.setMarginsColor(bg);
+        renderer.setAxesColor(0xff3a4468);
+        renderer.setGridColor(0xff2a3352);
+        renderer.setShowGridY(true);
+        renderer.setLabelsColor(0xffaab3cf);
+        renderer.setXLabelsColor(0xffaab3cf);
+        renderer.setYLabelsColor(0, 0xffaab3cf);
+        float text = com.codename1.ui.CN.convertToPixels(2.4f);
+        renderer.setLabelsTextSize(text);
+        int m = com.codename1.ui.CN.convertToPixels(3);
+        renderer.setMargins(new int[] {m / 2, m * 2, m * 2, m / 2});
+        renderer.setXLabels(0);
+        if (days != null) {
+            for (int k = 0; k < days.size(); k += 2) {
+                renderer.addXTextLabel(k, dayLabel(days.get(k).dayStart()));
+            }
+        }
+        // A value over every bar printed "0" thirteen times on a new
+        // experience; the Y axis and grid already carry the scale.
+        r.setDisplayChartValues(false);
         ChartComponent c = new ChartComponent(new BarChart(dataset, renderer, BarChart.Type.DEFAULT));
         c.setName("visitsChartComponent");
         c.setPreferredH(com.codename1.ui.CN.convertToPixels(CHART_HEIGHT_MM));
@@ -158,8 +220,9 @@ public final class DashboardForm {
             empty(versions, rows);
             if (rows != null) {
                 for (final VersionDto v : rows) {
-                    versions.add(Ui.panel(Ui.label("Version " + v.number() + " - " + v.status(), "Body"),
-                            Ui.link("Roll back to this", "rollback" + v.number(),
+                    versions.add(row(Ui.label("Version " + v.number(), "CardTitle"),
+                            Ui.label(v.status(), "CardMeta"),
+                            Ui.link("Roll back", "rollback" + v.number(),
                                     e -> Api.experiences().rollback(id, new RollbackDto(v.number()),
                                             Net.to(done -> {
                                                 Ui.toast("Now serving version " + done.number());
@@ -171,14 +234,31 @@ public final class DashboardForm {
         }, Ui::failed));
     }
 
+    /// A card with a title and a line under it on the left and its actions
+    /// side by side on the right, one line tall.
+    static Container row(Component title, Component meta, Component... actions) {
+        Container text = BoxLayout.encloseY(title, meta);
+        Container right = new Container(new com.codename1.ui.layouts.FlowLayout(Component.RIGHT,
+                Component.CENTER));
+        for (Component a : actions) {
+            right.add(a);
+        }
+        Container card = Ui.panel();
+        card.setLayout(new com.codename1.ui.layouts.BorderLayout());
+        card.add(com.codename1.ui.layouts.BorderLayout.CENTER, text);
+        card.add(com.codename1.ui.layouts.BorderLayout.EAST, right);
+        return card;
+    }
+
     static void loadProducts(final String id, final Container products, final Form f) {
         Api.economy().products(id, Net.to(rows -> {
             products.removeAll();
             empty(products, rows);
             if (rows != null) {
                 for (final ProductDto p : rows) {
-                    products.add(Ui.panel(Ui.label(p.name() + " (" + p.kind() + ") - " + p.price() + " Bricks",
-                                    "Body"),
+                    products.add(row(Ui.label(p.name(), "CardTitle"),
+                            Ui.label(("PASS".equals(p.kind()) ? "Game pass" : "Developer product") + "  -  "
+                                    + p.price() + " Bricks", "CardMeta"),
                             Ui.link("Edit", "editProduct" + p.id(), e -> editProduct(id, p, products, f)),
                             Ui.link("Retire", "retireProduct" + p.id(), e -> Api.economy().deactivateProduct(p.id(),
                                     Net.to(done -> loadProducts(id, products, f), Ui::failed)))));
@@ -224,7 +304,7 @@ public final class DashboardForm {
             empty(payouts, rows);
             if (rows != null) {
                 for (PayoutDto p : rows) {
-                    payouts.add(Ui.label(p.bricks() + " Bricks - " + p.status(), "Body"));
+                    payouts.add(Ui.panel(Ui.label(p.bricks() + " Bricks", "CardTitle"), Ui.label(p.status(), "CardMeta")));
                 }
             }
             f.revalidate();

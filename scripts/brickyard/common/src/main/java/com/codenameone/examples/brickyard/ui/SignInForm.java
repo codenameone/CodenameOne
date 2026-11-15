@@ -23,6 +23,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.brickyard.AppConfig;
 import com.codenameone.examples.brickyard.net.Session;
 
@@ -36,8 +37,7 @@ public final class SignInForm {
         f.setLayout(BoxLayout.yCenter());
         f.getToolbar().hideToolbar();
         Container col = new Container(BoxLayout.y());
-        col.add(new AvatarView(Avatar.load(), true));
-        col.add(Ui.label("BRICKYARD", "Logo"));
+        col.add(FlowLayout.encloseCenter(new BrandMark(24, true)));
         col.add(Ui.label("Build it. Share it. Play it.", "Tagline"));
         final TextField email = Ui.field("Email", TextField.EMAILADDR, "email");
         final TextField password = Ui.field("Password", TextField.PASSWORD, "password");

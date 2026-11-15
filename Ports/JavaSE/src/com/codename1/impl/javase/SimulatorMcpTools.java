@@ -37,6 +37,7 @@ import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
 import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.geom.Rectangle;
 
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -205,6 +206,37 @@ final class SimulatorMcpTools {
                         }
                         port.dispatchSimulatedPointer(MouseEvent.MOUSE_RELEASED, x2, y2);
                         return ok("x", x2, "y", y2);
+                    }
+                }));
+
+        server.addTool(new Tool("sim_key",
+                "Presses and/or releases a hardware key (the Mac keyboard, not the simulated "
+                        + "one) on the focused component: space, enter, up, down, left, right, or one "
+                        + "letter or digit. action is press, release or tap (default; holdMs apart). "
+                        + "Runs alongside sim_drag, so a game can jump while a joystick is held.",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"key\":{\"type\":\"string\"},"
+                        + "\"action\":{\"type\":\"string\",\"enum\":[\"tap\",\"press\",\"release\"]},"
+                        + "\"holdMs\":{\"type\":\"integer\",\"description\":\"Default 60\"}},"
+                        + "\"required\":[\"key\"]}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        Map<String, Object> a = parse(argumentsJson);
+                        Object k = a.get("key");
+                        int[] code = hardwareKey(k instanceof String ? (String) k : "");
+                        Object act = a.get("action");
+                        String action = act instanceof String ? (String) act : "tap";
+                        char ch = (char) code[1];
+                        if (!"release".equals(action)) {
+                            port.dispatchSimulatedKey(KeyEvent.KEY_PRESSED, code[0], ch);
+                        }
+                        if ("tap".equals(action)) {
+                            Thread.sleep(clamp(num(a, "holdMs", 60), 0, MAX_GESTURE_MS));
+                        }
+                        if (!"press".equals(action)) {
+                            port.dispatchSimulatedKey(KeyEvent.KEY_RELEASED, code[0], ch);
+                        }
+                        return ok("keyCode", code[0], "released", "press".equals(action) ? 0 : 1);
                     }
                 }));
 
@@ -439,6 +471,42 @@ final class SimulatorMcpTools {
 
     /// A tap point in screen pixels from x/y or from the centre of a node. Node
     /// bounds are in application coordinates, which the pan shift moves on screen.
+    /// {AWT key code, key char} for a sim_key name.
+    static int[] hardwareKey(String name) {
+        if ("space".equals(name)) {
+            return new int[]{KeyEvent.VK_SPACE, ' '};
+        }
+        if ("enter".equals(name) || "return".equals(name)) {
+            return new int[]{KeyEvent.VK_ENTER, '\n'};
+        }
+        if ("up".equals(name)) {
+            return new int[]{KeyEvent.VK_UP, KeyEvent.CHAR_UNDEFINED};
+        }
+        if ("down".equals(name)) {
+            return new int[]{KeyEvent.VK_DOWN, KeyEvent.CHAR_UNDEFINED};
+        }
+        if ("left".equals(name)) {
+            return new int[]{KeyEvent.VK_LEFT, KeyEvent.CHAR_UNDEFINED};
+        }
+        if ("right".equals(name)) {
+            return new int[]{KeyEvent.VK_RIGHT, KeyEvent.CHAR_UNDEFINED};
+        }
+        if (name.length() == 1) {
+            char c = name.charAt(0);
+            if (c >= 'a' && c <= 'z') {
+                return new int[]{KeyEvent.VK_A + (c - 'a'), c};
+            }
+            if (c >= 'A' && c <= 'Z') {
+                return new int[]{KeyEvent.VK_A + (c - 'A'), c};
+            }
+            if (c >= '0' && c <= '9') {
+                return new int[]{KeyEvent.VK_0 + (c - '0'), c};
+            }
+        }
+        throw new IllegalArgumentException("Unknown key: " + name
+                + " (space, enter, up, down, left, right, or one letter or digit)");
+    }
+
     private int[] point(Map<String, Object> a, String xKey, String yKey, String nodeKey) {
         if (a.get(nodeKey) instanceof Number) {
             final long id = ((Number) a.get(nodeKey)).longValue();

@@ -22,6 +22,7 @@ import com.codename1.appkit.server.Text;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
+import com.codename1.backend.annotations.Value;
 import com.codename1.backend.security.GrantedAuthority;
 import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
 import com.codename1.backend.security.core.userdetails.User;
@@ -43,8 +44,10 @@ import com.codenameone.examples.brickyard.economy.Wallet;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /// Accounts: the sign-in record (users and authorities, owned by the security
 /// layer) plus the [Account] row with the name, the birth year and the Bricks.
@@ -65,10 +68,25 @@ public class Accounts {
     private final Wallet wallet;
     private final JdbcUserDetailsManager users;
     private final PasswordEncoder encoder;
+    /// E-mail addresses that register as ADMIN: how a new deployment gets
+    /// its first administrator, who then grants every other role in the app.
+    private final List<String> bootstrapAdmins = new ArrayList<String>();
 
     public Accounts(AccountRepository accounts, FriendRepository friends,
             FriendRequestRepository requests, UserBlockRepository blocks, Wallet wallet,
-            JdbcUserDetailsManager users, PasswordEncoder encoder) {
+            JdbcUserDetailsManager users, PasswordEncoder encoder,
+            @Value("${brickyard.bootstrap-admins:}") String bootstrapAdmins) {
+        // Split by hand: the native runtime has no String.split.
+        int start = 0;
+        while (start <= bootstrapAdmins.length()) {
+            int comma = bootstrapAdmins.indexOf(',', start);
+            int end = comma < 0 ? bootstrapAdmins.length() : comma;
+            String a = bootstrapAdmins.substring(start, end).trim();
+            if (a.length() > 0) {
+                this.bootstrapAdmins.add(email(a));
+            }
+            start = end + 1;
+        }
         this.accounts = accounts;
         this.friends = friends;
         this.requests = requests;
@@ -90,7 +108,8 @@ public class Accounts {
             throw new ResponseStatusException(409, "That e-mail already has an account");
         }
         try {
-            create(username, request.password(), name, birthYear, new String[] {Roles.USER});
+            create(username, request.password(), name, birthYear, bootstrapAdmins.contains(username)
+                    ? new String[] {Roles.USER, Roles.ADMIN} : new String[] {Roles.USER});
         } catch (IOException | RuntimeException failed) {
             if (users.userExists(username)) {
                 throw new ResponseStatusException(409, "That e-mail already has an account");
@@ -245,6 +264,32 @@ public class Accounts {
             throw new ResponseStatusException(404, "No such account");
         }
         return a;
+    }
+
+    /// What another player is shown for `username`. A username is an e-mail
+    /// address, so it never leaves the server as a public name.
+    @Transactional(readOnly = true)
+    public String publicName(String username) {
+        Account a = username == null ? null : accounts.findById(username);
+        return publicName(a);
+    }
+
+    /// [#publicName(String)] for many accounts in one query, keyed by username.
+    @Transactional(readOnly = true)
+    public Map<String, String> publicNames(List<String> usernames) {
+        Map<String, String> out = new HashMap<String, String>();
+        if (usernames == null || usernames.isEmpty()) {
+            return out;
+        }
+        for (Account a : accounts.namedAny(usernames)) {
+            out.put(a.getUsername(), publicName(a));
+        }
+        return out;
+    }
+
+    static String publicName(Account a) {
+        String name = a == null ? null : a.getDisplayName();
+        return name == null || name.length() == 0 ? "Player" : name;
     }
 
     AccountDto toDto(Account a) {

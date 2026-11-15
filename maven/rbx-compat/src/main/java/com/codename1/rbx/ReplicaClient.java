@@ -306,12 +306,36 @@ public final class ReplicaClient implements Network.Transport, Engine.EngineList
 
     @Override
     public Instance instance(int id) {
+        if (id < 0) {
+            return Wire.service(engine, id);
+        }
         Instance i = byId.get(Integer.valueOf(id));
         if (i == null && id > 0) {
             missing = id;
         }
         return i;
     }
+
+    /// Points the camera at the local character, as the client's camera
+    /// script does in Roblox. A solo engine does it when it spawns the
+    /// character; here the character is replicated from the server, so
+    /// nothing else would, and the camera stayed where the place left it
+    /// while the player walked off into the distance.
+    /// Only a new character takes the camera, as a spawn does in a solo
+    /// engine, so a LocalScript that points it elsewhere keeps it.
+    private void follow(Instance hum) {
+        if (hum == followed) { // NOPMD CompareObjectsWithEquals - reference identity
+            return;
+        }
+        Object c = engine.getWorkspace().prop("CurrentCamera");
+        if (c instanceof Instance) {
+            ((Instance) c).put("CameraSubject", hum);
+            followed = hum;
+        }
+    }
+
+    /// The humanoid [#follow] last gave the camera.
+    private Instance followed;
 
     /// Sends the local character's root CFrame, move direction and jump.
     public void tick() {
@@ -322,6 +346,7 @@ public final class ReplicaClient implements Network.Transport, Engine.EngineList
         if (root == null || hum == null) {
             return;
         }
+        follow(hum);
         Wire.Writer w = new Wire.Writer();
         try {
             DataOutputStream out = w.op(Wire.MOVE); // NOPMD CloseResource - in-memory stream; nothing to close

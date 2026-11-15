@@ -142,7 +142,7 @@ public class Leaderboards {
             e.setStatValue(e.getStatValue() + score.delta());
             entries.save(e);
         }
-        return new LeaderDto(0, user, e.getStatValue());
+        return new LeaderDto(0, publicId(user), accounts.publicName(user), e.getStatValue());
     }
 
     @Transactional(readOnly = true)
@@ -217,7 +217,7 @@ public class Leaderboards {
         return out;
     }
 
-    private static List<LeaderDto> rank(Map<String, Long> totals, int limit) {
+    private List<LeaderDto> rank(Map<String, Long> totals, int limit) {
         List<Map.Entry<String, Long>> sorted = new ArrayList<Map.Entry<String, Long>>(totals.entrySet());
         Collections.sort(sorted, new Comparator<Map.Entry<String, Long>>() {
             @Override
@@ -226,14 +226,28 @@ public class Leaderboards {
                 return byValue != 0 ? byValue : a.getKey().compareTo(b.getKey());
             }
         });
-        List<LeaderDto> out = new ArrayList<LeaderDto>();
+        List<String> shown = new ArrayList<String>();
         for (int i = 0; i < sorted.size() && i < limit; i++) {
-            out.add(new LeaderDto(i + 1, sorted.get(i).getKey(), sorted.get(i).getValue().longValue()));
+            shown.add(sorted.get(i).getKey());
+        }
+        // Usernames are e-mail addresses: a board shows display names, fetched in one query.
+        Map<String, String> names = accounts.publicNames(shown);
+        List<LeaderDto> out = new ArrayList<LeaderDto>();
+        for (int i = 0; i < shown.size(); i++) {
+            String name = names.get(shown.get(i));
+            out.add(new LeaderDto(i + 1, publicId(shown.get(i)), name == null ? "Player" : name,
+                    sorted.get(i).getValue().longValue()));
         }
         return out;
     }
 
     private static String stat(String value) {
         return Text.required(value, 64, "the stat");
+    }
+
+    /// A stable id for a leaderboard row that is not the username, which is
+    /// an e-mail address and must not reach other players.
+    public static String publicId(String username) {
+        return Integer.toHexString(username == null ? 0 : username.hashCode());
     }
 }

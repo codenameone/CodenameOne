@@ -27,19 +27,49 @@ package com.codename1.rbx;
 /// the player drags and pinches, and stays put for a `Scriptable` camera a
 /// script drives itself.
 public final class CameraRig {
-    private double yaw = Math.PI;
+    /// The closest an obstruction may pull the camera in: nearer than this
+    /// the camera sits inside the character's head and shows only that.
+    static final double MIN_CLEAR = 3.5;
+
+    private double yaw;
     private double pitch = 0.35;
-    private double distance = 16;
+    private double distance = 12.5;
+    /// The subject the yaw was last aimed from; a new one (a spawn, a
+    /// respawn) puts the camera behind it again.
+    private Instance aimedAt;
+    private Vector3 pivot;
+
+    /// The lowest pitch: level with the head. Below it the camera looks up
+    /// from under the character, and a floor closer than [#MIN_CLEAR] along
+    /// that ray is then passed through rather than stopped at, so the player
+    /// saw the underside of the world as a ceiling.
+    static final double MIN_PITCH = 0.05;
+    /// The highest pitch, nearly straight down.
+    static final double MAX_PITCH = 1.4;
+
+    /// Orbits `p` at `dist` instead of following the camera subject, as an
+    /// editor's viewport does; null goes back to following.
+    public void setPivot(Vector3 p, double dist) {
+        pivot = p;
+        if (p != null) {
+            distance = Math.max(2, Math.min(400, dist));
+        }
+    }
+
+    /// The current pitch in radians, above the horizontal.
+    double pitch() {
+        return pitch;
+    }
 
     /// Turns the orbit; `dx`, `dy` in radians.
     public void orbit(double dx, double dy) {
         yaw += dx;
-        pitch = Math.max(-1.2, Math.min(1.4, pitch + dy));
+        pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, pitch + dy));
     }
 
     /// Multiplies the distance (a pinch or wheel step).
     public void zoom(double factor) {
-        distance = Math.max(2, Math.min(120, distance * factor));
+        distance = Math.max(2, Math.min(pivot == null ? 120 : 400, distance * factor));
     }
 
     /// Places `CurrentCamera` for this frame.
@@ -53,16 +83,101 @@ public final class CameraRig {
         if ("Scriptable".equals(SceneSnapshot.enumName(cam.prop("CameraType"), "Custom"))) {
             return;
         }
-        Vector3 t = target(cam.prop("CameraSubject"));
+        if (pivot != null) {
+            // The studio: no subject to follow, only a point to orbit, and
+            // nothing to pull in for -- the editor wants to see through walls.
+            double cp = Math.cos(pitch);
+            cam.put("CFrame", lookAt(pivot.x + Math.sin(yaw) * cp * distance, pivot.y + Math.sin(pitch) * distance,
+                    pivot.z + Math.cos(yaw) * cp * distance, pivot.x, pivot.y, pivot.z));
+            cam.put("Focus", new CFrame(pivot.x, pivot.y, pivot.z, 1, 0, 0, 0, 1, 0, 0, 0, 1));
+            return;
+        }
+        Object subject = cam.prop("CameraSubject");
+        Vector3 t = target(subject);
         if (t == null) {
             return;
         }
-        double cp = Math.cos(pitch);
-        double ex = t.x + Math.sin(yaw) * cp * distance;
-        double ey = t.y + Math.sin(pitch) * distance;
-        double ez = t.z + Math.cos(yaw) * cp * distance;
+        Instance root = rootOf(subject);
+        if (root != aimedAt) { // NOPMD CompareObjectsWithEquals - tree identity
+            aimedAt = root;
+            yaw = behind(Behaviors.cf(root));
+        }
+        // Something solid closer than MIN_CLEAR would put the eye inside it
+        // (a fence, a pad, the lava the character fell into), so the camera
+        // rises over the obstruction, a step at a time, before it settles
+        // for being pushed through it.
+        double p = pitch;
+        double d;
+        while (true) {
+            d = clearDistance(e, root, t, Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p));
+            if (d >= MIN_CLEAR || p >= MAX_PITCH) {
+                break;
+            }
+            p = Math.min(MAX_PITCH, p + 0.2);
+        }
+        d = Math.max(MIN_CLEAR, d);
+        double cp = Math.cos(p);
+        double ex = t.x + Math.sin(yaw) * cp * d;
+        double ey = t.y + Math.sin(p) * d;
+        double ez = t.z + Math.cos(yaw) * cp * d;
         cam.put("CFrame", lookAt(ex, ey, ez, t.x, t.y, t.z));
         cam.put("Focus", new CFrame(t.x, t.y, t.z, 1, 0, 0, 0, 1, 0, 0, 0, 1));
+    }
+
+    /// The yaw that puts the eye behind a part, looking where it faces.
+    static double behind(CFrame f) {
+        // LookVector is -Z; the eye sits along +Z, so yaw is the angle of +Z.
+        return Math.atan2(f.r02, f.r22);
+    }
+
+    /// How far the eye can sit along the unit direction before something
+    /// solid is between it and the subject: the camera pulls in rather than
+    /// end up inside a wall or a tree, the way players expect.
+    private double clearDistance(Engine e, Instance character, Vector3 t, double dx, double dy, double dz) {
+        Engine.PhysicsWorld w = e.getPhysics();
+        if (w == null) {
+            return distance;
+        }
+        Object[] hit = w.raycast(e, t, new Vector3(dx * distance, dy * distance, dz * distance),
+                new NotSelf(character));
+        if (hit == null) {
+            return distance;
+        }
+        if (!(hit[1] instanceof Vector3)) {
+            return distance;
+        }
+        Vector3 at = (Vector3) hit[1];
+        double hx = at.x - t.x;
+        double hy = at.y - t.y;
+        double hz = at.z - t.z;
+        return Math.min(distance, Math.sqrt(hx * hx + hy * hy + hz * hz) - 0.6);
+    }
+
+    /// Solid, visible parts that are not the character itself.
+    private static final class NotSelf implements Engine.RaycastFilter {
+        private final Instance character;
+        private final Instance model;
+
+        NotSelf(Instance character) {
+            this.character = character;
+            this.model = character.getParent();
+        }
+
+        @Override
+        public boolean accepts(Instance p) {
+            return p != character && (model == null || !p.isDescendantOf(model)) // NOPMD CompareObjectsWithEquals - tree identity
+                    && p.bool("CanCollide") && p.num("Transparency") < 0.5;
+        }
+    }
+
+    private static Instance rootOf(Object subject) {
+        Instance s = (Instance) subject;
+        if (s.isA("Humanoid")) {
+            Instance m = s.getParent();
+            Instance r = m == null ? null : m.findFirstChild("HumanoidRootPart");
+            return r == null ? s : r;
+        }
+        return s;
     }
 
     private static Vector3 target(Object subject) {

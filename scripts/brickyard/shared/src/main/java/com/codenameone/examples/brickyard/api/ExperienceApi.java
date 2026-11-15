@@ -55,6 +55,14 @@ public interface ExperienceApi {
     @GET("/api/experiences/{id}/place")
     void place(@Path("id") String id, OnComplete<Response<PlaceDto>> callback);
 
+    /// The tile picture; `data` is empty when the creator has not set one.
+    @GET("/api/experiences/{id}/thumbnail")
+    void thumbnail(@Path("id") String id, OnComplete<Response<ThumbnailDto>> callback);
+
+    /// Sets the tile picture: a JPEG or PNG frame of the experience, owner only.
+    @POST("/api/experiences/{id}/thumbnail")
+    void setThumbnail(@Path("id") String id, @Body ThumbnailDto image, OnComplete<Response<ThumbnailDto>> callback);
+
     @POST("/api/experiences/{id}/visit")
     void visit(@Path("id") String id, OnComplete<Response<ExperienceDto>> callback);
 

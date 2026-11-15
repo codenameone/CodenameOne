@@ -37,11 +37,8 @@ public class PlayEvents implements PlayServers.Events {
 
     @Override
     public void joined(PlayRoom room, String username) {
-        try {
-            analytics.record(room.getExperienceId(), username, "VISIT", 1);
-        } catch (Exception err) {
-            err.printStackTrace();
-        }
+        // The VISIT is recorded by Experiences.visit, which every play calls
+        // first; recording it here too counted each online play twice.
     }
 
     @Override

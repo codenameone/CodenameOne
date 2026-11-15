@@ -37,6 +37,26 @@ public final class SceneSnapshot {
     public static final int CYLINDER = 2;
     public static final int WEDGE = 3;
     public static final int CORNER_WEDGE = 4;
+    /// A character's head: drawn rounded, at the classic proportions, the way
+    /// a player expects a block avatar's head to look, whatever its box.
+    public static final int HEAD = 5;
+    /// The size a character's head is drawn at.
+    /// [Item#kind] values: what a part stands for, so a renderer can draw a
+    /// model in place of its primitive. [#PLAIN] is every other part.
+    public static final int PLAIN = 0;
+    public static final int TORSO = 1;
+    public static final int LEFT_ARM = 2;
+    public static final int RIGHT_ARM = 3;
+    public static final int LEFT_LEG = 4;
+    public static final int RIGHT_LEG = 5;
+    /// A part named `Trunk`; the tree it belongs to grows from its bottom.
+    public static final int TRUNK = 6;
+    /// A part named `Leaves`, the crown a [#TRUNK] carries.
+    public static final int LEAVES = 7;
+    /// A part named `Rock`.
+    public static final int ROCK = 8;
+
+    static final Vector3 HEAD_SIZE = new Vector3(1.25, 1.25, 1.25);
 
     /// One part to draw.
     public static final class Item {
@@ -50,9 +70,15 @@ public final class SceneSnapshot {
         /// The `Material` enum name.
         public final String material;
         public final float reflectance;
+        /// True when the part carries a `face` decal on its front.
+        public final boolean face;
+        /// What the part stands for: [#PLAIN], a character limb, or scenery.
+        public final int kind;
 
         Item(Instance part, int shape, float[] model, int rgb, float transparency, String material,
-                float reflectance) {
+                float reflectance, boolean face, int kind) {
+            this.face = face;
+            this.kind = kind;
             this.part = part;
             this.shape = shape;
             this.model = model;
@@ -64,6 +90,46 @@ public final class SceneSnapshot {
     }
 
     public final List<Item> items = new ArrayList<Item>();
+
+    /// One character (a model with a Humanoid and a HumanoidRootPart), for a
+    /// renderer that draws characters as animated bodies rather than as their
+    /// R6 limb parts.
+    public static final class Figure {
+        /// The character model; stable across frames, so a renderer can key
+        /// its per-character animation state on it.
+        public final Instance model;
+        /// Where the feet are, in world studs.
+        public final float x;
+        public final float y;
+        public final float z;
+        /// Facing: the turn about +Y, in degrees, that points a body modelled
+        /// facing +Z the way the character looks.
+        public final float yaw;
+        /// The `HumanoidStateType` name: Running, Jumping, Freefall, Landed,
+        /// Dead, Seated...
+        public final String state;
+        /// Horizontal speed in studs per second.
+        public final float speed;
+        /// The model's `AvatarBody` attribute, or null for the default.
+        public final String body;
+        /// `Torso` colour: the avatar's shirt colour, used as a tint.
+        public final int torso;
+
+        Figure(Instance model, float x, float y, float z, float yaw, String state, float speed, String body,
+                int torso) {
+            this.model = model;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.yaw = yaw;
+            this.state = state;
+            this.speed = speed;
+            this.body = body;
+            this.torso = torso;
+        }
+    }
+
+    public final List<Figure> figures = new ArrayList<Figure>();
     /// Eye position and look-at target, and the vertical field of view in degrees.
     public final float[] eye = new float[3];
     public final float[] target = new float[3];
@@ -93,12 +159,17 @@ public final class SceneSnapshot {
         List<Instance> parts = Behaviors.parts(e.getWorkspace());
         for (int i = 0; i < parts.size(); i++) { // NOPMD ForLoopCanBeForeach - per-frame code; no iterator, and the list may change while walked
             Instance p = parts.get(i);
+            if ("HumanoidRootPart".equals(p.getName())) {
+                figure(s, p);
+            }
             float tr = (float) p.num("Transparency");
             if (tr >= 1 || p.isA("Terrain")) {
                 continue;
             }
-            s.items.add(new Item(p, shape(p), model(Behaviors.cf(p), Behaviors.size(p)), rgb(p.prop("Color")), tr,
-                    enumName(p.prop("Material"), "Plastic"), (float) p.num("Reflectance")));
+            boolean head = isCharacterHead(p);
+            s.items.add(new Item(p, head ? HEAD : shape(p), model(Behaviors.cf(p), head ? HEAD_SIZE
+                    : Behaviors.size(p)), rgb(p.prop("Color")), tr, enumName(p.prop("Material"), "Plastic"),
+                    (float) p.num("Reflectance"), p.findFirstChild("face") != null, kind(p)));
         }
         Instance cam = (Instance) e.getWorkspace().prop("CurrentCamera");
         if (cam != null) {
@@ -151,6 +222,69 @@ public final class SceneSnapshot {
                 s.atmosphereColor = rgb(c.prop("Color"));
             }
         }
+    }
+
+    private static void figure(SceneSnapshot s, Instance root) {
+        Instance m = root.getParent();
+        Instance hum = m == null ? null : m.findFirstChildOfClass("Humanoid", false);
+        if (hum == null) {
+            return;
+        }
+        CFrame f = Behaviors.cf(root);
+        double half = Behaviors.size(root).y / 2 + 2 + hum.num("HipHeight");
+        // LookVector is -Z: (-r02, -r12, -r22)
+        float yaw = (float) Math.toDegrees(Math.atan2(-f.r02, -f.r22));
+        Object v = root.prop("AssemblyLinearVelocity");
+        float speed = 0;
+        if (v instanceof Vector3) {
+            Vector3 lv = (Vector3) v;
+            speed = (float) Math.sqrt(lv.x * lv.x + lv.z * lv.z);
+        }
+        Object body = m.getAttribute("AvatarBody");
+        Instance torso = m.findFirstChild("Torso");
+        String state = hum.num("Health") <= 0 ? "Dead" : Characters.stateOf(hum);
+        s.figures.add(new Figure(m, (float) f.x, (float) (f.y - half), (float) f.z, yaw, state, speed,
+                body instanceof String ? (String) body : null, torso == null ? 0xffffff : rgb(torso.prop("Color"))));
+    }
+
+    /// A part named Head directly under a model with a Humanoid.
+    static boolean isCharacterHead(Instance p) {
+        if (!"Head".equals(p.getName())) {
+            return false;
+        }
+        Instance m = p.getParent();
+        return m != null && m.findFirstChildOfClass("Humanoid", false) != null;
+    }
+
+    /// The [Item#kind] of a part: an R6 limb directly under a model with a
+    /// Humanoid, or scenery by the name the templates give it.
+    static int kind(Instance p) {
+        String n = p.getName();
+        if ("Trunk".equals(n)) {
+            return TRUNK;
+        }
+        if ("Leaves".equals(n)) {
+            return LEAVES;
+        }
+        if ("Rock".equals(n)) {
+            return ROCK;
+        }
+        int limb;
+        if ("Torso".equals(n)) {
+            limb = TORSO;
+        } else if ("Left Arm".equals(n)) {
+            limb = LEFT_ARM;
+        } else if ("Right Arm".equals(n)) {
+            limb = RIGHT_ARM;
+        } else if ("Left Leg".equals(n)) {
+            limb = LEFT_LEG;
+        } else if ("Right Leg".equals(n)) {
+            limb = RIGHT_LEG;
+        } else {
+            return PLAIN;
+        }
+        Instance m = p.getParent();
+        return m != null && m.findFirstChildOfClass("Humanoid", false) != null ? limb : PLAIN;
     }
 
     static int shape(Instance p) {

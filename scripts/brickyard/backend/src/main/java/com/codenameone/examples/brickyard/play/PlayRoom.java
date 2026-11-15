@@ -143,10 +143,22 @@ public final class PlayRoom {
 
     /// Queues `username` joining over `link`; any thread.
     public void connect(final Link link, final long userId, final String username, final String display) {
+        connect(link, userId, username, display, null);
+    }
+
+    /// [#connect(Link, long, String, String)] wearing `body`, the account's
+    /// chosen avatar body (null for the default figure).
+    public void connect(final Link link, final long userId, final String username, final String display,
+            final String body) {
         inbox.add(new Runnable() {
             @Override
             public void run() {
-                handles.put(link, Integer.valueOf(server.connect(link, userId, username, display)));
+                Map<String, Object> attrs = null;
+                if (body != null) {
+                    attrs = new HashMap<String, Object>();
+                    attrs.put("AvatarBody", body);
+                }
+                handles.put(link, Integer.valueOf(server.connect(link, userId, display, display, attrs)));
                 owners.put(link, username);
                 if (!since.containsKey(username)) {
                     since.put(username, Long.valueOf(System.currentTimeMillis()));

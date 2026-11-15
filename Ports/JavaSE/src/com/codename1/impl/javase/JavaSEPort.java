@@ -13022,6 +13022,39 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /// Presses or releases a hardware key on the simulator canvas, through the
+    /// canvas's own key listener, as typing on the Mac keyboard would. `id` is
+    /// KeyEvent.KEY_PRESSED or KEY_RELEASED. Unlike the simulated keyboard this
+    /// reaches whatever component has focus, so a game can be driven by key
+    /// while a pointer gesture is in progress.
+    public void dispatchSimulatedKey(final int id, final int keyCode, final char keyChar) {
+        final C c = canvas;
+        if (c == null) {
+            throw new IllegalStateException("The simulator window is not up");
+        }
+        Runnable r = new Runnable() {
+            public void run() {
+                KeyEvent ke = new KeyEvent(c, id, System.currentTimeMillis(), 0, keyCode, keyChar);
+                if (id == KeyEvent.KEY_PRESSED) {
+                    c.keyPressed(ke);
+                } else {
+                    c.keyReleased(ke);
+                }
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+            return;
+        }
+        try {
+            EventQueue.invokeAndWait(r);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            throw new RuntimeException(e.getCause());
+        }
+    }
+
     /// The Device menu's Rotate item, kept so a programmatic rotation runs the
     /// same action: setPortrait alone flips the flag without resizing the canvas
     /// or telling the application its size changed.

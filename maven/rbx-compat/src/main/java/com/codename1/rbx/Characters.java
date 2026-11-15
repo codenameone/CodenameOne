@@ -220,6 +220,12 @@ final class Characters {
         Instance starter = e.service("StarterPlayer").findFirstChild("StarterCharacter");
         Instance model = starter != null ? starter.cloneTree() : buildRig(e, player.getName(), null);
         model.setName(player.getName());
+        // The body the player chose in the avatar editor rides on the Player;
+        // the character carries it so every client draws the same figure.
+        Object body = player.getAttribute("AvatarBody");
+        if (body instanceof String && model.getAttribute("AvatarBody") == null) {
+            model.setAttribute("AvatarBody", body);
+        }
         Instance hum = model.findFirstChildOfClass("Humanoid", false);
         Instance sp = e.service("StarterPlayer");
         if (hum != null) {
@@ -298,6 +304,11 @@ final class Characters {
             for (int i = 0; i < all.size(); i++) { // NOPMD ForLoopCanBeForeach - per-frame code; no iterator, and the list may change while walked
                 if (all.get(i).isA("Motor6D")) {
                     all.get(i).put("Enabled", Boolean.FALSE);
+                } else if (all.get(i).isA("BasePart")) {
+                    // The body stays where it fell until the respawn: no
+                    // solver owns a dead character's parts, and left loose
+                    // they drifted down through the lava that killed them.
+                    all.get(i).put("Anchored", Boolean.TRUE);
                 }
             }
         }
@@ -313,6 +324,11 @@ final class Characters {
                 }
             });
         }
+    }
+
+    /// The humanoid's current `HumanoidStateType` name.
+    static String stateOf(Instance hum) {
+        return ctl(hum).state;
     }
 
     static void setState(Instance hum, String s) {
@@ -901,6 +917,13 @@ final class Characters {
         Animations.step(model, c.tracks, dt);
         if (!simulatedHere(e, model)) {
             syncRig(model);
+            // The owning client moves a player's character, but the server
+            // runs the Scripts, so the server finds what it touches: a kill
+            // brick, a checkpoint, a coin. Skipping this left every Touched
+            // handler in an online room dead, and a player stood on lava.
+            if (e.getRole() == Engine.SERVER && !c.dead) {
+                touches(e, hum, model, c);
+            }
             return;
         }
         if (c.dead || root.bool("Anchored")) {
@@ -1018,7 +1041,12 @@ final class Characters {
             CFrame c = Behaviors.cf(p);
             Vector3 hs = Behaviors.size(p).scale(0.5);
             Vector3 l = c.pointToObject(new Vector3(x, c.y, z));
-            if (Math.abs(l.x) > hs.x + 0.5 || Math.abs(l.z) > hs.z + 0.5) {
+            // All three axes: the point is taken at the part's own height, so
+            // the vertical axis reads about zero whichever local axis it is.
+            // Testing only X and Z made a part turned on its side (an upright
+            // cylinder pad) endless along its local Y, and a character stood
+            // on a pad 11 studs away, hovering over lava that never killed it.
+            if (Math.abs(l.x) > hs.x + 0.5 || Math.abs(l.y) > hs.y + 0.5 || Math.abs(l.z) > hs.z + 0.5) {
                 continue;
             }
             double ey = Math.abs(c.r10) * hs.x + Math.abs(c.r11) * hs.y + Math.abs(c.r12) * hs.z;

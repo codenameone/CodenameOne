@@ -53,9 +53,15 @@ public final class Ui {
         Form f = new Form(title, BoxLayout.y());
         f.setName(name);
         f.setUIID("GameForm");
+        // The native theme's content pane is opaque and light; this one lets
+        // the form's palette through.
+        f.getContentPane().setUIID("GameContent");
         f.getToolbar().setUIID("GameToolbar");
         f.getToolbar().getTitleComponent().setUIID("GameTitle");
         f.setScrollableY(true);
+        // Touch scrolling needs no bar; the desktop-style thumb drew a white
+        // stripe down the right edge of every screen.
+        f.getContentPane().setScrollVisible(false);
         Telemetry.screen(name);
         return f;
     }
@@ -65,6 +71,7 @@ public final class Ui {
         Form f = form(title, name);
         Container content = new Container(BoxLayout.y());
         content.setScrollableY(true);
+        content.setScrollVisible(false);
         f.setLayout(new BorderLayout());
         f.setScrollableY(false);
         f.add(BorderLayout.CENTER, content);
@@ -85,9 +92,12 @@ public final class Ui {
         bar.setSafeArea(true);
         for (int i = 0; i < SECTIONS.length; i++) {
             final int index = i;
-            Button b = new Button(SECTIONS[i], i == selected ? "Chip" : "LinkButton");
-            FontImage.setMaterialIcon(b, ICONS[i]);
+            Button b = new Button(SECTIONS[i], i == selected ? "SectionTabSelected" : "SectionTab");
+            // A 4.5mm glyph over the label, the selected one tinted rather
+            // than boxed: a filled pill around one tab outweighed the bar.
+            FontImage.setMaterialIcon(b, ICONS[i], 4.5f);
             b.setTextPosition(Component.BOTTOM);
+            b.setGap(CN.convertToPixels(0.4f));
             b.setName("section" + SECTIONS[i]);
             b.addActionListener(e -> Nav.section(index));
             bar.add(b);
@@ -96,12 +106,20 @@ public final class Ui {
     }
 
     public static void back(Form f, final Runnable leave) {
-        f.getToolbar().setBackCommand(new Command("") {
+        Command cmd = new Command("") {
             @Override
             public void actionPerformed(ActionEvent evt) {
                 leave.run();
             }
-        });
+        };
+        f.getToolbar().setBackCommand(cmd);
+        // An arrow and no words: a screen reader (and an agent driving the
+        // app) needs the name the picture stands for.
+        Button b = f.getToolbar().findCommandComponent(cmd);
+        if (b != null) {
+            b.setAccessibilityText("Back");
+            b.setName("backButton");
+        }
     }
 
     public static Label label(String text, String uiid) {
@@ -145,6 +163,9 @@ public final class Ui {
         TextField t = new TextField("", hint, 20, constraint);
         t.setUIID("GameField");
         t.setName(name);
+        // The hint is only drawn; screen readers (and the agent tools) read
+        // the accessibility text.
+        t.setAccessibilityText(hint);
         return t;
     }
 

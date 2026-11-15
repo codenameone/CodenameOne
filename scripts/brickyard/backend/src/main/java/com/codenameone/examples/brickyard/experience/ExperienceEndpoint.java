@@ -29,6 +29,7 @@ import com.codenameone.examples.brickyard.api.PresenceDto;
 import com.codenameone.examples.brickyard.api.PlaceDto;
 import com.codenameone.examples.brickyard.api.PlaceUploadDto;
 import com.codenameone.examples.brickyard.api.RollbackDto;
+import com.codenameone.examples.brickyard.api.ThumbnailDto;
 import com.codenameone.examples.brickyard.api.VersionDto;
 import com.codenameone.examples.brickyard.api.VoteDto;
 
@@ -47,10 +48,12 @@ public class ExperienceEndpoint implements ExperienceApiServer {
     private final PlayTickets tickets;
     private final Social social;
     private final Pushes pushes;
+    private final Thumbnails thumbnails;
 
     public ExperienceEndpoint(Experiences experiences, PlayServers servers, PlayTickets tickets, Social social,
-            Pushes pushes) {
+            Pushes pushes, Thumbnails thumbnails) {
         this.pushes = pushes;
+        this.thumbnails = thumbnails;
         this.experiences = experiences;
         this.servers = servers;
         this.tickets = tickets;
@@ -98,6 +101,16 @@ public class ExperienceEndpoint implements ExperienceApiServer {
     @Override
     public PlaceDto place(String id) throws Exception {
         return experiences.place(id);
+    }
+
+    @Override
+    public ThumbnailDto thumbnail(String id) throws Exception {
+        return thumbnails.get(id);
+    }
+
+    @Override
+    public ThumbnailDto setThumbnail(String id, ThumbnailDto body) throws Exception {
+        return thumbnails.set(id, body == null ? null : body.data());
     }
 
     @Override

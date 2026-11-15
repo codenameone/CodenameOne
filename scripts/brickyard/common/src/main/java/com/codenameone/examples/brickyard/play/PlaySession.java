@@ -171,9 +171,14 @@ public final class PlaySession {
             return;
         }
         AccountDto me = Session.user();
-        String name = me == null ? "Guest" : me.username();
-        String display = me == null ? "Guest" : me.displayName();
-        engine.addPlayer(Math.abs((long) name.hashCode()) + 1, name, display);
+        // The username is an e-mail address: it seeds the numeric id only and is
+        // never a player's Name, which scripts read and replicate.
+        String id = me == null ? "Guest" : me.username();
+        String display = me == null || me.displayName() == null || me.displayName().length() == 0
+                ? "Player" : me.displayName();
+        java.util.Map<String, Object> attrs = new java.util.HashMap<String, Object>();
+        attrs.put("AvatarBody", com.codenameone.examples.brickyard.ui.Avatar.load().body());
+        engine.addPlayer(Math.abs((long) id.hashCode()) + 1, display, display, attrs);
         show(engine, experienceId, title, report, errors, null, null);
     }
 
@@ -189,6 +194,10 @@ public final class PlaySession {
         final Form f = new Form(title, new BorderLayout());
         f.setName("play");
         f.setScrollable(false);
+        f.setUIID("GameForm");
+        f.getContentPane().setUIID("GameContent");
+        f.getToolbar().setUIID("GameToolbar");
+        f.getToolbar().getTitleComponent().setUIID("GameTitle");
         f.add(BorderLayout.CENTER, view);
         Friends.presence(title);
         final Runnable leave = new Runnable() {
@@ -204,12 +213,20 @@ public final class PlaySession {
                 }
             }
         };
-        f.getToolbar().setBackCommand(new Command("Leave") {
+        Command leaveCmd = new Command("Leave") {
             @Override
             public void actionPerformed(ActionEvent evt) {
                 leave.run();
             }
-        });
+        };
+        f.getToolbar().setBackCommand(leaveCmd);
+        // The toolbar draws the back command as an arrow alone; a screen
+        // reader (and an agent driving the app) needs the word.
+        com.codename1.ui.Button leaveButton = f.getToolbar().findCommandComponent(leaveCmd);
+        if (leaveButton != null) {
+            leaveButton.setAccessibilityText("Leave");
+            leaveButton.setName("leaveButton");
+        }
         f.getToolbar().addCommandToOverflowMenu(new Command("Players") {
             @Override
             public void actionPerformed(ActionEvent evt) {

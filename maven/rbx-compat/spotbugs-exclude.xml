@@ -33,6 +33,7 @@
     <Match>
         <Or>
             <Class name="com.codename1.rbx.SceneSnapshot$Item"/>
+            <Class name="com.codename1.rbx.SceneSnapshot$Figure"/>
             <!-- The renderer in rbx-view reads these; this module only writes them. -->
             <Class name="com.codename1.rbx.SceneSnapshot"/>
         </Or>

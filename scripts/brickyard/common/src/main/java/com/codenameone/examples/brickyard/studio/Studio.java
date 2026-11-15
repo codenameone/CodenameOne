@@ -18,10 +18,15 @@
  */
 package com.codenameone.examples.brickyard.studio;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.rbx.AgentMcp;
 import com.codename1.rbx.AgentTools;
 import com.codename1.rbx.Engine;
+import com.codename1.rbx.Gizmo;
+import com.codename1.rbx.CFrame;
 import com.codename1.rbx.Instance;
+import com.codename1.rbx.PlayView;
+import com.codename1.rbx.Vector3;
 import com.codename1.rbx.Scheduler;
 import com.codename1.rbx.place.PlaceFile;
 import com.codename1.rbx.place.PlaceLoader;
@@ -33,9 +38,12 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
@@ -45,10 +53,13 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.util.Base64;
 import com.codenameone.examples.brickyard.api.ExperienceSaveDto;
 import com.codenameone.examples.brickyard.api.PlaceUploadDto;
+import com.codenameone.examples.brickyard.api.ThumbnailDto;
 import com.codenameone.examples.brickyard.net.Api;
 import com.codenameone.examples.brickyard.net.Net;
 import com.codenameone.examples.brickyard.play.PlaySession;
 import com.codenameone.examples.brickyard.ui.Ui;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -65,24 +76,45 @@ public final class Studio implements AgentTools.Studio {
 
     private String experienceId;
     private String title;
+    private String genre = "Obby";
+    /// What a new experience says about itself until its creator edits it;
+    /// the backend refuses one without a description.
+    private String description = "Made in the Brickyard studio.";
+    private final Container viewport = new Container(new BorderLayout());
+    private final Container panel = new Container(new BorderLayout());
+    private final Container tabBar = new Container(new GridLayout(1, 4));
+    private int tab;
+    private PlayView view;
     private Engine engine;
     private final AgentTools tools = new AgentTools(this);
     private final List<byte[]> undo = new ArrayList<byte[]>();
+    /// The transform tool, a [Gizmo] mode.
+    private int tool = Gizmo.MOVE;
+    /// The place before the gizmo drag under way, for its undo step.
+    private byte[] dragBefore;
     private Instance selected;
     private final Form form;
     private final Container explorer = new Container(BoxLayout.y());
     private final Container properties = new Container(BoxLayout.y());
     private final TextArea source = new TextArea(12, 40);
     private final TextArea output = new TextArea(12, 40);
+    private final List<byte[]> redo = new ArrayList<byte[]>();
+    /// A desktop editor's layout (menu bar, tool strip, docked panes) on a
+    /// desktop, a tablet or any window wide enough; the phone keeps tabs.
+    private final boolean desktop;
+    private DesktopShell shell;
+    private Runnable exit;
 
     private Studio(String experienceId, String title) {
         this.experienceId = experienceId;
         this.title = title;
-        form = new Form(title, new BorderLayout());
-        form.setName("studio");
+        form = Ui.form(title, "studio");
+        form.setLayout(new BorderLayout());
+        form.setScrollableY(false);
         source.setName("scriptSource");
         output.setEditable(false);
         output.setName("studioOutput");
+        desktop = CN.isDesktop() || CN.isTablet() || CN.getDisplayWidth() >= CN.convertToPixels(180);
         replace(newEngine());
     }
 
@@ -90,9 +122,7 @@ public final class Studio implements AgentTools.Studio {
     public static void open(final String experienceId) {
         final Form previous = CN.getCurrentForm();
         if (experienceId == null) {
-            Studio s = new Studio(null, "New experience");
-            s.applyTemplate("obby");
-            s.show(previous);
+            TemplateGallery.show(previous);
             return;
         }
         Api.experiences().place(experienceId, Net.to(place -> {
@@ -109,30 +139,67 @@ public final class Studio implements AgentTools.Studio {
         }, Ui::failed));
     }
 
+    /// A new experience called `title`, started from the template `id`.
+    static void create(String id, String title, Form previous) {
+        Studio s = new Studio(null, title);
+        s.genre = TemplateGallery.genre(id);
+        s.description = TemplateGallery.blurb(id);
+        s.applyTemplate(id);
+        s.show(previous);
+    }
+
     private static Engine newEngine() {
         Engine e = new Engine(Engine.SOLO);
         e.setStudio(true);
         return e;
     }
 
+    private static final String[] TABS = {"Explorer", "Properties", "Script", "Output"};
+    private static final char[] TAB_ICONS = {FontImage.MATERIAL_ACCOUNT_TREE, FontImage.MATERIAL_TUNE,
+        FontImage.MATERIAL_CODE, FontImage.MATERIAL_TERMINAL};
+
     private void show(final Form previous) {
         current = this;
-        Tabs tabs = new Tabs();
-        tabs.addTab("Explorer", wrap(explorer));
-        tabs.addTab("Properties", wrap(properties));
-        Container script = new Container(new BorderLayout());
-        script.add(BorderLayout.CENTER, source);
-        script.add(BorderLayout.SOUTH, Ui.primary("Save script", "saveScript", ev -> saveScript()));
-        tabs.addTab("Script", script);
-        tabs.addTab("Output", wrap(output));
-        form.add(BorderLayout.CENTER, tabs);
-        Container bar = new Container(new GridLayout(1, 4));
-        bar.add(Ui.primary("Play", "studioPlay", ev -> playtest()));
-        bar.add(Ui.secondary("Part", "studioPart", ev -> edit("create_instance",
-                "{\"class\":\"Part\",\"parent\":\"Workspace\",\"properties\":{\"Anchored\":true,\"CFrame\":[0,6,0]}}")));
-        bar.add(Ui.secondary("Script", "studioScript", ev -> edit("write_script",
-                "{\"parent\":\"ServerScriptService\",\"name\":\"Script\",\"source\":\"print('hello')\"}")));
-        bar.add(Ui.secondary("Undo", "studioUndo", ev -> undo()));
+        exit = () -> {
+            if (current == this) {
+                current = null;
+            }
+            if (previous != null) {
+                previous.showBack();
+            }
+        };
+        if (desktop) {
+            shell = new DesktopShell(this);
+            shell.install(form, viewport, explorer, properties, source, output);
+            showTab(3);
+            // A desktop editor has a menu bar, not a phone's title bar: the
+            // title and the way out live there (File > Exit, the close button).
+            form.getToolbar().setHidden(true);
+            form.show();
+            rebuildViewport();
+            return;
+        }
+        // The place in 3D on top, as in any engine's editor: drag to orbit,
+        // pinch or wheel to zoom; picking a part in the Explorer flies to it.
+        viewport.setUIID("StudioViewport");
+        int vh = Math.max(CN.convertToPixels(36), CN.getDisplayHeight() / 3);
+        viewport.setPreferredH(vh);
+        Container body = new Container(new BorderLayout());
+        body.add(BorderLayout.NORTH, BoxLayout.encloseY(viewport, tabBar));
+        panel.setUIID("StudioPanel");
+        body.add(BorderLayout.CENTER, panel);
+        form.add(BorderLayout.CENTER, body);
+        tabBar.setUIID("StudioTabs");
+        showTab(0);
+        Container bar = new Container(new GridLayout(1, 5));
+        bar.setUIID("GameToolbar");
+        bar.setSafeArea(true);
+        bar.add(tool("Play", FontImage.MATERIAL_PLAY_ARROW, "StudioPlay", "studioPlay", ev -> playtest()));
+        bar.add(tool("Part", FontImage.MATERIAL_VIEW_IN_AR, "StudioTool", "studioPart", ev -> addPart()));
+        bar.add(tool("Script", FontImage.MATERIAL_NOTE_ADD, "StudioTool", "studioScript", ev -> addScript()));
+        bar.add(tool("Undo", FontImage.MATERIAL_UNDO, "StudioTool", "studioUndo", ev -> undo()));
+        bar.add(tool("Publish", FontImage.MATERIAL_ROCKET_LAUNCH, "StudioPublish", "studioPublish",
+                ev -> askPublish()));
         form.add(BorderLayout.SOUTH, bar);
         form.getToolbar().addCommandToOverflowMenu(new Command("Templates") {
             @Override
@@ -143,15 +210,13 @@ public final class Studio implements AgentTools.Studio {
         form.getToolbar().addCommandToOverflowMenu(new Command("Delete selected") {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                if (selected != null) {
-                    edit("delete_instance", "{\"path\":" + q(selected.fullName()) + "}");
-                }
+                deleteSelected();
             }
         });
         form.getToolbar().addCommandToOverflowMenu(new Command("Compatibility report") {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                log(tools.call("compat_report", "{}"));
+                compatReport();
             }
         });
         form.getToolbar().addCommandToOverflowMenu(new Command("Export .rbxlx") {
@@ -166,28 +231,222 @@ public final class Studio implements AgentTools.Studio {
                 agentMode();
             }
         });
-        form.getToolbar().addCommandToOverflowMenu(new Command("Publish") {
+        Ui.back(form, exit);
+        form.show();
+        rebuildViewport();
+    }
+
+    private static Button tool(String text, char icon, String uiid, String name,
+            com.codename1.ui.events.ActionListener<ActionEvent> onClick) {
+        Button b = new Button(text, uiid);
+        FontImage.setMaterialIcon(b, icon, 4);
+        b.setTextPosition(com.codename1.ui.Component.BOTTOM);
+        b.setGap(CN.convertToPixels(0.6f));
+        b.setName(name);
+        b.addActionListener(onClick);
+        return b;
+    }
+
+    void showTab(int index) {
+        tab = index;
+        output.setUIID("StudioCode");
+        source.setUIID("StudioCode");
+        if (shell != null) {
+            // Explorer and Properties are always docked; only the bottom
+            // pane switches, between the script and the output.
+            if (index >= 2) {
+                shell.showBottom(index == 2);
+            }
+            form.revalidate();
+            return;
+        }
+        tabBar.removeAll();
+        for (int i = 0; i < TABS.length; i++) {
+            final int k = i;
+            Button b = new Button(TABS[i], i == index ? "StudioTabSelected" : "StudioTab");
+            FontImage.setMaterialIcon(b, TAB_ICONS[i], 3);
+            b.setGap(CN.convertToPixels(0.8f));
+            b.setName("tab" + TABS[i]);
+            b.addActionListener(ev -> showTab(k));
+            tabBar.add(b);
+        }
+        panel.removeAll();
+        if (index == 2) {
+            Container script = new Container(new BorderLayout());
+            source.setUIID("StudioCode");
+            if (source.getParent() != null) {
+                source.remove();
+            }
+            script.add(BorderLayout.CENTER, source);
+            script.add(BorderLayout.SOUTH, Ui.primary("Save script", "saveScript", ev -> saveScript()));
+            panel.add(BorderLayout.CENTER, script);
+        } else {
+            panel.add(BorderLayout.CENTER, wrap(index == 0 ? explorer : index == 1 ? properties : output));
+        }
+        output.setUIID("StudioCode");
+        form.revalidate();
+    }
+
+    /// A new viewport over the current engine; called when the engine is
+    /// replaced (a template, an undo), since a view belongs to one engine.
+    private void rebuildViewport() {
+        if (!CN.isEdt()) {
+            CN.callSerially(this::rebuildViewport);
+            return;
+        }
+        viewport.removeAll();
+        view = new PlayView(engine);
+        view.setEditMode(true);
+        view.setPickListener(this::picked);
+        view.getGizmo().setMode(tool);
+        view.getGizmo().setSelection(selected);
+        view.setTransformListener(new PlayView.TransformListener() {
             @Override
-            public void actionPerformed(ActionEvent evt) {
-                TextField notes = new TextField("", "What changed", 30, TextField.ANY);
-                if (Dialog.show("Publish", notes, new Command("Cancel"), new Command("Publish")).getCommandName()
-                        .equals("Publish")) {
-                    log(publish(notes.getText()));
+            public void transformStarted() {
+                dragBefore = RbxlxWriter.writeBytes(PlaceSaver.save(engine));
+            }
+
+            @Override
+            public void transformFinished() {
+                if (dragBefore != null) {
+                    pushUndo(dragBefore);
+                    dragBefore = null;
+                    showProperties();
+                    form.revalidate();
                 }
             }
         });
-        Ui.back(form, () -> {
-            if (current == this) {
-                current = null;
+        // A GPU peer paints its whole bounds over lightweight components;
+        // sized exactly to the viewport, it cannot spill onto the tabs.
+        if (!desktop) {
+            view.setPreferredH(viewport.getPreferredH());
+        }
+        frame(null);
+        if (view.isSupported()) {
+            viewport.add(BorderLayout.CENTER, view);
+        } else {
+            viewport.add(BorderLayout.CENTER, Ui.label("3D is not available on this device", "Muted"));
+        }
+        viewport.revalidate();
+    }
+
+    /// Points the viewport at `focus`, or at the whole place when null.
+    private void frame(Instance focus) {
+        if (view == null) {
+            return;
+        }
+        double[] b = {Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE,
+            -Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE};
+        bounds(focus == null ? engine.getWorkspace() : focus, b, focus == null);
+        if (b[0] > b[3]) {
+            view.getCamera().setPivot(new Vector3(0, 0, 0), 60);
+            return;
+        }
+        double dx = b[3] - b[0];
+        double dy = b[4] - b[1];
+        double dz = b[5] - b[2];
+        double r = Math.sqrt(dx * dx + dy * dy + dz * dz) / 2;
+        view.getCamera().setPivot(new Vector3((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2),
+                Math.max(8, r * (focus == null ? 0.85 : 2.4)));
+    }
+
+    /// Grows `b` (min xyz, max xyz) by every part under `i`. The whole place
+    /// skips parts larger than 400 studs a side -- a lava sea or a baseplate
+    /// would otherwise frame the course as a speck -- and parts tagged
+    /// Scenery.
+    private static void bounds(Instance i, double[] b, boolean skipHuge) {
+        Object cf = i.prop("CFrame");
+        Object size = i.prop("Size");
+        if (i.isA("BasePart") && cf instanceof CFrame && size instanceof Vector3) {
+            CFrame f = (CFrame) cf;
+            Vector3 s = (Vector3) size;
+            // A template tags its backdrop (hills, a tree belt, the far
+            // ground) Scenery, so the place frames as its play area.
+            if (!skipHuge || Math.max(s.x, s.z) < 400 && !i.hasTag("Scenery")) {
+                b[0] = Math.min(b[0], f.x - s.x / 2);
+                b[1] = Math.min(b[1], f.y - s.y / 2);
+                b[2] = Math.min(b[2], f.z - s.z / 2);
+                b[3] = Math.max(b[3], f.x + s.x / 2);
+                b[4] = Math.max(b[4], f.y + s.y / 2);
+                b[5] = Math.max(b[5], f.z + s.z / 2);
             }
-            if (previous != null) {
-                previous.showBack();
+        }
+        for (Instance c : i.getChildren()) {
+            bounds(c, b, skipHuge);
+        }
+    }
+
+    /// A bright block beside the spawn (or at the viewport's pivot), which
+    /// the viewport then frames, so the creator sees what was added.
+    void addPart() {
+        Vector3 at = new Vector3(0, 6, 0);
+        Instance spawn = firstOf(engine.getWorkspace(), "SpawnLocation");
+        Object scf = spawn == null ? null : spawn.prop("CFrame");
+        if (scf instanceof CFrame) {
+            CFrame f = (CFrame) scf;
+            at = new Vector3(f.x + 6, f.y + 4, f.z - 6);
+        } else if (engine.getWorkspace().prop("CurrentCamera") instanceof Instance) {
+            Object focus = ((Instance) engine.getWorkspace().prop("CurrentCamera")).prop("Focus");
+            if (focus instanceof CFrame) {
+                at = new Vector3(((CFrame) focus).x, ((CFrame) focus).y, ((CFrame) focus).z);
             }
+        }
+        edit("create_instance", "{\"class\":\"Part\",\"parent\":\"Workspace\",\"properties\":{\"Anchored\":true,"
+                + "\"Size\":[4,4,4],\"Color\":\"#ffc43c\",\"CFrame\":[" + at.x + "," + at.y + "," + at.z + "]}}");
+        List<Instance> kids = engine.getWorkspace().getChildren();
+        if (!kids.isEmpty()) {
+            select(kids.get(kids.size() - 1));
+        }
+    }
+
+    private static Instance firstOf(Instance root, String cls) {
+        for (Instance c : root.getChildren()) {
+            if (cls.equals(c.getClassName())) {
+                return c;
+            }
+            Instance deeper = firstOf(c, cls);
+            if (deeper != null) {
+                return deeper;
+            }
+        }
+        return null;
+    }
+
+    void askPublish() {
+        final TextField notes = new TextField("", "What changed", 30, TextField.ANY);
+        notes.setUIID("StudioField");
+        notes.setName("publishNotes");
+        final Dialog d = darkDialog("Publish");
+        Container buttons = new Container(new GridLayout(1, 2));
+        Button cancel = new Button("Cancel", "StudioDialogButton");
+        cancel.addActionListener(ev -> d.dispose());
+        Button go = new Button("Publish", "StudioPublish");
+        go.setName("confirmPublish");
+        go.addActionListener(ev -> {
+            d.dispose();
+            log(publish(notes.getText()));
+            showTab(3);
         });
-        form.show();
+        buttons.add(cancel).add(go);
+        d.add(BorderLayout.CENTER, BoxLayout.encloseY(Ui.label("Release notes", "StudioPropName"), notes));
+        d.add(BorderLayout.SOUTH, buttons);
+        d.show();
+    }
+
+    /// A dialog in the editor's dark palette rather than the native theme's.
+    static Dialog darkDialog(String title) {
+        Dialog d = new Dialog(title, new BorderLayout());
+        d.setDialogUIID("StudioDialog");
+        d.getTitleComponent().setUIID("StudioDialogTitle");
+        d.getContentPane().setUIID("StudioDialogBody");
+        return d;
     }
 
     private static Container wrap(com.codename1.ui.Component c) {
+        // A tab's view moves between wrappers as tabs are switched.
+        if (c.getParent() != null) {
+            c.remove();
+        }
         Container w = new Container(new BorderLayout());
         w.setScrollableY(true);
         w.add(BorderLayout.CENTER, c);
@@ -212,11 +471,88 @@ public final class Studio implements AgentTools.Studio {
         });
         selected = null;
         refresh();
+        if (view != null) {
+            rebuildViewport();
+        }
     }
 
     @Override
     public byte[] screenshot() {
-        return null;
+        // The agent asks from its own thread; the capture is the EDT's.
+        final byte[][] out = new byte[1][];
+        CN.callSeriallyAndWait(() -> {
+            Image shot = viewportImage();
+            out[0] = shot == null ? null : encode(shot, ImageIO.FORMAT_PNG);
+        });
+        return out[0];
+    }
+
+    private void published(com.codenameone.examples.brickyard.api.VersionDto v) {
+        log("Published version " + v.number());
+        captureThumbnail();
+    }
+
+    /// Captures the viewport as it stands -- the real renderer, lit and post
+    /// processed -- as the experience's tile, which is what players see in
+    /// Discover. A creator frames it by orbiting before publishing.
+    void captureThumbnail() {
+        if (experienceId == null) {
+            log("Publish first: a thumbnail belongs to a published experience");
+            return;
+        }
+        Image shot = viewportImage();
+        byte[] jpeg = shot == null ? null : encode(tile(shot), ImageIO.FORMAT_JPEG);
+        if (jpeg == null) {
+            log("This device cannot capture the viewport; players see a drawn tile");
+            return;
+        }
+        Api.experiences().setThumbnail(experienceId, new ThumbnailDto(Base64.encodeNoNewline(jpeg)),
+                Net.to(t -> log("Thumbnail updated"), (status, message) -> log("Thumbnail not saved: " + message)));
+    }
+
+    /// The viewport's pixels: the GPU view paints its last frame when drawn
+    /// into an image, which is how the simulator's own screenshots see it.
+    private Image viewportImage() {
+        int w = viewport.getWidth();
+        int h = viewport.getHeight();
+        if (view == null || w <= 0 || h <= 0) {
+            return null;
+        }
+        Image img = Image.createImage(w, h, 0xff000000);
+        Graphics g = img.getGraphics();
+        g.translate(-viewport.getX(), -viewport.getY());
+        viewport.paintComponent(g, true);
+        return img;
+    }
+
+    /// The centre 16:9 of `shot`, scaled to the tile size Discover shows.
+    static Image tile(Image shot) {
+        int w = shot.getWidth();
+        int h = shot.getHeight();
+        int cw = w;
+        int ch = w * 9 / 16;
+        if (ch > h) {
+            ch = h;
+            cw = h * 16 / 9;
+        }
+        Image crop = shot.subImage((w - cw) / 2, (h - ch) / 2, cw, ch, false);
+        return crop.scaled(TILE_W, TILE_W * 9 / 16);
+    }
+
+    static final int TILE_W = 640;
+
+    private static byte[] encode(Image img, String format) {
+        ImageIO io = ImageIO.getImageIO();
+        if (io == null || !io.isFormatSupported(format)) {
+            return null;
+        }
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            io.save(img, out, format, 0.85f);
+            return out.toByteArray();
+        } catch (IOException err) {
+            return null;
+        }
     }
 
     @Override
@@ -224,16 +560,16 @@ public final class Studio implements AgentTools.Studio {
         final PlaceUploadDto upload = new PlaceUploadDto(Base64.encodeNoNewline(
                 RbxlxWriter.writeBytes(PlaceSaver.save(engine))));
         if (experienceId == null) {
-            Api.experiences().create(new ExperienceSaveDto(title, notes, "obby", 12, "public", "everyone"),
+            Api.experiences().create(new ExperienceSaveDto(title, description, genre, 12, "PUBLIC", "ALL"),
                     Net.to(created -> {
                         experienceId = created.id();
                         Api.experiences().publish(experienceId, upload,
-                                Net.to(v -> log("Published version " + v.number()), Ui::failed));
+                                Net.to(this::published, Ui::failed));
                     }, Ui::failed));
             return "Creating the experience and publishing its first version";
         }
         Api.experiences().publish(experienceId, upload,
-                Net.to(v -> log("Published version " + v.number()), Ui::failed));
+                Net.to(this::published, Ui::failed));
         return "Publishing a new version of " + experienceId;
     }
 
@@ -244,24 +580,131 @@ public final class Studio implements AgentTools.Studio {
         byte[] before = RbxlxWriter.writeBytes(PlaceSaver.save(engine));
         try {
             log(tool + " -> " + tools.call(tool, args));
-            undo.add(before);
-            if (undo.size() > UNDO_DEPTH) {
-                undo.remove(0);
-            }
+            pushUndo(before);
         } catch (RuntimeException err) {
             Ui.toast(String.valueOf(err.getMessage()));
         }
         refresh();
     }
 
-    private void undo() {
+    private void pushUndo(byte[] before) {
+        undo.add(before);
+        redo.clear();
+        if (undo.size() > UNDO_DEPTH) {
+            undo.remove(0);
+        }
+    }
+
+    /// Picks the viewport's transform tool, a [Gizmo] mode.
+    void setTool(int t) {
+        tool = t;
+        if (view != null) {
+            view.getGizmo().setMode(t);
+        }
+    }
+
+    void undo() {
         if (undo.isEmpty()) {
             Ui.toast("Nothing to undo");
             return;
         }
+        redo.add(RbxlxWriter.writeBytes(PlaceSaver.save(engine)));
+        load(undo.remove(undo.size() - 1));
+    }
+
+    void redo() {
+        if (redo.isEmpty()) {
+            Ui.toast("Nothing to redo");
+            return;
+        }
+        undo.add(RbxlxWriter.writeBytes(PlaceSaver.save(engine)));
+        load(redo.remove(redo.size() - 1));
+    }
+
+    private void load(byte[] place) {
         Engine e = newEngine();
-        PlaceLoader.loadPlace(e, PlaceFile.read(undo.remove(undo.size() - 1)));
+        PlaceLoader.loadPlace(e, PlaceFile.read(place));
         replace(e);
+    }
+
+    /// A copy of the selection beside it: same class, same properties.
+    /// Shallow -- children are not copied.
+    void duplicateSelected() {
+        if (selected == null || selected.getParent() == null) {
+            Ui.toast("Select an instance first");
+            return;
+        }
+        StringBuilder props = new StringBuilder("{");
+        for (Map.Entry<String, Object> p : selected.storedProps().entrySet()) {
+            if (props.length() > 1) {
+                props.append(',');
+            }
+            props.append(q(p.getKey())).append(':').append(AgentTools.json(p.getValue()));
+        }
+        props.append('}');
+        edit("create_instance", "{\"class\":" + q(selected.getClassName()) + ",\"parent\":"
+                + q(selected.getParent().fullName()) + ",\"name\":" + q(selected.getName())
+                + ",\"properties\":" + props + "}");
+    }
+
+    void deleteSelected() {
+        if (selected != null) {
+            edit("delete_instance", "{\"path\":" + q(selected.fullName()) + "}");
+        }
+    }
+
+    void addScript() {
+        edit("write_script", "{\"parent\":\"ServerScriptService\",\"name\":\"Script\",\"source\":\"print('hello')\"}");
+    }
+
+    void compatReport() {
+        log(tools.call("compat_report", "{}"));
+        showTab(3);
+    }
+
+    /// Opens `brickyard-import.rbxlx` (or the last export) from app storage.
+    void importPlace() {
+        String name = CN.existsInStorage("brickyard-import.rbxlx") ? "brickyard-import.rbxlx"
+                : "brickyard-export.rbxlx";
+        if (!CN.existsInStorage(name)) {
+            log("Import: put an .rbxlx in app storage as brickyard-import.rbxlx (" + CN.getAppHomePath() + ")");
+            showTab(3);
+            return;
+        }
+        try (java.io.InputStream in = CN.createStorageInputStream(name)) {
+            byte[] bytes = com.codename1.io.Util.readInputStream(in);
+            undo.add(RbxlxWriter.writeBytes(PlaceSaver.save(engine)));
+            load(bytes);
+            log("Imported " + name);
+        } catch (java.io.IOException err) {
+            Ui.toast(String.valueOf(err.getMessage()));
+        }
+    }
+
+    /// Returns to the editor from a running playtest.
+    void stopPlaytest() {
+        if (CN.getCurrentForm() != form) { // NOPMD CompareObjectsWithEquals - form identity
+            form.showBack();
+        } else {
+            log("No playtest is running", true);
+        }
+    }
+
+    void exit() {
+        if (exit != null) {
+            exit.run();
+        }
+    }
+
+    boolean hasSelection() {
+        return selected != null;
+    }
+
+    void log(String line, boolean show) {
+        log(line);
+        if (show) {
+            showTab(3);
+        }
     }
 
     private void applyTemplate(String id) {
@@ -273,7 +716,7 @@ public final class Studio implements AgentTools.Studio {
         refresh();
     }
 
-    private void pickTemplate() {
+    void pickTemplate() {
         Container c = new Container(BoxLayout.y());
         final Dialog d = new Dialog("Start from a template");
         for (final String id : Templates.ids()) {
@@ -289,7 +732,7 @@ public final class Studio implements AgentTools.Studio {
         d.show();
     }
 
-    private void saveScript() {
+    void saveScript() {
         if (selected == null || !(selected.storedProps().containsKey("Source"))) {
             Ui.toast("Select a script first");
             return;
@@ -299,12 +742,12 @@ public final class Studio implements AgentTools.Studio {
                 + q(selected.getName()) + ",\"source\":" + q(source.getText()) + "}");
     }
 
-    private void playtest() {
+    void playtest() {
         byte[] bytes = RbxlxWriter.writeBytes(PlaceSaver.save(engine));
         PlaySession.start(experienceId == null ? "draft" : experienceId, title + " (test)", bytes);
     }
 
-    private void exportPlace() {
+    void exportPlace() {
         String path = CN.getAppHomePath() + "brickyard-export.rbxlx";
         try (java.io.OutputStream out = CN.createStorageOutputStream("brickyard-export.rbxlx")) {
             out.write(RbxlxWriter.writeBytes(PlaceSaver.save(engine)));
@@ -319,7 +762,7 @@ public final class Studio implements AgentTools.Studio {
     /// `brickyard_place_tree`, `brickyard_create_instance`,
     /// `brickyard_write_script`, `brickyard_playtest` and the rest. The tools
     /// always act on the studio that is open.
-    private void agentMode() {
+    void agentMode() {
         if (!agentInstalled) {
             agentInstalled = true;
             AgentMcp.install(new AgentTools.Studio() {
@@ -363,6 +806,9 @@ public final class Studio implements AgentTools.Studio {
             CN.callSerially(this::refresh);
             return;
         }
+        if (view != null) {
+            view.getGizmo().setSelection(selected);
+        }
         explorer.removeAll();
         addTree(engine.getGame(), 0);
         showProperties();
@@ -370,55 +816,143 @@ public final class Studio implements AgentTools.Studio {
     }
 
     private void addTree(Instance i, int depth) {
+        addTree(i, depth, 1);
+    }
+
+    /// One Explorer row for `i`; `copies` above one folds that many
+    /// identical siblings (twenty rocks) into a single row.
+    private void addTree(Instance i, int depth, int copies) {
         if (depth > 0) {
-            StringBuilder indent = new StringBuilder();
-            for (int d = 1; d < depth; d++) {
-                indent.append("    ");
-            }
             final Instance target = i;
-            Button b = new Button(indent + i.getName() + "  (" + i.getClassName() + ")");
-            b.setUIID(i == selected ? "StudioNodeSelected" : "StudioNode");
+            Button b = new Button(copies > 1 ? i.getName() + "  x" + copies : i.getName(),
+                    i == selected ? "StudioNodeSelected" : "StudioNode"); // NOPMD CompareObjectsWithEquals - tree identity
+            b.setName("node-" + i.getName());
             b.addActionListener(ev -> select(target));
-            explorer.add(b);
+            FontImage.setMaterialIcon(b, icon(i), 3);
+            b.setGap(CN.convertToPixels(1));
+            b.getAllStyles().setPaddingLeft(CN.convertToPixels(2 + 3 * (depth - 1)));
+            b.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+            Label cls = new Label(i.getClassName(), "StudioNodeClass");
+            Container row = BorderLayout.centerEastWest(null, cls, null);
+            row.add(BorderLayout.CENTER, b);
+            row.setLeadComponent(b);
+            explorer.add(row);
         }
-        if (depth < 6) {
-            for (Instance c : i.getChildren()) {
-                addTree(c, depth + 1);
+        if (depth < 6 && copies == 1) {
+            List<Instance> kids = i.getChildren();
+            int k = 0;
+            while (k < kids.size()) {
+                Instance c = kids.get(k);
+                int run = 1;
+                while (k + run < kids.size() && kids.get(k + run).getName().equals(c.getName())
+                        && kids.get(k + run).getClassName().equals(c.getClassName())
+                        && kids.get(k + run).getChildren().isEmpty() && c.getChildren().isEmpty()) {
+                    run++;
+                }
+                addTree(c, depth + 1, run > 2 ? run : 1);
+                if (run <= 2) {
+                    run = 1;
+                }
+                k += run;
             }
         }
     }
 
+    /// The Explorer's glyph for a class, as an engine editor draws one.
+    static char icon(Instance i) {
+        String c = i.getClassName();
+        if (c.endsWith("Script")) {
+            return FontImage.MATERIAL_DESCRIPTION;
+        }
+        if ("SpawnLocation".equals(c)) {
+            return FontImage.MATERIAL_FLAG;
+        }
+        if ("Model".equals(c)) {
+            return FontImage.MATERIAL_CATEGORY;
+        }
+        if ("Camera".equals(c)) {
+            return FontImage.MATERIAL_VIDEOCAM;
+        }
+        if (i.isA("BasePart")) {
+            return FontImage.MATERIAL_VIEW_IN_AR;
+        }
+        if (c.endsWith("Light")) {
+            return FontImage.MATERIAL_LIGHTBULB;
+        }
+        if (c.endsWith("Gui") || c.startsWith("Text") || "Frame".equals(c)) {
+            return FontImage.MATERIAL_WEB_ASSET;
+        }
+        return FontImage.MATERIAL_FOLDER;
+    }
+
     private void select(Instance i) {
+        select(i, true);
+    }
+
+    /// A click in the viewport: the part's model when it is in one (a tree,
+    /// a checkpoint), as an editor selects, and the camera stays where the
+    /// creator put it.
+    private void picked(Instance part) {
+        if (part == null) {
+            selected = null;
+            refresh();
+            return;
+        }
+        Instance top = part;
+        Instance ws = engine.getWorkspace();
+        for (Instance p = part.getParent(); p != null && p != ws; p = p.getParent()) { // NOPMD CompareObjectsWithEquals - tree identity
+            if ("Model".equals(p.getClassName())) {
+                top = p;
+            }
+        }
+        select(top, false);
+    }
+
+    private void select(Instance i, boolean frameIt) {
         selected = i;
         Object src = i.storedProps().get("Source");
         source.setText(src == null ? "" : String.valueOf(src));
         refresh();
+        if (!frameIt) {
+            return;
+        }
+        if (i.isA("BasePart") || "Model".equals(i.getClassName())) {
+            frame(i);
+        } else if (src != null) {
+            showTab(2);
+        }
     }
 
     private void showProperties() {
         properties.removeAll();
         if (selected == null) {
-            properties.add(new Label("Select an instance in the Explorer"));
+            SpanLabel hint = new SpanLabel("Select an instance in the Explorer, or click a part in the viewport, to edit its properties.");
+            hint.setTextUIID("Muted");
+            properties.add(hint);
             return;
         }
-        properties.add(new Label(selected.fullName()));
+        properties.add(Ui.label(selected.fullName(), "RowTitle"));
         for (Map.Entry<String, Object> p : selected.storedProps().entrySet()) {
             final String key = p.getKey();
             if ("Source".equals(key)) {
                 continue;
             }
             final TextField f = new TextField(AgentTools.json(p.getValue()), key, 20, TextField.ANY);
+            f.setUIID("StudioField");
             f.setName("prop-" + key);
             f.addActionListener(ev -> edit("set_properties", "{\"path\":" + q(selected.fullName())
                     + ",\"properties\":{" + q(key) + ":" + literal(f.getText()) + "}}"));
             Container row = new Container(new BorderLayout());
-            row.add(BorderLayout.WEST, new Label(key));
+            Label name = Ui.label(key, "StudioPropName");
+            // One column for every name, so the values line up.
+            name.setPreferredW(desktop ? CN.convertToPixels(22) : CN.convertToPixels(26));
+            row.add(BorderLayout.WEST, name);
             row.add(BorderLayout.CENTER, f);
             properties.add(row);
         }
     }
 
-    private void log(String line) {
+    void log(String line) {
         if (!CN.isEdt()) {
             CN.callSerially(() -> log(line));
             return;

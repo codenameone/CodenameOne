@@ -106,6 +106,12 @@ public class Analytics {
     /// An event the backend itself observed (a room's VISIT or SESSION), so
     /// no engine role is asked for: the caller is the server, not a request.
     @Transactional(rollbackFor = IOException.class)
+    /// True when `username` has a VISIT to the experience on or after the
+    /// day starting at `from` (0 for ever).
+    public boolean visitedSince(String experienceId, String username, long from) {
+        return username != null && !events.byPlayer(experienceId, username, "VISIT", from).isEmpty();
+    }
+
     public void record(String experienceId, String username, String kind, long amount) throws IOException {
         AnalyticsEvent a = new AnalyticsEvent();
         a.setId(Ids.next());

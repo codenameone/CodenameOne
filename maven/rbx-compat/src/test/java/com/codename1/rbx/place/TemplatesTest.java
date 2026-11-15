@@ -81,6 +81,56 @@ class TemplatesTest {
         assertTrue(all.contains(": DONE") && !all.contains("error"), all);
     }
 
+    /// A character dropped onto a kill brick dies on it and its body stays
+    /// on the surface. It once hovered over the obby's lava pool, standing on
+    /// a pad 11 studs away whose side-turned axis was never bounds-checked.
+    @org.junit.jupiter.api.Test
+    void aBodyDroppedOnLavaDiesAndStaysOnIt() throws IOException {
+        final List<String> out = new ArrayList<String>();
+        Engine e = new Engine(Engine.SOLO);
+        e.setPhysics(new RigidBodies());
+        e.getScheduler().setOutput(new Scheduler.Output() {
+            @Override
+            public void message(String type, String text, Object owner) {
+                out.add(type + ": " + text);
+            }
+        });
+        Templates.load(e, "obby");
+        e.addPlayer(1, "Tester", null);
+        Instance s = e.create("Script");
+        s.setName("Drop");
+        s.put("Source", "local P = game:GetService('Players')\n"
+                + "task.wait(1)\n"
+                + "local c = P:GetPlayers()[1].Character\n"
+                + "local lava = workspace:FindFirstChild('Lava1', true)\n"
+                + "c:PivotTo(CFrame.new(lava.Position + Vector3.new(9, 6, 0)))\n"
+                + "local rp = RaycastParams.new() rp.FilterDescendantsInstances = {c} rp.FilterType = Enum.RaycastFilterType.Exclude\n"
+                + "local r = workspace:Raycast(c.HumanoidRootPart.Position, Vector3.new(0, -50, 0), rp)\n"
+                + "print('HIT', r and r.Instance.Name, r and math.floor(r.Distance))\n"
+                + "local h = c:FindFirstChildOfClass('Humanoid')\n"
+                + "local low = 1e9\n"
+                + "for i = 1, 90 do task.wait() low = math.min(low, c.Head.Position.Y) end\n"
+                + "print('DROP', h.Health, math.floor(low), math.floor(lava.Position.Y))\n");
+        s.setParent(e.service("ServerScriptService"));
+        for (int i = 0; i < 60 * 4; i++) {
+            e.step(1 / 60.0);
+        }
+        String all = out.toString();
+        String line = null;
+        for (String o : out) {
+            if (o.contains("DROP")) {
+                line = o;
+            }
+        }
+        assertTrue(line != null, all);
+        // A raycast that hits reports its part and distance: building the
+        // result once cast the hit's material to a distance and threw.
+        assertTrue(all.contains("HIT Lava1 5"), all);
+        String[] f = line.substring(line.indexOf("DROP")).split(" ");
+        assertTrue(Double.parseDouble(f[1]) == 0, "still alive on the lava: " + line);
+        assertTrue(Double.parseDouble(f[2]) >= Double.parseDouble(f[3]), "sank through the lava: " + line);
+    }
+
     private static boolean finished(List<String> out) {
         for (String s : out) {
             if (s.endsWith(": DONE") || s.startsWith("error")) {

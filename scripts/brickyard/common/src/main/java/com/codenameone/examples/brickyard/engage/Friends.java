@@ -93,6 +93,8 @@ public final class Friends {
     public static InviteButton button(String experienceId, String title) {
         InviteButton b = new InviteButton("Invite friends");
         b.setUIID("SecondaryButton");
+        // The theme gives no icon gap, so the icon sat flush against the text.
+        b.setGap(com.codename1.ui.CN.convertToPixels(1.5f));
         b.setName("inviteButton");
         b.setCampaign(CAMPAIGN);
         b.setChannel("experience_page");

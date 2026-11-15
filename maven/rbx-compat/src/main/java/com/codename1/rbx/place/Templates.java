@@ -45,9 +45,23 @@ public final class Templates {
 
     /// The place file of template `id`.
     public static byte[] bytes(String id) throws IOException {
-        InputStream in = Templates.class.getResourceAsStream("/com/codename1/rbx/templates/" + id + ".rbxlx"); // NOPMD CloseResource - closed in the finally below
-        if (in == null) {
+        byte[] b = resource("/com/codename1/rbx/templates/" + id + ".rbxlx");
+        if (b.length == 0) {
             throw new IOException("No template " + id);
+        }
+        return b;
+    }
+
+    /// The template's cover picture: a JPEG of the place as the 3D view
+    /// draws it, captured in the studio, or empty when it ships none.
+    public static byte[] picture(String id) throws IOException {
+        return resource("/com/codename1/rbx/templates/" + id + ".jpg");
+    }
+
+    private static byte[] resource(String path) throws IOException {
+        InputStream in = Templates.class.getResourceAsStream(path); // NOPMD CloseResource - closed in the finally below
+        if (in == null) {
+            return new byte[0];
         }
         try {
             ByteArrayOutputStream b = new ByteArrayOutputStream(); // NOPMD CloseResource - a memory stream holds nothing to close

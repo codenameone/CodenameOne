@@ -552,9 +552,22 @@ public final class Engine {
     /// Adds a player. On a client or solo engine the first one becomes
     /// `Players.LocalPlayer`.
     public Instance addPlayer(long userId, String name, String displayName) {
+        return addPlayer(userId, name, displayName, null);
+    }
+
+    /// [#addPlayer(long, String, String)] with attributes the player carries
+    /// from the platform -- its chosen `AvatarBody` -- set before PlayerAdded
+    /// fires and its character loads, so neither scripts nor the rig see the
+    /// player without them. `attributes` may be null.
+    public Instance addPlayer(long userId, String name, String displayName, Map<String, Object> attributes) {
         Instance players = services.get("Players");
         Instance p = create("Player");
         p.setName(name);
+        if (attributes != null) {
+            for (Map.Entry<String, Object> a : attributes.entrySet()) {
+                p.setAttribute(a.getKey(), a.getValue());
+            }
+        }
         p.putQuiet("UserId", Args.n(userId));
         p.putQuiet("DisplayName", displayName == null ? name : displayName);
         Instance bp = create("Backpack");

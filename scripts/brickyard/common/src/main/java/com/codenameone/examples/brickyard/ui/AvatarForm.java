@@ -18,25 +18,28 @@
  */
 package com.codenameone.examples.brickyard.ui;
 
+import com.codename1.rbx.AvatarPreview;
+
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
-import com.codename1.ui.plaf.Border;
 import com.codenameone.examples.brickyard.api.AccountDto;
 import com.codenameone.examples.brickyard.api.BadgeAwardDto;
 import com.codenameone.examples.brickyard.api.ProfileDto;
+import com.codenameone.examples.brickyard.api.ProgressDto;
 import com.codenameone.examples.brickyard.net.Api;
 import com.codenameone.examples.brickyard.net.Net;
 import com.codenameone.examples.brickyard.net.Session;
 
 import java.util.List;
 
-/// The player's profile: the block avatar editor, the display name, and the
-/// badges earned so far.
+/// The player's page: level and streak, the season pass, quests, the block
+/// avatar editor, the display name and the badges earned so far.
 public final class AvatarForm {
     private AvatarForm() {
     }
@@ -47,68 +50,123 @@ public final class AvatarForm {
                 e -> SettingsForm.show());
         Container content = Ui.content(f);
         final Avatar[] current = {Avatar.load()};
-        final AvatarView preview = new AvatarView(current[0], false);
-        content.add(BorderLayout.centerCenter(preview));
-        final int[] part = {Avatar.HEAD};
-        Container parts = new Container(new GridLayout(2, 3));
-        final Button[] partButtons = new Button[Avatar.PARTS.length];
-        for (int i = 0; i < Avatar.PARTS.length; i++) {
-            final int index = i;
-            partButtons[i] = Ui.button(Avatar.PARTS[i], i == 0 ? "Chip" : "LinkButton", "part" + i, e -> {
-                part[0] = index;
-                for (int j = 0; j < partButtons.length; j++) {
-                    partButtons[j].setUIID(j == index ? "Chip" : "LinkButton");
-                }
-                f.revalidate();
-            });
-            parts.add(partButtons[i]);
-        }
-        content.add(parts);
-        Container swatches = new Container(new GridLayout(2, Avatar.PALETTE.length / 2));
-        for (int i = 0; i < Avatar.PALETTE.length; i++) {
-            final int color = Avatar.PALETTE[i];
-            Button b = new Button(" ", "Chip");
-            b.setName("swatch" + i);
-            b.getAllStyles().setBgColor(color);
-            b.getAllStyles().setBgTransparency(255);
-            b.getAllStyles().setBorder(Border.createLineBorder(1, 0x10131f));
-            b.addActionListener(e -> {
-                current[0] = current[0].with(part[0], color);
-                current[0].save();
-                preview.setAvatar(current[0]);
-                Api.account().saveProfile(new ProfileDto(null, current[0].encode()),
-                        Net.to(saved -> { }, Ui::failed));
-            });
-            swatches.add(b);
-        }
-        content.add(swatches);
+
+        // Level, streak and the season: filled when the server answers.
+        final Container progress = new Container(BoxLayout.y());
+        progress.setName("progression");
+        content.add(progress);
+        final Container quests = new Container(BoxLayout.y());
+        quests.setName("quests");
+
+        content.add(Ui.label("Your character", "RowTitle"));
+        content.add(editor(current));
+
+        content.add(Ui.label("Quests", "RowTitle"));
+        content.add(quests);
 
         AccountDto me = Session.user();
         final TextField name = Ui.field("Display name", TextField.ANY, "displayName");
         name.setText(me == null || me.displayName() == null ? "" : me.displayName());
-        content.add(Ui.panel(name, Ui.secondary("Save name", "saveNameButton",
+        Container nameRow = new Container(new BorderLayout());
+        nameRow.add(BorderLayout.CENTER, name);
+        nameRow.add(BorderLayout.EAST, Ui.secondary("Save", "saveNameButton",
                 e -> Api.account().saveProfile(new ProfileDto(name.getText().trim(), null), Net.to(saved -> {
                     Session.setUser(saved);
                     Ui.toast("Saved.");
-                }, Ui::failed)))));
+                }, Ui::failed))));
+        content.add(Ui.label("Display name", "RowTitle"));
+        content.add(nameRow);
 
         content.add(Ui.label("Badges", "RowTitle"));
         final Container badges = new Container(BoxLayout.y());
         badges.setName("myBadges");
         content.add(badges);
         f.show();
-        // The server's colours win: they follow the account to every device.
-        Api.account().profile(Net.to(profile -> {
-            if (profile != null && profile.avatar() != null && profile.avatar().length() > 0) {
-                current[0] = Avatar.decode(profile.avatar());
-                current[0].save();
-                preview.setAvatar(current[0]);
-            }
-        }, (status, message) -> { }));
+        loadProgress(f, progress, quests, current);
         Api.badges().mine(Net.to(list -> {
             fill(badges, list);
             f.revalidate();
         }, (status, message) -> { }));
+    }
+
+    /// The character the player plays as: the real body on a turntable, lit
+    /// as the game lights it, above one chip per body. A chip saves at once,
+    /// locally and to the account, and the play servers dress the player's
+    /// character in it for everyone in the room.
+    private static Container editor(final Avatar[] current) {
+        final AvatarPreview preview = new AvatarPreview(current[0].body());
+        preview.setName("avatarPreview");
+        preview.setPreferredH(CN.convertToPixels(CN.isTablet() ? 70 : 52));
+        Container chips = new Container(new GridLayout(1, Avatar.BODIES.length));
+        final Button[] bodyButtons = new Button[Avatar.BODIES.length];
+        for (int i = 0; i < Avatar.BODIES.length; i++) {
+            final String body = Avatar.BODIES[i];
+            bodyButtons[i] = Ui.button(Avatar.BODY_NAMES[i], body.equals(current[0].body()) ? "ChipOn" : "Chip",
+                    "body_" + body, e -> {
+                        current[0] = current[0].withBody(body);
+                        current[0].save();
+                        preview.setBody(body);
+                        mark(bodyButtons, body);
+                        Api.account().saveProfile(new ProfileDto(null, current[0].encode()),
+                                Net.to(saved -> { }, Ui::failed));
+                    });
+            chips.add(bodyButtons[i]);
+        }
+        Container box = BoxLayout.encloseY(preview, chips);
+        box.setUIID("Panel");
+        // The server's choice wins: it follows the account to every device.
+        Api.account().profile(Net.to(profile -> {
+            if (profile != null && profile.avatar() != null && profile.avatar().length() > 0) {
+                current[0] = Avatar.decode(profile.avatar());
+                current[0].save();
+                preview.setBody(current[0].body());
+                mark(bodyButtons, current[0].body());
+            }
+        }, (status, message) -> { }));
+        return box;
+    }
+
+    private static void mark(Button[] buttons, String body) {
+        for (int j = 0; j < buttons.length; j++) {
+            buttons[j].setUIID(Avatar.BODIES[j].equals(body) ? "ChipOn" : "Chip");
+        }
+        buttons[0].getParent().revalidate();
+    }
+
+    /// Asks for the level, quests and the season, and rebuilds those cards;
+    /// a claim calls it again so the bars and the wallet move at once.
+    static void loadProgress(final Form f, final Container progress, final Container quests,
+            final Avatar[] current) {
+        final Runnable again = () -> loadProgress(f, progress, quests, current);
+        Api.progression().dailyLogin(Net.to(p -> {
+            if (p == null) {
+                return;
+            }
+            Api.progression().currentSeason(Net.to(season -> Api.progression().season(Net.to(tiers -> {
+                progress.removeAll();
+                progress.add(ProgressViews.hero(p, null));
+                progress.add(ProgressViews.season(season, p, tiers, again));
+                f.revalidate();
+            }, (status, message) -> { })), (status, message) -> heroOnly(f, progress, p, current)));
+        }, (status, message) -> { }));
+        Api.progression().quests(Net.to(list -> {
+            quests.removeAll();
+            if (list == null || list.isEmpty()) {
+                quests.add(Ui.label("No quests today. Check back tomorrow.", "Muted"));
+            } else {
+                for (com.codenameone.examples.brickyard.api.QuestDto q : list) {
+                    quests.add(ProgressViews.quest(q, again));
+                }
+            }
+            f.revalidate();
+        }, (status, message) -> { }));
+    }
+
+    /// No season running: the level card alone.
+    private static void heroOnly(Form f, Container progress, ProgressDto p, Avatar[] current) {
+        progress.removeAll();
+        progress.add(ProgressViews.hero(p, null));
+        f.revalidate();
     }
 
     static void fill(Container badges, List<BadgeAwardDto> list) {

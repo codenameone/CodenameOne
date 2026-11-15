@@ -36,7 +36,18 @@
 }
 
 GameForm {
+    /* The native theme paints forms with its own light background; the
+       explicit type replaces it, so the palette shows on every platform. */
+    cn1-background-type: cn1-none;
     background-color: var(--bg);
+}
+
+GameContent {
+    cn1-background-type: cn1-none;
+    background-color: transparent;
+    /* Nothing touches the screen edge: text and buttons sit inside a gutter. */
+    padding: 1mm 2.5mm 2mm 2.5mm;
+    margin: 0;
 }
 
 GameToolbar {
@@ -58,6 +69,7 @@ Logo {
 }
 
 Tagline, Muted {
+    background-color: transparent;
     color: var(--muted);
     font-family: "native:MainLight";
     font-size: 3mm;
@@ -106,7 +118,7 @@ PrimaryButton {
     font-size: 3.5mm;
     border-radius: 2mm;
     padding: 2mm;
-    margin: 1mm 0;
+    margin: 1.2mm 0.8mm;
     text-align: center;
 }
 
@@ -121,7 +133,8 @@ SecondaryButton {
     font-size: 3.2mm;
     border-radius: 2mm;
     padding: 1.6mm;
-    margin: 1mm 0;
+    /* Side margins too, so buttons placed in a row never touch. */
+    margin: 1mm 0.8mm;
     text-align: center;
 }
 
@@ -130,10 +143,37 @@ SecondaryButton.pressed {
 }
 
 LinkButton {
+    padding: 1.5mm;
+    margin: 0.5mm;
     color: var(--yellow);
     background-color: transparent;
     font-family: "native:MainRegular";
     font-size: 3mm;
+    text-align: center;
+}
+
+/* The bottom bar's sections: both states share every metric, so selecting
+   one never shifts the row; only the colours change. */
+SectionTab {
+    padding: 1.6mm 0 1.2mm 0;
+    margin: 0;
+    color: var(--muted);
+    background-color: transparent;
+    cn1-background-type: none;
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    text-align: center;
+}
+
+SectionTabSelected {
+    padding: 1.6mm 0 1.2mm 0;
+    margin: 0;
+    color: var(--yellow);
+    background-color: transparent;
+    cn1-background-type: none;
+    border-top: 0.5mm solid var(--yellow);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
     text-align: center;
 }
 
@@ -144,6 +184,7 @@ Chip {
     padding: 1mm 2mm;
     margin: 0.5mm;
     font-size: 2.6mm;
+    text-align: center;
 }
 
 Chip.selected {
@@ -181,4 +222,603 @@ StudioNodeSelected {
     padding: 1mm 2mm;
     text-align: left;
     border: none;
+}
+
+/* Text styles sit on the game's dark surfaces; the native theme's label
+   background must not show through behind them. */
+Body, Bricks, CardMeta, CardTitle, GameTitle, Logo, RowTitle {
+    cn1-background-type: cn1-none;
+    background-color: transparent;
+}
+
+/* The native theme's status bar and toolbar buttons are light; the game
+   toolbar is dark. */
+StatusBar, StatusBarSideMenu {
+    cn1-background-type: cn1-none;
+    background-color: var(--bg-alt);
+}
+
+TitleCommand, BackCommand, ToolbarButton {
+    cn1-background-type: cn1-none;
+    background-color: transparent;
+    color: var(--yellow);
+    border: none;
+}
+
+StatFigure {
+    color: var(--yellow);
+    font-family: "native:MainBold";
+    font-size: 6mm;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+/* The studio: a dark editor in the game's palette. */
+StudioViewport {
+    background-color: #0d1020;
+    padding: 0;
+    margin: 0;
+}
+
+StudioPanel {
+    background-color: var(--bg);
+    padding: 1mm;
+    margin: 0;
+}
+
+StudioTabs {
+    background-color: var(--bg-alt);
+    padding: 0.8mm 1mm;
+    margin: 0;
+}
+
+StudioTab, StudioTabSelected {
+    font-size: 2.8mm;
+    padding: 1.4mm 1mm;
+    margin: 0.4mm;
+    border-radius: 2.5mm;
+    text-align: center;
+    border: none;
+}
+
+StudioTab {
+    color: var(--muted);
+    background-color: transparent;
+}
+
+StudioTabSelected {
+    color: var(--bg);
+    background-color: var(--yellow);
+    font-family: "native:MainBold";
+}
+
+StudioNodeClass {
+    color: #6f7aa3;
+    background-color: transparent;
+    font-size: 2.4mm;
+    padding: 1mm 2mm;
+}
+
+StudioPropName {
+    color: var(--muted);
+    background-color: transparent;
+    font-size: 2.6mm;
+    padding: 1.6mm 2mm 0 1mm;
+}
+
+StudioField, StudioCode {
+    color: #e6e9f8;
+    background-color: #0f1324;
+    border: 1px solid #2f3960;
+    border-radius: 1.5mm;
+    font-size: 2.8mm;
+    padding: 1.2mm;
+    margin: 0.5mm;
+}
+
+StudioCode {
+    font-family: "native:MainLight";
+}
+
+StudioTool, StudioPlay, StudioPublish {
+    font-size: 2.4mm;
+    padding: 1.2mm 0.5mm;
+    margin: 0.8mm;
+    border-radius: 3mm;
+    text-align: center;
+    border: none;
+}
+
+StudioTool {
+    color: var(--text);
+    background-color: var(--card);
+}
+
+StudioPlay {
+    color: var(--bg);
+    background-color: var(--green);
+    font-family: "native:MainBold";
+}
+
+StudioPublish {
+    color: var(--bg);
+    background-color: var(--yellow);
+    font-family: "native:MainBold";
+}
+
+Hidden {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+StatFigure {
+    cn1-background-type: cn1-none;
+}
+
+/* Progression: level card, quests, the season pass, the avatar editor. */
+LevelBadge {
+    color: #2b1a07;
+    background-color: var(--yellow);
+    border-radius: 6mm;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    padding: 2mm 3mm;
+    margin: 0 2mm 0 0;
+    text-align: center;
+}
+
+Streak {
+    color: #ff9a3c;
+    background-color: transparent;
+    cn1-background-type: none;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 1mm 0 0 0;
+}
+
+QuestCadence {
+    color: var(--bg);
+    background-color: var(--blue);
+    border-radius: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2mm;
+    padding: 0.4mm 1.2mm;
+    margin: 0.6mm 1.5mm 0 0;
+}
+
+ClaimButton {
+    background-color: var(--yellow);
+    color: #2b1a07;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    border-radius: 3mm;
+    padding: 1.2mm 3mm;
+    margin: 0.5mm;
+    text-align: center;
+}
+
+ClaimButton.pressed {
+    background-color: #d9a32e;
+}
+
+PremiumButton {
+    background-color: #9a6cff;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    border-radius: 2mm;
+    padding: 2mm;
+    margin: 2mm 0 0 0;
+    text-align: center;
+}
+
+SeasonPanel {
+    background: linear-gradient(135deg, #3a2a7a 0%, #24305a 100%);
+    border-radius: 2mm;
+    padding: 2.5mm;
+    margin: 1mm;
+}
+
+SeasonTitle {
+    background-color: transparent;
+    cn1-background-type: none;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 0 0 1mm 0;
+}
+
+TierCard, TierCardReached {
+    background-color: #1b2142;
+    border-radius: 2mm;
+    padding: 1.5mm;
+    margin: 2mm 1.5mm 0 0;
+}
+
+TierCardReached {
+    border: 0.4mm solid var(--yellow);
+}
+
+TierNumber, TierNumberReached {
+    background-color: transparent;
+    cn1-background-type: none;
+    color: var(--muted);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    text-align: center;
+    padding: 0 0 1mm 0;
+}
+
+TierNumberReached {
+    color: var(--yellow);
+}
+
+TierReward, TierRewardPlus {
+    background-color: #262e55;
+    border-radius: 1.5mm;
+    padding: 1mm 2mm;
+    margin: 0.6mm 0;
+}
+
+TierRewardPlus {
+    background-color: #3b2d70;
+}
+
+TierTrack, TierTrackPlus {
+    background-color: transparent;
+    cn1-background-type: none;
+    color: var(--muted);
+    font-family: "native:MainBold";
+    font-size: 2mm;
+    text-align: center;
+}
+
+TierTrackPlus {
+    color: #c9b3ff;
+}
+
+TierAmount {
+    background-color: transparent;
+    cn1-background-type: none;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+TierState {
+    background-color: transparent;
+    cn1-background-type: none;
+    color: var(--muted);
+    font-size: 2.2mm;
+    text-align: center;
+}
+
+ChipOn {
+    background-color: var(--yellow);
+    color: #2b1a07;
+    border-radius: 3mm;
+    padding: 1mm 2mm;
+    margin: 0.5mm;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+}
+
+Swatch {
+    padding: 3.6mm;
+    margin: 1mm;
+}
+
+/* Shop */
+PackCard {
+    background: linear-gradient(160deg, #31407a 0%, #232b4d 100%);
+    border-radius: 2mm;
+    padding: 2.5mm;
+    margin: 1mm;
+}
+
+PackAmount {
+    background-color: transparent;
+    cn1-background-type: none;
+    color: var(--yellow);
+    font-family: "native:MainBold";
+    font-size: 6mm;
+}
+
+ItemCard {
+    background-color: var(--card);
+    border-radius: 2mm;
+    padding: 2mm;
+    margin: 1mm;
+}
+
+ItemIcon {
+    background-color: transparent;
+    cn1-background-type: none;
+    color: var(--yellow);
+    text-align: center;
+    padding: 1mm 0 2mm 0;
+}
+
+/* The studio's desktop layout (DesktopShell): an engine editor's chrome --
+   menu bar, icon strip, docked panes with header strips and 1px splitters,
+   dense 2.6mm type. */
+StudioMenuBar {
+    background-color: #0f1324;
+    border-bottom: 1px solid #2f3960;
+    padding: 0 1mm;
+    margin: 0;
+}
+
+StudioMenu, StudioMenuItem {
+    color: #d8dcf0;
+    background-color: transparent;
+    font-size: 2.6mm;
+    border: none;
+    margin: 0;
+    text-align: left;
+}
+
+StudioMenu {
+    padding: 1mm 2mm;
+}
+
+StudioMenuItem {
+    padding: 1.2mm 6mm 1.2mm 3mm;
+}
+
+StudioMenuPopup, StudioMenuPopupBody {
+    background-color: #1b2138;
+    border: 1px solid #3a4570;
+    padding: 0.5mm;
+    margin: 0;
+}
+
+StudioToolStrip {
+    background-color: var(--bg-alt);
+    border-bottom: 1px solid #2f3960;
+    padding: 0.4mm 1mm;
+    margin: 0;
+}
+
+StudioIcon, StudioIconSelected {
+    font-size: 2.6mm;
+    padding: 1mm 1.4mm;
+    margin: 0 0.3mm;
+    border-radius: 1mm;
+    border: none;
+    text-align: center;
+}
+
+StudioIcon {
+    color: #d8dcf0;
+    background-color: transparent;
+}
+
+StudioIconSelected {
+    color: #ffffff;
+    background-color: #3a4fd8;
+}
+
+StudioSeparator {
+    background-color: #3a4570;
+    padding: 0;
+    margin: 1mm 1.2mm;
+    width: 1px;
+    height: 4mm;
+}
+
+StudioDesktop, StudioCentre {
+    background-color: #0d1020;
+    padding: 0;
+    margin: 0;
+}
+
+StudioDockLeft {
+    background-color: var(--bg);
+    border-right: 1px solid #2f3960;
+    padding: 0;
+    margin: 0;
+}
+
+StudioDockRight {
+    background-color: var(--bg);
+    border-left: 1px solid #2f3960;
+    padding: 0;
+    margin: 0;
+}
+
+StudioDockBottom {
+    background-color: var(--bg);
+    border-top: 1px solid #2f3960;
+    padding: 0;
+    margin: 0;
+}
+
+StudioPaneHeader {
+    color: var(--muted);
+    background-color: #1b2138;
+    border-bottom: 1px solid #2f3960;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    padding: 0.8mm 2mm;
+    margin: 0;
+}
+
+StudioPaneHeaderHint {
+    color: #6f7aa3;
+    background-color: transparent;
+    font-size: 2.3mm;
+    padding: 0.8mm 2mm;
+}
+
+StudioPaneTab, StudioPaneTabSelected {
+    font-size: 2.4mm;
+    padding: 0.6mm 2.4mm;
+    margin: 0;
+    border: none;
+}
+
+StudioPaneTab {
+    color: var(--muted);
+    background-color: transparent;
+}
+
+StudioPaneTabSelected {
+    color: #ffffff;
+    background-color: var(--bg);
+    border-top: 2px solid var(--yellow);
+}
+
+StudioMiniButton {
+    color: var(--bg);
+    background-color: var(--yellow);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 1mm 2mm;
+    margin: 1mm;
+    border-radius: 1mm;
+    border: none;
+}
+
+/* The studio's dialogs (publish) in the editor's palette, not the native
+   theme's light one. */
+StudioDialog, StudioDialogBody {
+    background-color: #1b2138;
+    border: 1px solid #3a4570;
+    border-radius: 2mm;
+    padding: 2mm;
+    margin: 0;
+}
+
+StudioDialogBody {
+    border: none;
+    padding: 0;
+}
+
+StudioDialogTitle {
+    color: #ffffff;
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 1mm 1mm 2mm 1mm;
+    text-align: left;
+}
+
+StudioDialogButton {
+    color: var(--text);
+    background-color: var(--card);
+    font-size: 2.4mm;
+    padding: 1.2mm 0.5mm;
+    margin: 0.8mm;
+    border-radius: 3mm;
+    text-align: center;
+    border: none;
+}
+
+/* Create tab */
+CreatorStatBox {
+    background-color: var(--card);
+    border-radius: 2mm;
+    padding: 1.6mm 1mm;
+    margin: 1mm 0.8mm 2mm 0.8mm;
+    text-align: center;
+}
+CreatorStat {
+    background-color: transparent;
+    cn1-background-type: cn1-none;
+    color: var(--yellow);
+    font-family: "native:MainBold";
+    font-size: 4.6mm;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+CreatorStatCaption {
+    background-color: transparent;
+    cn1-background-type: cn1-none;
+    color: var(--muted);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+CreatorLive {
+    background-color: #1f4d2a;
+    color: #7ee08f;
+    border-radius: 2mm;
+    padding: 0.5mm 1.6mm;
+    margin: 0 0 0 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+}
+CreatorDraft {
+    background-color: var(--bg-alt);
+    color: var(--muted);
+    border-radius: 2mm;
+    padding: 0.5mm 1.6mm;
+    margin: 0 0 0 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+}
+CreatorGhostButton {
+    background-color: transparent;
+    border: 0.3mm solid var(--blue);
+    color: var(--blue);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    border-radius: 2mm;
+    padding: 1.6mm;
+    margin: 1mm 0.8mm;
+    text-align: center;
+}
+CreatorHeroIcon {
+    background-color: transparent;
+    cn1-background-type: cn1-none;
+    color: var(--yellow);
+    text-align: center;
+    padding: 4mm 0 1mm 0;
+    margin: 0;
+}
+CreatorHeroTitle {
+    background-color: transparent;
+    cn1-background-type: cn1-none;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    text-align: center;
+    padding: 1mm;
+}
+CreatorHeroBody {
+    background-color: transparent;
+    cn1-background-type: cn1-none;
+    color: var(--muted);
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    text-align: center;
+    padding: 0 3mm 3mm 3mm;
+}
+CreatorBenefit {
+    background-color: var(--card);
+    border-radius: 2mm;
+    padding: 2mm;
+    margin: 0.8mm 1mm;
+}
+CreatorBenefitIcon {
+    background-color: transparent;
+    cn1-background-type: cn1-none;
+    color: var(--blue);
+    padding: 0 2.4mm 0 0.6mm;
+    margin: 0;
+}
+CreatorCardText {
+    background-color: transparent;
+    cn1-background-type: cn1-none;
+    padding: 0 0 0 2.4mm;
+    margin: 0;
 }
