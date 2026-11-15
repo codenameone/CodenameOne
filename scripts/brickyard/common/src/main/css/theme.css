@@ -1,0 +1,166 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+/*
+ * The whole look of Brickyard: a dark, toy-box palette with bright primary
+ * buttons. Change the palette to re-skin the app; every screen is built from
+ * ordinary widgets that these rules dress.
+ */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    --bg: #161b2e;
+    --bg-alt: #222a45;
+    --card: #2c3557;
+    --red: #f0563c;
+    --yellow: #ffc43c;
+    --blue: #3caaff;
+    --green: #5ac86e;
+    --text: #ffffff;
+    --muted: #aab3cf;
+}
+
+GameForm {
+    background-color: var(--bg);
+}
+
+GameToolbar {
+    background-color: var(--bg-alt);
+    padding: 1mm 2mm;
+}
+
+GameTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+}
+
+Logo {
+    color: var(--yellow);
+    font-family: "native:MainBold";
+    font-size: 8mm;
+    text-align: center;
+}
+
+Tagline, Muted {
+    color: var(--muted);
+    font-family: "native:MainLight";
+    font-size: 3mm;
+}
+
+Tagline {
+    text-align: center;
+}
+
+Body {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+}
+
+RowTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.8mm;
+    padding: 3mm 2mm 1mm 2mm;
+}
+
+Panel, Card {
+    background-color: var(--card);
+    border-radius: 2mm;
+    padding: 2mm;
+    margin: 1mm;
+}
+
+CardTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+}
+
+CardMeta {
+    color: var(--muted);
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+}
+
+PrimaryButton {
+    background-color: var(--green);
+    color: #10240f;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    border-radius: 2mm;
+    padding: 2mm;
+    margin: 1mm 0;
+    text-align: center;
+}
+
+PrimaryButton.pressed {
+    background-color: #3f9a51;
+}
+
+SecondaryButton {
+    background-color: var(--blue);
+    color: #08223a;
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    border-radius: 2mm;
+    padding: 1.6mm;
+    margin: 1mm 0;
+    text-align: center;
+}
+
+SecondaryButton.pressed {
+    background-color: #2a85cc;
+}
+
+LinkButton {
+    color: var(--yellow);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    text-align: center;
+}
+
+Chip {
+    background-color: var(--bg-alt);
+    color: var(--text);
+    border-radius: 3mm;
+    padding: 1mm 2mm;
+    margin: 0.5mm;
+    font-size: 2.6mm;
+}
+
+Chip.selected {
+    background-color: var(--yellow);
+    color: #2b1a07;
+}
+
+GameField {
+    background-color: var(--bg-alt);
+    color: var(--text);
+    border-radius: 1.5mm;
+    padding: 2mm;
+    margin: 1mm 0;
+}
+
+Bricks {
+    color: var(--yellow);
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+}

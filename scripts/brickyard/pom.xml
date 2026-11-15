@@ -19,7 +19,7 @@
   <modules>
     <!-- The REST contract between the app and the server. -->
     <module>shared</module>
-    <!-- The app. A placeholder for now: it builds nothing. -->
+    <!-- The app: the player, the browser of experiences and the creator tools. -->
     <module>common</module>
   </modules>
   <properties>
@@ -42,6 +42,43 @@
       </dependency>
       <dependency>
         <groupId>com.codenameone</groupId>
+        <artifactId>java-runtime</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-javase</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-android-compat</artifactId>
+        <version>${cn1.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <!--
+              Optional desktop media binaries. BrowserComponent receives JCEF
+              Maven transitively from codenameone-javase and downloads the native
+              runtime for the current platform on first use. This aggregator is
+              retained for the bundled ffmpeg media implementation. Runtime scope:
+              see the javase module, and never make it compile scope.
+            -->
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>cn1-binaries-javase</artifactId>
+        <version>${cn1.version}</version>
+        <type>pom</type>
+        <scope>runtime</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-buildclient</artifactId>
+        <version>${cn1.version}</version>
+        <scope>system</scope>
+        <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
+      </dependency>
+      <dependency>
+        <groupId>com.codenameone</groupId>
         <artifactId>codenameone-luau-runtime</artifactId>
         <version>${cn1.version}</version>
       </dependency>
@@ -52,7 +89,112 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>com.codenameone</groupId>
+          <artifactId>codenameone-maven-plugin</artifactId>
+          <version>${cn1.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven-compiler-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>3.0.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-antrun-plugin</artifactId>
+          <groupId>org.apache.maven.plugins</groupId>
+          <version>3.1.0</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-maven-plugin</artifactId>
+        <version>${cn1.plugin.version}</version>
+      </plugin>
+    </plugins>
+  </build>
+  <!--
+        Codename One publishes its releases to the Codename One repository. Both lists
+        below are needed: Maven resolves ordinary dependencies through the repositories
+        list and build plugins through the pluginRepositories list, so a project that
+        declared only the first could download the framework and still fail to find a
+        newer codenameone-maven-plugin.
+    -->
+  <repositories>
+    <repository>
+      <id>codenameone</id>
+      <url>https://repo.codenameone.com/maven2</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <id>codenameone-plugins</id>
+      <url>https://repo.codenameone.com/maven2</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </pluginRepository>
+  </pluginRepositories>
   <profiles>
+    <!--
+          Codename One's client modules run their tests with cn1:test, so Surefire is
+          given a provider that finds nothing. Everywhere but the backend: the backend
+          module's tests are ordinary JUnit 5, which that provider would swallow:
+          Surefire uses a provider declared this way INSTEAD of detecting JUnit, so
+          "Tests run: 0" was all a backend ever reported.
+        -->
+    <profile>
+      <id>cn1-client-tests</id>
+      <activation>
+        <property>
+          <name>codename1.platform</name>
+          <value>!backend</value>
+        </property>
+        <!-- Only in a Codename One client module. The rules module's tests are
+             plain JUnit 5 too, and this provider would swallow them as well. -->
+        <file>
+          <exists>${basedir}/codenameone_settings.properties</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <!-- Codename One Uses its own test runner currently.
+                            This snippet configures Maven Surefire to use Codename One's "dummy"
+                            provider so that Surefire doesn't try to run Codename One's tests
+                            using its built-in test providers. -->
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.0.0-M5</version>
+            <dependencies>
+              <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-maven-plugin</artifactId>
+                <version>${cn1.plugin.version}</version>
+              </dependency>
+            </dependencies>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <!--
         The server. Like every platform module it is only in the reactor when

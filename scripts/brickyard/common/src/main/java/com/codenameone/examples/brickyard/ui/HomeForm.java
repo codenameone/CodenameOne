@@ -1,0 +1,101 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.brickyard.ui;
+
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codenameone.examples.brickyard.api.ExperienceDto;
+import com.codenameone.examples.brickyard.net.Api;
+import com.codenameone.examples.brickyard.net.Net;
+
+import java.util.List;
+import java.util.Map;
+
+/// Home: rows of experiences -- continue, featured, trending, then one row
+/// per genre -- each scrolling sideways.
+public final class HomeForm {
+    private HomeForm() {
+    }
+
+    public static void show() {
+        final Form f = Ui.section("Brickyard", "home", 0);
+        f.getToolbar().addMaterialCommandToRightBar("", com.codename1.ui.FontImage.MATERIAL_SETTINGS,
+                e -> SettingsForm.show());
+        final Container content = Ui.content(f);
+        content.add(Ui.bricks());
+        content.add(Ui.label("Loading...", "Muted"));
+        f.show();
+        Api.experiences().browse(null, Net.to(all -> {
+            content.removeAll();
+            content.add(Ui.bricks());
+            fill(content, all);
+            f.revalidate();
+        }, (status, message) -> {
+            content.removeAll();
+            content.add(Ui.text(message, "Muted"));
+            content.add(Ui.secondary("Try again", "retryButton", e -> show()));
+            f.revalidate();
+        }));
+    }
+
+    static void fill(Container content, List<ExperienceDto> all) {
+        if (all == null || all.isEmpty()) {
+            content.add(Ui.text("Nothing is published yet. Make the first experience in Create.", "Muted"));
+            return;
+        }
+        row(content, "Continue", Experiences.recent(all));
+        row(content, "Featured", Experiences.featured(all));
+        row(content, "Trending", Experiences.trending(all));
+        for (Map.Entry<String, List<ExperienceDto>> genre : Experiences.genres(all).entrySet()) {
+            row(content, genre.getKey(), genre.getValue());
+        }
+    }
+
+    static void row(Container content, String title, List<ExperienceDto> items) {
+        if (items.isEmpty()) {
+            return;
+        }
+        content.add(Ui.label(title, "RowTitle"));
+        Container row = new Container(BoxLayout.x());
+        row.setScrollableX(true);
+        row.setName("row" + title);
+        for (ExperienceDto e : items) {
+            row.add(card(e));
+        }
+        content.add(row);
+    }
+
+    static Container card(final ExperienceDto e) {
+        com.codename1.ui.Button open = Ui.button("", "Card", "open" + e.id(), ev -> ExperienceForm.show(e.id()));
+        Container card = BoxLayout.encloseY(new Thumbnail(e.id(), 32),
+                Ui.label(e.title(), "CardTitle"),
+                Ui.label(meta(e), "CardMeta"));
+        card.setUIID("Card");
+        card.setLeadComponent(open);
+        card.add(open);
+        open.setHidden(true);
+        return card;
+    }
+
+    static String meta(ExperienceDto e) {
+        int rating = Experiences.rating(e);
+        return (rating < 0 ? "New" : rating + "% liked") + "  -  " + e.visits() + " visits";
+    }
+}
