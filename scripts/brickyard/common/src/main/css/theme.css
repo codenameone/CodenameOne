@@ -164,3 +164,21 @@ Bricks {
     font-family: "native:MainBold";
     font-size: 3.4mm;
 }
+
+StudioNode {
+    background-color: transparent;
+    color: #d8dcf0;
+    font-size: 3mm;
+    padding: 1mm 2mm;
+    text-align: left;
+    border: none;
+}
+
+StudioNodeSelected {
+    background-color: #3a4fd8;
+    color: #ffffff;
+    font-size: 3mm;
+    padding: 1mm 2mm;
+    text-align: left;
+    border: none;
+}

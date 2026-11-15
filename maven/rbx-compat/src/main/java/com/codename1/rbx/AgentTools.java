@@ -806,6 +806,16 @@ public final class AgentTools {
         return new String[] {t[0], t[1], t[2]};
     }
 
+    /// A property value as the JSON the tools take and return.
+    public static String json(Object v) {
+        return value(v);
+    }
+
+    /// `s` as a JSON string literal.
+    public static String jsonString(String s) {
+        return quote(s);
+    }
+
     private static byte[] utf8(String s) {
         try {
             return s.getBytes("UTF-8");
