@@ -546,6 +546,19 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     String from() {
         return from(false);
     }
+    /// The table and alias alone, for a root joined by entity name: its
+    /// relationship joins follow its ON condition, see [#joinSources].
+    String rootSource() {
+        return session.tableSource(model) + ' ' + rootAlias;
+    }
+    /// The relationship joins navigation from this root has added so far.
+    String joinSources() {
+        StringBuilder result = new StringBuilder();
+        for (Join join : joins.values()) {
+            result.append(join.sql);
+        }
+        return result.toString();
+    }
     private String from(boolean counting) {
         StringBuilder result =
                 new StringBuilder(" FROM ").append(session.tableSource(model)).append(' ').append(rootAlias);

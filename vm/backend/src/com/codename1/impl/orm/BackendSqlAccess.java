@@ -110,7 +110,11 @@ public final class BackendSqlAccess implements SqlAccess {
                 // names with it: only the table the ORM's SQL reads may match.
                 + (mysql ? " AND (@@lower_case_table_names <> 0 OR BINARY c.table_name = BINARY ?)" : "")
                 + " ORDER BY c.ordinal_position";
-        return query(statement, new Object[]{table, table}, new int[8]);
+        // Every placeholder is the table name: MySQL's are c.table_name and the
+        // BINARY comparison; PostgreSQL's are the schema subquery and the table,
+        // once in the derived key table and once in the outer WHERE.
+        return query(statement, mysql ? new Object[]{table, table} : new Object[]{table, table, table, table},
+                new int[8]);
     }
 
     @Override

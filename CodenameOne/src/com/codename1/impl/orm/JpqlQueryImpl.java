@@ -139,6 +139,33 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         return result;
     }
+    /// Refuses a result type no row of this statement can have, so a
+    /// repository method declared with the wrong one fails the build that
+    /// parses its query rather than the first call. Run by the build only.
+    public void checkResultType() {
+        if (plan.mutation || resultType == Object.class) {
+            return;
+        }
+        boolean rows = resultType == Object[].class;
+        String found;
+        if (plan.entity != null) {
+            if (!rows && resultType.isAssignableFrom(plan.entity.type())) {
+                return;
+            }
+            found = "an entity of " + plan.entity.type().getName();
+        } else if (plan.projections.size() > 1) {
+            if (rows) {
+                return;
+            }
+            found = "Object[] rows of " + plan.projections.size() + " values";
+        } else {
+            if (!rows && !session.hasModel(resultType.getName())) {
+                return;
+            }
+            found = "a single scalar value";
+        }
+        throw new IllegalArgumentException("The statement selects " + found + ", not " + resultType.getName());
+    }
     private T checked(Object value) {
         if (value != null && resultType != Object.class && !resultType.isInstance(value)) {
             throw new PersistenceException(
@@ -578,20 +605,30 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             } else {
                 throw error("Expected SELECT or FROM");
             }
-            StringBuilder entitySources = new StringBuilder();
-            for (Object[] join : entityJoins) {
-                QueryImpl extra = (QueryImpl) join[0];
-                String source = extra.from().substring(" FROM ".length());
-                if (join[1] == null) {
-                    entitySources.append(" CROSS JOIN ").append(source);
-                } else {
+            // ON conditions are parsed here, so their bindings follow the
+            // projection's as the SQL text does; the sources themselves are
+            // rendered only once WHERE, GROUP BY, HAVING and ORDER BY have
+            // been parsed, because navigating a joined alias in any of them
+            // adds a relationship join to that alias. Each such join follows
+            // its root's ON condition: "JOIN B b ON c JOIN C b_j ON ..." is
+            // valid on every engine, a join nested before the ON is not.
+            String[] onConditions = new String[entityJoins.size()];
+            for (int i = 0; i < onConditions.length; i++) {
+                Object[] join = entityJoins.get(i);
+                if (join[1] != null) {
                     position = ((Integer) join[1]).intValue();
+                    String joinsBefore = joinsSoFar(entityJoins);
                     Expr on = expression();
+                    // A path in ON that needs a join would put that join after
+                    // the ON naming it; only the key of a to-one (b.owner.id)
+                    // and the joined roots' own columns can be read there.
+                    if (!joinsBefore.equals(joinsSoFar(entityJoins))) {
+                        throw error("ON may not navigate a relationship; compare its id or JOIN it");
+                    }
                     if (hasAggregate(on)) {
                         throw error("Aggregate functions are not allowed in ON");
                     }
-                    entitySources.append(((Boolean) join[2]).booleanValue() ? " LEFT JOIN " : " JOIN ")
-                            .append(source).append(" ON ").append(condition(on));
+                    onConditions[i] = condition(on);
                 }
             }
             position = afterFrom;
@@ -711,9 +748,29 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             for (int i = 0; i < plan.kinds.length; i++) {
                 plan.kinds[i] = kinds.get(i).intValue();
             }
+            StringBuilder entitySources = new StringBuilder();
+            for (int i = 0; i < onConditions.length; i++) {
+                Object[] join = entityJoins.get(i);
+                QueryImpl extra = (QueryImpl) join[0];
+                if (onConditions[i] == null) {
+                    entitySources.append(" CROSS JOIN ").append(extra.rootSource());
+                } else {
+                    entitySources.append(((Boolean) join[2]).booleanValue() ? " LEFT JOIN " : " JOIN ")
+                            .append(extra.rootSource()).append(" ON ").append(onConditions[i]);
+                }
+                entitySources.append(extra.joinSources());
+            }
             plan.sql = "SELECT " + (distinct ? "DISTINCT " : "") + projection + root.from() + entitySources +
                        where + group + having + order;
             return plan;
+        }
+        private String joinsSoFar(List<Object[]> entityJoins) {
+            // The root's own joins precede every entity join, so ON may use them.
+            StringBuilder result = new StringBuilder();
+            for (Object[] join : entityJoins) {
+                result.append('|').append(((QueryImpl) join[0]).joinSources());
+            }
+            return result.toString();
         }
         private void refuseImplicitBulkJoins() {
             if (root.from().indexOf(" JOIN ") >= 0) {

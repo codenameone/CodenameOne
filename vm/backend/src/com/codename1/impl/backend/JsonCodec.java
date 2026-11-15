@@ -85,11 +85,14 @@ public final class JsonCodec {
         if (installed == null && !DEFAULT_LOOKED.get()) {
             // Only where nothing installed one -- a JVM unit test that started no
             // context. Looked up once; ParparVM's default answers null.
-            DEFAULT_LOOKED.set(true);
+            // The flag goes up only after the registry is in place, so a
+            // second thread never reads "looked" beside a null registry; two
+            // racing lookups find the same class and the first one wins.
             Registry found = JsonCodecDefault.find();
             if (found != null) {
                 REGISTRY.compareAndSet(null, found);
             }
+            DEFAULT_LOOKED.set(true);
             installed = REGISTRY.get();
         }
         return installed;

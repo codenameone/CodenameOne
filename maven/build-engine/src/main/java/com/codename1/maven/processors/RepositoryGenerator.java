@@ -100,6 +100,13 @@ final class RepositoryGenerator {
         this.keyType = keyType;
     }
     static String generate(AnnotatedClass repository, Map<String, OrmAnnotationProcessor.EntityClass> entities) {
+        return generate(repository, entities, null);
+    }
+    /// @param statements receives `{method, JPQL, result class}` for every
+    ///     JPQL statement a method runs, declared or derived, so the build can
+    ///     parse each one with the runtime parser ([JpqlBuildCheck]); may be null
+    static String generate(AnnotatedClass repository, Map<String, OrmAnnotationProcessor.EntityClass> entities,
+            List<String[]> statements) {
         if (!repository.isInterface() || !repository.isPublic() || repository.getBinaryName().contains("$")) {
             throw invalid("@Repository requires a public top-level interface");
         }
@@ -121,6 +128,7 @@ final class RepositoryGenerator {
                     + "> directly; generic repositories and additional superinterfaces are unsupported");
         }
         RepositoryGenerator generator = new RepositoryGenerator(entity, key.getClassName());
+        generator.statements = statements;
         generator.typeTransactional = repository.getClassAnnotation(BackendBeans.TRANSACTIONAL);
         StringBuilder methods = new StringBuilder();
         Set<String> custom = new HashSet<String>();
@@ -130,6 +138,7 @@ final class RepositoryGenerator {
             // it reaches the generated methods through `this`, as in Spring Data.
             if (!method.isAbstract()) continue;
             generator.methodTransactional = method.getAnnotation(BackendBeans.TRANSACTIONAL);
+            generator.methodName = repository.getBinaryName() + "." + method.getName();
             try { methods.append(generator.method(method)); custom.add(method.getName()); }
             catch (IllegalArgumentException error) { throw invalid(method.getName() + ": " + error.getMessage()); }
         }
@@ -171,6 +180,8 @@ final class RepositoryGenerator {
                 + "private void requireTransaction() { if(!session.isTransactionActive() || session.isRollbackOnly()) throw new com.codename1.orm.session.PersistenceException(\"Repository write requires an active usable transaction\"); }\n"
                 + methods + "}\n";
     }
+    private List<String[]> statements;
+    private String methodName;
     private String method(MethodInfo method) {
         Type[] args = Type.getArgumentTypes(method.getDescriptor());
         Type result = Type.getReturnType(method.getDescriptor());
@@ -371,6 +382,10 @@ final class RepositoryGenerator {
         // read-only transaction.
         readOnly = !mutation && lockMode == null;
         String create = "session." + (nativeSql ? "createNativeQuery" : "createQuery") + "(" + quote(statement) + "," + valueType + ".class)";
+        if (!nativeSql && statements != null) {
+            statements.add(new String[]{methodName, statement, "Object".equals(valueType) ? "java.lang.Object"
+                    : "Long".equals(valueType) ? "java.lang.Long" : valueType});
+        }
         String returned = list ? "java.util.List<" + scalar + ">" : optional ? "java.util.Optional<" + scalar + ">" : scalar;
         StringBuilder body = new StringBuilder();
         body.append("com.codename1.orm.session.JpqlQuery<").append(valueType).append("> q=").append(create).append(';');

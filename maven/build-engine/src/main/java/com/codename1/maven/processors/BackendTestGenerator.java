@@ -614,20 +614,66 @@ final class BackendTestGenerator {
         sb.append("public final class Cn1StandaloneRouters extends "
                 + "com.codename1.impl.backend.test.StandaloneRouters {\n");
         sb.append("    protected com.codename1.backend.HttpServer.Handler router(Object controller) {\n");
+        // A controller this package cannot name -- Spring allows a package
+        // private one -- is reached through a helper generated into its own
+        // package; one no generated code can name (a private nested class, the
+        // default package) is left out, and StandaloneRouters.of names it.
+        Map<String, StringBuilder> packaged = new LinkedHashMap<String, StringBuilder>();
         for (BackendWiringWriter.Router r : routers) {
             String controller = r.controllerBinary.replace('$', '.');
-            sb.append("        if (controller instanceof ").append(controller).append(") {\n")
-              .append("            return new ").append(r.routerBinary.replace('$', '.')).append("((")
-              .append(controller).append(") controller);\n        }\n");
+            String check = "        if (controller instanceof " + controller + ") {\n"
+                    + "            return new " + r.routerBinary.replace('$', '.') + "((" + controller
+                    + ") controller);\n        }\n";
+            int dot = r.controllerBinary.lastIndexOf('.');
+            if (publiclyNamed(r.controllerBinary)) {
+                sb.append(check);
+            } else if (dot > 0 && r.controllerBinary.indexOf('$') < 0) {
+                String pkg = r.controllerBinary.substring(0, dot);
+                StringBuilder helper = packaged.get(pkg);
+                if (helper == null) {
+                    helper = new StringBuilder("package ").append(pkg).append(";\n\n")
+                            .append("// Generated: standaloneSetup routers for this package's non-public controllers.\n")
+                            .append("public final class Cn1StandaloneRoutersOfPackage {\n")
+                            .append("    private Cn1StandaloneRoutersOfPackage() {\n    }\n\n")
+                            .append("    public static com.codename1.backend.HttpServer.Handler router(Object controller) {\n");
+                    packaged.put(pkg, helper);
+                    sb.append("        com.codename1.backend.HttpServer.Handler in").append(packaged.size())
+                      .append(" = ").append(pkg).append(".Cn1StandaloneRoutersOfPackage.router(controller);\n")
+                      .append("        if (in").append(packaged.size()).append(" != null) {\n            return in")
+                      .append(packaged.size()).append(";\n        }\n");
+                }
+                helper.append(check);
+            }
         }
         sb.append("        return null;\n    }\n}\n");
         sources.put(STANDALONE_ROUTERS, sb.toString());
+        for (Map.Entry<String, StringBuilder> e : packaged.entrySet()) {
+            sources.put(e.getKey() + ".Cn1StandaloneRoutersOfPackage",
+                    e.getValue().append("        return null;\n    }\n}\n").toString());
+        }
         try {
             java.nio.file.Files.createDirectories(service.getParentFile().toPath());
             java.nio.file.Files.write(service.toPath(),
                     (STANDALONE_ROUTERS + "\n").getBytes(StandardCharsets.US_ASCII));
         } catch (IOException err) {
             throw new ProcessingException("Could not write " + service + ": " + err.getMessage(), err);
+        }
+    }
+
+    /// True when the class and every class enclosing it are public, so that
+    /// generated code in another package can name it.
+    private boolean publiclyNamed(String binary) {
+        String name = binary;
+        while (true) {
+            AnnotatedClass cls = ctx.lookup(name.replace('.', '/'));
+            if (cls == null || !cls.isPublic()) {
+                return false;
+            }
+            int nested = name.lastIndexOf('$');
+            if (nested < 0) {
+                return true;
+            }
+            name = name.substring(0, nested);
         }
     }
 

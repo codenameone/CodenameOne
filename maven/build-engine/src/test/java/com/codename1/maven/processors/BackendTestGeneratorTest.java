@@ -1092,7 +1092,12 @@ public class BackendTestGeneratorTest {
 
     @Test
     public void testSupportFromIssue6240() throws Throwable {
-        File classes = mainBuild(application());
+        Map<String, String> app = application();
+        // Spring allows a package-private controller; the standalone registry
+        // in cn1app.test cannot name it and reaches it through its package.
+        app.put("com.example.Hidden", MAIN + "@RestController class Hidden {\n"
+                + "    @GetMapping(\"/hidden\") public String hidden() { return \"h\"; }\n}\n");
+        File classes = mainBuild(app);
         Map<String, String> t = new LinkedHashMap<String, String>();
         t.put("com.example.LiveTest", SLICE_IMPORTS
                 + "@DataJpaTest(properties = \"fixed=1\")\n"
@@ -1109,6 +1114,9 @@ public class BackendTestGeneratorTest {
                 + "public class StandaloneTest {\n"
                 + "    public static MockMvc mvc() {\n"
                 + "        return MockMvcBuilders.standaloneSetup(new Api(new Greeter(), () -> 7L)).build();\n"
+                + "    }\n"
+                + "    public static MockMvc hidden() {\n"
+                + "        return MockMvcBuilders.standaloneSetup(new Hidden()).build();\n"
                 + "    }\n"
                 + "}\n");
         File tests = testBuild(classes, t, false);
@@ -1142,6 +1150,10 @@ public class BackendTestGeneratorTest {
             assertEquals(404, ((com.codename1.backend.test.MockMvc) mvc)
                     .perform(com.codename1.backend.test.MockMvcRequestBuilders.get("/none"))
                     .andReturn().getResponse().getStatus());
+            Object hidden = loader.loadClass("com.example.StandaloneTest").getMethod("hidden").invoke(null);
+            assertEquals("h", ((com.codename1.backend.test.MockMvc) hidden)
+                    .perform(com.codename1.backend.test.MockMvcRequestBuilders.get("/hidden"))
+                    .andReturn().getResponse().getContentAsString());
         } finally {
             Thread.currentThread().setContextClassLoader(previous);
             loader.close();
