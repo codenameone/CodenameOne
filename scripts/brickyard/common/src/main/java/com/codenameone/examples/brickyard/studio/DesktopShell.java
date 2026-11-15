@@ -23,7 +23,6 @@ import com.codename1.ui.CN;
 import com.codename1.ui.CodeEditor;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -193,6 +192,14 @@ final class DesktopShell {
             snippets[i * 2 + 1] = (Runnable) () -> studio.addSnippet(m);
         }
         bar.add(menu("Scripts", snippets));
+        bar.add(menu("Effects", new Object[] {
+            "Fire", (Runnable) () -> studio.addEffect("fire"),
+            "Sparkles", (Runnable) () -> studio.addEffect("sparkles"),
+            "Smoke", (Runnable) () -> studio.addEffect("smoke"),
+            "Point light", (Runnable) () -> studio.addEffect("light"),
+            "Noon", (Runnable) () -> studio.lighting("noon"),
+            "Dusk", (Runnable) () -> studio.lighting("dusk"),
+            "Night", (Runnable) () -> studio.lighting("night")}));
         bar.add(menu("Test", new Object[] {
             "Play", (Runnable) studio::playtest,
             "Stop", (Runnable) studio::stopPlaytest}));
@@ -204,7 +211,10 @@ final class DesktopShell {
         final Button title = new Button(name, "StudioMenu");
         title.setName("menu" + name);
         title.addActionListener(ev -> {
-            final Dialog d = new Dialog(new BorderLayout());
+            // In the form's own layers: a Dialog is a form of its own, and the
+            // 3D view behind it stopped and turned grey while a menu was open.
+            final com.codename1.components.InteractionDialog d =
+                    new com.codename1.components.InteractionDialog(new BorderLayout());
             d.setDialogUIID("StudioMenuPopup");
             d.getContentPane().setUIID("StudioMenuPopupBody");
             d.setDisposeWhenPointerOutOfBounds(true);
@@ -222,7 +232,14 @@ final class DesktopShell {
                 list.add(item);
             }
             d.add(BorderLayout.CENTER, list);
-            d.showPopupDialog(title);
+            d.setUIID("StudioMenuPopup");
+            // Dropped straight down from the title, as a desktop menu is.
+            Form f = title.getComponentForm();
+            int left = title.getAbsoluteX();
+            int top = title.getAbsoluteY() + title.getHeight();
+            int w = d.getPreferredW() + CN.convertToPixels(3);
+            int h = d.getPreferredH();
+            d.show(top, Math.max(0, f.getHeight() - top - h), left, Math.max(0, f.getWidth() - left - w));
         });
         return title;
     }

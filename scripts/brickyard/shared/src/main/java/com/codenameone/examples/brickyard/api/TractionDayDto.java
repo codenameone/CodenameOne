@@ -22,8 +22,9 @@ import com.codename1.annotations.Mapped;
 
 /// One day of platform traction for the admin console's charts: distinct
 /// players, visits and sessions across every experience, store Bricks that
-/// were not refunded, and new accounts.
+/// were not refunded, new accounts, and new players: those whose first visit
+/// to any experience fell on that day.
 @Mapped
 public record TractionDayDto(long dayStart, long activePlayers, long visits, long sessions, long bricks,
-        long signups) {
+        long signups, long newPlayers) {
 }

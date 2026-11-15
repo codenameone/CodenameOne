@@ -253,7 +253,7 @@ public final class AdminConsole {
         attention.setName("needsAttention");
         Container charts = new Container(new GridLayout(1, 2));
         charts.add(card("Players and visits, last " + TRACTION_DAYS + " days", trend));
-        charts.add(card("New accounts and Bricks spent", bars));
+        charts.add(card("New players and Bricks bought", bars));
         Container lists = new Container(new GridLayout(1, 2));
         lists.add(card("Top experiences", top));
         lists.add(card("Needs attention", attention));
@@ -356,10 +356,10 @@ public final class AdminConsole {
     }
 
     private static ChartComponent bars(List<TractionDayDto> days) {
-        XYSeries signups = new XYSeries("New accounts");
+        XYSeries signups = new XYSeries("New players");
         XYSeries bricks = new XYSeries("Bricks / 100");
         for (int i = 0; i < days.size(); i++) {
-            signups.add(i, days.get(i).signups());
+            signups.add(i, days.get(i).newPlayers());
             bricks.add(i, days.get(i).bricks() / 100.0);
         }
         XYMultipleSeriesDataset data = new XYMultipleSeriesDataset();

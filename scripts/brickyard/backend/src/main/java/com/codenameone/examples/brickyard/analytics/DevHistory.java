@@ -29,8 +29,10 @@ import com.codenameone.examples.brickyard.Clock;
 import com.codenameone.examples.brickyard.Ids;
 import com.codenameone.examples.brickyard.domain.AnalyticsEvent;
 import com.codenameone.examples.brickyard.domain.Experience;
+import com.codenameone.examples.brickyard.domain.StorePurchase;
 import com.codenameone.examples.brickyard.repository.AnalyticsEventRepository;
 import com.codenameone.examples.brickyard.repository.ExperienceRepository;
+import com.codenameone.examples.brickyard.repository.StorePurchaseRepository;
 import java.io.IOException;
 
 /// A development server's way to give a fresh database a past: two weeks of
@@ -44,10 +46,44 @@ public class DevHistory {
     static final int DAYS = 14;
     private final AnalyticsEventRepository events;
     private final ExperienceRepository experiences;
+    private final StorePurchaseRepository purchases;
 
-    public DevHistory(AnalyticsEventRepository events, ExperienceRepository experiences) {
+    public DevHistory(AnalyticsEventRepository events, ExperienceRepository experiences,
+            StorePurchaseRepository purchases) {
         this.events = events;
         this.experiences = experiences;
+        this.purchases = purchases;
+    }
+
+    /// Two weeks of Bricks packs bought by the same made-up cohort, growing
+    /// as the visits do, so the operations console's store chart has a past
+    /// too. Answers how many purchases it added.
+    @PostMapping("/api/dev/store/history")
+    @Transactional(rollbackFor = IOException.class)
+    public long storeHistory() throws IOException {
+        if (!Access.isStaff()) {
+            throw new ResponseStatusException(403, "Staff only");
+        }
+        long today = Clock.dayOf(Clock.now());
+        long added = 0;
+        for (int day = DAYS - 1; day >= 0; day--) {
+            // Today is still going: half a day's buyers, all in the past.
+            int buyers = day == 0 ? 3 : 2 + (DAYS - day) / 3 + (int) (next(day * 7919L) % 3);
+            for (int p = 0; p < buyers; p++) {
+                long roll = next(day * 104729L + p) % 10;
+                StorePurchase s = new StorePurchase();
+                s.setId(Ids.next());
+                s.setUsername("demo-player-" + day + "-" + p);
+                // The store's two packs, the smaller one bought more often.
+                s.setSku(roll < 7 ? "bricks.400" : "bricks.1000");
+                s.setBricks(roll < 7 ? 400 : 1000);
+                s.setCreatedAt(day == 0 ? Clock.now() - (p + 1) * 20 * 60000L
+                        : today - day * Clock.DAY + Clock.DAY / 2 + p * 60000L);
+                purchases.insert(s);
+                added++;
+            }
+        }
+        return added;
     }
 
     /// Writes the history and answers how many visits it added.

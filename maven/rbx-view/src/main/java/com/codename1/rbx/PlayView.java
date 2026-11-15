@@ -403,15 +403,19 @@ public class PlayView extends Container {
         g.setFont(font);
         for (Instance p : engine.service("Players").getChildren()) {
             Instance ch = p.ref("Character");
-            Instance head = ch == null ? null : ch.findFirstChild("Head");
-            if (head == null) {
-                head = ch == null ? null : ch.findFirstChild("HumanoidRootPart");
+            // The root part is what moves: a replicated rig's Head can lag
+            // behind it, and a bubble left at the spawn reads as a ghost.
+            Instance root = ch == null ? null : ch.findFirstChild("HumanoidRootPart");
+            double lift = 2.7;
+            if (root == null || !root.isA("BasePart")) {
+                root = ch == null ? null : ch.findFirstChild("Head");
+                lift = 1.6;
             }
-            if (head == null || !head.isA("BasePart")) {
+            if (root == null || !root.isA("BasePart")) {
                 continue;
             }
-            CFrame hf = Behaviors.cf(head);
-            double[] at = project(engine, hf.x, hf.y + 1.6, hf.z, w, h);
+            CFrame hf = Behaviors.cf(root);
+            double[] at = project(engine, hf.x, hf.y + lift, hf.z, w, h);
             if (at == null || at[2] > 140) {
                 continue;
             }

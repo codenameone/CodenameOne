@@ -32,5 +32,7 @@ public interface ExperienceRepository extends CrudRepository<Experience, String>
     @Query("select e from Experience e where e.publishedVersion > :none order by e.visits desc, e.id asc")
     List<Experience> published(@Param("none") int none);
 
-    List<Experience> findByOwner(String owner);
+    /// Newest first: what a creator just made is what they look for.
+    @Query("select e from Experience e where e.owner = :owner order by e.createdAt desc, e.id asc")
+    List<Experience> findByOwner(@Param("owner") String owner);
 }

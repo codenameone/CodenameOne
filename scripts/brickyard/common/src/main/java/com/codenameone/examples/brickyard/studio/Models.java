@@ -61,6 +61,8 @@ public final class Models {
             + "coin.Color = Color3.fromRGB(255, 200, 40)\n"
             + "coin.Material = Enum.Material.Neon\n"
             + "coin.CanCollide = false\n"
+            + "-- A cylinder's axis is X: turn it to face the player.\n"
+            + "coin.CFrame = coin.CFrame * CFrame.Angles(0, math.rad(90), 0)\n"
             + "Instance.new(\"Sparkles\").Parent = coin\n"
             + "-- Touch it to collect it: the coin hides, and comes back later.\n"
             + "local pickup = Instance.new(\"Script\")\n"
@@ -68,6 +70,12 @@ public final class Models {
             + "pickup.Source = [[\n"
             + "local coin = script.Parent:FindFirstChild(\"Coin\")\n"
             + "local taken = false\n"
+            + "task.spawn(function()\n"
+            + "    while coin.Parent do\n"
+            + "        coin.CFrame = coin.CFrame * CFrame.Angles(0, math.rad(3), 0)\n"
+            + "        task.wait()\n"
+            + "    end\n"
+            + "end)\n"
             + "coin.Touched:Connect(function(hit)\n"
             + "    local player = game.Players:GetPlayerFromCharacter(hit.Parent)\n"
             + "    if player and not taken then\n"
@@ -230,7 +238,7 @@ public final class Models {
                 + "end\n"
                 + "local at = Vector3.new(" + x + ", " + y + ", " + z + ")\n"
                 + "local folder = Instance.new(\"Model\")\n"
-                + "folder.Name = \"" + MODELS[i][0].replace(" ", "") + "\"\n"
+                + "folder.Name = \"" + pascal(MODELS[i][0]) + "\"\n"
                 + "folder.Parent = workspace\n"
                 + MODELS[i][1];
     }
@@ -248,5 +256,21 @@ public final class Models {
     /// Snippet `i`'s source.
     public static String snippet(int i) {
         return SNIPPETS[i][1];
+    }
+
+    /// "Lamp post" as an instance name: "LampPost".
+    static String pascal(String words) {
+        StringBuilder b = new StringBuilder();
+        boolean up = true;
+        for (int i = 0; i < words.length(); i++) {
+            char c = words.charAt(i);
+            if (c == ' ') {
+                up = true;
+            } else {
+                b.append(up && c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+                up = false;
+            }
+        }
+        return b.toString();
     }
 }

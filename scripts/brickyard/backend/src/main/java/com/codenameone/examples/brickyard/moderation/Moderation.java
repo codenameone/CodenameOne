@@ -513,6 +513,7 @@ public class Moderation {
         long[] sessions = new long[n];
         long[] bricks = new long[n];
         long[] signups = new long[n];
+        long[] newPlayers = new long[n];
         List<Set<String>> active = new ArrayList<Set<String>>();
         for (int i = 0; i < n; i++) {
             active.add(new HashSet<String>());
@@ -530,6 +531,21 @@ public class Moderation {
                 sessions[d]++;
             }
         }
+        // A player is new on the day of their first visit; a month before the
+        // window is read too, so one who came back is not counted again.
+        java.util.Map<String, Long> firstVisit = new java.util.HashMap<String, Long>();
+        for (AnalyticsEvent v : events.kindSince("VISIT", first - 30 * Clock.DAY)) {
+            Long seen = firstVisit.get(v.getUsername());
+            if (seen == null || v.getCreatedAt() < seen.longValue()) {
+                firstVisit.put(v.getUsername(), Long.valueOf(v.getCreatedAt()));
+            }
+        }
+        for (Long at : firstVisit.values()) {
+            int d = bucket(at.longValue(), first, n);
+            if (d >= 0) {
+                newPlayers[d]++;
+            }
+        }
         for (StorePurchase p : purchases.since(first)) {
             int d = bucket(p.getCreatedAt(), first, n);
             if (d >= 0 && p.getRefunded() == 0) {
@@ -545,7 +561,7 @@ public class Moderation {
         List<TractionDayDto> out = new ArrayList<TractionDayDto>();
         for (int i = 0; i < n; i++) {
             out.add(new TractionDayDto(first + i * Clock.DAY, active.get(i).size(), visits[i], sessions[i], bricks[i],
-                    signups[i]));
+                    signups[i], newPlayers[i]));
         }
         return out;
     }

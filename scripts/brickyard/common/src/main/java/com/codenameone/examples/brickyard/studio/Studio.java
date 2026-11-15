@@ -178,7 +178,11 @@ public final class Studio implements AgentTools.Studio {
             if (current == this) {
                 current = null;
             }
-            if (previous != null) {
+            if (previous != null && "create".equals(previous.getName())) {
+                // The list behind the studio predates what was just made or
+                // published there: build it again rather than show it stale.
+                com.codenameone.examples.brickyard.ui.CreateForm.show();
+            } else if (previous != null) {
                 previous.showBack();
             }
         };
@@ -428,6 +432,21 @@ public final class Studio implements AgentTools.Studio {
         }
     }
 
+    /// Puts a `fire`, `sparkles`, `smoke` or `light` effect on the selected
+    /// part, through the same tool an AI agent calls.
+    void addEffect(String kind) {
+        if (selected == null || !selected.isA("BasePart")) {
+            log("Select a part first: effects attach to a part.", true);
+            return;
+        }
+        edit("add_effect", "{\"kind\":" + q(kind) + ",\"target\":" + q(selected.fullName()) + "}");
+    }
+
+    /// Sets the time of day from a preset: noon, dusk or night.
+    void lighting(String preset) {
+        edit("set_lighting", "{\"preset\":" + q(preset) + "}");
+    }
+
     /// Adds snippet `i` as a new script: inside the selected part when one
     /// is selected (a kill brick, a moving platform act on their parent),
     /// otherwise in ServerScriptService, and opens it in the editor.
@@ -437,7 +456,7 @@ public final class Studio implements AgentTools.Studio {
         if (parent == null) {
             return;
         }
-        String base = Models.snippetName(i).replace(" ", "");
+        String base = Models.pascal(Models.snippetName(i));
         String name = base;
         for (int n = 2; parent.findFirstChild(name) != null; n++) {
             name = base + n;
@@ -700,6 +719,15 @@ public final class Studio implements AgentTools.Studio {
             int t = args.indexOf("-- Toolbox: ");
             return t < 0 ? "Ran Luau" : "Inserted model " + args.substring(t + 12, args.indexOf('\\', t));
         }
+        if ("add_effect".equals(tool)) {
+            String target = field(args, "target");
+            return "Added " + field(args, "kind") + (target == null ? ""
+                    : " to " + target.substring(target.lastIndexOf('.') + 1));
+        }
+        if ("set_lighting".equals(tool)) {
+            String preset = field(args, "preset");
+            return preset == null ? "Changed the lighting" : "Lighting: " + preset;
+        }
         return tool.replace('_', ' ') + " " + name;
     }
 
@@ -946,6 +974,11 @@ public final class Studio implements AgentTools.Studio {
             }
             s.log((failed ? "AI  failed: " : "AI  ") + agentLine(tool, args)
                     + (failed ? " -- " + result : ""), true);
+            if ("run_luau".equals(tool) && !failed) {
+                // The code itself, as the toolbox shows its own: the point is
+                // to see, and learn from, what the agent wrote.
+                s.log(unescape(rawField(args, "source")));
+            }
             s.refresh();
         });
         showConnectAgent();
@@ -953,11 +986,69 @@ public final class Studio implements AgentTools.Studio {
 
     /// What an agent's call did, in the words of Output's own history.
     static String agentLine(String tool, String args) {
-        if ("run_luau".equals(tool) || "playtest".equals(tool) || "screenshot".equals(tool)
+        if ("run_luau".equals(tool)) {
+            // Its first comment, when it starts with one, says what it is for.
+            String src = unescape(rawField(args, "source")).trim();
+            if (src.startsWith("--")) {
+                int nl = src.indexOf('\n');
+                return "ran Luau: " + src.substring(2, nl < 0 ? src.length() : nl).trim();
+            }
+            return "ran Luau";
+        }
+        if ("playtest".equals(tool) || "screenshot".equals(tool)
                 || "place_tree".equals(tool) || "compat_report".equals(tool)) {
             return tool.replace('_', ' ');
         }
         return describe(tool, args);
+    }
+
+    /// The still-escaped string value of `key` in a JSON object, or "": unlike
+    /// [#field] it reads past escaped quotes.
+    static String rawField(String json, String key) {
+        int s = json.indexOf("\"" + key + "\"");
+        if (s < 0) {
+            return "";
+        }
+        s = json.indexOf(':', s + key.length() + 2);
+        if (s < 0) {
+            return "";
+        }
+        s = json.indexOf('"', s);
+        if (s < 0) {
+            return "";
+        }
+        s++;
+        int e = s;
+        while (e < json.length() && json.charAt(e) != '"') {
+            e += json.charAt(e) == '\\' ? 2 : 1;
+        }
+        return json.substring(s, Math.min(e, json.length()));
+    }
+
+    /// Undoes JSON string escapes: the common ones, and four-digit unicode.
+    static String unescape(String s) {
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c != '\\' || i + 1 >= s.length()) {
+                b.append(c);
+                continue;
+            }
+            char n = s.charAt(++i);
+            if (n == 'n') {
+                b.append('\n');
+            } else if (n == 't') {
+                b.append('\t');
+            } else if (n == 'r') {
+                b.append('\r');
+            } else if (n == 'u' && i + 4 < s.length()) {
+                b.append((char) Integer.parseInt(s.substring(i + 1, i + 5), 16));
+                i += 4;
+            } else {
+                b.append(n);
+            }
+        }
+        return b.toString();
     }
 
     /// The MCP port this app's server listens on: the simulator sets
@@ -1176,6 +1267,10 @@ public final class Studio implements AgentTools.Studio {
         selected = i;
         Object src = i.storedProps().get("Source");
         source.setText(src == null ? "" : String.valueOf(src));
+        if (src == null && shell != null && tab == 2) {
+            // Nothing to edit: an empty editor would read as a script lost.
+            showTab(3);
+        }
         refresh();
         if (!frameIt) {
             return;
@@ -1226,7 +1321,10 @@ public final class Studio implements AgentTools.Studio {
             final String shown = f.getText();
             final Runnable commit = () -> {
                 String now = f.getText();
-                if (!now.equals(shown) && target.getParent() != null) {
+                // A field cleared to retype is not a value yet: no property
+                // takes an empty one, and applying it would rebuild the panel
+                // under the editor.
+                if (now.trim().length() > 0 && !now.equals(shown) && target.getParent() != null) {
                     edit("set_properties", "{\"path\":" + q(target.fullName())
                             + ",\"properties\":{" + q(key) + ":" + literal(now) + "}}");
                 }
@@ -1257,7 +1355,24 @@ public final class Studio implements AgentTools.Studio {
             return;
         }
         String t = output.getText() + line + "\n";
-        output.setText(t.length() > 20000 ? t.substring(t.length() - 20000) : t);
+        final boolean trimmed = t.length() > 20000;
+        final int before = trimmed ? 0 : output.getLines();
+        output.setText(trimmed ? t.substring(t.length() - 20000) : t);
+        // Bring the start of the new entry to the top of the panel: a model's
+        // first lines say what it is, its last ones are only its script.
+        CN.callSerially(() -> {
+            int row = output.getStyle().getFont().getHeight() + output.getRowsGap();
+            int y = output.getStyle().getPaddingTop() + Math.max(0, before - 1) * row;
+            if (output.isScrollableY()) {
+                // The area scrolls its own text when the panel gives it a fixed size.
+                output.scrollRectToVisible(0, y, 1, output.getHeight(), output);
+                return;
+            }
+            Container p = output.getParent();
+            if (p != null && p.isScrollableY()) {
+                p.scrollRectToVisible(0, output.getY() + y, 1, p.getHeight(), p);
+            }
+        });
     }
 
     /// The text of a property field as a JSON value: numbers, booleans,

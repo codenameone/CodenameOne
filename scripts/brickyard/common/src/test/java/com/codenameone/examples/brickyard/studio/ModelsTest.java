@@ -62,11 +62,11 @@ class ModelsTest {
         for (int i = 0; i < Models.count(); i++) {
             String r = t.call("run_luau", "{\"source\":" + AgentTools.jsonString(Models.luau(i, 8 * i, 0, 0)) + "}");
             assertFalse(r.contains("\"error\""), Models.name(i) + ": " + r);
-            Instance m = h.engine.getWorkspace().findFirstChild(Models.name(i).replace(" ", ""));
+            Instance m = h.engine.getWorkspace().findFirstChild(Models.pascal(Models.name(i)));
             assertNotNull(m, Models.name(i));
             assertFalse(m.getChildren().isEmpty(), Models.name(i));
         }
-        Instance kill = h.engine.getWorkspace().findFirstChild("Waterpool").findFirstChild("Rim");
+        Instance kill = h.engine.getWorkspace().findFirstChild("WaterPool").findFirstChild("Rim");
         for (int i = 0; i < Models.snippetCount(); i++) {
             String parent = Models.snippetName(i).startsWith("Kill") || Models.snippetName(i).startsWith("Moving")
                     ? kill.fullName() : "ServerScriptService";
