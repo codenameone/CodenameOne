@@ -33,24 +33,33 @@ import java.util.Map;
 /// of the same purchase would credit nothing new. A refund is the one event
 /// only the store knows about.
 ///
-/// The JWS signatures are not checked here: the endpoint is authenticated by
-/// the secret in its URL, which only the store's console knows. Checking
-/// Apple's x5c chain against Apple Root CA G3 is the hardening step for a
-/// production deployment.
+/// Apple's tokens are checked by [AppleSignedData] when one is given; only a
+/// development or test server without a pinned root reads them unchecked. A
+/// Google push is authenticated before it gets here, by [PubSubPushAuth].
 final class StoreRefunds {
     private StoreRefunds() {
     }
 
     /// The purchase id ("apple|txn") an Apple notification refunds, or null
     /// when it is not a refund.
-    static String apple(String body) throws IOException {
+    ///
+    /// @param signed checks Apple's signatures; null reads them unchecked
+    /// @param bundleId the app the notification must be for, when not null
+    /// @throws IOException when a signature, the chain or the app is wrong
+    static String apple(String body, AppleSignedData signed, String bundleId) throws IOException {
         Map outer = Json.parseObject(body);
-        Map payload = jws(outer.get("signedPayload"));
-        if (payload == null || !"REFUND".equals(payload.get("notificationType"))) {
+        Map payload = jws(outer.get("signedPayload"), signed);
+        Object data = payload == null ? null : payload.get("data");
+        if (bundleId != null && !(data instanceof Map && bundleId.equals(((Map) data).get("bundleId")))) {
+            throw new IOException("The notification is for another app");
+        }
+        if (!"REFUND".equals(payload == null ? null : payload.get("notificationType"))) {
             return null;
         }
-        Object data = payload.get("data");
-        Map txn = data instanceof Map ? jws(((Map) data).get("signedTransactionInfo")) : null;
+        Map txn = data instanceof Map ? jws(((Map) data).get("signedTransactionInfo"), signed) : null;
+        if (txn != null && bundleId != null && !bundleId.equals(txn.get("bundleId"))) {
+            throw new IOException("The transaction is for another app");
+        }
         Object id = txn == null ? null : txn.get("transactionId");
         return id instanceof String && ((String) id).length() > 0
                 ? AppleReceiptValidator.STORE + "|" + id : null;
@@ -73,8 +82,12 @@ final class StoreRefunds {
                 ? GooglePlayValidator.STORE + "|" + order : null;
     }
 
-    /// The claims of a compact JWS, or null for anything that is not one.
-    private static Map jws(Object token) throws IOException {
+    /// The claims of a compact JWS, checked when `signed` is given; unchecked,
+    /// null for anything that is not one.
+    private static Map jws(Object token, AppleSignedData signed) throws IOException {
+        if (signed != null) {
+            return signed.claims(token);
+        }
         if (!(token instanceof String)) {
             return null;
         }

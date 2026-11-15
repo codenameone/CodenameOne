@@ -33,6 +33,7 @@ import com.codenameone.examples.brickyard.domain.FraudFlag;
 import com.codenameone.examples.brickyard.domain.PlusSubscription;
 import com.codenameone.examples.brickyard.economy.Economy;
 import com.codenameone.examples.brickyard.economy.StoreNotifications;
+import com.codenameone.examples.brickyard.economy.StoreTestKeys;
 import com.codenameone.examples.brickyard.jobs.ScheduledJobs;
 import com.codenameone.examples.brickyard.referral.Referrals;
 import com.codenameone.examples.brickyard.repository.FraudFlagRepository;
@@ -65,6 +66,8 @@ class OperationsTest {
     private Accounts accounts;
     @Autowired
     private Economy economy;
+    @Autowired
+    private StoreNotifications notifications;
     @Autowired
     private ScheduledJobs jobs;
     @Autowired
@@ -110,12 +113,9 @@ class OperationsTest {
         assertEquals(404, notify("apple", "bricks.400", "t-both-3", "nobody@test.example"));
     }
 
-    private static String b64url(String json) throws Exception {
-        return com.codename1.backend.Base64Url.encode(json.getBytes("UTF-8"));
-    }
-
-    private int postRaw(String path, String body) throws Exception {
-        return Api.statusOf(mvc, Api.body(post(path), body));
+    private int postRaw(String path, String body, String authorization) throws Exception {
+        MockRequestBuilder request = Api.body(post(path), body);
+        return Api.statusOf(mvc, authorization == null ? request : request.header("Authorization", authorization));
     }
 
     @Test
@@ -124,23 +124,44 @@ class OperationsTest {
         assertEquals(200, receipt(u, "apple", "bricks.400", "t-ref-1"));
         assertEquals(200, receipt(u, "google", "bricks.400", "t-ref-2"));
         long paid = balance(u);
-        // The simulated store vouches for "sim:<id>", so that is the id its refund names.
-        String txn = "x." + b64url("{\"transactionId\":\"sim:t-ref-1\"}") + ".sig";
-        String apple = "{\"signedPayload\":\"h." + b64url("{\"notificationType\":\"REFUND\","
-                + "\"data\":{\"signedTransactionInfo\":\"" + txn + "\"}}") + ".sig\"}";
-        assertEquals(200, postRaw(StoreNotifications.APPLE_PATH, apple));
-        assertEquals(paid - 400, balance(u));
-        // The store retries: the second delivery changes nothing.
-        assertEquals(200, postRaw(StoreNotifications.APPLE_PATH, apple));
-        assertEquals(paid - 400, balance(u));
-        String data = java.util.Base64.getEncoder().encodeToString(
-                "{\"voidedPurchaseNotification\":{\"orderId\":\"sim:t-ref-2\"}}".getBytes("UTF-8"));
-        assertEquals(200, postRaw(StoreNotifications.GOOGLE_PATH, "{\"message\":{\"data\":\"" + data + "\"}}"));
-        assertEquals(paid - 800, balance(u));
-        // A renewal or a purchase is not acted on here; the app's receipt credits it.
-        String renewal = "{\"signedPayload\":\"h." + b64url("{\"notificationType\":\"DID_RENEW\"}") + ".s\"}";
-        assertEquals(200, postRaw(StoreNotifications.APPLE_PATH, renewal));
-        assertEquals(paid - 800, balance(u));
+        StoreTestKeys keys = new StoreTestKeys();
+        notifications.trust(keys.root, StoreTestKeys.BUNDLE, keys.googleKeys(), StoreTestKeys.AUDIENCE,
+                StoreTestKeys.PUSHER);
+        try {
+            // Forgeries first: none of them may take anything back.
+            String forged = keys.appleRefund("sim:t-ref-1", StoreTestKeys.BUNDLE).replace(".", ".x");
+            assertEquals(401, postRaw(StoreNotifications.APPLE_PATH, forged, null));
+            assertEquals(401, postRaw(StoreNotifications.APPLE_PATH,
+                    new StoreTestKeys().appleRefund("sim:t-ref-1", StoreTestKeys.BUNDLE), null));
+            assertEquals(401, postRaw(StoreNotifications.APPLE_PATH,
+                    keys.appleRefund("sim:t-ref-1", "com.other.app"), null));
+            String voided = StoreTestKeys.googleVoided("sim:t-ref-2");
+            assertEquals(401, postRaw(StoreNotifications.GOOGLE_PATH, voided, null));
+            assertEquals(401, postRaw(StoreNotifications.GOOGLE_PATH, voided,
+                    keys.googleBearer("https://elsewhere.example")));
+            assertEquals(401, postRaw(StoreNotifications.GOOGLE_PATH, voided,
+                    new StoreTestKeys().googleBearer(StoreTestKeys.AUDIENCE)));
+            assertEquals(paid, balance(u));
+            // The simulated store vouches for "sim:<id>", so that is the id its refund names.
+            String apple = keys.appleRefund("sim:t-ref-1", StoreTestKeys.BUNDLE);
+            assertEquals(200, postRaw(StoreNotifications.APPLE_PATH, apple, null));
+            assertEquals(paid - 400, balance(u));
+            // The store retries: the second delivery changes nothing.
+            assertEquals(200, postRaw(StoreNotifications.APPLE_PATH, apple, null));
+            assertEquals(paid - 400, balance(u));
+            String bearer = keys.googleBearer(StoreTestKeys.AUDIENCE);
+            assertEquals(200, postRaw(StoreNotifications.GOOGLE_PATH, voided, bearer));
+            assertEquals(paid - 800, balance(u));
+            assertEquals(200, postRaw(StoreNotifications.GOOGLE_PATH, voided, bearer));
+            assertEquals(paid - 800, balance(u));
+            // A renewal or a purchase is not acted on here; the app's receipt credits it.
+            String renewal = "{\"signedPayload\":\"" + keys.sign("{\"notificationType\":\"DID_RENEW\","
+                    + "\"data\":{\"bundleId\":\"" + StoreTestKeys.BUNDLE + "\"}}") + "\"}";
+            assertEquals(200, postRaw(StoreNotifications.APPLE_PATH, renewal, null));
+            assertEquals(paid - 800, balance(u));
+        } finally {
+            notifications.trust(null, null, null, null, null);
+        }
     }
 
     // -- bans --------------------------------------------------------------

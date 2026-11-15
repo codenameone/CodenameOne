@@ -27,6 +27,8 @@ import com.codename1.backend.annotations.Order;
 import com.codename1.backend.annotations.Value;
 import com.codename1.backend.security.AntPathRequestMatcher;
 import com.codename1.backend.security.BearerTokenAuthenticationFilter;
+import com.codename1.backend.security.oauth2.server.resource.BearerTokenResolver;
+import com.codename1.backend.security.oauth2.server.resource.DefaultBearerTokenResolver;
 import com.codename1.backend.security.HttpSecurity;
 import com.codename1.backend.security.LogoutFilter;
 import com.codename1.backend.security.SecurityFilterChain;
@@ -119,7 +121,10 @@ public class SecurityConfig {
                     .requestMatchers(AntPathRequestMatcher.antMatcher("/api/engine/**"))
                             .hasRole(Roles.ENGINE)
                     .anyRequest().authenticated())
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(
+            // Pub/Sub's Authorization header carries Google's OIDC token, not one
+            // of ours: StoreNotifications checks it, so the resource server must
+            // not read it there (it would refuse the push with 401).
+            .oauth2ResourceServer(oauth2 -> oauth2.bearerTokenResolver(notOnGooglePush()).jwt(jwt -> jwt.decoder(
                     AccountSecurity.tokenDecoder(signingKeys, issuer, AUDIENCE))
                     .jwtAuthenticationConverter(AccountSecurity.accountRoles(users))))
             // A ban is global: every write but an appeal is refused to a banned account.
@@ -127,5 +132,12 @@ public class SecurityConfig {
             // Where the request came from, for the referral network check.
             .addFilterBefore(ClientAddress.filter(), BearerTokenAuthenticationFilter.class);
         return http.build();
+    }
+
+    /// The standard bearer resolver, except on the Google push endpoint.
+    private static BearerTokenResolver notOnGooglePush() {
+        final DefaultBearerTokenResolver standard = new DefaultBearerTokenResolver();
+        final AntPathRequestMatcher push = AntPathRequestMatcher.antMatcher(StoreNotifications.GOOGLE_PATH);
+        return request -> push.matches(request) ? null : standard.resolve(request);
     }
 }
