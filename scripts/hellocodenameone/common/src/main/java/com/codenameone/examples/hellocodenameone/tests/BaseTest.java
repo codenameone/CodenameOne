@@ -108,6 +108,15 @@ public abstract class BaseTest extends AbstractTest {
         UITimer.timer(1500, false, parent, run);
     }
 
+    /// How many 200ms polls a GPU test's frame gate makes before it captures
+    /// anyway. The gate starts after 1200ms and captures 400ms after it ends,
+    /// about 19.6s in all, which the Android emulator's first program compiles
+    /// need. It must finish inside Cn1ssDeviceRunner's per-test budget, so the
+    /// gated tests get the 30s native budget on every platform, HTML5 included.
+    protected static int maxPolls() {
+        return 90;
+    }
+
     /// Wraps a component so a callback can run after its subtree has actually PAINTED, a
     /// deterministic "content is on screen" signal. Event-driven components (the pure editors
     /// report ready as soon as their backend initializes, typically before the first paint

@@ -142,6 +142,15 @@ cube, each drawn into its own viewport in a single frame:
 .Six rotation stages of an animated cube captured in one frame
 image::img/gpu-animation.png[Six rotation stages of an animated cube,scaledwidth=40%]
 
+Skinned characters are deformed on the GPU. A mesh in `VertexFormat.SKINNED`
+carries up to four joint indices and weights per vertex, and
+`Material.setSkinning(rows, count)` hands the shader the first three rows of
+each joint matrix (up to `Material.MAX_JOINTS`). The vertex stage blends the
+joints, and the shadow pass does the same, so shadows bend with the mesh.
+`AnimatedModel` uses this path by itself whenever
+`GraphicsDevice.isGpuSkinning()` is true. On a device without GPU skinning, or
+for a skin with more joints than the limit, it falls back to skinning on the CPU.
+
 === Camera and math
 
 https://www.codenameone.com/javadoc/com/codename1/gpu/Camera.html[Camera] builds
@@ -182,6 +191,13 @@ A `PostProcess` on the view renders the scene offscreen and adds bloom, a
 color grade, a vignette and film grain on the way to the screen. Touch
 controls are drawn after it and are never graded.
 
+`PostProcess.addPass` adds a full screen effect of your own, written with the
+same shader nodes as a material. The pass's `BASE_COLOR` graph runs once per
+pixel: `ShaderNode.screenUv()` is the pixel's place on screen and
+`ShaderNode.sceneColor(uv)` reads the frame. Passes run in order before the
+built-in effects. A frame with passes leaves out ambient occlusion, depth of
+field and the outline, because those read the scene's depth.
+
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava007Snippet.java[tag=3d-graphics-java-007,indent=0]
@@ -193,6 +209,85 @@ says so through `GpuCapabilities.isShadowsSupported()` and
 `isPostProcessSupported()`, and the scene is then drawn directly. The JavaSE
 software rasterizer applies the fog, the ambient, tone mapping and the sky
 gradient, but not shadows, clouds or the post chain.
+
+=== Custom shaders and the shader library
+
+A material's look can be extended per pixel and per vertex without writing
+shader source. `com.codename1.gpu.shader.ShaderNode` is a typed expression
+in Java -- arithmetic, `mix`, `smoothstep`, noise, texture reads and built in
+inputs such as `worldPos()`, `uv()`, `time()` and `sunDir()` -- and every port
+prints the same graph as GLSL, Metal, or HLSL. A `ShaderMaterial` plugs graphs
+into hooks of the standard lighting path: `VERTEX_OFFSET`, `BASE_COLOR`,
+`NORMAL`, `METALLIC`, `ROUGHNESS`, `EMISSIVE` and `DISCARD`. A hook left unset
+keeps the material's own behavior, so fog, shadows, the environment and tone
+mapping keep working around custom code. A material takes up to 16 uniforms
+and 4 textures, set by name with `setUniform` and `setTexture`.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava009Snippet.java[tag=3d-graphics-java-009,indent=0]
+----
+
+Most scenes need no graph at all. `com.codename1.gpu.shaders` is a library
+of ready materials, each built only from public `ShaderNode` calls, so its
+source doubles as a set of examples:
+
+* `Water` -- `ocean()`, `lake()` and `river()`: Gerstner waves, depth color,
+  Fresnel and sun glitter, crest foam.
+* `Terrain` and `Foliage` -- layered ground by height and slope, rock, and
+  wind sway for plants, leaves and grass.
+* `Surface` -- painted metal, rust, wood, concrete, glass, ice, fabric, car
+  paint, paint splats.
+* `Toon`, `Fx` and `Liquid` -- toon shading, hatching, flat low poly; dissolve,
+  hologram, force field, beam, fire, smoke, portal, x-ray, pulse; lava,
+  toxic sludge, caustics.
+* `Sky` -- a procedural sky dome in day, dusk, night and overcast moods.
+* `Noise` and `Shading` -- the building blocks: value, fractal, ridged and
+  cellular noise, bump normals, Fresnel and rim terms.
+
+`ScenePresets` bundles a light, an environment, a post chain and a sky that
+belong together: `harbourDusk()`, `clearNoon()`, `overcast()`, `night()`,
+`desert()` and `arctic()`.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava008Snippet.java[tag=3d-graphics-java-008,indent=0]
+----
+
+The post chain also offers FXAA, chromatic aberration and god rays from the
+sun's position (`setFxaa`, `setChromaticAberration`, `setGodRays`).
+
+Three more effects read the depth of the frame. `setAmbientOcclusion` darkens
+creases and the places where objects meet the ground, `setDepthOfField` keeps
+one distance sharp and blurs what's nearer or farther, and `setOutline` inks
+every silhouette for a toon look. `setColorLut` then maps the graded color
+through a lookup strip, the way a film look is applied in a grading tool;
+`ColorLuts` builds strips (`identity`, `filmic`, `posterize`) to upload with
+`GraphicsDevice.createTexture(ColorLuts.WIDTH, ColorLuts.HEIGHT, pixels)`. On
+an OpenGL ES 2 device without depth textures the three depth effects are
+skipped and the rest of the chain still runs.
+
+A scene can also be drawn into a texture and shown on a surface of another
+scene -- a security monitor, a mirror, a minimap. `createRenderTarget(w, h)`
+returns the texture (or null where the device can't render offscreen), and
+draws between `beginRenderTarget(target, clearColor)` and `endRenderTarget()`
+land in it, with a depth buffer of its own. Use it as any material texture
+afterward and release it with `dispose`.
+
+Animated shaders read `time()`. A `GameView` advances it every frame; a plain
+`RenderView` calls `GraphicsDevice.setTime` itself, and a test pins it to
+capture the same frame each run.
+
+Many copies of one mesh -- crates, rocks, a fleet -- draw with
+`GraphicsDevice.drawInstanced(mesh, material, matrices, colors, count)`, or
+`Model.setInstances` in a `GameView`. Each copy gets its own transform and
+tint, and a shader tells them apart through `instanceId()`,
+`instanceRandom()` and `instanceColor()`.
+
+The software rasterizer of the JavaSE simulator evaluates the vertex
+offset, color, emissive and discard hooks on the CPU, so a custom material
+keeps most of its look there; normal, metallic and roughness hooks need a
+GPU.
 
 === Platform notes
 

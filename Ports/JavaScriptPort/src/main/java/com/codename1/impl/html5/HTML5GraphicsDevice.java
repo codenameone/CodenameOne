@@ -38,6 +38,7 @@ import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.html5.js.webgl.WebGLBuffer;
 import com.codename1.html5.js.webgl.WebGLFramebuffer;
@@ -71,6 +72,10 @@ import java.util.Map;
 class HTML5GraphicsDevice extends GraphicsDevice {
     // WebGL enum values (fixed by the OpenGL ES 2 / WebGL 1 spec).
     private static final int DEPTH_BUFFER_BIT = 0x0100;
+    // chromatic aberration, FXAA, god rays and the sun, for the composite
+    private final float[] postFx = new float[6];
+    private final float[] depthFx = new float[12];
+    private boolean depthExtensionAsked;
     private static final int COLOR_BUFFER_BIT = 0x4000;
     private static final int POINTS = 0x0000;
     private static final int LINES = 0x0001;
@@ -82,6 +87,8 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     private static final int BLEND = 0x0BE2;
     private static final int FRONT = 0x0404;
     private static final int BACK = 0x0405;
+    private static final int CW = 0x0900;
+    private static final int CCW = 0x0901;
     private static final int TEXTURE_2D = 0x0DE1;
     private static final int UNSIGNED_BYTE = 0x1401;
     private static final int UNSIGNED_SHORT = 0x1403;
@@ -110,6 +117,9 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     private static final int COLOR_ATTACHMENT0 = 0x8CE0;
     private static final int DEPTH_ATTACHMENT = 0x8D00;
     private static final int DEPTH_COMPONENT16 = 0x81A5;
+    private static final int DEPTH_COMPONENT = 0x1902;
+    private static final int UNSIGNED_INT = 0x1405;
+    private static final int FRAMEBUFFER_COMPLETE = 0x8CD5;
 
     private final WebGLRenderingContext gl;
     private final Map<String, ProgramEntry> programs = new HashMap<String, ProgramEntry>();
@@ -121,6 +131,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         WebGLFramebuffer fbo;
         WebGLTexture tex;
         WebGLRenderbuffer depth;
+        WebGLTexture depthTex;
         int width;
         int height;
     }
@@ -137,6 +148,11 @@ class HTML5GraphicsDevice extends GraphicsDevice {
     private boolean inShadowPass;
     private boolean shadowReady;
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, and the cascade count and square size of the
+    // shadow pass in progress (the map is shadowCascades squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private int shadowCascades = 1;
+    private int shadowSize;
     private PostProcess activePost;
     // The canvas is the default framebuffer (null). The viewport is tracked
     // here because reading it back would need a typed array across the bridge.
@@ -151,6 +167,9 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         int aPosition = -1;
         int aNormal = -1;
         int aTexcoord = -1;
+        int aJoints = -1;
+        int aWeights = -1;
+        WebGLUniformLocation uJoints;
         WebGLUniformLocation uMvp;
         WebGLUniformLocation uModel;
         WebGLUniformLocation uNormalMatrix;
@@ -256,17 +275,24 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         boolean shadowed = shadowReady && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         ProgramEntry entry = getProgram(material, format, env, shadowed);
+        drawWith(mesh, material, modelMatrix, entry, cameraViewProjection(), shadowed, false);
+    }
+
+    // One draw of a mesh through a program. vp is the camera's view projection,
+    // or the light's for a caster whose material needs its own depth program;
+    // a caster draws with depth on, no blending and both faces.
+    private void drawWith(Mesh mesh, Material material, float[] modelMatrix, ProgramEntry entry, float[] vp,
+            boolean shadowed, boolean caster) {
+        VertexBuffer vertices = mesh.getVertices();
+        VertexFormat format = vertices.getFormat();
+        Environment env = getEnvironment();
         gl.useProgram(entry.program);
         applyEnvironment(entry, material, env, shadowed);
 
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
-        Camera camera = getCamera();
         float[] mvp = Matrix4.identity();
-        if (camera != null) {
-            Matrix4.multiply(camera.getViewProjection(), model, mvp);
-        } else {
-            Matrix4.copy(model, mvp);
-        }
+        Matrix4.multiply(vp, model, mvp);
+        Camera camera = getCamera();
         if (entry.uMvp != null) {
             gl.uniformMatrix4fv(entry.uMvp, false, mvp);
         }
@@ -324,11 +350,27 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             gl.uniform1i(entry.uTexture, 0);
         }
 
-        applyRenderState(material.getRenderState());
+        if (caster) {
+            gl.enable(DEPTH_TEST);
+            gl.depthMask(true);
+            gl.disable(BLEND);
+            gl.disable(CULL_FACE);
+        } else {
+            applyRenderState(material.getRenderState());
+        }
 
         WebGLBuffer vbo = uploadVertexBuffer(vertices);
         gl.bindBuffer(ARRAY_BUFFER, vbo);
         bindAttributes(entry, format);
+        if (entry.uJoints != null && material.isSkinned()) {
+            // exactly the joints in use: WebGL sizes the upload by the array
+            // (the runtime snapshots array arguments when it queues the call,
+            // see parparvm_runtime.js, so reusing an array here would be safe)
+            int n = material.getJointCount() * 12;
+            float[] joints = new float[n];
+            System.arraycopy(material.getJointRows(), 0, joints, 0, n);
+            gl.uniform4fv(entry.uJoints, joints);
+        }
 
         PrimitiveType pt = mesh.getPrimitiveType();
         int mode = toGlPrimitive(pt);
@@ -339,6 +381,14 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             gl.drawElements(mode, indices.getIndexCount(), UNSIGNED_SHORT, 0);
         } else {
             gl.drawArrays(mode, 0, vertices.getVertexCount());
+        }
+        // joint arrays stay enabled otherwise, and a later program that
+        // reads no buffer at that location would fail the draw
+        if (entry.aJoints >= 0) {
+            gl.disableVertexAttribArray(entry.aJoints);
+        }
+        if (entry.aWeights >= 0) {
+            gl.disableVertexAttribArray(entry.aWeights);
         }
     }
 
@@ -358,6 +408,12 @@ class HTML5GraphicsDevice extends GraphicsDevice {
                     break;
                 case TEXCOORD:
                     loc = entry.aTexcoord;
+                    break;
+                case JOINTS:
+                    loc = entry.aJoints;
+                    break;
+                case WEIGHTS:
+                    loc = entry.aWeights;
                     break;
                 default:
                     loc = -1;
@@ -443,6 +499,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             gl.disable(CULL_FACE);
         } else {
             gl.enable(CULL_FACE);
+            gl.frontFace(inRenderTarget ? CW : CCW);
             gl.cullFace(cull == RenderState.CullMode.FRONT ? FRONT : BACK);
         }
     }
@@ -476,6 +533,17 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         return entry;
     }
 
+    private ProgramEntry getDepthProgram(Material material, VertexFormat format) {
+        String key = "depth|" + material.getShaderKey() + "|" + formatKey(format);
+        ProgramEntry entry = programs.get(key);
+        if (entry == null) {
+            GlslShaderGenerator gen = GlslShaderGenerator.depthOnly(material, format);
+            entry = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
+            programs.put(key, entry);
+        }
+        return entry;
+    }
+
     private ProgramEntry buildProgram(String vertexSrc, String fragmentSrc) {
         WebGLShader vs = compileShader(VERTEX_SHADER, vertexSrc);
         WebGLShader fs = compileShader(FRAGMENT_SHADER, fragmentSrc);
@@ -492,6 +560,9 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         entry.aPosition = gl.getAttribLocation(program, GlslShaderGenerator.A_POSITION);
         entry.aNormal = gl.getAttribLocation(program, GlslShaderGenerator.A_NORMAL);
         entry.aTexcoord = gl.getAttribLocation(program, GlslShaderGenerator.A_TEXCOORD);
+        entry.aJoints = gl.getAttribLocation(program, GlslShaderGenerator.A_JOINTS);
+        entry.aWeights = gl.getAttribLocation(program, GlslShaderGenerator.A_WEIGHTS);
+        entry.uJoints = gl.getUniformLocation(program, GlslShaderGenerator.U_JOINTS);
         entry.uMvp = gl.getUniformLocation(program, "u_mvp");
         entry.uModel = gl.getUniformLocation(program, "u_model");
         entry.uNormalMatrix = gl.getUniformLocation(program, "u_normalMatrix");
@@ -536,6 +607,13 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
     }
 
+    private void uniform4(ProgramEntry p, String name, float a, float b, float c, float d) {
+        WebGLUniformLocation l = loc(p, name);
+        if (l != null) {
+            gl.uniform4f(l, a, b, c, d);
+        }
+    }
+
     private void uniform3(ProgramEntry p, String name, float a, float b, float c) {
         WebGLUniformLocation l = loc(p, name);
         if (l != null) {
@@ -551,6 +629,77 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             gl.uniform1i(l, unit);
             gl.activeTexture(TEXTURE0);
         }
+    }
+
+
+    // custom shading uniform names, so a draw does not build strings
+    private static final String[] CU_NAMES = new String[ShaderMaterial.MAX_UNIFORMS];
+    private static final String[] CT_NAMES = new String[ShaderMaterial.MAX_TEXTURES];
+
+    static {
+        for (int i = 0; i < CU_NAMES.length; i++) {
+            CU_NAMES[i] = "u_cu[" + i + "]";
+        }
+        for (int i = 0; i < CT_NAMES.length; i++) {
+            CT_NAMES[i] = "u_ct" + i;
+        }
+    }
+
+    // Custom shading (Material.getShader()): the clock, the uniform array and
+    // the material's own textures on units 2 and up -- 0 is the base texture,
+    // 1 the shadow map.
+    private void applyShader(ProgramEntry p, Material material) {
+        ShaderMaterial sm = material.getEffectiveShader();
+        if (sm == null) {
+            return;
+        }
+        uniform1(p, "u_time", getTime());
+        float[] v = sm.getUniformValues();
+        for (int i = 0; i < sm.getUniformCount(); i++) {
+            WebGLUniformLocation l = loc(p, CU_NAMES[i]);
+            if (l != null) {
+                gl.uniform4f(l, v[i * 4], v[i * 4 + 1], v[i * 4 + 2], v[i * 4 + 3]);
+            }
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            WebGLUniformLocation l = loc(p, CT_NAMES[i]);
+            if (l != null && t.getHandle() instanceof WebGLTexture) {
+                gl.activeTexture(TEXTURE0 + 2 + i);
+                gl.bindTexture(TEXTURE_2D, (WebGLTexture) t.getHandle());
+                int wrap = t.getWrap() == Texture.Wrap.REPEAT ? REPEAT : CLAMP_TO_EDGE;
+                int filter = t.getFilter() == Texture.Filter.NEAREST ? NEAREST : LINEAR;
+                gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_S, wrap);
+                gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_T, wrap);
+                gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, filter);
+                gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, filter);
+                gl.uniform1i(l, 2 + i);
+            }
+        }
+        gl.activeTexture(TEXTURE0);
+    }
+
+    // Binds the environment map image based lighting reads (unit 6) when the
+    // program declares it.
+    private void applyEnvironmentMap(ProgramEntry p) {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null) {
+            return;
+        }
+        WebGLUniformLocation l = loc(p, "u_envMap");
+        if (l != null && t.getHandle() instanceof WebGLTexture) {
+            gl.activeTexture(TEXTURE0 + 6);
+            gl.bindTexture(TEXTURE_2D, (WebGLTexture) t.getHandle());
+            int wrap = t.getWrap() == Texture.Wrap.REPEAT ? REPEAT : CLAMP_TO_EDGE;
+            int filter = t.getFilter() == Texture.Filter.NEAREST ? NEAREST : LINEAR;
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_S, wrap);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_T, wrap);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, filter);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, filter);
+            gl.uniform1i(l, 6);
+        }
+        gl.activeTexture(TEXTURE0);
     }
 
     private void applyEnvironment(ProgramEntry p, Material material, Environment env, boolean shadowed) {
@@ -571,14 +720,16 @@ class HTML5GraphicsDevice extends GraphicsDevice {
             }
         }
         uniformColor(p, "u_emissive", material.getEmissive());
+        applyShader(p, material);
+        applyEnvironmentMap(p);
         if (shadowed) {
             WebGLUniformLocation l = loc(p, "u_shadowMatrix");
             if (l != null) {
                 gl.uniformMatrix4fv(l, false, shadowMatrix);
             }
             Light light = getLight();
-            uniform3(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
-                    1f / shadowTarget.width);
+            uniform4(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
+                    light.getShadowSoftness() / shadowTarget.height, light.getShadowCascadeRatio());
             sampler(p, "u_shadowMap", 1, shadowTarget.tex);
         }
     }
@@ -605,6 +756,32 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         gl.bindFramebuffer(FRAMEBUFFER, n.fbo);
         gl.framebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, n.tex, 0);
         if (depth) {
+            // a depth texture, so the composite can read the scene's depth for
+            // ambient occlusion, depth of field and outlines. WebGL 1 needs
+            // WEBGL_depth_texture; without it the framebuffer is incomplete,
+            // a renderbuffer takes its place and the depth effects turn off
+            if (!depthExtensionAsked) {
+                depthExtensionAsked = true;
+                gl.getExtension("WEBGL_depth_texture");
+            }
+            n.depthTex = gl.createTexture();
+            gl.bindTexture(TEXTURE_2D, n.depthTex);
+            gl.texImage2D(TEXTURE_2D, 0, DEPTH_COMPONENT, w, h, 0, DEPTH_COMPONENT, UNSIGNED_INT, null);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, NEAREST);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, NEAREST);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_S, CLAMP_TO_EDGE);
+            gl.texParameteri(TEXTURE_2D, TEXTURE_WRAP_T, CLAMP_TO_EDGE);
+            gl.bindTexture(TEXTURE_2D, null);
+            gl.framebufferTexture2D(FRAMEBUFFER, DEPTH_ATTACHMENT, TEXTURE_2D, n.depthTex, 0);
+            if (gl.checkFramebufferStatus(FRAMEBUFFER) == FRAMEBUFFER_COMPLETE) {
+                return n;
+            }
+            for (int i = 0; i < 8 && gl.getError() != 0; i++) {
+                // drain the error the unsupported format raised
+            }
+            gl.framebufferTexture2D(FRAMEBUFFER, DEPTH_ATTACHMENT, TEXTURE_2D, null, 0);
+            gl.deleteTexture(n.depthTex);
+            n.depthTex = null;
             n.depth = gl.createRenderbuffer();
             gl.bindRenderbuffer(RENDERBUFFER, n.depth);
             gl.renderbufferStorage(RENDERBUFFER, DEPTH_COMPONENT16, w, h);
@@ -620,6 +797,9 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
         gl.deleteFramebuffer(t.fbo);
         gl.deleteTexture(t.tex);
+        if (t.depthTex != null) {
+            gl.deleteTexture(t.depthTex);
+        }
         if (t.depth != null) {
             gl.deleteRenderbuffer(t.depth);
         }
@@ -661,13 +841,16 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         saveTarget();
         int size = light.getShadowMapSize();
         // packed depth must not be interpolated between texels
-        shadowTarget = target(shadowTarget, size, size, true, NEAREST);
+        shadowCascades = light.getShadowCascades();
+        shadowSize = size;
+        shadowTarget = target(shadowTarget, size * shadowCascades, size, true, NEAREST);
         gl.bindFramebuffer(FRAMEBUFFER, shadowTarget.fbo);
-        setViewport(0, 0, size, size);
+        setViewport(0, 0, size * shadowCascades, size);
         gl.clearColor(1f, 1f, 1f, 1f);
         gl.depthMask(true);
         gl.clear(COLOR_BUFFER_BIT | DEPTH_BUFFER_BIT);
-        light.computeShadowMatrix(shadowMatrix);
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -681,17 +864,35 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         restoreTarget();
     }
 
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        if (shadowCascades < 2) {
+            drawShadowCascade(mesh, material, modelMatrix, shadowMatrix);
+            return;
+        }
+        setViewport(0, 0, shadowSize, shadowSize);
+        drawShadowCascade(mesh, material, modelMatrix, shadowMatrix);
+        setViewport(shadowSize, 0, shadowSize, shadowSize);
+        drawShadowCascade(mesh, material, modelMatrix, farShadowMatrix);
+        setViewport(0, 0, shadowSize * 2, shadowSize);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix, float[] lightMatrix) {
         if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
             return;
         }
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawWith(mesh, material, modelMatrix, getDepthProgram(material, fmt), lightMatrix, false, true);
+            return;
+        }
         gl.useProgram(shadowProgram.program);
         float[] model = modelMatrix != null ? modelMatrix : Matrix4.identity();
         float[] mvp = Matrix4.identity();
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(lightMatrix, model, mvp);
         if (shadowProgram.uMvp != null) {
             gl.uniformMatrix4fv(shadowProgram.uMvp, false, mvp);
         }
@@ -716,7 +917,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (effects == null) {
             return false;
         }
@@ -755,7 +956,7 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;
@@ -800,6 +1001,26 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         uniform1(c, "u_grain", pp.getGrain());
         uniform1(c, "u_time", timeSeconds);
         uniform2(c, "u_resolution", sceneTarget.width, sceneTarget.height);
+        packPostEffects(pp, postFx, 0);
+        uniform3(c, "u_fx", postFx[0], postFx[1], postFx[2]);
+        uniform2(c, "u_sun", postFx[3], postFx[4]);
+        packDepthEffects(pp, depthFx, 0);
+        if (sceneTarget.depthTex == null) {
+            depthFx[0] = 0f;
+            depthFx[3] = 0f;
+            depthFx[4] = 0f;
+        }
+        sampler(c, "u_depth", 2, sceneTarget.depthTex);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof WebGLTexture) {
+            sampler(c, "u_lut", 3, (WebGLTexture) lut.getHandle());
+        } else {
+            depthFx[7] = 0f;
+            sampler(c, "u_lut", 3, null);
+        }
+        uniform4(c, "u_dfx", depthFx[0], depthFx[1], depthFx[2], depthFx[3]);
+        uniform4(c, "u_dfx2", depthFx[4], depthFx[5], depthFx[6], depthFx[7]);
+        uniform3(c, "u_ocol", depthFx[8], depthFx[9], depthFx[10]);
         drawQuad(c);
         gl.depthMask(true);
     }
@@ -853,7 +1074,76 @@ class HTML5GraphicsDevice extends GraphicsDevice {
         }
     }
 
+
+    // Render targets: each is a colour texture with a depth buffer of its own.
+    // GL stores a target's rows bottom up while an uploaded image starts at
+    // the top, so draws into a target flip clip space Y (and with it the
+    // winding) to leave the texture upright, as Metal and Direct3D have it.
+    private final Map<Texture, Target> renderTargets = new HashMap<Texture, Target>();
+    private boolean inRenderTarget;
+    private final int[] rtSavedViewport = new int[4];
+    private final float[] flippedVp = new float[16];
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
+
+    public Texture createRenderTarget(int width, int height) {
+        if (gl == null || width <= 0 || height <= 0) {
+            return null;
+        }
+        Target t = target(null, width, height, true, LINEAR);
+        // creating the framebuffer binds it; drawing stays where it was
+        gl.bindFramebuffer(FRAMEBUFFER, activePost != null && sceneTarget != null ? sceneTarget.fbo : null);
+        Texture tex = new Texture(width, height);
+        tex.setHandle(t.tex);
+        renderTargets.put(tex, t);
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        Target t = target == null ? null : renderTargets.get(target);
+        if (t == null || inRenderTarget || inShadowPass || activePost != null) {
+            return false;
+        }
+        System.arraycopy(viewport, 0, rtSavedViewport, 0, 4);
+        gl.bindFramebuffer(FRAMEBUFFER, t.fbo);
+        setViewport(0, 0, t.width, t.height);
+        inRenderTarget = true;
+        clear(clearArgb, true, true);
+        return true;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        gl.bindFramebuffer(FRAMEBUFFER, null);
+        setViewport(rtSavedViewport[0], rtSavedViewport[1], rtSavedViewport[2], rtSavedViewport[3]);
+    }
+
+    // the camera's view projection, flipped in Y inside a render target
+    private float[] cameraViewProjection() {
+        Camera cam = getCamera();
+        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
+        if (!inRenderTarget) {
+            return vp;
+        }
+        for (int i = 0; i < 16; i++) {
+            flippedVp[i] = (i & 3) == 1 ? -vp[i] : vp[i];
+        }
+        return flippedVp;
+    }
+
     public void dispose(Texture texture) {
+        Target rt = renderTargets.remove(texture);
+        if (rt != null) {
+            releaseTarget(rt);
+            texture.setHandle(null);
+            return;
+        }
         if (texture.getHandle() instanceof WebGLTexture) {
             gl.deleteTexture((WebGLTexture) texture.getHandle());
             texture.setHandle(null);

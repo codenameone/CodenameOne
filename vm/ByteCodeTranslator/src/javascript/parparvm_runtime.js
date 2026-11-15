@@ -1897,9 +1897,15 @@ const jvm = {
           // bridge's ``mapHostArgs`` sees the token and materialises a
           // real JS function that posts ``worker-callback`` messages
           // back.
+          // An array is copied NOW, not at flush: a fire-and-forget op
+          // is only marshalled when the batch is sent, so a caller that
+          // reuses one array across calls (a scratch matrix, a joint
+          // palette uploaded per draw) would otherwise hand every queued
+          // call the values of the LAST one -- every skinned mesh posed
+          // by the last palette.
           transferableArgs[i] = (typeof arg === "function")
               ? self.toHostTransferArg(arg)
-              : arg;
+              : (Array.isArray(arg) ? arg.slice() : arg);
         }
         // Fire-and-forget for void-return JSO methods (and JSO property
         // setters, which are inherently void). The vast majority of canvas
