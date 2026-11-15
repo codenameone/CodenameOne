@@ -1,12 +1,15 @@
-name: Enter golden capture mode
+name: Golden capture and harvest
 description: >-
-  Switches a hellocodenameone screenshot job into golden capture: the whole
-  suite runs as usual, and cn1ss_process_and_report files every screenshot
-  that has no golden under $CN1SS_CAPTURE_DIR instead of gating or commenting.
+  Files every hellocodenameone screenshot that has no golden under
+  $CN1SS_CAPTURE_DIR, at its golden's repository path. In capture mode the
+  job then neither gates nor comments; in harvest mode (every normal run) the
+  gate runs exactly as before and the images are a by-product.
 
-# Called by .github/workflows/golden-capture.yml through each screenshot
-# workflow's `cn1ss_capture` input. Every step that uses it is guarded by
-# `if: inputs.cn1ss_capture != ''`, so a normal run never reaches it.
+# Every screenshot job runs it. Capture mode comes from
+# .github/workflows/golden-capture.yml through the workflow's `cn1ss_capture`
+# input; every other run is a harvest, collected by golden-harvest.yml: a
+# golden the source cannot predict (a new variant of an existing test, a
+# platform-specific image set) is still committed once the run has produced it.
 #
 # The suite is never filtered: tests leak state into one another, so an image
 # captured from a partial run can differ from what the full run then compares.
@@ -17,14 +20,18 @@ description: >-
 #   - Followed, at the end of the comparing job, by an upload of
 #     $CN1SS_CAPTURE_DIR named `cn1ss-capture-<leg>` with `if: always()`.
 #
-# It also sets CN1SS_SKIP_COUNT_CHECK=1, the existing seeding bypass: the
-# floor is counted from the golden set, which the new tests are not in yet.
+# Capture mode also sets CN1SS_SKIP_COUNT_CHECK=1, the existing seeding bypass:
+# the floor is counted from the golden set, which the new tests are not in yet.
 
 inputs:
   tests:
     description: The tests that have no golden, for the log only.
     required: false
     default: ''
+  mode:
+    description: capture or harvest.
+    required: false
+    default: harvest
 
 runs:
   using: composite
@@ -32,11 +39,14 @@ runs:
     - shell: bash
       env:
         CAPTURE_TESTS: ${{ inputs.tests }}
+        CAPTURE_MODE: ${{ inputs.mode }}
       run: |
         set -euo pipefail
+        case "$CAPTURE_MODE" in capture|harvest) ;; *) echo "::error::unknown mode $CAPTURE_MODE"; exit 1 ;; esac
         mkdir -p "$GITHUB_WORKSPACE/artifacts/cn1ss-capture"
         {
           echo "CN1SS_CAPTURE_DIR=$GITHUB_WORKSPACE/artifacts/cn1ss-capture"
-          echo "CN1SS_SKIP_COUNT_CHECK=1"
+          echo "CN1SS_CAPTURE_MODE=$CAPTURE_MODE"
+          if [ "$CAPTURE_MODE" = capture ]; then echo "CN1SS_SKIP_COUNT_CHECK=1"; fi
         } >> "$GITHUB_ENV"
-        echo "Golden capture (full suite); tests without goldens: $CAPTURE_TESTS"
+        echo "Golden $CAPTURE_MODE (full suite); tests without goldens: ${CAPTURE_TESTS:-none known}"

@@ -354,10 +354,10 @@ jobs:
         uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Enter golden capture mode
-        if: inputs.cn1ss_capture != ''
         uses: ./.github/actions/cn1ss-capture
         with:
           tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
 
       - name: Build HelloCodenameOne JavaScript port bundle
         run: |
@@ -458,7 +458,7 @@ jobs:
           retention-days: 14
 
       - name: Upload golden capture
-        if: always() && inputs.cn1ss_capture != ''
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: cn1ss-capture-javascript

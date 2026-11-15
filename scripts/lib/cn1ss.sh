@@ -568,7 +568,13 @@ import json, os, shutil, sys
 data = json.load(open(sys.argv[1]))
 root, out = os.path.realpath(sys.argv[2]), sys.argv[3]
 count = 0
+emitted = {}
 for r in data.get("results", []) if isinstance(data, dict) else []:
+    if isinstance(r, dict) and r.get("expected_path"):
+        rel = os.path.relpath(os.path.realpath(r["expected_path"]), root)
+        if not rel.startswith(".."):
+            stem = os.path.splitext(os.path.basename(rel))[0]
+            emitted.setdefault(os.path.dirname(rel), []).append(stem)
     if not isinstance(r, dict) or r.get("status") != "missing_expected":
         continue
     actual, expected = r.get("actual_path"), r.get("expected_path")
@@ -582,6 +588,11 @@ for r in data.get("results", []) if isinstance(data, dict) else []:
     shutil.copyfile(actual, dest)
     print("[cn1ss] captured " + rel)
     count += 1
+# Every image this leg produced, golden or not: lets the collector tell a
+# deleted golden the suite still renders from one it no longer does.
+os.makedirs(out, exist_ok=True)
+with open(os.path.join(out, "cn1ss-emitted.json"), "w") as fh:
+    json.dump(emitted, fh, sort_keys=True)
 print("[cn1ss] golden capture: %d new screenshot(s)" % count)
 PY
 }
@@ -694,14 +705,17 @@ cn1ss_process_and_report() {
     return 13
   fi
 
-  # Golden capture (.github/workflows/golden-capture.yml). The run was built
-  # with only the PR's new tests, so there is nothing to gate and nobody to
-  # comment to: hand every screenshot that has no golden to the capture job,
-  # filed under its golden's repository path, and stop. Existing goldens are
-  # never copied, so a capture can only add files.
+  # Every screenshot without a golden is filed under CN1SS_CAPTURE_DIR at its
+  # golden's repository path (.github/actions/cn1ss-capture). Existing goldens
+  # are never copied, so what is collected can only add files. In capture mode
+  # (.github/workflows/golden-capture.yml) there is nothing to gate and nobody
+  # to comment to, so stop; a harvest (every other run) gates as before, and
+  # golden-harvest.yml commits the images.
   if [ -n "${CN1SS_CAPTURE_DIR:-}" ]; then
-    cn1ss_capture_export "$compare_json_out" "$ref_dir" "$CN1SS_CAPTURE_DIR"
-    return $?
+    cn1ss_capture_export "$compare_json_out" "$ref_dir" "$CN1SS_CAPTURE_DIR" || return $?
+    if [ "${CN1SS_CAPTURE_MODE:-capture}" != harvest ]; then
+      return 0
+    fi
   fi
 
   # Run RenderScreenshotReport

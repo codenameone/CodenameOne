@@ -3,13 +3,13 @@ name: Golden plan
 # The first job of every hellocodenameone screenshot workflow. It reads the
 # suite's source (scripts/ci/cn1ss-golden-plan.py) and answers `run`:
 #
-#   false  (and this job fails) this is a same-repository pull request where some
-#          screenshot test has no golden in a directory whose port runs it. Every job of the calling workflow is
+#   false  (and this job fails) this is a pull request where some screenshot
+#          test has no golden in a directory whose port runs it, or deleted
+#          one the base has. Every job of the calling workflow is
 #          gated on `run` and skips; golden-capture.yml runs the suite in
 #          capture mode instead and pushes the goldens, which starts CI again.
 #   true   anything else: the goldens are complete, or this IS the capture run
-#          (`capture` set), or the PR is from a fork, where no capture can push
-#          and the suite must fail on the missing golden as it always has.
+#          (`capture` set), or not a pull request.
 #
 # Only names are read (git ls-tree on a blobless, sparse checkout), so this
 # costs a few seconds and never downloads an image.
@@ -39,6 +39,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          # A pull request checks out its merge commit; its first parent is
+          # the base, which --base needs to see a deleted golden.
+          fetch-depth: 2
           filter: blob:none
           sparse-checkout: |
             scripts/ci
@@ -52,15 +55,21 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          missing="$(python3 scripts/ci/cn1ss-golden-plan.py --verbose --from-git)"
+          base=()
+          if [ "$EVENT" = pull_request ]; then base=(--base=HEAD^1); fi
+          missing="$(python3 scripts/ci/cn1ss-golden-plan.py --verbose --from-git "${base[@]}")"
           run=true
-          if [ -n "$missing" ] && [ -z "$CAPTURE" ] && [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" = "$REPO" ]; then
+          if [ -n "$missing" ] && [ -z "$CAPTURE" ] && [ "$EVENT" = pull_request ]; then
             run=false
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
           if [ "$run" = false ]; then
             # Red, not skipped: a skipped required check counts as passing, and
             # this PR has not passed anything. The goldens push re-runs it.
-            echo "::error::No goldens yet for $missing. The Golden capture workflow records them and pushes them to this branch; if that run failed, re-run it."
+            if [ "$HEAD_REPO" = "$REPO" ]; then
+              echo "::error::No goldens yet for $missing. The Golden capture workflow records them and pushes them to this branch; if that run failed, re-run it."
+            else
+              echo "::error::No goldens yet for $missing. Golden capture cannot push to a fork: a maintainer has to capture them on a branch of this repository."
+            fi
             exit 1
           fi

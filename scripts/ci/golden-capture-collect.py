@@ -1,20 +1,29 @@
 #!/usr/bin/env python3
 """Merge downloaded cn1ss-capture-* artifacts into the checkout.
 
-Usage: golden-capture-collect.py DOWNLOADS DEST
+Usage: golden-capture-collect.py [--harvest] [--manifest=PORT_STATUS] DOWNLOADS DEST [BASE]
 
-DOWNLOADS/<run>/<artifact>/<repo path>.png. DEST is the repository checkout.
-An image is taken only when it fills a gap cn1ss-golden-plan.py finds in DEST:
-its directory lacks a golden for the test that owns it. Nothing in DEST is
-overwritten. Two legs that share a directory (Windows x64 and arm64) yield one
-file; when their bytes differ the first is kept and a warning names it.
+DOWNLOADS/<run>/<artifact>/<repo path>.png, plus each artifact's
+cn1ss-emitted.json (every image that leg produced, golden or not). DEST is the
+repository checkout; BASE, the PR's base revision.
 
-Exits 1 when a gap is still open afterwards, naming the test and directory: the
-leg failed, or the test captures nothing there and needs a
-`// cn1ss-skip: <ports>` declaration.
+Capture (golden-capture.yml): an image is taken only when it fills a gap
+cn1ss-golden-plan.py finds in DEST: its directory lacks a golden for the test
+that owns it, or lost one the base has. A gap still open afterwards fails,
+naming the test and directory. A deleted golden counts as closed when a leg
+writing that directory shows the suite no longer renders it.
+
+Harvest (golden-harvest.yml, after a normal run): every image without a golden
+is taken, provided screenshot_mappings names its owner. These are the goldens
+the source cannot predict: a new variant of an existing test, a platform's own
+image set. An image no mapping owns fails, naming it.
+
+Either way nothing in DEST is overwritten, and two legs that share a directory
+(the Windows legs) must produce identical bytes.
 """
 import filecmp
 import importlib.util
+import json
 import os
 import shutil
 import sys
@@ -25,29 +34,66 @@ plan = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(plan)
 
 
-def collect(dl, dest, **plan_args):
-    gaps, _ = plan.plan(root=dest, **plan_args)
-    classes, _ = plan.index_sources(plan_args.get("sources_dir", plan.SOURCES))
+def owner_of(stem, mappings):
+    for pat, t in mappings:
+        if plan.fnmatch.fnmatchcase(stem, pat):
+            return t
+    return None
+
+
+def collect(dl, dest, base=None, harvest=False, **plan_args):
     mappings = plan.load_mappings(plan_args.get("manifest", plan.MANIFEST))
+    dir_ports = plan_args.get("dir_ports", plan.DIR_PORTS)
+    ok = True
+    if harvest:
+        gaps, lost = [], {}
+    else:
+        gaps, _ = plan.plan(root=dest, base=base, **plan_args)
+        lost = {}
+        if base is not None:
+            stems = {d: plan.golden_stems(dest, d) for d in dir_ports}
+            lost = plan.deleted_goldens(dest, base, dir_ports, mappings, stems)
     open_gaps = set(gaps)
-    added = {}
+    added, emitted = {}, {}
     for run in sorted(os.listdir(dl)):
         for art in sorted(os.listdir(os.path.join(dl, run))):
-            base = os.path.join(dl, run, art)
-            for d, _, files in os.walk(base):
+            base_dir = os.path.join(dl, run, art)
+            listing = os.path.join(base_dir, "cn1ss-emitted.json")
+            if os.path.isfile(listing):
+                with open(listing) as fh:
+                    for gdir, names in json.load(fh).items():
+                        emitted.setdefault(gdir, set()).update(names)
+            for d, _, files in os.walk(base_dir):
                 for f in sorted(files):
+                    if not f.endswith(".png"):
+                        continue
                     src = os.path.join(d, f)
-                    rel = os.path.relpath(src, base)
+                    if os.path.islink(src) or not os.path.isfile(src):
+                        print("::error::%s (%s) is not a regular file" % (f, art))
+                        ok = False
+                        continue
+                    rel = os.path.relpath(src, base_dir)
                     gdir, stem = os.path.dirname(rel), f[:-4]
-                    owner = [t for t, gd in gaps if gd == gdir and f.endswith(".png")
-                             and plan.owns(t, {stem}, mappings, classes)]
-                    if not owner:
+                    if gdir not in dir_ports:
+                        print("::error::%s (%s) is outside every golden directory" % (rel, art))
+                        ok = False
+                        continue
+                    owner = owner_of(stem, mappings)
+                    if harvest:
+                        if owner is None:
+                            print("::error::%s (%s) has no golden and no screenshot_mappings entry "
+                                  "in docs/website/data/port_status.json owns it; add one" % (rel, art))
+                            ok = False
+                            continue
+                    elif owner is None or (owner, gdir) not in open_gaps and rel not in added:
                         print("[golden-capture] ignored %s (%s): fills no gap" % (rel, art), file=sys.stderr)
                         continue
                     if rel in added:
                         if not filecmp.cmp(added[rel], src, shallow=False):
-                            print("::warning::%s differs between %s and the leg captured first; kept the first"
-                                  % (rel, art))
+                            # One file cannot be a golden for both legs.
+                            print("::error::%s differs between %s and the leg captured first; the legs "
+                                  "sharing this directory do not render it alike" % (rel, art))
+                            ok = False
                         continue
                     target = os.path.join(dest, rel)
                     if os.path.exists(target):
@@ -55,13 +101,46 @@ def collect(dl, dest, **plan_args):
                     os.makedirs(os.path.dirname(target), exist_ok=True)
                     shutil.copyfile(src, target)
                     added[rel] = src
-                    open_gaps.discard((owner[0], gdir))
                     print("[golden-capture] added %s (%s)" % (rel, art), file=sys.stderr)
     for t, gd in sorted(open_gaps):
-        print("::error::%s produced no image for %s: its leg failed, or it captures nothing "
-              "there and needs a `// cn1ss-skip: <ports>` declaration" % (t, gd))
-    return not open_gaps
+        want = lost.get((t, gd))
+        if want:
+            gone = {s for s in want if not os.path.exists(os.path.join(dest, gd, s + ".png"))}
+            if gd in emitted:
+                for s in sorted(gone & emitted[gd]):
+                    print("::error::%s/%s.png was deleted, the suite still renders it and no leg "
+                          "captured it" % (gd, s))
+                obsolete = gone - emitted[gd]
+                for s in sorted(obsolete):
+                    print("[golden-capture] %s/%s.png: no longer rendered, stays deleted" % (gd, s),
+                          file=sys.stderr)
+                gone -= obsolete
+            if not gone:
+                continue
+            print("::error::%s: %s not restored in %s; no leg writing it reported in"
+                  % (t, ", ".join(sorted(gone)), gd))
+            ok = False
+        elif not any(os.path.dirname(r) == gd and owner_of(os.path.basename(r)[:-4], mappings) == t
+                     for r in added):
+            print("::error::%s produced no image for %s: its leg failed, or it captures nothing "
+                  "there and needs a `// cn1ss-skip: <ports>` declaration" % (t, gd))
+            ok = False
+    return ok
+
+
+def main(argv):
+    harvest = "--harvest" in argv
+    kw = {}
+    for a in argv[1:]:
+        if a.startswith("--manifest="):
+            kw["manifest"] = a[len("--manifest="):]
+    args = [a for a in argv[1:] if not a.startswith("--")]
+    if len(args) not in (2, 3):
+        print(__doc__, file=sys.stderr)
+        return 2
+    return 0 if collect(args[0], args[1], base=args[2] if len(args) == 3 else None,
+                    harvest=harvest, **kw) else 1
 
 
 if __name__ == "__main__":
-    sys.exit(0 if collect(sys.argv[1], sys.argv[2]) else 1)
+    sys.exit(main(sys.argv))

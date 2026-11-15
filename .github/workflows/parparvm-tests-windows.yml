@@ -475,10 +475,10 @@ jobs:
         uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Enter golden capture mode
-        if: inputs.cn1ss_capture != ''
         uses: ./.github/actions/cn1ss-capture
         with:
           tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
 
       # Build the hellocodenameone screenshot app into common/target/classes, which
       # the capture test translates into the native exe. This is a plain Maven build
@@ -979,10 +979,10 @@ jobs:
           name: windows-port-screenshot-raw-x64
           path: artifacts/windows-port/raw
       - name: Enter golden capture mode
-        if: inputs.cn1ss_capture != ''
         uses: ./.github/actions/cn1ss-capture
         with:
           tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
 
       - name: Post x64 screenshots to PR
         shell: bash
@@ -1056,7 +1056,7 @@ jobs:
           retention-days: 14
 
       - name: Upload golden capture
-        if: always() && inputs.cn1ss_capture != ''
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: cn1ss-capture-windows-x64
@@ -1098,10 +1098,10 @@ jobs:
           name: windows-port-screenshot-raw-arm64
           path: artifacts/windows-port/raw
       - name: Enter golden capture mode
-        if: inputs.cn1ss_capture != ''
         uses: ./.github/actions/cn1ss-capture
         with:
           tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
 
       - name: Post arm64 screenshots to PR
         shell: bash
@@ -1169,7 +1169,7 @@ jobs:
           retention-days: 14
 
       - name: Upload golden capture
-        if: always() && inputs.cn1ss_capture != ''
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: cn1ss-capture-windows-arm64

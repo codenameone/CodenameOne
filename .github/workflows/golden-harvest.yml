@@ -1,0 +1,98 @@
+name: Golden harvest
+
+# Commits the goldens a normal screenshot run produced but the source could
+# not predict: a new variant of an existing test, a platform's own image set.
+# golden-plan.yml stops a run before it starts when it can see a golden is
+# missing (a new test, a golden the PR deleted); what it cannot see, the run
+# itself finds. Every screenshot job uploads the images it rendered that have
+# no golden (`cn1ss-capture-<leg>`, .github/actions/cn1ss-capture) and still
+# fails its gate on them. Once every screenshot run at the PR's head has
+# completed, this commits those images to the branch with CN1SS_GH_TOKEN, and
+# the push starts CI again on a head that has them.
+#
+# Only the default branch's scripts run here (workflow_run), and the PR's
+# artifacts are data: only .png files under a golden directory, owned by a
+# screenshot_mappings entry, absent from the branch, are taken. Review them in
+# the commit like any other golden change. Forks are skipped: there is no
+# branch here to push to.
+
+on:
+  workflow_run:
+    workflows:
+      - Test iOS UI build scripts
+      - Test Android build scripts
+      - Test JavaScript screenshot scripts
+      - Linux native build + run (GTK3, x64 + arm64)
+      - ParparVM Java Tests (Windows)
+      - Windows cross-build + run (Linux build -> Windows run)
+      - Test macOS UI build scripts
+    types: [completed]
+
+permissions:
+  contents: read
+
+# One per head: the last run to complete is the one that harvests, and a
+# second completion queued behind it finds the head already moved.
+concurrency:
+  group: golden-harvest-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  harvest:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_REF: ${{ github.event.workflow_run.head_branch }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          path: trusted
+      - name: List the screenshot runs at this head
+        id: list
+        run: |
+          set -euo pipefail
+          trusted/scripts/ci/golden-harvest.sh list "$HEAD_SHA" runs.txt
+      - name: Check the push token
+        if: steps.list.outputs.ready == '1'
+        env:
+          CN1SS_GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+        run: |
+          if [ -z "$CN1SS_GH_TOKEN" ]; then
+            echo "::error::secrets.CN1SS_GH_TOKEN is not set; golden harvest cannot push."
+            exit 1
+          fi
+      - uses: actions/checkout@v6
+        if: steps.list.outputs.ready == '1'
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          token: ${{ secrets.CN1SS_GH_TOKEN }}
+          path: pr
+      - name: Collect, commit and push the goldens
+        if: steps.list.outputs.ready == '1'
+        run: |
+          set -euo pipefail
+          cd pr
+          if [ "$(git rev-parse HEAD)" != "$HEAD_SHA" ]; then
+            echo "The branch moved past $HEAD_SHA; its own runs will harvest."
+            exit 0
+          fi
+          ok=1
+          ../trusted/scripts/ci/golden-harvest.sh collect ../runs.txt "$PWD" || ok=0
+          git add -A -- scripts
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Harvest goldens rendered at ${HEAD_SHA:0:12}" \
+              -m "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            git push origin "HEAD:$HEAD_REF"
+          fi
+          [ "$ok" = 1 ]

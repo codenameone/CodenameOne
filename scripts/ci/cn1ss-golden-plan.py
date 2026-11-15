@@ -21,19 +21,18 @@ runner is allocated:
     calls createForm / captureWhenSettled / emitCurrentFormScreenshot /
     emitImage / screenshotName(); unless the nearest shouldTakeScreenshot()
     override is a plain `return false`.
-  * An image belongs to the test port_status.json's screenshot_mappings name
-    (the port-status contract requires every golden to be mapped). A test with
-    no mapping yet -- a new one -- is matched by name against the images no
-    mapping claims: the class name with or without "ScreenshotTest", "Test" or
-    "Screenshot", or a string literal in its class chain, optionally followed
-    by a "_", "-" or "." suffix.
+  * An image belongs to the test port_status.json's screenshot_mappings name.
+    Every screenshot test needs an entry -- the port-status contract requires
+    one for every golden anyway -- so a new test is never matched by guessing
+    at its image names; one without an entry exits 2.
   * Every golden directory is checked on its own. A test that captures nothing
     on some ports says so in its class, or the base class its guard lives in:
 
         // cn1ss-skip: macos, watchos
 
     using port_status.json's port ids (ios-metal covers both iOS Metal
-    directories, windows-x64 and windows-arm64 share one). A test whose chain
+    directories, ios-metal-27 the Xcode 27 one alone; windows-x64 and
+    windows-arm64 share one). A test whose chain
     has a skip guard -- a "status=SKIPPED" line, a conditional
     shouldTakeScreenshot(), or an `if (...) { done(); return true; }` early
     exit -- must carry a declaration (`cn1ss-skip: none` when the guard never
@@ -60,7 +59,7 @@ MANIFEST = os.path.join(ROOT, "docs/website/data/port_status.json")
 # values in the screenshot workflows.
 DIR_PORTS = {
     "scripts/ios/screenshots-metal": {"ios-metal"},
-    "scripts/ios/screenshots-metal-27": {"ios-metal"},
+    "scripts/ios/screenshots-metal-27": {"ios-metal-27"},
     "scripts/ios/screenshots-tv": {"tvos"},
     "scripts/ios/screenshots-watch": {"watchos"},
     "scripts/android/screenshots": {"android"},
@@ -72,6 +71,12 @@ DIR_PORTS = {
     "scripts/mac-catalyst/screenshots": {"mac-catalyst"},
 }
 PORTS = set().union(*DIR_PORTS.values())
+# A declaration naming ios-metal means both iOS Metal legs; name ios-metal-27
+# alone for a test only the Xcode 27 leg skips.
+ALIASES = {"ios-metal": {"ios-metal", "ios-metal-27"}}
+# Not here on purpose: scripts/javase/screenshots belongs to the JavaSE
+# simulator's own integration run (simulator chrome, not this suite), and
+# scripts/wayline/screenshots to the Wayline sample.
 GOLDEN_DIRS = [
     "scripts/ios/screenshots-metal",
     "scripts/ios/screenshots-metal-27",
@@ -96,9 +101,17 @@ SUFFIXES = ("ScreenshotTest", "Screenshot", "Test")
 
 
 SKIP_DECL = re.compile(r"cn1ss-skip:\s*([a-z0-9][a-z0-9, -]*?)\s*(?:--|$)", re.M)
+# A skip: a "status=SKIPPED" report, a conditional shouldTakeScreenshot(), or an
+# early exit -- `if (<platform or capability question>) { ...; done(); return`,
+# braced or not, with any statements before done(). The condition is what makes
+# it a skip: the same exit after the last variant, or on an error, is not one.
+# A variant choice (isWatch() picking an image name) is not a skip either; the
+# run-time harvest (golden-harvest.yml) covers per-port variants.
+PLATFORM_QUESTION = (r"(?:\bis(?:Watch|TV|Tv|Desktop|Html5|Simulator|Supported|GpuSupported|NativeMap"
+                     r"|NativeBrowserSupported)\s*\(|getPlatformName\s*\(|getProperty\s*\(\s*\"OS\")")
 SKIP_GUARD = re.compile(r"status=SKIPPED"
                         r"|shouldTakeScreenshot\s*\(\s*\)\s*(?::\s*Boolean\s*)?\{\s*return\s+(?!true\s*;|false\s*;)"
-                        r"|\bif\s*\([^{;]*\)\s*\{\s*(?:[^{};]*;\s*)?done\(\)\s*;\s*return\s+true\s*;\s*\}")
+                        r"|\bif\s*\((?=[^{};]*" + PLATFORM_QUESTION + r")[^{};]*\)\s*\{?[^{}]*?\bdone\s*\(\s*\)\s*;\s*return\b")
 
 
 class PlanError(Exception):
@@ -207,9 +220,9 @@ def candidate_names(name, classes):
     return names
 
 
-def golden_stems_from_git(root, d):
+def golden_stems_from_git(root, d, rev="HEAD"):
     import subprocess
-    out = subprocess.run(["git", "-C", root, "ls-tree", "--name-only", "HEAD", "--", d + "/"],
+    out = subprocess.run(["git", "-C", root, "ls-tree", "--name-only", rev, "--", d + "/"],
                          check=True, capture_output=True, text=True).stdout
     return {os.path.basename(l)[:-4] for l in out.splitlines() if l.endswith(".png")}
 
@@ -237,16 +250,21 @@ def load_mappings(path=MANIFEST):
                 if m.get("pattern") and m.get("test")]
 
 
-def owns(test, stems, mappings, classes):
-    """Does any of these golden stems belong to test?"""
+def owns(test, stems, mappings):
+    """Does any of these golden stems belong to test, by screenshot_mappings?"""
     patterns = [pat for pat, t in mappings if t == test]
-    if patterns:
-        return any(fnmatch.fnmatchcase(stem, pat) for stem in stems for pat in patterns)
-    # Unmapped (a new test): match by name, but never an image the contract
-    # already gives to another test -- a new FooTest is not covered by an older
-    # test's Foo_dark.png.
-    free = {stem for stem in stems if not any(fnmatch.fnmatchcase(stem, pat) for pat, _ in mappings)}
-    return covered(candidate_names(test, classes), free)
+    return any(fnmatch.fnmatchcase(stem, pat) for stem in stems for pat in patterns)
+
+
+def deleted_goldens(root, base, dir_ports, mappings, stems):
+    """{(test, dir): {stem}} for goldens base has and the tree lacks, by owner."""
+    lost = {}
+    for d in dir_ports:
+        for stem in golden_stems_from_git(root, d, base) - stems[d]:
+            for pat, t in mappings:
+                if fnmatch.fnmatchcase(stem, pat):
+                    lost.setdefault((t, d), set()).add(stem)
+    return lost
 
 
 def declared_skips(test, classes):
@@ -255,6 +273,7 @@ def declared_skips(test, classes):
     for c in chain(test, classes):
         for decl in classes[c][2]:
             ports = {x.strip() for x in decl.split(",") if x.strip()}
+            ports = set().union(*(ALIASES.get(x, {x}) for x in ports)) if ports else set()
             bad = ports - PORTS - {"none"}
             if bad:
                 raise PlanError("%s declares unknown ports %s (known: %s)"
@@ -264,9 +283,15 @@ def declared_skips(test, classes):
 
 
 def plan(root=ROOT, sources_dir=SOURCES, runner=RUNNER, dir_ports=DIR_PORTS,
-         manifest=MANIFEST, from_git=False):
+         manifest=MANIFEST, from_git=False, base=None):
     """(gaps, problems): gaps are (test, dir) pairs with no golden on a leg that
-    runs the test; problems are declarations the tree contradicts."""
+    runs the test; problems are declarations the tree contradicts.
+
+    With base (a git revision, the PR's base), a golden the base has and the
+    tree does not is a gap too, for the test that owns it: one image of a
+    multi-image test is missing although the test still owns the others.
+    deleted_goldens() names the images; the collector closes such a gap when
+    a leg renders the image again, or shows it no longer renders it."""
     classes, added = index_sources(sources_dir)
     with open(runner, encoding="utf-8", errors="replace") as fh:
         suite = suite_tests(fh.read(), added)
@@ -276,11 +301,16 @@ def plan(root=ROOT, sources_dir=SOURCES, runner=RUNNER, dir_ports=DIR_PORTS,
     if not any(stems.values()):
         # An empty set means the listing failed, not that nothing is captured.
         raise PlanError("no goldens found under %s" % ", ".join(dir_ports))
+    lost = deleted_goldens(root, base, dir_ports, mappings, stems) if base is not None else {}
     gaps, problems = [], []
     for t in suite:
         if t not in classes or opted_out(t, classes):
             continue
         if not (t in mapped or takes_screenshots(t, classes)):
+            continue
+        if t not in mapped:
+            problems.append("%s takes screenshots but docs/website/data/port_status.json has no "
+                            "screenshot_mappings entry for it; add one naming its images" % t)
             continue
         skips = declared_skips(t, classes)
         guarded = [c for c in chain(t, classes) if SKIP_GUARD.search(classes[c][1])]
@@ -289,7 +319,11 @@ def plan(root=ROOT, sources_dir=SOURCES, runner=RUNNER, dir_ports=DIR_PORTS,
                             % (t, ", ".join(guarded)))
             continue
         for d, ports in dir_ports.items():
-            has = owns(t, stems[d], mappings, classes)
+            if base is not None and (t, d) in lost:
+                if not ports <= (skips or set()):
+                    gaps.append((t, d))
+                    continue
+            has = owns(t, stems[d], mappings)
             runs = not ports <= (skips or set())
             if runs and not has:
                 gaps.append((t, d))
@@ -310,7 +344,11 @@ def missing(**kw):
 
 def main(argv):
     try:
-        gaps, problems = plan(from_git="--from-git" in argv)
+        base = None
+        for a in argv:
+            if a.startswith("--base="):
+                base = a[len("--base="):]
+        gaps, problems = plan(from_git="--from-git" in argv, base=base)
     except PlanError as e:
         print("::error::cn1ss-golden-plan: %s" % e)
         return 2

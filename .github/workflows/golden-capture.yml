@@ -6,7 +6,8 @@ name: Golden capture
 #
 # This workflow reads the suite's source (scripts/ci/cn1ss-golden-plan.py) and
 # checks every golden directory on its own: a screenshot test with no image in
-# a directory whose port runs it is a gap. Which ports a test skips is declared
+# a directory whose port runs it is a gap, and so is a golden the PR's base has
+# and the PR deleted. Which ports a test skips is declared
 # in the test (`// cn1ss-skip: <ports>`) and held to the tree both ways, so
 # the tree's goldens are complete and a gap is the whole signal: no marker, no
 # diff. When there is any gap, it:
@@ -50,14 +51,17 @@ jobs:
     outputs:
       tests: ${{ steps.find.outputs.tests }}
     steps:
+      # The merge commit, as golden-plan.yml sees it: its first parent is the
+      # base, so a deleted golden is a gap as well.
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+          fetch-depth: 2
+          filter: blob:none
       - id: find
         run: |
           set -euo pipefail
-          tests="$(python3 scripts/ci/cn1ss-golden-plan.py --verbose)"
+          tests="$(python3 scripts/ci/cn1ss-golden-plan.py --verbose --from-git --base=HEAD^1)"
           echo "New tests to capture: ${tests:-none}"
           echo "tests=$tests" >> "$GITHUB_OUTPUT"
 
@@ -75,6 +79,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TESTS: ${{ needs.detect.outputs.tests }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
       RUNS: /tmp/golden-capture-runs.txt
     steps:
       # Before anything is cancelled: without the token nothing can be pushed.
@@ -122,8 +127,10 @@ jobs:
           # Pull the branch again first: someone may have pushed while the legs
           # ran. A capture only adds files, so it applies on top of any head.
           git pull --ff-only origin "$HEAD_REF"
+          git fetch --no-tags origin "$BASE_SHA"
+          base="$(git merge-base HEAD "$BASE_SHA")"
           ok=1
-          scripts/ci/golden-capture.sh collect "$RUNS" "$GITHUB_WORKSPACE" || ok=0
+          scripts/ci/golden-capture.sh collect "$RUNS" "$GITHUB_WORKSPACE" "$base" || ok=0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A -- scripts

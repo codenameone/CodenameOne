@@ -191,10 +191,10 @@ jobs:
         uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Enter golden capture mode
-        if: inputs.cn1ss_capture != ''
         uses: ./.github/actions/cn1ss-capture
         with:
           tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
 
       - name: Build hellocodenameone-common (JDK 17)
         run: |
@@ -756,10 +756,10 @@ jobs:
         continue-on-error: true
 
       - name: Enter golden capture mode
-        if: inputs.cn1ss_capture != ''
         uses: ./.github/actions/cn1ss-capture
         with:
           tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
 
       - name: Post screenshots to PR
         shell: bash
@@ -901,7 +901,7 @@ jobs:
           gh workflow run website-docs.yml --ref master -f deploy_production=true
 
       - name: Upload golden capture
-        if: always() && inputs.cn1ss_capture != ''
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: cn1ss-capture-linux

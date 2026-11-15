@@ -7,6 +7,7 @@ wrong."""
 import importlib.util
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 
@@ -48,7 +49,10 @@ BASE_SOURCES = {
 }
 DIRS = {"g/phone": {"ios-metal"}, "g/watch": {"watchos"}, "g/win": {"windows-x64", "windows-arm64"}}
 MAPPINGS = [{"pattern": "weird-*", "test": "MappedTest"},
-            {"pattern": "bar-image", "test": "BarTest"}, {"pattern": "Foo_old", "test": "BarTest"}]
+            {"pattern": "bar-image", "test": "BarTest"}, {"pattern": "Foo_old", "test": "BarTest"},
+            {"pattern": "FooScreenshotTest*", "test": "FooScreenshotTest"},
+            {"pattern": "WatchSkipScreenshotTest", "test": "WatchSkipScreenshotTest"},
+            {"pattern": "parent-shot", "test": "ChildTest"}, {"pattern": "kotlin", "test": "KotlinUiTest"}]
 ALL = ["FooScreenshotTest_dark", "bar-image", "WatchSkipScreenshotTest", "parent-shot", "weird-1", "kotlin"]
 PHONE_ONLY = ["WatchSkipScreenshotTest", "parent-shot"]
 
@@ -76,8 +80,16 @@ class Fixture:
     def args(self):
         return dict(sources_dir=self.src, runner=self.runner, dir_ports=DIRS, manifest=self.manifest)
 
-    def plan(self):
-        return plan.plan(root=self.root, **self.args())
+    def plan(self, **kw):
+        return plan.plan(root=self.root, **self.args(), **kw)
+
+    def commit(self):
+        """Make the current tree a git revision, the PR's base in a test."""
+        git = ["git", "-C", self.root, "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run(git[:3] + ["init", "-q"], check=True)
+        subprocess.run(git + ["add", "-A"], check=True)
+        subprocess.run(git + ["commit", "-qm", "base"], check=True)
+        return "HEAD"
 
 
 def complete():
@@ -140,6 +152,30 @@ class GoldenPlanTest(unittest.TestCase):
         gaps, _ = Fixture(g).plan()
         self.assertEqual(len(gaps), len(DIRS))
 
+    def test_one_deleted_image_of_a_multi_image_test_is_a_gap_against_the_base(self):
+        g = complete()
+        g["g/phone"].append("FooScreenshotTest_light")
+        f = Fixture(g)
+        base = f.commit()
+        os.remove(os.path.join(f.root, "g/phone/FooScreenshotTest_light.png"))
+        self.assertEqual(f.plan(), ([], []))  # the tree alone cannot tell
+        self.assertEqual(f.plan(base=base), ([("FooScreenshotTest", "g/phone")], []))
+
+    def test_alias_declares_both_metal_directories(self):
+        dirs = {"g/phone": {"ios-metal"}, "g/phone27": {"ios-metal-27"}}
+        src = dict(BASE_SOURCES)
+        src["WatchSkipScreenshotTest.java"] = src["WatchSkipScreenshotTest.java"].replace(
+            "cn1ss-skip: watchos", "cn1ss-skip: ios-metal")
+        f = Fixture({}, sources=src)
+        for d in dirs:
+            os.makedirs(os.path.join(f.root, d), exist_ok=True)
+            for x in ALL:
+                if x not in PHONE_ONLY or x == "parent-shot":
+                    open(os.path.join(f.root, d, x + ".png"), "w").close()
+        args = f.args()
+        args["dir_ports"] = dirs
+        self.assertEqual(plan.plan(root=f.root, **args), ([], []))
+
     def test_empty_listing_is_an_error(self):
         with self.assertRaises(plan.PlanError):
             Fixture({}).plan()
@@ -164,12 +200,65 @@ class CollectTest(unittest.TestCase):
         dl = os.path.join(f.root, "dl")
         self.put(dl, "1", "cn1ss-capture-a", "g/win/bar-image.png", "x")
         self.put(dl, "1", "cn1ss-capture-a", "g/win/stray.png", "x")
-        self.put(dl, "2", "cn1ss-capture-b", "g/win/bar-image.png", "y")
+        self.put(dl, "2", "cn1ss-capture-b", "g/win/bar-image.png", "x")
         self.assertFalse(col.collect(dl, f.root, **f.args()))  # g/phone still open
         self.assertTrue(os.path.exists(os.path.join(f.root, "g/win/bar-image.png")))
         self.assertFalse(os.path.exists(os.path.join(f.root, "g/win/stray.png")))
         self.put(dl, "3", "cn1ss-capture-c", "g/phone/bar-image.png", "x")
         self.assertTrue(col.collect(dl, f.root, **f.args()))
+
+    def test_legs_sharing_a_directory_that_disagree_fail(self):
+        g = complete()
+        g["g/win"].remove("bar-image")
+        f = Fixture(g)
+        dl = os.path.join(f.root, "dl")
+        self.put(dl, "1", "cn1ss-capture-a", "g/win/bar-image.png", "x")
+        self.put(dl, "2", "cn1ss-capture-b", "g/win/bar-image.png", "y")
+        self.assertFalse(col.collect(dl, f.root, **f.args()))
+
+    def emit(self, dl, run, art, listing):
+        path = os.path.join(dl, run, art, "cn1ss-emitted.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            json.dump(listing, fh)
+
+    def deleted_fixture(self):
+        g = complete()
+        g["g/phone"].append("FooScreenshotTest_light")
+        f = Fixture(g)
+        base = f.commit()
+        os.remove(os.path.join(f.root, "g/phone/FooScreenshotTest_light.png"))
+        return f, base, os.path.join(f.root, "dl")
+
+    def test_deleted_golden_still_rendered_must_come_back(self):
+        f, base, dl = self.deleted_fixture()
+        self.emit(dl, "1", "cn1ss-capture-p", {"g/phone": ["FooScreenshotTest_light", "bar-image"]})
+        self.assertFalse(col.collect(dl, f.root, base=base, **f.args()))
+        self.put(dl, "1", "cn1ss-capture-p", "g/phone/FooScreenshotTest_light.png", "x")
+        self.assertTrue(col.collect(dl, f.root, base=base, **f.args()))
+        self.assertTrue(os.path.exists(os.path.join(f.root, "g/phone/FooScreenshotTest_light.png")))
+
+    def test_deleted_golden_no_longer_rendered_stays_deleted(self):
+        f, base, dl = self.deleted_fixture()
+        self.emit(dl, "1", "cn1ss-capture-p", {"g/phone": ["FooScreenshotTest_dark"]})
+        self.assertTrue(col.collect(dl, f.root, base=base, **f.args()))
+
+    def test_deleted_golden_with_no_report_from_its_leg_fails(self):
+        f, base, dl = self.deleted_fixture()
+        os.makedirs(dl)
+        self.assertFalse(col.collect(dl, f.root, base=base, **f.args()))
+
+    def test_harvest_takes_owned_images_and_rejects_unowned(self):
+        f = Fixture(complete())
+        dl = os.path.join(f.root, "dl")
+        self.put(dl, "1", "cn1ss-capture-a", "g/phone/FooScreenshotTest_new.png", "x")
+        self.assertTrue(col.collect(dl, f.root, harvest=True, **f.args()))
+        self.assertTrue(os.path.exists(os.path.join(f.root, "g/phone/FooScreenshotTest_new.png")))
+        self.put(dl, "2", "cn1ss-capture-b", "g/phone/nobody.png", "x")
+        self.assertFalse(col.collect(dl, f.root, harvest=True, **f.args()))
+        self.assertFalse(os.path.exists(os.path.join(f.root, "g/phone/nobody.png")))
+        self.put(dl, "3", "cn1ss-capture-c", "elsewhere/FooScreenshotTest_x.png", "x")
+        self.assertFalse(col.collect(dl, f.root, harvest=True, **f.args()))
 
 
 if __name__ == "__main__":
