@@ -29,6 +29,8 @@ import java.util.List;
 /// Storage for [LeaderboardEntry].
 @Repository(entity = LeaderboardEntry.class, key = String.class)
 public interface LeaderboardEntryRepository extends CrudRepository<LeaderboardEntry, String> {
+    List<LeaderboardEntry> findByExperienceId(String experienceId);
+
     @Query("select l from LeaderboardEntry l where l.experienceId = :e and l.stat = :s and l.dayStart >= :from")
     List<LeaderboardEntry> since(@Param("e") String experienceId, @Param("s") String stat, @Param("from") long from);
 

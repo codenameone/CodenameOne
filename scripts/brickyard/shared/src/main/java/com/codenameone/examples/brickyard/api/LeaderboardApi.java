@@ -44,6 +44,9 @@ public interface LeaderboardApi {
     void friends(@Path("experienceId") String experienceId, @Path("stat") String stat,
             @Query("period") String period, OnComplete<Response<List<LeaderDto>>> callback);
 
+    /// The stat names the experience has leaderboard entries for.
+    @GET("/api/experiences/{id}/stats")
+    void stats(@Path("id") String id, OnComplete<Response<List<String>>> callback);
     @POST("/api/experiences/{id}/bounds")
     void setBound(@Path("id") String id, @Body StatBoundDto bound, OnComplete<Response<StatBoundDto>> callback);
 }

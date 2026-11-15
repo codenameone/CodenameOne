@@ -102,4 +102,16 @@ public interface ModerationApi {
 
     @POST("/api/admin/jobs/{job}")
     void runJob(@Path("job") String job, OnComplete<Response<JobDto>> callback);
+
+    /// Every sanction in force now, newest first, fifty to a page from page 0.
+    @GET("/api/admin/sanctions")
+    void activeSanctions(@Query("page") int page, OnComplete<Response<List<SanctionDto>>> callback);
+
+    /// Moves a home-row entry: a new row name and/or position (`ordinal`).
+    @POST("/api/admin/featured/{featuredId}")
+    void updateFeatured(@Path("featuredId") String featuredId, @Body FeaturedDto featured, OnComplete<Response<FeaturedDto>> callback);
+
+    /// Ends the current season now and starts the next; season progress resets.
+    @POST("/api/admin/seasons")
+    void startSeason(@Body SeasonDto season, OnComplete<Response<SeasonDto>> callback);
 }

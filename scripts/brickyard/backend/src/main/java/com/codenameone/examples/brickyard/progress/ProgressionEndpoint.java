@@ -24,6 +24,7 @@ import com.codenameone.examples.brickyard.api.ProgressDto;
 import com.codenameone.examples.brickyard.api.ProgressEventDto;
 import com.codenameone.examples.brickyard.api.ProgressionApiServer;
 import com.codenameone.examples.brickyard.api.QuestDto;
+import com.codenameone.examples.brickyard.api.SeasonDto;
 import com.codenameone.examples.brickyard.api.SeasonTierDto;
 import java.util.List;
 
@@ -31,9 +32,11 @@ import java.util.List;
 @Component
 public class ProgressionEndpoint implements ProgressionApiServer {
     private final Progression progression;
+    private final Seasons seasons;
 
-    public ProgressionEndpoint(Progression progression) {
+    public ProgressionEndpoint(Progression progression, Seasons seasons) {
         this.progression = progression;
+        this.seasons = seasons;
     }
 
     @Override
@@ -74,5 +77,10 @@ public class ProgressionEndpoint implements ProgressionApiServer {
     @Override
     public SeasonTierDto claimTier(int tier, String track) throws Exception {
         return progression.claimTier(Caller.name(), tier, track);
+    }
+
+    @Override
+    public SeasonDto currentSeason() throws Exception {
+        return seasons.describe();
     }
 }

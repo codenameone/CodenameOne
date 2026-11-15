@@ -29,6 +29,7 @@ import com.codenameone.examples.brickyard.api.PartyDto;
 import com.codenameone.examples.brickyard.api.PresenceDto;
 import com.codenameone.examples.brickyard.api.SocialApiServer;
 import com.codenameone.examples.brickyard.api.WalletDto;
+import com.codenameone.examples.brickyard.referral.Referrals;
 import java.util.List;
 
 /// The social routes; the work is in [Social]. Sending a friend request is
@@ -36,9 +37,11 @@ import java.util.List;
 @Component
 public class SocialEndpoint implements SocialApiServer {
     private final Social social;
+    private final Referrals referrals;
 
-    public SocialEndpoint(Social social) {
+    public SocialEndpoint(Social social, Referrals referrals) {
         this.social = social;
+        this.referrals = referrals;
     }
 
     @Override
@@ -138,11 +141,11 @@ public class SocialEndpoint implements SocialApiServer {
 
     @Override
     public InviteDto createInvite(InviteDto invite) throws Exception {
-        return social.createInvite(Caller.name(), invite);
+        return referrals.createInvite(Caller.name(), invite);
     }
 
     @Override
     public WalletDto redeemInvite(InviteDto invite) throws Exception {
-        return social.redeem(Caller.name(), invite);
+        return referrals.redeem(Caller.name(), invite);
     }
 }

@@ -38,6 +38,10 @@ public class Invite {
     @Column(nullable = false)
     private long createdAt;
 
+    /// A hash of the network address the code was made from.
+    @Column(nullable = false, type = "VARCHAR(64)")
+    private String ipHash = "";
+
     public Invite() {
     }
 
@@ -71,5 +75,13 @@ public class Invite {
 
     public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getIpHash() {
+        return ipHash;
+    }
+
+    public void setIpHash(String ipHash) {
+        this.ipHash = ipHash;
     }
 }

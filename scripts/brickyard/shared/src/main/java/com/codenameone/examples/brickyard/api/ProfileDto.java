@@ -20,7 +20,8 @@ package com.codenameone.examples.brickyard.api;
 
 import com.codename1.annotations.Mapped;
 
-/// A change of display name.
+/// The editable profile: display name and avatar colours (six-digit hex
+/// colours, head first, separated by commas). A null or empty field is left as it is on save.
 @Mapped
-public record ProfileDto(String displayName) {
+public record ProfileDto(String displayName, String avatar) {
 }

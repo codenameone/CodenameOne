@@ -66,4 +66,16 @@ public interface EconomyApi {
 
     @POST("/api/me/payouts")
     void requestPayout(@Body PayoutDto payout, OnComplete<Response<PayoutDto>> callback);
+
+    /// Renames or reprices a product of the caller's experience.
+    @POST("/api/products/{productId}")
+    void updateProduct(@Path("productId") String productId, @Body ProductDto product, OnComplete<Response<ProductDto>> callback);
+
+    /// Takes a product off sale; what players already own stays theirs.
+    @POST("/api/products/{productId}/deactivate")
+    void deactivateProduct(@Path("productId") String productId, OnComplete<Response<ProductDto>> callback);
+
+    /// The caller's payout requests, newest first, whatever their status.
+    @GET("/api/me/payouts")
+    void myPayouts(OnComplete<Response<List<PayoutDto>>> callback);
 }

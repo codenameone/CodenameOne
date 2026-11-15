@@ -54,4 +54,8 @@ public interface ProgressionApi {
 
     @POST("/api/me/season/claim")
     void claimTier(@Query("tier") int tier, @Query("track") String track, OnComplete<Response<SeasonTierDto>> callback);
+
+    /// The season in progress: its id, name and when it started and ends.
+    @GET("/api/season/current")
+    void currentSeason(OnComplete<Response<SeasonDto>> callback);
 }

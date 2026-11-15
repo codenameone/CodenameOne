@@ -84,7 +84,7 @@ class ModerationTest {
                 "{\"reason\":\"stolen assets\"}"), mod, Roles.MODERATOR));
         assertTrue(!Api.list(mvc, Api.as(get("/api/home/featured"), owner)).toString().contains((String) f.get("id")));
         Api.json(mvc, Api.asStaff(Api.body(post("/api/admin/sanctions"),
-                "{\"username\":\"" + owner + "\",\"kind\":\"TEMP_BAN\",\"reason\":\"theft\",\"untilAt\":60}"),
+                "{\"username\":\"" + owner + "\",\"kind\":\"TEMP_BAN\",\"reason\":\"theft\",\"durationMinutes\":60}"),
                 mod, Roles.MODERATOR));
         assertEquals(403, Api.statusOf(mvc, Api.as(Api.body(post("/api/me/wallet/receipts"),
                 "{\"store\":\"apple\",\"sku\":\"bricks.400\",\"transactionId\":\"t-ban\"}"), owner)));
@@ -102,6 +102,10 @@ class ModerationTest {
                 "{\"username\":\"" + u + "\",\"role\":\"MODERATOR\",\"grant\":1}"), admin, Roles.ADMIN));
         assertTrue(accounts.describe(u).roles().contains(Roles.MODERATOR));
         Api.json(mvc, Api.as(Api.body(post("/api/me/presence"), "{\"status\":\"ONLINE\"}"), u));
+        // CCU counts seats in live play rooms (play.LiveServers), so take one.
+        String game = Api.experience(mvc, admin, "PUBLIC", "ALL");
+        Api.publishSample(mvc, admin, game);
+        Api.json(mvc, Api.as(Api.body(post("/api/experiences/" + game + "/join"), "{}"), u));
         Map k = Api.json(mvc, Api.asStaff(get("/api/admin/kpis"), admin, Roles.ADMIN));
         assertTrue(Api.number(k, "dau") >= 1 && Api.number(k, "ccu") >= 1);
         assertEquals(403, Api.statusOf(mvc, Api.asStaff(get("/api/admin/kpis"), admin, Roles.SUPPORT)));

@@ -31,4 +31,6 @@ import java.util.List;
 public interface ExperienceRepository extends CrudRepository<Experience, String> {
     @Query("select e from Experience e where e.publishedVersion > :none order by e.visits desc, e.id asc")
     List<Experience> published(@Param("none") int none);
+
+    List<Experience> findByOwner(String owner);
 }

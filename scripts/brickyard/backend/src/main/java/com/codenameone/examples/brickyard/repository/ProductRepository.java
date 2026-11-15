@@ -30,4 +30,9 @@ import java.util.List;
 public interface ProductRepository extends CrudRepository<Product, String> {
     @Query("select p from Product p where p.experienceId = :e order by p.createdAt asc, p.id asc")
     List<Product> of(@Param("e") String experienceId);
+
+    /// The products of an experience still on sale.
+    @Query("select p from Product p where p.experienceId = :e and p.active = 1 "
+            + "order by p.createdAt asc, p.id asc")
+    List<Product> onSale(@Param("e") String experienceId);
 }

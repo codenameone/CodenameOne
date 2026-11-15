@@ -33,6 +33,7 @@ import com.codenameone.examples.brickyard.api.FraudFlagDto;
 import com.codenameone.examples.brickyard.api.PayoutDto;
 import com.codenameone.examples.brickyard.api.ReportDto;
 import com.codenameone.examples.brickyard.api.SanctionDto;
+import com.codenameone.examples.brickyard.api.SeasonDto;
 import com.codenameone.examples.brickyard.net.Api;
 import com.codenameone.examples.brickyard.net.Net;
 import com.codenameone.examples.brickyard.net.Session;
@@ -82,6 +83,14 @@ public final class AdminForm {
         final TextField who = Ui.field("Username", TextField.ANY, "sanctionUser");
         f.add(who);
         final Container sanctions = box("sanctions", f);
+        f.add(Ui.secondary("Issue a sanction", "sanctionButton", e -> sanction(sanctions, f)));
+        f.add(Ui.label("Active sanctions", "RowTitle"));
+        final Container active = box("activeSanctions", f);
+        final int[] activePage = {0};
+        f.add(Ui.link("Next page", "activeSanctionsNext", e -> {
+            activePage[0]++;
+            loadActiveSanctions(activePage, active, f);
+        }));
         f.add(Ui.secondary("Look up sanctions", "sanctionsButton", e -> loadSanctions(who.getText().trim(),
                 sanctions, f)));
         f.add(Ui.label("Appeals", "RowTitle"));
@@ -98,9 +107,12 @@ public final class AdminForm {
         f.add(Ui.label("Jobs", "RowTitle"));
         f.add(Ui.secondary("Run engagement payouts", "jobEngagementButton", e -> job("engagement-payouts")));
         f.add(Ui.secondary("Run Plus stipends", "jobStipendsButton", e -> job("plus-stipends")));
+        f.add(Ui.label("Seasons", "RowTitle"));
+        f.add(Ui.secondary("Start a new season", "seasonButton", e -> startSeason()));
         f.add(Ui.label("Audit log", "RowTitle"));
         final Container audit = box("auditLog", f);
         f.show();
+        loadActiveSanctions(activePage, active, f);
 
         Api.moderation().kpis(Net.to(k -> {
             kpis.add(Ui.text("DAU " + k.dau() + ", CCU " + k.ccu() + ", sessions " + k.sessions()
@@ -250,6 +262,7 @@ public final class AdminForm {
             if (rows != null) {
                 for (final FeaturedDto x : rows) {
                     featured.add(Ui.panel(Ui.label(x.rowName() + " #" + x.ordinal() + ": " + x.experienceId(), "Body"),
+                            Ui.link("Move", "moveFeatured" + x.id(), e -> moveFeatured(x, featured, f)),
                             Ui.link("Remove", "unfeature" + x.id(), e -> Api.moderation().unfeature(x.id(),
                                     Net.to(done -> loadFeatured(featured, f), Ui::failed)))));
                 }
@@ -267,6 +280,71 @@ public final class AdminForm {
         }
         Api.moderation().feature(new FeaturedDto(null, row.getText().trim(), experience.getText().trim(),
                 (int) DashboardForm.parse(ordinal.getText())), Net.to(done -> loadFeatured(featured, f), Ui::failed));
+    }
+
+    /// Moves a home-row entry to another row or position; the server renumbers the rest.
+    static void moveFeatured(FeaturedDto x, final Container featured, final Form f) {
+        TextField row = Ui.field("Row name", TextField.ANY, "moveFeaturedRow");
+        row.setText(x.rowName());
+        TextField ordinal = Ui.field("Position", TextField.NUMERIC, "moveFeaturedOrdinal");
+        ordinal.setText(String.valueOf(x.ordinal()));
+        if (!confirm("Move a home-row entry", BoxLayout.encloseY(row, ordinal), "Move")) {
+            return;
+        }
+        Api.moderation().updateFeatured(x.id(), new FeaturedDto(x.id(), row.getText().trim(), x.experienceId(),
+                (int) DashboardForm.parse(ordinal.getText())), Net.to(done -> loadFeatured(featured, f), Ui::failed));
+    }
+
+    /// One page of the sanctions still in force; an empty page steps back to the first.
+    static void loadActiveSanctions(final int[] page, final Container active, final Form f) {
+        Api.moderation().activeSanctions(page[0], Net.to(rows -> {
+            if ((rows == null || rows.isEmpty()) && page[0] > 0) {
+                page[0] = 0;
+                loadActiveSanctions(page, active, f);
+                return;
+            }
+            active.removeAll();
+            empty(active, rows);
+            if (rows != null) {
+                for (SanctionDto s : rows) {
+                    active.add(Ui.label(s.username() + " - " + s.kind() + ": " + s.reason()
+                            + (s.untilAt() > 0 ? " (until " + new java.util.Date(s.untilAt()) + ")" : ""), "Body"));
+                }
+            }
+            f.revalidate();
+        }, Ui::failed));
+    }
+
+    /// Issues a sanction with an explicit length; 0 minutes keeps the server's default for the kind.
+    static void sanction(final Container sanctions, final Form f) {
+        String kind = choose("Issue a sanction", new String[] {"WARN", "MUTE", "TEMP_BAN", "PERM_BAN"});
+        if (kind == null) {
+            return;
+        }
+        TextField user = Ui.field("Username", TextField.ANY, "sanctionUser");
+        TextField reason = Ui.field("Reason", TextField.ANY, "sanctionReason");
+        TextField minutes = Ui.field("Duration in minutes", TextField.NUMERIC, "sanctionMinutes");
+        minutes.setText(String.valueOf(TEMP_BAN_MINUTES));
+        if (!confirm(kind, BoxLayout.encloseY(user, reason, minutes), "Issue")) {
+            return;
+        }
+        final String who = user.getText().trim();
+        Api.moderation().sanction(new SanctionDto(null, who, kind, reason.getText().trim(), 0, 0,
+                DashboardForm.parse(minutes.getText())), Net.to(done -> loadSanctions(who, sanctions, f), Ui::failed));
+    }
+
+    /// Starts a season now; its progress resets for everyone.
+    static void startSeason() {
+        TextField name = Ui.field("Season name", TextField.ANY, "seasonName");
+        TextField days = Ui.field("Length in days", TextField.NUMERIC, "seasonDays");
+        days.setText("30");
+        if (!confirm("Start a new season", BoxLayout.encloseY(name, days), "Start")) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        long length = Math.max(1, DashboardForm.parse(days.getText())) * 24L * 60 * 60 * 1000;
+        Api.moderation().startSeason(new SeasonDto(null, name.getText().trim(), now, now + length),
+                Net.to(s -> Ui.toast(s.name() + " started"), Ui::failed));
     }
 
     static void adjust() {

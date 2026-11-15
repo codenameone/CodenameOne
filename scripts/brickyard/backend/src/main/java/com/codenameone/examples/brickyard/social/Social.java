@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.brickyard.social;
 
+import com.codenameone.examples.brickyard.account.Limits;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -88,11 +89,14 @@ public class Social {
     private final InviteRepository invites;
     private final ReferralRepository referrals;
     private final FraudFlagRepository fraud;
+    /// Chat on or off for the account, checked on every line sent.
+    private final Limits limits;
 
     public Social(Accounts accounts, Sanctions sanctions, Wallet wallet, FriendRequestRepository requests,
             FollowRepository follows, PresenceRepository presence, UserBlockRepository blocks,
             PartyRepository parties, PartyMemberRepository members, ChatMessageRepository chat,
-            InviteRepository invites, ReferralRepository referrals, FraudFlagRepository fraud) {
+            InviteRepository invites, ReferralRepository referrals, FraudFlagRepository fraud, Limits limits) {
+        this.limits = limits;
         this.accounts = accounts;
         this.sanctions = sanctions;
         this.wallet = wallet;
@@ -192,6 +196,20 @@ public class Social {
             presence.save(row);
         }
         return toDto(row);
+    }
+
+    /// `username` left server `serverId`: back to ONLINE, unless their
+    /// presence already points at another server (they moved on).
+    @Transactional(rollbackFor = IOException.class)
+    public void leftServer(String username, String serverId) {
+        Presence row = presence.findById(username);
+        if (row != null && "IN_GAME".equals(row.getStatus()) && serverId.equals(row.getServerId())) {
+            row.setStatus("ONLINE");
+            row.setExperienceId("");
+            row.setServerId("");
+            row.setUpdatedAt(Clock.now());
+            presence.save(row);
+        }
     }
 
     private static String clip(String s, int max) {
@@ -374,6 +392,7 @@ public class Social {
 
     private ChatDto post(String username, String channel, ChatDto message) throws IOException {
         sanctions.requireCanChat(username);
+        limits.requireChat(username);
         String body = message == null || message.body() == null ? "" : message.body().trim();
         if (body.length() == 0 || body.length() > 200) {
             throw new ResponseStatusException(400, "A chat line is 1 to 200 characters");

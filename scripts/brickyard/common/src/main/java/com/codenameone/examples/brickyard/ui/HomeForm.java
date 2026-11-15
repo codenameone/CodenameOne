@@ -22,6 +22,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.brickyard.api.ExperienceDto;
+import com.codenameone.examples.brickyard.api.PresenceDto;
 import com.codenameone.examples.brickyard.api.QuestDto;
 import com.codenameone.examples.brickyard.net.Api;
 import com.codenameone.examples.brickyard.net.Net;
@@ -47,6 +48,7 @@ public final class HomeForm {
             content.removeAll();
             content.add(Ui.bricks());
             progress(content, f);
+            friendsPlaying(content, f, all);
             fill(content, all);
             f.revalidate();
         }, (status, message) -> {
@@ -87,6 +89,46 @@ public final class HomeForm {
             }
             f.revalidate();
         }, (status, message) -> { }));
+    }
+
+    /// A "Friends playing" row: each friend in a game now, with Join. Silent
+    /// when nobody is playing or the call fails.
+    static void friendsPlaying(final Container content, final Form f, final List<ExperienceDto> all) {
+        final Container row = new Container(BoxLayout.x());
+        row.setScrollableX(true);
+        row.setName("rowFriendsPlaying");
+        final com.codename1.ui.Label title = Ui.label("", "RowTitle");
+        content.add(title);
+        content.add(row);
+        Api.social().friendPresence(Net.to(presence -> {
+            if (presence == null) {
+                return;
+            }
+            for (final PresenceDto p : presence) {
+                if (!FriendsForm.inGame(p)) {
+                    continue;
+                }
+                String game = titleOf(all, p.experienceId());
+                row.add(Ui.panel(Ui.label(p.username(), "CardTitle"),
+                        Ui.label(game == null ? "Playing" : "Playing " + game, "CardMeta"),
+                        Ui.primary("Join", "homeJoin" + p.username(), e -> FriendsForm.join(p.username()))));
+            }
+            if (row.getComponentCount() > 0) {
+                title.setText("Friends playing");
+            }
+            f.revalidate();
+        }, (status, message) -> { }));
+    }
+
+    static String titleOf(List<ExperienceDto> all, String id) {
+        if (all != null) {
+            for (ExperienceDto e : all) {
+                if (e.id().equals(id)) {
+                    return e.title();
+                }
+            }
+        }
+        return null;
     }
 
     static void fill(Container content, List<ExperienceDto> all) {

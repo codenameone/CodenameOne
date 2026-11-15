@@ -20,8 +20,9 @@ package com.codenameone.examples.brickyard.ui;
 
 import com.codename1.io.Preferences;
 
-/// A block avatar: one colour per body part. Kept on the device; the account
-/// profile on the server carries only the display name.
+/// A block avatar: one colour per body part. Kept on the server with the
+/// account profile (so it follows the player to every device) and cached on
+/// the device.
 public final class Avatar {
     public static final int HEAD = 0;
     public static final int TORSO = 1;

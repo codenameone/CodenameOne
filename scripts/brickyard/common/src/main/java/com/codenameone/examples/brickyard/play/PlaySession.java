@@ -34,7 +34,6 @@ import com.codename1.rbx.place.PlaceFile;
 import com.codename1.rbx.place.PlaceLoader;
 import com.codename1.io.WebSocket;
 import com.codename1.ui.CN;
-import com.codename1.ui.util.UITimer;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
@@ -75,6 +74,16 @@ public final class PlaySession {
                         (status, message) -> solo(experienceId, title, place)));
     }
 
+    /// The game socket to open for `ticket`: the URL of the backend instance
+    /// running the room when the server names one, else this API host's.
+    static String socketUrl(JoinTicketDto ticket, String base) {
+        String at = ticket.url();
+        if (at == null || at.length() == 0) {
+            at = "ws" + base.substring(4) + "/ws/play";
+        }
+        return at + (at.indexOf('?') < 0 ? "?" : "&") + "ticket=" + ticket.ticket();
+    }
+
     /// The online path: a CLIENT engine kept in step with the server by a
     /// [ReplicaClient] over the game socket. Socket messages are delivered
     /// on the EDT, where PlayView steps the engine, and a UI timer ticks the
@@ -82,6 +91,9 @@ public final class PlaySession {
     private static void online(final String experienceId, final String title, final byte[] place,
             JoinTicketDto ticket) {
         final Engine engine = new Engine(Engine.CLIENT);
+        // The client simulates its own character (Characters.simulatedHere),
+        // so movement answers at once; the server checks and corrects it.
+        engine.setPhysics(new RigidBodies());
         final StringBuilder errors = errorSink(engine);
         final WebSocket[] socket = new WebSocket[1];
         final boolean[] state = new boolean[2]; // [0] shown, [1] over
@@ -107,8 +119,7 @@ public final class PlaySession {
                 }
             }
         };
-        String base = Session.serverUrl();
-        String url = "ws" + base.substring(4) + "/ws/play?ticket=" + ticket.ticket();
+        String url = socketUrl(ticket, Session.serverUrl());
         socket[0] = WebSocket.build(url)
                 .onBinaryMessage((ws, m) -> CN.callSerially(() -> {
                     if (state[1]) {
@@ -117,11 +128,12 @@ public final class PlaySession {
                     client.receive(m);
                     if (!state[0] && client.isJoined()) {
                         state[0] = true;
-                        Form f = show(engine, experienceId, title, null, errors, () -> {
+                        // Ticking right after each engine step sends the
+                        // move the step just produced, once per frame.
+                        show(engine, experienceId, title, null, errors, () -> {
                             state[1] = true;
                             socket[0].close();
-                        });
-                        UITimer.timer(16, true, f, () -> {
+                        }, () -> {
                             if (!state[1]) {
                                 client.tick();
                             }
@@ -162,16 +174,18 @@ public final class PlaySession {
         String name = me == null ? "Guest" : me.username();
         String display = me == null ? "Guest" : me.displayName();
         engine.addPlayer(Math.abs((long) name.hashCode()) + 1, name, display);
-        show(engine, experienceId, title, report, errors, null);
+        show(engine, experienceId, title, report, errors, null, null);
     }
 
     /// Shows `engine` in the 3D view with the play menu; `report` is null
     /// online, where the place was loaded on the server. `onLeave` runs when
-    /// the player leaves.
+    /// the player leaves; `afterStep` (may be null) runs after every engine step.
     private static Form show(final Engine engine, final String experienceId, final String title,
-            final CompatReport report, final StringBuilder errors, final Runnable onLeave) {
+            final CompatReport report, final StringBuilder errors, final Runnable onLeave,
+            Runnable afterStep) {
         final Form previous = CN.getCurrentForm();
         final PlayView view = new PlayView(engine);
+        view.setAfterStep(afterStep);
         final Form f = new Form(title, new BorderLayout());
         f.setName("play");
         f.setScrollable(false);

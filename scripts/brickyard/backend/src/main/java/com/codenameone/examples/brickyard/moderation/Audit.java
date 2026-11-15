@@ -20,6 +20,7 @@ package com.codenameone.examples.brickyard.moderation;
 
 import com.codename1.appkit.server.Caller;
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.security.SecurityContextHolder;
 import com.codenameone.examples.brickyard.Clock;
 import com.codenameone.examples.brickyard.Ids;
 import com.codenameone.examples.brickyard.api.AuditDto;
@@ -39,7 +40,8 @@ public class Audit {
     public AuditDto record(String action, String target, String detail) throws IOException {
         AuditLog a = new AuditLog();
         a.setId(Ids.next());
-        a.setActor(Caller.name());
+        // A scheduled job runs with no caller; it is recorded as the system.
+        a.setActor(SecurityContextHolder.getContext().getAuthentication() == null ? "system" : Caller.name());
         a.setAction(action);
         a.setTarget(target == null ? "" : clip(target, 190));
         a.setDetail(detail == null ? "" : clip(detail, 400));

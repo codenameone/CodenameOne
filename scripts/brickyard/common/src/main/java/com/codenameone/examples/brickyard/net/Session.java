@@ -237,6 +237,7 @@ public final class Session {
                 return;
             }
             setUser(described);
+            com.codenameone.examples.brickyard.engage.Notifications.registerWithServer();
             done.run();
         }, (status, message) -> {
             if (asked == session) {

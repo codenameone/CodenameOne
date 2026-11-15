@@ -23,8 +23,12 @@ import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.brickyard.api.AccountApiServer;
 import com.codenameone.examples.brickyard.api.AccountDto;
 import com.codenameone.examples.brickyard.api.FriendDto;
+import com.codenameone.examples.brickyard.api.LimitsDto;
+import com.codenameone.examples.brickyard.api.PushDeviceDto;
 import com.codenameone.examples.brickyard.api.ProfileDto;
 import com.codenameone.examples.brickyard.api.RegisterDto;
+import com.codenameone.examples.brickyard.push.PushDevices;
+import com.codenameone.examples.brickyard.push.Pushes;
 
 import java.util.List;
 
@@ -32,9 +36,15 @@ import java.util.List;
 @Component
 public class AccountEndpoint implements AccountApiServer {
     private final Accounts accounts;
+    private final Limits limits;
+    private final PushDevices devices;
+    private final Pushes pushes;
 
-    public AccountEndpoint(Accounts accounts) {
+    public AccountEndpoint(Accounts accounts, Limits limits, PushDevices devices, Pushes pushes) {
         this.accounts = accounts;
+        this.limits = limits;
+        this.devices = devices;
+        this.pushes = pushes;
     }
 
     @Override
@@ -49,7 +59,14 @@ public class AccountEndpoint implements AccountApiServer {
 
     @Override
     public AccountDto saveProfile(ProfileDto profile) throws Exception {
-        return accounts.rename(Caller.name(), profile == null ? null : profile.displayName());
+        String me = Caller.name();
+        if (profile != null && profile.avatar() != null) {
+            limits.saveAvatar(me, profile.avatar());
+        }
+        if (profile == null || profile.displayName() == null || profile.displayName().length() == 0) {
+            return accounts.describe(me);
+        }
+        return accounts.rename(me, profile.displayName());
     }
 
     @Override
@@ -59,11 +76,36 @@ public class AccountEndpoint implements AccountApiServer {
 
     @Override
     public FriendDto addFriend(FriendDto friend) throws Exception {
-        return accounts.addFriend(Caller.name(), friend == null ? null : friend.username());
+        String me = Caller.name();
+        FriendDto added = accounts.addFriend(me, friend == null ? null : friend.username());
+        if (!accounts.friendsOf(me).contains(added.username())) {
+            pushes.friendRequest(added.username(), me);
+        }
+        return added;
     }
 
     @Override
     public List<FriendDto> friends() throws Exception {
         return accounts.friendList(Caller.name());
+    }
+
+    @Override
+    public ProfileDto profile() throws Exception {
+        return limits.profile(Caller.name());
+    }
+
+    @Override
+    public PushDeviceDto registerDevice(PushDeviceDto device) throws Exception {
+        return devices.register(Caller.name(), device);
+    }
+
+    @Override
+    public LimitsDto limits() throws Exception {
+        return limits.limits(Caller.name());
+    }
+
+    @Override
+    public LimitsDto saveLimits(LimitsDto request) throws Exception {
+        return limits.save(Caller.name(), request);
     }
 }

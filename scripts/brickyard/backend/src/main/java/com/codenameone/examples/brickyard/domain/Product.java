@@ -44,6 +44,10 @@ public class Product {
     @Column(nullable = false)
     private long createdAt;
 
+    /// 1 while on sale; a deactivated product cannot be bought, and owners keep it.
+    @Column(nullable = false)
+    private int active = 1;
+
     public Product() {
     }
 
@@ -93,5 +97,13 @@ public class Product {
 
     public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public int getActive() {
+        return active;
+    }
+
+    public void setActive(int active) {
+        this.active = active;
     }
 }

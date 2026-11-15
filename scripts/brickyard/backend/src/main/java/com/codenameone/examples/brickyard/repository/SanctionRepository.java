@@ -23,6 +23,7 @@ import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.brickyard.domain.Sanction;
+import com.codename1.orm.repository.PageRequest;
 import java.util.List;
 
 /// Storage for [Sanction].
@@ -30,4 +31,9 @@ import java.util.List;
 public interface SanctionRepository extends CrudRepository<Sanction, String> {
     @Query("select s from Sanction s where s.username = :u order by s.createdAt asc, s.id asc")
     List<Sanction> of(@Param("u") String username);
+
+    /// Sanctions not lifted that end after `now`, the newest first.
+    @Query("select s from Sanction s where s.lifted = 0 and s.untilAt > :now "
+            + "order by s.createdAt desc, s.id desc")
+    List<Sanction> active(@Param("now") long now, PageRequest page);
 }

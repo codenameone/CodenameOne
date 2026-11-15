@@ -119,5 +119,6 @@ class LeaderboardTest {
         List mine = Api.list(mvc, Api.as(get("/api/me/badges"), player));
         assertEquals(1, mine.size());
         assertEquals(badgeId, ((Map) mine.get(0)).get("badgeId"));
+        assertEquals("First Steps", ((Map) mine.get(0)).get("name"), "an award carries its badge's name");
     }
 }

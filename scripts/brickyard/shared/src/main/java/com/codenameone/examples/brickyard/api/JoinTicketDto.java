@@ -21,7 +21,8 @@ package com.codenameone.examples.brickyard.api;
 import com.codename1.annotations.Mapped;
 
 /// A single-use ticket for the game socket (`/ws/play?ticket=...`), valid
-/// for `seconds`, and the server it seats the player on.
+/// for `seconds`, the server it seats the player on, and `url`, the game
+/// socket of the backend instance running that server (empty: the API host).
 @Mapped
-public record JoinTicketDto(String ticket, String serverId, int seconds) {
+public record JoinTicketDto(String ticket, String serverId, int seconds, String url) {
 }

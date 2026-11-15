@@ -63,6 +63,8 @@ import com.codenameone.examples.brickyard.repository.PresenceRepository;
 import com.codenameone.examples.brickyard.repository.ReportRepository;
 import com.codenameone.examples.brickyard.repository.SanctionRepository;
 import com.codenameone.examples.brickyard.repository.StorePurchaseRepository;
+import com.codename1.orm.repository.PageRequest;
+import com.codenameone.examples.brickyard.analytics.LiveServers;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -94,12 +96,13 @@ public class Moderation {
     private final StorePurchaseRepository purchases;
     private final AnalyticsEventRepository events;
     private final JdbcUserDetailsManager users;
+    private final LiveServers live;
 
     public Moderation(Accounts accounts, Audit audit, ReportRepository reports, SanctionRepository sanctions,
             AppealRepository appeals, AuditLogRepository log, FeaturedRepository featured,
             FraudFlagRepository fraud, ExperienceRepository experiences, ChatMessageRepository chat,
             PresenceRepository presence, StorePurchaseRepository purchases, AnalyticsEventRepository events,
-            JdbcUserDetailsManager users) {
+            JdbcUserDetailsManager users, LiveServers live) {
         this.accounts = accounts;
         this.audit = audit;
         this.reports = reports;
@@ -114,6 +117,7 @@ public class Moderation {
         this.purchases = purchases;
         this.events = events;
         this.users = users;
+        this.live = live;
     }
 
     private static String oneOf(String value, String[] allowed, String what) {
@@ -181,7 +185,7 @@ public class Moderation {
             unpublish(r.getTargetId(), reason);
         } else if (!"DISMISS".equals(kind)) {
             sanction(new SanctionDto(null, accountBehind(r, action.target()), kind, reason,
-                    action.minutes(), 0));
+                    0, 0, action.minutes()));
         }
         r.setStatus("DISMISS".equals(kind) ? "DISMISSED" : "RESOLVED");
         r.setResolvedBy(Caller.name());
@@ -212,9 +216,9 @@ public class Moderation {
         throw new ResponseStatusException(400, "Name the account to act on");
     }
 
-    /// A sanction's `untilAt` in the request is read as minutes: a TEMP_BAN
-    /// or MUTE needs them (a mute defaults to a day), a PERM_BAN never ends,
-    /// and a WARN is over as it is given.
+    /// How long a sanction lasts is the request's `durationMinutes`: a
+    /// TEMP_BAN needs it, a MUTE defaults to a day, a PERM_BAN never ends and
+    /// a WARN is over as it is given. `untilAt` is computed, never read.
     @Transactional(rollbackFor = IOException.class)
     public SanctionDto sanction(SanctionDto request) throws IOException {
         Staff.require(Staff.MODERATE);
@@ -225,7 +229,7 @@ public class Moderation {
         String kind = oneOf(request.kind(), new String[] {Sanctions.WARN, Sanctions.TEMP_BAN,
             Sanctions.PERM_BAN, Sanctions.MUTE}, "a sanction");
         long now = Clock.now();
-        long minutes = request.untilAt();
+        long minutes = request.durationMinutes();
         long until;
         if (Sanctions.PERM_BAN.equals(kind)) {
             until = Long.MAX_VALUE;
@@ -251,6 +255,18 @@ public class Moderation {
         sanctions.insert(s);
         audit.record(kind, s.getUsername(), s.getReason());
         return toDto(s);
+    }
+
+    public static final int SANCTION_PAGE = 50;
+
+    /// Every sanction in force now, newest first, a page at a time.
+    public List<SanctionDto> activeSanctions(int page) {
+        Staff.require(Staff.VIEW);
+        List<SanctionDto> out = new ArrayList<SanctionDto>();
+        for (Sanction s : sanctions.active(Clock.now(), new PageRequest(Math.max(0, page), SANCTION_PAGE))) {
+            out.add(toDto(s));
+        }
+        return out;
     }
 
     public List<SanctionDto> sanctionsOf(String username, boolean staff) {
@@ -398,6 +414,43 @@ public class Moderation {
         return toDto(f);
     }
 
+    /// Moves a home-row entry to another row and/or position. The entry
+    /// takes `ordinal` in its row and the others there keep their order
+    /// around it, renumbered 0, 1, 2..., so a reorder never leaves two
+    /// entries on one position.
+    @Transactional(rollbackFor = IOException.class)
+    public FeaturedDto updateFeatured(String id, FeaturedDto request) throws IOException {
+        Staff.require(Staff.ADMINISTER);
+        Featured f = id == null ? null : featured.findById(id);
+        if (f == null) {
+            throw new ResponseStatusException(404, "Nothing featured with that id");
+        }
+        if (request == null) {
+            throw new ResponseStatusException(400, "Nothing to change");
+        }
+        String row = request.rowName() == null || request.rowName().trim().length() == 0 ? f.getRowName()
+                : Text.required(request.rowName(), 64, "a row").trim();
+        List<Featured> inRow = new ArrayList<Featured>();
+        for (Featured o : featured.findAll()) {
+            if (o.getRowName().equals(row) && !o.getId().equals(f.getId())) {
+                inRow.add(o);
+            }
+        }
+        Collections.sort(inRow, (a, b) -> Integer.compare(a.getOrdinal(), b.getOrdinal()));
+        int at = Math.max(0, Math.min(request.ordinal(), inRow.size()));
+        f.setRowName(row);
+        inRow.add(at, f);
+        for (int i = 0; i < inRow.size(); i++) {
+            Featured o = inRow.get(i);
+            if (o.getOrdinal() != i || o == f) {
+                o.setOrdinal(i);
+                featured.save(o);
+            }
+        }
+        audit.record("FEATURE_MOVE", f.getExperienceId(), row + " #" + at);
+        return toDto(f);
+    }
+
     /// The home rows, by row name and then place in the row; an experience
     /// unpublished since it was featured drops out.
     public List<FeaturedDto> home() {
@@ -416,21 +469,18 @@ public class Moderation {
         return out;
     }
 
-    /// The last day: DAU is everyone with presence or a visit; CCU is live
-    /// presence (there is no servers table yet); revenue is store Bricks not
-    /// refunded; the error rate is script errors per thousand sessions.
+    /// The last day: DAU is everyone with presence or a visit; CCU is what
+    /// [LiveServers] counts; revenue is store Bricks not refunded; the error
+    /// rate is script errors per thousand sessions.
     public KpiDto kpis() {
         Staff.require(Staff.ADMINISTER);
         long now = Clock.now();
         long dayAgo = now - Clock.DAY;
         Set<String> daily = new HashSet<String>();
-        long ccu = 0;
         for (Presence p : presence.since(dayAgo)) {
             daily.add(p.getId());
-            if (p.getUpdatedAt() >= now - 2 * Clock.MINUTE && !"OFFLINE".equals(p.getStatus())) {
-                ccu++;
-            }
         }
+        long ccu = live.ccu();
         long since = Clock.dayOf(dayAgo);
         for (AnalyticsEvent v : events.kindSince("VISIT", since)) {
             if (v.getCreatedAt() >= dayAgo) {
@@ -476,7 +526,8 @@ public class Moderation {
     }
 
     static SanctionDto toDto(Sanction s) {
-        return new SanctionDto(s.getId(), s.getUsername(), s.getKind(), s.getReason(), s.getUntilAt(), s.getLifted());
+        return new SanctionDto(s.getId(), s.getUsername(), s.getKind(), s.getReason(), s.getUntilAt(), s.getLifted(),
+                0);
     }
 
     static AppealDto toDto(Appeal a) {

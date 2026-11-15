@@ -102,6 +102,26 @@ public class Analytics {
         return e;
     }
 
+    /// An event the backend itself observed (a room's VISIT or SESSION), so
+    /// no engine role is asked for: the caller is the server, not a request.
+    @Transactional(rollbackFor = IOException.class)
+    public void record(String experienceId, String username, String kind, long amount) throws IOException {
+        AnalyticsEvent a = new AnalyticsEvent();
+        a.setId(Ids.next());
+        a.setExperienceId(experienceId);
+        a.setUsername(clip(username, 190));
+        a.setKind(kind);
+        a.setName("");
+        a.setAmount(Math.max(0, amount));
+        a.setDetail("");
+        Experience e = experiences.findById(experienceId);
+        a.setVersion(e == null ? 0 : e.getPublishedVersion());
+        long now = Clock.now();
+        a.setDayStart(Clock.dayOf(now));
+        a.setCreatedAt(now);
+        events.insert(a);
+    }
+
     private static String clip(String s, int max) {
         String v = s == null ? "" : s;
         return v.length() > max ? v.substring(0, max) : v;

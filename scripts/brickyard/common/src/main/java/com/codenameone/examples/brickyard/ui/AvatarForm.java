@@ -76,6 +76,8 @@ public final class AvatarForm {
                 current[0] = current[0].with(part[0], color);
                 current[0].save();
                 preview.setAvatar(current[0]);
+                Api.account().saveProfile(new ProfileDto(null, current[0].encode()),
+                        Net.to(saved -> { }, Ui::failed));
             });
             swatches.add(b);
         }
@@ -85,7 +87,7 @@ public final class AvatarForm {
         final TextField name = Ui.field("Display name", TextField.ANY, "displayName");
         name.setText(me == null || me.displayName() == null ? "" : me.displayName());
         content.add(Ui.panel(name, Ui.secondary("Save name", "saveNameButton",
-                e -> Api.account().saveProfile(new ProfileDto(name.getText().trim()), Net.to(saved -> {
+                e -> Api.account().saveProfile(new ProfileDto(name.getText().trim(), null), Net.to(saved -> {
                     Session.setUser(saved);
                     Ui.toast("Saved.");
                 }, Ui::failed)))));
@@ -95,6 +97,14 @@ public final class AvatarForm {
         badges.setName("myBadges");
         content.add(badges);
         f.show();
+        // The server's colours win: they follow the account to every device.
+        Api.account().profile(Net.to(profile -> {
+            if (profile != null && profile.avatar() != null && profile.avatar().length() > 0) {
+                current[0] = Avatar.decode(profile.avatar());
+                current[0].save();
+                preview.setAvatar(current[0]);
+            }
+        }, (status, message) -> { }));
         Api.badges().mine(Net.to(list -> {
             fill(badges, list);
             f.revalidate();
@@ -108,8 +118,9 @@ public final class AvatarForm {
             return;
         }
         for (BadgeAwardDto b : list) {
-            badges.add(Ui.panel(Ui.label(b.badgeId(), "CardTitle"),
-                    Ui.label("in " + b.experienceId(), "CardMeta")));
+            String title = b.name() == null || b.name().length() == 0 ? b.badgeId() : b.name();
+            String about = b.description() == null ? "" : b.description();
+            badges.add(Ui.panel(Ui.label(title, "CardTitle"), Ui.label(about, "CardMeta")));
         }
     }
 }

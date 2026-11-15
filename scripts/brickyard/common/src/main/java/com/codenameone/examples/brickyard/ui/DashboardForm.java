@@ -70,8 +70,10 @@ public final class DashboardForm {
         final Container products = box("products", f);
         f.add(Ui.secondary("New product", "newProductButton", e -> newProduct(id, products, f)));
         f.add(Ui.label("Payouts", "RowTitle"));
-        f.add(Ui.secondary("Request a payout", "payoutButton", e -> payout()));
+        final Container payouts = box("payoutHistory", f);
+        f.add(Ui.secondary("Request a payout", "payoutButton", e -> payout(payouts, f)));
         f.show();
+        loadPayouts(payouts, f);
 
         Api.analytics().visits(id, DAYS, Net.to(days -> {
             visits.add(chart(days));
@@ -174,8 +176,12 @@ public final class DashboardForm {
             products.removeAll();
             empty(products, rows);
             if (rows != null) {
-                for (ProductDto p : rows) {
-                    products.add(Ui.label(p.name() + " (" + p.kind() + ") - " + p.price() + " Bricks", "Body"));
+                for (final ProductDto p : rows) {
+                    products.add(Ui.panel(Ui.label(p.name() + " (" + p.kind() + ") - " + p.price() + " Bricks",
+                                    "Body"),
+                            Ui.link("Edit", "editProduct" + p.id(), e -> editProduct(id, p, products, f)),
+                            Ui.link("Retire", "retireProduct" + p.id(), e -> Api.economy().deactivateProduct(p.id(),
+                                    Net.to(done -> loadProducts(id, products, f), Ui::failed)))));
                 }
             }
             f.revalidate();
@@ -197,14 +203,45 @@ public final class DashboardForm {
         Api.economy().createProduct(id, p, Net.to(created -> loadProducts(id, products, f), Ui::failed));
     }
 
-    static void payout() {
+    /// Renames or reprices a product; what was already bought stays owned.
+    static void editProduct(final String id, ProductDto p, final Container products, final Form f) {
+        TextField name = Ui.field("Name", TextField.ANY, "editProductName");
+        name.setText(p.name());
+        TextField price = Ui.field("Price in Bricks", TextField.NUMERIC, "editProductPrice");
+        price.setText(String.valueOf(p.price()));
+        if (!Dialog.show("Edit product", BoxLayout.encloseY(name, price), new com.codename1.ui.Command("Cancel"),
+                new com.codename1.ui.Command("Save")).getCommandName().equals("Save")) {
+            return;
+        }
+        Api.economy().updateProduct(p.id(), new ProductDto(p.id(), id, p.kind(), name.getText().trim(),
+                parse(price.getText())), Net.to(saved -> loadProducts(id, products, f), Ui::failed));
+    }
+
+    /// The creator's payout requests, newest first, with what staff decided.
+    static void loadPayouts(final Container payouts, final Form f) {
+        Api.economy().myPayouts(Net.to(rows -> {
+            payouts.removeAll();
+            empty(payouts, rows);
+            if (rows != null) {
+                for (PayoutDto p : rows) {
+                    payouts.add(Ui.label(p.bricks() + " Bricks - " + p.status(), "Body"));
+                }
+            }
+            f.revalidate();
+        }, Ui::failed));
+    }
+
+    static void payout(final Container payouts, final Form f) {
         TextField amount = Ui.field("Bricks to cash out", TextField.NUMERIC, "payoutAmount");
         if (!Dialog.show("Request a payout", amount, new com.codename1.ui.Command("Cancel"),
                 new com.codename1.ui.Command("Request")).getCommandName().equals("Request")) {
             return;
         }
         Api.economy().requestPayout(new PayoutDto(null, null, parse(amount.getText()), null),
-                Net.to(p -> Ui.toast("Payout " + p.status()), Ui::failed));
+                Net.to(p -> {
+                    Ui.toast("Payout " + p.status());
+                    loadPayouts(payouts, f);
+                }, Ui::failed));
     }
 
     static long parse(String s) {

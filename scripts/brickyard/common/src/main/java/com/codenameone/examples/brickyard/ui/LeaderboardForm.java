@@ -28,12 +28,15 @@ import com.codenameone.examples.brickyard.api.LeaderDto;
 import com.codenameone.examples.brickyard.net.Api;
 import com.codenameone.examples.brickyard.net.Net;
 
+import com.codename1.ui.ComboBox;
+import com.codename1.ui.list.DefaultListModel;
 import java.util.List;
 
-/// An experience's leaderboard: daily, weekly and all-time tabs, each either
-/// everyone or only friends.
+/// An experience's leaderboard for a stat picked from those it has entries
+/// for: daily, weekly and all-time tabs, each either everyone or only friends.
 public final class LeaderboardForm {
-    /// The stat the starter templates write.
+    /// The stat the starter templates write; the default when an experience
+    /// has no entries yet.
     static final String STAT = "score";
     static final String[] PERIODS = {"daily", "weekly", "all"};
     static final String[] TITLES = {"Today", "This week", "All time"};
@@ -49,6 +52,8 @@ public final class LeaderboardForm {
         final CheckBox friends = new CheckBox("Friends only");
         friends.setName("friendsOnly");
         friends.setUIID("Body");
+        final ComboBox<String> stat = new ComboBox<String>(STAT);
+        stat.setName("statPicker");
         final Tabs tabs = new Tabs();
         final Container[] lists = new Container[PERIODS.length];
         for (int i = 0; i < PERIODS.length; i++) {
@@ -59,17 +64,28 @@ public final class LeaderboardForm {
         }
         Runnable load = () -> {
             int i = tabs.getSelectedIndex();
-            load(experienceId, PERIODS[i], friends.isSelected(), lists[i]);
+            Object picked = stat.getSelectedItem();
+            load(experienceId, picked == null ? STAT : picked.toString(), PERIODS[i], friends.isSelected(),
+                    lists[i]);
         };
         tabs.addSelectionListener((old, now) -> load.run());
         friends.addActionListener(e -> load.run());
-        f.add(BorderLayout.NORTH, friends);
+        stat.addActionListener(e -> load.run());
+        f.add(BorderLayout.NORTH, BorderLayout.centerEastWest(stat, friends, null));
         f.add(BorderLayout.CENTER, tabs);
         f.show();
-        load.run();
+        // The stats this experience really has entries for.
+        Api.leaderboards().stats(experienceId, Net.to(names -> {
+            if (names != null && !names.isEmpty()) {
+                stat.setModel(new DefaultListModel<String>(names));
+                stat.setSelectedIndex(0);
+                f.revalidate();
+            }
+            load.run();
+        }, (status, message) -> load.run()));
     }
 
-    static void load(String experienceId, String period, boolean friends, final Container list) {
+    static void load(String experienceId, String stat, String period, boolean friends, final Container list) {
         list.removeAll();
         list.add(Ui.label("Loading...", "Muted"));
         list.revalidate();
@@ -91,9 +107,9 @@ public final class LeaderboardForm {
             list.revalidate();
         };
         if (friends) {
-            Api.leaderboards().friends(experienceId, STAT, period, Net.to(ok, failed));
+            Api.leaderboards().friends(experienceId, stat, period, Net.to(ok, failed));
         } else {
-            Api.leaderboards().top(experienceId, STAT, period, 50, Net.to(ok, failed));
+            Api.leaderboards().top(experienceId, stat, period, 50, Net.to(ok, failed));
         }
     }
 }

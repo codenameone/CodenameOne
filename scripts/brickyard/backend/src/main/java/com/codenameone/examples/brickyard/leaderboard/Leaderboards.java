@@ -78,6 +78,18 @@ public class Leaderboards {
         this.accounts = accounts;
     }
 
+    /// The stats `experienceId` has entries for, sorted: what a leaderboard
+    /// screen offers to pick from.
+    @Transactional(readOnly = true)
+    public List<String> stats(String experienceId) {
+        experiences.visible(experienceId);
+        java.util.TreeSet<String> names = new java.util.TreeSet<String>();
+        for (LeaderboardEntry e : entries.findByExperienceId(experienceId)) {
+            names.add(e.getStat());
+        }
+        return new java.util.ArrayList<String>(names);
+    }
+
     /// Not transactional on purpose: a refused write still has to leave its flag behind.
     public LeaderDto write(String experienceId, ScoreWriteDto score) throws IOException {
         Access.requireEngine();

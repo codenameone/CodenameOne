@@ -26,7 +26,9 @@ import com.codename1.backend.annotations.Configuration;
 import com.codename1.backend.annotations.Order;
 import com.codename1.backend.annotations.Value;
 import com.codename1.backend.security.AntPathRequestMatcher;
+import com.codename1.backend.security.BearerTokenAuthenticationFilter;
 import com.codename1.backend.security.HttpSecurity;
+import com.codename1.backend.security.LogoutFilter;
 import com.codename1.backend.security.SecurityFilterChain;
 import com.codename1.backend.security.SessionCreationPolicy;
 import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
@@ -37,6 +39,9 @@ import com.codename1.backend.security.oauth2.server.authorization.RegisteredClie
 import com.codename1.backend.security.ratelimit.InMemoryRateLimiter;
 import com.codename1.backend.security.ratelimit.RateLimitKeys;
 
+import com.codenameone.examples.brickyard.economy.StoreNotifications;
+import com.codenameone.examples.brickyard.moderation.BanGuard;
+import com.codenameone.examples.brickyard.moderation.Sanctions;
 import java.io.IOException;
 
 /// Sign-in is the app kit's OAuth server; the API is a stateless resource
@@ -79,7 +84,10 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain signIn(HttpSecurity http,
             @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer,
-            @Value("${brickyard.signin.per-minute:10}") int signInsPerMinute) throws IOException {
+            @Value("${brickyard.signin.per-minute:10}") int signInsPerMinute,
+            Sanctions sanctions, OAuth2AuthorizationService grants) throws IOException {
+        // A banned account signs in and refreshes nothing; see BanGuard.
+        http.addFilterBefore(BanGuard.signIn(sanctions, grants), LogoutFilter.class);
         return AccountSecurity.signIn(http, issuer, signInsPerMinute, AUDIENCE);
     }
 
@@ -87,7 +95,8 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain api(HttpSecurity http, JwkSource signingKeys,
             @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer,
-            JdbcUserDetailsManager users) throws IOException {
+            JdbcUserDetailsManager users,
+            Sanctions sanctions) throws IOException {
         http.securityMatcher("/api/**")
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -96,6 +105,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/account/register")).permitAll()
+                    // The store's server, not a player: StoreNotifications checks its secret.
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
+                            StoreNotifications.PATH)).permitAll()
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/leaderboards/*/scores")).hasRole(Roles.ENGINE)
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
@@ -105,7 +117,11 @@ public class SecurityConfig {
                     .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(
                     AccountSecurity.tokenDecoder(signingKeys, issuer, AUDIENCE))
-                    .jwtAuthenticationConverter(AccountSecurity.accountRoles(users))));
+                    .jwtAuthenticationConverter(AccountSecurity.accountRoles(users))))
+            // A ban is global: every write but an appeal is refused to a banned account.
+            .addFilterAfter(BanGuard.api(sanctions), BearerTokenAuthenticationFilter.class)
+            // Where the request came from, for the referral network check.
+            .addFilterBefore(ClientAddress.filter(), BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 }

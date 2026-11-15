@@ -64,10 +64,11 @@ public class Progression {
     private final AccountRepository accounts;
     private final Wallet wallet;
     private final Audit audit;
+    private final Seasons seasons;
 
     public Progression(ProgressRepository progress, QuestRepository quests,
             QuestProgressRepository questProgress, SeasonClaimRepository claims,
-            AccountRepository accounts, Wallet wallet, Audit audit) {
+            AccountRepository accounts, Wallet wallet, Audit audit, Seasons seasons) {
         this.progress = progress;
         this.quests = quests;
         this.questProgress = questProgress;
@@ -75,6 +76,7 @@ public class Progression {
         this.accounts = accounts;
         this.wallet = wallet;
         this.audit = audit;
+        this.seasons = seasons;
     }
 
     /// Level 1 at no XP; each level needs more than the last.
@@ -94,9 +96,28 @@ public class Progression {
             }
             p = new Progress();
             p.setId(username);
+            p.setSeasonId(seasons.current().getId());
             progress.insert(p);
+            return p;
+        }
+        // A row last touched in an earlier season starts this one from zero:
+        // the reset happens on the row's next read, so a rollover costs
+        // nothing however many players there are.
+        String season = seasons.current().getId();
+        if (!season.equals(p.getSeasonId())) {
+            p.setSeasonId(season);
+            p.setSeasonXp(0);
+            p.setPremium(0);
+            progress.save(p);
         }
         return p;
+    }
+
+    /// A season reward's key: claims of one season are not claims of the next.
+    /// The preseason keeps the key it always had.
+    private String claimId(String username, int tier, String track) {
+        String season = seasons.current().getId();
+        return username + "|" + tier + "|" + track + (season.length() == 0 ? "" : "|" + season);
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -241,8 +262,8 @@ public class Progression {
 
     private SeasonTierDto tierDto(String username, int t) {
         return new SeasonTierDto(t, t * XP_PER_TIER, freeBricks(t), premiumBricks(t),
-                claims.findById(username + "|" + t + "|FREE") == null ? 0 : 1,
-                claims.findById(username + "|" + t + "|PREMIUM") == null ? 0 : 1);
+                claims.findById(claimId(username, t, "FREE")) == null ? 0 : 1,
+                claims.findById(claimId(username, t, "PREMIUM")) == null ? 0 : 1);
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -251,7 +272,7 @@ public class Progression {
         if (p.getPremium() != 0) {
             throw new ResponseStatusException(409, "You already have the premium pass");
         }
-        wallet.post(username, -PREMIUM_PRICE, "SEASON_PREMIUM", "season");
+        wallet.post(username, -PREMIUM_PRICE, "SEASON_PREMIUM", "season " + p.getSeasonId());
         p.setPremium(1);
         progress.save(p);
         return toDto(p, 0);
@@ -273,7 +294,7 @@ public class Progression {
         if (premium && p.getPremium() == 0) {
             throw new ResponseStatusException(402, "The premium track needs the premium pass");
         }
-        String id = username + "|" + tier + "|" + (premium ? "PREMIUM" : "FREE");
+        String id = claimId(username, tier, premium ? "PREMIUM" : "FREE");
         if (claims.findById(id) != null) {
             throw new ResponseStatusException(409, "That reward was already claimed");
         }

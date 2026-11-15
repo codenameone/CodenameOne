@@ -23,24 +23,65 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Bean;
 import com.codename1.backend.annotations.Configuration;
 import com.codename1.backend.annotations.Value;
+import java.io.IOException;
 
-/// Chooses the receipt validator. `brickyard.iap.provider=simulated` accepts
-/// every receipt and is honoured on a development or test profile only; on
-/// any other profile, and until a store validator is written for this
-/// sample, receipts are refused with 503 rather than granted for free.
+/// Chooses the receipt validator.
+///
+/// `brickyard.iap.provider=simulated` accepts every receipt and is honoured
+/// on a development or test profile only. Otherwise each store is checked
+/// with the store itself, once it is configured:
+///
+/// | Store | Settings |
+/// |---|---|
+/// | `apple` | `brickyard.iap.apple.shared-secret`, `brickyard.iap.apple.bundle-id` |
+/// | `google` | `brickyard.iap.google.package-name`, `brickyard.iap.google.service-account-key` (a path to the JSON key) |
+///
+/// A store that is not configured answers 503 with a message naming the
+/// settings, rather than granting anything for free.
 @Configuration
 public class Receipts {
     @Bean
     public ReceiptValidator receiptValidator(Config config,
-            @Value("${brickyard.iap.provider:}") String chosen) {
+            @Value("${brickyard.iap.provider:}") String chosen,
+            @Value("${brickyard.iap.apple.shared-secret:}") String appleSecret,
+            @Value("${brickyard.iap.apple.bundle-id:}") String appleBundle,
+            @Value("${brickyard.iap.google.package-name:}") String googlePackage,
+            @Value("${brickyard.iap.google.service-account-key:}") String googleKey) throws IOException {
         boolean dev = config.isDevelopmentProfile() || "test".equalsIgnoreCase(config.getProfile());
         String kind = chosen.trim().length() > 0 ? chosen.trim() : dev ? "simulated" : "store";
         if ("simulated".equalsIgnoreCase(kind) && dev) {
             return simulated();
         }
-        final String why = "simulated".equalsIgnoreCase(kind)
-                ? "brickyard.iap.provider=simulated grants every purchase for free and is refused on this profile"
-                : "store receipts are not configured for this server";
+        if ("simulated".equalsIgnoreCase(kind)) {
+            return refusing("brickyard.iap.provider=simulated grants every purchase for free and is refused "
+                    + "on this profile");
+        }
+        StoreHttp http = StoreHttp.web();
+        ReceiptValidator apple = appleSecret.trim().length() > 0 && appleBundle.trim().length() > 0
+                ? new AppleReceiptValidator(appleSecret.trim(), appleBundle.trim(), http)
+                : refusing("App Store receipts are not configured for this server: set "
+                        + "brickyard.iap.apple.shared-secret and brickyard.iap.apple.bundle-id");
+        ReceiptValidator google = googlePackage.trim().length() > 0 && googleKey.trim().length() > 0
+                ? GooglePlayValidator.fromKeyFile(googlePackage.trim(), googleKey.trim(), http)
+                : refusing("Google Play receipts are not configured for this server: set "
+                        + "brickyard.iap.google.package-name and brickyard.iap.google.service-account-key");
+        return byStore(apple, google);
+    }
+
+    /// Sends each receipt to its store's validator; an unknown store is not a receipt.
+    public static ReceiptValidator byStore(final ReceiptValidator apple, final ReceiptValidator google) {
+        return (store, sku, transactionId, receipt) -> {
+            if (AppleReceiptValidator.STORE.equalsIgnoreCase(store)) {
+                return apple.verify(store, sku, transactionId, receipt);
+            }
+            if (GooglePlayValidator.STORE.equalsIgnoreCase(store)) {
+                return google.verify(store, sku, transactionId, receipt);
+            }
+            return null;
+        };
+    }
+
+    static ReceiptValidator refusing(final String why) {
         return (store, sku, transactionId, receipt) -> {
             throw new ResponseStatusException(503, why);
         };

@@ -37,9 +37,11 @@ import com.codenameone.examples.brickyard.api.QuestDto;
 import com.codenameone.examples.brickyard.api.ReportDto;
 import com.codenameone.examples.brickyard.api.RoleDto;
 import com.codenameone.examples.brickyard.api.SanctionDto;
+import com.codenameone.examples.brickyard.api.SeasonDto;
 import com.codenameone.examples.brickyard.api.WalletDto;
 import com.codenameone.examples.brickyard.economy.Economy;
 import com.codenameone.examples.brickyard.progress.Progression;
+import com.codenameone.examples.brickyard.progress.Seasons;
 import java.util.List;
 
 /// The report, moderation and admin console routes. The permission each
@@ -49,11 +51,13 @@ public class ModerationEndpoint implements ModerationApiServer {
     private final Moderation moderation;
     private final Economy economy;
     private final Progression progression;
+    private final Seasons seasons;
 
-    public ModerationEndpoint(Moderation moderation, Economy economy, Progression progression) {
+    public ModerationEndpoint(Moderation moderation, Economy economy, Progression progression, Seasons seasons) {
         this.moderation = moderation;
         this.economy = economy;
         this.progression = progression;
+        this.seasons = seasons;
     }
 
     @Override
@@ -184,8 +188,8 @@ public class ModerationEndpoint implements ModerationApiServer {
         return economy.addCatalogItem(item);
     }
 
-    /// The scheduled jobs, run on demand: a cron outside the backend (or an
-    /// admin) calls these, since the sample has no scheduler of its own.
+    /// The scheduled jobs, run on demand by an admin. The backend also runs
+    /// them itself, once a day (see ScheduledJobs); both are safe to repeat.
     @Override
     public JobDto runJob(String job) throws Exception {
         Staff.require(Staff.ADMINISTER);
@@ -196,5 +200,20 @@ public class ModerationEndpoint implements ModerationApiServer {
             return economy.payStipends();
         }
         throw new ResponseStatusException(404, "No such job");
+    }
+
+    @Override
+    public List<SanctionDto> activeSanctions(int page) throws Exception {
+        return moderation.activeSanctions(page);
+    }
+
+    @Override
+    public FeaturedDto updateFeatured(String featuredId, FeaturedDto featured) throws Exception {
+        return moderation.updateFeatured(featuredId, featured);
+    }
+
+    @Override
+    public SeasonDto startSeason(SeasonDto season) throws Exception {
+        return seasons.start(season);
     }
 }

@@ -119,7 +119,9 @@ public class Badges {
         return new BadgeDto(b.getId(), b.getExperienceId(), b.getName(), b.getDescription());
     }
 
-    private static BadgeAwardDto toDto(BadgeAward a) {
-        return new BadgeAwardDto(a.getBadgeId(), a.getExperienceId(), a.getUserId(), a.getAwardedAt());
+    private BadgeAwardDto toDto(BadgeAward a) {
+        BadgeDefinition b = definitions.findById(a.getBadgeId());
+        return new BadgeAwardDto(a.getBadgeId(), a.getExperienceId(), a.getUserId(), a.getAwardedAt(),
+                b == null ? "" : b.getName(), b == null ? "" : b.getDescription());
     }
 }

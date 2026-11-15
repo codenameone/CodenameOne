@@ -58,8 +58,9 @@ public final class CreateForm {
         list.setName("myExperiences");
         content.add(list);
         f.show();
-        Api.experiences().browse(null, Net.to(all -> {
-            List<ExperienceDto> mine = mine(all, me == null ? null : me.username());
+        // The server's list of the caller's own experiences, drafts included.
+        Api.experiences().mine(Net.to(found -> {
+            List<ExperienceDto> mine = found == null ? new ArrayList<ExperienceDto>() : found;
             if (mine.isEmpty()) {
                 list.add(Ui.label("Nothing yet.", "Muted"));
             }
@@ -74,8 +75,7 @@ public final class CreateForm {
         }, Ui::failed));
     }
 
-    /// The experiences `owner` made. The browse list holds published ones, so
-    /// an unpublished draft appears once it has been published.
+    /// The experiences `owner` made, out of a list of anyone's.
     static List<ExperienceDto> mine(List<ExperienceDto> all, String owner) {
         List<ExperienceDto> out = new ArrayList<>();
         if (all == null || owner == null) {

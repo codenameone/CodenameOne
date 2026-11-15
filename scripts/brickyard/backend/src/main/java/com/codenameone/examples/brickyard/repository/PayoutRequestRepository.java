@@ -30,4 +30,7 @@ import java.util.List;
 public interface PayoutRequestRepository extends CrudRepository<PayoutRequest, String> {
     @Query("select p from PayoutRequest p where p.status = :s order by p.createdAt asc, p.id asc")
     List<PayoutRequest> withStatus(@Param("s") String status);
+
+    @Query("select p from PayoutRequest p where p.username = :u order by p.createdAt desc, p.id desc")
+    List<PayoutRequest> ofUser(@Param("u") String username);
 }

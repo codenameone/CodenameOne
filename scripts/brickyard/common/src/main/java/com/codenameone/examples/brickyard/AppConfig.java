@@ -24,12 +24,20 @@ import com.codename1.ui.CN;
 /// Everything the app needs to know about where it runs: the server, the OIDC
 /// client, the store SKUs, the ad units and the deep links it answers.
 public final class AppConfig {
+    /// [#PUSH_APP_KEY], unless the `brickyard.pushAppKey` property overrides it.
+    public static String pushAppKey() {
+        return com.codename1.ui.CN.getProperty("brickyard.pushAppKey", PUSH_APP_KEY);
+    }
+
     public static final String DEFAULT_SERVER = "http://localhost:8080";
     /// Must match `SecurityConfig.CLIENT_ID` on the server.
     public static final String CLIENT_ID = "brickyard-app";
     public static final String REDIRECT_URI = "http://127.0.0.1/callback";
     public static final String WEB_REDIRECT_PATH = "/signin/code";
     public static final String SCHEME = "brickyard://";
+    /// The app's push id from the Codename One console; the backend's
+    /// `brickyard.push.app` holds the same value. A build can also set it
+    /// with the `brickyard.pushAppKey` display property instead of editing this.
     public static final String PUSH_APP_KEY = "";
     // Google's public test units: they always fill and never pay.
     public static final String REWARDED_AD_UNIT = "ca-app-pub-3940256099942544/5224354917";

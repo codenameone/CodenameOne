@@ -112,6 +112,11 @@ public final class ExperienceForm {
 
     /// Downloads the published place and hands it to the player.
     static void play(final ExperienceDto e) {
+        play(e, "");
+    }
+
+    /// Plays `e` on the server `serverId` names (a friend's), or any when empty.
+    static void play(final ExperienceDto e, final String serverId) {
         if (e.publishedVersion() <= 0) {
             Ui.toast("This experience has not been published yet.");
             return;
@@ -126,7 +131,7 @@ public final class ExperienceForm {
             Telemetry.played(e.id());
             Friends.presence(e.title());
             Api.experiences().visit(e.id(), Net.to(v -> { }, (s, m) -> { }));
-            PlaySession.start(e.id(), e.title(), bytes, e.maxPlayers(), "");
+            PlaySession.start(e.id(), e.title(), bytes, e.maxPlayers(), serverId);
         }, Ui::failed));
     }
 

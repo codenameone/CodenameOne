@@ -21,6 +21,11 @@ package com.codenameone.examples.brickyard.api;
 import com.codename1.annotations.Mapped;
 
 /// A WARN, TEMP_BAN, PERM_BAN or MUTE on an account.
+///
+/// `untilAt` is when it ends, in epoch milliseconds, and is only ever an
+/// answer. A request to sanction says how long in `durationMinutes`: a
+/// TEMP_BAN needs it, a MUTE defaults to a day, a WARN and a PERM_BAN ignore it.
 @Mapped
-public record SanctionDto(String id, String username, String kind, String reason, long untilAt, int lifted) {
+public record SanctionDto(String id, String username, String kind, String reason, long untilAt, int lifted,
+        long durationMinutes) {
 }

@@ -51,6 +51,11 @@ public class LeaderboardEndpoint implements LeaderboardApiServer {
     }
 
     @Override
+    public List<String> stats(String id) throws Exception {
+        return boards.stats(id);
+    }
+
+    @Override
     public StatBoundDto setBound(String id, StatBoundDto body) throws Exception {
         return boards.setBound(id, body);
     }

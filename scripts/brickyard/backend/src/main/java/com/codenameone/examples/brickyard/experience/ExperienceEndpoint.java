@@ -32,9 +32,9 @@ import com.codenameone.examples.brickyard.api.RollbackDto;
 import com.codenameone.examples.brickyard.api.VersionDto;
 import com.codenameone.examples.brickyard.api.VoteDto;
 
-import com.codenameone.examples.brickyard.play.PlayRoom;
 import com.codenameone.examples.brickyard.play.PlayServers;
 import com.codenameone.examples.brickyard.play.PlayTickets;
+import com.codenameone.examples.brickyard.push.Pushes;
 import com.codenameone.examples.brickyard.social.Social;
 import java.util.List;
 
@@ -46,8 +46,11 @@ public class ExperienceEndpoint implements ExperienceApiServer {
     private final PlayServers servers;
     private final PlayTickets tickets;
     private final Social social;
+    private final Pushes pushes;
 
-    public ExperienceEndpoint(Experiences experiences, PlayServers servers, PlayTickets tickets, Social social) {
+    public ExperienceEndpoint(Experiences experiences, PlayServers servers, PlayTickets tickets, Social social,
+            Pushes pushes) {
+        this.pushes = pushes;
         this.experiences = experiences;
         this.servers = servers;
         this.tickets = tickets;
@@ -76,7 +79,10 @@ public class ExperienceEndpoint implements ExperienceApiServer {
 
     @Override
     public VersionDto publish(String id, PlaceUploadDto body) throws Exception {
-        return experiences.upload(id, body == null ? null : body.data(), true);
+        VersionDto v = experiences.upload(id, body == null ? null : body.data(), true);
+        ExperienceDto e = experiences.describe(id);
+        pushes.published(e.owner(), id, e.title());
+        return v;
     }
 
     @Override
@@ -116,11 +122,23 @@ public class ExperienceEndpoint implements ExperienceApiServer {
     @Override
     public JoinTicketDto join(String id, JoinDto body) throws Exception {
         String me = Caller.name();
+        final String experienceId = id;
         ExperienceDto e = experiences.describe(id);
-        PlaceDto place = experiences.place(id);
         String requested = body == null || body.serverId() == null ? "" : body.serverId();
-        PlayRoom room = servers.seat(me, id, Math.max(1, e.maxPlayers()), requested, place);
-        social.setPresence(me, new PresenceDto(me, "IN_GAME", id, room.getId(), 0));
-        return new JoinTicketDto(tickets.issue(me, room.getId()), room.getId(), PlayTickets.TICKET_SECONDS);
+        // The place is read only when a new room opens on this instance.
+        PlayServers.Placement at = servers.seat(me, id, Math.max(1, e.maxPlayers()), requested,
+                new PlayServers.PlaceSource() {
+                    @Override
+                    public PlaceDto place() {
+                        return experiences.place(experienceId);
+                    }
+                });
+        social.setPresence(me, new PresenceDto(me, "IN_GAME", id, at.serverId, 0));
+        return new JoinTicketDto(tickets.issue(me, at.serverId), at.serverId, PlayTickets.TICKET_SECONDS, at.url);
+    }
+
+    @Override
+    public List<ExperienceDto> mine() throws Exception {
+        return experiences.mine(Caller.name());
     }
 }

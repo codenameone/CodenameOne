@@ -23,13 +23,16 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.brickyard.api.FriendDto;
+import com.codenameone.examples.brickyard.api.PresenceDto;
+import com.codename1.ui.Label;
 import com.codenameone.examples.brickyard.net.Api;
 import com.codenameone.examples.brickyard.net.Net;
 
 import java.util.List;
 
-/// Friends: the list, adding one by name, and inviting someone new. An
-/// invite into a particular experience is on that experience's page.
+/// Friends: the list with what each is doing, joining one who is in a game,
+/// adding one by name, and inviting someone new. An invite into a particular
+/// experience is on that experience's page.
 public final class FriendsForm {
     private FriendsForm() {
     }
@@ -60,6 +63,15 @@ public final class FriendsForm {
         Api.account().friends(Net.to(friends -> {
             fill(list, friends);
             f.revalidate();
+            Api.social().friendPresence(Net.to(presence -> {
+                if (presence != null && friends != null && !friends.isEmpty()) {
+                    list.removeAll();
+                    for (FriendDto friend : friends) {
+                        list.add(row(friend.username(), find(presence, friend.username())));
+                    }
+                    f.revalidate();
+                }
+            }, (status, message) -> { }));
         }, (status, message) -> {
             list.removeAll();
             list.add(Ui.text(message, "Muted"));
@@ -77,5 +89,49 @@ public final class FriendsForm {
         for (FriendDto friend : friends) {
             list.add(Ui.panel(Ui.label(friend.username(), "CardTitle")));
         }
+    }
+
+    static PresenceDto find(List<PresenceDto> presence, String username) {
+        for (PresenceDto p : presence) {
+            if (username.equals(p.username())) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    static boolean inGame(PresenceDto p) {
+        return p != null && "IN_GAME".equals(p.status()) && p.serverId() != null && p.serverId().length() > 0;
+    }
+
+    static String status(PresenceDto p) {
+        if (inGame(p)) {
+            return "Playing";
+        }
+        return p != null && "ONLINE".equals(p.status()) ? "Online" : "Offline";
+    }
+
+    /// A friend's row: their name, what they are doing (the experience's
+    /// title once it loads) and, while they are in a game, a Join button.
+    static Container row(final String username, final PresenceDto p) {
+        final Label what = Ui.label(status(p), "CardMeta");
+        if (!inGame(p)) {
+            return Ui.panel(Ui.label(username, "CardTitle"), what);
+        }
+        Api.experiences().experience(p.experienceId(), Net.to(e -> {
+            what.setText("Playing " + e.title());
+            if (what.getParent() != null) {
+                what.getParent().revalidate();
+            }
+        }, (status, message) -> { }));
+        return Ui.panel(Ui.label(username, "CardTitle"), what,
+                Ui.primary("Join", "join" + username, e -> join(username)));
+    }
+
+    /// Joins `friend` on the server they are playing on, through the
+    /// server's join check (friends only, not blocked, in a game now).
+    public static void join(String friend) {
+        Api.social().joinFriend(friend, Net.to(target -> Api.experiences().experience(target.experienceId(),
+                Net.to(e -> ExperienceForm.play(e, target.serverId()), Ui::failed)), Ui::failed));
     }
 }

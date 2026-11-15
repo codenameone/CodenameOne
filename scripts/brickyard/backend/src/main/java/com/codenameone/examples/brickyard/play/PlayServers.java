@@ -20,13 +20,15 @@ package com.codenameone.examples.brickyard.play;
 
 import com.codename1.backend.Base64;
 import com.codename1.backend.ResponseStatusException;
-import com.codename1.backend.annotations.Component;
 import com.codename1.rbx.Engine;
 import com.codename1.rbx.RigidBodies;
 import com.codename1.rbx.place.PlaceFile;
 import com.codename1.rbx.place.PlaceLoader;
+import com.codenameone.examples.brickyard.Clock;
 import com.codenameone.examples.brickyard.Ids;
 import com.codenameone.examples.brickyard.api.PlaceDto;
+import com.codenameone.examples.brickyard.domain.PlayServer;
+import com.codenameone.examples.brickyard.repository.PlayServerRepository;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,54 +37,223 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /// The directory of running servers, and matchmaking: a player goes to a
 /// public server of the experience with a free seat, or a new one.
-@Component
+///
+/// Rooms run on the instance that opened them; the directory itself is the
+/// `play_server` table, so every instance sharing the database can send a
+/// player to a room another instance runs. Each instance beats for its own
+/// rooms ([#heartbeat]); a row whose instance stopped beating is reaped.
+/// One instance is made per process by [PlayConfig].
 public class PlayServers {
     /// A requested server id that does not exist yet opens a private server
     /// under that name when it starts with this.
     public static final String PRIVATE_PREFIX = "private-";
+    /// How often an instance beats for its rooms.
+    public static final long HEARTBEAT_MILLIS = 5000;
+    /// A room whose row has not beaten for this long is taken as gone.
+    public static final long STALE_MILLIS = 20000;
+
+    /// Supplies the published place, read only when a room is really opened.
+    public interface PlaceSource {
+        PlaceDto place() throws IOException;
+    }
+
+    /// What a room tells the rest of the backend about its players.
+    public interface Events {
+        /// `username` connected to `room`.
+        void joined(PlayRoom room, String username);
+
+        /// `username` left `room` after `millis` connected, or gave up a
+        /// seat they never connected to (`millis` is -1).
+        void left(PlayRoom room, String username, long millis);
+    }
+
+    /// Where a join landed: the server, the socket URL of the instance that
+    /// runs it (empty: this API host), and the room when it runs here.
+    public static final class Placement {
+        public final String serverId;
+        public final String url;
+        public final PlayRoom room;
+
+        Placement(String serverId, String url, PlayRoom room) {
+            this.serverId = serverId;
+            this.url = url;
+            this.room = room;
+        }
+    }
 
     private final Map<String, PlayRoom> rooms = new ConcurrentHashMap<String, PlayRoom>();
+    private final PlayServerRepository rows;
+    private final Events events;
+    private final String instanceId;
+    private final String socketUrl;
 
-    /// Seats `username` and answers the room. `requested` (may be empty)
-    /// names a friend's or a private server.
-    public synchronized PlayRoom seat(String username, String experienceId, int maxPlayers, String requested,
-            PlaceDto place) throws IOException {
+    public PlayServers(PlayServerRepository rows, Events events, String instanceId, String socketUrl) {
+        this.rows = rows;
+        this.events = events;
+        this.instanceId = instanceId;
+        this.socketUrl = socketUrl == null ? "" : socketUrl;
+    }
+
+    public String getInstanceId() {
+        return instanceId;
+    }
+
+    /// Seats `username` and answers where. `requested` (may be empty) names
+    /// a friend's or a private server. `place` is read only when a new room
+    /// opens here: seating into a running room never touches the place.
+    public synchronized Placement seat(String username, String experienceId, int maxPlayers, String requested,
+            PlaceSource place) throws IOException {
+        long fresh = Clock.now() - STALE_MILLIS;
         if (requested != null && requested.length() > 0) {
             PlayRoom r = rooms.get(requested);
-            if (r == null || r.isClosed()) {
-                if (!requested.startsWith(PRIVATE_PREFIX) || requested.length() > 64) {
-                    throw new ResponseStatusException(404, "That server has closed");
+            if (r != null && !r.isClosed()) {
+                return local(r, username, experienceId);
+            }
+            PlayServer row = rows.findById(requested);
+            if (row != null && row.getHeartbeat() >= fresh && !instanceId.equals(row.getInstanceId())) {
+                if (!row.getExperienceId().equals(experienceId)) {
+                    throw new ResponseStatusException(404, "That server runs another experience");
                 }
-                r = open(requested, experienceId, maxPlayers, false, place);
+                if (row.getSeats() >= row.getMaxPlayers()) {
+                    throw new ResponseStatusException(409, "That server is full");
+                }
+                return new Placement(row.getId(), row.getSocketUrl(), null);
             }
-            if (!r.getExperienceId().equals(experienceId)) {
-                throw new ResponseStatusException(404, "That server runs another experience");
+            if (!requested.startsWith(PRIVATE_PREFIX) || requested.length() > 64) {
+                throw new ResponseStatusException(404, "That server has closed");
             }
-            if (!r.reserve(username)) {
-                throw new ResponseStatusException(409, "That server is full");
+            Placement elsewhere = claim(requested, experienceId, maxPlayers, row, fresh);
+            if (elsewhere != null) {
+                return elsewhere;
             }
-            return r;
+            return local(open(requested, experienceId, maxPlayers, false, place), username, experienceId);
         }
         for (PlayRoom r : rooms.values()) {
             if (r.isMatchmade() && r.getExperienceId().equals(experienceId) && r.reserve(username)) {
-                return r;
+                beat(r);
+                return new Placement(r.getId(), socketUrl, r);
             }
         }
-        PlayRoom r = open("srv-" + Ids.next(), experienceId, maxPlayers, true, place);
-        r.reserve(username);
-        return r;
+        for (PlayServer row : rows.liveOf(experienceId, fresh)) {
+            if (row.getPrivateRoom() == 0 && !instanceId.equals(row.getInstanceId())
+                    && row.getSeats() < row.getMaxPlayers()) {
+                // The owning instance takes the seat when the ticket connects;
+                // counting it here keeps a burst of joins from overfilling.
+                row.setSeats(row.getSeats() + 1);
+                rows.save(row);
+                return new Placement(row.getId(), row.getSocketUrl(), null);
+            }
+        }
+        return local(open("srv-" + Ids.next(), experienceId, maxPlayers, true, place), username, experienceId);
     }
 
-    private PlayRoom open(String id, String experienceId, int maxPlayers, boolean matchmade, PlaceDto place) {
-        PlayRoom r = new PlayRoom(id, experienceId, maxPlayers, matchmade, load(place));
+    /// Claims the directory row for a private room this instance is about to
+    /// open. Two instances asked for the same new private id at once both
+    /// reach here; the primary key lets exactly one insert win, and the loser
+    /// sends its player to the winner instead of opening a second copy. A row
+    /// left by a dead instance (`existing`, stale) is taken over.
+    private Placement claim(String id, String experienceId, int maxPlayers, PlayServer existing, long fresh) {
+        if (existing != null) {
+            rows.delete(existing);
+        }
+        PlayServer row = new PlayServer();
+        row.setId(id);
+        row.setExperienceId(experienceId);
+        row.setInstanceId(instanceId);
+        row.setSocketUrl(socketUrl);
+        row.setSeats(0);
+        row.setMaxPlayers(maxPlayers);
+        row.setPrivateRoom(1);
+        row.setHeartbeat(Clock.now());
+        try {
+            rows.insert(row);
+            return null;
+        } catch (RuntimeException lost) {
+            PlayServer winner = rows.findById(id);
+            if (winner == null || winner.getHeartbeat() < fresh || instanceId.equals(winner.getInstanceId())) {
+                throw new ResponseStatusException(409, "That server is starting; try again");
+            }
+            if (!winner.getExperienceId().equals(experienceId)) {
+                throw new ResponseStatusException(404, "That server runs another experience");
+            }
+            return new Placement(winner.getId(), winner.getSocketUrl(), null);
+        }
+    }
+
+    private Placement local(PlayRoom r, String username, String experienceId) {
+        if (!r.getExperienceId().equals(experienceId)) {
+            throw new ResponseStatusException(404, "That server runs another experience");
+        }
+        if (!r.reserve(username)) {
+            throw new ResponseStatusException(409, "That server is full");
+        }
+        beat(r);
+        return new Placement(r.getId(), socketUrl, r);
+    }
+
+    private PlayRoom open(String id, String experienceId, int maxPlayers, boolean matchmade, PlaceSource place)
+            throws IOException {
+        PlayRoom r = new PlayRoom(id, experienceId, maxPlayers, matchmade, load(place.place()));
         rooms.put(id, r);
-        r.start(new PlayRoom.Closed() {
+        beat(r);
+        r.start(new PlayRoom.Listener() {
             @Override
             public void closed(PlayRoom room) {
                 rooms.remove(room.getId(), room);
+                PlayServer row = rows.findById(room.getId());
+                if (row != null && instanceId.equals(row.getInstanceId())) {
+                    rows.delete(row);
+                }
+            }
+
+            @Override
+            public void joined(PlayRoom room, String username) {
+                if (events != null) {
+                    events.joined(room, username);
+                }
+            }
+
+            @Override
+            public void left(PlayRoom room, String username, long millis) {
+                if (events != null) {
+                    events.left(room, username, millis);
+                }
             }
         });
         return r;
+    }
+
+    /// Writes `r`'s row: owner, seats and a fresh heartbeat.
+    private void beat(PlayRoom r) {
+        PlayServer row = rows.findById(r.getId());
+        boolean fresh = row == null;
+        if (fresh) {
+            row = new PlayServer();
+            row.setId(r.getId());
+        }
+        row.setExperienceId(r.getExperienceId());
+        row.setInstanceId(instanceId);
+        row.setSocketUrl(socketUrl);
+        row.setSeats(r.getSeated());
+        row.setMaxPlayers(r.getMaxPlayers());
+        row.setPrivateRoom(r.isMatchmade() ? 0 : 1);
+        row.setHeartbeat(Clock.now());
+        if (fresh) {
+            rows.insert(row);
+        } else {
+            rows.save(row);
+        }
+    }
+
+    /// Beats for every room this instance runs and reaps rows no instance
+    /// beats for any more. [PlayHeartbeat] calls it on a schedule.
+    public void heartbeat() {
+        for (PlayRoom r : rooms.values()) {
+            if (!r.isClosed()) {
+                beat(r);
+            }
+        }
+        rows.reap(Clock.now() - STALE_MILLIS);
     }
 
     /// A SERVER engine with the place loaded and physics on.
@@ -97,11 +268,12 @@ public class PlayServers {
         return e;
     }
 
+    /// The room `id` when it runs on this instance.
     public PlayRoom room(String id) {
         return id == null ? null : rooms.get(id);
     }
 
-    /// The running servers of `experienceId`.
+    /// The running servers of `experienceId` on this instance.
     public List<PlayRoom> of(String experienceId) {
         List<PlayRoom> out = new ArrayList<PlayRoom>();
         for (PlayRoom r : rooms.values()) {
@@ -110,5 +282,12 @@ public class PlayServers {
             }
         }
         return out;
+    }
+
+    /// Closes every room this instance runs; for tests and shutdown.
+    public void closeAll() {
+        for (PlayRoom r : rooms.values()) {
+            r.close();
+        }
     }
 }

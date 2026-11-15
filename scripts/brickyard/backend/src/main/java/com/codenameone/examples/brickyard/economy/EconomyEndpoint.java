@@ -101,4 +101,19 @@ public class EconomyEndpoint implements EconomyApiServer {
     public PayoutDto requestPayout(PayoutDto payout) throws Exception {
         return economy.requestPayout(Caller.name(), payout);
     }
+
+    @Override
+    public ProductDto updateProduct(String productId, ProductDto product) throws Exception {
+        return economy.updateProduct(productId, product);
+    }
+
+    @Override
+    public ProductDto deactivateProduct(String productId) throws Exception {
+        return economy.deactivateProduct(productId);
+    }
+
+    @Override
+    public List<PayoutDto> myPayouts() throws Exception {
+        return economy.payoutsOf(Caller.name());
+    }
 }

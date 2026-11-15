@@ -45,9 +45,16 @@ public final class PlayRoom {
     public interface Link extends ReplicaServer.Link {
     }
 
-    /// Told when the room closes, so it can be dropped from the directory.
-    interface Closed {
+    /// Told when the room closes, so it can be dropped from the directory,
+    /// and when a player joins or leaves, for presence and analytics. Called
+    /// on the room's thread.
+    interface Listener {
         void closed(PlayRoom room);
+
+        void joined(PlayRoom room, String username);
+
+        /// `millis` connected, or -1 for a seat that never connected.
+        void left(PlayRoom room, String username, long millis);
     }
 
     private final String id;
@@ -61,9 +68,11 @@ public final class PlayRoom {
     /// Room thread only: the connected links and their replica handles.
     private final Map<Link, Integer> handles = new HashMap<Link, Integer>();
     private final Map<Link, String> owners = new HashMap<Link, String>();
+    /// Room thread only: when each connected username first connected.
+    private final Map<String, Long> since = new HashMap<String, Long>();
     private final AtomicBoolean closed = new AtomicBoolean();
     private ScheduledExecutorService thread;
-    private Closed onClosed;
+    private Listener listener;
     private long lastActive = System.currentTimeMillis();
 
     PlayRoom(String id, String experienceId, int maxPlayers, boolean matchmade, Engine engine) {
@@ -115,8 +124,8 @@ public final class PlayRoom {
     }
 
     /// Starts ticking at [#HZ] on a thread of its own.
-    void start(Closed whenClosed) {
-        onClosed = whenClosed;
+    void start(Listener l) {
+        listener = l;
         thread = Executors.newScheduledThreadPool(1);
         thread.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -139,6 +148,12 @@ public final class PlayRoom {
             public void run() {
                 handles.put(link, Integer.valueOf(server.connect(link, userId, username, display)));
                 owners.put(link, username);
+                if (!since.containsKey(username)) {
+                    since.put(username, Long.valueOf(System.currentTimeMillis()));
+                    if (listener != null) {
+                        listener.joined(PlayRoom.this, username);
+                    }
+                }
             }
         });
     }
@@ -168,6 +183,11 @@ public final class PlayRoom {
                 }
                 if (who != null && !owners.containsValue(who)) {
                     seats.remove(who);
+                    Long from = since.remove(who);
+                    if (listener != null) {
+                        listener.left(PlayRoom.this, who,
+                                from == null ? -1 : System.currentTimeMillis() - from.longValue());
+                    }
                 }
             }
         });
@@ -196,6 +216,9 @@ public final class PlayRoom {
         for (Map.Entry<String, Long> e : seats.entrySet()) {
             if (!owners.containsValue(e.getKey()) && now - e.getValue().longValue() > IDLE_MILLIS) {
                 seats.remove(e.getKey());
+                if (listener != null) {
+                    listener.left(this, e.getKey(), -1);
+                }
             }
         }
         if (seats.isEmpty() && now - lastActive <= IDLE_MILLIS && handles.isEmpty()) {
@@ -212,8 +235,8 @@ public final class PlayRoom {
         if (thread != null) {
             thread.shutdown();
         }
-        if (onClosed != null) {
-            onClosed.closed(this);
+        if (listener != null) {
+            listener.closed(this);
         }
     }
 

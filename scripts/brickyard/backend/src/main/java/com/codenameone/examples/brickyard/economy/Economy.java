@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.brickyard.economy;
 
+import com.codenameone.examples.brickyard.account.Limits;
 import com.codename1.appkit.server.Caller;
 import com.codename1.appkit.server.Text;
 import com.codename1.backend.ResponseStatusException;
@@ -35,6 +36,7 @@ import com.codenameone.examples.brickyard.api.PlayReportDto;
 import com.codenameone.examples.brickyard.api.PlusDto;
 import com.codenameone.examples.brickyard.api.ProductDto;
 import com.codenameone.examples.brickyard.api.ReceiptDto;
+import com.codenameone.examples.brickyard.api.StoreNotificationDto;
 import com.codenameone.examples.brickyard.api.WalletDto;
 import com.codenameone.examples.brickyard.domain.CatalogItem;
 import com.codenameone.examples.brickyard.domain.Experience;
@@ -46,6 +48,7 @@ import com.codenameone.examples.brickyard.domain.Product;
 import com.codenameone.examples.brickyard.domain.StorePurchase;
 import com.codenameone.examples.brickyard.moderation.Audit;
 import com.codenameone.examples.brickyard.moderation.Sanctions;
+import com.codenameone.examples.brickyard.repository.AccountRepository;
 import com.codenameone.examples.brickyard.repository.CatalogItemRepository;
 import com.codenameone.examples.brickyard.repository.ExperienceRepository;
 import com.codenameone.examples.brickyard.repository.OwnershipRepository;
@@ -88,11 +91,16 @@ public class Economy {
     private final PlayTimeRepository play;
     private final PayoutRequestRepository payouts;
     private final ExperienceRepository experiences;
+    private final AccountRepository accounts;
+    /// The parental spending limit, checked on every Bricks purchase.
+    private final Limits limits;
 
     public Economy(Wallet wallet, ReceiptValidator receipts, Sanctions sanctions, Audit audit,
             StorePurchaseRepository purchases, ProductRepository products, OwnershipRepository owned,
             CatalogItemRepository catalog, PlusSubscriptionRepository plus, PlayTimeRepository play,
-            PayoutRequestRepository payouts, ExperienceRepository experiences) {
+            PayoutRequestRepository payouts, ExperienceRepository experiences, AccountRepository accounts,
+            Limits limits) {
+        this.limits = limits;
         this.wallet = wallet;
         this.receipts = receipts;
         this.sanctions = sanctions;
@@ -105,6 +113,7 @@ public class Economy {
         this.play = play;
         this.payouts = payouts;
         this.experiences = experiences;
+        this.accounts = accounts;
     }
 
     /// The Bricks a store SKU grants, or 0 for Plus, or -1 for an unknown SKU.
@@ -121,23 +130,65 @@ public class Economy {
         return -1;
     }
 
-    /// Redeems a receipt once: the purchase is keyed by store and the store's
-    /// transaction id, so the same receipt sent twice is answered, not credited twice.
+    /// Redeems a receipt the app sent. See [#credit] for why it counts once.
     @Transactional(rollbackFor = IOException.class)
     public WalletDto redeem(String username, ReceiptDto r) throws IOException {
         sanctions.requireNotBanned(username);
         if (r == null || r.store() == null || r.sku() == null) {
             throw new ResponseStatusException(400, "A receipt needs a store and a SKU");
         }
-        long bricks = packBricks(r.sku());
+        credit(username, r.store(), r.sku(), r.transactionId(), r.receipt());
+        return wallet.describe(username);
+    }
+
+    /// A purchase the store reported to the server itself. The account the
+    /// app attached to the purchase is credited, after the same check with
+    /// the store and under the same key as [#redeem], so a purchase that
+    /// arrives both ways -- the store's notification and the app's receipt,
+    /// in either order -- is credited once. A ban does not stop it: the
+    /// player has paid, and a refund is staff's call.
+    @Transactional(rollbackFor = IOException.class)
+    public WalletDto notified(StoreNotificationDto n) throws IOException {
+        if (n == null || n.store() == null || n.sku() == null || n.account() == null) {
+            throw new ResponseStatusException(400, "A notification needs a store, a SKU and the account");
+        }
+        if (accounts.findById(n.account()) == null) {
+            throw new ResponseStatusException(404, "No such account");
+        }
+        credit(n.account(), n.store(), n.sku(), n.transactionId(), n.receipt());
+        return wallet.describe(n.account());
+    }
+
+    /// The store's name as the purchase key spells it: a receipt that says
+    /// "Apple" is the same purchase as one that says "apple".
+    static String storeKey(String store) {
+        String s = Text.required(store, 16, "the store").trim();
+        if (AppleReceiptValidator.STORE.equalsIgnoreCase(s)) {
+            return AppleReceiptValidator.STORE;
+        }
+        if (GooglePlayValidator.STORE.equalsIgnoreCase(s)) {
+            return GooglePlayValidator.STORE;
+        }
+        return s;
+    }
+
+    /// Credits a purchase once: it is keyed by the store and the transaction
+    /// id the store vouched for (never the one the caller claimed), so the
+    /// same purchase arriving again, by either path, is answered and not
+    /// credited twice. The key is the purchase row's primary key, so two
+    /// arriving at the same moment cannot both insert it.
+    private void credit(String username, String store, String sku, String transactionId, String receipt)
+            throws IOException {
+        long bricks = packBricks(sku);
         if (bricks < 0) {
             throw new ResponseStatusException(400, "No such product");
         }
-        String txn = receipts.verify(r.store(), r.sku(), r.transactionId(), r.receipt());
+        String key = storeKey(store);
+        String txn = receipts.verify(key, sku, transactionId, receipt);
         if (txn == null) {
             throw new ResponseStatusException(402, "The store did not accept that receipt");
         }
-        String id = Text.required(r.store(), 16, "the store") + "|" + txn;
+        String id = key + "|" + txn;
         if (id.length() > 400) {
             throw new ResponseStatusException(400, "That transaction id is too long");
         }
@@ -146,16 +197,16 @@ public class Economy {
             if (!existing.getUsername().equals(username)) {
                 throw new ResponseStatusException(409, "That receipt belongs to another account");
             }
-            return wallet.describe(username);
+            return;
         }
         StorePurchase p = new StorePurchase();
         p.setId(id);
         p.setUsername(username);
-        p.setSku(r.sku());
-        p.setBricks(PLUS_SKU.equals(r.sku()) ? PLUS_STIPEND : bricks);
+        p.setSku(sku);
+        p.setBricks(PLUS_SKU.equals(sku) ? PLUS_STIPEND : bricks);
         p.setCreatedAt(Clock.now());
         purchases.insert(p);
-        if (PLUS_SKU.equals(r.sku())) {
+        if (PLUS_SKU.equals(sku)) {
             PlusSubscription s = plus.findById(username);
             long now = Clock.now();
             boolean fresh = s == null;
@@ -174,7 +225,6 @@ public class Economy {
         } else {
             wallet.post(username, bricks, "PURCHASE", id);
         }
-        return wallet.describe(username);
     }
 
     public boolean isPlus(String username) {
@@ -215,10 +265,49 @@ public class Economy {
 
     public List<ProductDto> products(String experienceId) {
         List<ProductDto> out = new ArrayList<ProductDto>();
-        for (Product p : products.of(experienceId)) {
+        for (Product p : products.onSale(experienceId)) {
             out.add(toDto(p));
         }
         return out;
+    }
+
+    /// Renames or reprices a product; only the experience's owner may.
+    @Transactional(rollbackFor = IOException.class)
+    public ProductDto updateProduct(String productId, ProductDto request) throws IOException {
+        Product p = ownedProduct(productId);
+        if (request == null) {
+            throw new ResponseStatusException(400, "Nothing to change");
+        }
+        if (request.name() != null && request.name().trim().length() > 0) {
+            p.setName(Text.required(request.name(), 80, "a name").trim());
+        }
+        if (request.price() != 0) {
+            if (request.price() < 1 || request.price() > 1000000) {
+                throw new ResponseStatusException(400, "A price is between 1 and 1000000 Bricks");
+            }
+            p.setPrice(request.price());
+        }
+        products.save(p);
+        return toDto(p);
+    }
+
+    /// Takes a product off sale. Nothing is deleted: what players bought
+    /// stays in their inventory and the engine still answers that they own it.
+    @Transactional(rollbackFor = IOException.class)
+    public ProductDto deactivateProduct(String productId) throws IOException {
+        Product p = ownedProduct(productId);
+        p.setActive(0);
+        products.save(p);
+        return toDto(p);
+    }
+
+    private Product ownedProduct(String productId) {
+        Product p = productId == null ? null : products.findById(productId);
+        if (p == null || p.getActive() == 0) {
+            throw new ResponseStatusException(404, "No such product");
+        }
+        Access.requireOwner(experience(p.getExperienceId()));
+        return p;
     }
 
     /// A game pass is bought once; a developer product any number of times.
@@ -227,7 +316,7 @@ public class Economy {
     public OwnershipDto buyProduct(String username, String productId) throws IOException {
         sanctions.requireNotBanned(username);
         Product p = productId == null ? null : products.findById(productId);
-        if (p == null) {
+        if (p == null || p.getActive() == 0) {
             throw new ResponseStatusException(404, "No such product");
         }
         Experience e = experience(p.getExperienceId());
@@ -240,6 +329,7 @@ public class Economy {
         }
         Ownership o = ownership(pass ? username + "|" + p.getId() : Ids.next(), username, p.getId(),
                 e.getId(), p.getKind(), p.getPrice());
+        limits.spend(username, p.getPrice());
         wallet.post(username, -p.getPrice(), "BUY_" + p.getKind(), o.getId());
         wallet.post(e.getOwner(), p.getPrice() * CREATOR_SHARE / 100, "SALE", o.getId());
         owned.insert(o);
@@ -318,6 +408,7 @@ public class Economy {
             throw new ResponseStatusException(409, "You already own that item");
         }
         Ownership o = ownership(username + "|" + c.getId(), username, c.getId(), "", "ITEM", c.getPrice());
+        limits.spend(username, c.getPrice());
         wallet.post(username, -c.getPrice(), "BUY_ITEM", o.getId());
         owned.insert(o);
         return new OwnershipDto(c.getId(), username, 1);
@@ -412,6 +503,15 @@ public class Economy {
     public List<PayoutDto> pendingPayouts() {
         List<PayoutDto> out = new ArrayList<PayoutDto>();
         for (PayoutRequest p : payouts.withStatus("PENDING")) {
+            out.add(toDto(p));
+        }
+        return out;
+    }
+
+    /// A creator's own payout requests, newest first.
+    public List<PayoutDto> payoutsOf(String username) {
+        List<PayoutDto> out = new ArrayList<PayoutDto>();
+        for (PayoutRequest p : payouts.ofUser(username)) {
             out.add(toDto(p));
         }
         return out;

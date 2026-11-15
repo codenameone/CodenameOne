@@ -20,7 +20,8 @@ package com.codenameone.examples.brickyard.api;
 
 import com.codename1.annotations.Mapped;
 
-/// A badge a player holds.
+/// A badge a player holds, with the badge's name and description.
 @Mapped
-public record BadgeAwardDto(String badgeId, String experienceId, String userId, long awardedAt) {
+public record BadgeAwardDto(String badgeId, String experienceId, String userId, long awardedAt, String name,
+        String description) {
 }

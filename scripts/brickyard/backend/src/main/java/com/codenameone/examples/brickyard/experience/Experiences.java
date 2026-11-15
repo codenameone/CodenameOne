@@ -113,6 +113,16 @@ public class Experiences {
         return out;
     }
 
+    /// Everything `owner` created, drafts and unpublished ones included.
+    @Transactional(readOnly = true)
+    public List<ExperienceDto> mine(String owner) {
+        List<ExperienceDto> out = new ArrayList<ExperienceDto>();
+        for (Experience e : experiences.findByOwner(owner)) {
+            out.add(toDto(e));
+        }
+        return out;
+    }
+
     @Transactional(readOnly = true)
     public ExperienceDto describe(String id) {
         return toDto(visible(id));

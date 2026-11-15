@@ -44,6 +44,10 @@ public class Progress {
     @Column(nullable = false)
     private long lastLoginDay;
 
+    /// The season [#getSeasonXp] and [#getPremium] belong to.
+    @Column(nullable = false, type = "VARCHAR(32)")
+    private String seasonId = "";
+
     public Progress() {
     }
 
@@ -93,5 +97,13 @@ public class Progress {
 
     public void setLastLoginDay(long lastLoginDay) {
         this.lastLoginDay = lastLoginDay;
+    }
+
+    public String getSeasonId() {
+        return seasonId;
+    }
+
+    public void setSeasonId(String seasonId) {
+        this.seasonId = seasonId;
     }
 }

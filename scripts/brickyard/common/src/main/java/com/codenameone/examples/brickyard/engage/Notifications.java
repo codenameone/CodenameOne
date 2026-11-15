@@ -21,6 +21,9 @@ package com.codenameone.examples.brickyard.engage;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.push.PushClient;
+import com.codenameone.examples.brickyard.api.PushDeviceDto;
+import com.codenameone.examples.brickyard.net.Api;
+import com.codenameone.examples.brickyard.net.Net;
 import com.codename1.push.PushError;
 import com.codename1.push.PushListener;
 import com.codename1.push.PushMessage;
@@ -57,13 +60,13 @@ public final class Notifications {
             return;
         }
         if (client == null) {
-            client = PushClient.builder(AppConfig.PUSH_APP_KEY).listener(new Listener()).build();
+            client = PushClient.builder(AppConfig.pushAppKey()).listener(new Listener()).build();
         }
         client.register();
     }
 
     public static boolean available() {
-        if (AppConfig.PUSH_APP_KEY.length() == 0 || CN.isSimulator()) {
+        if (AppConfig.pushAppKey().length() == 0 || CN.isSimulator()) {
             return false;
         }
         String platform = CN.getPlatformName();
@@ -75,10 +78,23 @@ public final class Notifications {
         return subscription;
     }
 
+    /// Tells the backend where to reach this account (friend requests, a
+    /// followed creator publishing). Called on registration and again after
+    /// signing in, since a token registered signed out belongs to nobody.
+    public static void registerWithServer() {
+        PushSubscription s = subscription;
+        if (s == null || Session.user() == null) {
+            return;
+        }
+        Api.account().registerDevice(new PushDeviceDto(s.getTransportId(), s.getToken(), s.getPlatform()),
+                Net.to(saved -> { }, (status, message) -> Log.p("Push device not registered: " + message)));
+    }
+
     private static final class Listener implements PushListener {
         @Override
         public void onRegistration(PushSubscription registered) {
             subscription = registered;
+            registerWithServer();
         }
 
         @Override

@@ -73,6 +73,11 @@ public class PlaySocket implements WebSocket {
             session.close(4401, "ticket");
             return;
         }
+        // A ticket issued by another instance's matchmaking took no seat here yet.
+        if (!room.reserve(seat.username)) {
+            session.close(4409, "full");
+            return;
+        }
         Bound b = new Bound(room, session);
         session.setAttachment(b);
         String display = accounts.describe(seat.username).displayName();

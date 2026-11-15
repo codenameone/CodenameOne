@@ -18,6 +18,10 @@
  */
 package com.codenameone.examples.brickyard.ui;
 
+import com.codename1.ui.Label;
+import com.codenameone.examples.brickyard.api.LimitsDto;
+import com.codenameone.examples.brickyard.net.Api;
+import com.codenameone.examples.brickyard.net.Net;
 import com.codename1.io.Preferences;
 import com.codename1.ui.Command;
 import com.codename1.ui.Dialog;
@@ -34,7 +38,9 @@ import java.util.Calendar;
 
 /// Settings: the age gate's answer, the parental controls (a monthly Bricks
 /// spending limit and chat), notifications, analytics, and signing out. The
-/// parental controls are kept on this device.
+/// parental controls are kept and enforced by the server (a purchase past the
+/// limit, or a chat line with chat off, is refused there); this device keeps
+/// a copy so the shop can warn before asking.
 public final class SettingsForm {
     static final int CHILD_AGE = 13;
     static final int CHILD_DEFAULT_LIMIT = 0;
@@ -66,17 +72,37 @@ public final class SettingsForm {
                 "spendLimit");
         int current = limit(age);
         limit.setText(current < 0 ? "" : String.valueOf(current));
+        final Switch chat = new Switch();
+        final Label spentLabel = Ui.label("Spent this month: " + spent() + " Bricks", "Muted");
+        final boolean[] loaded = {false};
         limit.addDataChangedListener((type, index) -> {
             String t = limit.getText().trim();
             Preferences.set(LIMIT, t.length() == 0 ? -1 : parse(t));
+            if (loaded[0]) {
+                saveLimits(limit, chat);
+            }
         });
         f.add(limit);
-        f.add(Ui.label("Spent this month: " + spent() + " Bricks", "Muted"));
-        Switch chat = new Switch();
+        f.add(spentLabel);
         chat.setName("chatSwitch");
         chat.setValue(chatEnabled(age));
-        chat.addChangeListener(e -> Preferences.set(CHAT, chat.isValue()));
+        chat.addChangeListener(e -> {
+            Preferences.set(CHAT, chat.isValue());
+            if (loaded[0]) {
+                saveLimits(limit, chat);
+            }
+        });
         f.add(Ui.panel(Ui.label("Chat in experiences", "Body"), chat));
+        // The server's limits are the ones that count.
+        Api.account().limits(Net.to(l -> {
+            limit.setText(l.spendLimit() < 0 ? "" : String.valueOf(l.spendLimit()));
+            chat.setValue(l.chatEnabled());
+            spentLabel.setText("Spent this month: " + l.spent() + " Bricks");
+            Preferences.set(LIMIT, (int) l.spendLimit());
+            Preferences.set(CHAT, l.chatEnabled());
+            loaded[0] = true;
+            f.revalidate();
+        }, (status, message) -> loaded[0] = true));
 
         f.add(Ui.label("App", "RowTitle"));
         Switch push = new Switch();
@@ -97,6 +123,12 @@ public final class SettingsForm {
         }
         f.add(Ui.secondary("Sign out", "signOutButton", e -> Nav.signOut()));
         f.show();
+    }
+
+    private static void saveLimits(TextField limit, Switch chat) {
+        String t = limit.getText().trim();
+        int v = t.length() == 0 ? -1 : parse(t);
+        Api.account().saveLimits(new LimitsDto(v, 0, chat.isValue()), Net.to(saved -> { }, Ui::failed));
     }
 
     static int age(int birthYear, int thisYear) {

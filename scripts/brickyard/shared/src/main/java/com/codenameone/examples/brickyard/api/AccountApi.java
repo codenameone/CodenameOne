@@ -48,4 +48,15 @@ public interface AccountApi {
 
     @GET("/api/me/friends")
     void friends(OnComplete<Response<List<FriendDto>>> callback);
+    /// The caller's profile, avatar colours included.
+    @GET("/api/me/profile")
+    void profile(OnComplete<Response<ProfileDto>> callback);
+    /// Registers this device for push notifications.
+    @POST("/api/me/devices")
+    void registerDevice(@Body PushDeviceDto device, OnComplete<Response<PushDeviceDto>> callback);
+    @GET("/api/me/limits")
+    void limits(OnComplete<Response<LimitsDto>> callback);
+    /// Sets the parental limits; a player under 13 cannot turn them off themselves.
+    @POST("/api/me/limits")
+    void saveLimits(@Body LimitsDto limits, OnComplete<Response<LimitsDto>> callback);
 }
