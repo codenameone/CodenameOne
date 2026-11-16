@@ -163,6 +163,55 @@ class PlayRoomTest {
         assertEquals(2, room.getServer().getPlayerCount());
     }
 
+    @Test
+    void leaderstatsReachTheLeaderboardsAsDeltas() {
+        Engine s = new Engine(Engine.SERVER);
+        Instance script = s.create("Script");
+        script.setName("Stats");
+        script.put("Source", "game.Players.PlayerAdded:Connect(function(p)\n"
+                + "  local ls = Instance.new('Folder'); ls.Name = 'leaderstats'; ls.Parent = p\n"
+                + "  local w = Instance.new('IntValue'); w.Name = 'Wins'; w.Value = 5; w.Parent = ls\n"
+                + "  local n = Instance.new('StringValue'); n.Name = 'Rank'; n.Value = 'Gold'; n.Parent = ls\n"
+                + "  task.delay(0.5, function() w.Value = 8 end)\n"
+                + "end)\n");
+        script.setParent(s.service("ServerScriptService"));
+        PlayRoom room = new PlayRoom("t3", "x", 4, true, s);
+        final List<String> scores = new ArrayList<String>();
+        room.listen(new PlayRoom.Listener() {
+            @Override
+            public void closed(PlayRoom r) {
+            }
+
+            @Override
+            public void joined(PlayRoom r, String username) {
+            }
+
+            @Override
+            public void left(PlayRoom r, String username, long millis) {
+            }
+
+            @Override
+            public void scored(PlayRoom r, String username, String stat, long delta) {
+                scores.add(username + " " + stat + " " + delta);
+            }
+        });
+        Player alice = new Player(room);
+        room.connect(alice.down, 1, "alice@x", "Alice");
+        long now = 1000000;
+        for (int f = 0; f < 120; f++) {
+            now += 1000 / 60;
+            room.frame(now);
+            alice.frame();
+            if (f == 10) {
+                // A late first frame takes the baseline: 5 is not a score.
+                now += PlayRoom.SCORE_MILLIS;
+            }
+        }
+        room.frame(now + PlayRoom.SCORE_MILLIS);
+        assertEquals("[alice@x Wins 3]", scores.toString(),
+                "only the rise is reported, and a string stat never is");
+    }
+
     private static Engine place() {
         Engine s = new Engine(Engine.SERVER);
         Instance ping = s.create("RemoteEvent");

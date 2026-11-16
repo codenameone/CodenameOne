@@ -118,6 +118,12 @@ final class TemplateGallery {
         if ("simulator".equals(id)) {
             return "Simulator";
         }
+        if ("survival".equals(id)) {
+            return "Disaster Island";
+        }
+        if ("town".equals(id)) {
+            return "Brick Town";
+        }
         return id;
     }
 
@@ -128,6 +134,12 @@ final class TemplateGallery {
         }
         if ("rainbow".equals(id)) {
             return "Obby";
+        }
+        if ("survival".equals(id)) {
+            return "Survival";
+        }
+        if ("town".equals(id)) {
+            return "Roleplay";
         }
         return "arena".equals(id) ? "Fighting" : title(id);
     }
@@ -153,6 +165,12 @@ final class TemplateGallery {
         }
         if ("simulator".equals(id)) {
             return "Mine, sell, upgrade, repeat.";
+        }
+        if ("survival".equals(id)) {
+            return "Floods, meteors and a tornado. Outlast each round.";
+        }
+        if ("town".equals(id)) {
+            return "Houses, a cafe and a park. Get a job and hang out.";
         }
         return "";
     }

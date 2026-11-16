@@ -23,6 +23,7 @@ import com.codenameone.examples.brickyard.api.LeaderDto;
 import com.codenameone.examples.brickyard.api.LeaderboardApiServer;
 import com.codenameone.examples.brickyard.api.ScoreWriteDto;
 import com.codenameone.examples.brickyard.api.StatBoundDto;
+import com.codenameone.examples.brickyard.api.StatDto;
 
 import java.util.List;
 
@@ -51,8 +52,12 @@ public class LeaderboardEndpoint implements LeaderboardApiServer {
     }
 
     @Override
-    public List<String> stats(String id) throws Exception {
-        return boards.stats(id);
+    public List<StatDto> stats(String id) throws Exception {
+        List<StatDto> out = new java.util.ArrayList<StatDto>();
+        for (String name : boards.stats(id)) {
+            out.add(new StatDto(name));
+        }
+        return out;
     }
 
     @Override

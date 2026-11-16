@@ -65,6 +65,10 @@ public class PlayServers {
         /// `username` left `room` after `millis` connected, or gave up a
         /// seat they never connected to (`millis` is -1).
         void left(PlayRoom room, String username, long millis);
+
+        /// A leaderstat of `username` in `room` rose by `delta`.
+        default void scored(PlayRoom room, String username, String stat, long delta) {
+        }
     }
 
     /// Where a join landed: the server, the socket URL of the instance that
@@ -92,6 +96,18 @@ public class PlayServers {
         this.events = events;
         this.instanceId = instanceId;
         this.socketUrl = socketUrl == null ? "" : socketUrl;
+    }
+
+    /// Seated players per experience over every live server, on any instance.
+    public Map<String, Long> playingNow() {
+        Map<String, Long> out = new java.util.HashMap<String, Long>();
+        for (PlayServer row : rows.live(Clock.now() - STALE_MILLIS)) {
+            if (row.getSeats() > 0) {
+                Long n = out.get(row.getExperienceId());
+                out.put(row.getExperienceId(), (n == null ? 0 : n.longValue()) + row.getSeats());
+            }
+        }
+        return out;
     }
 
     public String getInstanceId() {
@@ -217,6 +233,13 @@ public class PlayServers {
             public void left(PlayRoom room, String username, long millis) {
                 if (events != null) {
                     events.left(room, username, millis);
+                }
+            }
+
+            @Override
+            public void scored(PlayRoom room, String username, String stat, long delta) {
+                if (events != null) {
+                    events.scored(room, username, stat, delta);
                 }
             }
         });

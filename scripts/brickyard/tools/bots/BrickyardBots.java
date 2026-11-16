@@ -65,6 +65,11 @@ public final class BrickyardBots {
     static final String[] COURSE = {"Step1", "Step2", "Step3", "Step4", "Step5", "Stage1", "Ramp", "Beam",
         "Checkpoint2", "SpinDeck", "Mover", "Landing", "Spiral1", "Spiral2", "Spiral3", "Spiral4", "Spiral5",
         "Spiral6", "Spiral7", "Spiral8", "Finish"};
+    /// The rainbow template's course.
+    static final String[] RAINBOW = {"RedJump1", "RedJump2", "RedJump3", "RedJump4", "RedJump5", "Stage1",
+        "OrangeStrip", "Stage2", "YellowBeam1", "YellowBeam2", "YellowBeam3", "YellowBeam4", "Stage3",
+        "GreenGlider", "Stage4", "BlueDeck", "Stage5", "PurpleStep1", "PurpleStep2", "PurpleStep3", "PurpleStep4",
+        "PurpleStep5", "PurpleStep6", "Rainbow", "Finish"};
     private static final String[] GREETINGS = {"hey!", "hi everyone", "yo"};
     private static final String[] REPLIES = {"nice", "lol", "let's go", "same", "haha"};
 
@@ -108,10 +113,18 @@ public final class BrickyardBots {
             System.out.println(a + " joined " + bot.ticketServer);
         }
         long end = System.nanoTime() + (long) (seconds * 1e9);
+        long presenceAt = System.nanoTime() + 60_000_000_000L;
         long next = System.nanoTime();
         while (System.nanoTime() < end) {
             for (Bot bot : bots) {
                 bot.frame();
+            }
+            if (System.nanoTime() > presenceAt) {
+                // Presence lapses after two minutes; the app refreshes it every minute.
+                presenceAt = System.nanoTime() + 60_000_000_000L;
+                for (Bot bot : bots) {
+                    b.presence(bot);
+                }
             }
             next += 16_666_667L;
             long wait = next - System.nanoTime();
@@ -172,8 +185,18 @@ public final class BrickyardBots {
         }
         url += (url.indexOf('?') < 0 ? "?" : "&") + "ticket=" + field(r.body(), "ticket");
         Bot bot = new Bot(index, field(r.body(), "serverId"));
+        bot.token = token;
+        bot.experience = experience;
         bot.socket = http.newWebSocketBuilder().buildAsync(URI.create(url), bot).join();
         return bot;
+    }
+
+    private void presence(Bot bot) {
+        String body = "{\"username\":\"\",\"status\":\"IN_GAME\",\"experienceId\":\"" + bot.experience
+                + "\",\"serverId\":\"" + bot.ticketServer + "\",\"updatedAt\":0}";
+        http.sendAsync(HttpRequest.newBuilder(URI.create(server + "/api/me/presence"))
+                .header("Authorization", "Bearer " + bot.token).header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.discarding());
     }
 
     private static String form(String... kv) {
@@ -206,6 +229,8 @@ public final class BrickyardBots {
         final Random random;
         final String ticketServer;
         final int index;
+        String token;
+        String experience;
         WebSocket socket;
         java.util.concurrent.CompletableFuture<WebSocket> sending =
                 java.util.concurrent.CompletableFuture.completedFuture(null);
@@ -222,6 +247,8 @@ public final class BrickyardBots {
         /// racing; a human saying "race" starts it.
         int leg = -1;
         int raceFrom;
+        /// The stops of the course this place has: [#COURSE] or [#RAINBOW].
+        String[] course = COURSE;
 
         Bot(int index, String ticketServer) {
             this.index = index;
@@ -383,7 +410,7 @@ public final class BrickyardBots {
                 Input.move(engine, 0, 0);
                 return true;
             }
-            Instance stop = leg < COURSE.length ? find(COURSE[leg]) : null;
+            Instance stop = leg < course.length ? find(course[leg]) : null;
             if (stop == null) {
                 leg = -1;
                 return false;
@@ -392,8 +419,8 @@ public final class BrickyardBots {
             if (jumpedTo > 15) {
                 // Respawned: carry on from the closest stop.
                 double best = Double.MAX_VALUE;
-                for (int i = 0; i < COURSE.length; i++) {
-                    Instance p = find(COURSE[i]);
+                for (int i = 0; i < course.length; i++) {
+                    Instance p = find(course[i]);
                     if (p != null) {
                         double[] q = Behaviors.position(p);
                         double d = Math.abs(q[0] - at[0]) + Math.abs(q[1] - at[1]) + Math.abs(q[2] - at[2]);
@@ -403,7 +430,7 @@ public final class BrickyardBots {
                         }
                     }
                 }
-                stop = find(COURSE[leg]);
+                stop = find(course[leg]);
             }
             double[] q = Behaviors.position(stop);
             Object sz = stop.prop("Size");
@@ -416,7 +443,7 @@ public final class BrickyardBots {
             lastZ = at[2];
             if (len < 1.8 && feet > top - 1.5) {
                 leg++;
-                if (leg >= COURSE.length) {
+                if (leg >= course.length) {
                     leg = -1;
                     say(index == 0 ? "made it! gg" : "gg, that spinner got me");
                     Input.move(engine, 0, 0);
@@ -424,7 +451,7 @@ public final class BrickyardBots {
                 return true;
             }
             Input.move(engine, dx / Math.max(len, 1e-6), -dz / Math.max(len, 1e-6));
-            boolean up = top > feet + 0.6;
+            boolean up = top > feet + 0.6 || killAhead(at, dx / Math.max(len, 1e-6), dz / Math.max(len, 1e-6));
             boolean gap = len > 3.5 && len < 11;
             if ((up || gap) && frame > jumpUntil + 20) {
                 Input.key(engine, "Space", true);
@@ -433,6 +460,24 @@ public final class BrickyardBots {
                 Input.key(engine, "Space", false);
             }
             return true;
+        }
+
+        /// A kill brick in the next couple of studs: hop it.
+        boolean killAhead(double[] at, double ux, double uz) {
+            for (Instance d : engine.getWorkspace().descendants()) {
+                if (!"KillBrick".equals(d.getName()) || !d.isA("BasePart")) {
+                    continue;
+                }
+                double[] q = Behaviors.position(d);
+                double ax = at[0] + ux * 1.8 - q[0];
+                double az = at[2] + uz * 1.8 - q[2];
+                Object sz = d.prop("Size");
+                if (sz instanceof Vector3 && Math.abs(ax) < ((Vector3) sz).x / 2 + 0.5
+                        && Math.abs(az) < ((Vector3) sz).z / 2 + 0.5 && Math.abs(at[1] - 3 - q[1]) < 2) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         Instance find(String name) {
@@ -455,6 +500,7 @@ public final class BrickyardBots {
             if (t.contains("race") || t.contains("go!")) {
                 // Leo is off at once, Sam a beat later: a race, not a parade.
                 leg = 0;
+                course = find(RAINBOW[0]) != null ? RAINBOW : COURSE;
                 raceFrom = frame + 60 + index * 100;
             }
             if (t.contains("race") || t.contains("follow")) {

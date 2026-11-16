@@ -72,6 +72,11 @@ public interface ExperienceApi {
     @POST("/api/experiences/{id}/vote")
     void vote(@Path("id") String id, @Body VoteDto vote, OnComplete<Response<ExperienceDto>> callback);
 
+    /// Players in each experience right now, for the "N playing" on a tile;
+    /// an experience nobody is in is left out.
+    @GET("/api/playing")
+    void playing(OnComplete<Response<List<PlayingDto>>> callback);
+
     /// The caller's own experiences, drafts included.
     @GET("/api/me/experiences")
     void mine(OnComplete<Response<List<ExperienceDto>>> callback);

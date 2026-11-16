@@ -1195,3 +1195,64 @@ StudioNodeSelectedTouch {
     text-align: left;
     border: none;
 }
+
+/* Leaderboards: period tabs, the stat picker and the friends filter. */
+Tabs, TabsContainer {
+    background-color: var(--bg);
+    padding: 0;
+    margin: 0;
+    border: none;
+}
+
+Tab, SelectedTab {
+    font-size: 3mm;
+    padding: 2mm 1mm;
+    margin: 0.5mm;
+    text-align: center;
+    border: none;
+    border-radius: 3mm;
+}
+
+Tab {
+    color: var(--muted);
+    background-color: transparent;
+}
+
+SelectedTab {
+    color: #121215;
+    background-color: var(--text);
+    font-weight: bold;
+}
+
+ComboBox, ComboBoxItem, ComboBoxList, PopupContentPane {
+    color: var(--text);
+    background-color: var(--card);
+    font-size: 3mm;
+    padding: 1.5mm;
+    border: none;
+}
+
+ComboBoxItem.selected {
+    background-color: var(--blue);
+}
+
+CheckBox {
+    color: var(--text);
+    background-color: transparent;
+    font-size: 3mm;
+}
+
+RankValue {
+    color: var(--yellow);
+    font-size: 3.5mm;
+    font-weight: bold;
+    background-color: transparent;
+}
+
+RankNumber {
+    color: var(--muted);
+    font-size: 3.5mm;
+    font-weight: bold;
+    padding: 0 2mm 0 0;
+    background-color: transparent;
+}

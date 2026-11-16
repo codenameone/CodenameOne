@@ -230,10 +230,12 @@ public final class PlaySession {
             }
         });
         Friends.presence(title);
+        PlayMcp.setEngine(engine, view);
         final Runnable leave = new Runnable() {
             @Override
             public void run() {
                 view.setPaused(true);
+                PlayMcp.setEngine(null, null);
                 if (onLeave != null) {
                     onLeave.run();
                 }

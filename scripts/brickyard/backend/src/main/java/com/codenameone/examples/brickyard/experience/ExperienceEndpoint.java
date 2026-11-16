@@ -27,6 +27,7 @@ import com.codenameone.examples.brickyard.api.JoinDto;
 import com.codenameone.examples.brickyard.api.JoinTicketDto;
 import com.codenameone.examples.brickyard.api.PresenceDto;
 import com.codenameone.examples.brickyard.api.PlaceDto;
+import com.codenameone.examples.brickyard.api.PlayingDto;
 import com.codenameone.examples.brickyard.api.PlaceUploadDto;
 import com.codenameone.examples.brickyard.api.RollbackDto;
 import com.codenameone.examples.brickyard.api.ThumbnailDto;
@@ -148,6 +149,15 @@ public class ExperienceEndpoint implements ExperienceApiServer {
                 });
         social.setPresence(me, new PresenceDto(me, "IN_GAME", id, at.serverId, 0));
         return new JoinTicketDto(tickets.issue(me, at.serverId), at.serverId, PlayTickets.TICKET_SECONDS, at.url);
+    }
+
+    @Override
+    public List<PlayingDto> playing() throws Exception {
+        List<PlayingDto> out = new java.util.ArrayList<PlayingDto>();
+        for (java.util.Map.Entry<String, Long> e : servers.playingNow().entrySet()) {
+            out.add(new PlayingDto(e.getKey(), e.getValue().longValue()));
+        }
+        return out;
     }
 
     @Override

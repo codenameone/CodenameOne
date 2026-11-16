@@ -75,8 +75,14 @@ public final class LeaderboardForm {
         f.add(BorderLayout.CENTER, tabs);
         f.show();
         // The stats this experience really has entries for.
-        Api.leaderboards().stats(experienceId, Net.to(names -> {
-            if (names != null && !names.isEmpty()) {
+        Api.leaderboards().stats(experienceId, Net.to(found -> {
+            List<String> names = new java.util.ArrayList<String>();
+            if (found != null) {
+                for (com.codenameone.examples.brickyard.api.StatDto d : found) {
+                    names.add(d.name());
+                }
+            }
+            if (!names.isEmpty()) {
                 stat.setModel(new DefaultListModel<String>(names));
                 stat.setSelectedIndex(0);
                 f.revalidate();
@@ -95,8 +101,11 @@ public final class LeaderboardForm {
                 list.add(Ui.label("No scores yet. Be the first.", "Muted"));
             } else {
                 for (LeaderDto r : rows) {
-                    list.add(Ui.panel(Ui.label("#" + r.rank() + "  " + r.name() + "  " + r.value(),
-                            "CardTitle")));
+                    Container row = com.codename1.ui.layouts.BorderLayout.centerEastWest(
+                            Ui.person(r.name(), "CardTitle"), Ui.label(String.valueOf(r.value()), "RankValue"),
+                            Ui.label("#" + r.rank(), "RankNumber"));
+                    row.setUIID("Panel");
+                    list.add(row);
                 }
             }
             list.revalidate();

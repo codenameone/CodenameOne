@@ -97,10 +97,15 @@ public class Leaderboards {
         if (score == null) {
             throw new ResponseStatusException(400, "There is no score");
         }
-        String stat = stat(score.stat());
-        String user = accounts.account(score.userId()).getUsername();
+        return record(experienceId, score.stat(), accounts.account(score.userId()).getUsername(), score.delta());
+    }
+
+    /// Adds `delta` to `user`'s `stat` in today's entry, after the per-minute
+    /// bound; what a live server's leaderstats report goes through here too.
+    public LeaderDto record(String experienceId, String statName, String user, long delta) throws IOException {
+        String stat = stat(statName);
         long now = Clock.now();
-        long moved = Math.abs(score.delta());
+        long moved = Math.abs(delta);
         for (ScoreWrite w : writes.since(experienceId, stat, user, now - Clock.MINUTE)) {
             moved += Math.abs(w.getDelta());
         }
@@ -111,7 +116,7 @@ public class Leaderboards {
             f.setExperienceId(experienceId);
             f.setStat(stat);
             f.setUserId(user);
-            f.setDelta(score.delta());
+            f.setDelta(delta);
             f.setReason(stat + " moved " + moved + " in a minute; the bound is " + max);
             f.setCreatedAt(now);
             flags.insert(f);
@@ -122,7 +127,7 @@ public class Leaderboards {
         w.setExperienceId(experienceId);
         w.setStat(stat);
         w.setUserId(user);
-        w.setDelta(score.delta());
+        w.setDelta(delta);
         w.setWrittenAt(now);
         writes.insert(w);
         long day = Clock.dayOf(now);
@@ -135,11 +140,11 @@ public class Leaderboards {
             e.setStat(stat);
             e.setUserId(user);
             e.setDayStart(day);
-            e.setStatValue(score.delta());
+            e.setStatValue(delta);
             entries.insert(e);
         } else {
             e = today.get(0);
-            e.setStatValue(e.getStatValue() + score.delta());
+            e.setStatValue(e.getStatValue() + delta);
             entries.save(e);
         }
         return new LeaderDto(0, publicId(user), accounts.publicName(user), e.getStatValue());

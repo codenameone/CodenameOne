@@ -20,6 +20,7 @@ package com.codenameone.examples.brickyard.play;
 
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.brickyard.analytics.Analytics;
+import com.codenameone.examples.brickyard.leaderboard.Leaderboards;
 import com.codenameone.examples.brickyard.social.Social;
 
 /// What a room's players mean to the rest of the backend: a VISIT when one
@@ -29,10 +30,24 @@ import com.codenameone.examples.brickyard.social.Social;
 public class PlayEvents implements PlayServers.Events {
     private final Social social;
     private final Analytics analytics;
+    private final Leaderboards leaderboards;
 
-    public PlayEvents(Social social, Analytics analytics) {
+    public PlayEvents(Social social, Analytics analytics, Leaderboards leaderboards) {
         this.social = social;
         this.analytics = analytics;
+        this.leaderboards = leaderboards;
+    }
+
+    /// A leaderstat rose on a live server: the experience's leaderboards
+    /// take it, through the same per-minute bound a write from an engine
+    /// passes. A change past the bound is flagged and dropped, not thrown.
+    @Override
+    public void scored(PlayRoom room, String username, String stat, long delta) {
+        try {
+            leaderboards.record(room.getExperienceId(), stat, username, delta);
+        } catch (Exception err) {
+            System.out.println("Leaderboard write refused: " + err.getMessage());
+        }
     }
 
     @Override

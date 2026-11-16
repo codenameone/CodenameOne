@@ -115,7 +115,8 @@ class ProfileLimitsTest {
         Api.json(mvc, Api.asEngine(Api.body(post("/api/leaderboards/" + id + "/scores"),
                 "{\"stat\":\"Wins\",\"userId\":\"" + owner + "\",\"delta\":1}")));
         List stats = Api.list(mvc, Api.as(get("/api/experiences/" + id + "/stats"), owner));
-        assertEquals("[Coins, Wins]", stats.toString());
-        assertFalse(stats.contains("score"));
+        // Records, not bare strings: the app fetches this as a mapped list.
+        assertEquals("[{name=Coins}, {name=Wins}]", stats.toString());
+        assertFalse(stats.toString().contains("score"));
     }
 }

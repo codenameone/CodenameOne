@@ -22,6 +22,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.brickyard.api.ExperienceDto;
+import com.codenameone.examples.brickyard.api.PlayingDto;
 import com.codenameone.examples.brickyard.api.PresenceDto;
 import com.codenameone.examples.brickyard.api.QuestDto;
 import com.codenameone.examples.brickyard.net.Api;
@@ -50,6 +51,21 @@ public final class HomeForm {
         content.add(Ui.bricks());
         content.add(Ui.label("Loading...", "Muted"));
         f.show();
+        // Live player counts first, so the tiles can say how many are in each
+        // game; a failed count only loses the "playing" line.
+        Api.experiences().playing(Net.to(counts -> {
+            PLAYING.clear();
+            for (PlayingDto c : counts) {
+                PLAYING.put(c.experienceId(), Long.valueOf(c.players()));
+            }
+            browse(content, f);
+        }, (status, message) -> browse(content, f)));
+    }
+
+    /// Players in each experience now, from the last refresh of Home.
+    static final java.util.Map<String, Long> PLAYING = new java.util.HashMap<String, Long>();
+
+    private static void browse(final Container content, final Form f) {
         Api.experiences().browse(null, Net.to(all -> {
             content.removeAll();
             content.add(Ui.bricks());
@@ -134,7 +150,7 @@ public final class HomeForm {
                     continue;
                 }
                 String game = titleOf(all, p.experienceId());
-                row.add(Ui.panel(Ui.label(p.username(), "CardTitle"),
+                row.add(Ui.panel(Ui.person(p.username(), "CardTitle"),
                         Ui.label(game == null ? "Playing" : "Playing " + game, "CardMeta"),
                         Ui.primary("Join", "homeJoin" + p.username(), e -> FriendsForm.join(p.username()))));
             }
@@ -157,6 +173,7 @@ public final class HomeForm {
     }
 
     static void fill(Container content, List<ExperienceDto> all) {
+        com.codenameone.examples.brickyard.play.PlayMcp.catalog(all);
         if (all == null || all.isEmpty()) {
             content.add(Ui.text("Nothing is published yet. Make the first experience in Create.", "Muted"));
             return;
@@ -204,6 +221,9 @@ public final class HomeForm {
 
     static String meta(ExperienceDto e) {
         int rating = Experiences.rating(e);
-        return (rating < 0 ? "New" : rating + "% liked") + "  -  " + ExperienceForm.count(e.visits(), "visit");
+        Long now = PLAYING.get(e.id());
+        String reach = now != null && now.longValue() > 0 ? now + " playing"
+                : ExperienceForm.count(e.visits(), "visit");
+        return (rating < 0 ? "New" : rating + "% liked") + "  -  " + reach;
     }
 }

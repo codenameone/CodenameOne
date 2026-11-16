@@ -87,7 +87,7 @@ public final class FriendsForm {
             return;
         }
         for (FriendDto friend : friends) {
-            list.add(Ui.panel(Ui.label(friend.username(), "CardTitle")));
+            list.add(Ui.panel(Ui.person(friend.username(), "CardTitle")));
         }
     }
 
@@ -116,7 +116,7 @@ public final class FriendsForm {
     static Container row(final String username, final PresenceDto p) {
         final Label what = Ui.label(status(p), "CardMeta");
         if (!inGame(p)) {
-            return Ui.panel(Ui.label(username, "CardTitle"), what);
+            return Ui.panel(Ui.person(username, "CardTitle"), what);
         }
         Api.experiences().experience(p.experienceId(), Net.to(e -> {
             what.setText("Playing " + e.title());
@@ -124,7 +124,7 @@ public final class FriendsForm {
                 what.getParent().revalidate();
             }
         }, (status, message) -> { }));
-        return Ui.panel(Ui.label(username, "CardTitle"), what,
+        return Ui.panel(Ui.person(username, "CardTitle"), what,
                 Ui.primary("Join", "join" + username, e -> join(username)));
     }
 

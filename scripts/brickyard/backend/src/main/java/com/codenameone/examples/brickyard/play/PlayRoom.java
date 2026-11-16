@@ -19,6 +19,7 @@
 package com.codenameone.examples.brickyard.play;
 
 import com.codename1.rbx.Engine;
+import com.codename1.rbx.Instance;
 import com.codename1.rbx.ReplicaServer;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,7 +56,14 @@ public final class PlayRoom {
 
         /// `millis` connected, or -1 for a seat that never connected.
         void left(PlayRoom room, String username, long millis);
+
+        /// A leaderstat of `username` moved by `delta` since the last report.
+        /// The server reads leaderstats; a client never writes a score.
+        void scored(PlayRoom room, String username, String stat, long delta);
     }
+
+    /// How often leaderstats are read for the leaderboards.
+    static final long SCORE_MILLIS = 2000;
 
     private final String id;
     private final String experienceId;
@@ -74,6 +82,9 @@ public final class PlayRoom {
     private ScheduledExecutorService thread;
     private Listener listener;
     private long lastActive = System.currentTimeMillis();
+    /// Room thread only: the leaderstat values last reported, per username.
+    private final Map<String, Map<String, Long>> reported = new HashMap<String, Map<String, Long>>();
+    private long lastScores;
 
     PlayRoom(String id, String experienceId, int maxPlayers, boolean matchmade, Engine engine) {
         this.id = id;
@@ -123,9 +134,15 @@ public final class PlayRoom {
         return true;
     }
 
+    /// Sets who hears about joins, leaves and scores; [#start] does this, and
+    /// tests that drive [#frame] themselves call it directly.
+    void listen(Listener l) {
+        listener = l;
+    }
+
     /// Starts ticking at [#HZ] on a thread of its own.
     void start(Listener l) {
-        listener = l;
+        listen(l);
         thread = Executors.newScheduledThreadPool(1);
         thread.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -195,6 +212,7 @@ public final class PlayRoom {
                 }
                 if (who != null && !owners.containsValue(who)) {
                     seats.remove(who);
+                    reported.remove(who);
                     Long from = since.remove(who);
                     if (listener != null) {
                         listener.left(PlayRoom.this, who,
@@ -214,12 +232,49 @@ public final class PlayRoom {
         }
         server.getEngine().step(1.0 / HZ);
         server.flush();
+        if (now - lastScores >= SCORE_MILLIS) {
+            lastScores = now;
+            reportScores();
+        }
         if (!handles.isEmpty()) {
             lastActive = now;
         } else {
             expireReservations(now);
             if (now - lastActive > IDLE_MILLIS && seats.isEmpty()) {
                 close();
+            }
+        }
+    }
+
+    /// Sends each numeric leaderstat's change since the last report. The first
+    /// reading of a stat is its baseline, so a value restored from a data
+    /// store is not counted again.
+    private void reportScores() {
+        if (listener == null) {
+            return;
+        }
+        for (Map.Entry<Link, Integer> h : handles.entrySet()) {
+            String who = owners.get(h.getKey());
+            Instance player = server.player(h.getValue().intValue());
+            Instance stats = player == null ? null : player.findFirstChild("leaderstats");
+            if (who == null || stats == null) {
+                continue;
+            }
+            Map<String, Long> last = reported.get(who);
+            if (last == null) {
+                last = new HashMap<String, Long>();
+                reported.put(who, last);
+            }
+            for (Instance v : stats.getChildren()) {
+                Object value = v.prop("Value");
+                if (!(value instanceof Number)) {
+                    continue;
+                }
+                long now = ((Number) value).longValue();
+                Long before = last.put(v.getName(), Long.valueOf(now));
+                if (before != null && now > before.longValue()) {
+                    listener.scored(this, who, v.getName(), now - before.longValue());
+                }
             }
         }
     }

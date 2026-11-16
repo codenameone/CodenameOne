@@ -153,6 +153,40 @@ public final class Ui {
         return button(text, "LinkButton", name, onClick);
     }
 
+    /// A friend's name for display: the account name before the domain,
+    /// capitalised ("ava@brickyard.example" reads "Ava").
+    public static String personName(String username) {
+        if (username == null || username.length() == 0) {
+            return "Player";
+        }
+        int at = username.indexOf('@');
+        String n = at > 0 ? username.substring(0, at) : username;
+        return Character.toUpperCase(n.charAt(0)) + n.substring(1);
+    }
+
+    /// A friend's row header: a round badge with their initial, in a colour
+    /// that stays the same for them, and their name.
+    public static Label person(String username, String uiid) {
+        String name = personName(username);
+        Label l = label(name, uiid);
+        int size = CN.convertToPixels(7);
+        int[] palette = {0x335fff, 0x00b06f, 0xff7a1a, 0x9b4dff, 0xe0245e, 0x00a3c4};
+        com.codename1.ui.Image img = com.codename1.ui.Image.createImage(size, size, 0);
+        com.codename1.ui.Graphics g = img.getGraphics();
+        g.setAntiAliased(true);
+        g.setColor(palette[Math.abs(name.hashCode()) % palette.length]);
+        g.fillArc(0, 0, size, size, 0, 360);
+        com.codename1.ui.Font font = com.codename1.ui.Font.createSystemFont(com.codename1.ui.Font.FACE_SYSTEM,
+                com.codename1.ui.Font.STYLE_BOLD, com.codename1.ui.Font.SIZE_LARGE);
+        g.setFont(font);
+        g.setColor(0xffffff);
+        String initial = name.substring(0, 1);
+        g.drawString(initial, (size - font.stringWidth(initial)) / 2, (size - font.getHeight()) / 2);
+        l.setIcon(img);
+        l.setGap(CN.convertToPixels(2));
+        return l;
+    }
+
     public static Container panel(Component... children) {
         Container c = BoxLayout.encloseY(children);
         c.setUIID("Panel");
