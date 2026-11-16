@@ -91,12 +91,15 @@ public final class PdfImageDecoder {
             // The platform decoder sizes its buffer from the JPEG's own frame
             // header, not the dictionary, so check that before handing it on.
             long frame = jpegPixels(data);
-            if (frame <= 0 || frame > MAX_PIXELS) {
+            if (frame < 0 || frame > MAX_PIXELS) {
                 return null;
             }
             int[] size = new int[2];
             int[] px = device.decodeJpeg(data, size);
             if (px == null) {
+                return null;
+            }
+            if ((long) size[0] * size[1] > MAX_PIXELS) {
                 return null;
             }
             out.width = size[0];
@@ -332,6 +335,12 @@ public final class PdfImageDecoder {
             }
             if (m >= 0xc0 && m <= 0xcf && m != 0xc4 && m != 0xc8 && m != 0xcc) {
                 long h = ((d[p + 5] & 0xff) << 8) | (d[p + 6] & 0xff);
+                if (h == 0) {
+                    // Height given later by a DNL marker, which is rare and
+                    // cannot be read without decoding: the width alone is
+                    // checked here, the decoded size after.
+                    h = 1;
+                }
                 long w = ((d[p + 7] & 0xff) << 8) | (d[p + 8] & 0xff);
                 return w * h;
             }

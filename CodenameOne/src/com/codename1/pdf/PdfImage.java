@@ -73,7 +73,7 @@ public final class PdfImage {
 
     /// An image from pixels `0xAARRGGBB`, row by row from the top.
     public static PdfImage create(int[] argb, int width, int height) {
-        if (width <= 0 || height <= 0 || argb.length < width * height) {
+        if (width <= 0 || height <= 0 || (long) width * height > argb.length) {
             throw new IllegalArgumentException("Pixel array does not match " + width + "x" + height);
         }
         int[] copy = new int[width * height];
@@ -109,7 +109,12 @@ public final class PdfImage {
             if (marker == 0xee && len >= 7 && p + 9 <= d.length && d[p + 4] == 'A' && d[p + 5] == 'd') {
                 adobe = true;
             }
-            boolean sof = marker >= 0xc0 && marker <= 0xcf && marker != 0xc4 && marker != 0xc8 && marker != 0xcc;
+            // Baseline, extended and progressive frames only: PDF's DCTDecode
+            // does not cover lossless or arithmetic-coded JPEG.
+            if (marker == 0xc3 || marker >= 0xc5 && marker <= 0xcf && marker != 0xc8 && marker != 0xcc) {
+                throw new IOException("JPEG coding not supported in PDF");
+            }
+            boolean sof = marker >= 0xc0 && marker <= 0xc2;
             if (sof && p + 10 <= d.length) {
                 int h = ((d[p + 5] & 0xff) << 8) | (d[p + 6] & 0xff);
                 int w = ((d[p + 7] & 0xff) << 8) | (d[p + 8] & 0xff);

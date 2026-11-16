@@ -104,8 +104,12 @@ public final class PdfFunction {
                         || f.size.length < f.domain.length / 2 || !validBits(f.bps)) {
                     return null;
                 }
+                // Every index into the table must fit the data, so the
+                // int arithmetic in sampled() cannot overflow.
+                long cells = f.range.length / 2;
                 for (int i = 0; i < f.size.length; i++) {
-                    if (f.size[i] < 1) {
+                    cells *= f.size[i];
+                    if (f.size[i] < 1 || cells * f.bps > (long) f.samples.length * 8) {
                         return null;
                     }
                 }

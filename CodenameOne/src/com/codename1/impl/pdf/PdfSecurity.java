@@ -70,7 +70,9 @@ final class PdfSecurity {
         }
         byte[] o = bytes(enc.get("O"));
         byte[] u = bytes(enc.get("U"));
-        byte[] pw = password == null ? new byte[0] : utf8(password);
+        // R2-R4 passwords are PDFDocEncoding bytes (Latin-1 for the
+        // characters a keyboard gives); R5/R6 use UTF-8.
+        byte[] pw = password == null ? new byte[0] : revision >= 5 ? utf8(password) : latin1(password);
         if (revision >= 5 && pw.length > 127) {
             // ISO 32000-2 7.6.4.3.3: an R5/R6 password is its first 127
             // UTF-8 bytes. SASLprep is not applied, so a password that
@@ -111,11 +113,27 @@ final class PdfSecurity {
         return o instanceof PdfString ? ((PdfString) o).bytes : new byte[0];
     }
 
+    private static byte[] latin1(String s) {
+        byte[] b = new byte[Math.min(32, s.length())];
+        for (int i = 0; i < b.length; i++) {
+            char c = s.charAt(i);
+            b[i] = (byte) (c <= 0xff ? c : '?');
+        }
+        return b;
+    }
+
     private static byte[] utf8(String s) {
         java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
         for (int i = 0; i < s.length(); i++) {
             int c = s.charAt(i);
-            if (c < 0x80) {
+            if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length() && s.charAt(i + 1) >= 0xdc00
+                    && s.charAt(i + 1) <= 0xdfff) {
+                int cp = 0x10000 + ((c - 0xd800) << 10) + (s.charAt(++i) - 0xdc00);
+                bo.write(0xf0 | (cp >> 18));
+                bo.write(0x80 | ((cp >> 12) & 0x3f));
+                bo.write(0x80 | ((cp >> 6) & 0x3f));
+                bo.write(0x80 | (cp & 0x3f));
+            } else if (c < 0x80) {
                 bo.write(c);
             } else if (c < 0x800) {
                 bo.write(0xc0 | (c >> 6));

@@ -111,13 +111,25 @@ final class GsubTable {
         int features = base + u16(base + 6);
         int[] lf = languageFeatures();
         List<Integer> out = new ArrayList<Integer>();
+        // A hostile font can list one feature, and one lookup, thousands of
+        // times over; each is taken once.
+        boolean[] seenFeature = new boolean[65536];
+        boolean[] seenLookup = new boolean[65536];
         for (int k = 0; k < lf.length; k++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops
+            if (seenFeature[lf[k] & 0xffff]) {
+                continue;
+            }
+            seenFeature[lf[k] & 0xffff] = true;
             int rec = features + 2 + lf[k] * 6;
             if (feature.equals(tag(rec))) {
                 int f = features + u16(rec + 4);
                 int n = u16(f + 2);
-                for (int i = 0; i < n; i++) {
-                    out.add(Integer.valueOf(u16(f + 4 + i * 2)));
+                for (int i = 0; i < n && out.size() < MAX_LOOKUPS; i++) {
+                    int l = u16(f + 4 + i * 2);
+                    if (!seenLookup[l]) {
+                        seenLookup[l] = true;
+                        out.add(Integer.valueOf(l));
+                    }
                 }
             }
         }
@@ -190,12 +202,18 @@ final class GsubTable {
     }
 
     /// `g` after the single substitutions of `feature`.
+    // Real fonts use a few dozen lookups of a few subtables each.
+    private static final int MAX_LOOKUPS = 1024;
+    private static final int MAX_SUBTABLE_VISITS = 4096;
+
     int substitute(String feature, int g) {
         int[] lk = lookups(feature);
         int out = g;
+        int budget = MAX_SUBTABLE_VISITS;
         for (int i = 0; i < lk.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops
             int[] st = subtables(lk[i]);
-            for (int k = 0; k < st.length; k += 2) {
+            for (int k = 0; k < st.length && budget > 0; k += 2) {
+                budget--;
                 if (st[k] != 1) {
                     continue;
                 }

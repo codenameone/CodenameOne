@@ -978,7 +978,7 @@ final class Jbig2Decoder {
         }
         // The cell count alone is cheap to pass with one large pattern: every
         // cell pastes that pattern, so the work is cells times its area.
-        if (pats == null || pats.length == 0 || gw * gh > MAX_PIXELS
+        if (pats == null || pats.length == 0 || gw > MAX_PIXELS || gh > MAX_PIXELS || gw * gh > MAX_PIXELS
                 || gw * gh * pats[0].w * pats[0].h > 4L * MAX_PIXELS) {
             throw new IllegalStateException("halftone");
         }

@@ -107,6 +107,9 @@ public final class TrueTypeFont extends PdfFont {
         bbox[3] = s16(head + 42);
         longLoca = s16(head + 50) != 0;
         numGlyphs = u16(table("maxp") + 4);
+        if (numGlyphs < 1) {
+            throw new IOException("Font has no glyphs");
+        }
         int hhea = table("hhea");
         ascender = s16(hhea + 4);
         descender = s16(hhea + 6);
@@ -222,7 +225,7 @@ public final class TrueTypeFont extends PdfFont {
     /// The glyph id of code point `cp`, 0 when the font has none.
     public int glyph(int cp) {
         int g = lookup(cp);
-        return g < numGlyphs ? g : 0;
+        return g >= 0 && g < numGlyphs ? g : 0;
     }
 
     private int lookup(int cp) {
@@ -394,6 +397,9 @@ public final class TrueTypeFont extends PdfFont {
                 if (logical.charAt(i) != 0x0644) {
                     continue;
                 }
+                // A haraka between lam and alef (vocalized text) keeps the
+                // two as joined letters rather than the ligature; both read
+                // correctly, and fonts that care do it in their own GSUB.
                 char alef = logical.charAt(i + 1);
                 char lig = ArabicShaper.lamAlef(alef, forms[i] == ArabicShaper.MEDIAL
                         ? ArabicShaper.FINAL : forms[i] == ArabicShaper.INITIAL ? ArabicShaper.ISOLATED : forms[i]);
@@ -676,7 +682,12 @@ public final class TrueTypeFont extends PdfFont {
             while (p + 4 <= end) {
                 int flags = u16(p);
                 int comp = u16(p + 2);
-                if (comp < numGlyphs && !keep[comp] && sp < stack.length) {
+                if (comp < numGlyphs && !keep[comp]) {
+                    if (sp == stack.length) {
+                        int[] grown = new int[sp * 2];
+                        System.arraycopy(stack, 0, grown, 0, sp);
+                        stack = grown;
+                    }
                     stack[sp++] = comp;
                 }
                 p += 4 + ((flags & 1) != 0 ? 4 : 2);

@@ -135,15 +135,7 @@ public final class PdfLexer {
                 if (nesting >= MAX_NESTING) {
                     // Too deep: skip to the matching bracket without
                     // recursing, so the enclosing structure stays in frame.
-                    int open = 1;
-                    while (pos < end && open > 0) {
-                        byte b = d[pos++];
-                        if (b == '[') {
-                            open++;
-                        } else if (b == ']') {
-                            open--;
-                        }
-                    }
+                    skipNested();
                     return list;
                 }
                 nesting++;
@@ -236,9 +228,58 @@ public final class PdfLexer {
         return pos == start ? -1 : v;
     }
 
+    /// Past the nesting limit: skips to the close of the array or
+    /// dictionary just opened, without recursing, stepping over strings and
+    /// comments whole so a bracket inside one cannot end it early.
+    private void skipNested() {
+        int open = 1;
+        while (pos < end && open > 0) {
+            byte b = d[pos];
+            if (b == '(') {
+                int paren = 0;
+                while (pos < end) {
+                    byte c = d[pos++];
+                    if (c == '\\') {
+                        pos++;
+                    } else if (c == '(') {
+                        paren++;
+                    } else if (c == ')') {
+                        paren--;
+                        if (paren == 0) {
+                            break;
+                        }
+                    }
+                }
+            } else if (b == '%') {
+                while (pos < end && d[pos] != '\n' && d[pos] != '\r') {
+                    pos++;
+                }
+            } else if (b == '<' && pos + 1 < end && d[pos + 1] == '<') {
+                open++;
+                pos += 2;
+            } else if (b == '>' && pos + 1 < end && d[pos + 1] == '>') {
+                open--;
+                pos += 2;
+            } else if (b == '<') {
+                while (pos < end && d[pos] != '>') {
+                    pos++;
+                }
+                pos++;
+            } else {
+                if (b == '[') {
+                    open++;
+                } else if (b == ']') {
+                    open--;
+                }
+                pos++;
+            }
+        }
+    }
+
     private PdfDict dictionary() {
         PdfDict dict = new PdfDict();
         if (nesting >= MAX_NESTING) {
+            skipNested();
             return dict;
         }
         nesting++;

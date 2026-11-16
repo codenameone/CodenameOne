@@ -166,6 +166,25 @@ class PdfInternalsTest {
     }
 
     @Test
+    void tooDeepStructuresAreSkippedWhole() {
+        StringBuilder b = new StringBuilder("[ /A ");
+        for (int i = 0; i < 70; i++) {
+            b.append("<< /K ");
+        }
+        b.append("(]>>) /Evil 1");
+        for (int i = 0; i < 70; i++) {
+            b.append(" >>");
+        }
+        b.append(" /Z ]");
+        byte[] d = b.toString().getBytes();
+        Object o = new PdfLexer(d, 0, d.length, false).next();
+        assertTrue(o instanceof java.util.List);
+        java.util.List<?> l = (java.util.List<?>) o;
+        assertEquals(3, l.size());
+        assertEquals("/Z", String.valueOf(l.get(2)));
+    }
+
+    @Test
     void calculatorStopsOnTooFewOperands() {
         double[] out = PdfCalculator.run(PdfCalculator.compile("{ pop pop add }".getBytes()), new double[] {1}, 1);
         assertEquals(1, out.length);
