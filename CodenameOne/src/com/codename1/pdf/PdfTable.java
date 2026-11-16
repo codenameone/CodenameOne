@@ -31,6 +31,8 @@ import java.util.List;
 /// header rows are repeated at the top of every page the table spans.
 ///
 /// ```java
+/// PdfDocument doc = new PdfDocument();
+/// PdfLayout layout = new PdfLayout(doc, PdfPageSize.A4, 54);
 /// PdfTable t = new PdfTable(3, 1, 1).setHeaderRows(1);
 /// t.addCell(new PdfParagraph("Item", PdfFont.HELVETICA_BOLD, 10), 1, 0xeeeeee);
 /// t.addCell(new PdfParagraph("Qty", PdfFont.HELVETICA_BOLD, 10), 1, 0xeeeeee);

@@ -35,6 +35,9 @@ import java.util.List;
 /// text. Runs headless, so it works on a server as well as on a device.
 ///
 /// ```java
+/// PdfDocument doc = new PdfDocument();
+/// doc.addPage(PdfPageSize.A4).getCanvas().drawText("Hello", 72, 72);
+/// byte[] bytes = doc.toByteArray();
 /// PdfReader r = PdfReader.open(bytes);
 /// for (int i = 0; i < r.getPageCount(); i++) {
 ///     String text = r.extractText(i);

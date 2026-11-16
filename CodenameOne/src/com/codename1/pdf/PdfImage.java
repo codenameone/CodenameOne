@@ -34,7 +34,9 @@ import java.io.IOException;
 /// transparency kept as a soft mask.
 ///
 /// ```java
-/// PdfImage logo = PdfImage.create(Util.readInputStream(in));
+/// PdfDocument doc = new PdfDocument();
+/// PdfCanvas canvas = doc.addPage(PdfPageSize.A4).getCanvas();
+/// PdfImage logo = PdfImage.create(Util.readInputStream(CN.getResourceAsStream("/logo.png")));
 /// canvas.drawImage(logo, 36, 36, 120, 120 * logo.getHeight() / logo.getWidth());
 /// ```
 @com.codename1.impl.SharedWithBackend

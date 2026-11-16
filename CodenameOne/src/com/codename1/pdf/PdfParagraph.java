@@ -30,6 +30,8 @@ import java.util.List;
 /// made of runs, each with its own font, size, color and optional link:
 ///
 /// ```java
+/// PdfDocument doc = new PdfDocument();
+/// PdfLayout layout = new PdfLayout(doc, PdfPageSize.A4, 54);
 /// layout.add(new PdfParagraph()
 ///         .append("Total due: ", PdfFont.HELVETICA, 11)
 ///         .append("$1,240.00", PdfFont.HELVETICA_BOLD, 11)

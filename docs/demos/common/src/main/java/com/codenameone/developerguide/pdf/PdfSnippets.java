@@ -40,7 +40,7 @@ import com.codename1.printing.Printer;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import java.io.IOException;
-import java.io.InputStream;
+import com.codename1.ui.CN;
 import java.io.OutputStream;
 
 public class PdfSnippets {
@@ -59,8 +59,10 @@ public class PdfSnippets {
         return pdf;
     }
 
-    public void layout(byte[] logoPng, byte[] fontTtf) throws IOException {
+    public void layout() throws IOException {
         // tag::pdf-layout[]
+        byte[] fontTtf = Util.readInputStream(CN.getResourceAsStream("/NotoSans-Regular.ttf"));
+        byte[] logoPng = Util.readInputStream(CN.getResourceAsStream("/logo.png"));
         PdfFont body = PdfFont.loadTrueType(fontTtf);
         PdfDocument doc = new PdfDocument().setTitle("Invoice 1042");
         PdfLayout layout = new PdfLayout(doc, PdfPageSize.A4, 48);
@@ -84,7 +86,8 @@ public class PdfSnippets {
         }
         layout.add(items);
         layout.finish();
-        OutputStream out = FileSystemStorage.getInstance().openOutputStream(invoicePath());
+        String path = FileSystemStorage.getInstance().getAppHomePath() + "invoice-1042.pdf";
+        OutputStream out = FileSystemStorage.getInstance().openOutputStream(path);
         try {
             doc.save(out);
         } finally {
@@ -93,8 +96,11 @@ public class PdfSnippets {
         // end::pdf-layout[]
     }
 
-    public void rightToLeft(PdfLayout layout, PdfFont hebrewAndArabic) {
+    public void rightToLeft() throws IOException {
         // tag::pdf-rtl[]
+        PdfFont hebrewAndArabic = PdfFont.loadTrueType(
+                Util.readInputStream(CN.getResourceAsStream("/NotoSansHebrewArabic.ttf")));
+        PdfLayout layout = new PdfLayout(new PdfDocument(), PdfPageSize.A4, 48);
         layout.add(new PdfParagraph("\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd (Hello world)",
                 hebrewAndArabic, 14));
         layout.add(new PdfParagraph("\u0645\u0631\u062d\u0628\u0627 \u0628\u0627\u0644\u0639\u0627\u0644\u0645",
@@ -102,19 +108,22 @@ public class PdfSnippets {
         // end::pdf-rtl[]
     }
 
-    public void read(InputStream in) throws IOException {
+    public void read() throws IOException {
         // tag::pdf-read[]
-        PdfReader reader = PdfReader.open(in);
+        String path = FileSystemStorage.getInstance().getAppHomePath() + "invoice-1042.pdf";
+        PdfReader reader = PdfReader.open(FileSystemStorage.getInstance().openInputStream(path));
         Log.p(reader.getTitle() + ": " + reader.getPageCount() + " pages");
         String firstPage = reader.extractText(0);
         // end::pdf-read[]
         Log.p(firstPage);
     }
 
-    public void view(Form form, byte[] pdf) throws IOException {
+    public void view() throws IOException {
         // tag::pdf-viewer[]
+        String path = FileSystemStorage.getInstance().getAppHomePath() + "invoice-1042.pdf";
+        byte[] pdf = Util.readInputStream(FileSystemStorage.getInstance().openInputStream(path));
         PdfViewer viewer = new PdfViewer(pdf);
-        form.setLayout(new BorderLayout());
+        Form form = new Form("Invoice", new BorderLayout());
         form.add(BorderLayout.CENTER, viewer);
         form.show();
         viewer.setPage(2);
@@ -123,13 +132,10 @@ public class PdfSnippets {
 
     public void print() {
         // tag::pdf-print[]
+        String path = FileSystemStorage.getInstance().getAppHomePath() + "invoice-1042.pdf";
         if (Printer.isPrintingSupported()) {
-            Printer.printPDF(invoicePath(), null);
+            Printer.printPDF(path, null);
         }
         // end::pdf-print[]
-    }
-
-    private static String invoicePath() {
-        return FileSystemStorage.getInstance().getAppHomePath() + "invoice-1042.pdf";
     }
 }

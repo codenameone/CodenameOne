@@ -29,6 +29,7 @@ import java.util.List;
 /// [PdfDocument], adding pages as they fill up.
 ///
 /// ```java
+/// String longText = "Revenue grew in every region this quarter.";
 /// PdfDocument doc = new PdfDocument();
 /// PdfLayout layout = new PdfLayout(doc, PdfPageSize.A4, 54);
 /// layout.setPageDecorator(new PdfLayout.PageDecorator() {

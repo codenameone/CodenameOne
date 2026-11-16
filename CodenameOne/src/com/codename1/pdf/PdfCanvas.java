@@ -34,6 +34,8 @@ import com.codename1.impl.pdf.PdfFormat;
 /// and then filled, stroked or used as a clip:
 ///
 /// ```java
+/// PdfDocument doc = new PdfDocument();
+/// PdfPage page = doc.addPage(PdfPageSize.A4);
 /// PdfCanvas c = page.getCanvas();
 /// c.setFillColor(0x1565c0);
 /// c.fillRect(36, 36, page.getWidth() - 72, 40);

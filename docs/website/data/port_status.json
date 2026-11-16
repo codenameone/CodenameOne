@@ -466,6 +466,15 @@
       ]
     },
     {
+      "id": "pdf-viewer",
+      "category": "Rich components",
+      "name": "PDF viewer",
+      "description": "Checks a generated invoice rendered by the pure-Java PDF renderer in the PDF viewer: text in standard fonts, a table with borders and fills, and vector graphics.",
+      "tests": [
+        "PdfViewerScreenshotTest"
+      ]
+    },
+    {
       "id": "native-theme-controls",
       "category": "Themes and styling",
       "name": "Native-theme controls",
@@ -1459,6 +1468,10 @@
     {
       "pattern": "NodeGraphTheme*",
       "test": "NodeGraphThemeScreenshotTest"
+    },
+    {
+      "pattern": "PdfViewer*",
+      "test": "PdfViewerScreenshotTest"
     },
     {
       "pattern": "ToolbarTheme_*",

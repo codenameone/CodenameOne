@@ -37,8 +37,10 @@ import java.io.IOException;
 /// [#loadTrueType(byte[])]: only the glyphs a document uses are embedded.
 ///
 /// ```java
+/// PdfDocument doc = new PdfDocument();
+/// PdfCanvas canvas = doc.addPage(PdfPageSize.A4).getCanvas();
 /// PdfFont body = PdfFont.loadTrueType(Util.readInputStream(
-///         Display.getInstance().getResourceAsStream(getClass(), "/NotoSans-Regular.ttf")));
+///         CN.getResourceAsStream("/NotoSans-Regular.ttf")));
 /// canvas.setFont(body, 12);
 /// canvas.drawText("Grusse, Jalapeno", 72, 72);
 /// ```

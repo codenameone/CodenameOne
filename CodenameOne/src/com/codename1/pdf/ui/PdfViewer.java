@@ -44,6 +44,12 @@ import java.util.List;
 /// on every platform and needs no native viewer:
 ///
 /// ```java
+/// PdfDocument doc = new PdfDocument();
+/// for (int i = 1; i <= 5; i++) {
+///     doc.addPage(PdfPageSize.A4).getCanvas().drawText("Page " + i, 72, 72);
+/// }
+/// byte[] pdfBytes = doc.toByteArray();
+/// Form form = new Form("Document", new BorderLayout());
 /// PdfViewer viewer = new PdfViewer(pdfBytes);
 /// form.add(BorderLayout.CENTER, viewer);
 /// viewer.setPage(3);
