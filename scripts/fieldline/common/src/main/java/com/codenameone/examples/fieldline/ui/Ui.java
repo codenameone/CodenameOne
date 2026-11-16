@@ -718,4 +718,21 @@ public final class Ui {
         }
         return minutes / 60 + " h" + (minutes % 60 == 0 ? "" : " " + minutes % 60 + " min");
     }
+
+    /// A phone number as people read it. A North American number in E.164
+    /// (+1 and ten digits) is grouped as (503) 555-0101; anything else is
+    /// shown as stored, since grouping differs by country. Dialing keeps the
+    /// stored form.
+    public static String phone(String e164) {
+        if (e164 == null || e164.length() != 12 || !e164.startsWith("+1")) {
+            return e164;
+        }
+        for (int iter = 2; iter < 12; iter++) {
+            char c = e164.charAt(iter);
+            if (c < '0' || c > '9') {
+                return e164;
+            }
+        }
+        return "(" + e164.substring(2, 5) + ") " + e164.substring(5, 8) + "-" + e164.substring(8);
+    }
 }

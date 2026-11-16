@@ -53,7 +53,9 @@ public final class RunView {
             card.add(Ui.link(Lang.tr("All {0} changes", String.valueOf(moved)), "allChanges",
                     e -> RunForm.show(from, run)));
         }
-        card.add(Ui.label(Lang.tr("{0} iterations in {1} ms", String.valueOf(run.iterations()),
+        // Wraps: the operator counts run long and were cut off at the card's
+        // edge in a side panel.
+        card.add(Ui.text(Lang.tr("{0} iterations in {1} ms", String.valueOf(run.iterations()),
                 String.valueOf(run.millis())) + Ui.DOT + run.operators(), "FlRunFoot"));
         return card;
     }

@@ -519,7 +519,9 @@ public final class BoardForm implements Nav.Home {
             task.setPriority(j.priority() * 200);
             task.setPercentComplete("COMPLETED".equals(j.status()) ? 100
                     : "ON_SITE".equals(j.status()) ? 50 : 0);
-            task.assign(j.techId());
+            // Not assigned to the technician as a resource: the chart writes
+            // the assignee after every bar, and under a route that already
+            // carries the technician's name it repeated it on every job.
             task.setUserObject(j);
             Long was = before.get(j.id());
             if (was != null) {
@@ -766,10 +768,12 @@ public final class BoardForm implements Nav.Home {
             if ((j.techId() == null || j.techId().length() == 0)
                     && !"CANCELLED".equals(j.status())) {
                 waiting++;
-                // Why the planner left it: the one thing to fix before it can go.
+                // Where and when, then why the planner left it: the one thing
+                // to fix before it can go. The reason alone left several "No
+                // cooling on 4th floor" rows that could not be told apart.
+                String where = j.siteName() + Ui.DOT + Ui.when(j.windowStart());
                 String why = j.unassignedReason() == null || j.unassignedReason().length() == 0
-                        ? j.siteName() + Ui.DOT + Ui.when(j.windowStart())
-                        : Lang.tr(j.unassignedReason());
+                        ? where : where + "\n" + Lang.tr(j.unassignedReason());
                 inspector.add(Ui.tap(Ui.row(FontImage.MATERIAL_ERROR_OUTLINE, j.title(),
                         why, null),
                         "waiting-" + j.id(), e -> jobSheet(j)));

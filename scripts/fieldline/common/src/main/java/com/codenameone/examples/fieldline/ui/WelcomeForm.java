@@ -31,6 +31,15 @@ public final class WelcomeForm {
     private WelcomeForm() {
     }
 
+    private static Container feature(char glyph, String text) {
+        Container row = new Container(new BorderLayout(), "WlHeroFeature");
+        Label icon = new Label("", "WlHeroFeatureIcon");
+        Ui.icon(icon, glyph, 3.6f);
+        row.add(BorderLayout.WEST, icon);
+        row.add(BorderLayout.CENTER, Ui.text(text, "WlHeroText"));
+        return row;
+    }
+
     public static void show() {
         final Form form = Ui.form("", "Welcome");
         form.getToolbar().hideToolbar();
@@ -43,6 +52,11 @@ public final class WelcomeForm {
         hero.add(icon);
         hero.add(Ui.label("Fieldline", "WlHeroTitle"));
         hero.add(Ui.text("The day planned around your crew, the job done right on site.", "WlHeroText"));
+        // What the app does, as Slate and Pulse say it: the hero was a logo
+        // and one line over an empty field of color.
+        hero.add(feature(FontImage.MATERIAL_ROUTE, "Your route, planned around skills, hours and travel"));
+        hero.add(feature(FontImage.MATERIAL_FACT_CHECK, "Checklists and photos the assistant can diagnose"));
+        hero.add(feature(FontImage.MATERIAL_VERIFIED, "Customer sign-off sealed so the report can be verified"));
 
         Container actions = Ui.page();
         actions.setScrollableY(false);

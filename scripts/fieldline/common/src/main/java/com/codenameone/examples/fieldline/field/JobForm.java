@@ -319,7 +319,7 @@ public final class JobForm {
                 e -> AssistantForm.show(form, job.id())));
         hero.add(actions);
         Container who = Ui.row(FontImage.MATERIAL_PERSON, job.customer(),
-                job.contactPhone(), null);
+                Ui.phone(job.contactPhone()), null);
         hero.add(who);
         return hero;
     }

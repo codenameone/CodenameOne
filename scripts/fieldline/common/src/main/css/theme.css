@@ -129,7 +129,9 @@ WlPage {
 /* The coloured top of the welcome screen. */
 WlHero {
     background-color: var(--brand);
-    padding: 14mm 4.4mm 8mm 4.4mm;
+    /* Room for the logo, the name and three feature lines on a phone: the
+       old 14mm top left the last line zero pixels high. */
+    padding: 8mm 4.4mm 4mm 4.4mm;
     margin: 0;
 }
 
@@ -154,6 +156,19 @@ WlHeroText {
 WlHeroIcon {
     color: var(--brand-contrast);
     padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlHeroFeature {
+    padding: 1.6mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+WlHeroFeatureIcon {
+    color: var(--brand-contrast);
+    padding: 0 2.4mm 0 0;
     margin: 0;
     background-color: transparent;
 }
@@ -1613,6 +1628,7 @@ FlDeltaCaption { color: var(--text-muted); background-color: transparent; font-f
     WlHeroTitle { color: var(--brand-contrast-dark); }
     WlHeroText { color: var(--brand-contrast-dark); }
     WlHeroIcon { color: var(--brand-contrast-dark); }
+    WlHeroFeatureIcon { color: var(--brand-contrast-dark); }
     WlCard { background-color: var(--surface-dark); }
     WlFloat { background-color: var(--surface-dark); }
     WlPanel { background-color: var(--surface-alt-dark); }
