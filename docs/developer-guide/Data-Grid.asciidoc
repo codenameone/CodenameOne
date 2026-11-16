@@ -57,7 +57,7 @@ A `GridColumn` decides how its values look and how they're edited. Its kind,
 `TEXT`, `NUMBER`, `BOOLEAN`, `DATE` or `CHOICE`, is read from each value when
 you leave it at `AUTO`, which is the default.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-columns,indent=0]
 ----
@@ -89,12 +89,12 @@ A `GridFormatter` turns a value into the text a cell shows and, for an edit,
 the text a user typed back into a value. The model keeps the value; only its
 picture changes.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-formatter,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-formatter-use,indent=0]
 ----
@@ -112,7 +112,7 @@ rows: only what's on the screen is painted.
 
 This renderer draws a shipped percentage as a bar:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-renderer,indent=0]
 ----
@@ -121,7 +121,7 @@ To change one thing about the default painting, such as a color, a font or
 the text, extend `DefaultGridCellRenderer` and override `textColor`, `font` or
 `text`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-renderer-use,indent=0]
 ----
@@ -143,7 +143,7 @@ to the row.
 `sortBy` sorts by one column and `addSort` adds the next key, which breaks the
 ties of the ones before it. The headers show the order with an arrow.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sort,indent=0]
 ----
@@ -161,7 +161,7 @@ By default numbers compare by value, dates by time, booleans false first and
 everything else by its text, ignoring case. A `Comparator` sorts a column in an
 order of its own:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-comparator,indent=0]
 ----
@@ -175,7 +175,7 @@ A `GridFilter` decides row by row which rows show. It's handed a `GridRow`,
 which reads any column of the model by its model index, whether the column is
 shown or not. A search field is a filter that changes as the user types:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-search,indent=0]
 ----
@@ -192,7 +192,7 @@ and the selection of the rows that are still shown.
 group row opens and closes with a tap, and shows each column's
 `GridAggregate`: `SUM`, `AVERAGE`, `MIN`, `MAX` or `COUNT`.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-group,indent=0]
 ----
@@ -204,7 +204,7 @@ The groups are ordered by their value, in the column's sort direction when
 it's sorted by, and the rows of each group keep the grid's sort. An aggregate of
 your own folds the values one at a time and turns the result into what's shown:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-aggregate,indent=0]
 ----
@@ -213,7 +213,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/D
 
 === Selection and actions
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-selection,indent=0]
 ----
@@ -261,12 +261,12 @@ text back through its `parse`.
 
 A `GridCellEditor` edits a column with a component of your own:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-editor,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-editing,indent=0]
 ----
@@ -295,12 +295,12 @@ The grid reads a value when it paints it, and paints only the rows on the screen
 model can therefore compute its rows instead of storing them, or page them in
 from a database, and the grid never asks for more than it shows.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-million,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-million-use,indent=0]
 ----
@@ -318,12 +318,12 @@ Built on a `TreeTableModel`, the grid is a tree table. The model answers a
 node's children and its value in each column; `getChildren(null)` answers the
 roots.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-tree,indent=0]
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-tree-use,indent=0]
 ----
@@ -353,7 +353,7 @@ than the bare names.
 
 === Appearance
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-appearance,indent=0]
 ----
