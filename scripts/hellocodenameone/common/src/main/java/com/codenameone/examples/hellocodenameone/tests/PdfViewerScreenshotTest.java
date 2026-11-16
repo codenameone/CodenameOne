@@ -41,6 +41,8 @@ import com.codename1.ui.layouts.Layout;
 /// justified paragraph, a table with a header row, a dashed rule and
 /// translucent shapes, drawn by the pure-Java renderer.
 public class PdfViewerScreenshotTest extends DualAppearanceBaseTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // a watch face is too small to read a page.
     @Override
     public boolean runTest() {
         if (CN.isWatch()) {
