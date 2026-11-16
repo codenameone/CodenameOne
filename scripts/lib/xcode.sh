@@ -38,6 +38,11 @@
 # The Xcode major the tree is validated against. Raising this is the one edit a
 # toolchain move needs; every script and workflow reads it from here.
 : "${CN1_XCODE_MAJOR:=26}"
+# Optional exact release within that major (e.g. 27.1). Unset, the newest
+# install of the major wins. Set it where an image carries several releases of
+# one major and the leg's baselines were measured on a particular one: the
+# xcode-27 image holds 27.0, 27.1 and 27.2, and "newest" would take 27.2.
+: "${CN1_XCODE_VERSION_PIN:=}"
 
 # Usage: cn1_select_xcode [log_function]
 # Exports DEVELOPER_DIR, XCODEBUILD, PATH and CN1_XCODE_VERSION on success.
@@ -88,6 +93,13 @@ cn1_select_xcode() {
             seen="$seen $version($app)"
             major="${version%%.*}"
             [ "$major" = "$CN1_XCODE_MAJOR" ] || continue
+            if [ -n "$CN1_XCODE_VERSION_PIN" ]; then
+                # 27.1 also names 27.1.0; nothing else.
+                case "$version" in
+                    "$CN1_XCODE_VERSION_PIN"|"$CN1_XCODE_VERSION_PIN".0) ;;
+                    *) continue ;;
+                esac
+            fi
             # sort -V so 26.10 beats 26.9, which a string compare gets backwards.
             if [ -z "$best_version" ] || \
                [ "$(printf '%s\n%s\n' "$best_version" "$version" | sort -V | tail -n 1)" = "$version" ]; then
@@ -96,7 +108,7 @@ cn1_select_xcode() {
             fi
         done
         if [ -z "$candidate" ]; then
-            "$log" "No Xcode $CN1_XCODE_MAJOR under /Applications. Found:${seen:- none}." >&2
+            "$log" "No Xcode ${CN1_XCODE_VERSION_PIN:-$CN1_XCODE_MAJOR} under /Applications. Found:${seen:- none}." >&2
             "$log" "Set XCODE_APP to an installed Xcode, or CN1_XCODE_MAJOR to a version you have." >&2
             return 1
         fi

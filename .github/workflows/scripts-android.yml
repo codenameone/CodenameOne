@@ -6,6 +6,12 @@ name: Test Android build scripts
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+    inputs:
+      cn1ss_capture:
+        description: Golden capture only (golden-capture.yml) - the tests without goldens, for the log; the full suite runs
+        required: false
+        default: ''
+        type: string
   schedule:
     - cron: '5 1 * * *'
   pull_request:
@@ -145,15 +151,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
+  # here; Golden capture (golden-capture.yml) records them instead.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    with:
+      capture: ${{ inputs.cn1ss_capture || '' }}
+
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   build-android:
+    if: needs.golden-plan.outputs.run == 'true'
     name: Build Android ${{ matrix.name }}
-    needs: unity-gallery
+    needs: [golden-plan, unity-gallery]
     strategy:
       fail-fast: false
       matrix:
@@ -317,6 +333,12 @@ jobs:
       - name: Unpack the Unity gallery prebuilt
         uses: ./.github/actions/unity-gallery-prebuilt
 
+      - name: Enter golden capture mode
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
+
       - name: Build Hello Codename One Android app
         id: build-android-app
         run: |
@@ -433,3 +455,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           compression-level: 6
+
+      - name: Upload golden capture
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-android-${{ matrix.id }}
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore

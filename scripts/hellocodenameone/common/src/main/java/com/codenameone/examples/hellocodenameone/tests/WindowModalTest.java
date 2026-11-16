@@ -45,6 +45,8 @@ import com.codename1.ui.layouts.BorderLayout;
  * state that would be blank if the second property regressed.</p>
  */
 public class WindowModalTest extends BaseTest {
+    // cn1ss-skip: android, ios-metal, mac-catalyst, javascript, tvos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
 
     /// How far below the requested size a window may legitimately be.
     /// Chrome costs tens of pixels; a window still carrying another

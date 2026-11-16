@@ -29,6 +29,8 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.scheduler.Scheduler;
 
 public class SchedulerThemeScreenshotTest extends DualAppearanceBaseTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     @Override
     public boolean runTest() {
         // A watch face has no room for this and no use for it: the

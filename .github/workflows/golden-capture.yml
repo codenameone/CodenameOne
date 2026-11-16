@@ -1,0 +1,176 @@
+name: Golden capture
+
+# A pull request that adds a hellocodenameone screenshot test, or deletes a
+# golden, needs images on every platform that runs the test, and until now the
+# only way to get them was a whole CI round per attempt, run for one image.
+#
+# This workflow reads the suite's source (scripts/ci/cn1ss-golden-plan.py) and
+# checks every golden directory on its own: a screenshot test with no image in
+# a directory whose port runs it is a gap, and so is a golden the PR's base has
+# and the PR deleted. Which ports a test skips is declared
+# in the test (`// cn1ss-skip: <ports>`) and held to the tree both ways, so
+# the tree's goldens are complete and a gap is the whole signal: no marker, no
+# diff. When there is any gap, it:
+#   1. cancels every other run of this PR. The screenshot workflows already
+#      skip every job (their first job, golden-plan.yml, runs the same
+#      detector); the rest would only spend runners on a head about to move;
+#   2. dispatches each screenshot workflow on the PR branch with
+#      `cn1ss_capture`: the FULL suite runs (tests leak, so a subset could
+#      render differently), non-screenshot jobs skip, and every image without
+#      a golden is uploaded instead of gated (.github/actions/cn1ss-capture);
+#   3. commits the images to the branch and pushes with CN1SS_GH_TOKEN, so the
+#      push starts the normal CI, where the detector now finds nothing.
+#
+# Only images that fill a gap are committed. A gap still open afterwards fails
+# this job by name: its leg failed, or the test captures nothing there and
+# needs a cn1ss-skip declaration. What did arrive is still committed, so the
+# next push captures only what is left.
+#
+# Pull requests from forks are skipped: the dispatches need the branch in this
+# repository and the push needs a token a fork run does not get. Review the
+# captured images in the commit like any other golden change.
+
+on:
+  # No paths filter: a deleted golden needs a capture as much as a new test,
+  # and the detector costs seconds.
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: golden-capture-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      tests: ${{ steps.find.outputs.tests }}
+    steps:
+      # The merge commit, as golden-plan.yml sees it: its first parent is the
+      # base, so a deleted golden is a gap as well.
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+          filter: blob:none
+      - id: find
+        run: |
+          set -euo pipefail
+          tests="$(python3 scripts/ci/cn1ss-golden-plan.py --verbose --from-git --base=HEAD^1)"
+          echo "New tests to capture: ${tests:-none}"
+          echo "tests=$tests" >> "$GITHUB_OUTPUT"
+
+  capture:
+    needs: detect
+    if: needs.detect.outputs.tests != ''
+    runs-on: ubuntu-24.04
+    # The slowest screenshot leg runs about two hours; this job only waits.
+    timeout-minutes: 330
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TESTS: ${{ needs.detect.outputs.tests }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      RUNS: /tmp/golden-capture-runs.txt
+    steps:
+      # Before anything is cancelled: without the token nothing can be pushed.
+      - name: Check the push token
+        env:
+          CN1SS_GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+        run: |
+          if [ -z "$CN1SS_GH_TOKEN" ]; then
+            echo "::error::secrets.CN1SS_GH_TOKEN is not set; golden capture cannot push."
+            exit 1
+          fi
+          # Set is not enough: an expired or narrowed token would pass the check
+          # above and fail only at the push, after the PR's runs were cancelled.
+          push="$(GH_TOKEN="$CN1SS_GH_TOKEN" gh api "repos/$GITHUB_REPOSITORY" --jq .permissions.push 2>/dev/null || true)"
+          if [ "$push" != true ]; then
+            echo "::error::secrets.CN1SS_GH_TOKEN cannot push to $GITHUB_REPOSITORY (expired, revoked or lacking Contents: write); golden capture cannot push. Regenerate it (see the note in scripts-android.yml)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.CN1SS_GH_TOKEN }}
+
+      - name: Cancel the PR's other runs
+        id: cancel1
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {cancelForCapture} = require('./scripts/ci/cancel-stale-pr-runs.js');
+            core.setOutput('ids', (await cancelForCapture({github, context, core, keepRunId: context.runId})).join(' '));
+
+      - name: Dispatch the screenshot workflows in capture mode
+        run: scripts/ci/golden-capture.sh dispatch "$HEAD_REF" "$TESTS" "$RUNS"
+
+      # Workflows the triggering push started after the first pass.
+      - name: Cancel the PR's other runs again
+        id: cancel2
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {cancelForCapture} = require('./scripts/ci/cancel-stale-pr-runs.js');
+            core.setOutput('ids', (await cancelForCapture({github, context, core, keepRunId: context.runId})).join(' '));
+
+      - name: Wait for the capture runs
+        run: scripts/ci/golden-capture.sh wait "$RUNS"
+
+      - name: Collect, commit and push the goldens
+        id: push
+        run: |
+          set -euo pipefail
+          # Pull the branch again first: someone may have pushed while the legs
+          # ran. A capture only adds files, so it applies on top of any head.
+          git pull --ff-only origin "$HEAD_REF"
+          git fetch --no-tags origin "$BASE_SHA"
+          base="$(git merge-base HEAD "$BASE_SHA")"
+          ok=1
+          scripts/ci/golden-capture.sh collect "$RUNS" "$GITHUB_WORKSPACE" "$base" || ok=0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- scripts
+          if git diff --cached --quiet; then
+            echo "::error::No capture leg produced an image for: $TESTS"
+            exit 1
+          fi
+          git commit -m "Capture goldens for $TESTS" \
+            -m "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          git push origin "HEAD:$HEAD_REF"
+          echo "pushed=1" >> "$GITHUB_OUTPUT"
+          if [ "$ok" != 1 ]; then
+            echo "::error::At least one capture leg failed; see the log above for which."
+            exit 1
+          fi
+
+      # A capture that never pushed would leave the PR's other checks cancelled
+      # for good; start them again.
+      - name: Re-run what was cancelled
+        # Not after a push: that started CI on the new head already.
+        if: failure() && steps.push.outputs.pushed != '1'
+        env:
+          IDS: ${{ steps.cancel1.outputs.ids }} ${{ steps.cancel2.outputs.ids }}
+        run: |
+          for id in $IDS; do
+            gh run rerun "$id" --repo "$GITHUB_REPOSITORY" || echo "could not re-run $id"
+          done
+
+      # Superseded (a new push) or timed out: the dispatched suites are ours.
+      - name: Cancel the capture runs
+        if: cancelled() || failure()
+        run: |
+          [ -f "$RUNS" ] || exit 0
+          while read -r wf id; do
+            gh run cancel "$id" --repo "$GITHUB_REPOSITORY" || true
+          done < "$RUNS"

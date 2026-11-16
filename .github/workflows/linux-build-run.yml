@@ -28,6 +28,12 @@ on:
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+    inputs:
+      cn1ss_capture:
+        description: Golden capture only (golden-capture.yml) - the tests without goldens, for the log; the full suite runs
+        required: false
+        default: ''
+        type: string
   schedule:
     - cron: '45 1 * * *'
   pull_request:
@@ -123,10 +129,19 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
+  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
+  # here; Golden capture (golden-capture.yml) records them instead.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    with:
+      capture: ${{ inputs.cn1ss_capture || '' }}
+
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   # Build the codenameone maven plugin (it needs CEF, which is x64-only on Linux)
@@ -135,7 +150,8 @@ jobs:
   # the mock ad provider, the Unity runtime). These are architecture-independent (they are translated to C later),
   # so both arch legs translate from these same classes.
   prepare-suite:
-    needs: unity-gallery
+    if: needs.golden-plan.outputs.run == 'true'
+    needs: [golden-plan, unity-gallery]
     name: build suite classes (x64)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -174,6 +190,12 @@ jobs:
       - name: Unpack the Unity gallery prebuilt
         uses: ./.github/actions/unity-gallery-prebuilt
 
+      - name: Enter golden capture mode
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
+
       - name: Build hellocodenameone-common (JDK 17)
         run: |
           set -e
@@ -211,8 +233,9 @@ jobs:
           retention-days: 1
 
   build-run:
+    if: needs.golden-plan.outputs.run == 'true'
     name: build + run suite (${{ matrix.arch }})
-    needs: prepare-suite
+    needs: [golden-plan, prepare-suite]
     runs-on: ${{ matrix.runner }}
     # 90 for the suite plus the ParparVM vs JDK 25 performance gate below.
     timeout-minutes: 140
@@ -598,7 +621,9 @@ jobs:
   # using the host's glibc node.
   build-run-musl:
     name: build + run suite (musl, Alpine x64)
-    needs: prepare-suite
+    needs: [golden-plan, prepare-suite]
+    # No golden directory of its own, so a golden capture skips it.
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (inputs.cn1ss_capture == '') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -672,7 +697,7 @@ jobs:
   # sync (mirrors the iOS/watch jobs).
   compare-comment:
     name: screenshot-comment
-    needs: build-run
+    needs: [golden-plan, build-run]
     # !cancelled() rather than a plain event check: without it GitHub skips this
     # job whenever a build-run leg fails, and skipping it is precisely the wrong
     # response to a failing suite. Normalization is what publishes the fail /
@@ -680,9 +705,11 @@ jobs:
     # green report -- a failure masked as a pass. The workflow still goes red
     # because build-run itself failed; this only keeps the reporting honest.
     if: >-
+      needs.golden-plan.outputs.run == 'true' && (
       !cancelled() &&
       (github.event_name == 'pull_request' || github.event_name == 'push' ||
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      )
     runs-on: ubuntu-24.04
     permissions:
       # write, because this job publishes the normalized report to the
@@ -727,6 +754,12 @@ jobs:
           name: linux-demo-arm64
           path: artifacts/linux-port/demo-arm64
         continue-on-error: true
+
+      - name: Enter golden capture mode
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
 
       - name: Post screenshots to PR
         shell: bash
@@ -866,3 +899,11 @@ jobs:
           # themselves. In the same step as the publish, so it runs only when
           # the publish actually succeeded.
           gh workflow run website-docs.yml --ref master -f deploy_production=true
+
+      - name: Upload golden capture
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-linux
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore
