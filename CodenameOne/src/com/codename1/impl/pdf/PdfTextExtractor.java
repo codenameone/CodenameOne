@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.pdf;
 
+import com.codename1.util.Bidi;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -57,7 +58,7 @@ public final class PdfTextExtractor {
         byte[] data = PdfContent.concat(page.getFile(), contents);
         x.run(data, page.getDict("Resources"), new double[] {1, 0, 0, 1, 0, 0}, 0);
         String text = x.out.toString();
-        if (!PdfBidi.hasRtl(text)) {
+        if (Bidi.isLeftToRight(text, false)) {
             return text;
         }
         // Text is drawn in display order; restore the reading order of
@@ -70,7 +71,7 @@ public final class PdfTextExtractor {
             int nl = text.indexOf('\n', start);
             int end = nl < 0 ? text.length() : nl;
             String line = text.substring(start, end);
-            sb.append(PdfBidi.reorder(line, PdfBidi.majority(line)));
+            sb.append(Bidi.reorder(line, mostlyRtl(line)));
             if (nl < 0) {
                 break;
             }
@@ -239,8 +240,19 @@ public final class PdfTextExtractor {
     /// they show, and a right-to-left cluster of several letters (a
     /// lam-alef ligature) is reversed, so that reordering the line puts
     /// it back in reading order.
+    /// True when most strong characters of `line` are right to left.
+    private static boolean mostlyRtl(String line) {
+        int balance = 0;
+        int n = line.length();
+        for (int i = 0; i < n; i++) {
+            balance += Bidi.strongDirection(line.charAt(i)) == Bidi.RTL ? 1
+                    : Bidi.strongDirection(line.charAt(i)) == Bidi.LTR ? -1 : 0;
+        }
+        return balance > 0;
+    }
+
     static String logicalCluster(String text) {
-        if (!PdfBidi.hasRtl(text)) {
+        if (Bidi.isLeftToRight(text, false)) {
             return text;
         }
         StringBuilder sb = new StringBuilder(text.length() + 1);

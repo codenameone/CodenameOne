@@ -22,7 +22,7 @@
  */
 package com.codename1.pdf;
 
-import com.codename1.impl.pdf.PdfBidi;
+import com.codename1.util.Bidi;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -123,7 +123,7 @@ public final class PdfParagraph {
             return direction;
         }
         for (int i = 0; i < runs.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops
-            int d = PdfBidi.direction(runs.get(i).text, -1);
+            int d = Bidi.direction(runs.get(i).text);
             if (d >= 0) {
                 return d;
             }
@@ -359,7 +359,7 @@ public final class PdfParagraph {
         }
         String text = sb.toString();
         List<Piece> out = new ArrayList<Piece>();
-        if (dir == DIRECTION_LTR && !PdfBidi.hasRtl(text)) {
+        if (dir == DIRECTION_LTR && Bidi.isLeftToRight(text, false)) {
             for (int i = 0; i < line.fragments.size(); i++) {
                 Piece p = new Piece();
                 p.run = line.fragments.get(i).run;
@@ -368,7 +368,7 @@ public final class PdfParagraph {
             }
             return out;
         }
-        byte[] levels = PdfBidi.levels(text, dir);
+        byte[] levels = Bidi.levels(text, dir == DIRECTION_RTL);
         int[] frag = new int[text.length()];
         int pos = 0;
         for (int i = 0; i < line.fragments.size(); i++) {
@@ -390,7 +390,7 @@ public final class PdfParagraph {
         for (int i = 0; i < sl.length; i++) {
             sl[i] = levels[spans.get(i)[0]];
         }
-        int[] order = PdfBidi.order(sl);
+        int[] order = Bidi.visualOrder(sl);
         for (int i = 0; i < order.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops
             int[] sp = spans.get(order[i]);
             Piece p = new Piece();

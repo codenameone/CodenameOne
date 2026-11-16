@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.pdf;
 
+import com.codename1.security.Aes;
 import com.codename1.security.Hash;
 import java.io.IOException;
 import java.util.List;
@@ -229,7 +230,7 @@ final class PdfSecurity {
         if (wrapped.length < 32) {
             return null;
         }
-        return new PdfAes(k).decryptCbc(new byte[16], wrapped, 0, 32, false);
+        return Aes.cbcDecrypt(k, new byte[16], sub(wrapped, 0, 32));
     }
 
     /// Algorithm 2.A/2.B: SHA-256 for revision 5, the iterated hash for 6.
@@ -245,7 +246,7 @@ final class PdfSecurity {
             for (int i = 0; i < 64; i++) {
                 System.arraycopy(k1, 0, rep, i * k1.length, k1.length);
             }
-            byte[] e = new PdfAes(sub(k, 0, 16)).encryptCbc(sub(k, 16, 16), rep);
+            byte[] e = Aes.cbcEncrypt(sub(k, 0, 16), sub(k, 16, 16), rep);
             int mod = 0;
             for (int i = 0; i < 16; i++) {
                 mod += e[i] & 0xff;
@@ -304,7 +305,11 @@ final class PdfSecurity {
             // nothing; that is what other readers show for it too.
             return new byte[0];
         }
-        return new PdfAes(k).decryptCbc(sub(data, 0, 16), data, 16, data.length - 16, true);
+        byte[] out = Aes.cbcDecrypt(k, sub(data, 0, 16), sub(data, 16, (data.length - 16) / 16 * 16));
+        int pad = out.length > 0 ? out[out.length - 1] & 0xff : 0;
+        // A valid PKCS#5 padding is removed; anything else is kept, as other
+        // readers do for a damaged string.
+        return pad >= 1 && pad <= 16 ? sub(out, 0, out.length - pad) : out;
     }
 
     static byte[] rc4(byte[] key, byte[] data) {

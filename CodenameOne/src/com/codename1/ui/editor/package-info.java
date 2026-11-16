@@ -44,8 +44,8 @@
 /// client contract; `CodeView` and `RichView` extend it for the code and rich
 /// text feature layers.
 ///
-/// - `BidiUtil` - the Unicode Bidirectional Algorithm used to resolve
-/// embedding levels and reorder mixed-direction runs for measurement and paint.
+/// - [com.codename1.util.Bidi] - the Unicode Bidirectional Algorithm the views
+/// use to resolve embedding levels and reorder mixed-direction runs.
 ///
 /// - `HtmlImporter` - parses the HTML fragment accepted by `RichTextArea` into
 /// the styled block/run model the engine renders.

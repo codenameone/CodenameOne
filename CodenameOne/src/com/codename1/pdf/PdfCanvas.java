@@ -22,8 +22,8 @@
  */
 package com.codename1.pdf;
 
+import com.codename1.util.Bidi;
 import com.codename1.impl.pdf.FontState;
-import com.codename1.impl.pdf.PdfBidi;
 import com.codename1.impl.pdf.PdfFormat;
 
 /// Draws the content of one [PdfPage].
@@ -436,13 +436,13 @@ public final class PdfCanvas {
         if (font == null) {
             setFont(PdfFont.HELVETICA, 12);
         }
-        if (direction == PdfParagraph.DIRECTION_LTR && !PdfBidi.hasRtl(text)
-                || direction == PdfParagraph.DIRECTION_AUTO && !PdfBidi.hasRtl(text)) {
+        boolean rtl = direction == PdfParagraph.DIRECTION_RTL
+                || direction == PdfParagraph.DIRECTION_AUTO && Bidi.direction(text) == Bidi.RTL;
+        if (Bidi.isLeftToRight(text, rtl)) {
             drawRun(text, x, y, false);
             return this;
         }
-        byte[] levels = PdfBidi.levels(text, direction == PdfParagraph.DIRECTION_RTL ? PdfBidi.RTL
-                : direction == PdfParagraph.DIRECTION_LTR ? PdfBidi.LTR : PdfBidi.AUTO);
+        byte[] levels = Bidi.levels(text, rtl);
         float cx = x;
         int[][] runs = visualRuns(levels);
         for (int i = 0; i < runs.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops
@@ -468,7 +468,7 @@ public final class PdfCanvas {
         for (int i = 0; i < rl.length; i++) {
             rl[i] = levels[runs.get(i)[0]];
         }
-        int[] order = PdfBidi.order(rl);
+        int[] order = Bidi.visualOrder(rl);
         int[][] out = new int[order.length][];
         for (int i = 0; i < order.length; i++) {
             out[i] = runs.get(order[i]);

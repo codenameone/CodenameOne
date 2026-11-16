@@ -55,4 +55,16 @@ public class PortCryptoEngine extends CryptoEngine {
     public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
         return impl.pbkdf2(hashAlgorithm, password, salt, iterations, length);
     }
+
+    /// AES-CBC through the port's native cipher. A port without one throws
+    /// for the transformation, and the portable implementation runs instead.
+    @Override
+    public byte[] aesCbc(boolean encrypt, byte[] key, byte[] iv, byte[] blocks) {
+        try {
+            return encrypt ? impl.aesEncrypt(Cipher.AES_CBC, key, iv, null, blocks)
+                    : impl.aesDecrypt(Cipher.AES_CBC, key, iv, null, blocks);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
 }

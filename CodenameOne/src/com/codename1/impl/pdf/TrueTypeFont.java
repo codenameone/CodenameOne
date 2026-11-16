@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.pdf;
 
+import com.codename1.util.Bidi;
 import com.codename1.pdf.PdfFont;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -353,7 +354,7 @@ public final class TrueTypeFont extends PdfFont {
             if (isHighSurrogate(cp) && i + 1 < n) {
                 cp = toCodePoint(cp, text.charAt(++i));
             } else if (rtl) {
-                int m = PdfBidi.mirror((char) cp);
+                int m = Bidi.mirror((char) cp);
                 if (m != cp) {
                     mirrored = true;
                     cp = m;

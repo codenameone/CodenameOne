@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.pdf;
 
+import com.codename1.util.Bidi;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,15 +32,15 @@ class PdfInternalsTest {
     @Test
     void bidiReordersRightToLeftRunsAndMirrors() {
         String hebrew = "\u05d0\u05d1\u05d2";
-        assertTrue(PdfBidi.hasRtl(hebrew));
-        assertEquals(PdfBidi.RTL, PdfBidi.direction(hebrew + " abc", PdfBidi.LTR));
-        assertEquals(PdfBidi.LTR, PdfBidi.direction("abc " + hebrew, PdfBidi.RTL));
+        assertFalse(Bidi.isLeftToRight(hebrew, false));
+        assertEquals(Bidi.RTL, Bidi.direction(hebrew + " abc"));
+        assertEquals(Bidi.LTR, Bidi.direction("abc " + hebrew));
         // Logical "abc ALEF BET GIMEL" displays the Hebrew reversed.
-        assertEquals("abc \u05d2\u05d1\u05d0", PdfBidi.reorder("abc " + hebrew, PdfBidi.LTR));
+        assertEquals("abc \u05d2\u05d1\u05d0", Bidi.reorder("abc " + hebrew, false));
         // Numbers inside right-to-left text keep their order.
-        assertEquals("123 \u05d2\u05d1\u05d0", PdfBidi.reorder(hebrew + " 123", PdfBidi.RTL));
-        assertEquals(')', PdfBidi.mirror('('));
-        byte[] levels = PdfBidi.levels("ab" + hebrew, PdfBidi.LTR);
+        assertEquals("123 \u05d2\u05d1\u05d0", Bidi.reorder(hebrew + " 123", true));
+        assertEquals(')', Bidi.mirror('('));
+        byte[] levels = Bidi.levels("ab" + hebrew, false);
         assertEquals(0, levels[0]);
         assertEquals(1, levels[2]);
     }
@@ -139,11 +140,11 @@ class PdfInternalsTest {
 
     @Test
     void jpxDecodesLosslessExactly() {
-        JpxDecoder j = JpxDecoder.decode(hex(JPX));
+        com.codename1.util.Jpeg2000 j = com.codename1.util.Jpeg2000.decode(hex(JPX));
         assertNotNull(j);
-        assertEquals(16, j.width);
-        assertEquals(16, j.height);
-        int[] px = j.argb(null, false);
+        assertEquals(16, j.getWidth());
+        assertEquals(16, j.getHeight());
+        int[] px = j.toArgb();
         for (int y = 0; y < 16; y++) {
             for (int x = 0; x < 16; x++) {
                 int v = ((x * 16 + y * 5) ^ (x * y)) & 255;

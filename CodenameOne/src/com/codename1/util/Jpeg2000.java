@@ -20,9 +20,10 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.pdf;
+package com.codename1.util;
 
-/// A pure-Java JPEG 2000 decoder for PDF `JPXDecode` images.
+/// A pure-Java JPEG 2000 decoder, for platforms whose image APIs cannot read the format
+/// (most of them) and for the backend, which has no image support of its own for it.
 ///
 /// It reads either a JP2 file (the `jp2h` header boxes and the `jp2c` codestream) or a raw
 /// J2K codestream, and decodes every tile into one integer plane per component. The
@@ -33,12 +34,58 @@ package com.codename1.impl.pdf;
 /// changes (`POC`) are ignored, and High Throughput code-blocks are refused.
 ///
 /// Malformed or truncated data never escapes as an exception: `decode` answers null, or
-/// the image as far as it could be decoded.
-final class JpxDecoder {
-    /// The image width in pixels, from the codestream's `SIZ` marker.
-    int width;
-    /// The image height in pixels, from the codestream's `SIZ` marker.
-    int height;
+/// the image as far as it could be decoded. Images above 25 megapixels are refused.
+///
+/// ```java
+/// byte[] data = new byte[0]; // the contents of a .jp2 or .j2k file
+/// Jpeg2000 j = Jpeg2000.decode(data);
+/// if (j != null) {
+///     int[] argb = j.toArgb();
+///     // on the client: Image.createImage(argb, j.getWidth(), j.getHeight())
+/// }
+/// ```
+@com.codename1.impl.SharedWithBackend
+public final class Jpeg2000 {
+    /// Converts colour components the file does not describe itself, as when a PDF gives the
+    /// image's colour space in its own dictionary.
+    public interface Colors {
+        /// The number of components a colour has; ignored for an indexed space.
+        int getComponents();
+
+        /// True for an indexed (palette) space, which takes the raw sample as its one component.
+        boolean isIndexed();
+
+        /// The RGB value (0xRRGGBB) of the colour whose components, each scaled to 0..1 (or the
+        /// raw index for an indexed space), are in `components`.
+        int toRgb(double[] components);
+    }
+
+    private int width;
+    private int height;
+
+    /// The image width in pixels.
+    public int getWidth() {
+        return width;
+    }
+
+    /// The image height in pixels.
+    public int getHeight() {
+        return height;
+    }
+
+    /// ARGB pixels, row by row, `getWidth() * getHeight()` of them; null when the image's
+    /// components cannot be turned into a colour. A JP2 palette is applied, YCC and CMYK are
+    /// converted, and an alpha channel named by a `cdef` box, or a component past the colour
+    /// ones, becomes the alpha.
+    public int[] toArgb() {
+        return argb(null, true);
+    }
+
+    /// ARGB pixels as [#toArgb()], with the colours of `colors` instead of the file's own.
+    /// With `alpha` false any alpha channel is ignored and the image is opaque.
+    public int[] toArgb(Colors colors, boolean alpha) {
+        return argb(colors, alpha);
+    }
 
     private static final int MAX_PIXELS = 25000000;
     private static final long MAX_CODE_BLOCKS = 1 << 20;
@@ -332,11 +379,11 @@ final class JpxDecoder {
     }
 
     /// Parses a JP2 file or a raw J2K codestream; null when it cannot be decoded.
-    static JpxDecoder decode(byte[] data) {
+    public static Jpeg2000 decode(byte[] data) {
         if (data == null || data.length < 12) {
             return null;
         }
-        JpxDecoder d = new JpxDecoder();
+        Jpeg2000 d = new Jpeg2000();
         try {
             if (!d.parse(data)) {
                 return null;
@@ -1930,13 +1977,13 @@ final class JpxDecoder {
 
     /// ARGB pixels (row-major, `width * height`).
     ///
-    /// `cs` is the PDF image's `/ColorSpace`; when it is null the codestream's own components
+    /// `cs` is a colour space given outside the file; when it is null the codestream's own components
     /// decide: 1 is gray, 3 is RGB, 4 is CMYK, and a JP2 palette (`pclr`) is applied. When it is
     /// non-null its component count is fed to `toRgb`, each component scaled to 0..1 (an
     /// Indexed space takes the raw index). With `smaskInData` an extra component (named by a
     /// JP2 `cdef` box, or the one after the colour components) becomes the alpha channel.
     /// Returns null on failure.
-    int[] argb(PdfColorSpace cs, boolean smaskInData) {
+    private int[] argb(Colors cs, boolean smaskInData) {
         try {
             return argbImpl(cs, smaskInData);
         } catch (RuntimeException e) {
@@ -1944,11 +1991,11 @@ final class JpxDecoder {
         }
     }
 
-    private int[] argbImpl(PdfColorSpace cs, boolean smask) {
+    private int[] argbImpl(Colors cs, boolean smask) {
         if (planes == null) {
             return null;
         }
-        boolean indexed = cs != null && cs.getKind() == PdfColorSpace.INDEXED;
+        boolean indexed = cs != null && cs.isIndexed();
         int nch;
         int[] chComp;
         int[][] chPal;
@@ -2144,7 +2191,8 @@ final class JpxDecoder {
                         for (int s = 0; s < 4; s++) {
                             cc[s] = (raw[s] - mins[s]) / (double) maxs[s];
                         }
-                        rgb = PdfColorSpace.DEVICE_CMYK.toRgb(cc) & 0xffffff;
+                        rgb = (unit8((1 - cc[0]) * (1 - cc[3])) << 16) | (unit8((1 - cc[1]) * (1 - cc[3])) << 8)
+                                | unit8((1 - cc[2]) * (1 - cc[3]));
                     }
                     for (int s = 0; s < need; s++) {
                         last[s] = raw[s];
@@ -2156,6 +2204,12 @@ final class JpxDecoder {
             }
         }
         return out;
+    }
+
+    /// `v`, from 0 to 1, as a byte; the naive CMYK conversion of the PDF renderer.
+    private static int unit8(double v) {
+        int i = (int) (v * 255 + 0.5);
+        return i < 0 ? 0 : i > 255 ? 255 : i;
     }
 
     private static int clamp8(int v) {

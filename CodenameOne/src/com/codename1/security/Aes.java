@@ -20,15 +20,25 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.pdf;
+package com.codename1.security;
 
-/// AES (FIPS 197) with 128 and 256 bit keys, and the CBC mode the PDF
-/// security handler uses. Byte oriented and unoptimized: it decrypts the
-/// strings and streams of protected documents, which are not hot paths,
-/// and is kept here because the shared backend code has no cipher of its
-/// own to call.
+/// AES (FIPS 197) in CBC mode over whole 16 byte blocks, with no padding: the
+/// building block of formats that define their own padding or key handling,
+/// such as the PDF security handler. Runs on the client and on the backend.
+///
+/// The installed [CryptoEngine] does the work where the platform has a native
+/// cipher (the client ports and the backend); elsewhere, the JavaScript port
+/// among them, a portable Java implementation produces the same bytes. For
+/// authenticated encryption of application data on the client use `Cipher` instead.
+///
+/// ```java
+/// byte[] key = new byte[16];
+/// byte[] iv = new byte[16];
+/// byte[] sealed = Aes.cbcEncrypt(key, iv, new byte[32]);
+/// byte[] plain = Aes.cbcDecrypt(key, iv, sealed);
+/// ```
 @com.codename1.impl.SharedWithBackend
-final class PdfAes {
+public final class Aes {
     private static final int[] SBOX = new int[256];
     private static final int[] INV = new int[256];
 
@@ -60,7 +70,41 @@ final class PdfAes {
         return ((x << s) | (x >> (8 - s))) & 0xff;
     }
 
-    PdfAes(byte[] key) {
+    /// Encrypts `data`, a whole number of blocks, with `key` (16, 24 or 32
+    /// bytes) chained from the 16 byte `iv`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a key, IV or data of the wrong length
+    public static byte[] cbcEncrypt(byte[] key, byte[] iv, byte[] data) {
+        check(key, iv, data);
+        byte[] fast = CryptoEngine.get().aesCbc(true, key, iv, data);
+        return fast != null ? fast : new Aes(key).encryptCbc(iv, data);
+    }
+
+    /// Decrypts `data`, a whole number of blocks, with `key` (16, 24 or 32
+    /// bytes) chained from the 16 byte `iv`. Padding, if the format has any,
+    /// is left for the caller to remove.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a key, IV or data of the wrong length
+    public static byte[] cbcDecrypt(byte[] key, byte[] iv, byte[] data) {
+        check(key, iv, data);
+        byte[] fast = CryptoEngine.get().aesCbc(false, key, iv, data);
+        return fast != null ? fast : new Aes(key).decryptCbc(iv, data);
+    }
+
+    private static void check(byte[] key, byte[] iv, byte[] data) {
+        if (key.length != 16 && key.length != 24 && key.length != 32) {
+            throw new IllegalArgumentException("AES key of " + key.length + " bytes");
+        }
+        if (iv.length != 16 || data.length % 16 != 0) {
+            throw new IllegalArgumentException("AES-CBC needs a 16 byte IV and whole blocks");
+        }
+    }
+
+    private Aes(byte[] key) {
         int nk = key.length / 4;
         rounds = nk + 6;
         w = new int[4 * (rounds + 1)];
@@ -112,7 +156,7 @@ final class PdfAes {
         }
     }
 
-    void encryptBlock(byte[] in, int inOff, byte[] out, int outOff) {
+    private void encryptBlock(byte[] in, int inOff, byte[] out, int outOff) {
         int[] s = new int[16];
         for (int i = 0; i < 16; i++) {
             s[i] = in[inOff + i] & 0xff;
@@ -149,7 +193,7 @@ final class PdfAes {
         }
     }
 
-    void decryptBlock(byte[] in, int inOff, byte[] out, int outOff) {
+    private void decryptBlock(byte[] in, int inOff, byte[] out, int outOff) {
         int[] s = new int[16];
         for (int i = 0; i < 16; i++) {
             s[i] = in[inOff + i] & 0xff;
@@ -184,10 +228,9 @@ final class PdfAes {
         }
     }
 
-    /// CBC decryption of `data[off, off + len)` with `iv`; with `unpad`
-    /// a valid PKCS#5 padding is removed.
-    byte[] decryptCbc(byte[] iv, byte[] data, int off, int len, boolean unpad) {
-        int blocks = len / 16;
+    private byte[] decryptCbc(byte[] iv, byte[] data) {
+        int off = 0;
+        int blocks = data.length / 16;
         byte[] out = new byte[blocks * 16];
         byte[] prev = new byte[16];
         System.arraycopy(iv, 0, prev, 0, 16);
@@ -198,19 +241,10 @@ final class PdfAes {
             }
             System.arraycopy(data, off + b * 16, prev, 0, 16);
         }
-        if (unpad && out.length > 0) {
-            int pad = out[out.length - 1] & 0xff;
-            if (pad >= 1 && pad <= 16) {
-                byte[] t = new byte[out.length - pad];
-                System.arraycopy(out, 0, t, 0, t.length);
-                return t;
-            }
-        }
         return out;
     }
 
-    /// CBC encryption of whole blocks, no padding.
-    byte[] encryptCbc(byte[] iv, byte[] data) {
+    private byte[] encryptCbc(byte[] iv, byte[] data) {
         byte[] out = new byte[data.length / 16 * 16];
         byte[] prev = new byte[16];
         System.arraycopy(iv, 0, prev, 0, 16);

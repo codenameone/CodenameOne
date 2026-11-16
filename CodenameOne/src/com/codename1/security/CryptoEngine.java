@@ -77,6 +77,14 @@ public class CryptoEngine {
         return out;
     }
 
+    /// AES in CBC mode over `blocks`, a whole number of 16 byte blocks, with
+    /// no padding: encryption when `encrypt` is true, else decryption. `key`
+    /// is 16, 24 or 32 bytes and `iv` 16; the arguments are already
+    /// validated. Answers `null` to use the Java implementation in [Aes].
+    public byte[] aesCbc(boolean encrypt, byte[] key, byte[] iv, byte[] blocks) {
+        return null;
+    }
+
     /// PBKDF2 (RFC 8018) with HMAC over `hashAlgorithm` ([Hash#SHA256] or
     /// [Hash#SHA512]), or `null` to use the Java derivation. The arguments
     /// are already validated.

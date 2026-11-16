@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Arrays;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -112,6 +113,13 @@ class PdfDocumentTest {
         assertTrue(r.extractText(0).contains("Secret text"), r.extractText(0));
     }
 
+    @Test
+    void readsAes256EncryptedFileWithItsPassword() throws Exception {
+        byte[] pdf = aes256File("Top secret", "pa55");
+        assertTrue(PdfReader.open(pdf, "pa55").extractText(0).contains("Top secret"));
+        assertThrows(java.io.IOException.class, () -> PdfReader.open(pdf, "wrong").extractText(0));
+    }
+
     // ---- an AESV2 (R4) file written with the JDK's own crypto ----
 
     private static final byte[] PAD = hex("28bf4e5e4e758a4164004e56fffa01082e2e00b6d0683e802f0ca9fe6453697a");
@@ -147,14 +155,20 @@ class PdfDocumentTest {
         System.arraycopy(u, 0, u32, 0, 16);
         byte[] content = ("BT /F1 18 Tf 40 700 Td (" + text + ") Tj ET").getBytes(StandardCharsets.ISO_8859_1);
         byte[] enc = aes(objectKey(key, 4), content);
+        return file(enc, "<< /Filter /Standard /V 4 /R 4 /Length 128 /CF << /StdCF << /CFM /AESV2 /AuthEvent"
+                + " /DocOpen /Length 16 >> >> /StmF /StdCF /StrF /StdCF /O <" + toHex(o) + "> /U <" + toHex(u32)
+                + "> /P " + p + " >>", id);
+    }
+
+    /// A one page file whose content stream is `enc` (already encrypted)
+    /// under the encryption dictionary `encrypt`.
+    private static byte[] file(byte[] enc, String encrypt, byte[] id) throws Exception {
         String[] objs = new String[6];
         objs[1] = "<< /Type /Catalog /Pages 2 0 R >>";
         objs[2] = "<< /Type /Pages /Kids [3 0 R] /Count 1 >>";
         objs[3] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Contents 4 0 R"
                 + " /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>";
-        objs[5] = "<< /Filter /Standard /V 4 /R 4 /Length 128 /CF << /StdCF << /CFM /AESV2 /AuthEvent /DocOpen"
-                + " /Length 16 >> >> /StmF /StdCF /StrF /StdCF /O <" + toHex(o) + "> /U <" + toHex(u32)
-                + "> /P " + p + " >>";
+        objs[5] = encrypt;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         write(out, "%PDF-1.6\n");
         int[] off = new int[6];
@@ -181,6 +195,77 @@ class PdfDocumentTest {
                 .append(toHex(id)).append(">] >>\nstartxref\n").append(xref).append("\n%%EOF\n");
         write(out, sb.toString());
         return out.toByteArray();
+    }
+
+    // ---- an AESV3 (R6) file: the iterated hash of ISO 32000-2, algorithm 2.B ----
+
+    private static byte[] aes256File(String text, String password) throws Exception {
+        byte[] pw = password.getBytes(StandardCharsets.UTF_8);
+        byte[] fileKey = new byte[32];
+        for (int i = 0; i < 32; i++) {
+            fileKey[i] = (byte) (i * 11 + 3);
+        }
+        byte[] uvs = hex("0102030405060708");
+        byte[] uks = hex("1112131415161718");
+        byte[] u = concat(hash2b(pw, uvs, new byte[0]), uvs, uks);
+        byte[] ue = aesNoPad(hash2b(pw, uks, new byte[0]), new byte[16], fileKey);
+        byte[] ovs = hex("2122232425262728");
+        byte[] oks = hex("3132333435363738");
+        byte[] o = concat(hash2b(pw, ovs, u), ovs, oks);
+        byte[] oe = aesNoPad(hash2b(pw, oks, u), new byte[16], fileKey);
+        int p = -4;
+        byte[] perms = {(byte) p, (byte) (p >> 8), (byte) (p >> 16), (byte) (p >> 24), -1, -1, -1, -1,
+            'T', 'a', 'd', 'b', 0, 0, 0, 0};
+        Cipher ecb = Cipher.getInstance("AES/ECB/NoPadding");
+        ecb.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(fileKey, "AES"));
+        perms = ecb.doFinal(perms);
+        byte[] content = ("BT /F1 18 Tf 40 700 Td (" + text + ") Tj ET").getBytes(StandardCharsets.ISO_8859_1);
+        return file(aes(fileKey, content), "<< /Filter /Standard /V 5 /R 6 /Length 256 /CF << /StdCF << /CFM"
+                + " /AESV3 /AuthEvent /DocOpen /Length 32 >> >> /StmF /StdCF /StrF /StdCF /O <" + toHex(o)
+                + "> /U <" + toHex(u) + "> /OE <" + toHex(oe) + "> /UE <" + toHex(ue) + "> /Perms <"
+                + toHex(perms) + "> /P " + p + " >>", hex("00112233445566778899aabbccddeeff"));
+    }
+
+    private static byte[] hash2b(byte[] pw, byte[] salt, byte[] udata) throws Exception {
+        byte[] k = MessageDigest.getInstance("SHA-256").digest(concat(pw, salt, udata));
+        int round = 0;
+        while (true) {
+            byte[] k1 = concat(pw, k, udata);
+            byte[] rep = new byte[k1.length * 64];
+            for (int i = 0; i < 64; i++) {
+                System.arraycopy(k1, 0, rep, i * k1.length, k1.length);
+            }
+            byte[] e = aesNoPad(Arrays.copyOfRange(k, 0, 16), Arrays.copyOfRange(k, 16, 32), rep);
+            int mod = 0;
+            for (int i = 0; i < 16; i++) {
+                mod += e[i] & 0xff;
+            }
+            k = MessageDigest.getInstance(new String[] {"SHA-256", "SHA-384", "SHA-512"}[mod % 3]).digest(e);
+            round++;
+            if (round >= 64 && (e[e.length - 1] & 0xff) <= round - 32) {
+                return Arrays.copyOfRange(k, 0, 32);
+            }
+        }
+    }
+
+    private static byte[] aesNoPad(byte[] key, byte[] iv, byte[] data) throws Exception {
+        Cipher c = Cipher.getInstance("AES/CBC/NoPadding");
+        c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+        return c.doFinal(data);
+    }
+
+    private static byte[] concat(byte[]... parts) {
+        int n = 0;
+        for (byte[] b : parts) {
+            n += b.length;
+        }
+        byte[] out = new byte[n];
+        int o = 0;
+        for (byte[] b : parts) {
+            System.arraycopy(b, 0, out, o, b.length);
+            o += b.length;
+        }
+        return out;
     }
 
     private static byte[] objectKey(byte[] key, int num) throws Exception {

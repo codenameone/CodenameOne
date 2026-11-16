@@ -22,11 +22,12 @@
  */
 package com.codename1.impl.pdf;
 
+import com.codename1.util.Jpeg2000;
 import java.util.List;
 
 /// Turns an image XObject (or inline image) into ARGB pixels. JPEG data
 /// is decoded by the device; JPEG 2000, JBIG2 and CCITT fax data by
-/// [JpxDecoder], [Jbig2Decoder] and [CcittDecoder].
+/// [com.codename1.util.Jpeg2000], [Jbig2Decoder] and [CcittDecoder].
 public final class PdfImageDecoder {
     /// Images above this many pixels are not decoded, to bound memory.
     public static final int MAX_PIXELS = 25 * 1000 * 1000;
@@ -127,13 +128,13 @@ public final class PdfImageDecoder {
             out.argb = samples(bits, w, h, 1, mask ? PdfColorSpace.DEVICE_GRAY
                     : cs == null ? PdfColorSpace.DEVICE_GRAY : cs, nums(get(s, "Decode", "D")), mask, fillRgb, s);
         } else if ("JPXDecode".equals(codec)) {
-            JpxDecoder j = JpxDecoder.decode(data);
+            Jpeg2000 j = Jpeg2000.decode(data);
             if (j == null) {
                 return null;
             }
-            out.width = j.width;
-            out.height = j.height;
-            out.argb = j.argb(cs, s.has("SMaskInData") && s.getInt("SMaskInData", 0) != 0);
+            out.width = j.getWidth();
+            out.height = j.getHeight();
+            out.argb = j.toArgb(cs == null ? null : new JpxColors(cs), s.has("SMaskInData") && s.getInt("SMaskInData", 0) != 0);
             if (out.argb == null) {
                 return null;
             }
@@ -347,5 +348,29 @@ public final class PdfImageDecoder {
             p += 2 + (((d[p + 2] & 0xff) << 8) | (d[p + 3] & 0xff));
         }
         return -1;
+    }
+
+    /// A PDF colour space as the colours of a JPEG 2000 image.
+    private static final class JpxColors implements Jpeg2000.Colors {
+        private final PdfColorSpace cs;
+
+        JpxColors(PdfColorSpace cs) {
+            this.cs = cs;
+        }
+
+        @Override
+        public int getComponents() {
+            return cs.getComponents();
+        }
+
+        @Override
+        public boolean isIndexed() {
+            return cs.getKind() == PdfColorSpace.INDEXED;
+        }
+
+        @Override
+        public int toRgb(double[] components) {
+            return cs.toRgb(components);
+        }
     }
 }

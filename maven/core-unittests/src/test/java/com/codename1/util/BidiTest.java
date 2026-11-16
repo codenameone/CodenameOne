@@ -21,7 +21,7 @@
  * need additional information or have any questions.
  */
 
-package com.codename1.ui.editor;
+package com.codename1.util;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,63 +29,63 @@ import static org.junit.jupiter.api.Assertions.*;
 /// Unit tests for the Unicode Bidi Algorithm core used by the pure editor. Samples use unicode escapes
 /// to keep the source ASCII only: Hebrew alef/bet/gimel = u05D0..u05D2, Arabic alef/beh/teh =
 /// u0627/u0628/u062A, Arabic-Indic zero = u0660.
-class BidiUtilTest {
+class BidiTest {
 
     private static final String HEB = "\u05D0\u05D1\u05D2";   // aleph bet gimel (strong R)
     private static final String ARABIC = "\u0627\u0628\u062A"; // alef beh teh (strong AL)
 
     @Test
     void classifiesCommonTypes() {
-        assertEquals(BidiUtil.L, BidiUtil.typeOf('a'));
-        assertEquals(BidiUtil.L, BidiUtil.typeOf('Z'));
-        assertEquals(BidiUtil.EN, BidiUtil.typeOf('5'));
-        assertEquals(BidiUtil.R, BidiUtil.typeOf('\u05D0'));
-        assertEquals(BidiUtil.AL, BidiUtil.typeOf('\u0627'));
-        assertEquals(BidiUtil.AN, BidiUtil.typeOf('\u0660'));
-        assertEquals(BidiUtil.WS, BidiUtil.typeOf(' '));
-        assertEquals(BidiUtil.ON, BidiUtil.typeOf('!'));
-        assertEquals(BidiUtil.L, BidiUtil.typeOf('\u4E2D')); // CJK -> strong L
+        assertEquals(Bidi.L, Bidi.typeOf('a'));
+        assertEquals(Bidi.L, Bidi.typeOf('Z'));
+        assertEquals(Bidi.EN, Bidi.typeOf('5'));
+        assertEquals(Bidi.R, Bidi.typeOf('\u05D0'));
+        assertEquals(Bidi.AL, Bidi.typeOf('\u0627'));
+        assertEquals(Bidi.AN, Bidi.typeOf('\u0660'));
+        assertEquals(Bidi.WS, Bidi.typeOf(' '));
+        assertEquals(Bidi.ON, Bidi.typeOf('!'));
+        assertEquals(Bidi.L, Bidi.typeOf('\u4E2D')); // CJK -> strong L
     }
 
     @Test
     void autoBaseDirectionFromFirstStrong() {
-        assertFalse(BidiUtil.autoBaseRtl("hello"));
-        assertFalse(BidiUtil.autoBaseRtl("123 abc"));      // digits are not strong; first strong is 'a'
-        assertTrue(BidiUtil.autoBaseRtl(HEB));
-        assertTrue(BidiUtil.autoBaseRtl("123 " + HEB));    // first strong is Hebrew
-        assertFalse(BidiUtil.autoBaseRtl("abc " + HEB));   // first strong is Latin
-        assertTrue(BidiUtil.autoBaseRtl(ARABIC + " abc")); // first strong is Arabic
+        assertFalse(Bidi.direction("hello") == Bidi.RTL);
+        assertFalse(Bidi.direction("123 abc") == Bidi.RTL);      // digits are not strong; first strong is 'a'
+        assertTrue(Bidi.direction(HEB) == Bidi.RTL);
+        assertTrue(Bidi.direction("123 " + HEB) == Bidi.RTL);    // first strong is Hebrew
+        assertFalse(Bidi.direction("abc " + HEB) == Bidi.RTL);   // first strong is Latin
+        assertTrue(Bidi.direction(ARABIC + " abc") == Bidi.RTL); // first strong is Arabic
     }
 
     @Test
     void pureLtrIsIdentityOrder() {
-        byte[] levels = BidiUtil.resolveLevels("hello", false);
+        byte[] levels = Bidi.levels("hello", false);
         for (byte b : levels) {
             assertEquals(0, b);
         }
-        int[] vis = BidiUtil.reorderVisual(levels);
+        int[] vis = Bidi.visualOrder(levels);
         assertArrayEquals(new int[]{0, 1, 2, 3, 4}, vis);
-        assertTrue(BidiUtil.isTrivialLtr("hello world 123", false));
+        assertTrue(Bidi.isLeftToRight("hello world 123", false));
     }
 
     @Test
     void pureRtlIsFullyReversed() {
-        byte[] levels = BidiUtil.resolveLevels(HEB, true);
+        byte[] levels = Bidi.levels(HEB, true);
         for (byte b : levels) {
             assertEquals(1, b);
         }
-        int[] vis = BidiUtil.reorderVisual(levels);
+        int[] vis = Bidi.visualOrder(levels);
         assertArrayEquals(new int[]{2, 1, 0}, vis);
-        assertFalse(BidiUtil.isTrivialLtr(HEB, true));
-        assertFalse(BidiUtil.isTrivialLtr(HEB, false)); // strong R makes even an LTR base non-trivial
+        assertFalse(Bidi.isLeftToRight(HEB, true));
+        assertFalse(Bidi.isLeftToRight(HEB, false)); // strong R makes even an LTR base non-trivial
     }
 
     @Test
     void embeddedRtlRunReversesWithinLtrParagraph() {
         // logical: a b c _ H0 H1 _ x y z   (H = Hebrew), LTR base
         String s = "abc \u05D0\u05D1 xyz";
-        byte[] levels = BidiUtil.resolveLevels(s, false);
-        int[] vis = BidiUtil.reorderVisual(levels);
+        byte[] levels = Bidi.levels(s, false);
+        int[] vis = Bidi.visualOrder(levels);
         // only the two Hebrew letters (indices 4,5) swap; everything else stays put
         assertArrayEquals(new int[]{0, 1, 2, 3, 5, 4, 6, 7, 8, 9}, vis);
     }
@@ -95,12 +95,12 @@ class BidiUtilTest {
         // logical: H0 H1 _ '1' '2'  with RTL base. The number is an LTR island inside RTL text, so
         // visually (left to right) the number reads "12" on the left, then space, then the reversed Hebrew.
         String s = "\u05D0\u05D1 12";
-        byte[] levels = BidiUtil.resolveLevels(s, true);
+        byte[] levels = Bidi.levels(s, true);
         assertEquals(1, levels[0]); // Hebrew
         assertEquals(1, levels[1]);
         assertEquals(2, levels[3]); // '1' European number -> level base+1 = 2 inside RTL
         assertEquals(2, levels[4]); // '2'
-        int[] vis = BidiUtil.reorderVisual(levels);
+        int[] vis = Bidi.visualOrder(levels);
         assertArrayEquals(new int[]{3, 4, 2, 1, 0}, vis);
     }
 
@@ -108,7 +108,7 @@ class BidiUtilTest {
     void arabicNumberFollowsArabicLetters() {
         // W2: European digits after an Arabic letter become Arabic numbers (still an LTR-ordered run).
         String s = ARABIC + "12";
-        byte[] levels = BidiUtil.resolveLevels(s, true);
+        byte[] levels = Bidi.levels(s, true);
         // Arabic letters resolve to R (level 1); the digits are AN -> level 2
         assertEquals(1, levels[0]);
         assertEquals(2, levels[levels.length - 1]);
@@ -118,7 +118,7 @@ class BidiUtilTest {
     void reorderIsAStablePermutation() {
         String s = "abc " + HEB + " 42 " + ARABIC;
         for (boolean rtl : new boolean[]{false, true}) {
-            int[] vis = BidiUtil.reorderVisual(BidiUtil.resolveLevels(s, rtl));
+            int[] vis = Bidi.visualOrder(Bidi.levels(s, rtl));
             assertEquals(s.length(), vis.length);
             boolean[] seen = new boolean[s.length()];
             for (int v : vis) {
@@ -131,13 +131,13 @@ class BidiUtilTest {
 
     @Test
     void emptyLineIsHandled() {
-        assertEquals(0, BidiUtil.resolveLevels("", false).length);
-        assertEquals(0, BidiUtil.reorderVisual(new byte[0]).length);
-        assertTrue(BidiUtil.isTrivialLtr("", false));
+        assertEquals(0, Bidi.levels("", false).length);
+        assertEquals(0, Bidi.visualOrder(new byte[0]).length);
+        assertTrue(Bidi.isLeftToRight("", false));
     }
 
     private static String levelString(String text, boolean rtl) {
-        byte[] lv = BidiUtil.resolveLevels(text, rtl);
+        byte[] lv = Bidi.levels(text, rtl);
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < lv.length; i++) {
             char c = text.charAt(i);
@@ -184,7 +184,20 @@ class BidiUtilTest {
 
     @Test
     void explicitControlsAreNotTrivial() {
-        assertFalse(BidiUtil.isTrivialLtr("a\u2067b\u2069", false));
-        assertTrue(BidiUtil.isTrivialLtr("a (b) c", false));
+        assertFalse(Bidi.isLeftToRight("a\u2067b\u2069", false));
+        assertTrue(Bidi.isLeftToRight("a (b) c", false));
+    }
+
+    @Test
+    void otherScriptsAreLeftToRightAndBracketsMirror() {
+        // Greek and Cyrillic are strong left to right, not neutrals.
+        assertEquals(Bidi.LTR, Bidi.strongDirection('\u03b1'));
+        assertEquals(Bidi.LTR, Bidi.strongDirection('\u0436'));
+        assertEquals(Bidi.LTR, Bidi.direction("123 \u0436 " + HEB));
+        assertEquals(Bidi.NEUTRAL, Bidi.direction("123 !"));
+        assertEquals(')', Bidi.mirror('('));
+        assertTrue(Bidi.isMark('\u05b0'));
+        // The bracket pair is resolved as a pair (N0) and mirrored in the right-to-left run.
+        assertEquals("(" + new StringBuilder(HEB).reverse() + ")", Bidi.reorder("(" + HEB + ")", true));
     }
 }

@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.pdf;
 
+import com.codename1.util.Bidi;
 import java.io.IOException;
 
 /// What one document knows about one font: its resource name, its object
@@ -46,7 +47,7 @@ public abstract class FontState {
         }
         StringBuilder sb = new StringBuilder(text.length());
         for (int i = text.length() - 1; i >= 0; i--) {
-            sb.append(PdfBidi.mirror(text.charAt(i)));
+            sb.append(Bidi.mirror(text.charAt(i)));
         }
         showText(content, sb.toString());
     }

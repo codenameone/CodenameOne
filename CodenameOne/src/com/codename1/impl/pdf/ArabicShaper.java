@@ -22,6 +22,8 @@
  */
 package com.codename1.impl.pdf;
 
+import com.codename1.util.Bidi;
+
 /// Arabic joining: which contextual form each letter takes, the Unicode
 /// presentation forms for fonts that map them, and the mapping back from
 /// presentation forms to letters for text extraction.
@@ -81,7 +83,7 @@ public final class ArabicShaper {
 
     /// True for marks that do not take part in joining.
     static boolean transparent(char c) {
-        return PdfBidi.type(c) == PdfBidi.NSM;
+        return Bidi.isMark(c);
     }
 
     private static boolean joinsAfter(char c) {

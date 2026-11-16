@@ -95,6 +95,15 @@ public final class Crypto {
         // code (mnemonics, Schnorr nonces) draws on through CryptoEngine.random.
         com.codename1.security.CryptoEngine.install(new com.codename1.security.CryptoEngine() {
             @Override
+            public byte[] aesCbc(boolean encrypt, byte[] key, byte[] iv, byte[] blocks) {
+                try {
+                    return encrypt ? aesCbcEncryptBlocks(key, iv, blocks) : aesCbcDecryptBlocks(key, iv, blocks);
+                } catch (IOException e) {
+                    return null;
+                }
+            }
+
+            @Override
             public boolean randomBytes(byte[] out) {
                 RANDOM.nextBytes(out);
                 return true;
