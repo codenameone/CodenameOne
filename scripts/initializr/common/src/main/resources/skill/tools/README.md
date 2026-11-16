@@ -187,3 +187,24 @@ java tools/Sim.java record-start flow.mp4 && java tools/Sim.java record-stop
 ```
 
 The comment at the top of the file lists every command, including `device-screenshot` and `device-record` for an iOS simulator or an Android emulator.
+
+### `MakeIcon.java`
+
+Makes the app icon from the usual ingredients: a brand colour or diagonal gradient, and one
+glyph from the Material icon font every Codename One app ships (or the app's initials). Headless,
+JDK only; the glyph names and the font come from the `codenameone-core` jar in the local cache
+(build the project once first; `--text` needs no jar).
+
+```bash
+java tools/MakeIcon.java --palettes                       # brand pairs that read well as icons
+java tools/MakeIcon.java --list-glyphs fitness            # glyph names containing "fitness"
+java tools/MakeIcon.java --glyph check_circle --bg 1f5eff --bg2 6a3df0 --out common/icon.png
+java tools/MakeIcon.java --text HT --bg 0f766e --out common/icon.png
+# WROTE /.../common/icon.png
+```
+
+The default output is what both stores want from a source icon: 1024 x 1024, opaque (App Store
+Connect rejects an alpha channel), full bleed, the glyph inside the central safe area. The build
+derives every platform size from `common/icon.png` (`icon.png` in a Gradle project).
+`--adaptive DIR` also writes Android adaptive-icon layers. Open the PNG and look at it, and show
+it to the user with the app's screenshots: one bold glyph, no words, high contrast.

@@ -159,7 +159,9 @@ Play**: tell the developer where it is and that they must back it up and keep it
 ## Submit (needs "Store submission")
 
 Store credentials (App Store Connect key, Google Play service account) must already be stored.
-Then, for a finished build from `list_builds`:
+Before the first submission, and always before `PRODUCTION`, go through
+`store-review.md` and its checklist: most rejections are things you can find in the code
+first. Then, for a finished build from `list_builds`:
 
 ```
 POST /api/v2/console/builds/{id}/submit
