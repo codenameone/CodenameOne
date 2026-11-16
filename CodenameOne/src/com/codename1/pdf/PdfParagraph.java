@@ -246,18 +246,30 @@ public final class PdfParagraph {
                     int start = pos;
                     float w = 0;
                     int i = pos;
+                    int last = pos;
                     while (i < end) {
                         int next = nextCluster(t, i, end);
                         float cw = run.font.getStringWidth(t.substring(i, next), run.size);
                         if (w + cw > avail - line.width && i > start) {
+                            // The sum leaves out kerning and joined forms;
+                            // the fragment as drawn is measured once, and
+                            // gives back a cluster when it is wider.
+                            if (last > start && run.font.getStringWidth(t.substring(start, i), run.size)
+                                    > avail - line.width) {
+                                i = last;
+                            }
                             add(line, run, t.substring(start, i));
                             finish(lines, line, run);
                             line = new Line();
                             avail = width;
                             start = i;
+                            last = i;
                             w = 0;
+                            // Measure the cluster at i again on the new line.
+                            continue;
                         }
                         w += cw;
+                        last = i;
                         i = next;
                     }
                     add(line, run, t.substring(start, withSpace));
@@ -480,7 +492,7 @@ public final class PdfParagraph {
         }
         while (j < end) {
             char c = t.charAt(j);
-            boolean extend = c >= 0x0300 && c <= 0x036f || c >= 0x0483 && c <= 0x0489 || c >= 0x0591 && c <= 0x05c7
+            boolean extend = c >= 0x0300 && c <= 0x036f || c >= 0x0483 && c <= 0x0489 || c >= 0x0591 && c <= 0x05bd || c == 0x05bf || c == 0x05c1 || c == 0x05c2 || c == 0x05c4 || c == 0x05c5 || c == 0x05c7
                     || c >= 0x0610 && c <= 0x061a || c >= 0x064b && c <= 0x065f || c == 0x0670
                     || c >= 0x06d6 && c <= 0x06ed || c == 0x200c || c == 0x200d || c >= 0xfe00 && c <= 0xfe0f
                     || c >= 0x20d0 && c <= 0x20ff;

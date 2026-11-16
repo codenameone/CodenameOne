@@ -222,24 +222,29 @@ public final class PdfLayout {
         List<List<PdfTable.Cell>> rows = table.rows();
         int headers = Math.min(table.headerRows, rows.size());
         boolean repeat = headers > 0;
-        int startPage = pages.size();
-        float startY = y;
+        float headerHeight = 0;
         for (int r = 0; r < rows.size(); r++) {
             if (r == headers && repeat) {
                 // A header that fills more than half a page would leave a
                 // line or two of body per continuation page; it is drawn
-                // once and not repeated.
-                float height = pages.size() == startPage ? y - startY : y - top;
-                repeat = height <= (limit() - top) / 2;
+                // once and not repeated. The rows' own heights are summed,
+                // since a header can itself cross a page break.
+                repeat = headerHeight <= (limit() - top) / 2;
             }
-            drawRow(table, rows.get(r), colX, r >= headers && repeat ? rows.subList(0, headers) : null);
+            float h = drawRow(table, rows.get(r), colX, r >= headers && repeat ? rows.subList(0, headers) : null);
+            if (r < headers) {
+                headerHeight += h;
+            }
         }
         y += table.spaceAfter;
         return this;
     }
 
-    private void drawRow(PdfTable table, List<PdfTable.Cell> row, float[] colX,
+    /// Draws one row, across pages as needed; answers the total height of
+    /// its fragments.
+    private float drawRow(PdfTable table, List<PdfTable.Cell> row, float[] colX,
             List<List<PdfTable.Cell>> headerRows) {
+        float drawn = 0;
         int n = row.size();
         float pad = table.padding;
         float[] cx = new float[n];
@@ -307,6 +312,7 @@ public final class PdfLayout {
             }
             c.restore();
             y += height;
+            drawn += height;
             boolean done = true;
             for (int i = 0; i < n; i++) {
                 next[i] = end[i];
@@ -315,7 +321,7 @@ public final class PdfLayout {
                 }
             }
             if (done) {
-                return;
+                return drawn;
             }
             newPage();
             if (headerRows != null) {

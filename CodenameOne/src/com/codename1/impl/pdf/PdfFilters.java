@@ -319,7 +319,9 @@ public final class PdfFilters {
     static byte[] runLength(byte[] in) {
         ByteArrayOutputStream bo = new ByteArrayOutputStream(in.length * 2);
         int i = 0;
-        while (i < in.length) {
+        // Each run can expand two bytes to 128, so a chain after Flate
+        // needs its own cap.
+        while (i < in.length && bo.size() < MAX_DECODED) {
             int len = in[i++] & 0xff;
             if (len == 128) {
                 break;

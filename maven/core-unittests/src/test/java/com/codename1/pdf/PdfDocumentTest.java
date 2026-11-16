@@ -275,4 +275,21 @@ class PdfDocumentTest {
         assertThrows(IllegalArgumentException.class, () -> new PdfTable(0f, 0f));
         assertThrows(IllegalArgumentException.class, () -> new PdfTable(1f, -1f));
     }
+
+    @Test
+    void leftOpenSavesStillGiveABalancedStream() {
+        PdfDocument doc = new PdfDocument();
+        PdfPage page = doc.addPage(PdfPageSize.A5);
+        page.getCanvas().save().save().fillRect(0, 0, 10, 10);
+        String c = page.getCanvas().content();
+        int q = 0;
+        for (String tok : c.split("\\s+")) {
+            if ("q".equals(tok)) {
+                q++;
+            } else if ("Q".equals(tok)) {
+                q--;
+            }
+        }
+        assertEquals(0, q);
+    }
 }

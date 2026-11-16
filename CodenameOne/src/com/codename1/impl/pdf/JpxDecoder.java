@@ -41,6 +41,8 @@ final class JpxDecoder {
     int height;
 
     private static final int MAX_PIXELS = 25000000;
+    private static final long MAX_CODE_BLOCKS = 1 << 20;
+    private long codeBlocks;
     private static final RuntimeException EOD = new RuntimeException("jpx: end of data");
 
     // SIZ
@@ -894,8 +896,8 @@ final class JpxDecoder {
                 }
                 int np = rr.npx * rr.npy;
                 bd.precs = new Prec[np];
-                int ps = rr.ppx - pb;
-                int pt = rr.ppy - pb;
+                int ps = Math.max(0, rr.ppx - pb); // a precinct exponent of 0 past resolution 0 is invalid
+                int pt = Math.max(0, rr.ppy - pb);
                 for (int ky = 0; ky < rr.npy; ky++) {
                     for (int kx = 0; kx < rr.npx; kx++) {
                         Prec pr = new Prec();
@@ -910,6 +912,12 @@ final class JpxDecoder {
                             int cy0 = iy0 >> bd.cbh;
                             int nx = ceilShift(ix1, bd.cbw) - cx0;
                             int ny = ceilShift(iy1, bd.cbh) - cy0;
+                            // Tiny code-blocks over a large image are millions
+                            // of objects; a real file has a few thousand.
+                            codeBlocks += (long) nx * ny;
+                            if (nx < 0 || ny < 0 || codeBlocks > MAX_CODE_BLOCKS) {
+                                throw new IllegalStateException("too many code-blocks");
+                            }
                             pr.cbs = new CB[nx * ny];
                             for (int j = 0; j < ny; j++) {
                                 for (int i = 0; i < nx; i++) {

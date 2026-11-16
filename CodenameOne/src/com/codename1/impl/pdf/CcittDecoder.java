@@ -233,8 +233,12 @@ final class CcittDecoder {
         if (columns <= 0 || columns > 1 << 16) {
             columns = width;
         }
-        int h = rows > 0 ? rows : height;
+        // /Rows is a hint the image's own (already checked) height bounds.
+        int h = rows > 0 && (height <= 0 || rows < height) ? rows : height;
         int rowBytes = (columns + 7) / 8;
+        if (h <= 0 || (long) rowBytes * h > PdfFilters.MAX_DECODED) {
+            return new byte[0];
+        }
         byte[] out = new byte[rowBytes * Math.max(0, h)];
         if (!blackIs1) {
             for (int i = 0; i < out.length; i++) {

@@ -53,6 +53,11 @@ public final class PdfContent {
             if (s instanceof PdfStream) {
                 try {
                     byte[] d = ((PdfStream) s).getData();
+                    if ((long) bo.size() + d.length > PdfFilters.MAX_DECODED) {
+                        // One stream listed many times over would otherwise
+                        // grow the page past any memory.
+                        break;
+                    }
                     bo.write(d, 0, d.length);
                     bo.write('\n');
                 } catch (java.io.IOException e) {

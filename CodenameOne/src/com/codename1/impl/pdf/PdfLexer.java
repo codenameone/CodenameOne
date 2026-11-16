@@ -133,19 +133,33 @@ public final class PdfLexer {
                 pos++;
                 List<Object> list = new ArrayList<Object>();
                 if (nesting >= MAX_NESTING) {
+                    // Too deep: skip to the matching bracket without
+                    // recursing, so the enclosing structure stays in frame.
+                    int open = 1;
+                    while (pos < end && open > 0) {
+                        byte b = d[pos++];
+                        if (b == '[') {
+                            open++;
+                        } else if (b == ']') {
+                            open--;
+                        }
+                    }
                     return list;
                 }
                 nesting++;
-                while (true) {
-                    Object o = token();
-                    if (o == END_ARRAY || o == EOF) {
-                        nesting--;
-                        return list;
+                try {
+                    while (true) {
+                        Object o = token();
+                        if (o == END_ARRAY || o == EOF) { // NOPMD CompareObjectsWithEquals - sentinel identity
+                            return list;
+                        }
+                        if (o == END_DICT) { // NOPMD CompareObjectsWithEquals - sentinel identity
+                            continue;
+                        }
+                        list.add(o);
                     }
-                    if (o == END_DICT) {
-                        continue;
-                    }
-                    list.add(o);
+                } finally {
+                    nesting--;
                 }
             }
             case ']':

@@ -40,6 +40,11 @@ public final class PdfFile {
     private static final int MAX_DEPTH = 64;
 
     private final byte[] data;
+    // The last large decoded streams (see PdfStream.getData): a page that
+    // draws one image many times, or a big embedded font, decodes it once.
+    private final PdfStream[] largeKeys = new PdfStream[2];
+    private final byte[][] largeValues = new byte[2][];
+    private int largeNext;
     /// Object number to `{offset}` (type 1) or `{-1, objstm, index}` (type 2).
     private final Map<Integer, int[]> xref = new HashMap<Integer, int[]>();
     private final Map<Integer, Object> cache = new HashMap<Integer, Object>();
@@ -669,4 +674,24 @@ public final class PdfFile {
         }
         return -1;
     }
+
+    byte[] recentLarge(PdfStream s) {
+        for (int i = 0; i < largeKeys.length; i++) {
+            if (largeKeys[i] == s) { // NOPMD CompareObjectsWithEquals - keyed by the stream object itself
+                return largeValues[i];
+            }
+        }
+        return null;
+    }
+
+    void keepLarge(PdfStream s, byte[] d) {
+        if (d.length > LARGE_LIMIT) {
+            return;
+        }
+        largeKeys[largeNext] = s;
+        largeValues[largeNext] = d;
+        largeNext = (largeNext + 1) % largeKeys.length;
+    }
+
+    private static final int LARGE_LIMIT = 24 << 20;
 }

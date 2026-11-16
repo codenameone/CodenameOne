@@ -111,8 +111,15 @@ public final class PngDecoder {
             }
             pos = body + len + 4;
         }
-        if (width <= 0 || height <= 0 || (long) width * height > 0x4000000L) {
+        if (width <= 0 || height <= 0 || (long) width * height > 25000000L) {
             throw new IOException("Bad PNG size " + width + "x" + height);
+        }
+        // The bit depths the PNG specification allows; any other would
+        // divide by zero or misread the rows.
+        boolean depthOk = bitDepth == 8 || bitDepth == 16
+                || (colorType == 0 || colorType == 3) && (bitDepth == 1 || bitDepth == 2 || bitDepth == 4);
+        if (!depthOk || colorType == 3 && bitDepth == 16 || colorType == 1 || colorType == 5 || colorType > 6) {
+            throw new IOException("Bad PNG format");
         }
         if (colorType == 3 && palette == null) {
             throw new IOException("Palette PNG without PLTE");
@@ -301,12 +308,17 @@ public final class PngDecoder {
 
     /// Inflates zlib data completely.
     public static byte[] inflate(byte[] data) throws IOException {
+        return inflate(data, PdfFilters.MAX_DECODED);
+    }
+
+    /// Inflates zlib data, stopping after `limit` bytes.
+    static byte[] inflate(byte[] data, int limit) throws IOException {
         InputStream in = new InflaterInputStream(new ByteArrayInputStream(data));
         ByteArrayOutputStream bo = new ByteArrayOutputStream(data.length * 3 + 64);
         byte[] buf = new byte[8192];
         try {
             int n;
-            while ((n = in.read(buf)) > 0) {
+            while ((n = in.read(buf)) > 0 && bo.size() < limit) {
                 bo.write(buf, 0, n);
             }
         } finally {

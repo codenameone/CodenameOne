@@ -172,7 +172,7 @@ public final class PdfColorSpace {
             PdfColorSpace s = new PdfColorSpace(INDEXED, 1);
             s.base = resolve(file, arg1, resources, depth + 1);
             Object hv = a.size() > 2 ? (file != null ? file.resolve(a.get(2)) : a.get(2)) : null;
-            s.hival = hv instanceof Number ? ((Number) hv).intValue() : 0;
+            s.hival = Math.max(0, Math.min(255, hv instanceof Number ? ((Number) hv).intValue() : 0)); // the spec caps hival at 255
             Object lk = a.size() > 3 ? (file != null ? file.resolve(a.get(3)) : a.get(3)) : null;
             if (lk instanceof PdfString) {
                 s.lookup = ((PdfString) lk).bytes;

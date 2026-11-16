@@ -88,6 +88,12 @@ public final class PdfImageDecoder {
         PdfColorSpace cs = mask ? PdfColorSpace.DEVICE_GRAY
                 : csObj == null ? null : PdfColorSpace.resolve(file, csObj, resources);
         if ("DCTDecode".equals(codec)) {
+            // The platform decoder sizes its buffer from the JPEG's own frame
+            // header, not the dictionary, so check that before handing it on.
+            long frame = jpegPixels(data);
+            if (frame <= 0 || frame > MAX_PIXELS) {
+                return null;
+            }
             int[] size = new int[2];
             int[] px = device.decodeJpeg(data, size);
             if (px == null) {
@@ -306,5 +312,31 @@ public final class PdfImageDecoder {
         }
         int shift = 8 - bpc - (bit & 7);
         return ((d[p] & 0xff) >> shift) & ((1 << bpc) - 1);
+    }
+
+    /// Width times height from the first frame header of JPEG `d`, or -1.
+    static long jpegPixels(byte[] d) {
+        int p = 2;
+        while (p + 9 < d.length) {
+            if ((d[p] & 0xff) != 0xff) {
+                return -1;
+            }
+            int m = d[p + 1] & 0xff;
+            if (m == 0xff) {
+                p++;
+                continue;
+            }
+            if (m == 0xd8 || m == 0x01 || m >= 0xd0 && m <= 0xd7) {
+                p += 2;
+                continue;
+            }
+            if (m >= 0xc0 && m <= 0xcf && m != 0xc4 && m != 0xc8 && m != 0xcc) {
+                long h = ((d[p + 5] & 0xff) << 8) | (d[p + 6] & 0xff);
+                long w = ((d[p + 7] & 0xff) << 8) | (d[p + 8] & 0xff);
+                return w * h;
+            }
+            p += 2 + (((d[p + 2] & 0xff) << 8) | (d[p + 3] & 0xff));
+        }
+        return -1;
     }
 }

@@ -34,14 +34,23 @@ public final class PdfStream extends PdfDict {
     /// The data with every filter but an image one undone; see
     /// [PdfFilters#decode(PdfStream)]. Small results (fonts, functions,
     /// shared forms) are cached; a large one is decoded again when asked, so
-    /// a file's images do not all stay in memory for the life of the file.
+    /// a file's images do not all stay in memory for the life of the file;
+    /// the file keeps the last two large ones, for an image drawn many times
+    /// or an embedded font.
     public byte[] getData() throws IOException {
         if (decoded != null) {
             return decoded;
         }
-        byte[] d = PdfFilters.decode(this);
+        PdfFile f = getFile();
+        byte[] d = f != null ? f.recentLarge(this) : null;
+        if (d != null) {
+            return d;
+        }
+        d = PdfFilters.decode(this);
         if (d.length <= CACHE_LIMIT) {
             decoded = d;
+        } else if (f != null) {
+            f.keepLarge(this, d);
         }
         return d;
     }

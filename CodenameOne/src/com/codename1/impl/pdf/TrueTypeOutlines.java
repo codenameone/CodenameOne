@@ -200,8 +200,14 @@ public final class TrueTypeOutlines {
         return g < numGlyphs ? g : 0;
     }
 
+    // Components left for the outline being drawn: the depth cap bounds a
+    // chain of composites, not their fan-out (a glyph made of a thousand
+    // copies of itself).
+    private int componentBudget;
+
     /// Writes the outline of glyph `g` to `sink`, in em units.
     public void outline(int g, GlyphSink sink) {
+        componentBudget = 4096;
         outline(g, sink, 1, 0, 0, 1, 0, 0, 0);
     }
 
@@ -368,7 +374,7 @@ public final class TrueTypeOutlines {
 
     private void composite(int p, int limit, GlyphSink sink, double a, double b, double c, double dd, double e,
             double f, int depth) {
-        while (p + 4 <= limit) {
+        while (p + 4 <= limit && --componentBudget >= 0) {
             int flags = u16(p);
             int glyph = u16(p + 2);
             p += 4;

@@ -28,6 +28,11 @@ import java.util.List;
 /// Separation and DeviceN color spaces.
 public final class PdfFunction {
     private static final int MAX_DEPTH = 8;
+    private static final int MAX_NODES = 256;
+
+    private static boolean validBits(int bps) {
+        return bps == 1 || bps == 2 || bps == 4 || bps == 8 || bps == 12 || bps == 16 || bps == 24 || bps == 32;
+    }
 
     private final int type;
     private final double[] domain;
@@ -57,7 +62,9 @@ public final class PdfFunction {
     /// Parses function `o` (a dictionary or stream); null when it is not
     /// one this reader understands.
     public static PdfFunction parse(Object o) {
-        return parse(o, 0);
+        // The depth cap alone bounds a chain, not a tree: a stitching
+        // function listing itself twenty times would be 20^8 nodes.
+        return parse(o, 0, new int[] {MAX_NODES});
     }
 
     /// Parses an array of functions, one per output, or a single function.
@@ -78,8 +85,9 @@ public final class PdfFunction {
         return f == null ? null : new PdfFunction[] {f};
     }
 
-    private static PdfFunction parse(Object o, int depth) {
-        if (!(o instanceof PdfDict) || depth > MAX_DEPTH) {
+    private static PdfFunction parse(Object o, int depth, int[] budget) {
+        budget[0]--;
+        if (!(o instanceof PdfDict) || depth > MAX_DEPTH || budget[0] < 0) {
             return null;
         }
         PdfDict d = (PdfDict) o;
@@ -92,8 +100,14 @@ public final class PdfFunction {
                 f.encode = nums(d.getArray("Encode"));
                 f.decode = nums(d.getArray("Decode"));
                 f.samples = ((PdfStream) d).getData();
-                if (f.size == null || f.range == null) {
+                if (f.size == null || f.range == null || f.domain == null
+                        || f.size.length < f.domain.length / 2 || !validBits(f.bps)) {
                     return null;
+                }
+                for (int i = 0; i < f.size.length; i++) {
+                    if (f.size[i] < 1) {
+                        return null;
+                    }
                 }
             } else if (type == 2) {
                 f.c0 = nums(d.getArray("C0"));
@@ -107,13 +121,13 @@ public final class PdfFunction {
                 f.n = d.getNumber("N", 1);
             } else if (type == 3) {
                 List<Object> fs = d.getArray("Functions");
-                if (fs == null) {
+                if (fs == null || fs.isEmpty()) {
                     return null;
                 }
                 f.parts = new PdfFunction[fs.size()];
                 for (int i = 0; i < fs.size(); i++) {
                     Object fo = d.getFile() != null ? d.getFile().resolve(fs.get(i)) : fs.get(i);
-                    f.parts[i] = parse(fo, depth + 1);
+                    f.parts[i] = parse(fo, depth + 1, budget);
                     if (f.parts[i] == null) {
                         return null;
                     }

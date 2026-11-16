@@ -1042,11 +1042,18 @@ public final class PdfRenderer {
             return;
         }
         double[] r = transformBox(new double[] {region[0], region[1], region[2], region[3]}, inv);
-        int i0 = (int) Math.floor((r[0] - bbox[2]) / Math.abs(xstep));
-        int i1 = (int) Math.ceil((r[2] - bbox[0]) / Math.abs(xstep));
-        int j0 = (int) Math.floor((r[1] - bbox[3]) / Math.abs(ystep));
-        int j1 = (int) Math.ceil((r[3] - bbox[1]) / Math.abs(ystep));
-        if ((long) (i1 - i0 + 1) * (j1 - j0 + 1) > MAX_TILES) {
+        // In doubles first: a tiny step makes these quotients overflow an
+        // int, and a wrapped count would pass the cap and loop forever.
+        double fi0 = Math.floor((r[0] - bbox[2]) / Math.abs(xstep));
+        double fi1 = Math.ceil((r[2] - bbox[0]) / Math.abs(xstep));
+        double fj0 = Math.floor((r[1] - bbox[3]) / Math.abs(ystep));
+        double fj1 = Math.ceil((r[3] - bbox[1]) / Math.abs(ystep));
+        double tiles = (fi1 - fi0 + 1) * (fj1 - fj0 + 1);
+        int i0 = (int) fi0;
+        int i1 = (int) fi1;
+        int j0 = (int) fj0;
+        int j1 = (int) fj1;
+        if (!(tiles <= MAX_TILES)) { // NOPMD LogicInversion - also catches NaN
             // Too fine to draw tile by tile: approximate with the color of
             // an uncolored pattern, or mid-gray.
             PdfPath all = new PdfPath();

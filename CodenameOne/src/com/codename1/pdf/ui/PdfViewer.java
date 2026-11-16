@@ -332,7 +332,21 @@ public class PdfViewer extends Component {
                 Image img;
                 try {
                     img = renderPage(page, drawn);
-                } catch (Throwable e) { // NOPMD AvoidCatchingThrowable - out of memory on a huge page must not retry it on every paint
+                } catch (OutOfMemoryError e) {
+                    // Memory may have been held by the other pages: drop
+                    // them and try this one once more.
+                    for (int i = 0; i < cache.length; i++) {
+                        cache[i] = null;
+                    }
+                    try {
+                        img = renderPage(page, drawn);
+                    } catch (Throwable again) { // NOPMD AvoidCatchingThrowable - a page that fails twice is not retried on every paint
+                        img = null;
+                    }
+                } catch (Throwable e) { // NOPMD AvoidCatchingThrowable - a failing page must not be retried on every paint
+                    img = null;
+                }
+                if (img == null) {
                     // A page that fails is stored as blank paper, so the
                     // next paint does not schedule it again.
                     img = Image.createImage(1, 1, 0xffffffff);

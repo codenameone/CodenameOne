@@ -103,7 +103,14 @@ public final class PdfCanvas {
     }
 
     String content() {
-        return content.toString() + "Q\n";
+        // Close what the caller left saved, then the outer q, so the stream
+        // is balanced however the canvas was used; the builder is untouched.
+        StringBuilder close = new StringBuilder(content.length() + 2 * depth + 2);
+        close.append(content);
+        for (int i = 0; i < depth; i++) {
+            close.append("Q\n");
+        }
+        return close.append("Q\n").toString();
     }
 
     private PdfCanvas op(String operator) {

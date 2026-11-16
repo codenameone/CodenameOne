@@ -173,6 +173,28 @@ class PdfInternalsTest {
     }
 
     @Test
+    void selfReferencingStitchingFunctionIsBounded() throws Exception {
+        StringBuilder refs = new StringBuilder();
+        for (int i = 0; i < 20; i++) {
+            refs.append("1 0 R ");
+        }
+        String body = "%PDF-1.4\n1 0 obj\n<</FunctionType 3 /Domain [0 1] /Functions [" + refs
+                + "] /Bounds [] /Encode [0 1]>>\nendobj\n2 0 obj\n<</Type /Catalog>>\nendobj\n"
+                + "trailer\n<</Size 3 /Root 2 0 R>>\n%%EOF\n";
+        PdfFile f = new PdfFile(body.getBytes("ISO-8859-1"), null);
+        long t = System.currentTimeMillis();
+        assertNull(PdfFunction.parse(f.resolve(new PdfRef(1, 0))));
+        assertTrue(System.currentTimeMillis() - t < 5000);
+    }
+
+    @Test
+    void pngWithInvalidBitDepthIsRejected() {
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0, 0, 13, 'I', 'H', 'D', 'R',
+            0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        assertThrows(java.io.IOException.class, () -> PngDecoder.decode(png));
+    }
+
+    @Test
     void cidCollectionsMapToUnicode() {
         assertEquals(0x3042, CidToUnicode.lookup("Japan1", 843));
         assertEquals(0x65e5, CidToUnicode.lookup("Japan1", 3284));

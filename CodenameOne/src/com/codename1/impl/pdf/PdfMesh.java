@@ -107,7 +107,8 @@ final class PdfMesh {
         if (type == 4) {
             freeForm();
         } else if (type == 5) {
-            lattice(Math.max(2, s.getInt("VerticesPerRow", 2)));
+            // A row cannot hold more vertices than the data has bits for.
+            lattice(Math.max(2, Math.min(s.getInt("VerticesPerRow", 2), d.length * 8 + 2)));
         } else {
             patches(type == 7);
         }
