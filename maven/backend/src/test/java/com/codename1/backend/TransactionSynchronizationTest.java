@@ -74,6 +74,33 @@ class TransactionSynchronizationTest {
         assertThrows(TransactionException.IllegalState.class, () -> Transactions.bindResource("x", "y"));
     }
 
+    @Test void requiredWorkInAfterCommitRunsInATransactionOfItsOwn() throws Exception {
+        // Issue 6240: a REQUIRED call from afterCommit threw "Transaction has
+        // completed", and best-effort callbacks swallowed it. Spring starts a new
+        // transaction there.
+        final DataSource pool = pool();
+        try {
+            Transactions.execute(() -> {
+                pool.execute("INSERT INTO t VALUES (1)", null);
+                Transactions.registerSynchronization(new Transactions.Synchronization() {
+                    public void afterCommit() {
+                        try {
+                            Transactions.execute(Propagation.REQUIRED, false, -1, Isolation.DEFAULT, () -> {
+                                pool.execute("INSERT INTO t VALUES (2)", null);
+                                return null;
+                            });
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                });
+                return null;
+            });
+            assertEquals(2, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM t", null).get("n")).intValue());
+            assertFalse(Transactions.isActive());
+        } finally { pool.close(); }
+    }
+
     @Test void requiresNewSuspendsAndRestoresCallbacksAndResources() throws Exception {
         final List<String> events = new ArrayList<String>();
         Transactions.execute(() -> {

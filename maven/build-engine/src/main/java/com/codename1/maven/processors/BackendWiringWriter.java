@@ -374,6 +374,9 @@ final class BackendWiringWriter {
         if (Boolean.TRUE.equals(model.ctx.getAttribute("cn1.backend.mvc"))) {
             sb.append("        handlers.add(new com.codename1.generated.mvc.Assets());\n");
         }
+        // Last, and taken back out of the chain by the server: the advice that
+        // answers a NoHandlerFoundException for a path nothing serves.
+        sb.append("        if (cn1Hooks.hasResolvers()) {\n            handlers.add(cn1Hooks);\n        }\n");
         sb.append("        com.codename1.backend.HttpServer.Handler[] out =\n")
           .append("                new com.codename1.backend.HttpServer.Handler[handlers.size()];\n");
         sb.append("        for (int i = 0; i < out.length; i++) {\n")

@@ -259,7 +259,20 @@ final class BackendJsonCodecs {
             // name; only an application class needs a codec.
             return null;
         }
-        return read ? checkRead(t) : checkWrite(t);
+        if (!read) {
+            return checkWrite(t);
+        }
+        String why = checkRead(t);
+        if (why == null) {
+            // A class the application reads is one it routinely writes back too --
+            // often through an Object-typed write the scan cannot type, such as a
+            // Map<String, Object> response. Json.write refuses a class with no
+            // codec, so a read root also gets its writer (issue 6240). A class
+            // that can be read but not written is still a valid read root, so
+            // the writer's answer is not the call site's.
+            checkWrite(t);
+        }
+        return why;
     }
 
     /// Whether [#sources] includes [#REGISTRY], for the entry point that has to

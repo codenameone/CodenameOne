@@ -100,6 +100,13 @@ final class RepositoryGenerator {
         this.keyType = keyType;
     }
     static String generate(AnnotatedClass repository, Map<String, OrmAnnotationProcessor.EntityClass> entities) {
+        return generate(repository, entities, null);
+    }
+    /// @param statements receives `{method, JPQL, result class}` for every
+    ///     JPQL statement a method runs, declared or derived, so the build can
+    ///     parse each one with the runtime parser ([JpqlBuildCheck]); may be null
+    static String generate(AnnotatedClass repository, Map<String, OrmAnnotationProcessor.EntityClass> entities,
+            List<String[]> statements) {
         if (!repository.isInterface() || !repository.isPublic() || repository.getBinaryName().contains("$")) {
             throw invalid("@Repository requires a public top-level interface");
         }
@@ -121,6 +128,7 @@ final class RepositoryGenerator {
                     + "> directly; generic repositories and additional superinterfaces are unsupported");
         }
         RepositoryGenerator generator = new RepositoryGenerator(entity, key.getClassName());
+        generator.statements = statements;
         generator.typeTransactional = repository.getClassAnnotation(BackendBeans.TRANSACTIONAL);
         StringBuilder methods = new StringBuilder();
         Set<String> custom = new HashSet<String>();
@@ -130,6 +138,7 @@ final class RepositoryGenerator {
             // it reaches the generated methods through `this`, as in Spring Data.
             if (!method.isAbstract()) continue;
             generator.methodTransactional = method.getAnnotation(BackendBeans.TRANSACTIONAL);
+            generator.methodName = repository.getBinaryName() + "." + method.getName();
             try { methods.append(generator.method(method)); custom.add(method.getName()); }
             catch (IllegalArgumentException error) { throw invalid(method.getName() + ": " + error.getMessage()); }
         }
@@ -140,7 +149,7 @@ final class RepositoryGenerator {
         // wrapper that runs it REQUIRED (see wrap).
         String[][] defaults = {
             {"findById", e, k, "return session.find(" + e + ".class,p0);", "true"},
-            {"save", e, e, "return session.merge(p0);", "false"},
+            {"save", e, e, "return session.save(p0);", "false"},
             {"insert", "void", e, "session.persist(p0);", "false"},
             {"deleteById", "void", k, "requireTransaction(); " + e + " value=session.find(" + e + ".class,p0); if(value!=null) session.remove(value);", "false"},
             {"findAll", list, "", "return session.query(" + e + ".class).list();", "true"},
@@ -149,7 +158,7 @@ final class RepositoryGenerator {
             {"delete", "void", e, "requireTransaction(); if(p0==null) throw new IllegalArgumentException(\"entity is null\"); if(session.contains(p0)) { session.remove(p0); return; } " + e + " value=session.merge(p0); if(value!=null) session.remove(value);", "false"},
             {"deleteAll", "void", "", "requireTransaction(); for(" + e + " value : session.query(" + e + ".class).list()) session.remove(value);", "false"},
             {"deleteAll", "void", "Iterable<? extends " + e + ">", "requireTransaction(); if(p0==null) throw new IllegalArgumentException(\"entities is null\"); for(" + e + " value : p0) delete$cn1Tx(value);", "false"},
-            {"saveAll", list, "Iterable<? extends " + e + ">", "if(p0==null) throw new IllegalArgumentException(\"entities is null\"); " + list + " out=new java.util.ArrayList<" + e + ">(); for(" + e + " value : p0) out.add(session.merge(value)); return out;", "false"},
+            {"saveAll", list, "Iterable<? extends " + e + ">", "if(p0==null) throw new IllegalArgumentException(\"entities is null\"); " + list + " out=new java.util.ArrayList<" + e + ">(); for(" + e + " value : p0) out.add(session.save(value)); return out;", "false"},
             {"findAllById", list, "Iterable<" + k + ">", "if(p0==null) throw new IllegalArgumentException(\"ids is null\"); " + list + " out=new java.util.ArrayList<" + e + ">(); for(" + k + " id : p0) { " + e + " value=session.find(" + e + ".class,id); if(value!=null) out.add(value); } return out;", "true"},
             {"flush", "void", "", "session.flush();", "false"}
         };
@@ -171,6 +180,8 @@ final class RepositoryGenerator {
                 + "private void requireTransaction() { if(!session.isTransactionActive() || session.isRollbackOnly()) throw new com.codename1.orm.session.PersistenceException(\"Repository write requires an active usable transaction\"); }\n"
                 + methods + "}\n";
     }
+    private List<String[]> statements;
+    private String methodName;
     private String method(MethodInfo method) {
         Type[] args = Type.getArgumentTypes(method.getDescriptor());
         Type result = Type.getReturnType(method.getDescriptor());
@@ -371,6 +382,10 @@ final class RepositoryGenerator {
         // read-only transaction.
         readOnly = !mutation && lockMode == null;
         String create = "session." + (nativeSql ? "createNativeQuery" : "createQuery") + "(" + quote(statement) + "," + valueType + ".class)";
+        if (!nativeSql && statements != null) {
+            statements.add(new String[]{methodName, statement, "Object".equals(valueType) ? "java.lang.Object"
+                    : "Long".equals(valueType) ? "java.lang.Long" : valueType});
+        }
         String returned = list ? "java.util.List<" + scalar + ">" : optional ? "java.util.Optional<" + scalar + ">" : scalar;
         StringBuilder body = new StringBuilder();
         body.append("com.codename1.orm.session.JpqlQuery<").append(valueType).append("> q=").append(create).append(';');

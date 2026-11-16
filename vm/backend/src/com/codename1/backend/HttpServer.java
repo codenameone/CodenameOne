@@ -877,6 +877,25 @@ public final class HttpServer {
             this.bodyBytes = binary;
         }
 
+        /// A request built by hand, for a unit test of a [Handler], a filter or an
+        /// interceptor that never goes through a listener. `headers` may be null;
+        /// its names are matched in any case, as a listener's are. `body` may be
+        /// null too. Nothing about it is pooled or valid only for one call.
+        public static Request of(String method, String target, Map<String, String> headers, byte[] body) {
+            if (method == null || target == null) {
+                throw new IllegalArgumentException("A request needs a method and a target");
+            }
+            Map folded = new LinkedHashMap();
+            if (headers != null) {
+                for (Map.Entry<String, String> h : headers.entrySet()) {
+                    folded.put(asciiLower(h.getKey()), h.getValue());
+                }
+            }
+            byte[] copy = body == null ? null : body.clone();
+            return new Request(method, target, "HTTP/1.1", folded,
+                    copy == null ? null : new String(copy, java.nio.charset.StandardCharsets.UTF_8), copy);
+        }
+
         Request(String method, String target, String version, Map headers, String body) {
             // pathLength is NOT set here, and does not need to be: it carries a
             // field initializer (= -1) and javac copies those into every
@@ -1664,6 +1683,23 @@ public final class HttpServer {
 
         public int getStatus() {
             return status;
+        }
+
+        /// The content type, or null.
+        public String getContentType() {
+            return contentType;
+        }
+
+        /// The body as it will be sent, for a unit test that called a handler
+        /// directly; a deferred JSON value is written now. A file or streamed body
+        /// is not held in memory -- read those through `MockMvc`, which sends the
+        /// request the way a listener does.
+        public byte[] getBody() {
+            if (fileFd >= 0 || bodyWriter != null) {
+                throw new IllegalStateException("A file or streamed body is not held in memory");
+            }
+            serializeDeferredJson();
+            return body == null ? new byte[0] : body;
         }
 
         /// Adds a response header and returns this Response. A copy is made

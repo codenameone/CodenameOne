@@ -72,6 +72,7 @@ public final class RecordingOptions {
     private boolean tapSound;
     private Audio audio = Audio.APP;
     private int maxSeconds = 600;
+    private boolean lockstep;
 
     public String getPath() {
         return path;
@@ -171,6 +172,19 @@ public final class RecordingOptions {
 
     public void setAudio(Audio audio) {
         this.audio = audio == null ? Audio.NONE : audio;
+    }
+
+    /// True when every video frame is rendered for its own moment of the
+    /// timeline instead of grabbed from the live window. Simulator
+    /// animations (a fold, a turn) then advance exactly one frame interval
+    /// per video frame, so the video is smooth however slowly a frame
+    /// renders. Scripted recordings use it.
+    public boolean isLockstep() {
+        return lockstep;
+    }
+
+    public void setLockstep(boolean lockstep) {
+        this.lockstep = lockstep;
     }
 
     public int getMaxSeconds() {

@@ -36,6 +36,8 @@ import argparse
 import gzip
 import hashlib
 import json
+from pathlib import Path
+import math
 import os
 import random
 import re
@@ -434,11 +436,68 @@ def brand_label_from_slug(slug: str, label_map: dict[str, str]) -> str:
     return m.group(1).title() if m else slug
 
 
+FOLDABLES_JSON = Path(__file__).with_name("foldables.json")
+
+
+def apply_curated_folds(records: list[dict], path: Path = FOLDABLES_JSON) -> list[dict]:
+    """Writes the hand-curated fold data of foldables.json over the records.
+
+    The scrape knows a phone folds (is_foldable) but not where its hinge is
+    or what its cover display is, and it files some clamshell feature phones
+    with ordinary screens as foldable. Records that are absent are skipped,
+    so the table may name devices a given scrape did not return.
+    """
+    table = json.loads(path.read_text(encoding="utf-8"))
+    curated = table.get("devices", {})
+    not_foldable = set(table.get("notFoldable", []))
+    out = []
+    for r in records:
+        c = curated.get(r["id"])
+        if c is not None:
+            r = dict(r)
+            fold = {"orientation": c.get("orientation", "vertical"),
+                    "type": c.get("type", "continuous")}
+            if "coverW" in c:
+                diag = math.hypot(c["coverW"], c["coverH"])
+                fold.update(coverW=c["coverW"], coverH=c["coverH"],
+                            coverPpi=int(round(diag / c["coverInches"])),
+                            coverInches=c["coverInches"])
+            fold["estimated"] = bool(c.get("estimated", False))
+            r["fold"] = fold
+            for key in ("w", "h"):
+                if key in c:
+                    r[key] = c[key]
+            r["form"] = "Foldable"
+            r["tablet"] = False
+        elif r["id"] in not_foldable and r.get("form") == "Foldable":
+            r = dict(r, form="Phone")
+        elif r.get("form") == "Foldable" and "fold" not in r:
+            # Not curated yet: a clamshell by its name, a book fold
+            # otherwise, and no cover display. Marked estimated.
+            name = r.get("name", "").lower()
+            flip = "flip" in name or "razr" in name
+            r = dict(r, fold={"orientation": "horizontal" if flip else "vertical",
+                              "type": "continuous", "estimated": True})
+        out.append(r)
+    return out
+
+
 def merge(existing: list[dict], fresh: list[dict]) -> list[dict]:
     by_id: dict[str, dict] = {r["id"]: r for r in existing}
     for r in fresh:
         prev = by_id.get(r["id"])
         if prev is None or (r.get("year") or 0) >= (prev.get("year") or 0):
+            # The "fold" object (hinge orientation, cover display) is
+            # curated by hand: the scrape has no source for it, so a fresh
+            # record must not drop it.
+            # The inner resolution and form factor of a foldable are
+            # curated with it: the cover must be the folded half of the
+            # inner display, and a scraped spec sheet does not know that.
+            if prev is not None and "fold" in prev and "fold" not in r:
+                r = dict(r, fold=prev["fold"])
+                for key in ("w", "h", "form", "tablet"):
+                    if key in prev:
+                        r[key] = prev[key]
             by_id[r["id"]] = r
     return list(by_id.values())
 
@@ -533,6 +592,7 @@ def main() -> int:
             break
 
     merged = merge(existing, fresh)
+    merged = apply_curated_folds(merged)
     merged.sort(key=lambda r: (-(r["year"] or 0), r["brand"].lower(), r["name"].lower()))
 
     # Don't rewrite the file when no device record actually changed. The

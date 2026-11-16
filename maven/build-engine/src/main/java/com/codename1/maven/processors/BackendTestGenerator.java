@@ -84,6 +84,9 @@ final class BackendTestGenerator {
     static final int SLICE_DATA = 2;
     static final String TEST_CONFIGURATION = "Lcom/codename1/backend/test/TestConfiguration;";
     static final String MOCKITO_BEAN = "Lcom/codename1/backend/test/MockitoBean;";
+    static final String DYNAMIC_PROPERTY_SOURCE = "Lcom/codename1/backend/test/DynamicPropertySource;";
+    private static final String DYNAMIC_PROPERTY_DESCRIPTOR =
+            "(Lcom/codename1/backend/test/DynamicPropertyRegistry;)V";
     static final String LOCAL_SERVER_PORT = "Lcom/codename1/backend/test/LocalServerPort;";
     static final String WITH_MOCK_USER = "Lcom/codename1/backend/test/WithMockUser;";
     static final String WITH_ANONYMOUS_USER = "Lcom/codename1/backend/test/WithAnonymousUser;";
@@ -136,6 +139,8 @@ final class BackendTestGenerator {
         AnnotatedClass test;
         final Set<String> configurations = new TreeSet<String>();
         final List<String> properties = new ArrayList<String>();
+        /// The `@DynamicPropertySource` calls, as source: `Owner.method`.
+        final List<String> dynamicProperties = new ArrayList<String>();
         String profile = "test";
         int webEnvironment;
         /// {field, internal type}
@@ -206,8 +211,9 @@ final class BackendTestGenerator {
         if (ctx.hasErrors()) {
             return 0;
         }
+        readWiringRecord();
+        standaloneRouters();
         if (!specs.isEmpty()) {
-            readWiringRecord();
             resolveContexts(specs);
             if (ctx.hasErrors()) {
                 return 0;
@@ -293,7 +299,8 @@ final class BackendTestGenerator {
             spec.annotationName = "@DataJpaTest";
             // NONE: the test calls the repositories itself, and makes no requests.
             spec.webEnvironment = 3;
-            spec.rollback = a.getBoolOrDefault("rollback", true);
+            spec.rollback = a.getBoolOrDefault("rollback", true)
+                    && !nonTransactional(annotation(cls.getClassAnnotations(), BackendBeans.TRANSACTIONAL));
             if (!includes(spec, cls, a.get("includes"))) {
                 return null;
             }
@@ -312,6 +319,9 @@ final class BackendTestGenerator {
                 spec.properties.add(p.substring(0, eq).trim());
                 spec.properties.add(p.substring(eq + 1).trim());
             }
+        }
+        if (!dynamicProperties(spec, cls)) {
+            return null;
         }
         if (spec.slice == SLICE_DATA) {
             // The declared database, in the top layer with the test's own
@@ -391,6 +401,10 @@ final class BackendTestGenerator {
         key.append('|').append(testInjectsDatabase(spec));
         key.append('|').append(spec.slice).append(spec.sliceScope).append('|')
            .append(spec.features).append('|').append(spec.rollback);
+        if (!spec.dynamicProperties.isEmpty()) {
+            // Values known only when it starts: an application of its own.
+            key.append("|dynamic:").append(cls.getBinaryName());
+        }
         spec.key = key.toString();
         return spec;
     }
@@ -574,6 +588,93 @@ final class BackendTestGenerator {
             c = sup == null || "java/lang/Object".equals(sup) ? null : ctx.lookup(sup);
         }
         return out;
+    }
+
+    // --------------------------------------------------- standalone routers
+
+    static final String STANDALONE_ATTRIBUTE = "cn1.backend.test.standalone";
+    static final String STANDALONE_ROUTERS = "cn1app.test.Cn1StandaloneRouters";
+    static final String STANDALONE_SERVICE =
+            "META-INF/services/com.codename1.impl.backend.test.StandaloneRouters";
+
+    /// `MockMvcBuilders.standaloneSetup` matches a controller to its generated
+    /// router through this class, an `instanceof` per controller, named in a
+    /// service file of the test output: no reflection, and nothing of it in the
+    /// application's own classes.
+    private void standaloneRouters() throws ProcessingException {
+        File service = new File(ctx.getOutputClassDir(), STANDALONE_SERVICE);
+        if (routers.isEmpty() || !Boolean.TRUE.equals(ctx.getAttribute(STANDALONE_ATTRIBUTE))) {
+            if (service.isFile() && !service.delete()) {
+                ctx.getLog().warn("could not remove the stale " + STANDALONE_SERVICE);
+            }
+            return;
+        }
+        StringBuilder sb = new StringBuilder("package cn1app.test;\n\n");
+        sb.append("// Generated: the routers MockMvcBuilders.standaloneSetup uses. Do not edit.\n");
+        sb.append("public final class Cn1StandaloneRouters extends "
+                + "com.codename1.impl.backend.test.StandaloneRouters {\n");
+        sb.append("    protected com.codename1.backend.HttpServer.Handler router(Object controller) {\n");
+        // A controller this package cannot name -- Spring allows a package
+        // private one -- is reached through a helper generated into its own
+        // package; one no generated code can name (a private nested class, the
+        // default package) is left out, and StandaloneRouters.of names it.
+        Map<String, StringBuilder> packaged = new LinkedHashMap<String, StringBuilder>();
+        for (BackendWiringWriter.Router r : routers) {
+            String controller = r.controllerBinary.replace('$', '.');
+            String check = "        if (controller instanceof " + controller + ") {\n"
+                    + "            return new " + r.routerBinary.replace('$', '.') + "((" + controller
+                    + ") controller);\n        }\n";
+            int dot = r.controllerBinary.lastIndexOf('.');
+            if (publiclyNamed(r.controllerBinary)) {
+                sb.append(check);
+            } else if (dot > 0 && r.controllerBinary.indexOf('$') < 0) {
+                String pkg = r.controllerBinary.substring(0, dot);
+                StringBuilder helper = packaged.get(pkg);
+                if (helper == null) {
+                    helper = new StringBuilder("package ").append(pkg).append(";\n\n")
+                            .append("// Generated: standaloneSetup routers for this package's non-public controllers.\n")
+                            .append("public final class Cn1StandaloneRoutersOfPackage {\n")
+                            .append("    private Cn1StandaloneRoutersOfPackage() {\n    }\n\n")
+                            .append("    public static com.codename1.backend.HttpServer.Handler router(Object controller) {\n");
+                    packaged.put(pkg, helper);
+                    sb.append("        com.codename1.backend.HttpServer.Handler in").append(packaged.size())
+                      .append(" = ").append(pkg).append(".Cn1StandaloneRoutersOfPackage.router(controller);\n")
+                      .append("        if (in").append(packaged.size()).append(" != null) {\n            return in")
+                      .append(packaged.size()).append(";\n        }\n");
+                }
+                helper.append(check);
+            }
+        }
+        sb.append("        return null;\n    }\n}\n");
+        sources.put(STANDALONE_ROUTERS, sb.toString());
+        for (Map.Entry<String, StringBuilder> e : packaged.entrySet()) {
+            sources.put(e.getKey() + ".Cn1StandaloneRoutersOfPackage",
+                    e.getValue().append("        return null;\n    }\n}\n").toString());
+        }
+        try {
+            java.nio.file.Files.createDirectories(service.getParentFile().toPath());
+            java.nio.file.Files.write(service.toPath(),
+                    (STANDALONE_ROUTERS + "\n").getBytes(StandardCharsets.US_ASCII));
+        } catch (IOException err) {
+            throw new ProcessingException("Could not write " + service + ": " + err.getMessage(), err);
+        }
+    }
+
+    /// True when the class and every class enclosing it are public, so that
+    /// generated code in another package can name it.
+    private boolean publiclyNamed(String binary) {
+        String name = binary;
+        while (true) {
+            AnnotatedClass cls = ctx.lookup(name.replace('.', '/'));
+            if (cls == null || !cls.isPublic()) {
+                return false;
+            }
+            int nested = name.lastIndexOf('$');
+            if (nested < 0) {
+                return true;
+            }
+            name = name.substring(0, nested);
+        }
     }
 
     // --------------------------------------------------------- wiring record
@@ -793,8 +894,19 @@ final class BackendTestGenerator {
         }
         sb.append("    public String[] profileSettings() {\n        return ")
           .append(array(profileSettings)).append(";\n    }\n\n");
-        sb.append("    public String[] properties() {\n        return ")
-          .append(array(spec.properties)).append(";\n    }\n\n");
+        if (spec.dynamicProperties.isEmpty()) {
+            sb.append("    public String[] properties() {\n        return ")
+              .append(array(spec.properties)).append(";\n    }\n\n");
+        } else {
+            sb.append("    public String[] properties() {\n")
+              .append("        com.codename1.impl.backend.test.DynamicProperties registry =\n")
+              .append("                new com.codename1.impl.backend.test.DynamicProperties(")
+              .append(array(spec.properties)).append(");\n");
+            for (String call : spec.dynamicProperties) {
+                sb.append("        ").append(call).append("(registry);\n");
+            }
+            sb.append("        return registry.toArray();\n    }\n\n");
+        }
         sb.append("    public String profile() {\n        return ").append(quote(spec.profile))
           .append(";\n    }\n\n");
         sb.append("    public int webEnvironment() {\n        return ").append(spec.webEnvironment)
@@ -977,6 +1089,13 @@ final class BackendTestGenerator {
             }
             if (BackendBeans.ENTITIES_TYPE.equals(type)) {
                 return "environment.backend().getEntityManager()";
+            }
+            if ("com/codename1/orm/session/Session".equals(type)) {
+                // The session the application's beans are injected: it forwards to
+                // the calling thread's transaction -- the test method's, in a
+                // rolled-back test -- and reads outside one (#6240).
+                return "new com.codename1.impl.backend.TransactionSession("
+                        + "environment.backend().getEntityManager())";
             }
         }
         AnnotationValues qualifier = f.getAnnotation(BackendBeans.QUALIFIER);
@@ -1181,7 +1300,8 @@ final class BackendTestGenerator {
             for (MethodInfo b : beforeEach) {
                 sb.append("            ").append(call(owners.get(b), b, pkg, "test")).append(";\n");
             }
-            if (spec != null && spec.rollback) {
+            if (spec != null && spec.rollback
+                    && !nonTransactional(annotation(m.getAnnotations(), BackendBeans.TRANSACTIONAL))) {
                 // The test method alone in the transaction, as the JUnit
                 // extension runs it: the @BeforeEach methods above and the
                 // @AfterEach ones below see the database as it was.
@@ -1351,6 +1471,48 @@ final class BackendTestGenerator {
     /// cannot see (from a library jar rather than this module) is not followed.
     private boolean carries(MethodInfo m, String annotation) {
         return annotation(m.getAnnotations(), annotation) != null;
+    }
+
+    /// Collects the `@DynamicPropertySource` methods of `cls` and its superclasses,
+    /// superclass first as Spring calls them; false after reporting one the
+    /// generated context cannot call.
+    private boolean dynamicProperties(Spec spec, AnnotatedClass cls) {
+        List<AnnotatedClass> chain = new ArrayList<AnnotatedClass>(methodHierarchy(cls));
+        Collections.reverse(chain);
+        String testPkg = packageOf(cls.getBinaryName());
+        boolean ok = true;
+        for (AnnotatedClass c : chain) {
+            for (MethodInfo m : c.getMethods()) {
+                if (!carries(m, DYNAMIC_PROPERTY_SOURCE)) {
+                    continue;
+                }
+                String where = c.getSourceName() + "." + m.getName();
+                if (!m.isStatic() || !DYNAMIC_PROPERTY_DESCRIPTOR.equals(m.getDescriptor())) {
+                    ctx.error(c, "@DynamicPropertySource " + where + " must be static and take one "
+                            + "DynamicPropertyRegistry.");
+                    ok = false;
+                } else if (m.isPrivate() || (!m.isPublic() && !packageOf(c.getBinaryName()).equals(testPkg))) {
+                    ctx.error(c, "@DynamicPropertySource " + where + " is called from the test's "
+                            + "generated context in " + (testPkg.length() == 0 ? "the default package" : testPkg)
+                            + "; make it package-private there, or public.");
+                    ok = false;
+                } else {
+                    spec.dynamicProperties.add(c.getSourceName() + "." + m.getName());
+                }
+            }
+        }
+        return ok;
+    }
+
+    /// True for `@Transactional(propagation = NOT_SUPPORTED)` or `NEVER` on a test
+    /// class or method: as in Spring, the test then runs outside the rolled-back
+    /// test transaction and what it writes stays written (#6240).
+    private static boolean nonTransactional(AnnotationValues tx) {
+        if (tx == null) {
+            return false;
+        }
+        String propagation = BackendBeans.enumName(tx.get("propagation"), "REQUIRED");
+        return "NOT_SUPPORTED".equals(propagation) || "NEVER".equals(propagation);
     }
 
     /// `annotation` among `annotations`, directly or through a composed annotation

@@ -179,6 +179,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     String nextAlias() {
         return "q" + (aliasSequence++);
     }
+    /// True when name is a registered entity's binary or simple name; tells
+    /// an entity join ("JOIN Person p ON ...") from a relationship path join.
+    boolean hasModel(String name) {
+        for (EntityModel candidate : models.values()) {
+            String binary = candidate.type().getName();
+            if (binary.equals(name) || binary.substring(binary.lastIndexOf('.') + 1).equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
     EntityModel model(String name) {
         EntityModel result = null;
         for (EntityModel candidate : models.values()) {
@@ -610,6 +621,33 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             cascadePersist(e, visited);
         }
         return entity;
+    }
+    @Override
+    public <T> T save(T entity) {
+        if (entity == null) {
+            throw new IllegalArgumentException("entity is null");
+        }
+        if (entries.containsKey(entity)) {
+            return merge(entity);
+        }
+        EntityModel<T> model = model((Class<T>) entity.getClass());
+        if (!model.immutable() && isNewEntity(model, entity)) {
+            // Spring Data persists a new entity rather than merging it: merging
+            // would copy it into a fresh managed instance and leave the caller's
+            // object detached and without its generated key, so a second save
+            // of the same object inserted a second row (issue 6240).
+            persist(entity);
+            return entity;
+        }
+        return merge(entity);
+    }
+    private static <T> boolean isNewEntity(EntityModel<T> model, T entity) {
+        Object id = model.identifier(entity);
+        if (id == null) {
+            return true;
+        }
+        boolean generated = model.attributes()[model.idIndex()].generated || model.generation() != 0;
+        return generated && id instanceof Number && ((Number) id).longValue() == 0;
     }
     @Override
     public <T> T merge(T entity) {
@@ -3036,6 +3074,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
 
+    /// The key of `value` when it is a mapped entity, otherwise `value` itself:
+    /// what a bound entity parameter compares as.
+    Object entityKey(Object value) {
+        if (value == null) {
+            return null;
+        }
+        EntityModel model = models.get(value.getClass().getName());
+        return model == null ? value : model.identifier(current(value));
+    }
     <T> EntityModel<T> model(Class<T> type) {
         EntityModel<T> model = (EntityModel<T>) models.get(type.getName());
         if (model == null) {

@@ -258,12 +258,14 @@ final class BackendExceptionHandlers {
             }
         }
         if (!packages.isEmpty()) {
-            sb.append("        if (");
+            // A null handler is an unmatched path (NoHandlerFoundException),
+            // which belongs to no controller and so to no package.
+            sb.append("        if (handler == null || ");
             for (int i = 0; i < packages.size(); i++) {
-                sb.append(i == 0 ? "" : " && ").append("!handler.isInPackage(")
+                sb.append(i == 0 ? "(" : " && ").append("!handler.isInPackage(")
                   .append(RestControllerAnnotationProcessor.quote(packages.get(i))).append(')');
             }
-            sb.append(") {\n            return null;\n        }\n");
+            sb.append(")) {\n            return null;\n        }\n");
         }
         sb.append(dispatch(handlers, "        "));
         sb.append("    }\n}\n");

@@ -98,12 +98,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     static final String BACKEND_BOOTSTRAP_BINARY = "cn1app.BackendDaoBootstrap";
     static final String BACKEND_BOOTSTRAP_SIMPLE = "BackendDaoBootstrap";
 
+    /// Method annotations only a generated repository reads; anywhere else they
+    /// would be ignored, so finding one outside an @Repository is a build error.
+    private static final String[] REPOSITORY_METHOD_ANNOTATIONS = {"Query", "Modifying", "Lock"};
     private static final Set<String> DESCRIPTORS;
     static {
         Set<String> s = new LinkedHashSet<String>();
         s.add(ENTITY_DESC);
         s.add(RepositoryGenerator.REPOSITORY);
         s.add(MIGRATION_DESC);
+        for (String annotation : REPOSITORY_METHOD_ANNOTATIONS) s.add(RepositoryGenerator.PREFIX + annotation + ";");
         DESCRIPTORS = Collections.unmodifiableSet(s);
     }
 
@@ -275,6 +279,16 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
+        if (cls.getClassAnnotation(RepositoryGenerator.REPOSITORY) == null) {
+            for (com.codename1.maven.annotations.MethodInfo method : cls.getMethods()) {
+                for (String annotation : REPOSITORY_METHOD_ANNOTATIONS) {
+                    if (method.getAnnotation(RepositoryGenerator.PREFIX + annotation + ";") != null) {
+                        ctx.error(cls.getBinaryName() + "." + method.getName() + ": @" + annotation
+                                + " applies only to methods of an @Repository interface, and is ignored here");
+                    }
+                }
+            }
+        }
         if (cls.getClassAnnotation(RepositoryGenerator.REPOSITORY) != null
                 && BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(), ctx.getSourceEncoding())) {
             repositories.add(cls);
@@ -928,11 +942,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             sources.put(MigrationGenerator.BACKEND_CLI_BINARY,
                     MigrationGenerator.cliSource(librarySets, !migrations.isEmpty()));
         }
+        java.util.List<String[]> statements = new java.util.ArrayList<String[]>();
         for (AnnotatedClass repository : repositories) {
             try {
                 String name = repository.getBinaryName() + "Cn1Repository";
                 if (!wouldReplaceAnExistingClass(name, "repository for " + repository.getBinaryName(), ctx)) {
-                    sources.put(name, RepositoryGenerator.generate(repository, accepted));
+                    sources.put(name, RepositoryGenerator.generate(repository, accepted, statements));
                 }
             } catch (IllegalArgumentException error) {
                 ctx.error(repository.getBinaryName() + ": " + error.getMessage());
@@ -1002,6 +1017,14 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             throw new ProcessingException("Could not compile generated dao sources: "
                     + ioe.getMessage(), ioe);
         }
+        // Every JPQL @Query is parsed here, by the runtime's parser over the
+        // models just compiled, so a statement the server would reject fails
+        // the build naming its method instead of failing the first request.
+        java.util.List<String> modelClasses = new java.util.ArrayList<String>();
+        for (EntityClass ec : accepted.values()) {
+            modelClasses.add(ec.binaryName + (backend ? "Cn1BackendModel" : "Cn1Model"));
+        }
+        JpqlBuildCheck.check(ctx, modelClasses, statements);
         ctx.getLog().info("cn1: generated " + accepted.size() + " @Entity "
                 + (backend ? "server-side " : "") + "dao(s) + "
                 + (backend ? BACKEND_BOOTSTRAP_BINARY : BOOTSTRAP_BINARY)

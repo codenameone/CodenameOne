@@ -53,6 +53,7 @@ import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -1085,6 +1086,76 @@ public class BackendTestGeneratorTest {
             assertEquals("the compiled run left its row", 0,
                     db.query("SELECT body FROM notes", new Object[0]).size());
         } finally {
+            loader.close();
+        }
+    }
+
+    @Test
+    public void testSupportFromIssue6240() throws Throwable {
+        Map<String, String> app = application();
+        // Spring allows a package-private controller; the standalone registry
+        // in cn1app.test cannot name it and reaches it through its package.
+        app.put("com.example.Hidden", MAIN + "@RestController class Hidden {\n"
+                + "    @GetMapping(\"/hidden\") public String hidden() { return \"h\"; }\n}\n");
+        File classes = mainBuild(app);
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.LiveTest", SLICE_IMPORTS
+                + "@DataJpaTest(properties = \"fixed=1\")\n"
+                + "@Transactional(propagation = Propagation.NOT_SUPPORTED)\n"
+                + "public class LiveTest {\n"
+                + "    @Autowired com.codename1.orm.session.Session session;\n"
+                + "    @DynamicPropertySource\n"
+                + "    static void props(DynamicPropertyRegistry registry) {\n"
+                + "        registry.add(\"fixed\", () -> \"2\");\n"
+                + "        registry.add(\"started\", () -> \"yes\");\n"
+                + "    }\n"
+                + "}\n");
+        t.put("com.example.StandaloneTest", SLICE_IMPORTS
+                + "public class StandaloneTest {\n"
+                + "    public static MockMvc mvc() {\n"
+                + "        return MockMvcBuilders.standaloneSetup(new Api(new Greeter(), () -> 7L)).build();\n"
+                + "    }\n"
+                + "    public static MockMvc hidden() {\n"
+                + "        return MockMvcBuilders.standaloneSetup(new Hidden()).build();\n"
+                + "    }\n"
+                + "}\n");
+        File tests = testBuild(classes, t, false);
+        URLClassLoader loader = new URLClassLoader(new URL[] {tests.toURI().toURL(),
+                classes.toURI().toURL()}, getClass().getClassLoader());
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(loader);
+        try {
+            TestContext context = (TestContext) loader.loadClass(
+                    "com.example.LiveTestCn1TestContext").newInstance();
+            assertFalse("NOT_SUPPORTED on the class runs its tests outside the rolled-back transaction",
+                    context.rollsBack());
+            List<String> props = Arrays.asList(context.properties());
+            assertEquals("the dynamic value comes after, and wins over, the fixed one",
+                    Arrays.asList("fixed", "2", "started", "yes"),
+                    props.subList(props.size() - 4, props.size()));
+            assertTrue(props.indexOf("1") >= 0 && props.indexOf("1") < props.size() - 4);
+            assertTrue("a dynamic source gets an application of its own",
+                    context.key().contains("dynamic:com.example.LiveTest"));
+            TestEnvironment env = TestContexts.acquire(context);
+            Object test = loader.loadClass("com.example.LiveTest").newInstance();
+            context.inject(test, env);
+            java.lang.reflect.Field session = test.getClass().getDeclaredField("session");
+            session.setAccessible(true);
+            assertNotNull("a test can autowire the Session", session.get(test));
+
+            Object mvc = loader.loadClass("com.example.StandaloneTest").getMethod("mvc").invoke(null);
+            com.codename1.backend.test.ResultActions now = ((com.codename1.backend.test.MockMvc) mvc)
+                    .perform(com.codename1.backend.test.MockMvcRequestBuilders.get("/now"));
+            assertEquals("7", now.andReturn().getResponse().getContentAsString());
+            assertEquals(404, ((com.codename1.backend.test.MockMvc) mvc)
+                    .perform(com.codename1.backend.test.MockMvcRequestBuilders.get("/none"))
+                    .andReturn().getResponse().getStatus());
+            Object hidden = loader.loadClass("com.example.StandaloneTest").getMethod("hidden").invoke(null);
+            assertEquals("h", ((com.codename1.backend.test.MockMvc) hidden)
+                    .perform(com.codename1.backend.test.MockMvcRequestBuilders.get("/hidden"))
+                    .andReturn().getResponse().getContentAsString());
+        } finally {
+            Thread.currentThread().setContextClassLoader(previous);
             loader.close();
         }
     }

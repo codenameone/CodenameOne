@@ -326,6 +326,16 @@ public final class Transactions {
 
     private static Transaction open(int propagation, boolean readOnly, int timeoutSeconds, Isolation isolation) {
         Physical current = (Physical) CURRENT.get();
+        if (current != null && current.completed && (propagation == REQUIRED || propagation == NESTED)) {
+            // An afterCommit/afterCompletion callback: the transaction it belongs
+            // to has ended and cannot be joined. Spring runs a REQUIRED call made
+            // there in a transaction of its own, so this does too -- the completed
+            // one is suspended and restored when the call ends. Refusing it
+            // instead made every best-effort callback (which catches its own
+            // exceptions) silently do nothing (issue 6240). MANDATORY and
+            // SUPPORTS still refuse: they never start a transaction.
+            return fresh(readOnly, timeoutSeconds, isolation, current, true);
+        }
         if (current != null && propagation != REQUIRES_NEW && propagation != NOT_SUPPORTED
                 && propagation != NEVER) {
             if (current.completed) {

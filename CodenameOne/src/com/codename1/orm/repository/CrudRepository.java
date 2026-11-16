@@ -23,7 +23,9 @@
 package com.codename1.orm.repository;
 
 /// Base contract for generated repositories. The caller owns the Session and transaction.
-/// save returns the managed merge result; insert schedules a new instance for persistence.
+/// save persists a new entity in place (the argument becomes managed and gets its
+/// generated key) and merges any other, as Spring Data does; insert schedules a
+/// new instance for persistence.
 @com.codename1.impl.SharedWithBackend
 public interface CrudRepository<E, K> {
     E findById(K id);
