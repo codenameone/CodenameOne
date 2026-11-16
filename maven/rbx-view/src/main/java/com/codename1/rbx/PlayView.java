@@ -228,6 +228,15 @@ public class PlayView extends Container {
     }
 
     /// Pauses or resumes simulation (the in-experience menu).
+    /// Deflects the on-screen stick as a controller would: `x` right and
+    /// `y` forward, each -1..1, in camera space. The knob shows the
+    /// deflection, and touching the stick takes it over again.
+    public void setStick(double x, double y) {
+        overlay.stickX = Math.max(-1, Math.min(1, x));
+        overlay.stickY = Math.max(-1, Math.min(1, y));
+        overlay.repaint();
+    }
+
     public void setPaused(boolean p) {
         paused = p;
         last = 0;

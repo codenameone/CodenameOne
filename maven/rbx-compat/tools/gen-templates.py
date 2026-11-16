@@ -2,7 +2,7 @@
 # Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
 # Licensed under the GNU General Public License version 2 with the Classpath exception.
 """Writes the starter templates the studio offers (obby, rainbow obby, tycoon, arena,
-simulator, racing) as .rbxlx place files. They are original: layouts and
+simulator, racing, disaster island survival, brick town) as .rbxlx place files. They are original: layouts and
 scripts written for Brickyard. Re-run after editing; the output is checked in.
 
     maven/rbx-compat/tools/gen-templates.py
@@ -236,10 +236,20 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 -- An obby is retried constantly: back on the last checkpoint quickly.
 Players.RespawnTime = 1.5
-Players.PlayerAdded:Connect(function(p)
-    local ls = stats(p, {"Stage", "Wins"})
-end)
-for _, p in ipairs(Players:GetPlayers()) do stats(p, {"Stage", "Wins"}) end
+-- A new character starts on the player's last checkpoint, not back in
+-- the lobby.
+local function joined(p)
+    stats(p, {"Stage", "Wins"})
+    p.CharacterAdded:Connect(function(ch)
+        local cp = workspace:FindFirstChild(p:GetAttribute("Checkpoint") or "")
+        if cp then
+            task.wait()
+            ch:PivotTo(cp.CFrame + Vector3.new(0, 3.5, 0))
+        end
+    end)
+end
+Players.PlayerAdded:Connect(joined)
+for _, p in ipairs(Players:GetPlayers()) do joined(p) end
 for _, brick in ipairs(CollectionService:GetTagged("KillBrick")) do
     brick.Touched:Connect(function(hit)
         local h = hit.Parent and hit.Parent:FindFirstChildOfClass("Humanoid")
@@ -251,7 +261,6 @@ for _, cp in ipairs(CollectionService:GetTagged("Checkpoint")) do
         local p = playerOf(hit)
         if p and p.leaderstats.Stage.Value < cp:GetAttribute("Stage") then
             p.leaderstats.Stage.Value = cp:GetAttribute("Stage")
-            p.RespawnLocation = nil
             p:SetAttribute("Checkpoint", cp.Name)
         end
     end)
@@ -808,6 +817,425 @@ print("TEMPLATE READY racing")
             service(pl, "ServerScriptService", script(pl, "Racing", src))]
     return place(ws, rest)
 
+def status_gui():
+    """Server-side helpers both round-based templates could share: a status
+    line in ReplicatedStorage, mirrored into a label on every player's screen."""
+    return """
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local status = Instance.new("StringValue")
+status.Name = "RoundStatus"
+status.Parent = ReplicatedStorage
+local function showStatus(p)
+    local pg = p:WaitForChild("PlayerGui")
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "RoundGui"
+    gui.ResetOnSpawn = false
+    local label = Instance.new("TextLabel")
+    label.Name = "Status"
+    label.Size = UDim2.new(0.6, 0, 0, 40)
+    label.Position = UDim2.new(0.2, 0, 0, 12)
+    label.BackgroundColor3 = Color3.fromRGB(20, 24, 32)
+    label.BackgroundTransparency = 0.3
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextScaled = true
+    label.Text = status.Value
+    label.Parent = gui
+    gui.Parent = pg
+    status.Changed:Connect(function() label.Text = status.Value end)
+end
+"""
+
+def survival():
+    """Disaster Island: wait in the sky lobby, get dropped on the island, and
+    outlast a flood, a meteor shower or a tornado."""
+    import math
+    pl = Place()
+    ws = []
+    # The sea is the flood: the round script raises this very part.
+    ws.append(part(pl, "Sea", (0, -8, 0), (800, 10, 800), 0x2a8fd6, "Water", collide=False, transparency=0.25))
+    ws.append(part(pl, "Seabed", (0, -14, 0), (800, 1, 800), 0xd9c27a, "Sand", tags=SCENERY))
+    ws.append(part(pl, "Beach", (0, -3.3, 0), (6, 104, 104), 0xf2dc8c, "Sand", shape=2, rot=UPRIGHT))
+    ws.append(part(pl, "Island", (0, -3, 0), (6, 90, 90), 0x5fbf4a, "Grass", shape=2, rot=UPRIGHT))
+    # Huts: a box, a gable roof, a door and a window each.
+    for x, z, ang, wall, roof in ((-18, 12, 20, 0xffd54f, 0xe53935), (8, 22, -15, 0x81d4fa, 0x3949ab),
+                                  (-14, -18, 160, 0xffab91, 0x2e7d32)):
+        r0 = yaw(ang)
+        c, s = r0[0], r0[2]
+
+        def at(lx, ly, lz):
+            return (x + c * lx + s * lz, ly, z - s * lx + c * lz)
+        ws.append(part(pl, "Hut", at(0, 3, 0), (10, 6, 8), wall, "SmoothPlastic", rot=r0))
+        ws.append(part(pl, "HutRoof", at(0, 7, -2), (11, 2, 4), roof, "SmoothPlastic", cls="WedgePart", rot=r0))
+        ws.append(part(pl, "HutRoof", at(0, 7, 2), (11, 2, 4), roof, "SmoothPlastic", cls="WedgePart",
+                       rot=yaw(ang + 180)))
+        ws.append(part(pl, "HutDoor", at(0, 2, -4.05), (2.4, 4, 0.2), 0x6d4c33, "Wood", rot=r0))
+        ws.append(part(pl, "HutWindow", at(3, 3.5, -4.05), (2, 2, 0.2), 0xbfe9ff, "Glass", rot=r0))
+    # The lighthouse is the high ground: its deck stays dry in any flood.
+    lx, lz = 22, -14
+    for k in range(4):
+        ws.append(part(pl, "Lighthouse", (lx, 3 + k * 6, lz), (6, 6 - k * 0.6, 6 - k * 0.6),
+                       0xf2f3f3 if k % 2 == 0 else 0xe53935, "SmoothPlastic", shape=2, rot=UPRIGHT))
+    ws.append(part(pl, "LighthouseDeck", (lx, 24.5, lz), (8, 1, 8), 0x37474f, "Metal"))
+    ws.append(part(pl, "Beacon", (lx, 26.5, lz), (3, 3, 3), 0xfff176, "Neon", shape=0))
+    ws.append(part(pl, "LighthouseCap", (lx, 29, lz), (2, 4.4, 4.4), 0xe53935, "SmoothPlastic", shape=2,
+                   rot=UPRIGHT))
+    for x, z in ((-30, -6), (-4, -30), (30, 14), (-28, 26), (14, -32)):
+        tree(pl, ws, x, z, 0)
+    for i in range(8):
+        a = math.radians(i * 45 + 10)
+        ws.append(part(pl, "Rock", (math.sin(a) * 46, -1, math.cos(a) * 46), (4, 3, 5), 0x8d8478, "Slate",
+                       rot=yaw(i * 40)))
+    # The lobby floats above it all, out of reach of every disaster.
+    ly, lz0 = 40, 90
+    ws.append(part(pl, "Lobby", (0, ly, lz0), (32, 2, 32), 0xa3a2a5, "SmoothPlastic"))
+    ws.append(part(pl, "LobbySpawn", (0, ly + 1.5, lz0), (8, 1, 8), 0xf2f3f3, "SmoothPlastic", cls="SpawnLocation"))
+    for i, col in enumerate(RAINBOW):
+        ws.append(part(pl, "LobbyStripe", (-10 + i * 4, ly + 1.06, lz0 - 12), (4, 0.12, 2), col, "Neon",
+                       collide=False))
+    fence(pl, ws, -15.5, lz0 - 15.5, 15.5, lz0 - 15.5, ly + 1)
+    fence(pl, ws, -15.5, lz0 + 15.5, 15.5, lz0 + 15.5, ly + 1)
+    fence(pl, ws, -15.5, lz0 - 15.5, -15.5, lz0 + 15.5, ly + 1)
+    fence(pl, ws, 15.5, lz0 - 15.5, 15.5, lz0 + 15.5, ly + 1)
+    ws.append(part(pl, "StatusBoard", (0, ly + 6, lz0 - 15), (14, 6, 0.6), 0x263238, "SmoothPlastic"))
+    ws.append(part(pl, "StatusGlow", (0, ly + 6, lz0 - 14.6), (12, 4, 0.2), 0xff9a1f, "Neon", collide=False))
+    for i in range(10):
+        side = -1 if i % 2 else 1
+        x = side * (60 + (i * 31) % 50)
+        z = -60 + i * 20
+        w = 16 + (i * 7) % 12
+        ws.append(part(pl, "Cloud", (x, 30 + (i * 13) % 20, z), (w, 4, w * 0.6), 0xffffff, "SmoothPlastic",
+                       collide=False, tags=SCENERY))
+    src = LEADER + status_gui() + """
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local sea = workspace.Sea
+local SEA_Y = sea.Position.Y
+local LOBBY = workspace.LobbySpawn.Position + Vector3.new(0, 4, 0)
+-- Timings and the disaster can be set as attributes on workspace while the
+-- place runs; a shorter value cuts a countdown already under way.
+local function cfg(name, default)
+    local v = workspace:GetAttribute(name)
+    if v == nil then return default end
+    return v
+end
+local inRound = {}
+local function setup(p)
+    stats(p, {"Survivals", "Coins"})
+    task.spawn(showStatus, p)
+    p.CharacterAdded:Connect(function(c)
+        local h = c:WaitForChild("Humanoid")
+        h.Died:Connect(function() inRound[p] = nil end)
+    end)
+end
+Players.PlayerAdded:Connect(setup)
+for _, p in ipairs(Players:GetPlayers()) do setup(p) end
+local function rootOf(p)
+    local c = p.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    if h == nil or h.Health <= 0 then return nil end
+    return c:FindFirstChild("HumanoidRootPart"), h
+end
+local function countdown(text, name, default)
+    local left = cfg(name, default)
+    while left > 0 do
+        status.Value = text .. " " .. left
+        task.wait(1)
+        left = math.min(left - 1, cfg(name, default))
+    end
+end
+local rng = Random.new()
+local DISASTERS = {}
+-- Flood: the sea climbs over the island; only high ground stays dry.
+DISASTERS.Flood = function(length)
+    local t = 0
+    local conn = RunService.Heartbeat:Connect(function(dt)
+        t += dt
+        local rise = math.min(1, t / (length * 0.6)) * 11
+        sea.CFrame = CFrame.new(0, SEA_Y + rise, 0)
+        local top = sea.Position.Y + sea.Size.Y / 2
+        for p in pairs(inRound) do
+            local root, h = rootOf(p)
+            if root and root.Position.Y < top - 1 then h.Health = 0 end
+        end
+    end)
+    return function()
+        conn:Disconnect()
+        sea.CFrame = CFrame.new(0, SEA_Y, 0)
+    end
+end
+-- Meteors: burning rocks fall from the sky and blast whoever is close.
+DISASTERS.Meteors = function(length)
+    local live = true
+    task.spawn(function()
+        while live do
+            local m = Instance.new("Part")
+            m.Name = "Meteor"
+            m.Shape = Enum.PartType.Ball
+            m.Size = Vector3.new(6, 6, 6)
+            m.Anchored = true
+            m.CanCollide = false
+            m.Material = Enum.Material.CrackedLava
+            m.Color = Color3.fromRGB(255, 110, 40)
+            -- Every other rock aims near a player, so the shower is a threat
+            -- and not scenery.
+            local target = Vector3.new(rng:NextInteger(-40, 40), 1, rng:NextInteger(-40, 40))
+            local aimed = {}
+            for p in pairs(inRound) do table.insert(aimed, p) end
+            if #aimed > 0 and rng:NextInteger(0, 1) == 1 then
+                local root = rootOf(aimed[rng:NextInteger(1, #aimed)])
+                if root then
+                    target = Vector3.new(root.Position.X + rng:NextInteger(-12, 12), 1,
+                        root.Position.Z + rng:NextInteger(-12, 12))
+                end
+            end
+            m.Position = target + Vector3.new(0, 90, 0)
+            Instance.new("Fire").Parent = m
+            m.Parent = workspace
+            task.spawn(function()
+                while m.Position.Y > target.Y do
+                    local dt = task.wait()
+                    m.Position = m.Position - Vector3.new(0, 45 * dt, 0)
+                end
+                for p in pairs(inRound) do
+                    local root, h = rootOf(p)
+                    if root and (root.Position - target).Magnitude < 8 then h.Health = 0 end
+                end
+                m:Destroy()
+            end)
+            task.wait(0.3)
+        end
+    end)
+    return function() live = false end
+end
+-- Tornado: a spinning column sweeps across the island; touching it hurts.
+DISASTERS.Tornado = function(length)
+    local tw = Instance.new("Part")
+    tw.Name = "Tornado"
+    tw.Shape = Enum.PartType.Cylinder
+    tw.Size = Vector3.new(40, 12, 12)
+    tw.Anchored = true
+    tw.CanCollide = false
+    tw.Material = Enum.Material.ForceField
+    tw.Color = Color3.fromRGB(200, 210, 220)
+    tw.Transparency = 0.3
+    Instance.new("Smoke").Parent = tw
+    tw.Parent = workspace
+    local t = 0
+    local conn = RunService.Heartbeat:Connect(function(dt)
+        t += dt
+        local x, z = math.sin(t * 0.7) * 28, math.sin(t * 0.45) * 28
+        tw.CFrame = CFrame.new(x, 20, z) * CFrame.Angles(0, t * 6, math.pi / 2)
+        for p in pairs(inRound) do
+            local root, h = rootOf(p)
+            if root then
+                local d = Vector2.new(root.Position.X - x, root.Position.Z - z).Magnitude
+                if d < 7 and root.Position.Y < 40 then h:TakeDamage(60 * dt) end
+            end
+        end
+    end)
+    return function()
+        conn:Disconnect()
+        tw:Destroy()
+    end
+end
+local NAMES = {"Flood", "Meteors", "Tornado"}
+while true do
+    countdown("Intermission:", "Intermission", 12)
+    local name = cfg("ForceDisaster", NAMES[rng:NextInteger(1, #NAMES)])
+    for _, p in ipairs(Players:GetPlayers()) do
+        local root = rootOf(p)
+        if root then
+            inRound[p] = true
+            p.Character:PivotTo(CFrame.new(rng:NextInteger(-20, 20), 5, rng:NextInteger(-20, 20)))
+        end
+    end
+    local length = cfg("RoundLength", 25)
+    local stop = DISASTERS[name](length)
+    countdown("Disaster: " .. name .. "! Survive", "RoundLength", 25)
+    stop()
+    local survivors = 0
+    for p in pairs(inRound) do
+        if rootOf(p) then
+            survivors += 1
+            p.leaderstats.Survivals.Value += 1
+            p.leaderstats.Coins.Value += 10
+            p.Character:PivotTo(CFrame.new(LOBBY))
+        end
+    end
+    inRound = {}
+    status.Value = survivors .. " survived the " .. name
+    task.wait(cfg("Results", 3))
+end
+"""
+    src = src.replace("\nwhile true do\n", '\nprint("TEMPLATE READY survival")\nwhile true do\n', 1)
+    rest = [lighting(pl, 14, bloom(pl, 0.6, 1.1) + atmosphere(pl, 0.06, 0xcfe8ff) + color_correction(pl, 0.15, 0.08),
+                     3.0),
+            service(pl, "ServerScriptService", script(pl, "Rounds", src))]
+    return place(ws, rest)
+
+def town():
+    """Brick Town: a roleplay hangout. A block of streets around a park, six
+    houses with automatic doors, a cafe, a school, benches and a job board."""
+    import math
+    pl = Place()
+    ws = [part(pl, "Ground", (0, -0.5, 0), (420, 1, 420), 0x6abf4b, "Grass")]
+    road, mark = 0x3a3d42, 0xffd21f
+    # A square loop of road around the park, and the avenue leading out east and west.
+    for z in (-42, 42):
+        ws.append(part(pl, "Road", (0, 0.05, z), (180, 0.1, 12), road, "Asphalt"))
+        for i in range(8):
+            ws.append(part(pl, "Marking", (-77 + i * 22, 0.12, z), (6, 0.04, 0.5), mark, "SmoothPlastic",
+                           collide=False))
+    for x in (-42, 42):
+        ws.append(part(pl, "Road", (x, 0.05, 0), (12, 0.1, 72), road, "Asphalt"))
+        for i in range(4):
+            ws.append(part(pl, "Marking", (x, 0.12, -24 + i * 16), (0.5, 0.04, 6), mark, "SmoothPlastic",
+                           collide=False))
+    for z in (-36, 36):
+        ws.append(part(pl, "Crossing", (0, 0.12, z), (8, 0.04, 2), 0xffffff, "SmoothPlastic", collide=False))
+    # The park: paths to a fountain plaza, the spawn by the fountain.
+    ws.append(part(pl, "Plaza", (0, 0.1, 0), (30, 0.2, 30), 0xd6d2c4, "Concrete"))
+    ws.append(part(pl, "Path", (0, 0.08, -21), (6, 0.16, 12), 0xd6d2c4, "Concrete"))
+    ws.append(part(pl, "Path", (0, 0.08, 21), (6, 0.16, 12), 0xd6d2c4, "Concrete"))
+    ws.append(part(pl, "Spawn", (0, 0.3, 10), (8, 0.4, 6), 0xf2f3f3, "SmoothPlastic", cls="SpawnLocation"))
+    ws.append(part(pl, "FountainRim", (0, 0.9, -3), (1.6, 12, 12), 0xeceff1, "SmoothPlastic", shape=2, rot=UPRIGHT))
+    ws.append(part(pl, "FountainWater", (0, 1.2, -3), (1.6, 10.4, 10.4), 0x4fc3f7, "Water", shape=2, rot=UPRIGHT,
+                   collide=False, transparency=0.2))
+    ws.append(part(pl, "FountainColumn", (0, 3, -3), (4, 1.4, 1.4), 0xeceff1, "SmoothPlastic", shape=2, rot=UPRIGHT))
+    ws.append(part(pl, "FountainTop", (0, 5.2, -3), (0.6, 4, 4), 0xeceff1, "SmoothPlastic", shape=2, rot=UPRIGHT,
+                   children=emitter(pl, 0xb3e5fc, 0xffffff, rate=30, speed=(6, 9), life=(0.8, 1.2), size=0.4,
+                                    accel=-30)))
+    for x, z, ang in ((-10, 8, 90), (10, 8, -90), (-10, -12, 90), (10, -12, -90)):
+        ws.append(part(pl, "Seat", (x, 1, z), (5, 0.6, 2), 0x8d6e63, "Wood", cls="Seat", rot=yaw(ang)))
+        bx = x - 1.1 if x < 0 else x + 1.1
+        ws.append(part(pl, "BenchBack", (bx, 2, z), (0.3, 1.6, 5), 0x8d6e63, "Wood"))
+    for x, z in ((-26, -26), (26, -26), (-26, 26), (26, 26), (-24, 0), (24, 0)):
+        tree(pl, ws, x, z, 0)
+    flowers = (0xff4f8b, 0xffd21f, 0xb36bff)
+    for i, (x, z) in enumerate(((-16, -20), (16, -20), (-16, 20), (16, 20))):
+        ws.append(part(pl, "Flowerbed", (x, 0.4, z), (8, 0.8, 3), flowers[i % 3], "LeafyGrass"))
+    ws.append(part(pl, "JobBoard", (8, 3, 16), (6, 4, 0.4), 0x1e88e5, "SmoothPlastic"))
+    ws.append(part(pl, "JobPad", (8, 0.25, 18.5), (6, 0.3, 4), 0x00e676, "Neon", collide=False))
+    # Houses, three either side of the park, their doors facing the road.
+    walls = (0xff8a80, 0xffe082, 0x80deea, 0xc5e1a5, 0xb39ddb, 0xffcc80)
+    roofs = (0x3949ab, 0xc62828, 0x6d4c41, 0x00897b, 0xef6c00, 0x455a64)
+
+    def building(x, z, ang, w, d, h, wall, roof, name, door_tag):
+        r0 = yaw(ang)
+        c, s = r0[0], r0[2]
+
+        def at(lx, ly, lz):
+            return (x + c * lx + s * lz, ly, z - s * lx + c * lz)
+        t = 0.6
+        ws.append(part(pl, name + "Floor", at(0, 0.2, 0), (w, 0.4, d), 0xbcaaa4, "WoodPlanks", rot=r0))
+        ws.append(part(pl, name + "Wall", at(0, h / 2, d / 2 - t / 2), (w, h, t), wall, "SmoothPlastic", rot=r0))
+        for sx in (-1, 1):
+            ws.append(part(pl, name + "Wall", at(sx * (w / 2 - t / 2), h / 2, 0), (t, h, d), wall, "SmoothPlastic",
+                           rot=r0))
+            ws.append(part(pl, name + "Wall", at(sx * (w / 4 + 1.2), h / 2, -d / 2 + t / 2), (w / 2 - 2.4, h, t),
+                           wall, "SmoothPlastic", rot=r0))
+            ws.append(part(pl, name + "Window", at(sx * (w / 4 + 1.2), h * 0.55, -d / 2 - 0.05), (3, 2.6, 0.2),
+                           0xbfe9ff, "Glass", transparency=0.3, rot=r0))
+        ws.append(part(pl, name + "Wall", at(0, h - 1, -d / 2 + t / 2), (4.8, 2, t), wall, "SmoothPlastic", rot=r0))
+        ws.append(part(pl, name + "Roof", at(0, h + 2, -d / 4), (w + 1, 4, d / 2 + 0.5), roof, "SmoothPlastic",
+                       cls="WedgePart", rot=r0))
+        ws.append(part(pl, name + "Roof", at(0, h + 2, d / 4), (w + 1, 4, d / 2 + 0.5), roof, "SmoothPlastic",
+                       cls="WedgePart", rot=yaw(ang + 180)))
+        ws.append(part(pl, name + "Door", at(0, (h - 2) / 2, -d / 2 + t / 2), (4.8, h - 2, 0.4), 0x6d4c33, "Wood",
+                       rot=r0, tags=("Door",)))
+        ws.append(part(pl, name + "DoorMat", at(0, 0.15, -d / 2 - 2), (5, 0.3, 3), 0xa1887f, "Fabric",
+                       collide=False, rot=r0, tags=(door_tag,)))
+        return at
+
+    n = 0
+    for z, ang in ((-66, 180), (66, 0)):
+        for x in (-50, 0, 50):
+            # A house's front is its -Z side; turned 180 the north row faces south, onto the road.
+            building(x, z, ang, 16, 14, 9, walls[n], roofs[n], "House%d" % (n + 1), "DoorMat")
+            n += 1
+    # The cafe on the east corner: an awning, tables outside.
+    at = building(66, 0, 90, 20, 16, 10, 0xfff3e0, 0x8d6e63, "Cafe", "DoorMat")
+    for i in range(5):
+        ws.append(part(pl, "Awning", at(-8 + i * 4, 8, -10), (4, 0.4, 4), (0xe53935, 0xffffff)[i % 2],
+                       "Fabric", rot=yaw(90)))
+    ws.append(part(pl, "CafeSign", at(0, 11, -8.4), (8, 1.6, 0.3), 0xff4081, "Neon", rot=yaw(90)))
+    for k in (-1, 1):
+        ws.append(part(pl, "Table", (52.5, 1.6, k * 6), (0.4, 3, 3), 0xeceff1, "SmoothPlastic", shape=2,
+                       rot=UPRIGHT))
+        ws.append(part(pl, "Seat", (52.5, 1, k * 6 + 2.6), (2, 0.6, 2), 0xe53935, "SmoothPlastic", cls="Seat"))
+    # The school on the west corner: bigger, a bell tower and a flag.
+    at = building(-68, 0, -90, 28, 18, 12, 0xffcc80, 0x5d4037, "School", "DoorMat")
+    ws.append(part(pl, "BellTower", at(0, 17, 4), (5, 6, 5), 0xfff3e0, "SmoothPlastic", rot=yaw(-90)))
+    ws.append(part(pl, "Bell", at(0, 17, 4), (2.4, 2.4, 2.4), 0xffd700, "Metal", shape=0))
+    ws.append(part(pl, "SchoolSign", at(0, 13, -9.4), (10, 1.6, 0.3), 0x1e88e5, "Neon", rot=yaw(-90)))
+    ws.append(part(pl, "FlagPole", (-52, 7, -8), (0.4, 14, 0.4), 0xb0bec5, "Metal"))
+    ws.append(part(pl, "Flag", (-52, 12.5, -6.4), (0.2, 2.4, 3), 0xe53935, "Fabric"))
+    for x in (-30, 30):
+        for z in (-50, 50):
+            lamp(pl, ws, x, z, 0)
+    for x in (-50, 50):
+        for z in (-18, 18):
+            lamp(pl, ws, x, z, 0)
+    for i, (x, z) in enumerate(((-90, -70), (90, -70), (-90, 70), (90, 70))):
+        tree(pl, ws, x, z, 0, h=6 + i % 3)
+    hills(pl, ws, 230, -1, count=8, trees=False)
+    src = LEADER + """
+local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+local PAY, JOB_PAY = 1, 5
+local jobs = {}
+local function setup(p)
+    stats(p, {"Cash"})
+end
+Players.PlayerAdded:Connect(setup)
+for _, p in ipairs(Players:GetPlayers()) do setup(p) end
+-- The job board: step on its pad to clock in and earn more every paycheck.
+workspace.JobPad.Touched:Connect(function(hit)
+    local p = playerOf(hit)
+    if p and not jobs[p] then
+        jobs[p] = true
+        p:SetAttribute("Job", "Worker")
+    end
+end)
+Players.PlayerRemoving:Connect(function(p) jobs[p] = nil end)
+-- Doors open while someone stands on the mat in front of them.
+local doors = {}
+for _, d in ipairs(CollectionService:GetTagged("Door")) do
+    doors[d.Name] = d
+end
+for _, mat in ipairs(CollectionService:GetTagged("DoorMat")) do
+    local door = doors[(mat.Name:gsub("Mat$", ""))]
+    local closeAt = 0
+    mat.Touched:Connect(function(hit)
+        if door == nil or playerOf(hit) == nil then return end
+        closeAt = time() + 3
+        if door.CanCollide then
+            door.CanCollide = false
+            door.Transparency = 0.8
+            task.spawn(function()
+                while time() < closeAt do task.wait(0.5) end
+                door.CanCollide = true
+                door.Transparency = 0
+            end)
+        end
+    end)
+end
+task.spawn(function()
+    while true do
+        task.wait(5)
+        for _, p in ipairs(Players:GetPlayers()) do
+            local ls = p:FindFirstChild("leaderstats")
+            if ls then ls.Cash.Value += jobs[p] and JOB_PAY or PAY end
+        end
+    end
+end)
+print("TEMPLATE READY town")
+"""
+    rest = [lighting(pl, 15, bloom(pl, 0.5, 1.2) + atmosphere(pl, 0.06, 0xdbe9ff) + color_correction(pl, 0.15, 0.08),
+                     3.0),
+            service(pl, "ServerScriptService", script(pl, "Town", src))]
+    return place(ws, rest)
+
 def baseplate():
     """An empty world to build in from scratch: a baseplate, a spawn and a sky."""
     pl = Place()
@@ -825,7 +1253,7 @@ def baseplate():
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "main", "resources", "com", "codename1",
                    "rbx", "templates")
 for name, fn in (("baseplate", baseplate), ("obby", obby), ("rainbow", rainbow), ("tycoon", tycoon), ("arena", arena), ("simulator", simulator),
-                 ("racing", racing)):
+                 ("racing", racing), ("survival", survival), ("town", town)):
     with open(os.path.join(OUT, name + ".rbxlx"), "w") as f:
         f.write(fn())
 print("wrote", OUT)

@@ -54,7 +54,7 @@ class TemplatesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"obby", "rainbow", "tycoon", "arena", "simulator", "racing"})
+    @ValueSource(strings = {"obby", "rainbow", "tycoon", "arena", "simulator", "racing", "survival", "town"})
     void plays(String id) throws IOException {
         final List<String> out = new ArrayList<String>();
         Engine e = new Engine(Engine.SOLO);

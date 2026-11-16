@@ -126,10 +126,20 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 -- An obby is retried constantly: back on the last checkpoint quickly.
 Players.RespawnTime = 1.5
-Players.PlayerAdded:Connect(function(p)
-    local ls = stats(p, {"Stage", "Wins"})
-end)
-for _, p in ipairs(Players:GetPlayers()) do stats(p, {"Stage", "Wins"}) end
+-- A new character starts on the player's last checkpoint, not back in
+-- the lobby.
+local function joined(p)
+    stats(p, {"Stage", "Wins"})
+    p.CharacterAdded:Connect(function(ch)
+        local cp = workspace:FindFirstChild(p:GetAttribute("Checkpoint") or "")
+        if cp then
+            task.wait()
+            ch:PivotTo(cp.CFrame + Vector3.new(0, 3.5, 0))
+        end
+    end)
+end
+Players.PlayerAdded:Connect(joined)
+for _, p in ipairs(Players:GetPlayers()) do joined(p) end
 for _, brick in ipairs(CollectionService:GetTagged("KillBrick")) do
     brick.Touched:Connect(function(hit)
         local h = hit.Parent and hit.Parent:FindFirstChildOfClass("Humanoid")
@@ -141,7 +151,6 @@ for _, cp in ipairs(CollectionService:GetTagged("Checkpoint")) do
         local p = playerOf(hit)
         if p and p.leaderstats.Stage.Value < cp:GetAttribute("Stage") then
             p.leaderstats.Stage.Value = cp:GetAttribute("Stage")
-            p.RespawnLocation = nil
             p:SetAttribute("Checkpoint", cp.Name)
         end
     end)

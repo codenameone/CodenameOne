@@ -166,6 +166,12 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
         p.player.destroy();
     }
 
+    /// The engine's Player for client `handle`, or null once it has left.
+    public Instance player(int handle) {
+        Peer p = peer(handle);
+        return p == null ? null : p.player;
+    }
+
     private Peer peer(int handle) {
         return handle >= 0 && handle < peers.size() ? peers.get(handle) : null;
     }
