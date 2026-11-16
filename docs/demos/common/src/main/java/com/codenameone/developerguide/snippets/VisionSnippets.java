@@ -47,6 +47,7 @@ import com.codename1.camera.CameraFacing;
 import com.codename1.components.ToastBar;
 import com.codename1.io.Log;
 import com.codename1.ui.Button;
+import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
@@ -103,6 +104,13 @@ public class VisionSnippets {
             })
             .except(error -> Log.e(error));
         // end::vision-code-scanner-options[]
+    }
+
+    /** Names the charset of PDF417 payloads that are not UTF-8 (Android). */
+    public void barcodeCharset() {
+        // tag::vision-barcode-charset[]
+        Display.getInstance().setProperty("android.barcodeCharset", "ISO-8859-2");
+        // end::vision-barcode-charset[]
     }
 
     /** A live preview inside a form of your own, analyzing every frame. */
