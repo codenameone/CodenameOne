@@ -217,6 +217,10 @@ class PdfInternalsTest {
     void cidCollectionsMapToUnicode() {
         assertEquals(0x3042, CidToUnicode.lookup("Japan1", 843));
         assertEquals(0x65e5, CidToUnicode.lookup("Japan1", 3284));
+        // CID 1 is the space in every Adobe collection: each table decodes.
+        assertEquals(0x20, CidToUnicode.lookup("GB1", 1));
+        assertEquals(0x20, CidToUnicode.lookup("CNS1", 1));
+        assertEquals(0x20, CidToUnicode.lookup("Korea1", 1));
         assertEquals(0, CidToUnicode.lookup("Unknown", 1));
     }
 
