@@ -26,6 +26,7 @@ import com.codenameone.examples.fieldline.account.Accounts;
 import com.codenameone.examples.fieldline.account.DemoAccounts;
 import com.codenameone.examples.fieldline.domain.TimeEntry;
 import com.codenameone.examples.fieldline.field.Crew;
+import com.codenameone.examples.fieldline.field.Timekeeping;
 import com.codenameone.examples.fieldline.repository.TimeEntryRepository;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,8 @@ class WorkforceSettingsTest {
     private Crew crew;
     @Autowired
     private TimeEntryRepository entries;
+    @Autowired
+    private Timekeeping timekeeping;
 
     private MockRequestBuilder as(MockRequestBuilder request, String token) {
         return request.header("Host", SignIn.HOST).header("Authorization", "Bearer " + token);
@@ -167,7 +170,9 @@ class WorkforceSettingsTest {
             e.setStartAt(start + i * 60000L);
             entries.insert(e);
         }
-        Map sheet = Http.json(mvc, as(get("/api/admin/timesheets?week=0"), admin()));
+        // The week the shifts start in, which just after midnight on a Monday
+        // is last week.
+        Map sheet = Http.json(mvc, as(get("/api/admin/timesheets?week=" + start), admin()));
         for (Object o : (List) sheet.get("rows")) {
             Map row = (Map) o;
             if (tech.equals(row.get("techId"))) {
@@ -191,8 +196,10 @@ class WorkforceSettingsTest {
         // they run four hours: one break is owed, not none.
         String username = People.technician(accounts, "overlap");
         String tech = crew.of(username).getId();
-        long now = System.currentTimeMillis();
-        long[][] spans = {{now - 240 * 60000L, now - 130 * 60000L}, {now - 140 * 60000L, 0}};
+        // Last Wednesday at 08:00, so the shift is closed and inside one week
+        // whatever the time the test runs.
+        long base = timekeeping.weekStart(0) - 5 * 86400000L + 8 * 3600000L;
+        long[][] spans = {{base, base + 110 * 60000L}, {base + 100 * 60000L, base + 240 * 60000L}};
         for (int i = 0; i < spans.length; i++) {
             TimeEntry e = new TimeEntry();
             e.setId("teoverlap" + i);
@@ -203,7 +210,7 @@ class WorkforceSettingsTest {
             e.setEndAt(spans[i][1]);
             entries.insert(e);
         }
-        Map sheet = Http.json(mvc, as(get("/api/admin/timesheets?week=0"), admin()));
+        Map sheet = Http.json(mvc, as(get("/api/admin/timesheets?week=" + base), admin()));
         boolean seen = false;
         for (Object o : (List) sheet.get("rows")) {
             Map row = (Map) o;
