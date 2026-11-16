@@ -23565,6 +23565,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (peerImage != null) {
                 return peerImage;
             }
+            // A Swing peer (the 3D view among them) paints into "__buffer" at
+            // device size, and that image is what the canvas shows. Without a
+            // copy of it, lightweight mode drew a white rectangle where the
+            // peer was.
+            BufferedImage src = copyOfBuffer();
+            if (src != null) {
+                int w = src.getWidth();
+                int h = src.getHeight();
+                return com.codename1.ui.Image.createImage(src.getRGB(0, 0, w, h, null, 0, w), w, h);
+            }
             if (peerBuffer != null) {
                 peerBuffer.modifyBuffer(new Runnable() {
                     public void run() {
@@ -23586,6 +23596,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         
 
+        /// A copy of what the Swing peer last painted, or null when it has no buffer.
+        private BufferedImage copyOfBuffer() {
+            Object buffered = getClientProperty("__buffer");
+            if (!(buffered instanceof BufferedImage)) {
+                return null;
+            }
+            BufferedImage src = (BufferedImage) buffered;
+            BufferedImage copy = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D cg = copy.createGraphics();
+            cg.drawImage(src, 0, 0, null);
+            cg.dispose();
+            return copy;
+        }
+
         protected void setLightweightMode(final boolean l) {
             if (lightweightMode == l) {
                 if (l || init) {
@@ -23599,6 +23623,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 } 
             } else {
                 peerImage = null;
+                // The base class caches the image it painted; drop it too,
+                // or the next overlay shows this one's stale snapshot.
+                setPeerImage(null);
             }
             SwingUtilities.invokeLater(new Runnable() {
 

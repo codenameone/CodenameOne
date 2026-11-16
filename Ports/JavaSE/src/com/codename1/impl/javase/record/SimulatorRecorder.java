@@ -443,7 +443,7 @@ public final class SimulatorRecorder {
     private void compose(BufferedImage img, long now) {
         Graphics2D g = scaled.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.drawImage(img, 0, 0, width, height, null);
+        drawFitted(g, img, width, height);
         Caption[] active;
         synchronized (this) {
             active = captions.toArray(new Caption[captions.size()]);
@@ -454,6 +454,26 @@ public final class SimulatorRecorder {
             }
         }
         g.dispose();
+    }
+
+    /// Draws a screen frame into the fixed-size video frame. A video cannot
+    /// change size mid-stream, but the screen can: rotating the device turns
+    /// a portrait capture landscape. Stretching it to the frame distorted
+    /// every frame after the rotation, so a frame of another shape is fitted
+    /// at its own aspect ratio and centred on black instead.
+    static void drawFitted(Graphics2D g, BufferedImage img, int w, int h) {
+        int iw = img.getWidth();
+        int ih = img.getHeight();
+        if ((long) iw * h == (long) ih * w) {
+            g.drawImage(img, 0, 0, w, h, null);
+            return;
+        }
+        g.setColor(java.awt.Color.BLACK);
+        g.fillRect(0, 0, w, h);
+        double s = Math.min(w / (double) iw, h / (double) ih);
+        int dw = (int) Math.round(iw * s);
+        int dh = (int) Math.round(ih * s);
+        g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh, null);
     }
 
     static void paintCaption(Graphics2D g, String text, int w, int h) {
