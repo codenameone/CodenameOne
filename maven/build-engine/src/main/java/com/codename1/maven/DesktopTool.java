@@ -150,7 +150,9 @@ public final class DesktopTool {
         args.add("-Dcom.apple.mrj.application.apple.menu.about.name=" + displayName);
         args.add("-Dsun.awt.application.name=" + displayName);
         args.add("-Dsun.awt.X11.XWMClass=" + windowClass);
-        if (isJava9OrNewer()) {
+        // com.apple.eawt exists only in a macOS JDK; elsewhere the JVM prints a
+        // "package not in java.desktop" warning per option into the tool's log.
+        if (isJava9OrNewer() && isMacOs()) {
             args.add("--add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED");
             args.add("--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED");
         }
@@ -234,6 +236,7 @@ public final class DesktopTool {
     /// `<runtimeDir>/<prefix>.log`; attached waits for the window to close.
     public void launch(List<File> classpath, File primaryJar, File input, File workingDir, boolean detached,
                        List<String> extraJvmArgs, Log log) throws BuildExecutionException {
+        requireCompatibleRuntime(primaryJar);
         List<String> command = command(classpath, primaryJar, input, extraJvmArgs, log);
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(workingDir);
@@ -259,6 +262,63 @@ public final class DesktopTool {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new BuildExecutionException("Interrupted while running " + displayName, ex);
+        }
+    }
+
+    /// Fails when the JVM the tool would start on cannot load its classes.
+    ///
+    /// The tool runs on the JVM running Maven or Gradle. When that is older than
+    /// the tool's bytecode, the detached launch "succeeds" and the child dies at
+    /// once: on Windows `javaw.exe` shows only "A JNI error has occurred" and the
+    /// build still reports success (a customer on JDK 15 hit exactly this with
+    /// the Certificate Wizard, compiled for 17). The required version is read
+    /// from the main class itself, so it can never drift from how the tool is built.
+    void requireCompatibleRuntime(File primaryJar) throws BuildExecutionException {
+        int needed = primaryJar == null ? -1 : classFileMajorVersion(primaryJar, mainClass);
+        int supported = runtimeMaxClassFileVersion();
+        if (needed > 0 && supported > 0 && needed > supported) {
+            throw new BuildExecutionException(displayName + " requires Java " + (needed - 44)
+                    + " or newer, but this build runs on Java " + (supported - 44)
+                    + " (" + System.getProperty("java.home") + "). Point JAVA_HOME (or your IDE's Maven/Gradle"
+                    + " JDK setting) at JDK " + (needed - 44) + " or newer and run it again.");
+        }
+    }
+
+    /// The class file major version of `className` in `jar`, or -1 when unknown.
+    static int classFileMajorVersion(File jar, String className) {
+        try (JarFile jf = new JarFile(jar)) {
+            JarEntry entry = jf.getJarEntry(className.replace('.', '/') + ".class");
+            if (entry == null) {
+                return -1;
+            }
+            try (InputStream in = jf.getInputStream(entry)) {
+                byte[] header = new byte[8];
+                int read = 0;
+                while (read < header.length) {
+                    int n = in.read(header, read, header.length - read);
+                    if (n < 0) {
+                        return -1;
+                    }
+                    read += n;
+                }
+                if ((header[0] & 0xff) != 0xca || (header[1] & 0xff) != 0xfe) {
+                    return -1;
+                }
+                return ((header[6] & 0xff) << 8) | (header[7] & 0xff);
+            }
+        } catch (IOException ex) {
+            return -1;
+        }
+    }
+
+    /// The highest class file major version this JVM loads, or -1 when unknown.
+    static int runtimeMaxClassFileVersion() {
+        String v = System.getProperty("java.class.version", "");
+        int dot = v.indexOf('.');
+        try {
+            return Integer.parseInt(dot < 0 ? v : v.substring(0, dot));
+        } catch (NumberFormatException ex) {
+            return -1;
         }
     }
 
