@@ -196,6 +196,13 @@ class DataGridTest extends UITestBase {
         TextField tf = findEditor();
         assertNotNull(tf, "the editor is in the layered pane");
         assertEquals("7", tf.getText());
+        g.getComponentForm().revalidate();
+        int[] cellBounds = new int[4];
+        g.getCellBounds(0, 2, cellBounds);
+        assertEquals(cellBounds[2], tf.getWidth(), "the editor is as wide as the cell");
+        assertEquals(cellBounds[3], tf.getHeight(), "the editor is as tall as the cell");
+        assertEquals(g.getAbsoluteX() + cellBounds[0], tf.getAbsoluteX(), "the editor lies over the cell");
+        assertEquals(g.getAbsoluteY() + cellBounds[1], tf.getAbsoluteY(), "the editor lies over the cell");
         tf.setText("42");
         g.commitEdit();
         assertFalse(g.isEditing());

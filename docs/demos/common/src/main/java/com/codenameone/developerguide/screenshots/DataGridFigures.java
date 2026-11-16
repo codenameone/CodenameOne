@@ -25,6 +25,7 @@ package com.codenameone.developerguide.screenshots;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.UIManager;
@@ -114,12 +115,22 @@ public final class DataGridFigures {
             g.selectRows(1, 3, false);
             g.selectRows(6, 6, true);
         }));
-        v.add(wide("datagrid-editing", grid(DataGridSnippets::editing), (form, g) -> g.editCellAt(2, 1)));
-        v.add(wide("datagrid-tree", grid(DataGridSnippets::tree), (form, g) -> {
+        v.add(wide("datagrid-editing", grid(DataGridSnippets::editing), (form, g) -> {
+            g.editCellAt(2, 1);
+            // The simulator edits in a native field the capture can't see;
+            // end that session and keep the grid's edit, so the field draws
+            // itself over the cell.
+            TextArea field = editor(form.getFormLayeredPane(DataGrid.class, false));
+            if (field != null) {
+                field.setText("Kestrel Aviation");
+                field.stopEditing();
+            }
+        }));
+        v.add(wide("datagrid-tree", grid("Files", DataGridSnippets::tree), (form, g) -> {
             g.expandAll();
             g.setSelectedRow(3);
         }));
-        v.add(wide("datagrid-million", grid(DataGridSnippets::million), (form, g) -> {
+        v.add(wide("datagrid-million", grid("Ledger", DataGridSnippets::million), (form, g) -> {
             g.scrollToCell(500000, 0);
             g.setSelectedRow(500002);
         }));
@@ -137,8 +148,12 @@ public final class DataGridFigures {
     }
 
     private static Scene grid(final GridScene s) {
+        return grid("Orders", s);
+    }
+
+    private static Scene grid(final String title, final GridScene s) {
         return () -> {
-            Form f = new Form("Orders", new BorderLayout());
+            Form f = new Form(title, new BorderLayout());
             f.add(BorderLayout.CENTER, s.build());
             return f;
         };
@@ -146,6 +161,22 @@ public final class DataGridFigures {
 
     private static FigureVariant wide(String name, Scene scene, Act act) {
         return new FigureVariant(new Fig(name, scene, act, false), FigureDevice.ANDROID, false, true, name + ".png");
+    }
+
+    private static TextArea editor(Container c) {
+        for (int i = 0; i < c.getComponentCount(); i++) {
+            Component k = c.getComponentAt(i);
+            if (k instanceof TextArea) {
+                return (TextArea) k;
+            }
+            if (k instanceof Container) {
+                TextArea t = editor((Container) k);
+                if (t != null) {
+                    return t;
+                }
+            }
+        }
+        return null;
     }
 
     private static DataGrid find(Container c) {

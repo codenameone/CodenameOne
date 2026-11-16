@@ -121,7 +121,7 @@ public final class DataGridSnippets {
     public static DataGrid columns() {
         // tag::grid-columns[]
         DataGrid grid = new DataGrid(orders());
-        grid.getColumn(ORDER).setWidthMM(16);
+        grid.getColumn(ORDER).setWidthMM(20);
         grid.getColumn(CUSTOMER).setFlex(1).setMinWidthMM(24);
         grid.getColumn(REGION).setChoices("North", "East", "South", "West");
         grid.getColumn(AMOUNT)
@@ -143,7 +143,11 @@ public final class DataGridSnippets {
             if (!(value instanceof Number)) {
                 return "";
             }
-            return "$" + L10NManager.getInstance().format(((Number) value).doubleValue(), 2);
+            double d = ((Number) value).doubleValue();
+            long cents = Math.round(Math.abs(d) * 100);
+            String fraction = Long.toString(100 + cents % 100).substring(1);
+            String whole = L10NManager.getInstance().format((int) (cents / 100));
+            return (d < 0 ? "-$" : "$") + whole + "." + fraction;
         }
 
         @Override
