@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
 # Licensed under the GNU General Public License version 2 with the Classpath exception.
-"""Writes the starter templates the studio offers (obby, tycoon, arena,
+"""Writes the starter templates the studio offers (obby, rainbow obby, tycoon, arena,
 simulator, racing) as .rbxlx place files. They are original: layouts and
 scripts written for Brickyard. Re-run after editing; the output is checked in.
 
@@ -226,6 +226,58 @@ def trim(pl, ws, name, pos, size, color):
     ws.append(part(pl, name, (x - w / 2 + 0.15, t, z), (0.3, 0.12, d - 0.6), color, "Neon", collide=False))
     ws.append(part(pl, name, (x + w / 2 - 0.15, t, z), (0.3, 0.12, d - 0.6), color, "Neon", collide=False))
 
+def obby_script(name):
+    """Kill bricks, checkpoints, the finish, spinners and gliders: the rules
+    every obby template shares."""
+    return LEADER + """
+local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+-- An obby is retried constantly: back on the last checkpoint quickly.
+Players.RespawnTime = 1.5
+Players.PlayerAdded:Connect(function(p)
+    local ls = stats(p, {"Stage", "Wins"})
+end)
+for _, p in ipairs(Players:GetPlayers()) do stats(p, {"Stage", "Wins"}) end
+for _, brick in ipairs(CollectionService:GetTagged("KillBrick")) do
+    brick.Touched:Connect(function(hit)
+        local h = hit.Parent and hit.Parent:FindFirstChildOfClass("Humanoid")
+        if h then h.Health = 0 end
+    end)
+end
+for _, cp in ipairs(CollectionService:GetTagged("Checkpoint")) do
+    cp.Touched:Connect(function(hit)
+        local p = playerOf(hit)
+        if p and p.leaderstats.Stage.Value < cp:GetAttribute("Stage") then
+            p.leaderstats.Stage.Value = cp:GetAttribute("Stage")
+            p.RespawnLocation = nil
+            p:SetAttribute("Checkpoint", cp.Name)
+        end
+    end)
+end
+for _, f in ipairs(CollectionService:GetTagged("Finish")) do
+    f.Touched:Connect(function(hit)
+        local p = playerOf(hit)
+        if p and not p:GetAttribute("Finished") then
+            p:SetAttribute("Finished", true)
+            p.leaderstats.Wins.Value += 1
+        end
+    end)
+end
+local spinners = CollectionService:GetTagged("Spin")
+RunService.Heartbeat:Connect(function(dt)
+    for _, s in ipairs(spinners) do
+        s.CFrame = s.CFrame * CFrame.Angles(0, dt * 1.6, 0)
+    end
+end)
+for _, m in ipairs(CollectionService:GetTagged("Glide")) do
+    local info = TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    TweenService:Create(m, info, {CFrame = m.CFrame + Vector3.new(16, 0, 0)}):Play()
+end
+print("TEMPLATE READY %s")
+""" % name
+
 def obby():
     pl = Place()
     ws = []
@@ -311,59 +363,112 @@ def obby():
     for x in (-6, 6):
         ws.append(part(pl, "Confetti", (x, fy + 10.4, top - 17), (1, 1, 1), 0xffffff, "Neon", transparency=1,
                        collide=False, children=emitter(pl, 0xff4081, 0x40c4ff, 14, (3, 6), (1.5, 2.5), 0.5, -6)))
-    src = LEADER + """
-local Players = game:GetService("Players")
-local CollectionService = game:GetService("CollectionService")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
--- An obby is retried constantly: back on the last checkpoint quickly.
-Players.RespawnTime = 1.5
-Players.PlayerAdded:Connect(function(p)
-    local ls = stats(p, {"Stage", "Wins"})
-end)
-for _, p in ipairs(Players:GetPlayers()) do stats(p, {"Stage", "Wins"}) end
-for _, brick in ipairs(CollectionService:GetTagged("KillBrick")) do
-    brick.Touched:Connect(function(hit)
-        local h = hit.Parent and hit.Parent:FindFirstChildOfClass("Humanoid")
-        if h then h.Health = 0 end
-    end)
-end
-for _, cp in ipairs(CollectionService:GetTagged("Checkpoint")) do
-    cp.Touched:Connect(function(hit)
-        local p = playerOf(hit)
-        if p and p.leaderstats.Stage.Value < cp:GetAttribute("Stage") then
-            p.leaderstats.Stage.Value = cp:GetAttribute("Stage")
-            p.RespawnLocation = nil
-            p:SetAttribute("Checkpoint", cp.Name)
-        end
-    end)
-end
-for _, f in ipairs(CollectionService:GetTagged("Finish")) do
-    f.Touched:Connect(function(hit)
-        local p = playerOf(hit)
-        if p and not p:GetAttribute("Finished") then
-            p:SetAttribute("Finished", true)
-            p.leaderstats.Wins.Value += 1
-        end
-    end)
-end
-local spinners = CollectionService:GetTagged("Spin")
-RunService.Heartbeat:Connect(function(dt)
-    for _, s in ipairs(spinners) do
-        s.CFrame = s.CFrame * CFrame.Angles(0, dt * 1.6, 0)
-    end
-end)
-for _, m in ipairs(CollectionService:GetTagged("Glide")) do
-    local info = TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-    TweenService:Create(m, info, {CFrame = m.CFrame + Vector3.new(16, 0, 0)}):Play()
-end
-print("TEMPLATE READY obby")
-"""
+    src = obby_script("obby")
     # Golden hour at sea: a low sun over the water, a light salt haze, and
     # torches lit for the evening.
     rest = [lighting(pl, 17.8, bloom(pl, 0.9, 0.95) + atmosphere(pl, 0.25, 0xf2b38a)
                      + color_correction(pl, 0.12, 0.12) + sun_rays(pl, 0.2), 2.6),
             service(pl, "ServerScriptService", script(pl, "Obby", src))]
+    return place(ws, rest)
+
+RAINBOW = [0xff3b3b, 0xff9a1f, 0xffd91a, 0x3fd65a, 0x2f8bff, 0x9b4dff]
+
+def rainbow():
+    """A classic sky obby: plastic bricks floating over a baseplate, one
+    colour per stage from red to purple, and a rainbow bridge to the end."""
+    import math
+    pl = Place()
+    ws = []
+    # The ground far below. Falling is the fail state, so it is a kill brick.
+    ws.append(part(pl, "Baseplate", (0, -40, -120), (600, 2, 600), 0x4caf50, "SmoothPlastic", tags=("KillBrick",)))
+    # Blocky clouds off to both sides, clear of the line of sight down the course.
+    for i in range(16):
+        side = -1 if i % 2 else 1
+        x = side * (45 + (i * 31) % 50)
+        z = 20 - i * 16
+        y = 6 + (i * 13) % 26
+        w = 14 + (i * 7) % 12
+        ws.append(part(pl, "Cloud", (x, y, z), (w, 4, w * 0.6), 0xffffff, "SmoothPlastic", collide=False,
+                       tags=SCENERY))
+        ws.append(part(pl, "Cloud", (x + w * 0.3, y + 2.5, z), (w * 0.5, 4, w * 0.45), 0xffffff, "SmoothPlastic",
+                       collide=False, tags=SCENERY))
+    # The lobby: a grey pad with a white spawn.
+    ws.append(part(pl, "Lobby", (0, -1, 6), (24, 2, 24), 0xa3a2a5, "SmoothPlastic"))
+    ws.append(part(pl, "Start", (0, 0.5, 8), (8, 1, 8), 0xf2f3f3, "SmoothPlastic", cls="SpawnLocation"))
+    for i, c in enumerate(RAINBOW):
+        ws.append(part(pl, "LobbyStripe", (-10 + i * 4, 0.06, -5), (4, 0.12, 2), c, "Neon", collide=False))
+    y, z = 0.0, -4.0
+
+    def pad(name, x, yy, zz, w, d, c, **kw):
+        ws.append(part(pl, name, (x, yy, zz), (w, 1, d), c, "SmoothPlastic", **kw))
+
+    def checkpoint(stage, c, yy, zz):
+        ws.append(part(pl, "Stage%d" % stage, (0, yy - 0.5, zz), (12, 2, 12), c, "SmoothPlastic"))
+        ws.append(part(pl, "Checkpoint%d" % stage, (0, yy + 0.6, zz), (6, 0.2, 6), 0xffffff, "Neon",
+                       collide=False, tags=("Checkpoint",), attrs={"Stage": stage}))
+
+    # Stage 1, red: plain jumps, gently rising.
+    c = RAINBOW[0]
+    for i in range(5):
+        y += 0.8
+        z -= 9
+        pad("RedJump%d" % (i + 1), (i % 2) * 4 - 2, y, z, 5, 5, c)
+    z -= 11
+    checkpoint(1, c, y, z)
+    # Stage 2, orange: a strip crossed by kill bricks.
+    c = RAINBOW[1]
+    z -= 6
+    ws.append(part(pl, "OrangeStrip", (0, y - 0.5, z - 14), (6, 1, 30), c, "SmoothPlastic"))
+    for i in range(4):
+        ws.append(part(pl, "KillBrick", (0, y + 0.3, z - 4 - i * 7), (6, 0.6, 1.6), 0xff1f1f, "Neon",
+                       tags=("KillBrick",)))
+    z -= 37
+    checkpoint(2, c, y, z)
+    # Stage 3, yellow: narrow beams, each a step to the side of the last.
+    c = RAINBOW[2]
+    for i in range(4):
+        z -= 9
+        y += 0.6
+        ws.append(part(pl, "YellowBeam%d" % (i + 1), ((i % 2) * 3 - 1.5, y - 0.5, z), (1.6, 1, 7), c,
+                       "SmoothPlastic"))
+    z -= 12
+    checkpoint(3, c, y, z)
+    # Stage 4, green: a platform that glides across the gap.
+    c = RAINBOW[3]
+    z -= 13
+    pad("GreenGlider", -8, y, z, 6, 6, c, tags=("Glide",))
+    z -= 13
+    checkpoint(4, c, y, z)
+    # Stage 5, blue: a wide deck with a spinning bar.
+    c = RAINBOW[4]
+    z -= 15
+    ws.append(part(pl, "BlueDeck", (0, y - 0.5, z), (18, 1, 18), c, "SmoothPlastic"))
+    ws.append(part(pl, "SpinHub", (0, y + 1, z), (2, 2, 2), 0xf2f3f3, "SmoothPlastic", shape=2, rot=UPRIGHT))
+    ws.append(part(pl, "Spinner", (0, y + 1, z), (17, 0.8, 0.8), 0xff1f1f, "Neon", tags=("KillBrick", "Spin")))
+    z -= 18
+    checkpoint(5, c, y, z)
+    # Stage 6, purple: small steps climbing up.
+    c = RAINBOW[5]
+    for i in range(6):
+        z -= 6
+        y += 1.4
+        pad("PurpleStep%d" % (i + 1), (i % 3 - 1) * 3, y, z, 3, 3, c)
+    # The rainbow bridge: a band of every colour, side by side.
+    z -= 6
+    for i, col in enumerate(RAINBOW):
+        ws.append(part(pl, "Rainbow", (-5 + i * 2, y - 0.5, z - 12), (2, 1, 22), col, "SmoothPlastic"))
+    z -= 30
+    ws.append(part(pl, "Finish", (0, y - 0.5, z), (14, 1, 14), 0xffd700, "SmoothPlastic", tags=("Finish",)))
+    for i, col in enumerate(RAINBOW):
+        h = 13 - i
+        ws.append(part(pl, "Arch", (-h / 2.0, y + h / 2.0, z - 5), (1, h, 1), col, "SmoothPlastic"))
+        ws.append(part(pl, "Arch", (h / 2.0, y + h / 2.0, z - 5), (1, h, 1), col, "SmoothPlastic"))
+        ws.append(part(pl, "Arch", (0, y + h, z - 5), (h + 1, 1, 1), col, "SmoothPlastic"))
+    ws.append(part(pl, "Trophy", (0, y + 2, z), (2.4, 2.4, 2.4), 0xffd700, "SmoothPlastic", shape=0,
+                   children=sparkles(pl, 0xffffff)))
+    # Noon under a clear sky, no haze: the flat, bright look of a classic brick game.
+    rest = [lighting(pl, 13.5, color_correction(pl, 0.15, 0.05), 3.0),
+            service(pl, "ServerScriptService", script(pl, "Obby", obby_script("rainbow")))]
     return place(ws, rest)
 
 def tycoon():
@@ -719,7 +824,7 @@ def baseplate():
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "main", "resources", "com", "codename1",
                    "rbx", "templates")
-for name, fn in (("baseplate", baseplate), ("obby", obby), ("tycoon", tycoon), ("arena", arena), ("simulator", simulator),
+for name, fn in (("baseplate", baseplate), ("obby", obby), ("rainbow", rainbow), ("tycoon", tycoon), ("arena", arena), ("simulator", simulator),
                  ("racing", racing)):
     with open(os.path.join(OUT, name + ".rbxlx"), "w") as f:
         f.write(fn())
