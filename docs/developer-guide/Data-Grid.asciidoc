@@ -1,0 +1,128 @@
+[[data-grid]]
+== Data grids and tree tables
+
+A list of orders, an inventory, a log, a file browser: each is rows of records
+under a row of column titles, and users expect to sort them, filter them, resize
+the columns and edit a value where it stands. `DataGrid` in
+`com.codename1.ui.table` is that component, and it shows a tree as readily as a
+flat list.
+
+The grid paints its cells itself, the way the scheduler and the Gantt chart do.
+There is no component per cell or per row, so a model with a million rows
+scrolls the way one with a hundred does. Sorting and filtering reorder an array
+of row numbers and never copy your data, and a node of a tree costs what it
+shows when it opens.
+
+`Table`, in the same package, lays out one component per cell. It suits a small
+form arranged in rows and columns; use `DataGrid` for data.
+
+=== A first grid
+
+Any `TableModel` works. Each of its columns gets a `GridColumn` with the model's
+title.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-first,indent=0]
+----
+
+A tap on a title sorts by that column, a second tap reverses the order and a
+third restores the model's order. Shift with a tap adds the column as a further
+sort key. A drag on a title moves the column, and a drag on the line between
+two titles resizes it.
+
+=== Columns
+
+A `GridColumn` decides how its values look and how they're edited. Its kind,
+`TEXT`, `NUMBER`, `BOOLEAN`, `DATE` or `CHOICE`, is read from the values when
+you leave it at `AUTO`. Numbers align to the right, booleans show a check box.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-columns,indent=0]
+----
+
+A width in millimetres stays the same on every screen. A column without one is
+measured from its title and first rows. Columns with a flex share the width
+that's left over. Frozen columns stay in place while the others scroll
+sideways.
+
+A column takes a `GridCellRenderer` to paint its cells differently, a
+`GridFormatter` to turn values into text and back, and a `Comparator` to sort
+them in its own order.
+
+=== Sorting, filtering and grouping
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sort-filter,indent=0]
+----
+
+A filter decides row by row. Grouping puts the rows that share a value under a
+row of their own that opens and closes, and the group row shows the column's
+aggregate: a sum, an average, the smallest, the largest or a count.
+
+The grid listens to its `TableModel`. A changed value repaints its cell, and
+anything else sorts, filters and groups again, keeping the selection on the
+same records.
+
+=== Trees
+
+Built on a `TreeTableModel`, the grid is a tree table. The first visible column,
+or the one you pass to `setTreeColumn`, indents each node under its parent and
+draws the arrow that opens it.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-tree,indent=0]
+----
+
+The grid asks for a node's children the first time it opens and keeps them.
+Sorting orders the children of each node, and a filter shows every path that
+leads to a match. A tree model has no listeners: call `refresh()` after the tree
+changes, or `refreshNode(node)` after one node's children change.
+
+=== Selection and keys
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-selection,indent=0]
+----
+
+Rows the grid reports are view rows, counted in what is on screen after
+sorting, filtering, grouping and opening nodes. `getModelRow` and `getNode`
+translate one to your data.
+
+The arrow keys move between cells, Left and Right close and open a node, and
+Enter edits the cell or opens the row. With a mouse, a press selects, Shift
+extends, Control or Command adds and removes, and a drag selects a range.
+
+=== Editing
+
+A cell is edited when its column and its model both allow it. A boolean
+toggles with a tap. Any other value is edited in place: a double tap or Enter
+lays a text field over the cell, or a picker for a date or a choice, and
+removes it when the edit ends. Moving on, scrolling or tapping elsewhere stores
+the value; `cancelEdit()` drops it. A number is read back as the type the cell
+held, and text that isn't a number leaves the cell as it was.
+
+Supply a `GridCellEditor` to edit a column with a component of your own. The
+grid shows it only while the cell is edited.
+
+=== Styles
+
+Only colours, fonts and paddings are read; nothing has a border. The UIIDs are
+`DataGrid` for the background, `DataGridHeader`, `DataGridRow` and its selected
+state, `DataGridRowAlt` for every other row, `DataGridGroupRow`, `DataGridLine`,
+whose foreground colours the grid lines, `DataGridCheck` and `DataGridEditor`.
+The native themes style all of them for light and dark mode.
+
+=== Swing applications
+
+An imported Swing application keeps Swing's own painting, renderers and
+editors, but its rows come from the same engine as `DataGrid`. A `JTable` or
+`JXTable` sorted through a `TableRowSorter` orders its rows with `GridSorter`,
+reading each sort column from the model once per row. A `JXTreeTable` takes its
+rows from `TreeRows`, so expanding a node inserts only the rows under it.
+
+Both classes are public, so a view of your own can use them too.

@@ -56,6 +56,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.EventObject;
 import java.util.List;
+import java.util.Vector;
 
 /// A table whose rows are the nodes of a tree: one column, the
 /// hierarchical one, indents each row by its depth and has the arrow
@@ -796,19 +797,40 @@ public class JXTreeTable extends JXTable {
         }
     }
 
-    /// The tree that keeps which nodes are expanded and so which have a
-    /// row. It is never shown: the table draws its rows.
+    /// The tree that keeps which nodes are expanded. It is never shown: the
+    /// table draws its rows. It stays a `JXTree` because tree cell renderers
+    /// are handed one, and because its will-expand listeners may veto, but
+    /// its rows come from the core grid's tree engine
+    /// (`com.codename1.ui.table.TreeRows`): opening a node inserts the rows
+    /// under it and closing one removes them, where the tree rebuilt every
+    /// row of the table on each change.
+    ///
+    /// The engine's nodes are the tree's `TreePath`s, which are equal only
+    /// when every node along them is: a value that repeats under two parents
+    /// ("Untitled" in two folders) is two rows that open and close apart, as
+    /// in Swing.
     private static final class Rows extends JXTree {
 
         private TreeTableModelAdapter adapter;
         private boolean live;
         private boolean fixing;
+        // None of these has an initializer: the superclass constructor
+        // reaches setModel and treeDidChange before one would run.
+        private com.codename1.ui.table.TreeRows core;
+        private TreePath pending;
+        // The one row whose children came or went in the last change, and
+        // how many; changeMany when more than one node moved.
+        private int changeRow;
+        private int changeDelta;
+        private boolean changeMany;
 
         Rows(TreeTableModel model) {
             super(model);
             super.setRootVisible(false);
             super.setShowsRootHandles(true);
             live = true;
+            reset();
+            super.treeDidChange();
         }
 
         @Override
@@ -816,12 +838,106 @@ public class JXTreeTable extends JXTable {
             return new DefaultTreeRenderer(new HierarchicalText(this));
         }
 
-        /// The rows may have changed. A hidden root that got its first
-        /// children is expanded, or they would never show; then the
-        /// table is told.
+        @Override
+        public void setModel(TreeModel newModel) {
+            super.setModel(newModel);
+            if (live) {
+                reset();
+            }
+        }
+
+        private void reset() {
+            core = new com.codename1.ui.table.TreeRows(new Nodes(this));
+            changeMany = true;
+            TreeModel m = getModel();
+            Object root = m == null ? null : m.getRoot();
+            if (root != null && isExpanded(new TreePath(root))) {
+                core.setNodeExpanded(new TreePath(root), true);
+            }
+            core.refresh();
+        }
+
+        @Override
+        public int getRowCount() {
+            return core == null ? 0 : core.getRowCount();
+        }
+
+        @Override
+        public TreePath getPathForRow(int row) {
+            if (core == null || row < 0 || row >= core.getRowCount()) {
+                return null;
+            }
+            Object node = core.getNode(row);
+            return node instanceof TreePath ? (TreePath) node : null;
+        }
+
+        @Override
+        public int getRowForPath(TreePath path) {
+            if (path == null || core == null) {
+                return -1;
+            }
+            return core.getRow(path);
+        }
+
+        @Override
+        protected void setExpandedState(TreePath path, boolean state) {
+            TreePath outer = pending;
+            pending = path;
+            try {
+                super.setExpandedState(path, state);
+            } finally {
+                pending = outer;
+            }
+            // A change below a collapsed node changes the state alone, and
+            // tells no one: the engine learns it here.
+            sync(path);
+        }
+
+        // Hands the tree's state for a path and the paths above it to the
+        // engine, which inserts or removes the rows that follow.
+        private void sync(TreePath path) {
+            if (core == null || path == null) {
+                return;
+            }
+            int n = path.getPathCount();
+            for (int i = 0; i < n; i++) {
+                TreePath p = i == n - 1 ? path : parentAt(path, i);
+                int d = core.setNodeExpanded(p, isExpanded(p));
+                if (d != 0) {
+                    if (changeDelta != 0 || changeMany) {
+                        changeMany = true;
+                    } else {
+                        changeRow = core.getRow(p);
+                        changeDelta = d;
+                    }
+                }
+            }
+        }
+
+        private static TreePath parentAt(TreePath path, int index) {
+            TreePath p = path;
+            for (int i = path.getPathCount() - 1; i > index; i--) {
+                p = p.getParentPath();
+            }
+            return p;
+        }
+
+        /// The rows may have changed. During an expansion the engine is
+        /// told what opened or closed; anything else reads the tree again.
+        /// A hidden root that got its first children is expanded, or they
+        /// would never show; then the table is told.
         @Override
         public void treeDidChange() {
             super.treeDidChange();
+            if (core == null) {
+                return;
+            }
+            if (pending != null) {
+                sync(pending);
+            } else {
+                changeMany = true;
+                core.refresh();
+            }
             if (live && !fixing && !isRootVisible()) {
                 TreeModel m = getModel();
                 Object root = m == null ? null : m.getRoot();
@@ -837,9 +953,83 @@ public class JXTreeTable extends JXTable {
                     }
                 }
             }
-            if (adapter != null) {
+            if (adapter != null && !fixing) {
                 adapter.rowsChanged();
             }
+        }
+
+        /// The change since the table last asked: `{row, delta}` for one
+        /// node that opened or closed, or null when the rows must be
+        /// compared.
+        int[] takeChange() {
+            int[] out = changeMany || changeDelta == 0 ? null : new int[]{changeRow, changeDelta};
+            changeMany = false;
+            changeDelta = 0;
+            return out;
+        }
+    }
+
+    /// The Swing tree as the engine reads it, a node being the `TreePath` to
+    /// it. The children of `null` are the rows of the first level: the root
+    /// alone when it shows, its children when it is hidden.
+    private static final class Nodes implements com.codename1.ui.table.TreeTableModel {
+        private final Rows tree;
+
+        Nodes(Rows tree) {
+            this.tree = tree;
+        }
+
+        @Override
+        public Vector getChildren(Object parent) {
+            Vector out = new Vector();
+            TreeModel m = tree.getModel();
+            Object root = m == null ? null : m.getRoot();
+            if (root == null) {
+                return out;
+            }
+            TreePath rootPath = new TreePath(root);
+            if (parent == null && tree.isRootVisible()) {
+                out.addElement(rootPath);
+                return out;
+            }
+            TreePath of = parent instanceof TreePath ? (TreePath) parent : rootPath;
+            Object node = of.getLastPathComponent();
+            int n = m.getChildCount(node);
+            for (int i = 0; i < n; i++) {
+                out.addElement(of.pathByAddingChild(m.getChild(node, i)));
+            }
+            return out;
+        }
+
+        @Override
+        public boolean isLeaf(Object node) {
+            TreeModel m = tree.getModel();
+            return m == null || !(node instanceof TreePath)
+                    || m.isLeaf(((TreePath) node).getLastPathComponent());
+        }
+
+        @Override
+        public int getColumnCount() {
+            return 0;
+        }
+
+        @Override
+        public String getColumnName(int column) {
+            return "";
+        }
+
+        @Override
+        public Object getValueAt(Object node, int column) {
+            return null;
+        }
+
+        @Override
+        public boolean isCellEditable(Object node, int column) {
+            return false;
+        }
+
+        @Override
+        public void setValueAt(Object node, int column, Object value) {
         }
     }
 
@@ -865,6 +1055,8 @@ public class JXTreeTable extends JXTable {
         }
 
         private ArrayList<TreePath> snapshot() {
+            // The rows are read whole: a change pending until now is in them.
+            tree.takeChange();
             int n = tree.getRowCount();
             ArrayList<TreePath> out = new ArrayList<TreePath>(n);
             for (int i = 0; i < n; i++) {
@@ -938,12 +1130,31 @@ public class JXTreeTable extends JXTable {
             if (muted) {
                 return;
             }
-            ArrayList<TreePath> old = shown;
-            ArrayList<TreePath> now = snapshot();
-            shown = now;
             if (table != null) {
                 table.cn1LostSelection = false;
             }
+            int[] change = tree.takeChange();
+            if (change != null && shown.size() + change[1] == tree.getRowCount()) {
+                // One node opened or closed: its rows came or went right
+                // after it, and nothing else moved.
+                int first = change[0] + 1;
+                int count = Math.abs(change[1]);
+                if (change[1] > 0) {
+                    for (int i = 0; i < count; i++) {
+                        shown.add(first + i, tree.getPathForRow(first + i));
+                    }
+                    fireTableRowsInserted(first, first + count - 1);
+                } else {
+                    int last = first + count - 1;
+                    markLostSelection(first, last);
+                    shown.subList(first, last + 1).clear();
+                    fireTableRowsDeleted(first, last);
+                }
+                return;
+            }
+            ArrayList<TreePath> old = shown;
+            ArrayList<TreePath> now = snapshot();
+            shown = now;
             int on = old.size();
             int nn = now.size();
             int prefix = 0;
@@ -963,17 +1174,21 @@ public class JXTreeTable extends JXTable {
                 fireTableRowsInserted(prefix, nn - suffix - 1);
             } else if (prefix + suffix == nn) {
                 int last = on - suffix - 1;
-                if (table != null) {
-                    for (int row = prefix; row <= last; row++) {
-                        if (table.isRowSelected(row)) {
-                            table.cn1LostSelection = true;
-                            break;
-                        }
-                    }
-                }
+                markLostSelection(prefix, last);
                 fireTableRowsDeleted(prefix, last);
             } else {
                 fireTableDataChanged();
+            }
+        }
+
+        private void markLostSelection(int first, int last) {
+            if (table != null) {
+                for (int row = first; row <= last; row++) {
+                    if (table.isRowSelected(row)) {
+                        table.cn1LostSelection = true;
+                        break;
+                    }
+                }
             }
         }
 

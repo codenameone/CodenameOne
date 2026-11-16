@@ -531,4 +531,88 @@ public class JXTreeTableTest extends KernelTestBase {
         assertEquals(2 * step, t.getEditorComponent().getX() - t.getCellRect(1, 0, false).x);
         t.removeEditor();
     }
+
+    /// The rows come from the core grid's tree engine: opening a node of a
+    /// large tree tells the table of the rows it inserted, at their place,
+    /// and closing it of the rows it removed, without the table being made
+    /// again or any other node being read.
+    @Test
+    public void openingANodeInsertsOnlyItsRows() {
+        DefaultMutableTreeTableNode r = new DefaultMutableTreeTableNode("r");
+        DefaultMutableTreeTableNode big = null;
+        for (int i = 0; i < 2000; i++) {
+            DefaultMutableTreeTableNode n = new DefaultMutableTreeTableNode("n" + i);
+            for (int k = 0; k < 5; k++) {
+                n.add(new DefaultMutableTreeTableNode("n" + i + "." + k));
+            }
+            r.add(n);
+            if (i == 1000) {
+                big = n;
+            }
+        }
+        JXTreeTable t = new JXTreeTable(new DefaultTreeTableModel(r, Arrays.asList("Name")));
+        assertEquals(2000, t.getRowCount());
+        final List<String> events = new ArrayList<String>();
+        t.getModel().addTableModelListener(new com.codename1.desktopcompat.javax.swing.event.TableModelListener() {
+            @Override
+            public void tableChanged(com.codename1.desktopcompat.javax.swing.event.TableModelEvent e) {
+                events.add(e.getType() + ":" + e.getFirstRow() + "-" + e.getLastRow());
+            }
+        });
+        t.setRowSelectionInterval(1500, 1500);
+        t.expandRow(1000);
+        assertEquals(2005, t.getRowCount());
+        assertEquals(Arrays.asList(com.codename1.desktopcompat.javax.swing.event.TableModelEvent.INSERT + ":1001-1005"),
+                events);
+        assertEquals("n1000.0", t.getValueAt(1001, 0));
+        assertEquals("n1001", t.getValueAt(1006, 0));
+        assertEquals(path(r, big, big.getChildAt(4)), t.getPathForRow(1005));
+        assertEquals("the selection stayed on its node", 1505, t.getSelectedRow());
+
+        events.clear();
+        t.collapseRow(1000);
+        assertEquals(2000, t.getRowCount());
+        assertEquals(Arrays.asList(com.codename1.desktopcompat.javax.swing.event.TableModelEvent.DELETE + ":1001-1005"),
+                events);
+        assertEquals(1500, t.getSelectedRow());
+    }
+
+    /// Equal values under two parents are two rows, opened apart, as in
+    /// Swing: the rows are keyed by path, not by node.
+    @Test
+    public void equalNodesUnderTwoParentsAreTwoRows() {
+        DefaultMutableTreeTableNode r = new DefaultMutableTreeTableNode("r");
+        JXTreeTable t = new JXTreeTable(new DefaultTreeTableModel(r, Arrays.asList("Name")) {
+            @Override
+            public int getChildCount(Object parent) {
+                return parent == r ? 2 : parent instanceof String ? 1 : 0;
+            }
+
+            @Override
+            public Object getChild(Object parent, int index) {
+                return parent == r ? (index == 0 ? "a" : "b") : "Untitled";
+            }
+
+            @Override
+            public boolean isLeaf(Object node) {
+                return "Untitled".equals(node);
+            }
+
+            @Override
+            public Object getValueAt(Object node, int column) {
+                return node;
+            }
+        });
+        t.expandRow(1);
+        assertEquals(3, t.getRowCount());
+        assertEquals(path(r, "b", "Untitled"), t.getPathForRow(2));
+        t.expandRow(0);
+        assertEquals(4, t.getRowCount());
+        assertEquals(path(r, "a", "Untitled"), t.getPathForRow(1));
+        assertEquals(1, t.getRowForPath(path(r, "a", "Untitled")));
+        assertEquals(3, t.getRowForPath(path(r, "b", "Untitled")));
+        t.collapseRow(0);
+        assertEquals(3, t.getRowCount());
+        assertTrue(t.isExpanded(path(r, "b")));
+    }
 }

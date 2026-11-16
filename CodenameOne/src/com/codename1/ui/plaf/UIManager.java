@@ -2255,6 +2255,22 @@ public class UIManager {
         schedulingStyle("GanttLoad", onPrimary, primary, "255", null, small);
         schedulingStyle("GanttOverload", onPrimary, error, "255", null, small);
 
+        // the data grid: painted, so only colours, fonts and paddings are read
+        schedulingStyle("DataGrid", onSurface, surface, "255", "0,0,0,0", null);
+        schedulingStyle("DataGridHeader", variant, raised, "255", "0,0,1.5,1.5", bold);
+        if (schedulingStyle("DataGridRow", onSurface, surface, "255", "0,0,1.5,1.5", null)) {
+            schedulingState("DataGridRow", "sel#", onTint, tint, "255");
+        }
+        schedulingStyle("DataGridRowAlt", onSurface, dark ? "232227" : "f8f9fa", "255", "0,0,1.5,1.5", null);
+        schedulingStyle("DataGridGroupRow", onSurface, raised, "255", "0,0,1.5,1.5", bold);
+        schedulingStyle("DataGridLine", line, surface, "0", null, null);
+        schedulingStyle("DataGridCheck", onPrimary, primary, "255", null, null);
+        if (!themed.contains("DataGridEditor")) {
+            schedulingDefault("DataGridEditor", "DataGridEditor.derive", "TextField");
+            schedulingDefault("DataGridEditor", "DataGridEditor.sel#derive", "TextField.sel");
+            schedulingDefault("DataGridEditor", "DataGridEditor.press#derive", "TextField.press");
+        }
+
         // the toolbar the scheduler and the chart share
         schedulingStyle("SchedulerToolbar", onSurface, surface, "255", "1,1,1,1", null);
         schedulingStyle("SchedulerTitle", onSurface, surface, "0", "1,1,2,2", bold);
