@@ -41,10 +41,14 @@ import com.codename1.orm.session.Session;
 /// commits and closed when it ends. That is the same contract as a Spring-managed
 /// `EntityManager`.
 ///
-/// Outside a transaction there is no unit of work to belong to, and every call
-/// refuses with a message saying so. The transaction's boundaries belong to the
-/// annotation, so beginning, committing, rolling back and closing through this
-/// object are refused too.
+/// Outside a transaction a READ -- `find`, `query`, `createQuery`,
+/// `createNativeQuery`, `count` -- runs in a session of its own with no
+/// transaction, as Spring's shared `EntityManager` reads without one: what it
+/// answers is not attached to any later unit of work, and a bulk `executeUpdate`
+/// on such a query still requires a transaction. Every write refuses with a
+/// message saying so. The transaction's boundaries belong to the annotation, so
+/// beginning, committing, rolling back and closing through this object are
+/// refused too.
 public final class TransactionSession implements Session {
     private final EntityManager entities;
 
@@ -56,6 +60,18 @@ public final class TransactionSession implements Session {
         return BackendAccess.get().session(entities);
     }
 
+    /// The session a read goes to: the transaction's, or outside one a new
+    /// session with no transaction. That session holds no connection between
+    /// statements (each borrows from the pool), so it is left to be collected
+    /// with what it loaded instead of being closed under a query that has not
+    /// run yet (issue 6240).
+    private Session reader() {
+        if (Transactions.isActive()) {
+            return current();
+        }
+        return entities.openSession();
+    }
+
     private static UnsupportedOperationException boundary(String what) {
         return new UnsupportedOperationException(what + " belongs to the @Transactional "
                 + "method this session is part of. Throw to roll back, or call "
@@ -64,17 +80,17 @@ public final class TransactionSession implements Session {
 
     @Override
     public <T> JpqlQuery<T> createNativeQuery(String statement, Class<T> resultType) {
-        return current().createNativeQuery(statement, resultType);
+        return reader().createNativeQuery(statement, resultType);
     }
 
     @Override
     public <T> JpqlQuery<T> createQuery(String statement, Class<T> resultType) {
-        return current().createQuery(statement, resultType);
+        return reader().createQuery(statement, resultType);
     }
 
     @Override
     public JpqlQuery<Object> createQuery(String statement) {
-        return current().createQuery(statement);
+        return reader().createQuery(statement);
     }
 
     @Override
@@ -124,7 +140,7 @@ public final class TransactionSession implements Session {
 
     @Override
     public <T> T find(Class<T> type, Object id) {
-        return current().find(type, id);
+        return reader().find(type, id);
     }
 
     @Override
@@ -145,6 +161,11 @@ public final class TransactionSession implements Session {
     @Override
     public <T> T merge(T entity) {
         return current().merge(entity);
+    }
+
+    @Override
+    public <T> T save(T entity) {
+        return current().save(entity);
     }
 
     @Override
@@ -169,7 +190,7 @@ public final class TransactionSession implements Session {
 
     @Override
     public <T> Query<T> query(Class<T> type) {
-        return current().query(type);
+        return reader().query(type);
     }
 
     @Override
@@ -189,7 +210,7 @@ public final class TransactionSession implements Session {
 
     @Override
     public long count(Object entity, String field) {
-        return current().count(entity, field);
+        return reader().count(entity, field);
     }
 
     @Override

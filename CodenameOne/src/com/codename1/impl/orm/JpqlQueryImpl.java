@@ -139,6 +139,33 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         return result;
     }
+    /// Refuses a result type no row of this statement can have, so a
+    /// repository method declared with the wrong one fails the build that
+    /// parses its query rather than the first call. Run by the build only.
+    public void checkResultType() {
+        if (plan.mutation || resultType == Object.class) {
+            return;
+        }
+        boolean rows = resultType == Object[].class;
+        String found;
+        if (plan.entity != null) {
+            if (!rows && resultType.isAssignableFrom(plan.entity.type())) {
+                return;
+            }
+            found = "an entity of " + plan.entity.type().getName();
+        } else if (plan.projections.size() > 1) {
+            if (rows) {
+                return;
+            }
+            found = "Object[] rows of " + plan.projections.size() + " values";
+        } else {
+            if (!rows && !session.hasModel(resultType.getName())) {
+                return;
+            }
+            found = "a single scalar value";
+        }
+        throw new IllegalArgumentException("The statement selects " + found + ", not " + resultType.getName());
+    }
     private T checked(Object value) {
         if (value != null && resultType != Object.class && !resultType.isInstance(value)) {
             throw new PersistenceException(
@@ -501,7 +528,17 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             position = from + 1;
             root();
-            while (peek("JOIN") || peek("LEFT") || peek("INNER")) {
+            // Entity joins: "FROM A a, B b" (a cross join filtered by WHERE) and
+            // "JOIN B b ON <predicate>". Each extra entity is a QueryImpl of its
+            // own with a distinct SQL alias, resolved exactly as a correlated
+            // outer alias is. The ON predicates are parsed after the SELECT list
+            // so their bindings follow the projection's, in SQL order.
+            List<Object[]> entityJoins = new ArrayList<Object[]>();
+            while (peek("JOIN") || peek("LEFT") || peek("INNER") || peek(",")) {
+                if (take(",")) {
+                    entityJoins.add(new Object[] {extraRoot(), null, Boolean.FALSE});
+                    continue;
+                }
                 boolean left = take("LEFT");
                 if (left) {
                     take("OUTER");
@@ -509,6 +546,27 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     take("INNER");
                 }
                 expect("JOIN");
+                if (!peek("FETCH") && session.hasModel(peekPath()) && aliases.get(peek()) == null) {
+                    QueryImpl extra = extraRoot();
+                    expect("ON");
+                    int onStart = position;
+                    int onDepth = 0;
+                    while (position < tokens.size()) {
+                        String t = peek();
+                        if (onDepth == 0 && (clause(t) || "JOIN".equalsIgnoreCase(t) || "LEFT".equalsIgnoreCase(t)
+                                || "INNER".equalsIgnoreCase(t) || ",".equals(t))) {
+                            break;
+                        }
+                        if ("(".equals(t)) {
+                            onDepth++;
+                        } else if (")".equals(t)) {
+                            onDepth--;
+                        }
+                        position++;
+                    }
+                    entityJoins.add(new Object[] {extra, Integer.valueOf(onStart), Boolean.valueOf(left)});
+                    continue;
+                }
                 boolean fetch = take("FETCH");
                 String joinPath = local(path());
                 if (fetch) {
@@ -546,6 +604,32 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 selections.add(new Expr(root.rootColumns(), Attribute.BIGINT, root.model));
             } else {
                 throw error("Expected SELECT or FROM");
+            }
+            // ON conditions are parsed here, so their bindings follow the
+            // projection's as the SQL text does; the sources themselves are
+            // rendered only once WHERE, GROUP BY, HAVING and ORDER BY have
+            // been parsed, because navigating a joined alias in any of them
+            // adds a relationship join to that alias. Each such join follows
+            // its root's ON condition: "JOIN B b ON c JOIN C b_j ON ..." is
+            // valid on every engine, a join nested before the ON is not.
+            String[] onConditions = new String[entityJoins.size()];
+            for (int i = 0; i < onConditions.length; i++) {
+                Object[] join = entityJoins.get(i);
+                if (join[1] != null) {
+                    position = ((Integer) join[1]).intValue();
+                    String joinsBefore = joinsSoFar(entityJoins);
+                    Expr on = expression();
+                    // A path in ON that needs a join would put that join after
+                    // the ON naming it; only the key of a to-one (b.owner.id)
+                    // and the joined roots' own columns can be read there.
+                    if (!joinsBefore.equals(joinsSoFar(entityJoins))) {
+                        throw error("ON may not navigate a relationship; compare its id or JOIN it");
+                    }
+                    if (hasAggregate(on)) {
+                        throw error("Aggregate functions are not allowed in ON");
+                    }
+                    onConditions[i] = condition(on);
+                }
             }
             position = afterFrom;
             Expr predicate = take("WHERE") ? expression() : null;
@@ -664,9 +748,29 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             for (int i = 0; i < plan.kinds.length; i++) {
                 plan.kinds[i] = kinds.get(i).intValue();
             }
-            plan.sql = "SELECT " + (distinct ? "DISTINCT " : "") + projection + root.from() +
+            StringBuilder entitySources = new StringBuilder();
+            for (int i = 0; i < onConditions.length; i++) {
+                Object[] join = entityJoins.get(i);
+                QueryImpl extra = (QueryImpl) join[0];
+                if (onConditions[i] == null) {
+                    entitySources.append(" CROSS JOIN ").append(extra.rootSource());
+                } else {
+                    entitySources.append(((Boolean) join[2]).booleanValue() ? " LEFT JOIN " : " JOIN ")
+                            .append(extra.rootSource()).append(" ON ").append(onConditions[i]);
+                }
+                entitySources.append(extra.joinSources());
+            }
+            plan.sql = "SELECT " + (distinct ? "DISTINCT " : "") + projection + root.from() + entitySources +
                        where + group + having + order;
             return plan;
+        }
+        private String joinsSoFar(List<Object[]> entityJoins) {
+            // The root's own joins precede every entity join, so ON may use them.
+            StringBuilder result = new StringBuilder();
+            for (Object[] join : entityJoins) {
+                result.append('|').append(((QueryImpl) join[0]).joinSources());
+            }
+            return result.toString();
         }
         private void refuseImplicitBulkJoins() {
             if (root.from().indexOf(" JOIN ") >= 0) {
@@ -675,6 +779,32 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         private void root() {
             root(false);
+        }
+        private String peekPath() {
+            StringBuilder value = new StringBuilder();
+            for (int i = position; i < tokens.size(); i += 2) {
+                value.append(tokens.get(i));
+                if (i + 1 >= tokens.size() || !".".equals(tokens.get(i + 1))) {
+                    break;
+                }
+                value.append('.');
+            }
+            return value.toString();
+        }
+        private QueryImpl extraRoot() {
+            String entity = path();
+            EntityModel model = session.model(entity);
+            QueryImpl extra = new QueryImpl(session, model);
+            take("AS");
+            if (!identifier(peek()) || clause(peek())) {
+                throw error("An entity join requires an alias");
+            }
+            String name = next();
+            if (aliases.containsKey(name)) {
+                throw error("Duplicate alias: " + name);
+            }
+            aliases.put(name, new Alias(extra, ""));
+            return extra;
         }
         private void root(boolean mutation) {
             String entity = path();

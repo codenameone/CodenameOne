@@ -67,6 +67,10 @@ final class JsonCallSites {
                     || cls.isFromBackendLibrary()) {
                 continue;
             }
+            registered(ctx, codecs, cls, cls.getClassAnnotation(REGISTER), cls.getSourceName());
+            for (com.codename1.maven.annotations.MethodInfo m : cls.getMethods()) {
+                registered(ctx, codecs, cls, m.getAnnotation(REGISTER), cls.getSourceName() + "." + m.getName());
+            }
             byte[] bytes;
             try {
                 bytes = Files.readAllBytes(file.toPath());
@@ -81,6 +85,38 @@ final class JsonCallSites {
                     return new Sites(ctx, codecs, cls, name);
                 }
             }, ClassReader.SKIP_FRAMES);
+        }
+    }
+
+    private static final String REGISTER = "Lcom/codename1/backend/annotations/RegisterReflectionForBinding;";
+
+    /// The classes a `@RegisterReflectionForBinding` names: read and write roots,
+    /// as a call site reading one and another writing it would be (issue 6240).
+    private static void registered(ProcessorContext ctx, BackendJsonCodecs codecs, AnnotatedClass cls,
+                                   com.codename1.maven.annotations.AnnotationValues a, String where) {
+        if (a == null) {
+            return;
+        }
+        for (String attribute : new String[] {"value", "classes"}) {
+            Object listed = a.get(attribute);
+            if (!(listed instanceof List)) {
+                continue;
+            }
+            for (Object o : (List<?>) listed) {
+                if (!(o instanceof Type)) {
+                    continue;
+                }
+                String binary = ((Type) o).getClassName();
+                String why = codecs.typedUse(binary, true);
+                if (why == null) {
+                    why = codecs.typedUse(binary, false);
+                }
+                if (why != null) {
+                    ctx.error(cls, "@RegisterReflectionForBinding on " + where + " names "
+                            + BackendJsonCodecs.source(binary) + ", which cannot be read and written as JSON: "
+                            + why);
+                }
+            }
         }
     }
 

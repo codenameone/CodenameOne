@@ -923,6 +923,26 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aByteArrayBodyIsTheRawBytes() throws Exception {
+        // Issue 6240: a byte[] body was JSON-decoded, so a webhook body answered
+        // 400 before the handler ran. Spring binds the raw bytes.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/hook\")\n"
+                + "    public String hook(@RequestBody byte[] body) {\n"
+                + "        return body.length + \":\" + (char) body[0];\n"
+                + "    }\n"
+                + "}\n");
+        Object result = router.call("POST", "/hook", "{\"a\":1}");
+        assertNotNull("POST /hook matched no route", result);
+        assertEquals(200, Router.statusOf(result));
+        assertEquals("7:{", Router.bodyOf(result));
+    }
+
+    @Test
     public void aNestedBodyElementOfTheWrongTypeIsAlso400() throws Exception {
         // The one-level check stopped at the outer list, because a nested
         // container is not one of the scalar types it looked for. "[[1]]" then
@@ -1677,6 +1697,46 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void registeredClassesGetCodecsNoCallSiteNames() throws Exception {
+        // Issue 6240: a class written only through an Object-typed Json.write had
+        // no codec; @RegisterReflectionForBinding declares it, as in Spring AOT.
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Invoice", "package com.example;\n"
+                + "public class Invoice { public String id = \"i1\"; public int cents = 250; }\n");
+        sources.put("com.example.Hooks", "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RegisterReflectionForBinding(Invoice.class)\n"
+                + "public class Hooks {\n"
+                + "    public static Object payload() { return new Invoice(); }\n"
+                + "    public static String send() { return com.codename1.backend.Json.write(payload()); }\n"
+                + "}\n");
+        sources.put("com.example.Notes", "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/n\")\n"
+                + "    public String n() { return \"n\"; }\n"
+                + "}\n");
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(sources, classes, backendClasspath());
+        ProcessorContext ctx = run(classes);
+        assertFalse(ctx.getErrors().toString(), ctx.hasErrors());
+        // And named for the JVM runtime, so a plain unit test finds it unaided.
+        assertEquals("cn1app.JsonCodecs\n", new String(ctx.getEmittedResources()
+                .get(RestControllerAnnotationProcessor.CODEC_SERVICE_RESOURCE), "US-ASCII"));
+        URLClassLoader loader = new URLClassLoader(new URL[]{ classes.toURI().toURL() },
+                getClass().getClassLoader());
+        com.codename1.impl.backend.JsonCodec.install((com.codename1.impl.backend.JsonCodec.Registry)
+                loader.loadClass("cn1app.JsonCodecs").newInstance());
+        try {
+            assertEquals("{\"id\":\"i1\",\"cents\":250}",
+                    loader.loadClass("com.example.Hooks").getMethod("send").invoke(null));
+        } finally {
+            com.codename1.impl.backend.JsonCodec.install(null);
+        }
+    }
+
+    @Test
     public void aParameterWithTwoBindingAnnotationsIsRefused() throws Exception {
         // The binding chain is priority-ordered, so this used to bind the header
         // and ignore the @RequestParam without a word. For an authentication input
@@ -2424,6 +2484,16 @@ public class RestControllerAnnotationProcessorTest {
         assertEquals("advice:disk", Router.bodyOf(io));
         assertEquals("the controller's own handler still comes first",
                 422, Router.statusOf(router.call("GET", "/iae", null)));
+        // #6240: a path nothing serves reaches the advice as Spring Boot's
+        // NoHandlerFoundException, so an API can answer it in its own shape.
+        HttpServer.Response missing = hooks.notFound(HttpServer.Request.of("GET", "/nowhere?x=1", null, null));
+        assertNotNull("a catch-all advice answers an unmatched path", missing);
+        assertEquals(503, missing.getStatus());
+        assertEquals("advice:No endpoint GET /nowhere",
+                new String(missing.getBody(), java.nio.charset.StandardCharsets.UTF_8));
+        assertNull("no advice, no answer: the server's own 404 stands",
+                com.codename1.backend.web.ControllerHooks.none().notFound(
+                        HttpServer.Request.of("GET", "/nowhere", null, null)));
         try {
             router.call("GET", "/denied", null);
             fail("not even a global Exception handler sees a security failure");

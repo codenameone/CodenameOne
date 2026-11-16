@@ -35,6 +35,8 @@ import com.codename1.impl.backend.BackendAccess;
 /// assembles its own server can make one with [#MockMvc(Backend)].
 public final class MockMvc {
     private final Backend backend;
+    /// The routers of [MockMvcBuilders#standaloneSetup], when there is no backend.
+    private final HttpServer.Handler[] routers;
 
     /// A client for `backend`, which must be running.
     public MockMvc(Backend backend) {
@@ -42,6 +44,28 @@ public final class MockMvc {
             throw new IllegalArgumentException("No backend");
         }
         this.backend = backend;
+        this.routers = null;
+    }
+
+    MockMvc(HttpServer.Handler[] routers) {
+        this.backend = null;
+        this.routers = routers;
+    }
+
+    private HttpServer.Response route(MockRequestBuilder.Built built) throws Exception {
+        HttpServer.Request request = HttpServer.Request.of(built.method, built.target, built.headers, built.body);
+        try {
+            for (HttpServer.Handler router : routers) {
+                HttpServer.Response answered = router.handle(request);
+                if (answered != null) {
+                    return answered;
+                }
+            }
+        } catch (com.codename1.backend.ResponseStatusException chosen) {
+            // As Backend.dispatch answers it: the status the handler chose.
+            return HttpServer.Response.text(chosen.getStatus(), chosen.getReason());
+        }
+        return HttpServer.Response.text(404, "Not Found");
     }
 
     /// Sends one request and returns what came back, to assert on.
@@ -65,8 +89,8 @@ public final class MockMvc {
         // 404 the HTTP/1 and HTTP/2 listeners send, so status().isNotFound() asserts
         // what a real request gets (GreetingApiTest.unknownRoutesAreNotFound in the
         // developer guide's demos covers it).
-        HttpServer.Response response = access.dispatch(backend, built.method, built.target,
-                built.headers, built.body);
+        HttpServer.Response response = backend == null ? route(built)
+                : access.dispatch(backend, built.method, built.target, built.headers, built.body);
         int status = access.status(response);
         // No body where the HTTP writers send none -- a HEAD, a 1xx, 204, 205 or
         // 304 -- so a test cannot assert on content no client ever receives.

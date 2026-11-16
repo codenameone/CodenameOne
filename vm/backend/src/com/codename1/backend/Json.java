@@ -385,7 +385,7 @@ public final class Json {
             // wrote for it -- the same one a route answering with it uses.
             return;
         }
-        writeString(out, String.valueOf(value));
+        writeString(out, unencodable(value));
     }
 
     private static void writeString(ByteSink out, String value) {
@@ -562,7 +562,27 @@ public final class Json {
                 return;
             }
         }
-        writeString(out, value.toString());
+        writeString(out, unencodable(value));
+    }
+
+    /// The text written for a value no clause above and no codec encodes. A JDK
+    /// value (an enum, a UUID, a java.time value, a BigDecimal, a Character) is
+    /// written as its string, as before. An application class is refused, as a
+    /// read of one is: writing its `toString()` stored "Foo@1e04fa0a" or a
+    /// record's "Foo[name=..]" in a column or a response with no error and
+    /// nothing logged (issue 6240). The build writes a codec for a class a route
+    /// answers with, or that a call site passes literally to a Json method; a
+    /// class reached only through an `Object`-typed write needs one of those.
+    private static String unencodable(Object value) {
+        String name = value.getClass().getName();
+        if (value instanceof CharSequence || value instanceof Enum || value instanceof Character || value instanceof Number
+                || name.startsWith("java.") || name.startsWith("javax.")) {
+            return value.toString();
+        }
+        throw new IllegalStateException("No JSON codec for " + name
+                + ": the build writes one for a class a route answers with or that a call "
+                + "site passes literally to Json.write, Json.read, Json.readList or "
+                + "Json.convert; nothing writes a class by reflection.");
     }
 
     private static void writeString(StringBuilder out, String value) {
