@@ -135,7 +135,7 @@ public final class PdfLexer {
                 if (nesting >= MAX_NESTING) {
                     // Too deep: skip to the matching bracket without
                     // recursing, so the enclosing structure stays in frame.
-                    skipNested();
+                    skipNested(true);
                     return list;
                 }
                 nesting++;
@@ -231,16 +231,19 @@ public final class PdfLexer {
     /// Past the nesting limit: skips to the close of the array or
     /// dictionary just opened, without recursing, stepping over strings and
     /// comments whole so a bracket inside one cannot end it early.
-    private void skipNested() {
-        int open = 1;
-        while (pos < end && open > 0) {
+    private void skipNested(boolean array) {
+        // Arrays and dictionaries are counted apart, so a stray close of the
+        // other kind cannot end the skip early.
+        int arrays = array ? 1 : 0;
+        int dicts = array ? 0 : 1;
+        while (pos < end && arrays + dicts > 0) {
             byte b = d[pos];
             if (b == '(') {
                 int paren = 0;
                 while (pos < end) {
                     byte c = d[pos++];
                     if (c == '\\') {
-                        pos++;
+                        pos = Math.min(pos + 1, end);
                     } else if (c == '(') {
                         paren++;
                     } else if (c == ')') {
@@ -255,21 +258,23 @@ public final class PdfLexer {
                     pos++;
                 }
             } else if (b == '<' && pos + 1 < end && d[pos + 1] == '<') {
-                open++;
+                dicts++;
                 pos += 2;
             } else if (b == '>' && pos + 1 < end && d[pos + 1] == '>') {
-                open--;
+                if (dicts > 0) {
+                    dicts--;
+                }
                 pos += 2;
             } else if (b == '<') {
                 while (pos < end && d[pos] != '>') {
                     pos++;
                 }
-                pos++;
+                pos = Math.min(pos + 1, end);
             } else {
                 if (b == '[') {
-                    open++;
-                } else if (b == ']') {
-                    open--;
+                    arrays++;
+                } else if (b == ']' && arrays > 0) {
+                    arrays--;
                 }
                 pos++;
             }
@@ -279,7 +284,7 @@ public final class PdfLexer {
     private PdfDict dictionary() {
         PdfDict dict = new PdfDict();
         if (nesting >= MAX_NESTING) {
-            skipNested();
+            skipNested(false);
             return dict;
         }
         nesting++;
