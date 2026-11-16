@@ -29,12 +29,13 @@ import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.FlowLayout;
 
-/// The studio's desktop layout, as Roblox Studio or Unity lay out an editor:
-/// a menu bar, a strip of tool icons, the Explorer docked left, Properties
-/// right, Output (or the script) along the bottom and the 3D viewport in
-/// the middle. It only arranges; every action is the [Studio]'s own.
+/// The studio's docked layout, as a desktop engine editor lays one out: the
+/// Explorer docked left, Properties right, Output (or the script) along the
+/// bottom and the 3D viewport in the middle. On a desktop a strip of tool
+/// icons runs along the top, under the operating system's menu bar; a tablet
+/// gets the same docks with the touch bar instead. It only arranges; every
+/// action is the [Studio]'s own.
 final class DesktopShell {
     private static final String[] TOOLS = {"Select", "Move", "Rotate", "Scale"};
     private static final char[] TOOL_ICONS = {FontImage.MATERIAL_NEAR_ME, FontImage.MATERIAL_OPEN_WITH,
@@ -56,8 +57,13 @@ final class DesktopShell {
     private Form form;
     private int activeTool = 1;
 
-    DesktopShell(Studio studio) {
+    /// True on a desktop, where the tool strip of small icons runs under the
+    /// OS menu bar; a tablet's touch bar is the [Studio]'s own.
+    private final boolean pointer;
+
+    DesktopShell(Studio studio, boolean pointer) {
         this.studio = studio;
+        this.pointer = pointer;
     }
 
     void install(Form f, Container viewport, Container explorer, Container properties, CodeEditor src,
@@ -65,13 +71,16 @@ final class DesktopShell {
         form = f;
         source = src;
         output = out;
-        Container north = BoxLayout.encloseY(menuBar(), toolStrip());
-        f.add(BorderLayout.NORTH, north);
+        if (pointer) {
+            // The menus are the operating system's (see StudioActions); the
+            // window keeps only the icon strip an editor has under them.
+            f.add(BorderLayout.NORTH, toolStrip());
+        }
 
         left = pane("EXPLORER", FontImage.MATERIAL_ACCOUNT_TREE, scroll(explorer), "StudioDockLeft");
         // Docks take a share of the window, as an editor's do, so the
         // viewport stays the largest thing on screen at any window size.
-        left.setPreferredW(Math.max(CN.convertToPixels(40), CN.getDisplayWidth() * 21 / 100));
+        left.setPreferredW(Math.max(CN.convertToPixels(pointer ? 40 : 48), CN.getDisplayWidth() * 21 / 100));
         right = pane("PROPERTIES", FontImage.MATERIAL_TUNE, scroll(properties), "StudioDockRight");
         right.setPreferredW(Math.max(CN.convertToPixels(44), CN.getDisplayWidth() * 23 / 100));
 
@@ -149,104 +158,14 @@ final class DesktopShell {
         header.add(BorderLayout.EAST, c);
     }
 
-    // ---- menu bar ----
-
-    private Container menuBar() {
-        Container bar = new Container(new FlowLayout(Component.LEFT));
-        bar.setUIID("StudioMenuBar");
-        bar.add(menu("File", new Object[] {
-            "New from template...", (Runnable) studio::pickTemplate,
-            "Open template...", (Runnable) () -> TemplateGallery.show(CN.getCurrentForm()),
-            "Import .rbxlx", (Runnable) studio::importPlace,
-            "Export .rbxlx", (Runnable) studio::exportPlace,
-            "Publish...", (Runnable) studio::askPublish,
-            "Capture thumbnail", (Runnable) studio::captureThumbnail,
-            "Compatibility report", (Runnable) studio::compatReport,
-            "Connect AI agent...", (Runnable) studio::agentMode,
-            "Exit", (Runnable) studio::exit}));
-        bar.add(menu("Edit", new Object[] {
-            "Undo", (Runnable) studio::undo,
-            "Redo", (Runnable) studio::redo,
-            "Duplicate", (Runnable) studio::duplicateSelected,
-            "Delete", (Runnable) studio::deleteSelected}));
-        bar.add(menu("View", new Object[] {
-            "Explorer", (Runnable) () -> toggle(left),
-            "Properties", (Runnable) () -> toggle(right),
-            "Output", (Runnable) () -> toggle(bottom)}));
-        bar.add(menu("Insert", new Object[] {
-            "Part", (Runnable) studio::addPart,
-            "Ball", (Runnable) () -> studio.addPart("Ball"),
-            "Cylinder", (Runnable) () -> studio.addPart("Cylinder"),
-            "Script", (Runnable) studio::addScript}));
-        Object[] models = new Object[Models.count() * 2];
-        for (int i = 0; i < Models.count(); i++) {
-            final int m = i;
-            models[i * 2] = Models.name(i);
-            models[i * 2 + 1] = (Runnable) () -> studio.addModel(m);
-        }
-        bar.add(menu("Models", models));
-        Object[] snippets = new Object[Models.snippetCount() * 2];
-        for (int i = 0; i < Models.snippetCount(); i++) {
-            final int m = i;
-            snippets[i * 2] = Models.snippetName(i);
-            snippets[i * 2 + 1] = (Runnable) () -> studio.addSnippet(m);
-        }
-        bar.add(menu("Scripts", snippets));
-        bar.add(menu("Effects", new Object[] {
-            "Fire", (Runnable) () -> studio.addEffect("fire"),
-            "Sparkles", (Runnable) () -> studio.addEffect("sparkles"),
-            "Smoke", (Runnable) () -> studio.addEffect("smoke"),
-            "Point light", (Runnable) () -> studio.addEffect("light"),
-            "Noon", (Runnable) () -> studio.lighting("noon"),
-            "Dusk", (Runnable) () -> studio.lighting("dusk"),
-            "Night", (Runnable) () -> studio.lighting("night")}));
-        bar.add(menu("Test", new Object[] {
-            "Play", (Runnable) studio::playtest,
-            "Stop", (Runnable) studio::stopPlaytest}));
-        return bar;
-    }
-
-    /// A menu title that drops its items, given as label, action pairs.
-    private Button menu(final String name, final Object[] items) {
-        final Button title = new Button(name, "StudioMenu");
-        title.setName("menu" + name);
-        title.addActionListener(ev -> {
-            // In the form's own layers: a Dialog is a form of its own, and the
-            // 3D view behind it stopped and turned grey while a menu was open.
-            final com.codename1.components.InteractionDialog d =
-                    new com.codename1.components.InteractionDialog(new BorderLayout());
-            d.setDialogUIID("StudioMenuPopup");
-            d.getContentPane().setUIID("StudioMenuPopupBody");
-            d.setDisposeWhenPointerOutOfBounds(true);
-            Container list = new Container(BoxLayout.y());
-            for (int i = 0; i + 1 < items.length; i += 2) {
-                final Object action = items[i + 1];
-                Button item = new Button(String.valueOf(items[i]), "StudioMenuItem");
-                item.setName("menuItem-" + items[i]);
-                item.addActionListener(e -> {
-                    d.dispose();
-                    if (action instanceof Runnable) {
-                        CN.callSerially((Runnable) action);
-                    }
-                });
-                list.add(item);
-            }
-            d.add(BorderLayout.CENTER, list);
-            d.setUIID("StudioMenuPopup");
-            // Dropped straight down from the title, as a desktop menu is.
-            Form f = title.getComponentForm();
-            int left = title.getAbsoluteX();
-            int top = title.getAbsoluteY() + title.getHeight();
-            int w = d.getPreferredW() + CN.convertToPixels(3);
-            int h = d.getPreferredH();
-            d.show(top, Math.max(0, f.getHeight() - top - h), left, Math.max(0, f.getWidth() - left - w));
-        });
-        return title;
-    }
-
     private void toggle(Container pane) {
         pane.setHidden(!pane.isHidden());
         form.revalidate();
+    }
+
+    /// Shows or hides a dock: 0 the Explorer, 1 Properties.
+    void toggleDock(int which) {
+        toggle(which == 0 ? left : right);
     }
 
     // ---- tool strip ----

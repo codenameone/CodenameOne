@@ -113,9 +113,13 @@ public final class Studio implements AgentTools.Studio {
     private static final String[] PART_PROPS = {"Shape", "Size", "CFrame", "Color", "Material", "Anchored",
         "CanCollide", "Transparency"};
     private final Set<Instance> expanded = new HashSet<Instance>();
-    /// A desktop editor's layout (menu bar, tool strip, docked panes) on a
-    /// desktop, a tablet or any window wide enough; the phone keeps tabs.
+    /// Docked panes on a desktop, a tablet or any window wide enough; the
+    /// phone keeps tabs.
     private final boolean desktop;
+    /// A desktop with a mouse and an OS menu bar, as opposed to a touch
+    /// screen of any size.
+    private final boolean pointer;
+    private StudioActions actions;
     private DesktopShell shell;
     private Runnable exit;
 
@@ -128,7 +132,8 @@ public final class Studio implements AgentTools.Studio {
         source.setName("scriptSource");
         output.setEditable(false);
         output.setName("studioOutput");
-        desktop = CN.isDesktop() || CN.isTablet() || CN.getDisplayWidth() >= CN.convertToPixels(180);
+        pointer = CN.isDesktop();
+        desktop = pointer || CN.isTablet() || CN.getDisplayWidth() >= CN.convertToPixels(180);
         replace(newEngine());
     }
 
@@ -169,8 +174,6 @@ public final class Studio implements AgentTools.Studio {
     }
 
     private static final String[] TABS = {"Explorer", "Properties", "Script", "Output"};
-    private static final char[] TAB_ICONS = {FontImage.MATERIAL_ACCOUNT_TREE, FontImage.MATERIAL_TUNE,
-        FontImage.MATERIAL_CODE, FontImage.MATERIAL_TERMINAL};
 
     private void show(final Form previous) {
         current = this;
@@ -186,14 +189,24 @@ public final class Studio implements AgentTools.Studio {
                 previous.showBack();
             }
         };
+        actions = new StudioActions(this);
         if (desktop) {
-            shell = new DesktopShell(this);
+            shell = new DesktopShell(this, pointer);
             shell.install(form, viewport, explorer, properties, source, output);
             showTab(3);
-            // A desktop editor has a menu bar, not a phone's title bar: the
-            // title and the way out live there (File > Exit, the close button).
-            form.getToolbar().setHidden(true);
+            if (pointer) {
+                // A desktop application: the catalog goes to the operating
+                // system's menu bar, and with desktop.titleBar=native the
+                // toolbar gives way to the real window title bar.
+                actions.installDesktopMenus(form);
+            } else {
+                touchChrome();
+                form.add(BorderLayout.SOUTH, touchBar());
+            }
             form.show();
+            if (!pointer) {
+                nameChrome();
+            }
             rebuildViewport();
             return;
         }
@@ -209,49 +222,149 @@ public final class Studio implements AgentTools.Studio {
         form.add(BorderLayout.CENTER, body);
         tabBar.setUIID("StudioTabs");
         showTab(0);
-        Container bar = new Container(new GridLayout(1, 5));
-        bar.setUIID("GameToolbar");
-        bar.setSafeArea(true);
-        bar.add(tool("Play", FontImage.MATERIAL_PLAY_ARROW, "StudioPlay", "studioPlay", ev -> playtest()));
-        bar.add(tool("Part", FontImage.MATERIAL_VIEW_IN_AR, "StudioTool", "studioPart", ev -> addPart()));
-        bar.add(tool("Script", FontImage.MATERIAL_NOTE_ADD, "StudioTool", "studioScript", ev -> addScript()));
-        bar.add(tool("Undo", FontImage.MATERIAL_UNDO, "StudioTool", "studioUndo", ev -> undo()));
-        bar.add(tool("Publish", FontImage.MATERIAL_ROCKET_LAUNCH, "StudioPublish", "studioPublish",
-                ev -> askPublish()));
-        form.add(BorderLayout.SOUTH, bar);
-        form.getToolbar().addCommandToOverflowMenu(new Command("Templates") {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                pickTemplate();
-            }
-        });
-        form.getToolbar().addCommandToOverflowMenu(new Command("Delete selected") {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                deleteSelected();
-            }
-        });
-        form.getToolbar().addCommandToOverflowMenu(new Command("Compatibility report") {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                compatReport();
-            }
-        });
-        form.getToolbar().addCommandToOverflowMenu(new Command("Export .rbxlx") {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                exportPlace();
-            }
-        });
-        form.getToolbar().addCommandToOverflowMenu(new Command("Connect AI agent") {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                agentMode();
-            }
-        });
-        Ui.back(form, exit);
+        touchChrome();
+        form.add(BorderLayout.SOUTH, touchBar());
         form.show();
+        nameChrome();
         rebuildViewport();
+    }
+
+    /// Names the side menu and overflow buttons, which the toolbar makes
+    /// when the form shows: the left-most and right-most icon buttons.
+    private void nameChrome() {
+        Button first = null;
+        Button last = null;
+        for (com.codename1.ui.Component c : form.getToolbar().getChildrenAsList(true)) {
+            List<Button> found = new ArrayList<Button>();
+            collectButtons(c, found);
+            for (Button b : found) {
+                if (first == null || b.getAbsoluteX() < first.getAbsoluteX()) {
+                    first = b;
+                }
+                if (last == null || b.getAbsoluteX() > last.getAbsoluteX()) {
+                    last = b;
+                }
+            }
+        }
+        if (first != null) {
+            first.setName("studioMenu");
+            first.setAccessibilityText("Menu");
+        }
+        if (last != null && last != first) { // NOPMD CompareObjectsWithEquals - identity
+            last.setName("studioMore");
+            last.setAccessibilityText("More options");
+        }
+    }
+
+    private static void collectButtons(com.codename1.ui.Component c, List<Button> out) {
+        if (c instanceof Button) {
+            out.add((Button) c);
+        } else if (c instanceof Container) {
+            for (com.codename1.ui.Component k : ((Container) c).getChildrenAsList(true)) {
+                collectButtons(k, out);
+            }
+        }
+    }
+
+    /// A touch device's chrome: the side menu holds the catalog, the title
+    /// bar the two actions used most (undo and play), the overflow what acts
+    /// on the selection. The device's back button leaves the studio.
+    private void touchChrome() {
+        actions.installSideMenu(form, title);
+        if (desktop) {
+            // A tablet's title bar has room for play next to undo; a phone's
+            // play button is in the bottom bar instead.
+            form.getToolbar().addMaterialCommandToRightBar("", FontImage.MATERIAL_PLAY_ARROW, 4, ev -> playtest());
+        }
+        form.getToolbar().addMaterialCommandToRightBar("", FontImage.MATERIAL_UNDO, 4, ev -> undo());
+        actions.installOverflow(form);
+        name(FontImage.MATERIAL_PLAY_ARROW, "studioPlay", "Play test");
+        name(FontImage.MATERIAL_UNDO, "studioUndo", "Undo");
+        form.setBackCommand(Command.create("Back", null, ev -> exit()));
+    }
+
+    /// Names the icon-only title-bar button showing `icon`, for screen
+    /// readers and agents.
+    private void name(char icon, String name, String label) {
+        for (com.codename1.ui.Component c : form.getToolbar().getChildrenAsList(true)) {
+            name(c, icon, name, label);
+        }
+    }
+
+    private static void name(com.codename1.ui.Component c, char icon, String name, String label) {
+        if (c instanceof Button && ((Button) c).getIcon() instanceof FontImage
+                && ((FontImage) ((Button) c).getIcon()).getText().equals(String.valueOf(icon))) {
+            c.setName(name);
+            ((Button) c).setAccessibilityText(label);
+        } else if (c instanceof Container) {
+            for (com.codename1.ui.Component k : ((Container) c).getChildrenAsList(true)) {
+                name(k, icon, name, label);
+            }
+        }
+    }
+
+    private static final String[] TOOL_NAMES = {"Select", "Move", "Rotate", "Scale"};
+    private static final char[] TOOL_GLYPHS = {FontImage.MATERIAL_NEAR_ME, FontImage.MATERIAL_OPEN_WITH,
+        FontImage.MATERIAL_ROTATE_RIGHT, FontImage.MATERIAL_ASPECT_RATIO};
+    private final Container touchBar = new Container(new GridLayout(1, 6));
+
+    /// The bar along the bottom edge, where a thumb rests. A tablet shows the
+    /// four gizmo tools side by side, then Insert and Publish; a phone has
+    /// room for four buttons, so the tools fold into one that shows the
+    /// current tool and opens a picker, beside Insert, Play and Publish.
+    private Container touchBar() {
+        touchBar.removeAll();
+        touchBar.setUIID("GameToolbar");
+        touchBar.setSafeArea(true);
+        if (desktop) {
+            touchBar.setLayout(new GridLayout(1, 6));
+            for (int i = 0; i < TOOL_NAMES.length; i++) {
+                final int k = i;
+                touchBar.add(tool(TOOL_NAMES[i], TOOL_GLYPHS[i], k == tool ? "StudioToolSelected" : "StudioTool",
+                        "tool" + TOOL_NAMES[i], ev -> pickTool(k)));
+            }
+        } else {
+            touchBar.setLayout(new GridLayout(1, 4));
+            touchBar.add(tool(TOOL_NAMES[tool], TOOL_GLYPHS[tool], "StudioToolSelected", "studioTool",
+                    ev -> showToolPicker()));
+        }
+        touchBar.add(tool("Insert", FontImage.MATERIAL_ADD_BOX, "StudioPlay", "studioInsert",
+                ev -> actions.showInsertSheet(form)));
+        if (!desktop) {
+            touchBar.add(tool("Play", FontImage.MATERIAL_PLAY_ARROW, "StudioTool", "studioPlay",
+                    ev -> playtest()));
+        }
+        touchBar.add(tool("Publish", FontImage.MATERIAL_ROCKET_LAUNCH, "StudioPublish", "studioPublish",
+                ev -> askPublish()));
+        return touchBar;
+    }
+
+    private void pickTool(int k) {
+        setTool(k);
+        touchBar();
+        touchBar.revalidate();
+    }
+
+    /// The phone's tool picker: the four gizmo tools as big tiles in a sheet.
+    private void showToolPicker() {
+        actions.showTileSheet(form, "Tool", TOOL_NAMES, TOOL_GLYPHS, tool, k -> pickTool(k));
+    }
+
+    /// The Explorer row style suffix: a touch tablet's docks get rows a
+    /// finger can hit; a desktop's stay dense, as an editor's are.
+    private String touchRows() {
+        return desktop && !pointer ? "Touch" : "";
+    }
+
+    /// Shows a pane: 0 Explorer, 1 Properties, 2 the script, 3 Output. The
+    /// phone switches its tab; docked layouts toggle the Explorer and
+    /// Properties docks and switch the bottom one.
+    void view(int pane) {
+        if (shell != null && pane < 2) {
+            shell.toggleDock(pane);
+        } else {
+            showTab(pane);
+        }
     }
 
     private static Button tool(String text, char icon, String uiid, String name,
@@ -282,8 +395,7 @@ public final class Studio implements AgentTools.Studio {
         for (int i = 0; i < TABS.length; i++) {
             final int k = i;
             Button b = new Button(TABS[i], i == index ? "StudioTabSelected" : "StudioTab");
-            FontImage.setMaterialIcon(b, TAB_ICONS[i], 3);
-            b.setGap(CN.convertToPixels(0.8f));
+            // Words alone: four icons and four words did not fit a phone.
             b.setName("tab" + TABS[i]);
             b.addActionListener(ev -> showTab(k));
             tabBar.add(b);
@@ -1161,7 +1273,7 @@ public final class Studio implements AgentTools.Studio {
         if (depth > 0) {
             final Instance target = i;
             Button b = new Button(copies > 1 ? i.getName() + "  x" + copies : i.getName(),
-                    i == selected ? "StudioNodeSelected" : "StudioNode"); // NOPMD CompareObjectsWithEquals - tree identity
+                    (i == selected ? "StudioNodeSelected" : "StudioNode") + touchRows()); // NOPMD CompareObjectsWithEquals - tree identity
             b.setName("node-" + i.getName());
             final boolean folds = folds(i);
             b.addActionListener(ev -> {

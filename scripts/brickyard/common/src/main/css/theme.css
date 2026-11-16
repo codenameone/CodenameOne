@@ -274,8 +274,8 @@ StudioTabs {
 }
 
 StudioTab, StudioTabSelected {
-    font-size: 2.8mm;
-    padding: 1.4mm 1mm;
+    font-size: 2.5mm;
+    padding: 1.4mm 0.3mm;
     margin: 0.4mm;
     border-radius: 2.5mm;
     text-align: center;
@@ -544,38 +544,110 @@ ItemIcon {
     padding: 1mm 0 2mm 0;
 }
 
-/* The studio's desktop layout (DesktopShell): an engine editor's chrome --
-   menu bar, icon strip, docked panes with header strips and 1px splitters,
-   dense 2.6mm type. */
-StudioMenuBar {
-    background-color: #0f1324;
-    border-bottom: 1px solid #2f3960;
-    padding: 0 1mm;
-    margin: 0;
+/* The studio's docked layout (DesktopShell): an engine editor's chrome --
+   icon strip under the OS menu bar, docked panes with header strips and 1px
+   splitters, dense 2.6mm type. The menus themselves are the OS's. */
+
+/* Touch chrome (phone and tablet): the selected gizmo tool, the side menu,
+   and the insert sheet with its category chips and big tiles. */
+StudioToolSelected {
+    font-size: 2.4mm;
+    padding: 1.2mm 0.5mm;
+    margin: 0.8mm;
+    border-radius: 3mm;
+    text-align: center;
+    border: none;
+    color: var(--bg);
+    background-color: var(--blue);
+    font-family: "native:MainBold";
 }
 
-StudioMenu, StudioMenuItem {
-    color: #d8dcf0;
+SideNavigationPanel {
+    background-color: var(--bg);
+    padding: 0;
+}
+
+SideCommand {
+    color: var(--text);
     background-color: transparent;
-    font-size: 2.6mm;
-    border: none;
+    font-size: 3mm;
+    padding: 2.4mm 3mm;
     margin: 0;
+    border: none;
     text-align: left;
 }
 
-StudioMenu {
-    padding: 1mm 2mm;
-}
-
-StudioMenuItem {
-    padding: 1.2mm 6mm 1.2mm 3mm;
-}
-
-StudioMenuPopup, StudioMenuPopupBody {
-    background-color: #1b2138;
-    border: 1px solid #3a4570;
-    padding: 0.5mm;
+StudioSideTitle {
+    color: var(--yellow);
+    background-color: var(--bg-alt);
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    padding: 4mm 3mm 3mm 3mm;
     margin: 0;
+}
+
+StudioSideSection {
+    color: var(--muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    padding: 3mm 3mm 0.6mm 3mm;
+    margin: 0;
+}
+
+StudioSheet, StudioSheetBody {
+    background-color: var(--bg-alt);
+    border-radius: 4mm 4mm 0 0;
+    border-top: 1px solid #3a4570;
+    padding: 0;
+    margin: 0;
+}
+
+StudioSheetHead {
+    background-color: transparent;
+    padding: 1.5mm 2mm 0 3mm;
+}
+
+StudioSheetTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+}
+
+StudioSheetChips {
+    background-color: transparent;
+    padding: 1mm 2mm 2mm 2mm;
+}
+
+StudioChip, StudioChipSelected {
+    font-size: 2.6mm;
+    padding: 1.4mm 3mm;
+    margin: 0 0.8mm;
+    border-radius: 4mm;
+    border: none;
+}
+
+StudioChip {
+    color: var(--text);
+    background-color: var(--card);
+}
+
+StudioChipSelected {
+    color: var(--bg);
+    background-color: var(--yellow);
+    font-family: "native:MainBold";
+}
+
+StudioTile {
+    color: var(--text);
+    background-color: var(--card);
+    font-size: 2.4mm;
+    padding: 2.5mm 1mm;
+    margin: 1mm;
+    border-radius: 3mm;
+    border: none;
+    text-align: center;
 }
 
 StudioToolStrip {
@@ -1085,4 +1157,31 @@ ConsoleAttention, ConsoleAttentionClear {
 ConsoleAttentionClear {
     color: #5ee6a0;
     background-color: #15261f;
+}
+
+StudioPopup {
+    background-color: var(--bg-alt);
+    border: 1px solid #3a4570;
+    border-radius: 3mm;
+    padding: 1mm 0;
+    margin: 0;
+}
+
+/* A touch tablet's Explorer rows: tall enough for a fingertip. */
+StudioNodeTouch {
+    background-color: transparent;
+    color: #d8dcf0;
+    font-size: 3.2mm;
+    padding: 2.2mm 2mm;
+    text-align: left;
+    border: none;
+}
+
+StudioNodeSelectedTouch {
+    background-color: #3a4fd8;
+    color: #ffffff;
+    font-size: 3.2mm;
+    padding: 2.2mm 2mm;
+    text-align: left;
+    border: none;
 }

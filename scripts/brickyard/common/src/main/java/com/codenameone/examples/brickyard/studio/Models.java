@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.brickyard.studio;
 
+import com.codename1.ui.FontImage;
+
 /// The toolbox's ready-made models and the script editor's snippets.
 ///
 /// Each model is plain Luau, run through the same `run_luau` tool an AI
@@ -178,6 +180,33 @@ public final class Models {
             + "    coins.Value = 0\n"
             + "    coins.Parent = stats\n"
             + "end)\n"},
+        {"Goal and win", ""
+            + "-- The game's goal, on every player's screen: collect 10 coins to win.\n"
+            + "local GOAL = 10\n"
+            + "game.Players.PlayerAdded:Connect(function(player)\n"
+            + "    local gui = Instance.new(\"ScreenGui\")\n"
+            + "    gui.ResetOnSpawn = false -- keep it when the character respawns\n"
+            + "    gui.Parent = player:WaitForChild(\"PlayerGui\")\n"
+            + "    local label = Instance.new(\"TextLabel\")\n"
+            + "    label.Size = UDim2.new(0, 360, 0, 44)\n"
+            + "    label.Position = UDim2.new(0.5, -180, 0, 12)\n"
+            + "    label.BackgroundColor3 = Color3.fromRGB(22, 27, 46)\n"
+            + "    label.TextColor3 = Color3.fromRGB(255, 196, 60)\n"
+            + "    label.TextSize = 22\n"
+            + "    label.Text = \"Goal: collect \" .. GOAL .. \" coins\"\n"
+            + "    label.Parent = gui\n"
+            + "    -- Waits for the Leaderstats script's counter; the goal shows meanwhile.\n"
+            + "    local coins = player:WaitForChild(\"leaderstats\"):WaitForChild(\"Coins\")\n"
+            + "    local function update()\n"
+            + "        if coins.Value >= GOAL then\n"
+            + "            label.Text = \"You win! \" .. coins.Value .. \" coins\"\n"
+            + "        else\n"
+            + "            label.Text = \"Goal: collect \" .. GOAL .. \" coins (\" .. coins.Value .. \"/\" .. GOAL .. \")\"\n"
+            + "        end\n"
+            + "    end\n"
+            + "    coins.Changed:Connect(update)\n"
+            + "    update()\n"
+            + "end)\n"},
         {"Day and night", ""
             + "-- A full day every two minutes.\n"
             + "local Lighting = game:GetService(\"Lighting\")\n"
@@ -211,6 +240,15 @@ public final class Models {
     };
 
     private Models() {
+    }
+
+    private static final char[] MODEL_ICONS = {FontImage.MATERIAL_PARK, FontImage.MATERIAL_LOCAL_FIRE_DEPARTMENT,
+        FontImage.MATERIAL_MONETIZATION_ON, FontImage.MATERIAL_LIGHT, FontImage.MATERIAL_ARROW_UPWARD,
+        FontImage.MATERIAL_CACHED, FontImage.MATERIAL_POOL, FontImage.MATERIAL_FLAG};
+
+    /// Model `i`'s toolbox icon, a material glyph.
+    public static char icon(int i) {
+        return i < MODEL_ICONS.length ? MODEL_ICONS[i] : FontImage.MATERIAL_WIDGETS;
     }
 
     /// How many toolbox models there are.
