@@ -60,7 +60,12 @@ Do not loop a refused call: retrying the same request returns the same pending a
   Endpoints marked `needsApproval` go through the approval page.
   Paths start with `/api/v2/` or, for Apple signing, `/appsec/7.0/apple/`. Pass the query
   string as `query`, the JSON body as `body`. Binary responses (`.p12`, `.mobileprovision`) come
-  back as `bodyBase64`.
+  back as `bodyBase64`. Endpoints marked `multipart` take files as `files`:
+  `[{"field": "file", "filename": "1.png", "contentType": "image/png", "base64": "..."}]`, with
+  the form's other fields in `query` (16 MB in all).
+- `start_build` -- a cloud build from a prepared bundle (`application.jar`,
+  `codenameone_settings.properties`, `icons/<icon>`), the input the browser IDE's Cloud build
+  sends. With a local project, build with the wrapper as below instead; it needs no bundle.
 
 ## Build
 
@@ -156,10 +161,34 @@ Play**: tell the developer where it is and that they must back it up and keep it
 4. `GET /api/v2/console/push/apps/{appId}/credentials` shows what is configured. Credentials are
    write-only; nothing reads them back.
 
+## Store listing and screenshots
+
+Make the screenshots from the running app (`tools/Sim.java screenshot`, one per screen, in
+store order), then size them for each store slot:
+
+```
+java tools/StoreScreenshots.java --in shots --out store --captions captions.txt --bg 1f5eff [--ipad]
+```
+
+Upload each file with `call_api` (no approval needed):
+
+```
+POST /api/v2/console/apps/{package}/metadata/screenshots
+query: {"store": "apple" | "google", "locale": "en-US", "displayType": "<folder name>", "ordinal": "0"}
+files: [{"field": "file", "filename": "1.png", "contentType": "image/png", "base64": "..."}]
+```
+
+The folder names under `store/<store>/` are the display types. The listing text
+(`PUT /api/v2/console/apps/{package}/metadata`, check it first with `POST .../metadata/validate`)
+carries public support, marketing and privacy URLs, so `call_api` holds it for the developer, who
+sees the exact text on the approval page.
+
 ## Submit (needs "Store submission")
 
 Store credentials (App Store Connect key, Google Play service account) must already be stored.
-Then, for a finished build from `list_builds`:
+Before the first submission, and always before `PRODUCTION`, go through
+`store-review.md` and its checklist: most rejections are things you can find in the code
+first. Then, for a finished build from `list_builds`:
 
 ```
 POST /api/v2/console/builds/{id}/submit

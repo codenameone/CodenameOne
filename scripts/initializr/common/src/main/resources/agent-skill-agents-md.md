@@ -66,3 +66,12 @@ kill %1                                           # stop the simulator when done
 
 When in doubt, open `.agent-skills/codename-one/SKILL.md` and follow the
 reference table at the bottom.
+
+## Ship it: cloud builds, signing and store submission
+
+Native builds, iOS and Android signing, push and App Store / Google Play
+submission run on cloud.codenameone.com from any OS -- never tell the user to
+install Xcode or Android Studio. `.mcp.json` registers its MCP server
+(`codenameone-cloud`); the whole flow, and the few steps only the user can do,
+are in `.agent-skills/codename-one/references/cloud-agent.md`. Make the store
+icon with `.agent-skills/codename-one/tools/MakeIcon.java`.

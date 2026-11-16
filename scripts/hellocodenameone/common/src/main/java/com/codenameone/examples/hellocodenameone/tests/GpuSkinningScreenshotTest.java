@@ -49,6 +49,8 @@ import com.codename1.ui.util.UITimer;
 /// tears the tubes apart at the joints. The shadows go through the skinned
 /// depth program, so they bend with the tubes.
 public class GpuSkinningScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     // frames the renderer has started: the first compiles every program and
     // can outlast a fixed timer on a slow emulator, leaving a blank capture
     private final java.util.concurrent.atomic.AtomicInteger frames =

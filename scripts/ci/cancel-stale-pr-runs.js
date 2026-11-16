@@ -97,4 +97,30 @@ async function cancelStale({github, context, core, dryRun = false}) {
   core.info(`${cancelled} obsolete run(s) ${dryRun ? 'identified' : 'cancelled'}`);
   return cancelled;
 }
-module.exports = {belongsTo, stale, cancelStale};
+// Golden capture (.github/workflows/golden-capture.yml): every active PR run of
+// this pull request except the capture run itself, the current head included.
+// The capture's own workflow_dispatch runs are not pull_request events and are
+// never touched; the push that commits the goldens starts the full run again.
+async function cancelForCapture({github, context, core, keepRunId}) {
+  const repo = context.repo;
+  const payloadPr = context.payload.pull_request;
+  const pr = await readPr(github, repo, payloadPr.number, payloadPr);
+  const runs = new Map();
+  for (const status of ACTIVE) {
+    const page = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
+      {...repo, event: 'pull_request', status, per_page: 100});
+    for (const run of page) {
+      if (run.id !== keepRunId && belongsTo(run, pr)) runs.set(run.id, run);
+    }
+  }
+  for (const run of runs.values()) {
+    core.info(`Golden capture: cancelling PR #${pr.number} run ${run.id}: ${run.name}`);
+    try {
+      await github.rest.actions.cancelWorkflowRun({...repo, run_id: run.id});
+    } catch (error) {
+      if (error.status !== 409) throw error;
+    }
+  }
+  return [...runs.keys()];
+}
+module.exports = {belongsTo, stale, cancelStale, cancelForCapture};

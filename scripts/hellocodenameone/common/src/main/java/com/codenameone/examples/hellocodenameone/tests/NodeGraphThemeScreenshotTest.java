@@ -35,6 +35,8 @@ import com.codename1.ui.layouts.Layout;
 /// A service map with a group, a labeled edge, typed ports and a selection,
 /// so every themed NodeGraph UIID shows up in one capture per appearance.
 public class NodeGraphThemeScreenshotTest extends DualAppearanceBaseTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     @Override
     public boolean runTest() {
         // A watch face has no room for a diagram of this size.

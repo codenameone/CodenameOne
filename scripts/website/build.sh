@@ -30,6 +30,9 @@ WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-auto}"
 WEBSITE_INCLUDE_INITIALIZR="${WEBSITE_INCLUDE_INITIALIZR:-false}"
 WEBSITE_INCLUDE_PLAYGROUND="${WEBSITE_INCLUDE_PLAYGROUND:-false}"
 WEBSITE_INCLUDE_SKINDESIGNER="${WEBSITE_INCLUDE_SKINDESIGNER:-true}"
+# The files /agents/ hands an AI coding agent: the project generator as a
+# command, the skills and the create-app scripts (scripts/website/build_agent_kit.py).
+WEBSITE_INCLUDE_AGENT_KIT="${WEBSITE_INCLUDE_AGENT_KIT:-true}"
 WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS:-auto}"
 WEBSITE_REFRESH_PORT_STATUS="${WEBSITE_REFRESH_PORT_STATUS:-false}"
 WEBSITE_CN1_VERSION="${WEBSITE_CN1_VERSION:-auto}"
@@ -830,11 +833,46 @@ fi
 "${PYTHON_BIN}" "${REPO_ROOT}/vm/selfhost/perf_baseline.py" summary \
   --out "${WEBSITE_DIR}/data/port_status_jdk25.json"
 
+# /agents/ on the site is where an agent starts: it reads llms.txt, runs
+# create-app.sh, which downloads cn1-create.jar from here. The jar is the
+# Initializr's own generator, so it is rebuilt with the site and can never drift
+# from the Generate button. Each complete-app template is its own file under
+# agents/templates/. Cloudflare Pages refuses an asset over 25 MiB, so a file
+# that outgrows that fails here rather than as a deploy that drops it.
+build_agent_kit_for_site() {
+  if [ "${WEBSITE_INCLUDE_AGENT_KIT}" != "true" ]; then
+    return
+  fi
+  local out="${WEBSITE_DIR}/static/agents"
+  local javac_major
+  javac_major="$(javac -version 2>&1 | sed -n 's/^javac \([0-9]*\).*/\1/p')"
+  if [ -z "${javac_major}" ] || [ "${javac_major}" -lt 11 ] 2>/dev/null; then
+    if [ -n "${JAVA17_HOME:-}" ] && [ -x "${JAVA17_HOME}/bin/javac" ]; then
+      export PATH="${JAVA17_HOME}/bin:${PATH}"
+    else
+      echo "The agent kit needs javac 11 or newer (or JAVA17_HOME); set WEBSITE_INCLUDE_AGENT_KIT=false to skip it." >&2
+      exit 1
+    fi
+  fi
+  echo "Building the agent kit for website..." >&2
+  "${PYTHON_BIN}" "${REPO_ROOT}/scripts/website/build_agent_kit.py" "${out}" --self-test
+  local f size
+  for f in "${out}"/* "${out}"/templates/*; do
+    [ -f "${f}" ] || continue
+    size="$(wc -c < "${f}" | tr -d ' ')"
+    if [ "${size}" -gt 26000000 ]; then
+      echo "${f#${WEBSITE_DIR}/static/} is ${size} bytes; Cloudflare Pages refuses assets over 25 MiB." >&2
+      exit 1
+    fi
+  done
+}
+
 build_javadocs_for_site
 build_developer_guide_for_site
 build_initializr_for_site
 build_playground_for_site
 build_skindesigner_for_site
+build_agent_kit_for_site
 
 cd "${WEBSITE_DIR}"
 

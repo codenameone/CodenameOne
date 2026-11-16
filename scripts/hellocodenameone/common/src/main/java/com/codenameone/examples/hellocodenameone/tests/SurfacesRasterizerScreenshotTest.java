@@ -68,6 +68,8 @@ import java.util.Map;
 /// async native-font load flake. Light and dark renders are shown together with the action hit
 /// rectangles outlined.
 public class SurfacesRasterizerScreenshotTest extends BaseTest {
+    // cn1ss-skip: tvos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
 
     private static final String NAME = "SurfacesRasterizer";
     private static final int TILE = 316;

@@ -46,6 +46,8 @@ import com.codename1.ui.util.UITimer;
 /// backend that reads the depth upside down puts the contact shadows and
 /// lines in the wrong place; one that reads no depth shows none of them.
 public class GpuPostDepthScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     // frames the renderer has started: the first compiles every program and
     // can outlast a fixed timer on a slow emulator, leaving a blank capture
     private final java.util.concurrent.atomic.AtomicInteger frames =

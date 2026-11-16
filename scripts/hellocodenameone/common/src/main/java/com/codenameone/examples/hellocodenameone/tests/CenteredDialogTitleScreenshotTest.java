@@ -42,6 +42,8 @@ import com.codename1.ui.plaf.UIManager;
  * in the middle of the host form.
  */
 public class CenteredDialogTitleScreenshotTest extends DualAppearanceBaseTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     @Override
     public boolean runTest() {
         if (CN.isWatch()) {

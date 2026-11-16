@@ -38,6 +38,10 @@ Generate a complete application from Initializr, then make it your own. These te
 | --- | --- |
 | <a href="https://www.codenameone.com/bastion/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=bastion"><img src="docs/developer-guide/img/bastion-dashboard.png" alt="Bastion account balances and dashboard" width="200"></a><br><br>Customer accounts, transfers and a staff console, with a Java backend and double-entry ledger. Money and markets are simulated. | <a href="https://www.codenameone.com/developer-guide/reel-users-guide/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=reel"><img src="docs/developer-guide/img/reel-viewer-home.png" alt="Reel streaming catalog and continue-watching screen" width="200"></a><br><br>A viewer app, creator studio, moderation and admin screens, with a Java backend for subscriptions, rentals and courses. |
 
+| [Fieldline — Field service and inspections](https://www.codenameone.com/fieldline/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=fieldline) |
+| --- |
+| <a href="https://www.codenameone.com/fieldline/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=fieldline"><img src="docs/developer-guide/img/fieldline-today.png" alt="Fieldline technician day with the route on a map" width="200"></a><br><br>Technician and dispatch apps, with a Java backend whose scheduling engine plans the crew around skills, hours, time off and travel, plus AI photo diagnosis and sealed customer signatures. |
+
 [Generate your application](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=template-start) · [Explore the complete templates](https://www.codenameone.com/demos/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=fullstack-samples)
 
 | What do you want to build? | Start here |
@@ -49,7 +53,7 @@ Generate a complete application from Initializr, then make it your own. These te
 | An existing Swing or JavaFX app | [Import desktop Java source](https://www.codenameone.com/developer-guide/desktop-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=desktop-import) and compile supported Swing, SwingX, JavaFX, FXML and CSS for phones, desktop and web |
 | A Kotlin Multiplatform / Compose app | [Import shared Kotlin and Compose screens](https://www.codenameone.com/developer-guide/kotlin-multiplatform-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=kmp-import) and use Codename One APIs from the same project |
 | Existing Flutter screens | [Compile supported Dart and Flutter code to Java](https://www.codenameone.com/developer-guide/flutter-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=flutter-import); experimental compatibility, with interaction limits documented in the guide |
-| A complete full-stack application | [Choose a template](#start-with-a-complete-full-stack-application): food delivery, messaging, ride hailing, multiplayer games, fitness, appointment booking, virtual banking or streaming and courses |
+| A complete full-stack application | [Choose a template](#start-with-a-complete-full-stack-application): food delivery, messaging, ride hailing, multiplayer games, fitness, appointment booking, field service, virtual banking or streaming and courses |
 | Bring Python code | [Compile supported Python modules to Java](https://www.codenameone.com/developer-guide/python-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=python-interop) for apps and native Java backends; no Python interpreter ships in the executable |
 | Evidence before adopting | [Compare performance](#measured-performance) and [inspect platform support](https://www.codenameone.com/port-status/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=platforms) |
 

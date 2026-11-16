@@ -44,6 +44,8 @@ import com.codename1.ui.util.UITimer;
 /// the surfaces in the top rows, the stylized and animated effects below.
 /// The shader clock is pinned so the animated ones hold still.
 public class GpuShaderGalleryScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private RenderView view;
     // frames the renderer has finished: the first one compiles twelve
     // programs, which on an emulator outlasts any fixed wait

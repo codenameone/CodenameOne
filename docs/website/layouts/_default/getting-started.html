@@ -67,7 +67,7 @@
         <p class="cn1-eyebrow">Connect the agent</p>
         <h2>Give Codex or Claude the project context.</h2>
         <p>Java 17 projects include the Codename One authoring skill in the downloaded project. Open the project in Codex or Claude Code so the agent can use the framework-specific build, UI, testing, and screenshot instructions instead of guessing.</p>
-        <p>Run the simulator, open its <strong>MCP</strong> menu, and choose <strong>Install in MCP Hosts</strong>. The built-in server lets supported hosts inspect the semantic UI tree, enter text, activate components, and call application tools.</p>
+        <p>The agent runs the app itself with <code>./mvnw cn1:agent</code> and drives it over the built-in MCP server: it reads the UI tree, enters text, taps and takes screenshots. The project's <code>.mcp.json</code> also connects it to cloud.codenameone.com for signing, builds and store submission. To start from nothing, with no project or JDK yet, see <a href="/agents/">Build an app with an agent</a>.</p>
         <div class="cn1-action-row">
           {{ partial "cn1-cta.html" (dict "label" "Read the MCP guide" "href" "/developer-guide/mcp-headless-api/#_mcp_headless_api" "variant" "secondary") }}
         </div>
@@ -81,8 +81,8 @@
           <li>Tests and screenshots</li>
           <li>Native interfaces</li>
         </ul>
-        <p>Available from the simulator</p>
-        <code>MCP → Install in MCP Hosts</code>
+        <p>Run and drive the app</p>
+        <code>./mvnw cn1:agent</code>
       </aside>
     </section>
 

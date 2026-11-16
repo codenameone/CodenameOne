@@ -33,6 +33,8 @@ import com.codename1.ui.util.UITimer;
 import com.codename1.util.SuccessCallback;
 
 public class BrowserComponentScreenshotTest extends BaseTest {
+    // cn1ss-skip: javascript, tvos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private static final int VISUAL_RETRY_MS = 250;
     /**
      * Wall-clock budget for WebKit to composite its native peer into the

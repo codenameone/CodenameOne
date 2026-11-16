@@ -64,6 +64,11 @@ import java.util.Set;
 /// MigrationReport report = migration.finish();
 /// ```
 ///
+/// A directory that stays the source of truth is not migrated at all: sign
+/// its users in against it with
+/// [com.codename1.backend.security.ldap.LdapAuthenticationProvider] or
+/// [com.codename1.backend.security.ldap.ActiveDirectoryLdapAuthenticationProvider].
+///
 /// What it guarantees:
 ///
 /// - **Usernames, subjects and authorities are written verbatim.** An issued

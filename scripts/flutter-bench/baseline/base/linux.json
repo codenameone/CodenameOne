@@ -14,11 +14,11 @@
   },
   "install_bytes": {
    "runs": 1,
-   "value": 119244256
+   "value": 119264736
   },
   "wire_bytes": {
    "runs": 1,
-   "value": 85985296
+   "value": 86023550
   }
  }
 }
