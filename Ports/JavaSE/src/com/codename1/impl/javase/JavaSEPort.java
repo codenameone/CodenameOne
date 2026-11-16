@@ -910,6 +910,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (System.getProperty("apple.laf.useScreenMenuBar") == null) {
             System.setProperty("apple.laf.useScreenMenuBar", "true");
         }
+        // -Dcn1.simulator.inWindowMenus=true (or the inWindowMenus preference) keeps the
+        // menu bar inside the window, where screenshots and recordings can paint it.
+        if (SimulatorMenus.sessionInWindow()) {
+            System.setProperty("apple.laf.useScreenMenuBar", "false");
+        }
         
         // New desktop fonts are opt-in with the native desktop theme. Keep legacy
         // system-font metrics unchanged for applications that only upgrade the framework.
@@ -2917,7 +2922,32 @@ public class JavaSEPort extends CodenameOneImplementation {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                frame.setJMenuBar(buildNativeMenuBar(encoded, icons, frame, null));
+                JMenuBar appBar = buildNativeMenuBar(encoded, icons, frame, null);
+                if (simulatorMenus == null && simulatorBar != null) {
+                    simulatorMenus = new java.util.ArrayList<JMenu>();
+                    for (int i = 0; i < simulatorBar.getMenuCount(); i++) {
+                        if (simulatorBar.getMenu(i) != null) {
+                            simulatorMenus.add(simulatorBar.getMenu(i));
+                        }
+                    }
+                }
+                if (simulatorMenus != null) {
+                    // The desktop preview: the application's menus first, as its desktop
+                    // build shows them, then the simulator's own, which a developer still needs.
+                    java.util.Set<String> titles = new java.util.HashSet<String>();
+                    for (int i = 0; i < appBar.getMenuCount(); i++) {
+                        if (appBar.getMenu(i) != null) {
+                            titles.add(appBar.getMenu(i).getText());
+                        }
+                    }
+                    for (JMenu m : simulatorMenus) {
+                        // The MCP menu is added to both bars; one is enough.
+                        if (!titles.contains(m.getText())) {
+                            appBar.add(m);
+                        }
+                    }
+                }
+                frame.setJMenuBar(appBar);
                 frame.revalidate();
             }
         });
@@ -3398,7 +3428,35 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// separate from {@link #resolveDesktopTitleBarMode()} so the "unset" case survives all the
     /// way to Form, where a desktop native theme's own constant gets to answer instead.
     private static String configuredDesktopTitleBarMode() {
-        return System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+        String m = System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+        return m != null ? m : simulatorPreviewTitleBarMode;
+    }
+
+    /// The project's `desktop.titleBar` hint while the simulator runs without a skin, so
+    /// the desktop preview shows the menu bar the desktop build will have. Only "native":
+    /// "custom" would undecorate the simulator's own window. Null otherwise.
+    private static String simulatorPreviewTitleBarMode;
+
+    /// The simulator's own menus (Device, Simulate, Tools...), kept after the application's
+    /// when a desktop preview publishes native commands, so neither set is lost.
+    private java.util.List<JMenu> simulatorMenus;
+    private JMenuBar simulatorBar;
+
+    /// Reads `desktop.titleBar` from the project for the skinless simulator preview.
+    private static void readSimulatorPreviewTitleBarMode() {
+        File f = projectSettingsFile();
+        if (f == null || !f.exists()) {
+            return;
+        }
+        java.util.Properties props = new java.util.Properties();
+        try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+            props.load(in);
+        } catch (IOException err) {
+            return;
+        }
+        if ("native".equals(props.getProperty("codename1.arg.desktop.titleBar"))) {
+            simulatorPreviewTitleBarMode = "native";
+        }
     }
 
     /// @inheritDoc
@@ -7606,6 +7664,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         JMenuBar bar = new JMenuBar();
         frm.setJMenuBar(bar);
+        if (desktopSkin) {
+            simulatorBar = bar;
+            readSimulatorPreviewTitleBarMode();
+        }
 
         JMenu deviceMenu = new JMenu("Device");
         registerMenuWithBlit(deviceMenu);
@@ -12990,6 +13052,62 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// A frame for the recorder: the screen with its overlays, and for
     /// [com.codename1.impl.javase.record.RecordingOptions.Frame#SKIN] the device skin
     /// around it, at the skin's own resolution.
+    private BufferedImage composeDesktopMenus(final BufferedImage screen) {
+        final C c = canvas;
+        final JFrame f = findTopFrame();
+        if (c == null || f == null) {
+            return screen;
+        }
+        final BufferedImage[] out = {screen};
+        Runnable r = new Runnable() {
+            public void run() {
+                try {
+                    out[0] = SimulatorMenus.compose(screen, c, f);
+                } catch (RuntimeException e) {
+                    out[0] = screen;
+                }
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+        } else {
+            try {
+                EventQueue.invokeAndWait(r);
+            } catch (Exception e) {
+                return screen;
+            }
+        }
+        return out[0];
+    }
+
+    /// The simulator window's Swing menu bar, or null. For the sim_menu MCP tools.
+    public JFrame getSimulatorFrameForMenus() {
+        return findTopFrame();
+    }
+
+    /// Moves the desktop menu bar into the window while a recording runs (macOS
+    /// only; elsewhere it already is). Called from sim_record_start/stop.
+    public void setRecordingMenusInWindow(final boolean inWindow) {
+        if (!isDesktop() || getSkin() != null) {
+            return;
+        }
+        final JFrame f = findTopFrame();
+        Runnable r = new Runnable() {
+            public void run() {
+                SimulatorMenus.setInWindow(f, inWindow);
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+        } else {
+            try {
+                EventQueue.invokeAndWait(r);
+            } catch (Exception e) {
+                Log.e(e);
+            }
+        }
+    }
+
     BufferedImage captureSimulatorFrame(com.codename1.impl.javase.record.RecordingOptions.Frame frame) {
         if (canvas == null) {
             return null;
@@ -13006,6 +13124,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             return null;
         }
         BufferedImage screen = composeSimulatorOverlays(accessibilityFilteredImage(buf), true);
+        if (isDesktop() && getSkin() == null) {
+            // The real menu bar and any open menus, painted by Swing at their true offsets.
+            return composeDesktopMenus(screen);
+        }
         if (sc == null) {
             return screen;
         }

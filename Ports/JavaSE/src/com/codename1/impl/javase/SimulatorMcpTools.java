@@ -326,6 +326,101 @@ final class SimulatorMcpTools {
                     }
                 }));
 
+        server.addTool(new Tool("sim_menu",
+                "Drives the window's real desktop menu bar (desktop mode with native menus). path "
+                        + "is item texts separated by /, e.g. Insert/Models/Coin: each menu opens "
+                        + "visibly for holdMs (default 700) so a recording shows the dropdown and "
+                        + "submenu, then the leaf is clicked; activate=false leaves it open. "
+                        + "close=true closes any open menu. Use sim_menu_list to discover paths.",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"path\":{\"type\":\"string\"},"
+                        + "\"holdMs\":{\"type\":\"integer\",\"description\":\"Per level, default 700\"},"
+                        + "\"activate\":{\"type\":\"boolean\",\"description\":\"Default true\"},"
+                        + "\"close\":{\"type\":\"boolean\"}}}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        Map<String, Object> a = parse(argumentsJson);
+                        if (flag(a, "close", false)) {
+                            onAwt(new Runnable() {
+                                public void run() {
+                                    javax.swing.MenuSelectionManager.defaultManager().clearSelectedPath();
+                                }
+                            });
+                            return "{\"closed\":true}";
+                        }
+                        final String path = str(a, "path");
+                        final long hold = clamp(num(a, "holdMs", 700), 0, MAX_GESTURE_MS);
+                        final boolean activate = flag(a, "activate", true);
+                        final javax.swing.JMenuBar[] bar = new javax.swing.JMenuBar[1];
+                        final java.util.List<javax.swing.JMenuItem>[] items = new java.util.List[1];
+                        onAwt(new Runnable() {
+                            public void run() {
+                                bar[0] = SimulatorMenus.menuBar(port.getSimulatorFrameForMenus());
+                                items[0] = SimulatorMenus.resolve(bar[0], SimulatorMenus.splitPath(path));
+                            }
+                        });
+                        final int n = items[0].size();
+                        final boolean leafIsMenu = items[0].get(n - 1) instanceof javax.swing.JMenu;
+                        int menus = leafIsMenu ? n : n - 1;
+                        for (int d = 1; d <= menus; d++) {
+                            final int depth = d;
+                            onAwt(new Runnable() {
+                                public void run() {
+                                    javax.swing.MenuSelectionManager.defaultManager().setSelectedPath(
+                                            SimulatorMenus.selectionPath(bar[0], items[0], depth, false));
+                                }
+                            });
+                            Thread.sleep(hold);
+                        }
+                        if (!leafIsMenu) {
+                            onAwt(new Runnable() {
+                                public void run() {
+                                    javax.swing.MenuSelectionManager.defaultManager().setSelectedPath(
+                                            SimulatorMenus.selectionPath(bar[0], items[0], n - 1, true));
+                                }
+                            });
+                            Thread.sleep(Math.min(hold, 400));
+                        }
+                        boolean clicked = false;
+                        if (activate && !leafIsMenu) {
+                            final javax.swing.JMenuItem leaf = items[0].get(n - 1);
+                            if (!leaf.isEnabled()) {
+                                throw new IllegalStateException("\"" + leaf.getText() + "\" is disabled");
+                            }
+                            onAwt(new Runnable() {
+                                public void run() {
+                                    javax.swing.MenuSelectionManager.defaultManager().clearSelectedPath();
+                                    leaf.doClick(0);
+                                }
+                            });
+                            clicked = true;
+                        }
+                        Map<String, Object> out = new LinkedHashMap<String, Object>();
+                        out.put("path", path);
+                        out.put("activated", Boolean.valueOf(clicked));
+                        out.put("open", Boolean.valueOf(!clicked));
+                        return JSONParser.toJson(out);
+                    }
+                }));
+
+        server.addTool(new Tool("sim_menu_list",
+                "Returns the window's desktop menu bar as a tree of {text, enabled, children}, "
+                        + "the paths sim_menu accepts.",
+                "{\"type\":\"object\",\"properties\":{}}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        final Object[] tree = new Object[1];
+                        onAwt(new Runnable() {
+                            public void run() {
+                                tree[0] = SimulatorMenus.tree(SimulatorMenus.menuBar(port.getSimulatorFrameForMenus()));
+                            }
+                        });
+                        Map<String, Object> out = new LinkedHashMap<String, Object>();
+                        out.put("menus", tree[0]);
+                        return JSONParser.toJson(out);
+                    }
+                }));
+
         server.addTool(new Tool("sim_record_start",
                 "Starts recording the simulator screen to a video. format: mp4 (default), mov, webm "
                         + "or gif. frame: screen (the device screen only) or skin (inside the device "
@@ -356,6 +451,8 @@ final class SimulatorMcpTools {
                         t.setColor(o.getTouchColor());
                         t.setRadius(o.getTouchRadius());
                         SimulatorRecorder rec = port.getSimulatorRecorder();
+                        // Recordings paint the real menu bar; on macOS that needs it in the window.
+                        port.setRecordingMenusInWindow(true);
                         rec.start(o);
                         Map<String, Object> out = new LinkedHashMap<String, Object>();
                         out.put("recording", Boolean.TRUE);
@@ -371,6 +468,7 @@ final class SimulatorMcpTools {
                 "{\"type\":\"object\",\"properties\":{}}",
                 new ToolHandler() {
                     public String invoke(String argumentsJson) throws IOException {
+                        port.setRecordingMenusInWindow(false);
                         SimulatorRecorder rec = port.getSimulatorRecorder();
                         SimulatorRecorder.Result r;
                         boolean auto = false;
@@ -585,6 +683,34 @@ final class SimulatorMcpTools {
             throw new IllegalArgumentException("Give x and y, or nodeId");
         }
         return new int[]{((Number) a.get(xKey)).intValue(), ((Number) a.get(yKey)).intValue()};
+    }
+
+    private static boolean flag(Map<String, Object> a, String key, boolean def) {
+        Object v = a.get(key);
+        if (v instanceof Boolean) {
+            return ((Boolean) v).booleanValue();
+        }
+        if (v instanceof String) {
+            return "true".equalsIgnoreCase((String) v);
+        }
+        return def;
+    }
+
+    /// Runs on the AWT event thread and waits, rethrowing what it threw.
+    private static void onAwt(final Runnable r) throws Exception {
+        if (java.awt.EventQueue.isDispatchThread()) {
+            r.run();
+            return;
+        }
+        try {
+            java.awt.EventQueue.invokeAndWait(r);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable t = e.getCause();
+            if (t instanceof Exception) {
+                throw (Exception) t;
+            }
+            throw e;
+        }
     }
 
     private static void onEdt(final Runnable r) {
