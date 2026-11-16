@@ -31,10 +31,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/D
 ----
 
 .The first grid
-image::img/generated/datagrid-first.png["Five players in a grid with columns Name, Team, Score and Active; the scores align right and Active is a check box",scaledwidth=30%]
+image::img/generated/datagrid-first.png["Five players in a grid with columns Name, Team, Score and Active; the scores align right and Active is a checkbox",scaledwidth=30%]
 
 Nothing else was configured. Each column took its width from its title and
-first rows, numbers align to the right and a `Boolean` shows a check box. Every
+first rows, numbers align to the right and a `Boolean` shows a checkbox. Every
 other row is shaded.
 
 What a user can already do:
@@ -45,7 +45,7 @@ What a user can already do:
 * A drag on a title moves the column; a drag on the line between two titles
   resizes it.
 * A tap selects a row, and a double tap edits a cell.
-* A check box toggles with a tap.
+* A checkbox toggles with a tap.
 
 The examples that follow use a model of sales orders with seven columns:
 order number, customer, region, the date it was placed, the amount, how much has
@@ -108,7 +108,7 @@ amounts sort as numbers whatever sign they're shown with.
 A column's `GridCellRenderer` paints its cells. It's handed the `Graphics`, the
 cell's bounds and a `GridCell` with the value, the row and the style of the row,
 and it draws; it creates no component. That's what lets the grid show a million
-rows: only what's on screen is painted.
+rows: only what's on the screen is painted.
 
 This renderer draws a shipped percentage as a bar:
 
@@ -224,7 +224,7 @@ image::img/generated/datagrid-selection.png["The orders grid with rows two to fo
 `SelectionMode` is `NONE`, `SINGLE_ROW` or `MULTIPLE_ROWS`. A selection is kept
 as ranges, so selecting every row of a million costs one range.
 
-Rows the grid reports are view rows, counted in what's on screen after
+Rows the grid reports are view rows, counted in what's on the screen after
 sorting, filtering, grouping and opening nodes. `getModelRow` turns one into a
 row of your model, `getViewRow` goes the other way, and in a tree `getNode`
 answers the node. A group row has no model row: `isGroupRow` tells them apart.
@@ -241,7 +241,7 @@ extends, Control or Command adds and removes, and a drag selects a range.
 === Editing
 
 A cell is edited when its column and its model both allow it:
-`GridColumn.setEditable` and `TableModel.isCellEditable`. A boolean toggles with
+`GridColumn.setEditable` and `TableModel.isCellEditable`. A boolean cell toggles with
 a tap. Any other value is edited in place: a double tap or Enter lays an editor
 over the cell, and the cell is painted again when the edit ends.
 
@@ -291,7 +291,7 @@ didn't report.
 
 === A million rows
 
-The grid reads a value when it paints it, and paints only the rows on screen. A
+The grid reads a value when it paints it, and paints only the rows on the screen. A
 model can therefore compute its rows instead of storing them, or page them in
 from a database, and the grid never asks for more than it shows.
 
@@ -380,7 +380,7 @@ Only colors, fonts and paddings are read; nothing has a border.
 |`DataGridRowAlt` |Every other row, when the grid is striped
 |`DataGridGroupRow` |The row heading a group
 |`DataGridLine` |The grid lines, in its foreground color
-|`DataGridCheck` |A check box: its background when checked, its foreground for the tick
+|`DataGridCheck` |A checkbox: its background when checked, its foreground for the tick
 |`DataGridEditor` |The text field an edit lays over a cell
 |===
 
