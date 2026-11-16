@@ -684,8 +684,12 @@ public final class Bidi {
             return ET;
         }
         if (c >= 0x2190 && c <= 0x2bff || c >= 0x3001 && c <= 0x3003 || c >= 0x3008 && c <= 0x3011
-                || c >= 0xfe50 && c <= 0xfe6f && c != 0xfe52 && c != 0xfe55 || c >= 0xff01 && c <= 0xff0f
-                && c != 0xff03 && c != 0xff04 && c != 0xff05) {
+                || c >= 0x2e00 && c <= 0x2e7f || c >= 0xfe50 && c <= 0xfe6f && c != 0xfe52 && c != 0xfe55
+                || c >= 0xff01 && c <= 0xff0f && c != 0xff03 && c != 0xff04 && c != 0xff05
+                || c >= 0xff1a && c <= 0xff20 || c >= 0xff3b && c <= 0xff40 || c >= 0xff5b && c <= 0xff65) {
+            if (c == 0xff0c || c == 0xff0e || c == 0xff1a) {
+                return CS;
+            }
             return c == 0x2212 ? ES : ON;
         }
         if (c == 0x3000) {
@@ -702,6 +706,11 @@ public final class Bidi {
         }
         if (c == 0xfeff) {
             return BN;
+        }
+        if (c >= 0xd800 && c <= 0xdfff) {
+            // A surrogate half: emoji and other astral symbols, neutral so
+            // they do not split a right-to-left run.
+            return ON;
         }
         return L;
     }

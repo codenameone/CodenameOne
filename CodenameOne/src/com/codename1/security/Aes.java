@@ -79,7 +79,7 @@ public final class Aes {
     public static byte[] cbcEncrypt(byte[] key, byte[] iv, byte[] data) {
         check(key, iv, data);
         byte[] fast = CryptoEngine.get().aesCbc(true, key, iv, data);
-        return fast != null ? fast : new Aes(key).encryptCbc(iv, data);
+        return fast != null && fast.length == data.length ? fast : new Aes(key).encryptCbc(iv, data);
     }
 
     /// Decrypts `data`, a whole number of blocks, with `key` (16, 24 or 32
@@ -92,7 +92,7 @@ public final class Aes {
     public static byte[] cbcDecrypt(byte[] key, byte[] iv, byte[] data) {
         check(key, iv, data);
         byte[] fast = CryptoEngine.get().aesCbc(false, key, iv, data);
-        return fast != null ? fast : new Aes(key).decryptCbc(iv, data);
+        return fast != null && fast.length == data.length ? fast : new Aes(key).decryptCbc(iv, data);
     }
 
     private static void check(byte[] key, byte[] iv, byte[] data) {

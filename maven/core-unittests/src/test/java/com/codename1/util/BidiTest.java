@@ -200,4 +200,13 @@ class BidiTest {
         // The bracket pair is resolved as a pair (N0) and mirrored in the right-to-left run.
         assertEquals("(" + new StringBuilder(HEB).reverse() + ")", Bidi.reorder("(" + HEB + ")", true));
     }
+
+    @Test
+    void emojiAndFullwidthPunctuationDoNotSplitRightToLeftRuns() {
+        String t = "\u05d0 \ud83d\ude00 \uff1b \u05d1";
+        byte[] lv = Bidi.levels(t, true);
+        for (byte b : lv) {
+            org.junit.jupiter.api.Assertions.assertEquals(1, b, t);
+        }
+    }
 }

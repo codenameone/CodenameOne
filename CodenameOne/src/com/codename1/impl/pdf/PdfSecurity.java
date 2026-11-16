@@ -124,34 +124,7 @@ final class PdfSecurity {
     }
 
     private static byte[] utf8(String s) {
-        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
-        for (int i = 0; i < s.length(); i++) {
-            int c = s.charAt(i);
-            if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length() && s.charAt(i + 1) >= 0xdc00
-                    && s.charAt(i + 1) <= 0xdfff) {
-                int cp = 0x10000 + ((c - 0xd800) << 10) + (s.charAt(++i) - 0xdc00);
-                bo.write(0xf0 | (cp >> 18));
-                bo.write(0x80 | ((cp >> 12) & 0x3f));
-                bo.write(0x80 | ((cp >> 6) & 0x3f));
-                bo.write(0x80 | (cp & 0x3f));
-            } else if (c < 0x80) {
-                bo.write(c);
-            } else if (c < 0x800) {
-                bo.write(0xc0 | (c >> 6));
-                bo.write(0x80 | (c & 0x3f));
-            } else {
-                bo.write(0xe0 | (c >> 12));
-                bo.write(0x80 | ((c >> 6) & 0x3f));
-                bo.write(0x80 | (c & 0x3f));
-            }
-        }
-        byte[] b = bo.toByteArray();
-        if (b.length > 127) {
-            byte[] t = new byte[127];
-            System.arraycopy(b, 0, t, 0, 127);
-            return t;
-        }
-        return b;
+        return PdfFormat.utf8(s);
     }
 
     private static byte[] pad(byte[] pw) {
@@ -305,11 +278,21 @@ final class PdfSecurity {
             // nothing; that is what other readers show for it too.
             return new byte[0];
         }
+        boolean whole = (data.length - 16) % 16 == 0;
         byte[] out = Aes.cbcDecrypt(k, sub(data, 0, 16), sub(data, 16, (data.length - 16) / 16 * 16));
-        int pad = out.length > 0 ? out[out.length - 1] & 0xff : 0;
         // A valid PKCS#5 padding is removed; anything else is kept, as other
-        // readers do for a damaged string.
-        return pad >= 1 && pad <= 16 ? sub(out, 0, out.length - pad) : out;
+        // readers do for a damaged string. A truncated payload has lost its
+        // real last block, so the one decrypted last is not padding.
+        int pad = whole && out.length > 0 ? out[out.length - 1] & 0xff : 0;
+        if (pad < 1 || pad > 16 || pad > out.length) {
+            return out;
+        }
+        for (int i = out.length - pad; i < out.length; i++) {
+            if ((out[i] & 0xff) != pad) {
+                return out;
+            }
+        }
+        return sub(out, 0, out.length - pad);
     }
 
     static byte[] rc4(byte[] key, byte[] data) {
