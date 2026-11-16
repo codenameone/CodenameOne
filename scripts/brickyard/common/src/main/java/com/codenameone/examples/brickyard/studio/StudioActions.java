@@ -187,7 +187,7 @@ final class StudioActions {
     }
 
     private void showOverflow(Form f) {
-        final InteractionDialog d = new InteractionDialog(new BorderLayout());
+        final Overlay d = new Overlay(new BorderLayout());
         d.setUIID("StudioSheet");
         d.setDialogUIID("StudioPopup");
         d.getContentPane().setUIID("StudioPopup");
@@ -226,7 +226,7 @@ final class StudioActions {
     /// sliding up from the bottom edge, as a touch app inserts. Opened by the
     /// bar's Insert button; a tap on a tile inserts and closes it.
     void showInsertSheet(Form f) {
-        final InteractionDialog d = new InteractionDialog(new BorderLayout());
+        final Overlay d = new Overlay(new BorderLayout());
         d.setUIID("StudioSheet");
         d.setDialogUIID("StudioSheet");
         d.getContentPane().setUIID("StudioSheetBody");
@@ -261,7 +261,7 @@ final class StudioActions {
     /// index. The selected one is highlighted.
     void showTileSheet(Form f, String title, String[] labels, char[] icons, int selected,
             final java.util.function.IntConsumer chosen) {
-        final InteractionDialog d = new InteractionDialog(new BorderLayout());
+        final Overlay d = new Overlay(new BorderLayout());
         d.setUIID("StudioSheet");
         d.setDialogUIID("StudioSheet");
         d.getContentPane().setUIID("StudioSheetBody");

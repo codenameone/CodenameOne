@@ -18,7 +18,6 @@
  */
 package com.codenameone.examples.brickyard.studio;
 
-import com.codename1.components.InteractionDialog;
 import com.codename1.components.SpanLabel;
 import com.codename1.mcp.MCPClientDescriptor;
 import com.codename1.mcp.MCPClientRegistrar;
@@ -615,7 +614,7 @@ public final class Studio implements AgentTools.Studio {
         // An in-form dialog, not a modal one: a modal Dialog is a form of
         // its own, and the 3D viewport behind it stops rendering and shows
         // as a grey slab for as long as the prompt is open.
-        final InteractionDialog d = new InteractionDialog("Publish", new BorderLayout());
+        final Overlay d = new Overlay("Publish", new BorderLayout());
         d.setUIID("StudioDialog");
         d.getTitleComponent().setUIID("StudioDialogTitle");
         d.getContentPane().setUIID("StudioDialogBody");
