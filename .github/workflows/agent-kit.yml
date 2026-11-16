@@ -45,7 +45,14 @@ jobs:
         shell: bash
         run: |
           cd "$RUNNER_TEMP/site"
-          nohup python3 -m http.server 8765 > "$RUNNER_TEMP/http.log" 2>&1 &
+          # Serve the scripts as text, as docs/website/static/_headers makes Cloudflare Pages do.
+          cat > "$RUNNER_TEMP/serve.py" <<'PY'
+          import http.server
+          H = http.server.SimpleHTTPRequestHandler
+          H.extensions_map.update({".ps1": "text/plain; charset=utf-8", ".sh": "text/plain; charset=utf-8"})
+          http.server.test(HandlerClass=H, port=8765, bind="127.0.0.1")
+          PY
+          nohup python3 "$RUNNER_TEMP/serve.py" > "$RUNNER_TEMP/http.log" 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/agents/cn1-create.properties && break; sleep 1; done
 
       - name: Create projects (bash, no JDK on PATH)
@@ -60,7 +67,16 @@ jobs:
           # a java is on PATH.
           export PATH="$(echo "$PATH" | tr ':' '\n' | grep -v -i -E 'java|jdk|hostedtoolcache/Java' | paste -sd: -)"
           unset JAVA_HOME
-          if command -v java >/dev/null; then echo "java still on PATH: $(command -v java)"; fi
+          if command -v java >/dev/null; then
+            # A system JDK in /usr/bin (Ubuntu runners) cannot be taken off PATH without
+            # losing bash and curl; shadow it with a java that is no JDK, which the
+            # script skips, so the download branch runs as on a bare machine.
+            echo "java still on PATH: $(command -v java); shadowing it"
+            mkdir -p "$RUNNER_TEMP/nojava/bin"
+            printf '#!/bin/sh\nexit 1\n' > "$RUNNER_TEMP/nojava/bin/java"
+            chmod +x "$RUNNER_TEMP/nojava/bin/java"
+            export PATH="$RUNNER_TEMP/nojava/bin:$PATH"
+          fi
           curl -fsSL "$CN1_AGENT_SITE/create-app.sh" | bash -s -- --list
           cd "$RUNNER_TEMP"
           curl -fsSL "$CN1_AGENT_SITE/create-app.sh" | bash -s -- --name HabitTracker --package com.example.habits | tee create.log
@@ -78,7 +94,8 @@ jobs:
           $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'java|jdk' }) -join ';'
           Remove-Item Env:JAVA_HOME -ErrorAction SilentlyContinue
           Get-ChildItem Env: | Where-Object { $_.Name -like 'JAVA_HOME*' } | ForEach-Object { Remove-Item "Env:$($_.Name)" }
-          $create = (Invoke-WebRequest -UseBasicParsing "$env:CN1_AGENT_SITE/create-app.ps1").Content
+          # The documented command: irm, as an agent on Windows runs it.
+          $create = irm "$env:CN1_AGENT_SITE/create-app.ps1"
           & ([scriptblock]::Create($create)) --list
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Set-Location $env:RUNNER_TEMP
