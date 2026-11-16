@@ -133,7 +133,13 @@ reviewer, IAP with restore, no placeholder screens, the backend deployed.
 Most rejections are visible in the code. Write the store listing (name,
 subtitle, description, keywords, category, privacy labels, Data safety,
 age rating) from `APP_SPEC.md` and what the code really does, and have the
-user approve it with the screenshots.
+user approve it with the screenshots. Capture one screenshot per key screen,
+then size them for every store slot:
+
+```bash
+java .agent-skills/codename-one/tools/StoreScreenshots.java --in shots --out store \
+    --captions captions.txt --bg <brand RRGGBB>
+```
 
 ## 7. Ship through cloud.codenameone.com
 

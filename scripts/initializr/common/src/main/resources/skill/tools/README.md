@@ -208,3 +208,19 @@ Connect rejects an alpha channel), full bleed, the glyph inside the central safe
 derives every platform size from `common/icon.png` (`icon.png` in a Gradle project).
 `--adaptive DIR` also writes Android adaptive-icon layers. Open the PNG and look at it, and show
 it to the user with the app's screenshots: one bold glyph, no words, high contrast.
+
+### `StoreScreenshots.java`
+
+Turns screenshots of the running app into images at the exact sizes the App Store and Google Play
+take (iPhone 6.7"/6.9", optional iPad, Play phone and tablet). Each screen is put on a brand-colour
+background with rounded corners, and a caption above it if you give one. The output has no alpha
+channel. Pure JDK, headless.
+
+```bash
+java tools/StoreScreenshots.java --in shots --out store --captions captions.txt --bg 1f5eff
+# apple APP_IPHONE_67: 4 image(s) in store/apple/APP_IPHONE_67 ...
+java tools/StoreScreenshots.java --check store/google/phoneScreenshots/1.png
+# store/google/phoneScreenshots/1.png: OK google phoneScreenshots
+```
+
+`references/cloud-agent.md` shows how to upload them.
