@@ -1030,7 +1030,7 @@ channel) logout isn't supported.
 
 === Signing in against LDAP or Active Directory
 
-`LdapAuthenticationProvider` checks a user name and password against a
+`LdapAuthenticationProvider` checks a username and password against a
 directory. It plugs into form login and HTTP Basic alike:
 
 [source,java,role=cn1-no-try]
@@ -1074,8 +1074,8 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/s
 It reports a locked account, an expired password, a disabled account and an
 expired account as such, rather than as a wrong password.
 
-`memberOf` lists only the groups a user belongs to directly. To include the
-groups those groups belong to, turn on nested groups, which costs one more
+`memberOf` lists only a user's direct groups. To include the groups those
+groups are members of, turn on nested groups, which costs one more
 search for each sign-in:
 
 [source,java,role=cn1-no-try]
@@ -1083,8 +1083,8 @@ search for each sign-in:
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-active-directory-nested,indent=0]
 ----
 
-What the user types is escaped before it reaches a filter or a DN, so a user
-name such as `*` or `admin)(uid=*` matches only itself. An empty password is
+What the user types is escaped before it reaches a filter or a DN, so a
+username such as `*` or `admin)(uid=*` matches only itself. An empty password is
 refused without asking the directory. A bind with a name and no password is an
 unauthenticated bind, and many directories answer it with success.
 
