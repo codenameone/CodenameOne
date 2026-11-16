@@ -230,6 +230,7 @@ public class SelfTest {
         futures();
         jsonCodec();
         cache();
+        pdf();
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -255,6 +256,44 @@ public class SelfTest {
      * CacheTest pins on the JVM -- one load per key under concurrency, expiry
      * on a controlled clock, LRU eviction, and removal notifications.
      */
+    // ------------------------------------------------------------------
+    // PDF generation: the shared com.codename1.pdf classes, headless, on the
+    // server runtime. A paginated table with a footer that needs the page
+    // count, compressed with the shared Deflater, then read back with the
+    // shared parser.
+    private static void pdf() throws Exception {
+        com.codename1.pdf.PdfDocument doc = new com.codename1.pdf.PdfDocument().setTitle("Statement");
+        com.codename1.pdf.PdfLayout layout = new com.codename1.pdf.PdfLayout(doc,
+                com.codename1.pdf.PdfPageSize.A4, 48);
+        layout.setPageDecorator(new com.codename1.pdf.PdfLayout.PageDecorator() {
+            public void decorate(com.codename1.pdf.PdfPage page, int number, int count) {
+                page.getCanvas().setFont(com.codename1.pdf.PdfFont.HELVETICA, 9)
+                        .drawText("Page " + number + " of " + count, 48, page.getHeight() - 24);
+            }
+        });
+        layout.add(new com.codename1.pdf.PdfParagraph("Monthly statement",
+                com.codename1.pdf.PdfFont.HELVETICA_BOLD, 20));
+        com.codename1.pdf.PdfTable t = new com.codename1.pdf.PdfTable(3, 1, 1).setHeaderRows(1);
+        t.addCell("Date").addCell("Description").addCell("Amount");
+        for (int i = 1; i <= 90; i++) {
+            t.addCell("2026-11-" + (i % 28 + 1)).addCell("Order " + i).addCell("$" + i + ".00");
+        }
+        layout.add(t);
+        layout.finish();
+        byte[] bytes = doc.toByteArray();
+        check("pdf: a document starts with the header", "%PDF-",
+                new String(bytes, 0, 5, "ISO-8859-1"));
+        int pages = doc.getPageCount();
+        check("pdf: the table runs onto several pages", "true", String.valueOf(pages >= 2));
+        com.codename1.pdf.PdfReader r = com.codename1.pdf.PdfReader.open(bytes);
+        check("pdf: the reader sees every page", String.valueOf(pages), String.valueOf(r.getPageCount()));
+        check("pdf: the title round trips", "Statement", r.getTitle());
+        String last = r.extractText(pages - 1);
+        check("pdf: the footer knows the page count", "true",
+                String.valueOf(last.indexOf("Page " + pages + " of " + pages) >= 0));
+        check("pdf: the last row is on the last page", "true", String.valueOf(last.indexOf("Order 90") >= 0));
+    }
+
     private static void cache() throws Exception {
         final long[] now = new long[] {1000};
         final List removals = new ArrayList();

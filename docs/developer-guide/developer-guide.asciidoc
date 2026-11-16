@@ -226,6 +226,8 @@ include::Smart-Home.asciidoc[]
 
 include::Printing.asciidoc[]
 
+include::PDF.asciidoc[]
+
 include::Deep-Links-Routing.asciidoc[]
 
 include::State-Restoration-And-Continuity.asciidoc[]

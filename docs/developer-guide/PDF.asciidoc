@@ -1,0 +1,90 @@
+== PDF documents
+
+Invoices, tickets, reports, signed forms and statements end up as PDF files sooner or later. An app either produces them, often on the server where the data lives, or shows ones it received. Codename One does both in Java, without a native PDF library or a platform viewer:
+
+* `com.codename1.pdf` writes and reads PDF files. It has no dependency on the UI, so the same code runs in an app, in a test and in a Codename One backend.
+* `com.codename1.pdf.ui.PdfViewer` displays a PDF in your UI. It renders pages with a pure-Java renderer, so a document looks the same on iOS, Android, desktop, the web and the simulator, and the viewer doesn't depend on a browser or an operating system component.
+
+=== Drawing a page
+
+`PdfDocument` holds the pages. Each `PdfPage` has a `PdfCanvas` measured in points (1/72 inch), with the origin at the top left corner and `y` growing downwards, like `Graphics`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/pdf/PdfSnippets.java[tag=pdf-canvas,indent=0]
+----
+
+The canvas covers what a page needs: paths with lines, curves, rectangles, rounded rectangles and ellipses, filled, stroked, dashed or used as clip; transforms; RGB colors with alpha; text in a font; and images. `PdfImage.create(byte[])` takes encoded JPEG or PNG data, and `PdfImage.create(int[], int, int)` takes ARGB pixels, so anything drawn on a mutable `Image` can go into a document. `PdfPage.addLink` makes a rectangle a link to a URL or to another page, and `PdfDocument.addBookmark` adds an entry to the reader's outline.
+
+==== Fonts
+
+The 14 standard PDF fonts (Helvetica, Times, Courier with their bold and italic variants, Symbol and Zapf Dingbats) are constants of `PdfFont`. They cost nothing to use, since every PDF reader has them, but they cover only Western European characters.
+
+For any other text, load a TrueType or OpenType font with `PdfFont.loadTrueType(byte[])`. Only the glyphs the document uses are embedded, together with a map from each glyph back to its text, so readers can search and copy the text.
+
+==== Right-to-left text
+
+Text is given in reading order. Hebrew and Arabic are laid out right to left with the Unicode bidirectional algorithm, so numbers and Latin words inside them keep their own order, and brackets mirror. Arabic letters take their joined forms, from the font's own substitution tables when it has them. A paragraph whose first strong character is right to left starts at the right margin:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/pdf/PdfSnippets.java[tag=pdf-rtl,indent=0]
+----
+
+`PdfParagraph.setDirection` and the `direction` argument of `PdfCanvas.drawText` override that choice.
+
+=== Flowing content across pages
+
+Positioning every line by hand suits a ticket. A report or an invoice needs text that wraps and tables that run onto the next page. `PdfLayout` places paragraphs, tables, images, rules and spaces one under another and starts a new page when the current one is full:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/pdf/PdfSnippets.java[tag=pdf-layout,indent=0]
+----
+
+* A `PdfParagraph` is made of runs, each with its own font, size and color, or a link. It wraps at word boundaries and aligns left, right, centered, justified, or to the start side of its direction.
+* A `PdfTable` divides the content width between its columns by weight. Cells hold text or paragraphs, can span columns and have backgrounds. A row that doesn't fit on the page carries over to the next one, and the header rows repeat at the top of each page.
+* The `PageDecorator` runs once per page after `finish()`, when the page count is known, which is what a "Page 3 of 7" footer needs.
+
+=== On the server
+
+Nothing in `com.codename1.pdf` touches the UI, so a Codename One backend generates documents with the same classes. A typical use is an endpoint that returns `doc.toByteArray()` with the `application/pdf` content type, or a scheduled job that mails monthly statements. The app and the server can share the code that lays out a document.
+
+=== Reading a PDF
+
+`PdfReader` opens an existing file to read its page count, page sizes, metadata and text:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/pdf/PdfSnippets.java[tag=pdf-read,indent=0]
+----
+
+The reader handles the structures real files use: cross-reference tables and streams, object streams, incremental updates, and files with broken cross-references, which it rebuilds by scanning. Encrypted files open with `PdfReader.open(data, password)`, using RC4 or AES (128 and 256 bit) as the standard security handler defines them. Either the user or the owner password works.
+
+Text comes out in reading order, line by line, with right-to-left lines reordered. Text in fonts without a map to Unicode is recovered from the font's encoding, or, for Chinese, Japanese and Korean fonts, from Adobe's character collections.
+
+=== Showing a PDF
+
+`PdfViewer` is a component that shows the pages one under another, fitted to its width. The user scrolls through them, zooms with a pinch or a double tap, and pans a zoomed page:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/pdf/PdfSnippets.java[tag=pdf-viewer,indent=0]
+----
+
+Pages are drawn on the EDT one at a time, between other events, so scrolling stays responsive, and only the pages near the view are kept in memory. `renderPage(index, scale)` draws a single page to an `Image`, for a thumbnail or a share sheet, without showing the viewer.
+
+The renderer draws what the PDF specification defines: vector graphics with dashes, clipping and every blend mode; transparency groups, knockout groups and soft masks; axial, radial, function-based and mesh shadings; tiling patterns; embedded TrueType, OpenType, CFF, Type 1 and Type 3 fonts, including vertical writing; and images in every format PDF defines, among them JPEG, JPEG 2000, JBIG2 and CCITT fax, with their masks. Form fields and annotations are drawn from their appearances.
+
+A font that isn't embedded in the file is drawn with a platform font of the same family, so its letters can differ in shape from what the author saw. PDF generators embed fonts by default, so this mostly affects old files.
+
+=== Printing a PDF
+
+The printing API takes PDF files directly. Save the document to `FileSystemStorage` and pass its path:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/pdf/PdfSnippets.java[tag=pdf-print,indent=0]
+----
+
+See the Printing chapter for the details of the print dialog and its result.
