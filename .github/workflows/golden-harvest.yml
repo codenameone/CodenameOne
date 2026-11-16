@@ -56,6 +56,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -69,6 +70,15 @@ jobs:
         id: list
         run: |
           set -euo pipefail
+          # A PR's last runs often complete after it merged or closed, and
+          # the branch is usually deleted by then: there is nothing to push
+          # to, and goldens must never land on a merged branch either.
+          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD_REF" --state open --json number --jq length)"
+          if [ "$open" = 0 ]; then
+            echo "No open pull request for $HEAD_REF (merged, closed or deleted); nothing to harvest."
+            echo "ready=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           trusted/scripts/ci/golden-harvest.sh list "$HEAD_SHA" runs.txt
       - name: Check the push token
         if: steps.list.outputs.ready == '1'
