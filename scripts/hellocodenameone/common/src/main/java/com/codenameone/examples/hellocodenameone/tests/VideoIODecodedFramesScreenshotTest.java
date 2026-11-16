@@ -72,6 +72,8 @@ import java.util.List;
  * {@link VideoIORoundTripTest} (frame order, brightness ramp, PCM verification).</p>
  */
 public class VideoIODecodedFramesScreenshotTest extends AbstractAnimationScreenshotTest {
+    // cn1ss-skip: tvos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
 
     /// Not safe for the runner's silent-timeout retry: it decodes frames on a worker thread,
     /// and that worker outlives runTest(). A retry resets the shared

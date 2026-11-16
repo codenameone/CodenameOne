@@ -40,6 +40,7 @@ import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexAttribute;
 import com.codename1.gpu.VertexBuffer;
 import com.codename1.gpu.VertexFormat;
+import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.impl.gpu.GlslShaderGenerator;
 import com.codename1.ui.Image;
 
@@ -72,6 +73,9 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         int aPosition;
         int aNormal;
         int aTexcoord;
+        int aJoints = -1;
+        int aWeights = -1;
+        int uJoints = -1;
         int uMvp;
         int uModel;
         int uNormalMatrix;
@@ -99,6 +103,9 @@ class AndroidGraphicsDevice extends GraphicsDevice {
     }
 
     private final Map<String, Program> programs = new HashMap<String, Program>();
+    // chromatic aberration, FXAA, god rays and the sun, for the composite
+    private final float[] postFx = new float[6];
+    private final float[] depthFx = new float[12];
 
     private GpuCapabilities caps;
 
@@ -112,6 +119,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         int fbo;
         int tex;
         int depth;
+        boolean depthTex;
         int width;
         int height;
     }
@@ -128,6 +136,11 @@ class AndroidGraphicsDevice extends GraphicsDevice {
     private boolean inShadowPass;
     private boolean shadowReady;
     private final float[] shadowMatrix = new float[16];
+    // the far cascade's matrix, and the cascade count and square size of the
+    // shadow pass in progress (the map is shadowCascades squares wide)
+    private final float[] farShadowMatrix = new float[16];
+    private int shadowCascades = 1;
+    private int shadowSize;
     private PostProcess activePost;
     private final int[] savedFbo = new int[1];
     private final int[] savedViewport = new int[4];
@@ -186,6 +199,14 @@ class AndroidGraphicsDevice extends GraphicsDevice {
 
         GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, w, h, 0,
                 GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, pixels);
+        // GL's default minification filter samples mipmaps, which this upload
+        // has none of: the texture is then incomplete and reads as black. A
+        // material re-sets these when it binds the texture, but a texture
+        // bound only by sampler() -- the post chain's colour LUT -- never is.
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
         return id;
     }
@@ -227,9 +248,21 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         boolean shadowed = shadowReady && isShadowMapCurrent() && getLight().isShadows() && material.isLit()
                 && material.isReceiveShadows();
         Program program = getProgram(material, fmt, env, shadowed);
+        drawWith(mesh, material, modelMatrix, program, cameraViewProjection(),
+                shadowed, false);
+    }
+
+    // One draw of a mesh through a program. vp is the camera's view projection,
+    // or the light's for a caster whose material needs its own depth program;
+    // a caster draws with depth on, no blending and both faces.
+    private void drawWith(Mesh mesh, Material material, float[] modelMatrix, Program program, float[] vp,
+            boolean shadowed, boolean caster) {
         if (program.handle == 0) {
             return;
         }
+        VertexBuffer vb = mesh.getVertices();
+        VertexFormat fmt = vb.getFormat();
+        Environment env = getEnvironment();
         GLES20.glUseProgram(program.handle);
         applyEnvironment(program, material, env, shadowed);
 
@@ -240,7 +273,6 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             Matrix4.setIdentity(model);
         }
         Camera cam = getCamera();
-        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
         Matrix4.multiply(vp, model, mvp);
         float[] nm = Matrix4.normalMatrix(model);
         for (int i = 0; i < 16; i++) {
@@ -309,7 +341,14 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             }
         }
 
-        applyRenderState(material.getRenderState());
+        if (caster) {
+            GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+            GLES20.glDepthMask(true);
+            GLES20.glDisable(GLES20.GL_BLEND);
+            GLES20.glDisable(GLES20.GL_CULL_FACE);
+        } else {
+            applyRenderState(material.getRenderState());
+        }
 
         // Upload (if dirty) and bind the vertex buffer, then wire the attribute
         // pointers from the interleaved format offsets.
@@ -319,6 +358,11 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         bindAttribute(program.aPosition, fmt, VertexAttribute.Usage.POSITION, strideBytes);
         bindAttribute(program.aNormal, fmt, VertexAttribute.Usage.NORMAL, strideBytes);
         bindAttribute(program.aTexcoord, fmt, VertexAttribute.Usage.TEXCOORD, strideBytes);
+        bindAttribute(program.aJoints, fmt, VertexAttribute.Usage.JOINTS, strideBytes);
+        bindAttribute(program.aWeights, fmt, VertexAttribute.Usage.WEIGHTS, strideBytes);
+        if (program.uJoints >= 0 && material.isSkinned()) {
+            GLES20.glUniform4fv(program.uJoints, material.getJointCount() * 3, material.getJointRows(), 0);
+        }
 
         int glMode = toGlPrimitive(mesh.getPrimitiveType());
         if (mesh.isIndexed()) {
@@ -334,6 +378,8 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         disableAttribute(program.aPosition);
         disableAttribute(program.aNormal);
         disableAttribute(program.aTexcoord);
+        disableAttribute(program.aJoints);
+        disableAttribute(program.aWeights);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
     }
 
@@ -400,7 +446,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         } else {
             GLES20.glEnable(GLES20.GL_CULL_FACE);
             // The portable winding convention treats counter clockwise as front.
-            GLES20.glFrontFace(GLES20.GL_CCW);
+            GLES20.glFrontFace(inRenderTarget ? GLES20.GL_CW : GLES20.GL_CCW);
             GLES20.glCullFace(cull == RenderState.CullMode.FRONT
                     ? GLES20.GL_FRONT : GLES20.GL_BACK);
         }
@@ -507,6 +553,17 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         return p;
     }
 
+    private Program getDepthProgram(Material material, VertexFormat fmt) {
+        String key = "depth|" + material.getShaderKey() + "|" + System.identityHashCode(fmt);
+        Program p = programs.get(key);
+        if (p == null) {
+            GlslShaderGenerator gen = GlslShaderGenerator.depthOnly(material, fmt);
+            p = buildProgram(gen.getVertexSource(), gen.getFragmentSource());
+            programs.put(key, p);
+        }
+        return p;
+    }
+
     private Program buildProgram(String vertexSrc, String fragmentSrc) {
         int handle = linkProgram(vertexSrc, fragmentSrc);
         Program p = new Program();
@@ -515,6 +572,9 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             p.aPosition = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_POSITION);
             p.aNormal = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_NORMAL);
             p.aTexcoord = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_TEXCOORD);
+            p.aJoints = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_JOINTS);
+            p.aWeights = GLES20.glGetAttribLocation(handle, GlslShaderGenerator.A_WEIGHTS);
+            p.uJoints = GLES20.glGetUniformLocation(handle, GlslShaderGenerator.U_JOINTS);
             p.uMvp = GLES20.glGetUniformLocation(handle, "u_mvp");
             p.uModel = GLES20.glGetUniformLocation(handle, "u_model");
             p.uNormalMatrix = GLES20.glGetUniformLocation(handle, "u_normalMatrix");
@@ -560,6 +620,13 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         }
     }
 
+    private void uniform4(Program p, String name, float a, float b, float c, float d) {
+        int l = loc(p, name);
+        if (l >= 0) {
+            GLES20.glUniform4f(l, a, b, c, d);
+        }
+    }
+
     private void uniform3(Program p, String name, float a, float b, float c) {
         int l = loc(p, name);
         if (l >= 0) {
@@ -575,6 +642,77 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             GLES20.glUniform1i(l, unit);
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         }
+    }
+
+
+    // custom shading uniform names, so a draw does not build strings
+    private static final String[] CU_NAMES = new String[ShaderMaterial.MAX_UNIFORMS];
+    private static final String[] CT_NAMES = new String[ShaderMaterial.MAX_TEXTURES];
+
+    static {
+        for (int i = 0; i < CU_NAMES.length; i++) {
+            CU_NAMES[i] = "u_cu[" + i + "]";
+        }
+        for (int i = 0; i < CT_NAMES.length; i++) {
+            CT_NAMES[i] = "u_ct" + i;
+        }
+    }
+
+    // Custom shading (Material.getShader()): the clock, the uniform array and
+    // the material's own textures on units 2 and up -- 0 is the base texture,
+    // 1 the shadow map.
+    private void applyShader(Program p, Material material) {
+        ShaderMaterial sm = material.getEffectiveShader();
+        if (sm == null) {
+            return;
+        }
+        uniform1(p, "u_time", getTime());
+        float[] v = sm.getUniformValues();
+        for (int i = 0; i < sm.getUniformCount(); i++) {
+            int l = loc(p, CU_NAMES[i]);
+            if (l >= 0) {
+                GLES20.glUniform4f(l, v[i * 4], v[i * 4 + 1], v[i * 4 + 2], v[i * 4 + 3]);
+            }
+        }
+        for (int i = 0; i < sm.getTextureCount(); i++) {
+            Texture t = sm.getTexture(i);
+            int l = loc(p, CT_NAMES[i]);
+            if (l >= 0 && t.getHandle() instanceof TexHandle) {
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + 2 + i);
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
+                int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GLES20.GL_REPEAT : GLES20.GL_CLAMP_TO_EDGE;
+                int filter = t.getFilter() == Texture.Filter.NEAREST ? GLES20.GL_NEAREST : GLES20.GL_LINEAR;
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, wrap);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, wrap);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, filter);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter);
+                GLES20.glUniform1i(l, 2 + i);
+            }
+        }
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+    }
+
+    // Binds the environment map image based lighting reads (unit 6) when the
+    // program declares it.
+    private void applyEnvironmentMap(Program p) {
+        Environment env = getEnvironment();
+        Texture t = env == null ? null : env.getEnvironmentMap();
+        if (t == null) {
+            return;
+        }
+        int l = loc(p, "u_envMap");
+        if (l >= 0 && t.getHandle() instanceof TexHandle) {
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0 + 6);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ((TexHandle) t.getHandle()).id);
+            int wrap = t.getWrap() == Texture.Wrap.REPEAT ? GLES20.GL_REPEAT : GLES20.GL_CLAMP_TO_EDGE;
+            int filter = t.getFilter() == Texture.Filter.NEAREST ? GLES20.GL_NEAREST : GLES20.GL_LINEAR;
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, wrap);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, wrap);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, filter);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter);
+            GLES20.glUniform1i(l, 6);
+        }
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
     }
 
     private void applyEnvironment(Program p, Material material, Environment env, boolean shadowed) {
@@ -595,14 +733,16 @@ class AndroidGraphicsDevice extends GraphicsDevice {
             }
         }
         uniformColor(p, "u_emissive", material.getEmissive());
+        applyShader(p, material);
+        applyEnvironmentMap(p);
         if (shadowed) {
             int l = loc(p, "u_shadowMatrix");
             if (l >= 0) {
                 GLES20.glUniformMatrix4fv(l, 1, false, shadowMatrix, 0);
             }
             Light light = getLight();
-            uniform3(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
-                    1f / shadowTarget.width);
+            uniform4(p, "u_shadow", light.getShadowBias(), light.getShadowStrength(),
+                    light.getShadowSoftness() / shadowTarget.height, light.getShadowCascadeRatio());
             sampler(p, "u_shadowMap", 1, shadowTarget.tex);
         }
     }
@@ -638,6 +778,32 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0,
                 GLES20.GL_TEXTURE_2D, n.tex, 0);
         if (depth) {
+            // a depth texture, so the composite can read the scene's depth for
+            // ambient occlusion, depth of field and outlines; ES 2 devices
+            // without OES_depth_texture leave the framebuffer incomplete and
+            // fall back to a renderbuffer, and the depth effects turn off
+            GLES20.glGenTextures(1, ids, 0);
+            n.depth = ids[0];
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, n.depth);
+            GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_DEPTH_COMPONENT, w, h, 0,
+                    GLES20.GL_DEPTH_COMPONENT, GLES20.GL_UNSIGNED_INT, null);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+            GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT,
+                    GLES20.GL_TEXTURE_2D, n.depth, 0);
+            if (GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) == GLES20.GL_FRAMEBUFFER_COMPLETE) {
+                n.depthTex = true;
+                return n;
+            }
+            for (int i = 0; i < 8 && GLES20.glGetError() != GLES20.GL_NO_ERROR; i++) {
+                // drain the error the unsupported format raised
+            }
+            GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT,
+                    GLES20.GL_TEXTURE_2D, 0, 0);
+            GLES20.glDeleteTextures(1, new int[]{n.depth}, 0);
             GLES20.glGenRenderbuffers(1, ids, 0);
             n.depth = ids[0];
             GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, n.depth);
@@ -655,7 +821,9 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         }
         GLES20.glDeleteFramebuffers(1, new int[]{t.fbo}, 0);
         GLES20.glDeleteTextures(1, new int[]{t.tex}, 0);
-        if (t.depth != 0) {
+        if (t.depthTex) {
+            GLES20.glDeleteTextures(1, new int[]{t.depth}, 0);
+        } else if (t.depth != 0) {
             GLES20.glDeleteRenderbuffers(1, new int[]{t.depth}, 0);
         }
     }
@@ -683,14 +851,17 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         saveTarget();
         int size = light.getShadowMapSize();
         // packed depth must not be interpolated between texels
-        shadowTarget = target(shadowTarget, size, size, true, GLES20.GL_NEAREST);
+        shadowCascades = light.getShadowCascades();
+        shadowSize = size;
+        shadowTarget = target(shadowTarget, size * shadowCascades, size, true, GLES20.GL_NEAREST);
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, shadowTarget.fbo);
-        GLES20.glViewport(0, 0, size, size);
+        GLES20.glViewport(0, 0, size * shadowCascades, size);
         GLES20.glClearColor(1f, 1f, 1f, 1f);
         GLES20.glClearDepthf(1f);
         GLES20.glDepthMask(true);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-        light.computeShadowMatrix(shadowMatrix);
+        light.computeCascadeMatrix(0, shadowMatrix);
+        light.computeCascadeMatrix(1, farShadowMatrix);
         inShadowPass = true;
         return true;
     }
@@ -705,20 +876,38 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         restoreTarget();
     }
 
+    // Draws a caster into every cascade: each has its own square of the map
+    // and its own matrix.
     private void drawShadowCaster(Mesh mesh, Material material, float[] modelMatrix) {
+        if (shadowCascades < 2) {
+            drawShadowCascade(mesh, material, modelMatrix, shadowMatrix);
+            return;
+        }
+        GLES20.glViewport(0, 0, shadowSize, shadowSize);
+        drawShadowCascade(mesh, material, modelMatrix, shadowMatrix);
+        GLES20.glViewport(shadowSize, 0, shadowSize, shadowSize);
+        drawShadowCascade(mesh, material, modelMatrix, farShadowMatrix);
+        GLES20.glViewport(0, 0, shadowSize * 2, shadowSize);
+    }
+
+    private void drawShadowCascade(Mesh mesh, Material material, float[] modelMatrix, float[] lightMatrix) {
         if (!material.isCastShadows() || material.getRenderState().getBlendMode() != RenderState.BlendMode.NONE
                 || material.getType() == Material.Type.SKYBOX) {
             return;
         }
         VertexBuffer vb = mesh.getVertices();
         VertexFormat fmt = vb.getFormat();
+        if (GlslShaderGenerator.needsOwnDepthProgram(material)) {
+            drawWith(mesh, material, modelMatrix, getDepthProgram(material, fmt), lightMatrix, false, true);
+            return;
+        }
         GLES20.glUseProgram(shadowProgram.handle);
         if (modelMatrix != null) {
             Matrix4.copy(modelMatrix, model);
         } else {
             Matrix4.setIdentity(model);
         }
-        Matrix4.multiply(shadowMatrix, model, mvp);
+        Matrix4.multiply(lightMatrix, model, mvp);
         GLES20.glUniformMatrix4fv(shadowProgram.uMvp, 1, false, mvp, 0);
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
         GLES20.glDepthMask(true);
@@ -741,7 +930,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
     }
 
-    public boolean beginPostProcess(PostProcess effects, int width, int height) {
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
         if (effects == null) {
             return false;
         }
@@ -771,7 +960,7 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         return true;
     }
 
-    public void endPostProcess(float timeSeconds) {
+    protected void endPostEffects(float timeSeconds) {
         PostProcess pp = activePost;
         if (pp == null) {
             return;
@@ -816,6 +1005,26 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         uniform1(c, "u_grain", pp.getGrain());
         uniform1(c, "u_time", timeSeconds);
         uniform2(c, "u_resolution", sceneTarget.width, sceneTarget.height);
+        packPostEffects(pp, postFx, 0);
+        uniform3(c, "u_fx", postFx[0], postFx[1], postFx[2]);
+        uniform2(c, "u_sun", postFx[3], postFx[4]);
+        packDepthEffects(pp, depthFx, 0);
+        if (!sceneTarget.depthTex) {
+            depthFx[0] = 0f;
+            depthFx[3] = 0f;
+            depthFx[4] = 0f;
+        }
+        sampler(c, "u_depth", 2, sceneTarget.depthTex ? sceneTarget.depth : 0);
+        Texture lut = pp.getColorLut();
+        if (lut != null && lut.getHandle() instanceof TexHandle) {
+            sampler(c, "u_lut", 3, ((TexHandle) lut.getHandle()).id);
+        } else {
+            depthFx[7] = 0f;
+            sampler(c, "u_lut", 3, 0);
+        }
+        uniform4(c, "u_dfx", depthFx[0], depthFx[1], depthFx[2], depthFx[3]);
+        uniform4(c, "u_dfx2", depthFx[4], depthFx[5], depthFx[6], depthFx[7]);
+        uniform3(c, "u_ocol", depthFx[8], depthFx[9], depthFx[10]);
         drawQuad(c);
         GLES20.glDepthMask(true);
     }
@@ -898,7 +1107,81 @@ class AndroidGraphicsDevice extends GraphicsDevice {
         }
     }
 
+
+    // Render targets: each is a colour texture with a depth buffer of its own.
+    // GL stores a target's rows bottom up while an uploaded image starts at
+    // the top, so draws into a target flip clip space Y (and with it the
+    // winding) to leave the texture upright, as Metal and Direct3D have it.
+    private final Map<Texture, Target> renderTargets = new HashMap<Texture, Target>();
+    private boolean inRenderTarget;
+    private final int[] rtSavedFbo = new int[1];
+    private final int[] rtSavedViewport = new int[4];
+    private final float[] flippedVp = new float[16];
+
+    @Override
+    public boolean isGpuSkinning() {
+        return true;
+    }
+
+    @Override
+    public Texture createRenderTarget(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        // creating the framebuffer binds it; drawing stays where it was
+        int[] bound = new int[1];
+        GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, bound, 0);
+        Target t = target(null, width, height, true);
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, bound[0]);
+        Texture tex = new Texture(width, height);
+        tex.setHandle(new TexHandle(t.tex, width, height));
+        renderTargets.put(tex, t);
+        return tex;
+    }
+
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+        Target t = target == null ? null : renderTargets.get(target);
+        if (t == null || inRenderTarget || inShadowPass || activePost != null) {
+            return false;
+        }
+        GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, rtSavedFbo, 0);
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, rtSavedViewport, 0);
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, t.fbo);
+        GLES20.glViewport(0, 0, t.width, t.height);
+        inRenderTarget = true;
+        clear(clearArgb, true, true);
+        return true;
+    }
+
+    public void endRenderTarget() {
+        if (!inRenderTarget) {
+            return;
+        }
+        inRenderTarget = false;
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, rtSavedFbo[0]);
+        GLES20.glViewport(rtSavedViewport[0], rtSavedViewport[1], rtSavedViewport[2], rtSavedViewport[3]);
+    }
+
+    // the camera's view projection, flipped in Y inside a render target
+    private float[] cameraViewProjection() {
+        Camera cam = getCamera();
+        float[] vp = cam != null ? cam.getViewProjection() : Matrix4.identity();
+        if (!inRenderTarget) {
+            return vp;
+        }
+        for (int i = 0; i < 16; i++) {
+            flippedVp[i] = (i & 3) == 1 ? -vp[i] : vp[i];
+        }
+        return flippedVp;
+    }
+
     public void dispose(Texture texture) {
+        Target rt = renderTargets.remove(texture);
+        if (rt != null) {
+            releaseTarget(rt);
+            texture.setHandle(null);
+            return;
+        }
         TexHandle h = (TexHandle) texture.getHandle();
         if (h != null) {
             GLES20.glDeleteTextures(1, new int[]{h.id}, 0);

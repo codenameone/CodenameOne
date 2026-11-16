@@ -73,6 +73,21 @@ public final class SkinModel {
     public int safeTop = 40;
     public int safeBottom = 0;
 
+    /**
+     * Foldable description, written as the simulator's {@code foldable*}
+     * skin keys. The cover display is in device pixels; zero width means
+     * the device has no cover display.
+     */
+    public boolean foldable;
+    public boolean foldVertical = true;
+    public boolean foldDualScreen;
+    public boolean foldHalf = true;
+    public boolean foldClosed = true;
+    public boolean foldCrease = true;
+    public int coverW;
+    public int coverH;
+    public int coverPpi;
+
     private static final String P = "wiz.skin.";
 
     /**
@@ -96,13 +111,29 @@ public final class SkinModel {
         // appends ".skin" as the file extension, so without this the file
         // came out as "Apple-iPad-Air-13-2024-skin.skin".
         name = d == null ? "My skin" : d.name;
+        // Frame units are 0.2 mm (SkinDesigner.MM_PER_UNIT): a 40 unit
+        // corner is 8 mm, a 14 unit bezel 2.8 mm, as on a current phone.
         cornerR = 40;
-        bezel = 40;
+        bezel = 14;
         homeIndicator = d == null || d.hasHomeIndicator;
         cutouts = new ArrayList<>();
         safeTop = d == null ? 40 : d.safeTop;
         safeBottom = d == null ? 0 : d.safeBottom;
-        if (d != null) {
+        DeviceDatabase.Fold f = d == null ? null : d.fold;
+        foldable = f != null;
+        foldVertical = f == null || f.vertical;
+        foldDualScreen = f != null && f.dualScreen;
+        foldHalf = true;
+        foldClosed = true;
+        foldCrease = f == null || !f.dualScreen;
+        coverW = f != null && f.hasCover() ? f.coverW : 0;
+        coverH = f != null && f.hasCover() ? f.coverH : 0;
+        coverPpi = f != null && f.hasCover() ? f.coverPpi : 0;
+        if (d != null && foldDualScreen) {
+            // A Duo-style device's two screens have no camera cutout: the
+            // camera sits in the bezel.
+            presetId = "rr";
+        } else if (d != null) {
             if (d.hasIsland) {
                 cutouts.add(new Cutout(CUTOUT_ISLAND, 120, 35, 0, 14, "Dynamic Island"));
                 presetId = "island";
@@ -110,7 +141,7 @@ public final class SkinModel {
                 cutouts.add(new Cutout(CUTOUT_NOTCH, 180, 30, 0, 0, "Notch"));
                 presetId = "notch";
             } else if (d.hasHole) {
-                cutouts.add(new Cutout(CUTOUT_HOLE, 28, 28, 0, 20, "Camera"));
+                cutouts.add(new Cutout(CUTOUT_HOLE, 17, 17, 0, 15, "Camera"));
                 presetId = "hole";
             } else if (!d.hasHomeIndicator) {
                 presetId = "classic";
@@ -159,6 +190,15 @@ public final class SkinModel {
         Preferences.set(P + "safeTop", safeTop);
         Preferences.set(P + "safeBottom", safeBottom);
         Preferences.set(P + "cutoutCount", cutouts.size());
+        Preferences.set(P + "foldable", foldable);
+        Preferences.set(P + "foldVertical", foldVertical);
+        Preferences.set(P + "foldDualScreen", foldDualScreen);
+        Preferences.set(P + "foldHalf", foldHalf);
+        Preferences.set(P + "foldClosed", foldClosed);
+        Preferences.set(P + "foldCrease", foldCrease);
+        Preferences.set(P + "coverW", coverW);
+        Preferences.set(P + "coverH", coverH);
+        Preferences.set(P + "coverPpi", coverPpi);
         for (int i = 0; i < cutouts.size(); i++) {
             Cutout c = cutouts.get(i);
             String k = P + "cut." + i + ".";
@@ -182,6 +222,15 @@ public final class SkinModel {
         homeIndicator = Preferences.get(P + "homeIndicator", homeIndicator);
         safeTop = Preferences.get(P + "safeTop", safeTop);
         safeBottom = Preferences.get(P + "safeBottom", safeBottom);
+        foldable = Preferences.get(P + "foldable", foldable);
+        foldVertical = Preferences.get(P + "foldVertical", foldVertical);
+        foldDualScreen = Preferences.get(P + "foldDualScreen", foldDualScreen);
+        foldHalf = Preferences.get(P + "foldHalf", foldHalf);
+        foldClosed = Preferences.get(P + "foldClosed", foldClosed);
+        foldCrease = Preferences.get(P + "foldCrease", foldCrease);
+        coverW = Preferences.get(P + "coverW", coverW);
+        coverH = Preferences.get(P + "coverH", coverH);
+        coverPpi = Preferences.get(P + "coverPpi", coverPpi);
         int n = Preferences.get(P + "cutoutCount", 0);
         cutouts = new ArrayList<>();
         for (int i = 0; i < n; i++) {
@@ -199,7 +248,9 @@ public final class SkinModel {
 
     public static void clearPersisted() {
         for (String key : new String[]{"schema", "presetId", "name", "cornerR", "bezel",
-                "homeIndicator", "safeTop", "safeBottom", "cutoutCount"}) {
+                "homeIndicator", "safeTop", "safeBottom", "cutoutCount",
+                "foldable", "foldVertical", "foldDualScreen", "foldHalf", "foldClosed", "foldCrease",
+                "coverW", "coverH", "coverPpi"}) {
             Preferences.delete(P + key);
         }
         for (int i = 0; i < 32; i++) {

@@ -289,6 +289,8 @@ public class SpriteRenderer implements Renderer {
         device.setViewport(0, 0, width, height);
     }
 
+    private float shaderClock;
+
     @Override
     public void onFrame(GraphicsDevice device) {
         long now = System.currentTimeMillis();
@@ -307,6 +309,13 @@ public class SpriteRenderer implements Renderer {
             updatable.frame(dt);
         }
         scene.update(dt);
+        // the clock animated shaders read; wrapped hourly so a float keeps
+        // sub-millisecond precision in a session that runs for days
+        shaderClock += (float) dt;
+        if (shaderClock > 3600f) {
+            shaderClock -= 3600f;
+        }
+        device.setTime(shaderClock);
         if (!released.isEmpty()) {
             disposeReleased(device);
         }
@@ -330,6 +339,12 @@ public class SpriteRenderer implements Renderer {
             for (int i = 0; i < modelCount; i++) {
                 Model m = (Model) models.get(i);
                 if (m.isVisible() && m.getMesh() != null && m.getMaterial().isCastShadows()) {
+                    if (m.getInstanceCount() > 0) {
+                        // copies spread past the model's own position; cull none
+                        device.drawInstanced(m.getMesh(), m.getMaterial(), m.instanceMatrices(),
+                                m.instanceColors(), m.getInstanceCount());
+                        continue;
+                    }
                     float[] mm = m.modelMatrix();
                     float dx = mm[12] - cx;
                     float dz = mm[14] - cz;
@@ -349,7 +364,12 @@ public class SpriteRenderer implements Renderer {
         for (int i = 0; i < modelCount; i++) {
             Model m = (Model) models.get(i);
             if (m.isVisible() && m.getMesh() != null) {
-                device.draw(m.getMesh(), m.getMaterial(), m.modelMatrix());
+                if (m.getInstanceCount() > 0) {
+                    device.drawInstanced(m.getMesh(), m.getMaterial(), m.instanceMatrices(),
+                            m.instanceColors(), m.getInstanceCount());
+                } else {
+                    device.draw(m.getMesh(), m.getMaterial(), m.modelMatrix());
+                }
             }
         }
 

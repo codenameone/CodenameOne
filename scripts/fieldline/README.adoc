@@ -1,0 +1,207 @@
+= Fieldline
+
+A field service and inspection application and its server, in one Maven project
+and one language. A scheduling engine plans every technician's day around skills,
+working hours, time off and travel. Technicians follow their day as a route on a
+map, work through each job's checklist, photograph what they find, ask the
+assistant what is wrong and have the customer sign on the screen. Dispatchers see
+the crew on a timeline, a Gantt chart and a map, drag work between people, and let
+the optimizer plan and repair the week. Which screens a person sees is decided by
+the roles the server gives their account.
+
+It is a sample of how a Codename One application and a Codename One Backend fit
+together, and the project the Initializr generates when you start from the field
+service template.
+
+== Start here
+
+https://www.codenameone.com/developer-guide/fieldline-users-guide/[The user's guide]
+(link:../../docs/developer-guide/Fieldline-Users-Guide.asciidoc[source]) shows the
+application as a technician, a dispatcher and an administrator see it, with the
+demo accounts.
+
+To see it running first, the two commands under <<Running it>> are all it takes.
+
+== The modules
+
+[cols="1,4"]
+|===
+| `shared`
+| The contract: the data classes both sides exchange and the `@RestClient`
+  interfaces that name every call. The app's build generates a client from them
+  and the server's build generates the interfaces it implements, so a change the
+  other side did not follow is a compile error.
+  It also holds the scheduling engine, package `scheduler`, with no
+  dependencies and no I/O: the model
+  (`Technician`, `Job`, `Shift`), the hard and soft constraints and their
+  `Weights`, the `Solver` (regret insertion, then adaptive large neighbourhood
+  search, seeded so one seed gives one plan) and the `Reoptimizer` that repairs
+  a plan when the day changes while keeping work in place. Travel comes from a
+  `TravelModel`; `GeoTravel` is the straight-line estimate. The server runs it;
+  it builds for the client too, under the same Java subset.
+
+| `common`
+| The application: sign-in, the technician's day and jobs, the dispatch board and
+  back office, the assistant, the map, the settings and the live channel. Styled in
+  `src/main/css/theme.css`, whose first block of variables holds the colors and
+  the corner radius everything else is drawn with. The text is in
+  `src/main/l10n`, in English, Spanish, French, German and Hebrew.
+  What it reports to Codename One analytics about how it is used, once the user
+  has agreed, is all in `Telemetry`.
+
+| `backend`
+| The server: accounts and roles, technicians and their availability, sites and
+  jobs, checklists, photos and signatures, the planner's runs, time tracking and
+  timesheets, the assistant behind the server's own key, push notifications, and
+  a WebSocket that pushes changes as they happen.
+  The data is entity classes in `domain`, read and written by the repository
+  beside each service. The schema is the migration scripts in
+  `src/main/resources/db/migration`, and the same server runs on SQLite,
+  PostgreSQL, MySQL and MariaDB.
+
+|===
+
+There are no platform modules: `common` builds the application for the
+simulator, the desktop, Android, iOS and the browser itself.
+
+== Running it
+
+Start the server on the development profile. It needs nothing installed: the
+database is in memory, push notifications are printed on the console, and the
+assistant answers from rules built into the server.
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then run the application in the simulator, from another terminal:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+The development profile creates a contractor with a crew of twelve based in
+Portland, their customers' sites and a planned working week of jobs, and these
+accounts, all with the password `fieldline-demo`:
+
+[cols="2,3"]
+|===
+| `tech@fieldline.example`, `tech2@fieldline.example` | technicians with a day of jobs
+| `dispatch@fieldline.example` | runs the board and the planner
+| `admin@fieldline.example` | also sets the crew's limits, the rates and the accounts
+|===
+
+Sign in as the technician in one simulator and as the dispatcher in another to
+see a change on one reach the other live. On a phone, set the server's address
+on the welcome screen: `localhost` on a phone is the phone.
+
+=== In a browser, with nothing installed
+
+The server can host the application itself. Build the browser version once, and
+again when the application changes; it takes about a minute:
+
+[source,bash]
+----
+backend/server.sh web
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then open `http://localhost:8080/`. `server.sh run --web` does both in one step.
+
+`server.sh web` runs `cn1:backend-webapp`, which builds the application for the
+browser and stages it in `backend/target/webapp`; a server that finds it there
+serves it at `/`, after its own routes. In the browser the application takes the
+page's address as the server's and opens its live channel to the same origin. To
+deploy it, put `backend/target/webapp` beside the server binary as `webapp`.
+
+== What each role does
+
+A technician opens on today: the jobs as a numbered route on a map with the
+travel time between stops. They start driving, check in on site, work through a
+checklist that saves as they go, take photos the assistant diagnoses, and finish
+with a drafted report and the customer's signature, sealed with a hash of the
+signature, the time and the place. They clock in and out, take breaks, set
+their working hours and limits, ask for time off, and add their jobs to the
+phone's calendar.
+
+A dispatcher sees the crew on a timeline, a Gantt chart against the last plan and
+a map. A job dragged to another technician is checked against every constraint
+before it is applied, a new job is placed automatically, an absence is covered in
+one tap, and every optimizer run lists what it changed and why. The assistant
+re-plans when asked in plain words, such as "Dana is out Thursday, cover her
+jobs". Time-off requests wait in a queue for a decision.
+
+An administrator does all of that, and in the back office sets each
+technician's limits, the labour rates, rush hours and time tracking, reads the
+timesheets, and grants roles to accounts.
+
+== What is real and what is simulated
+
+Maps and place search are real and need no key: the map draws OpenStreetMap
+vector tiles, and the server looks addresses up with Photon
+(`fieldline.geocoder.url`), so the app never talks to a third party directly.
+Travel times are estimated from the straight-line distance with a road factor;
+a routing service can take their place behind the engine's travel interface.
+
+The assistant is Claude when `FIELDLINE_AI_KEY` holds a key, and otherwise
+answers from rules written into the server, so the template is whole without an
+account and the tests are repeatable. Every answer says which of the two produced
+it. The key stays on the server.
+
+Push notifications go through the Codename One push service
+(`fieldline.push.app`, `fieldline.push.key`). On a development profile they are
+printed on the console instead. A server whose settings are missing still starts
+and logs a configuration error naming each one.
+
+`backend/application.properties` lists every setting a deployment supplies. The
+database is the one named by `DATABASE_URL`: a `postgres://` or `mysql://`
+address, or the path of a SQLite file. Every setting is also read from the
+environment in upper case with `_` for every dot (`FIELDLINE_AI_KEY`). Outside a
+development profile the only account created is the administrator named by
+`fieldline.admin.email` and `fieldline.admin.password`, who grants the first roles.
+
+== Tests
+
+[source,bash]
+----
+mvn -pl shared,backend -Dcodename1.platform=backend test   # <1>
+mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true   # <2>
+./run-e2e.sh   # <3>
+./check-template.sh   # <4>
+./run-web-e2e.sh   # <5>
+----
+<1> The server's tests, on the JVM.
+<2> The same tests again, translated to a native binary, which is how the server
+    ships.
+<3> Starts the server on the `test` profile and runs the application's tests
+    against it in the simulator: they sign in as a technician and a dispatcher,
+    work a job, register and change the settings while a second user acts
+    through the API, and compare the screens in `screenshots/`. Pass `--native` to run them against the compiled
+    server.
+<4> Generates a project from the Initializr template, under another name and
+    package, and builds it.
+<5> Builds the browser version of the application, starts the server hosting
+    it, and drives it in a headless browser: the application loads from the
+    server, signs in as the demo technician, reaches their day and opens its
+    live channel. Needs Node with Playwright and its Chromium (`npm ci` and
+    `npx playwright install chromium` in `scripts/`). Screenshots and logs go
+    to `target/web-e2e`.
+
+`.github/workflows/fieldline.yml` runs all five, and builds the application for
+Android and iOS through `scripts/build-android-app.sh` and
+`scripts/build-ios-app.sh` with `CN1_APP_DIR=scripts/fieldline`.
+
+== The Initializr template
+
+`scripts/sync-initializr-template.py fieldline --write` copies this project into the
+Initializr's resources; without `--write` it fails when they differ, which is what
+CI runs. Change the project here, never the copies.
+
+== Licence
+
+Fieldline is released under MIT No Attribution (see `LICENSE`), not under the
+GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
+into your own application, under any licence, with no notice to keep. The same
+holds for everything Initializr writes into a generated project.

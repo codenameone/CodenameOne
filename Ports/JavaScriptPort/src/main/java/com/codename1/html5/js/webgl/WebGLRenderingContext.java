@@ -55,6 +55,7 @@ public interface WebGLRenderingContext extends JSObject {
     void blendFunc(int sfactor, int dfactor);
     void blendFuncSeparate(int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
     void cullFace(int mode);
+    void frontFace(int mode);
 
     WebGLShader createShader(int type);
     void shaderSource(WebGLShader shader, String source);
@@ -87,6 +88,8 @@ public interface WebGLRenderingContext extends JSObject {
 
     void uniformMatrix4fv(WebGLUniformLocation location, boolean transpose, float[] value);
     void uniform4f(WebGLUniformLocation location, float x, float y, float z, float w);
+    // an array of vec4; the bridge wraps it in a Float32Array
+    void uniform4fv(WebGLUniformLocation location, float[] value);
     void uniform3f(WebGLUniformLocation location, float x, float y, float z);
     void uniform1f(WebGLUniformLocation location, float x);
     void uniform1i(WebGLUniformLocation location, int x);
@@ -113,4 +116,6 @@ public interface WebGLRenderingContext extends JSObject {
     void deleteRenderbuffer(WebGLRenderbuffer renderbuffer);
     void disableVertexAttribArray(int index);
     void uniform2f(WebGLUniformLocation location, float x, float y);
+    int checkFramebufferStatus(int target);
+    JSObject getExtension(String name);
 }

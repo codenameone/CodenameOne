@@ -178,6 +178,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     /** Where the generated bootstrap's name is left for the packaging goal to read. */
     public static final String MAIN_CLASS_RESOURCE = "META-INF/cn1-backend-main";
+    /// The service file naming the generated JSON codec registry; see
+    /// `com.codename1.impl.backend.JsonCodecDefault` in the JVM runtime.
+    static final String CODEC_SERVICE_RESOURCE =
+            "META-INF/services/com.codename1.impl.backend.JsonCodec$Registry";
 
     /**
      * Where the routers, websocket endpoints and routes the wiring was built from
@@ -1943,6 +1947,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             MvcAssets.removeObsoleteClasses(ctx.getOutputClassDir(), sources.keySet());
             ctx.emitResource(MAIN_CLASS_RESOURCE, asciiBytes(bootstrap));
             ctx.emitResource(WIRING_RESOURCE, asciiBytes(wiringRecord(entryPackage)));
+            File services = new File(ctx.getOutputClassDir(), CODEC_SERVICE_RESOURCE);
+            if (codecs != null && codecs.hasRegistry()) {
+                // Read only by the JVM runtime, when nothing installed a registry:
+                // a plain JUnit test calling Json.read gets the same codecs as one
+                // that started a test context, whatever order the tests run in
+                // (#6240). ParparVM never reads it; its entry point installs.
+                ctx.emitResource(CODEC_SERVICE_RESOURCE, asciiBytes(BackendJsonCodecs.REGISTRY + "\n"));
+            } else if (services.isFile() && !services.delete()) {
+                ctx.getLog().warn("could not remove the stale " + CODEC_SERVICE_RESOURCE);
+            }
             // The class path copy ships in the artifact, so only a build that
             // serves the document carries it: a packaged server that did not ask
             // must not hand its whole API surface to whoever unzips it. The copy
@@ -2869,7 +2883,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static void emitBodyLocals(StringBuilder sb, Route route, String pad) {
         for (int i = 0; i < route.params.size(); i++) {
             Param p = route.params.get(i);
-            if (!"BODY".equals(p.kind) || "java.lang.String".equals(p.javaType)) {
+            if (!"BODY".equals(p.kind) || "java.lang.String".equals(p.javaType)
+                    || "byte[]".equals(p.javaType)) {
+                // A byte[] body is the raw octets, as Spring binds it -- never a
+                // JSON document: a webhook verifies a signature over the exact
+                // bytes, and an image is not base64 (issue 6240).
                 continue;
             }
             if (p.codecRead != null) {
@@ -3113,6 +3131,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static String bodyExpression(Param p) {
         if ("java.lang.String".equals(p.javaType)) {
             return "request.getBody()";
+        }
+        if ("byte[]".equals(p.javaType)) {
+            return "request.getBodyBytes()";
         }
         if (p.local != null) {
             return p.local;

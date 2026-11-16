@@ -67,12 +67,12 @@ final class JdkHttp2 {
     /// One `HttpClient`, per redirect policy, for one WebClient: the
     /// connection it keeps is the pool.
     static final class Clients {
-        private final Object[] clients = new Object[2];
+        private final Object[] clients = new Object[4];
 
-        synchronized Object get(WebClient client, boolean follow) throws IOException {
-            int at = follow ? 1 : 0;
+        synchronized Object get(WebClient client, boolean follow, boolean http2) throws IOException {
+            int at = (follow ? 1 : 0) + (http2 ? 0 : 2);
             if (clients[at] == null) {
-                clients[at] = build(client, follow);
+                clients[at] = build(client, follow, http2);
             }
             return clients[at];
         }
@@ -93,6 +93,16 @@ final class JdkHttp2 {
                     clients[iter] = null;
                 }
             }
+        }
+    }
+
+    /// Whether this JVM has `java.net.http` (Java 11 and newer).
+    static boolean available() {
+        try {
+            type("HttpClient");
+            return true;
+        } catch (IOException missing) {
+            return false;
         }
     }
 
@@ -146,12 +156,12 @@ final class JdkHttp2 {
         }
     }
 
-    private static Object build(WebClient client, boolean follow) throws IOException {
+    private static Object build(WebClient client, boolean follow, boolean http2) throws IOException {
         Class clientType = type("HttpClient");
         Class builderType = type("HttpClient$Builder");
         Object builder = call(null, clientType, "newBuilder", new Class[0]);
         call(builder, builderType, "version", new Class[] {type("HttpClient$Version")},
-                constant("HttpClient$Version", "HTTP_2"));
+                constant("HttpClient$Version", http2 ? "HTTP_2" : "HTTP_1_1"));
         call(builder, builderType, "followRedirects", new Class[] {type("HttpClient$Redirect")},
                 constant("HttpClient$Redirect", follow ? "NORMAL" : "NEVER"));
         if (client.getConnectTimeoutMillis() > 0) {
@@ -166,12 +176,20 @@ final class JdkHttp2 {
     static Web.Result perform(WebClient client, Clients clients, String method, String url,
                               List headers, byte[] body, List trace, long maxBytes)
             throws IOException {
+        return perform(client, clients, method, url, headers, body, trace, maxBytes, true);
+    }
+
+    /// As above; `http2` false sends over HTTP/1.1 and accepts it, which is how
+    /// a verb HttpURLConnection refuses (PATCH) is sent on this arm.
+    static Web.Result perform(WebClient client, Clients clients, String method, String url,
+                              List headers, byte[] body, List trace, long maxBytes,
+                              boolean http2) throws IOException {
         String verb = method == null ? "GET" : method;
         boolean safe = "GET".equals(verb) || "HEAD".equals(verb);
         boolean follow = (headers == null || headers.isEmpty())
                 && (body == null || body.length == 0) && safe
                 && client.getClientCertificate() == null;
-        Object http = clients.get(client, follow);
+        Object http = clients.get(client, follow, http2);
 
         Class requestType = type("HttpRequest");
         Class rbType = type("HttpRequest$Builder");
@@ -228,8 +246,17 @@ final class JdkHttp2 {
         Class handlerType = type("HttpResponse$BodyHandler");
         Object handler = call(null, handlers, "ofInputStream", new Class[0]);
         Class responseType = type("HttpResponse");
-        Object response = call(http, type("HttpClient"), "send",
-                new Class[] {requestType, handlerType}, request, handler);
+        Object response;
+        try {
+            response = call(http, type("HttpClient"), "send",
+                    new Class[] {requestType, handlerType}, request, handler);
+        } catch (IOException err) {
+            // java.net.http raises a refused connection as a ConnectException
+            // with no message at all; say which request failed and how, as the
+            // HttpURLConnection path and the packaged arm do.
+            throw new IOException("Request to " + Urls.forMessage(url) + " failed: "
+                    + (err.getMessage() != null ? err.getMessage() : err.getClass().getName()), err);
+        }
         InputStream in = (InputStream) call(response, responseType, "body", new Class[0]);
         java.util.concurrent.atomic.AtomicBoolean expired =
                 new java.util.concurrent.atomic.AtomicBoolean();
@@ -244,7 +271,7 @@ final class JdkHttp2 {
                 }, ceiling, java.util.concurrent.TimeUnit.MILLISECONDS);
         try {
             Object version = call(response, responseType, "version", new Class[0]);
-            if (!"HTTP_2".equals(((Enum) version).name())) {
+            if (http2 && !"HTTP_2".equals(((Enum) version).name())) {
                 throw new IOException("Request to " + Urls.forMessage(url) + " failed: the "
                         + "server did not negotiate HTTP/2, which this client requires");
             }

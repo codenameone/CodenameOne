@@ -911,8 +911,12 @@ killfeed
 paintballs
 Paintballs
 gamepad
+Gerstner
+Fresnel
+toon
 detune
 rolloff
 worklet
 # PDF standard font names.
 Zapf
+Fieldline

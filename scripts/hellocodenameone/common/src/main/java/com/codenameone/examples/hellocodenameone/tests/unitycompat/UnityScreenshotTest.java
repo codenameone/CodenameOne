@@ -45,6 +45,8 @@ import com.codenameone.examples.hellocodenameone.tests.BaseTest;
 /// one the test passes without a capture, the way `Gpu3DCubeScreenshotTest`
 /// does.
 public abstract class UnityScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     /// The frames every scene is stepped, and the length of each: a second
     /// and a half of a game running at sixty frames a second, which is long
     /// enough for a body to come to rest and for an animator to be well into

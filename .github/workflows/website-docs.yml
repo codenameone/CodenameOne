@@ -7,6 +7,8 @@ on:
       - 'docs/developer-guide/**'
       - 'scripts/cn1playground/**'
       - 'scripts/initializr/**'
+      # The /agents/ kit: create-app scripts and the bootstrap skill (build_agent_kit.py).
+      - 'scripts/agent-kit/**'
       - 'scripts/website/**'
       - 'scripts/skindesigner/**'
       # The Initializr/playground/skindesigner JS bundles are built from
@@ -59,6 +61,8 @@ on:
       - 'docs/developer-guide/**'
       - 'scripts/cn1playground/**'
       - 'scripts/initializr/**'
+      # The /agents/ kit: create-app scripts and the bootstrap skill (build_agent_kit.py).
+      - 'scripts/agent-kit/**'
       # The developer guide's Wayline chapters include the sample's sources by
       # tag, so a merged change there changes the published guide. Not on pull
       # requests: developer-guide-docs.yml already renders the guide for those.
@@ -67,6 +71,7 @@ on:
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
       - 'scripts/slate/**'
+      - 'scripts/fieldline/**'
       - 'scripts/splat/**'
       - 'scripts/skirmish/**'
       - 'scripts/dash/**'

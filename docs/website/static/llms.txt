@@ -1,0 +1,54 @@
+# Codename One
+
+> Codename One builds native iOS, Android, desktop (macOS, Windows, Linux) and web apps from one Java or Kotlin codebase, with an optional Java backend in the same project. Java bytecode is compiled ahead of time to native code (no interpreter, no web view). cloud.codenameone.com builds, signs and submits the apps to the App Store and Google Play from any OS: no Mac, Xcode or Android Studio needed. Everything an AI coding agent needs to go from a description to a store submission is published here.
+
+## For AI coding agents: start here
+
+- [Agent quick start](https://www.codenameone.com/agents/): the whole path, from nothing installed to a store submission, and the few steps only a human can do.
+- [Bootstrap skill](https://www.codenameone.com/agents/codenameone-bootstrap.zip): install into `~/.claude/skills/` (Claude Code; `%USERPROFILE%\.claude\skills\` on Windows) or read its SKILL.md from any agent. Covers JDK setup, project creation, the app spec, building and checking every screen, the icon, and shipping.
+- [create-app.sh](https://www.codenameone.com/agents/create-app.sh) / [create-app.ps1](https://www.codenameone.com/agents/create-app.ps1): create a project with nothing installed (bash on macOS/Linux, PowerShell on Windows). Finds or downloads a JDK 17 (no admin rights) and runs the start.codenameone.com generator. `--list` shows the templates.
+- [Project skill](https://www.codenameone.com/agents/codenameone-skill.zip): how to write Codename One code, UI, CSS, tests, screenshots, the backend. Every generated project already contains it in `.agent-skills/codename-one/`.
+- [Store review checklist](https://www.codenameone.com/agents/codenameone-skill.zip): `references/store-review.md` in the project skill. Read before the first App Store / Google Play submission.
+- No terminal: [browser IDE](https://cloud.codenameone.com/ide/) with WebMCP tools (edit, compile, run, screenshot, tap, API lookup). Client apps only: no running backend, basic templates only, about 2 MiB of source; the user starts cloud builds there.
+- Cloud MCP server: `https://cloud.codenameone.com/api/v1/mcp` (HTTP, OAuth sign-in in the browser). Builds, logs, iOS signing, push, store submission. Generated projects register it in `.mcp.json`.
+
+## Quick start
+
+```
+curl -fsSL https://www.codenameone.com/agents/create-app.sh | bash -s -- --list
+curl -fsSL https://www.codenameone.com/agents/create-app.sh | bash -s -- --name HabitTracker --package com.acme.habits
+cd HabitTracker && cat AGENTS.md
+./mvnw cn1:agent &      # the app in a simulator you drive with .agent-skills/codename-one/tools/Sim.java
+```
+
+Windows (PowerShell): `$c = irm https://www.codenameone.com/agents/create-app.ps1; & ([scriptblock]::Create($c)) --name HabitTracker --package com.acme.habits`, then `mvnw.cmd cn1:agent`.
+
+## Templates (create-app.sh --template NAME)
+
+- BAREBONES: empty Java app, one form and a CSS theme.
+- KOTLIN: empty Kotlin app.
+- [WAYLINE](https://www.codenameone.com/wayline/): ride hailing, rider and driver apps, admin console, Java backend.
+- [SAVOR](https://www.codenameone.com/savor/): food delivery, menus, cart, checkout, order tracking.
+- [BASTION](https://www.codenameone.com/bastion/): mobile banking and security showcase.
+- [PARLEY](https://www.codenameone.com/parley/): encrypted messaging, groups, WebRTC calls.
+- REEL: video streaming with downloads and DRM.
+- [PULSE](https://www.codenameone.com/pulse/): gym and studio class booking.
+- [SLATE](https://www.codenameone.com/slate/): appointment booking with calendar sync.
+- [SKIRMISH](https://www.codenameone.com/skirmish/), [DASH](https://www.codenameone.com/dash/), [SPLAT](https://www.codenameone.com/splat/): games (card battle, endless runner, 3D team shooter).
+
+## What the framework covers
+
+- UI: native-looking components, CSS theming, iOS and Material native themes, animations, charts, maps, media, camera, barcode scanning, 3D and GPU graphics.
+- Device: push notifications, biometrics, in-app purchase, location, contacts, Bluetooth, NFC, background tasks, widgets, Apple Watch.
+- Backend: a Java server in the same project, ORM over SQL and NoSQL databases, REST, WebSockets, sign-in.
+- Porting: existing Android, Swing/JavaFX, Flutter, Kotlin Multiplatform and Unity code.
+
+## Documentation
+
+- [Developer guide](https://www.codenameone.com/developer-guide/)
+- [API reference](https://www.codenameone.com/javadoc/) and [backend API reference](https://www.codenameone.com/backend/javadoc/)
+- [Build hints](https://www.codenameone.com/developer-guide/build-hints/)
+- [Signing](https://www.codenameone.com/developer-guide/signing/)
+- [MCP and headless control of a running app](https://www.codenameone.com/developer-guide/mcp-headless-api/)
+- [Getting started (for humans)](https://www.codenameone.com/getting-started/)
+- [Web project generator](https://start.codenameone.com/)

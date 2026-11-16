@@ -170,6 +170,39 @@ public class OrmAnnotationProcessorTest {
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
 
+    /// A JPQL @Query the runtime parser rejects fails the build, naming the method,
+    /// instead of failing the first request that reaches it.
+    @Test
+    public void unsupportedJpqlFailsTheBuild() throws Exception {
+        for (boolean backend : new boolean[]{false, true}) {
+            File classes=tmp.newFolder();
+            Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("badjpql.Item","package badjpql; import com.codename1.annotations.*; @Entity public class Item { @Id public long id; public String name; }");
+            sources.put("badjpql.Items","package badjpql; import com.codename1.orm.repository.*; import java.util.List; @Repository(entity=Item.class,key=Long.class) public interface Items extends CrudRepository<Item,Long> { "
+                + "@Query(\"select i from Item i where i.nmae = :n\") List<Item> typo(@Param(\"n\") String n); "
+                + "@Query(\"select i from Nothing i\") List<Item> entity(); "
+                + "@Query(\"select i from Item i right join Item j on i.id = j.id\") List<Item> rightJoin(); "
+                + "@Query(\"select i from Item i\") List<String> wrongType(); "
+                + "@Query(\"select i.name, i.id from Item i\") List<String> wrongArity(); "
+                + "@Query(\"select i.name from Item i\") List<Item> scalarAsEntity(); "
+                + "@Query(\"select i.name, i.id from Item i\") List<Object[]> rows(); "
+                + "@Query(\"select i from Item i where i.name = :n\") List<Item> fine(@Param(\"n\") String n); }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());
+            String errors=ctx.getErrors().toString();
+            assertTrue(errors,errors.contains("badjpql.Items.typo: JPQL rejected"));
+            assertTrue(errors,errors.contains("badjpql.Items.entity: JPQL rejected"));
+            assertTrue(errors,errors.contains("badjpql.Items.rightJoin: JPQL rejected"));
+            sources.clear();
+            sources.put("badjpql.Loose","package badjpql; import com.codename1.orm.repository.*; public interface Loose extends CrudRepository<Item,Long> { @Query(\"select i from Item i\") java.util.List<Item> all(); }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(classes,testClassesDir()));
+            String loose=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList()).getErrors().toString();
+            assertTrue(loose,loose.contains("badjpql.Loose.all: @Query applies only to methods of an @Repository interface"));
+            for (String bad : new String[]{"wrongType","wrongArity","scalarAsEntity"}) assertTrue(errors,errors.contains("badjpql.Items."+bad+": JPQL rejected"));
+            assertFalse(errors,errors.contains("badjpql.Items.fine") || errors.contains("badjpql.Items.rows"));
+        }
+    }
+
     /// A collation is spliced into DDL, so the processor refuses anything but a name.
     @Test
     public void collationMustBeAName() throws Exception {
@@ -2408,6 +2441,23 @@ public class OrmAnnotationProcessorTest {
                     org.junit.Assert.assertEquals(ownerType.getField("id").get(owner),session.createQuery("select t.owner.id from scalarprojections.Ticket t",Long.class).first());
                     org.junit.Assert.assertEquals("Paris",session.createQuery("select o.address.city from scalarprojections.Ticket t join t.owner o",String.class).first());
                     org.junit.Assert.assertEquals(active,session.createQuery("select (select max(o.status) from scalarprojections.Owner o) from scalarprojections.Ticket t",stateType).first());
+                    // #6240: an entity bound as a parameter, theta and ad-hoc entity joins,
+                    // and a relationship id path in a bulk delete.
+                    org.junit.Assert.assertEquals(1,session.createQuery("select t from scalarprojections.Ticket t where t.owner = :o").setParameter("o",owner).list().size());
+                    org.junit.Assert.assertEquals(1,session.createQuery("select t from scalarprojections.Ticket t, scalarprojections.Person p where t.owner.id = p.id and p.active = true").list().size());
+                    org.junit.Assert.assertEquals(1,session.createQuery("select t from scalarprojections.Ticket t join scalarprojections.Person p on t.owner.id = p.id where p.active = true").list().size());
+                    org.junit.Assert.assertEquals(0,session.createQuery("select t from scalarprojections.Ticket t join scalarprojections.Person p on t.owner.id = p.id where p.active = false").list().size());
+                    // A joined alias navigated after its join was read: the relationship
+                    // join it needs follows that alias, not the FROM text taken before.
+                    org.junit.Assert.assertEquals(1,session.createQuery("select p from scalarprojections.Person p, scalarprojections.Ticket t where t.owner.id = p.id and t.owner.address.city = 'Paris' order by t.owner.address.city").list().size());
+                    org.junit.Assert.assertEquals(1,session.createQuery("select p from scalarprojections.Person p join scalarprojections.Ticket t on t.owner.id = p.id where t.owner.address.city = 'Paris'").list().size());
+                    org.junit.Assert.assertThrows(IllegalArgumentException.class,()->session.createQuery("select p from scalarprojections.Person p join scalarprojections.Ticket t on t.owner.address.city = p.name"));
+                    session.beginTransaction();
+                    org.junit.Assert.assertEquals(1,session.createQuery("delete from scalarprojections.Ticket t where t.owner.id = :oid").setParameter("oid",ownerType.getField("id").get(owner)).executeUpdate());
+                    session.rollbackTransaction();
+                    session.beginTransaction();
+                    org.junit.Assert.assertEquals(1,session.createQuery("delete from scalarprojections.Ticket t where t.owner = :o").setParameter("o",owner).executeUpdate());
+                    session.rollbackTransaction();
                 } finally { session.close();db.close(); }
             }
         }
@@ -4321,7 +4371,7 @@ public class OrmAnnotationProcessorTest {
                 Collections.<String>emptyList(), "UTF-8", compileClasspath);
         proc.start(ctx);
         for (AnnotatedClass cls : index.values()) {
-            if (!cls.getClassAnnotations().isEmpty()) proc.processClass(cls, ctx);
+            if (!cls.getAllAnnotationDescriptors().isEmpty()) proc.processClass(cls, ctx);
         }
         proc.finish(ctx);
     }
@@ -4398,7 +4448,7 @@ public class OrmAnnotationProcessorTest {
                 sourceRoots, "UTF-8", compileClasspath);
         proc.start(ctx);
         for (AnnotatedClass cls : index.values()) {
-            if (!cls.getClassAnnotations().isEmpty()) proc.processClass(cls, ctx);
+            if (!cls.getAllAnnotationDescriptors().isEmpty()) proc.processClass(cls, ctx);
         }
         proc.finish(ctx);
         return ctx;
@@ -4423,7 +4473,7 @@ public class OrmAnnotationProcessorTest {
                 Collections.<String>emptyList(), "UTF-8", compileClasspath);
         proc.start(ctx);
         for (AnnotatedClass cls : index.values()) {
-            if (!cls.getClassAnnotations().isEmpty()) proc.processClass(cls, ctx);
+            if (!cls.getAllAnnotationDescriptors().isEmpty()) proc.processClass(cls, ctx);
         }
         proc.finish(ctx);
         return ctx;

@@ -63,7 +63,7 @@ extern int cn1LinuxSurfaceToPng(cairo_surface_t* surface, unsigned char** outDat
 typedef struct {
     GLuint fbo;
     GLuint tex;
-    GLuint depth;
+    GLuint depth; /* a depth texture, so the composite can read the scene's depth */
     int w, h;
 } CN1GlTarget;
 
@@ -82,10 +82,24 @@ typedef struct {
     GLuint quadVbo;
     GLint savedFbo;
     GLint savedVp[4];
+    /* Render targets share one framebuffer and one depth buffer, resized to
+     * the target being drawn (attachments must match in size on GLES 2); the
+     * colour texture is the target. */
+    GLuint rtFbo;
+    GLuint rtDepth;
+    int rtDepthW, rtDepthH;
+    GLint rtSavedFbo;
+    GLint rtSavedVp[4];
 } CN1GlContext;
 
+/* The winding of a front face. A render target is drawn with clip space Y
+ * flipped (LinuxGraphicsDevice), so its texture rows come out top first like
+ * an uploaded image, and the winding flips with it. */
+static GLenum cn1GlFrontFace = GL_CCW;
+
 /* Layout of the packed uniform array a draw passes in; must match
- * LinuxGraphicsDevice.packUniforms (112 floats). A size of 16 is a mat4. */
+ * LinuxGraphicsDevice.packUniforms (178 floats). A size of 16 is a mat4, 64
+ * the ShaderMaterial vec4[16] array u_cu. */
 typedef struct {
     const char* name;
     int size;
@@ -97,15 +111,17 @@ static const CN1GlUniformDef CN1_UNIFORMS[] = {
     {"u_eye", 3}, {"u_shininess", 1}, {"u_fogColor", 3}, {"u_fog", 3},
     {"u_sky", 3}, {"u_ground", 3}, {"u_exposure", 1}, {"u_pbr", 2},
     {"u_emissive", 3}, {"u_zenith", 3}, {"u_horizon", 3}, {"u_sun", 4},
-    {"u_shadow", 3}
+    {"u_shadow", 4}, {"u_time", 1}, {"u_cu", 64}
 };
 #define CN1_UNIFORM_COUNT ((int) (sizeof(CN1_UNIFORMS) / sizeof(CN1_UNIFORMS[0])))
-#define CN1_UNIFORM_FLOATS 112
+#define CN1_UNIFORM_FLOATS 178
 
 typedef struct {
     GLuint program;
     int hasNormal;
     int hasTexcoord;
+    int hasJoints;
+    GLint uJoints;
     int blend, cull, depthTest, depthWrite;
     GLint loc[CN1_UNIFORM_COUNT];
     GLint uTexture;
@@ -124,7 +140,7 @@ static void cn1GlReleaseTarget(CN1GlTarget* t) {
         glDeleteTextures(1, &t->tex);
     }
     if (t->depth) {
-        glDeleteRenderbuffers(1, &t->depth);
+        glDeleteTextures(1, &t->depth);
     }
     memset(t, 0, sizeof(*t));
 }
@@ -201,6 +217,12 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDestroyContext___long(CODENAM
     cn1GlReleaseTarget(&c->scene);
     cn1GlReleaseTarget(&c->bloomA);
     cn1GlReleaseTarget(&c->bloomB);
+    if (c->rtFbo) {
+        glDeleteFramebuffers(1, &c->rtFbo);
+    }
+    if (c->rtDepth) {
+        glDeleteRenderbuffers(1, &c->rtDepth);
+    }
     if (c->quadVbo) {
         glDeleteBuffers(1, &c->quadVbo);
     }
@@ -452,6 +474,8 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dGetOrCreatePipeline___long_ja
     glBindAttribLocation(prog, 0, "a_position");
     glBindAttribLocation(prog, 1, "a_normal");
     glBindAttribLocation(prog, 2, "a_texcoord");
+    glBindAttribLocation(prog, 3, "a_joints");
+    glBindAttribLocation(prog, 4, "a_weights");
     glLinkProgram(prog);
     glGetProgramiv(prog, GL_LINK_STATUS, &linkOk);
     glDeleteShader(vs);
@@ -470,10 +494,36 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dGetOrCreatePipeline___long_ja
         p->loc[i] = glGetUniformLocation(prog, CN1_UNIFORMS[i].name);
     }
     p->uTexture = glGetUniformLocation(prog, "u_texture");
+    /* ShaderMaterial textures sample units 2 and up; the sampler uniforms keep
+     * their unit in the program, so they are set once here. */
+    {
+        GLint prev = 0;
+        int t;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &prev);
+        glUseProgram(prog);
+        for (t = 0; t < 4; t++) {
+            char nm[8];
+            GLint l;
+            snprintf(nm, sizeof(nm), "u_ct%d", t);
+            l = glGetUniformLocation(prog, nm);
+            if (l >= 0) {
+                glUniform1i(l, 2 + t);
+            }
+        }
+        {
+            GLint le = glGetUniformLocation(prog, "u_envMap");
+            if (le >= 0) {
+                glUniform1i(le, 6);
+            }
+        }
+        glUseProgram((GLuint) prev);
+    }
     p->uShadowMap = glGetUniformLocation(prog, "u_shadowMap");
     /* Record which optional interleaved attributes the shader declared. */
     p->hasNormal = strstr(vsrc, "attribute vec3 a_normal") != 0;
     p->hasTexcoord = strstr(vsrc, "attribute vec2 a_texcoord") != 0;
+    p->hasJoints = strstr(vsrc, "attribute vec4 a_joints") != 0;
+    p->uJoints = glGetUniformLocation(prog, "u_joints");
     p->blend = blendMode;
     p->cull = cullMode;
     p->depthTest = depthTest;
@@ -554,7 +604,7 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
         glDisable(GL_CULL_FACE);
     } else {
         glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CCW);
+        glFrontFace(cn1GlFrontFace);
         glCullFace(p->cull == 2 ? GL_FRONT : GL_BACK);
     }
     if (p->depthTest) {
@@ -573,6 +623,7 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
             int n = CN1_UNIFORMS[i].size;
             if (l >= 0) {
                 switch (n) {
+                    case 64: glUniform4fv(l, 16, u); break;
                     case 16: glUniformMatrix4fv(l, 1, GL_FALSE, u); break;
                     case 4: glUniform4fv(l, 1, u); break;
                     case 3: glUniform3fv(l, 1, u); break;
@@ -581,6 +632,11 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
                 }
             }
             u += n;
+        }
+        /* A skinned draw appends its joint rows, three vec4 per joint, after
+         * the named uniforms (LinuxGraphicsDevice.packUniforms). */
+        if (p->uJoints >= 0 && uniformFloats > CN1_UNIFORM_FLOATS) {
+            glUniform4fv(p->uJoints, (uniformFloats - CN1_UNIFORM_FLOATS) / 4, uniforms + CN1_UNIFORM_FLOATS);
         }
     }
 
@@ -604,11 +660,22 @@ static void cn1GlBindDraw(CN1GlContext* c, CN1GlPipeline* p, GLuint vbo, int str
              * an unlit textured shader has no a_normal, yet its buffer may still
              * carry normals (POSITION_NORMAL_TEXCOORD), and counting from the
              * shader then sampled the normal as the texcoord. */
-            offset = strideBytes - 8;
+            offset = strideBytes == 64 ? 24 : strideBytes - 8;
             glEnableVertexAttribArray(2);
             glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, strideBytes, (void*) (intptr_t) offset);
         } else {
             glDisableVertexAttribArray(2);
+        }
+        /* VertexFormat.SKINNED: position, normal, texcoord, then the four
+         * joint indices at float 8 and their weights at float 12. */
+        if (p->hasJoints && strideBytes == 64) {
+            glEnableVertexAttribArray(3);
+            glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, strideBytes, (void*) (intptr_t) 32);
+            glEnableVertexAttribArray(4);
+            glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, strideBytes, (void*) (intptr_t) 48);
+        } else {
+            glDisableVertexAttribArray(3);
+            glDisableVertexAttribArray(4);
         }
     }
 
@@ -691,11 +758,15 @@ static int cn1GlEnsureTarget(CN1GlTarget* t, int w, int h, int depth, GLint filt
     glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t->tex, 0);
     if (depth) {
-        glGenRenderbuffers(1, &t->depth);
-        glBindRenderbuffer(GL_RENDERBUFFER, t->depth);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, w, h);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, t->depth);
-        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        glGenTextures(1, &t->depth);
+        glBindTexture(GL_TEXTURE_2D, t->depth);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, t->depth, 0);
     }
     status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
@@ -705,19 +776,34 @@ static int cn1GlEnsureTarget(CN1GlTarget* t, int w, int h, int depth, GLint filt
     return 1;
 }
 
-JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT size) {
+/* Binds a ShaderMaterial texture on unit index for the next draw. */
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dBindTexture___long_int_long_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT index, JAVA_LONG texturePeer, JAVA_INT texFilter, JAVA_INT texWrap) {
+    GLuint t = (GLuint) texturePeer;
+    if (contextPeer == 0) return;
+    glActiveTexture(GL_TEXTURE0 + index);
+    glBindTexture(GL_TEXTURE_2D, t);
+    if (t) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, texFilter ? GL_LINEAR : GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texFilter ? GL_LINEAR : GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texWrap ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texWrap ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+    }
+    glActiveTexture(GL_TEXTURE0);
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginShadowPass___long_int_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT size) {
     CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
-    if (!c || size <= 0) {
+    if (!c || size <= 0 || width <= 0) {
         return JAVA_FALSE;
     }
     cn1GlMakeCurrent(c);
     cn1GlSaveTarget(c);
     /* packed depth must not be interpolated between texels */
-    if (!cn1GlEnsureTarget(&c->shadow, size, size, 1, GL_NEAREST)) {
+    if (!cn1GlEnsureTarget(&c->shadow, width, size, 1, GL_NEAREST)) {
         cn1GlRestoreTarget(c);
         return JAVA_FALSE;
     }
-    glViewport(0, 0, size, size);
+    glViewport(0, 0, width, size);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClearDepthf(1.0f);
     glDepthMask(GL_TRUE);
@@ -731,6 +817,75 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndShadowPass___long(CODENAME
         cn1GlMakeCurrent(c);
         cn1GlRestoreTarget(c);
     }
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateRenderTarget___long_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_INT width, JAVA_INT height) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    GLuint tex = 0;
+    if (!c || width <= 0 || height <= 0) {
+        return 0;
+    }
+    cn1GlMakeCurrent(c);
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return (JAVA_LONG) tex;
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginRenderTarget___long_long_int_int_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG texturePeer, JAVA_INT width, JAVA_INT height, JAVA_INT argb) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    if (!c || texturePeer == 0 || width <= 0 || height <= 0) {
+        return JAVA_FALSE;
+    }
+    cn1GlMakeCurrent(c);
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &c->rtSavedFbo);
+    glGetIntegerv(GL_VIEWPORT, c->rtSavedVp);
+    if (!c->rtFbo) {
+        glGenFramebuffers(1, &c->rtFbo);
+    }
+    if (!c->rtDepth || c->rtDepthW != width || c->rtDepthH != height) {
+        int dw = width;
+        int dh = height;
+        if (!c->rtDepth) {
+            glGenRenderbuffers(1, &c->rtDepth);
+        }
+        glBindRenderbuffer(GL_RENDERBUFFER, c->rtDepth);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, dw, dh);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        c->rtDepthW = dw;
+        c->rtDepthH = dh;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, c->rtFbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, (GLuint) texturePeer, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, c->rtDepth);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint) c->rtSavedFbo);
+        return JAVA_FALSE;
+    }
+    glViewport(0, 0, width, height);
+    glClearColor(((argb >> 16) & 0xff) / 255.0f, ((argb >> 8) & 0xff) / 255.0f, (argb & 0xff) / 255.0f,
+            ((argb >> 24) & 0xff) / 255.0f);
+    glClearDepthf(1.0f);
+    glDepthMask(GL_TRUE);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    cn1GlFrontFace = GL_CW;
+    return JAVA_TRUE;
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndRenderTarget___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer) {
+    CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
+    cn1GlFrontFace = GL_CCW;
+    if (!c) {
+        return;
+    }
+    cn1GlMakeCurrent(c);
+    glBindFramebuffer(GL_FRAMEBUFFER, (GLuint) c->rtSavedFbo);
+    glViewport(c->rtSavedVp[0], c->rtSavedVp[1], c->rtSavedVp[2], c->rtSavedVp[3]);
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_gl3dBeginPost___long_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_BOOLEAN bloom) {
@@ -789,6 +944,11 @@ static void cn1GlUniform3(GLuint program, const char* name, float a, float b, fl
     if (l >= 0) glUniform3f(l, a, b, d);
 }
 
+static void cn1GlUniform4(GLuint program, const char* name, float a, float b, float d, float e) {
+    GLint l = glGetUniformLocation(program, name);
+    if (l >= 0) glUniform4f(l, a, b, d, e);
+}
+
 static void cn1GlPassInto(const CN1GlTarget* t) {
     glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
     glViewport(0, 0, t->w, t->h);
@@ -808,12 +968,18 @@ static void cn1GlQuad(CN1GlContext* c) {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, (void*) 0);
     glDisableVertexAttribArray(1);
     glDisableVertexAttribArray(2);
+    /* a skinned draw left the joint attributes on, still naming its mesh's
+       buffer; with that buffer deleted the quad's draw would fail */
+    glDisableVertexAttribArray(3);
+    glDisableVertexAttribArray(4);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 /* params: threshold, bloomIntensity, contrast, saturation, lift rgb, gain rgb,
- * vignette, grain, time (13 floats). */
+ * vignette, grain, time (13 floats), then the six of
+ * GraphicsDevice.packPostEffects and the twelve of packDepthEffects. The
+ * colour lookup is bound on unit 3 by the caller (gl3dBindTexture). */
 JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndPost___long_long_long_long_boolean_float_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG contextPeer, JAVA_LONG brightPeer, JAVA_LONG blurPeer, JAVA_LONG compositePeer, JAVA_BOOLEAN bloom, JAVA_OBJECT params) {
     CN1GlContext* c = (CN1GlContext*) (intptr_t) contextPeer;
     CN1GlPipeline* bright = (CN1GlPipeline*) (intptr_t) brightPeer;
@@ -867,6 +1033,26 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dEndPost___long_long_long_long
     cn1GlUniform1(comp->program, "u_grain", pr[11]);
     cn1GlUniform1(comp->program, "u_time", pr[12]);
     cn1GlUniform2(comp->program, "u_resolution", (float) c->scene.w, (float) c->scene.h);
+    if (((JAVA_ARRAY) params)->length >= 18) {
+        cn1GlUniform3(comp->program, "u_fx", pr[13], pr[14], pr[15]);
+        cn1GlUniform2(comp->program, "u_sun", pr[16], pr[17]);
+    } else {
+        cn1GlUniform3(comp->program, "u_fx", 0.0f, 0.0f, 0.0f);
+        cn1GlUniform2(comp->program, "u_sun", 0.5f, 0.5f);
+    }
+    cn1GlSampler(comp->program, "u_depth", 2, c->scene.depth);
+    {
+        GLint l = glGetUniformLocation(comp->program, "u_lut");
+        if (l >= 0) glUniform1i(l, 3);
+    }
+    if (((JAVA_ARRAY) params)->length >= 31) {
+        cn1GlUniform4(comp->program, "u_dfx", pr[19], pr[20], pr[21], pr[22]);
+        cn1GlUniform4(comp->program, "u_dfx2", pr[23], pr[24], pr[25], pr[26]);
+        cn1GlUniform3(comp->program, "u_ocol", pr[27], pr[28], pr[29]);
+    } else {
+        cn1GlUniform4(comp->program, "u_dfx", 0.0f, 0.0f, 0.0f, 0.0f);
+        cn1GlUniform4(comp->program, "u_dfx2", 0.0f, 0.1f, 100.0f, 0.0f);
+    }
     cn1GlQuad(c);
     glDepthMask(GL_TRUE);
 }

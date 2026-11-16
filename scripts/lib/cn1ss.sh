@@ -275,6 +275,10 @@ cn1ss_start_ws_server() {
   fi
   local log_file bind_port="${CN1SS_WS_BIND_PORT:-8765}"
   log_file="$(mktemp)"
+  # A 4K tvOS capture of a noisy scene (GpuShaderHarbour) is ~12 MB as PNG,
+  # past the backend's default 8 MB WebSocket message cap; the session was
+  # dropped and the screenshot silently went missing.
+  export CN1_WS_MAX_MESSAGE_MB="${CN1_WS_MAX_MESSAGE_MB:-32}"
   if [ -n "$(cn1ss_server_dist)" ]; then
     "$(cn1ss_server_script)" exec-dist "$(cn1ss_server_dist)" --port "$bind_port" --out "$out_dir" \
       >"$log_file" 2>&1 &
@@ -554,6 +558,49 @@ print(sum(1 for r in results if isinstance(r, dict) and r.get("status") == "miss
 PY
 }
 
+# Copy each "missing_expected" actual into CAPTURE_DIR/<golden path relative to
+# the repository root>. Usage: cn1ss_capture_export COMPARE_JSON REF_DIR CAPTURE_DIR
+cn1ss_capture_export() {
+  local json="$1" ref_dir="$2" capture_dir="$3" root
+  root="$(git -C "$ref_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -z "$root" ]; then
+    cn1ss_log "FATAL: golden capture cannot place $ref_dir inside a repository"
+    return 19
+  fi
+  python3 - "$json" "$root" "$capture_dir" <<'PY'
+import json, os, shutil, sys
+data = json.load(open(sys.argv[1]))
+root, out = os.path.realpath(sys.argv[2]), sys.argv[3]
+count = 0
+emitted = {}
+for r in data.get("results", []) if isinstance(data, dict) else []:
+    if isinstance(r, dict) and r.get("expected_path"):
+        rel = os.path.relpath(os.path.realpath(r["expected_path"]), root)
+        if not rel.startswith(".."):
+            stem = os.path.splitext(os.path.basename(rel))[0]
+            emitted.setdefault(os.path.dirname(rel), []).append(stem)
+    if not isinstance(r, dict) or r.get("status") != "missing_expected":
+        continue
+    actual, expected = r.get("actual_path"), r.get("expected_path")
+    if not actual or not expected or not os.path.isfile(actual):
+        continue
+    rel = os.path.relpath(os.path.realpath(expected), root)
+    if rel.startswith(".."):
+        sys.exit("golden %s is outside the repository" % expected)
+    dest = os.path.join(out, rel)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.copyfile(actual, dest)
+    print("[cn1ss] captured " + rel)
+    count += 1
+# Every image this leg produced, golden or not: lets the collector tell a
+# deleted golden the suite still renders from one it no longer does.
+os.makedirs(out, exist_ok=True)
+with open(os.path.join(out, "cn1ss-emitted.json"), "w") as fh:
+    json.dump(emitted, fh, sort_keys=True)
+print("[cn1ss] golden capture: %d new screenshot(s)" % count)
+PY
+}
+
 # Write the machine-readable report consumed by /port-status/. Callers opt in
 # with CN1SS_PORT_ID and provide up to three suite logs. Screenshot comparison
 # results come from the same JSON that drives the strict golden gate below.
@@ -660,6 +707,24 @@ cn1ss_process_and_report() {
   if ! cn1ss_java_run "$CN1SS_PROCESS_CLASS" "${compare_args[@]}" > "$compare_json_out"; then
     cn1ss_log "FATAL: Screenshot comparison helper failed"
     return 13
+  fi
+
+  # Every screenshot without a golden is filed under CN1SS_CAPTURE_DIR at its
+  # golden's repository path (.github/actions/cn1ss-capture). Existing goldens
+  # are never copied, so what is collected can only add files. In capture mode
+  # (.github/workflows/golden-capture.yml) there is nothing to gate and nobody
+  # to comment to, so stop; a harvest (every other run) gates as before, and
+  # golden-harvest.yml commits the images.
+  if [ -n "${CN1SS_CAPTURE_DIR:-}" ]; then
+    local export_rc=0
+    cn1ss_capture_export "$compare_json_out" "$ref_dir" "$CN1SS_CAPTURE_DIR" || export_rc=$?
+    if [ "${CN1SS_CAPTURE_MODE:-capture}" != harvest ]; then
+      return "$export_rc"
+    fi
+    # A harvest is a by-product: the gate and the PR comment still run.
+    if [ "$export_rc" -ne 0 ]; then
+      cn1ss_log "golden harvest export failed ($export_rc); gating as usual"
+    fi
   fi
 
   # Run RenderScreenshotReport

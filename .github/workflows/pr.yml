@@ -41,6 +41,8 @@ on:
       # Same: the builder define-toggle lint runs from this workflow and nowhere else.
       - 'scripts/check-builder-define-toggles.py'
       - 'scripts/check-cast-semantics.sh'
+      - 'scripts/check-gpu-shaders.sh'
+      - 'scripts/gpu-shader-check/**'
       - 'scripts/cast-semantics-baseline.txt'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
@@ -111,6 +113,8 @@ on:
       # Same: the builder define-toggle lint runs from this workflow and nowhere else.
       - 'scripts/check-builder-define-toggles.py'
       - 'scripts/check-cast-semantics.sh'
+      - 'scripts/check-gpu-shaders.sh'
+      - 'scripts/gpu-shader-check/**'
       - 'scripts/cast-semantics-baseline.txt'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
@@ -525,6 +529,16 @@ jobs:
           mvn -B -q -f maven/pom.xml -pl windows,linux -am -DskipTests \
             -Dcn1.binaries="${CN1_BINARIES}" compile
           scripts/check-native-signatures.sh --require-all
+      # Every shader of com.codename1.gpu.shaders and the post composite,
+      # through a real GLSL ES 100 compiler and an HLSL one (glslang, via
+      # SPIR-V). A generator change that prints code a GPU rejects otherwise
+      # shows only as a model that silently does not draw on that device.
+      # Metal is checked by the same script on macOS.
+      - name: Compile the GPU shader library with real compilers
+        if: ${{ matrix.java-version == 8 }}
+        run: |
+          command -v glslangValidator >/dev/null || (sudo apt-get update && sudo apt-get install -y glslang-tools)
+          scripts/check-gpu-shaders.sh
       # Linkage, which the signature gate above cannot see: it verifies that a
       # native's NAME matches its Java method, and a mangled C++ symbol has the
       # right name too. Needs no compiler and no build output, so it sits on its

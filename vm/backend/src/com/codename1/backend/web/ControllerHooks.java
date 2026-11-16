@@ -55,7 +55,7 @@ import java.util.List;
 /// 5. Anything else is rethrown, and the server answers it as before: the
 ///    status of a `ResponseStatusException`, otherwise a 500 that reveals
 ///    nothing about the failure.
-public final class ControllerHooks {
+public final class ControllerHooks implements HttpServer.Handler {
     private static final ControllerHooks NONE =
             new ControllerHooks(new HandlerInterceptor[0], new ExceptionResolver[0]);
 
@@ -108,6 +108,49 @@ public final class ControllerHooks {
             }
         }
         return out.toArray(empty);
+    }
+
+    /// Never a router: always null. The wiring hands these hooks to the server
+    /// among its handlers, and the server takes them out of the chain and asks
+    /// [#notFound] only once every router and static file has passed.
+    ///
+    /// @param request the request
+    /// @return null
+    @Override
+    public HttpServer.Response handle(HttpServer.Request request) {
+        return null;
+    }
+
+    /// Whether any global resolver could answer an unmatched path.
+    ///
+    /// @return true when a `@ControllerAdvice` or resolver bean exists
+    public boolean hasResolvers() {
+        return resolvers.length > 0;
+    }
+
+    /// The answer for a request nothing served: the global resolvers are offered
+    /// a [NoHandlerFoundException], with a null handler. Null when none answers,
+    /// which leaves the server's own 404. Security failures and `Error`s are not
+    /// asked here, as nothing threw them.
+    ///
+    /// @param request the request
+    /// @return the response, or null
+    /// @throws Exception what a resolver threw
+    public HttpServer.Response notFound(HttpServer.Request request) throws Exception {
+        if (resolvers.length == 0) {
+            return null;
+        }
+        String target = request.getTarget();
+        int query = target == null ? -1 : target.indexOf('?');
+        NoHandlerFoundException missing = new NoHandlerFoundException(request.getMethod(),
+                query < 0 ? target : target.substring(0, query));
+        for (ExceptionResolver resolver : resolvers) {
+            HttpServer.Response r = resolver.resolve(request, null, missing);
+            if (r != null) {
+                return r;
+            }
+        }
+        return null;
     }
 
     /// Runs one matched route through the interceptors and exception handlers.

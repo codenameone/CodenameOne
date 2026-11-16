@@ -232,6 +232,8 @@ for Android, run `./gradlew assembleDebug` inside the generated project.
 
 ## Local iOS builds (`ios-source`) prerequisites
 
+**For an agent, or anyone without a Mac, a cloud build is the default:** it needs none of the table below and builds, signs and submits from any OS. See `cloud-agent.md`. Use `ios-source` only when the developer has a Mac and asks for a local Xcode project.
+
 `-Dcodename1.buildTarget=ios-source` skips the build server and emits an Xcode project under `ios/target/<finalName>-ios-source/` (the build logs the exact path). You can open it in Xcode (or build it with `xcodebuild`) and produce an `.ipa` locally. Requirements:
 
 | Requirement | Notes |

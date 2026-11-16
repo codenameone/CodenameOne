@@ -166,6 +166,17 @@ public interface Session {
     /// @throws PersistenceException if no transaction is active or merging fails
     <T> T merge(T entity);
 
+    /// Saves an entity as Spring Data's `save` does: a NEW entity (no key, or a
+    /// generated key still unset) is persisted in place, so the argument itself
+    /// becomes managed and receives its generated key and version at flush; any
+    /// other entity is merged. Answers the instance to keep using -- the argument
+    /// for a new mutable entity, the merge result otherwise (and the keyed copy
+    /// for a record).
+    /// @param <T> entity type
+    /// @param entity entity to save
+    /// @return the managed instance
+    <T> T save(T entity);
+
     /// Schedules a managed entity for deletion, cascading REMOVE associations.
     /// @param entity managed instance to remove
     /// @throws PersistenceException if no transaction is active or the instance is not managed

@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.gpu;
 
@@ -37,6 +50,18 @@ public final class VertexFormat {
             new VertexAttribute(VertexAttribute.Usage.POSITION, 3),
             new VertexAttribute(VertexAttribute.Usage.NORMAL, 3),
             new VertexAttribute(VertexAttribute.Usage.TEXCOORD, 2)
+    });
+
+    /// Position, normal, texture coordinate, four joint indices and four
+    /// joint weights (3 + 3 + 2 + 4 + 4 floats): the layout of a mesh the
+    /// device skins on the GPU, with the joints given by
+    /// `Material.setSkinning`.
+    public static final VertexFormat SKINNED = new VertexFormat(new VertexAttribute[]{
+            new VertexAttribute(VertexAttribute.Usage.POSITION, 3),
+            new VertexAttribute(VertexAttribute.Usage.NORMAL, 3),
+            new VertexAttribute(VertexAttribute.Usage.TEXCOORD, 2),
+            new VertexAttribute(VertexAttribute.Usage.JOINTS, 4),
+            new VertexAttribute(VertexAttribute.Usage.WEIGHTS, 4)
     });
 
     private final VertexAttribute[] attributes;

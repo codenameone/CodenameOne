@@ -117,4 +117,16 @@ class JavaSESoftwareDeviceBlendTest {
         assertColor(38, 51, 77, drawOver(BACKGROUND, 0x00ffffff, RenderState.BlendMode.ADDITIVE),
                 "additive light with no alpha");
     }
+
+    @Test
+    void overATransparentFrameTheCoverageIsKept() {
+        // A frame cleared to transparent is rendered for compositing over
+        // something else; half coverage must stay half, not turn opaque black.
+        int out = drawOver(0x00000000, 0x80ff8040, RenderState.BlendMode.ALPHA);
+        assertNear(0x80, out >>> 24, "alpha");
+        assertNear(255, (out >> 16) & 0xff, "red");
+        assertNear(128, (out >> 8) & 0xff, "green");
+        assertEquals(0, drawOver(0x00000000, 0x00ffffff, RenderState.BlendMode.ALPHA),
+                "a transparent sprite over a transparent frame");
+    }
 }

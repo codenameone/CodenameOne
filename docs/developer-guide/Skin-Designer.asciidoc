@@ -158,6 +158,38 @@ written into `skin.properties`:
   insets it writes into `skin.properties`, so the same 47 is
   correct on every notched iPhone regardless of resolution.
 
+[[skin-designer-fold-tab]]
+==== Fold tab
+
+The Fold tab turns the skin into a foldable. Picking a foldable device from the catalog, such as
+the iPhone Duo, fills it in. Where the manufacturer hasn't published a resolution, the catalog's
+value is an estimate and the tab says so.
+
+* *Foldable device* - writes the fold keys at all; off for every other skin.
+* *Book fold* - the hinge runs top to bottom (on), or left to right for a flip phone (off).
+* *Two screens with a gap* - a device with two separate panels. The gap is what
+  `DevicePosture.getFoldBounds()` reports, and the device always reads as separating.
+* *Crease on the flat screen* - a faint line where a single flexible panel folds.
+* *Postures* - whether the device can rest half opened and closed. Flat is always supported.
+* *Cover display* - the outer screen in pixels plus its PPI. Zero width means no cover display,
+  and the closed device then shows its back.
+* *Preview* - flat, half and closed sketches in the editor's preview. The simulator renders the
+  real fold in 3D.
+
+The generated skin carries two more images, `cover.png` and `cover_l.png`, the cover display in
+portrait and landscape, and these `skin.properties` keys:
+
+* `foldable=true`, `foldOrientation` (`vertical` or `horizontal`), `foldType` (`continuous` or
+  `dualScreen`), `foldPostures` (for example `flat,half,closed`) and `crease`.
+* `hingePortrait` and `hingeLandscape` - the hinge as `x,y,width,height` in the skin image. A
+  continuous fold has zero width (book) or zero height (flip).
+* `coverPortraitScreenX/Y/Width/Height`, `coverLandscapeScreenX/Y/Width/Height` and `coverPpi` -
+  the cover display in the cover images. `coverCutouts` lists its cutouts as `cutouts` does for
+  the inner display.
+
+Landscape rectangles are the portrait ones rotated clockwise, the way the simulator rotates the
+skin. A skin without `foldable=true` behaves as it always has.
+
 === Stage 4 — finish and download
 
 image::img/skin-designer/skin-designer-stage-4-done.png["Done page showing the green check, summary of the generated skin, and a Download skin button",role="text-center"]
@@ -176,6 +208,8 @@ Clicking *Finish* in the editor's footer:
 . Writes `skin.properties` with `roundScreen=true`,
   `displayX/Y/Width/Height`, `safePortrait*` / `safeLandscape*`,
   `cutouts`, the platform name, override names, fonts, and PPI.
+. For a foldable, renders the cover display images and writes the fold keys described under
+  <<skin-designer-fold-tab,Fold tab>>.
 
 Clicking *Download skin* on the done page hands the file to the
 browser's download dialog. The button is the only reliable trigger

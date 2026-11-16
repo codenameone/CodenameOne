@@ -27,6 +27,10 @@ on:
       unity_prepared:
         type: boolean
         default: false
+      cn1ss_capture:
+        description: Golden capture only (golden-capture.yml, through scripts-ios.yml)
+        type: string
+        default: ''
 
 env:
   # A method the translator culled as unreachable is still emitted as a stub,
@@ -190,6 +194,12 @@ jobs:
       - name: Unpack the Unity gallery prebuilt
         uses: ./.github/actions/unity-gallery-prebuilt
 
+      - name: Enter golden capture mode
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
+
       - name: Build sample Mac Catalyst app and compile workspace
         id: build-mac-catalyst-app
         run: ./scripts/build-mac-catalyst-app.sh -q -DskipTests
@@ -271,3 +281,11 @@ jobs:
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Upload golden capture
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-mac-catalyst
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore
