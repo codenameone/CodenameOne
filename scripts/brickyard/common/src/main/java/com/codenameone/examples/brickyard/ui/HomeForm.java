@@ -53,9 +53,12 @@ public final class HomeForm {
         Api.experiences().browse(null, Net.to(all -> {
             content.removeAll();
             content.add(Ui.bricks());
-            progress(content, f);
+            // Games first, as a player expects of a game platform: friends in
+            // a game, then the rows. The level and quests follow the first
+            // rows instead of pushing them off the screen.
             friendsPlaying(content, f, all);
             fill(content, all);
+            progress(content, f, afterSecondRow(content));
             f.revalidate();
         }, (status, message) -> {
             content.removeAll();
@@ -65,12 +68,25 @@ public final class HomeForm {
         }));
     }
 
-    /// The login streak and today's quests, above the rows. Silent when the
-    /// call fails: Home still works without them.
-    static void progress(final Container content, final Form f) {
+    /// The index just past the second row of games, or the end when there
+    /// are fewer: a row is its title and its strip, so count the strips.
+    static int afterSecondRow(Container content) {
+        int rows = 0;
+        for (int i = 0; i < content.getComponentCount(); i++) {
+            String name = content.getComponentAt(i).getName();
+            if (name != null && name.startsWith("row") && !"rowFriendsPlaying".equals(name) && ++rows == 2) {
+                return i + 1;
+            }
+        }
+        return content.getComponentCount();
+    }
+
+    /// The login streak and today's quests, placed at `index` among the rows.
+    /// Silent when the call fails: Home still works without them.
+    static void progress(final Container content, final Form f, int index) {
         final Container box = new Container(BoxLayout.y());
         box.setName("progress");
-        content.add(box);
+        content.addComponent(index, box);
         Api.progression().dailyLogin(Net.to(p -> {
             if (p != null) {
                 box.addComponent(0, ProgressViews.hero(p, null));
@@ -171,9 +187,12 @@ public final class HomeForm {
 
     static Container card(final ExperienceDto e) {
         com.codename1.ui.Button open = Ui.button("", "Card", "open" + e.id(), ev -> ExperienceForm.show(e.id()));
-        Container card = BoxLayout.encloseY(new Thumbnail(e, 32),
+        // A tile, not a panel: the picture, the name and a thumbs-up line.
+        com.codename1.ui.Label meta = Ui.label(meta(e), "CardMeta");
+        com.codename1.ui.FontImage.setMaterialIcon(meta, com.codename1.ui.FontImage.MATERIAL_THUMB_UP, 2.4f);
+        Container card = BoxLayout.encloseY(new Thumbnail(e, 30),
                 Ui.label(e.title(), "CardTitle"),
-                Ui.label(meta(e), "CardMeta"));
+                meta);
         card.setUIID("Card");
         card.setLeadComponent(open);
         card.add(open);

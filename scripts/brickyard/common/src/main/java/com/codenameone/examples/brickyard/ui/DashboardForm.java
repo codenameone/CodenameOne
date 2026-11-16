@@ -49,7 +49,7 @@ import java.util.List;
 public final class DashboardForm {
     static final int DAYS = 14;
     static final int CHART_HEIGHT_MM = 40;
-    static final int CHART_COLOR = 0x3d8bfd;
+    static final int CHART_COLOR = 0x335fff;
 
     private DashboardForm() {
     }
@@ -185,16 +185,16 @@ public final class DashboardForm {
         renderer.setShowLegend(false);
         // The chart library paints black margins and grey labels by default,
         // which read as a hole in the page: it takes the theme's colours.
-        int bg = 0xff161b2e;
+        int bg = 0xff121215;
         renderer.setApplyBackgroundColor(true);
         renderer.setBackgroundColor(bg);
         renderer.setMarginsColor(bg);
-        renderer.setAxesColor(0xff3a4468);
-        renderer.setGridColor(0xff2a3352);
+        renderer.setAxesColor(0xff3a3c42);
+        renderer.setGridColor(0xff2a2b30);
         renderer.setShowGridY(true);
-        renderer.setLabelsColor(0xffaab3cf);
-        renderer.setXLabelsColor(0xffaab3cf);
-        renderer.setYLabelsColor(0, 0xffaab3cf);
+        renderer.setLabelsColor(0xffa0a3ab);
+        renderer.setXLabelsColor(0xffa0a3ab);
+        renderer.setYLabelsColor(0, 0xffa0a3ab);
         float text = com.codename1.ui.CN.convertToPixels(2.4f);
         renderer.setLabelsTextSize(text);
         int m = com.codename1.ui.CN.convertToPixels(3);

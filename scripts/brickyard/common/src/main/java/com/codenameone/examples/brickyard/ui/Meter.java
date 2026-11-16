@@ -54,7 +54,7 @@ public class Meter extends Component {
         int x = getX();
         int y = getY();
         g.setAntiAliased(true);
-        g.setColor(0x10142a);
+        g.setColor(0x0e0f11);
         g.fillRoundRect(x, y, w, h, h, h);
         int fill = (int) (w * clamp(value));
         if (fill > 0) {

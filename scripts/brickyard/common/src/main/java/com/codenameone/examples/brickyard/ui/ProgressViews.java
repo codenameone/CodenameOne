@@ -42,7 +42,7 @@ public final class ProgressViews {
     /// Season XP per tier; the server's `Progression.XP_PER_TIER`.
     static final long XP_PER_TIER = 500;
     static final int YELLOW = 0xffc43c;
-    static final int GREEN = 0x5ac86e;
+    static final int GREEN = 0x00b06f;
     static final int PURPLE = 0x9a6cff;
 
     private ProgressViews() {

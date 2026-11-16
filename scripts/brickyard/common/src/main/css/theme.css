@@ -17,22 +17,24 @@
  * IN THE SOFTWARE.
  */
 /*
- * The whole look of Brickyard: a dark, toy-box palette with bright primary
- * buttons. Change the palette to re-skin the app; every screen is built from
- * ordinary widgets that these rules dress.
+ * The whole look of Brickyard: neutral charcoal surfaces with white text,
+ * a green Play, a blue primary action, and yellow kept for Bricks and badges.
+ * Change the palette to re-skin the app; every screen is built from ordinary
+ * widgets that these rules dress.
  */
 #Constants {
     includeNativeBool: true;
     defaultSourceDPIInt: "0";
-    --bg: #161b2e;
-    --bg-alt: #222a45;
-    --card: #2c3557;
+    --bg: #121215;
+    --bg-alt: #1c1d21;
+    --card: #26272c;
     --red: #f0563c;
     --yellow: #ffc43c;
-    --blue: #3caaff;
-    --green: #5ac86e;
+    --blue: #335fff;
+    --green: #00b06f;
     --text: #ffffff;
-    --muted: #aab3cf;
+    --muted: #a0a3ab;
+    --link: #6f94ff;
 }
 
 GameForm {
@@ -92,11 +94,19 @@ RowTitle {
     padding: 3mm 2mm 1mm 2mm;
 }
 
-Panel, Card {
+Panel {
     background-color: var(--card);
     border-radius: 2mm;
     padding: 2mm;
     margin: 1mm;
+}
+
+/* A game tile: no box around it, just the picture and two lines under it. */
+Card {
+    cn1-background-type: cn1-none;
+    background-color: transparent;
+    padding: 0;
+    margin: 1mm 2mm 1mm 0;
 }
 
 CardTitle {
@@ -113,7 +123,7 @@ CardMeta {
 
 PrimaryButton {
     background-color: var(--green);
-    color: #10240f;
+    color: #ffffff;
     font-family: "native:MainBold";
     font-size: 3.5mm;
     border-radius: 2mm;
@@ -123,12 +133,12 @@ PrimaryButton {
 }
 
 PrimaryButton.pressed {
-    background-color: #3f9a51;
+    background-color: #00935c;
 }
 
 SecondaryButton {
     background-color: var(--blue);
-    color: #08223a;
+    color: #ffffff;
     font-family: "native:MainBold";
     font-size: 3.2mm;
     border-radius: 2mm;
@@ -139,13 +149,13 @@ SecondaryButton {
 }
 
 SecondaryButton.pressed {
-    background-color: #2a85cc;
+    background-color: #274bd1;
 }
 
 LinkButton {
     padding: 1.5mm;
     margin: 0.5mm;
-    color: var(--yellow);
+    color: var(--link);
     background-color: transparent;
     font-family: "native:MainRegular";
     font-size: 3mm;
@@ -168,10 +178,10 @@ SectionTab {
 SectionTabSelected {
     padding: 1.6mm 0 1.2mm 0;
     margin: 0;
-    color: var(--yellow);
+    color: var(--text);
     background-color: transparent;
     cn1-background-type: none;
-    border-top: 0.5mm solid var(--yellow);
+    border-top: 0.5mm solid var(--text);
     font-family: "native:MainBold";
     font-size: 2.4mm;
     text-align: center;
@@ -188,8 +198,8 @@ Chip {
 }
 
 Chip.selected {
-    background-color: var(--yellow);
-    color: #2b1a07;
+    background-color: var(--text);
+    color: var(--bg);
 }
 
 GameField {
@@ -208,7 +218,7 @@ Bricks {
 
 StudioNode {
     background-color: transparent;
-    color: #d8dcf0;
+    color: #e1e2e5;
     font-size: 3mm;
     padding: 1mm 2mm;
     text-align: left;
@@ -216,7 +226,7 @@ StudioNode {
 }
 
 StudioNodeSelected {
-    background-color: #3a4fd8;
+    background-color: #335fff;
     color: #ffffff;
     font-size: 3mm;
     padding: 1mm 2mm;
@@ -241,7 +251,7 @@ StatusBar, StatusBarSideMenu {
 TitleCommand, BackCommand, ToolbarButton {
     cn1-background-type: cn1-none;
     background-color: transparent;
-    color: var(--yellow);
+    color: var(--text);
     border: none;
 }
 
@@ -256,7 +266,7 @@ StatFigure {
 
 /* The studio: a dark editor in the game's palette. */
 StudioViewport {
-    background-color: #0d1020;
+    background-color: #0b0c0e;
     padding: 0;
     margin: 0;
 }
@@ -289,12 +299,12 @@ StudioTab {
 
 StudioTabSelected {
     color: var(--bg);
-    background-color: var(--yellow);
+    background-color: var(--text);
     font-family: "native:MainBold";
 }
 
 StudioNodeClass {
-    color: #6f7aa3;
+    color: #7d8088;
     background-color: transparent;
     font-size: 2.4mm;
     padding: 1mm 2mm;
@@ -308,9 +318,9 @@ StudioPropName {
 }
 
 StudioField, StudioCode {
-    color: #e6e9f8;
-    background-color: #0f1324;
-    border: 1px solid #2f3960;
+    color: #ececee;
+    background-color: #0e0f11;
+    border: 1px solid #33353b;
     border-radius: 1.5mm;
     font-size: 2.8mm;
     padding: 1.2mm;
@@ -336,14 +346,14 @@ StudioTool {
 }
 
 StudioPlay {
-    color: var(--bg);
+    color: #ffffff;
     background-color: var(--green);
     font-family: "native:MainBold";
 }
 
 StudioPublish {
-    color: var(--bg);
-    background-color: var(--yellow);
+    color: #ffffff;
+    background-color: var(--blue);
     font-family: "native:MainBold";
 }
 
@@ -380,7 +390,7 @@ Streak {
 }
 
 QuestCadence {
-    color: var(--bg);
+    color: #ffffff;
     background-color: var(--blue);
     border-radius: 1mm;
     font-family: "native:MainBold";
@@ -416,7 +426,7 @@ PremiumButton {
 }
 
 SeasonPanel {
-    background: linear-gradient(135deg, #3a2a7a 0%, #24305a 100%);
+    background: linear-gradient(135deg, #34303f 0%, #2a2c32 100%);
     border-radius: 2mm;
     padding: 2.5mm;
     margin: 1mm;
@@ -432,7 +442,7 @@ SeasonTitle {
 }
 
 TierCard, TierCardReached {
-    background-color: #1b2142;
+    background-color: #1c1d21;
     border-radius: 2mm;
     padding: 1.5mm;
     margin: 2mm 1.5mm 0 0;
@@ -457,14 +467,14 @@ TierNumberReached {
 }
 
 TierReward, TierRewardPlus {
-    background-color: #262e55;
+    background-color: #2a2b30;
     border-radius: 1.5mm;
     padding: 1mm 2mm;
     margin: 0.6mm 0;
 }
 
 TierRewardPlus {
-    background-color: #3b2d70;
+    background-color: #352f45;
 }
 
 TierTrack, TierTrackPlus {
@@ -498,8 +508,8 @@ TierState {
 }
 
 ChipOn {
-    background-color: var(--yellow);
-    color: #2b1a07;
+    background-color: var(--text);
+    color: var(--bg);
     border-radius: 3mm;
     padding: 1mm 2mm;
     margin: 0.5mm;
@@ -515,7 +525,7 @@ Swatch {
 
 /* Shop */
 PackCard {
-    background: linear-gradient(160deg, #31407a 0%, #232b4d 100%);
+    background: linear-gradient(160deg, #2c2d33 0%, #1c1d21 100%);
     border-radius: 2mm;
     padding: 2.5mm;
     margin: 1mm;
@@ -557,7 +567,7 @@ StudioToolSelected {
     border-radius: 3mm;
     text-align: center;
     border: none;
-    color: var(--bg);
+    color: #ffffff;
     background-color: var(--blue);
     font-family: "native:MainBold";
 }
@@ -578,7 +588,7 @@ SideCommand {
 }
 
 StudioSideTitle {
-    color: var(--yellow);
+    color: var(--text);
     background-color: var(--bg-alt);
     font-family: "native:MainBold";
     font-size: 3.6mm;
@@ -598,7 +608,7 @@ StudioSideSection {
 StudioSheet, StudioSheetBody {
     background-color: var(--bg-alt);
     border-radius: 4mm 4mm 0 0;
-    border-top: 1px solid #3a4570;
+    border-top: 1px solid #3a3c42;
     padding: 0;
     margin: 0;
 }
@@ -635,7 +645,7 @@ StudioChip {
 
 StudioChipSelected {
     color: var(--bg);
-    background-color: var(--yellow);
+    background-color: var(--text);
     font-family: "native:MainBold";
 }
 
@@ -652,7 +662,7 @@ StudioTile {
 
 StudioToolStrip {
     background-color: var(--bg-alt);
-    border-bottom: 1px solid #2f3960;
+    border-bottom: 1px solid #33353b;
     padding: 0.4mm 1mm;
     margin: 0;
 }
@@ -667,17 +677,17 @@ StudioIcon, StudioIconSelected {
 }
 
 StudioIcon {
-    color: #d8dcf0;
+    color: #e1e2e5;
     background-color: transparent;
 }
 
 StudioIconSelected {
     color: #ffffff;
-    background-color: #3a4fd8;
+    background-color: #335fff;
 }
 
 StudioSeparator {
-    background-color: #3a4570;
+    background-color: #3a3c42;
     padding: 0;
     margin: 1mm 1.2mm;
     width: 1px;
@@ -685,36 +695,36 @@ StudioSeparator {
 }
 
 StudioDesktop, StudioCentre {
-    background-color: #0d1020;
+    background-color: #0b0c0e;
     padding: 0;
     margin: 0;
 }
 
 StudioDockLeft {
     background-color: var(--bg);
-    border-right: 1px solid #2f3960;
+    border-right: 1px solid #33353b;
     padding: 0;
     margin: 0;
 }
 
 StudioDockRight {
     background-color: var(--bg);
-    border-left: 1px solid #2f3960;
+    border-left: 1px solid #33353b;
     padding: 0;
     margin: 0;
 }
 
 StudioDockBottom {
     background-color: var(--bg);
-    border-top: 1px solid #2f3960;
+    border-top: 1px solid #33353b;
     padding: 0;
     margin: 0;
 }
 
 StudioPaneHeader {
     color: var(--muted);
-    background-color: #1b2138;
-    border-bottom: 1px solid #2f3960;
+    background-color: #1a1b1f;
+    border-bottom: 1px solid #33353b;
     font-family: "native:MainBold";
     font-size: 2.3mm;
     padding: 0.8mm 2mm;
@@ -722,7 +732,7 @@ StudioPaneHeader {
 }
 
 StudioPaneHeaderHint {
-    color: #6f7aa3;
+    color: #7d8088;
     background-color: transparent;
     font-size: 2.3mm;
     padding: 0.8mm 2mm;
@@ -743,12 +753,12 @@ StudioPaneTab {
 StudioPaneTabSelected {
     color: #ffffff;
     background-color: var(--bg);
-    border-top: 2px solid var(--yellow);
+    border-top: 2px solid var(--blue);
 }
 
 StudioMiniButton {
     color: var(--bg);
-    background-color: var(--yellow);
+    background-color: var(--text);
     font-family: "native:MainBold";
     font-size: 2.3mm;
     padding: 0.5mm 2mm;
@@ -760,8 +770,8 @@ StudioMiniButton {
 /* The studio's dialogs (publish) in the editor's palette, not the native
    theme's light one. */
 StudioDialog, StudioDialogBody {
-    background-color: #1b2138;
-    border: 1px solid #3a4570;
+    background-color: #1a1b1f;
+    border: 1px solid #3a3c42;
     border-radius: 2mm;
     padding: 2mm;
     margin: 0;
@@ -907,7 +917,7 @@ GameHud {
 
 /* The connect-an-agent sheet. */
 StudioDialogText {
-    color: #c9d1ea;
+    color: #d4d6da;
     background-color: transparent;
     font-size: 2.3mm;
     padding: 0.6mm 1mm;
@@ -915,7 +925,7 @@ StudioDialogText {
 }
 
 StudioDialogHeading {
-    color: #8fa3e8;
+    color: #b8bbc2;
     background-color: transparent;
     font-family: "native:MainBold";
     font-size: 2.2mm;
@@ -943,7 +953,7 @@ StudioDialogMono {
 
 StudioDialogQuote {
     color: #ffffff;
-    background-color: #252d4d;
+    background-color: #2a2b30;
     font-size: 2.3mm;
     padding: 1.5mm;
     margin: 0.5mm 1mm;
@@ -962,7 +972,7 @@ GameChatButton {
 GameChatInput {
     color: #ffffff;
     background-color: rgba(18, 24, 48, 0.9);
-    border: 1px solid #5c6bc0;
+    border: 1px solid #5a5d66;
     border-radius: 2mm;
     font-size: 2.8mm;
     padding: 1.2mm 2mm;
@@ -983,14 +993,14 @@ GameChatSystem {
 
 /* The desktop operations console. */
 ConsoleForm, ConsoleMain {
-    background-color: #0f1324;
+    background-color: #0e0f11;
     padding: 0;
     margin: 0;
 }
 
 ConsoleToolbar {
-    background-color: #0b0f1d;
-    border-bottom: 1px solid #262e4c;
+    background-color: #0b0c0e;
+    border-bottom: 1px solid #2a2b30;
     padding: 0.5mm 1mm;
 }
 
@@ -1002,8 +1012,8 @@ ConsoleTitle {
 }
 
 ConsoleSidebar {
-    background-color: #0b0f1d;
-    border-right: 1px solid #262e4c;
+    background-color: #0b0c0e;
+    border-right: 1px solid #2a2b30;
     padding: 3mm 2mm;
     margin: 0;
 }
@@ -1019,14 +1029,14 @@ ConsoleBrand {
 
 ConsoleBrandSub {
     background-color: transparent;
-    color: #7e88aa;
+    color: #8a8d95;
     font-size: 2.1mm;
     padding: 0 2mm 3mm 2mm;
     margin: 0;
 }
 
 ConsoleNav, ConsoleNavSelected {
-    color: #c9d1ea;
+    color: #d4d6da;
     background-color: transparent;
     font-size: 2.6mm;
     text-align: left;
@@ -1037,13 +1047,13 @@ ConsoleNav, ConsoleNavSelected {
 
 ConsoleNavSelected {
     color: #ffffff;
-    background-color: #24305a;
+    background-color: #2a2c32;
     font-family: "native:MainBold";
 }
 
 ConsoleHeader {
-    background-color: #0f1324;
-    border-bottom: 1px solid #262e4c;
+    background-color: #0e0f11;
+    border-bottom: 1px solid #2a2b30;
     padding: 2mm 4mm;
     margin: 0;
 }
@@ -1059,7 +1069,7 @@ ConsoleHeading {
 
 ConsoleWho {
     background-color: transparent;
-    color: #aab3cf;
+    color: #a0a3ab;
     font-size: 2.3mm;
     padding: 1mm 2mm;
     margin: 0;
@@ -1067,7 +1077,7 @@ ConsoleWho {
 
 ConsoleAction {
     color: #ffffff;
-    background-color: #2b3766;
+    background-color: #2f3137;
     font-size: 2.3mm;
     padding: 1mm 2.5mm;
     margin: 0;
@@ -1081,8 +1091,8 @@ ConsoleBody {
 }
 
 ConsoleCard {
-    background-color: #161b2e;
-    border: 1px solid #262e4c;
+    background-color: #121215;
+    border: 1px solid #2a2b30;
     border-radius: 2mm;
     padding: 2mm 2.5mm;
     margin: 1.2mm;
@@ -1090,7 +1100,7 @@ ConsoleCard {
 
 ConsoleCardTitle {
     background-color: transparent;
-    color: #8fa3e8;
+    color: #b8bbc2;
     font-family: "native:MainBold";
     font-size: 2.4mm;
     padding: 0 0 1.5mm 0;
@@ -1098,8 +1108,8 @@ ConsoleCardTitle {
 }
 
 ConsoleKpi {
-    background-color: #161b2e;
-    border: 1px solid #262e4c;
+    background-color: #121215;
+    border: 1px solid #2a2b30;
     border-radius: 2mm;
     padding: 2mm 2.5mm;
     margin: 1.2mm;
@@ -1107,7 +1117,7 @@ ConsoleKpi {
 
 ConsoleKpiName {
     background-color: transparent;
-    color: #7e88aa;
+    color: #8a8d95;
     font-size: 2.1mm;
     padding: 0;
     margin: 0;
@@ -1124,29 +1134,29 @@ ConsoleKpiValue {
 
 ConsoleTableHead {
     background-color: transparent;
-    color: #7e88aa;
+    color: #8a8d95;
     font-family: "native:MainBold";
     font-size: 2.1mm;
     padding: 0.8mm 1.5mm;
     margin: 0;
-    border-bottom: 1px solid #262e4c;
+    border-bottom: 1px solid #2a2b30;
 }
 
 ConsoleCell, ConsoleCellMuted {
     background-color: transparent;
-    color: #e6eaf7;
+    color: #ececee;
     font-size: 2.3mm;
     padding: 0.8mm 1.5mm;
     margin: 0;
 }
 
 ConsoleCellMuted {
-    color: #8e97b8;
+    color: #9a9da5;
 }
 
 ConsoleAttention, ConsoleAttentionClear {
     color: #ffd27a;
-    background-color: #241f2e;
+    background-color: #27241f;
     font-size: 2.5mm;
     text-align: left;
     padding: 1.5mm 2mm;
@@ -1161,7 +1171,7 @@ ConsoleAttentionClear {
 
 StudioPopup {
     background-color: var(--bg-alt);
-    border: 1px solid #3a4570;
+    border: 1px solid #3a3c42;
     border-radius: 3mm;
     padding: 1mm 0;
     margin: 0;
@@ -1170,7 +1180,7 @@ StudioPopup {
 /* A touch tablet's Explorer rows: tall enough for a fingertip. */
 StudioNodeTouch {
     background-color: transparent;
-    color: #d8dcf0;
+    color: #e1e2e5;
     font-size: 3.2mm;
     padding: 2.2mm 2mm;
     text-align: left;
@@ -1178,7 +1188,7 @@ StudioNodeTouch {
 }
 
 StudioNodeSelectedTouch {
-    background-color: #3a4fd8;
+    background-color: #335fff;
     color: #ffffff;
     font-size: 3.2mm;
     padding: 2.2mm 2mm;

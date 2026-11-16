@@ -45,7 +45,7 @@ import java.util.Map;
 /// experience that has never been published, a little skyline of blocks
 /// whose colours come from the id stands in.
 public class Thumbnail extends Component {
-    private static final int[] COLORS = {0xf0563c, 0xffc43c, 0x3caaff, 0x5ac86e, 0x8a5cf0, 0xff8fc8};
+    private static final int[] COLORS = {0xf0563c, 0xffc43c, 0x335fff, 0x00b06f, 0x8a5cf0, 0xff8fc8};
     /// Renders already made this run, by storage key.
     private static final Map<String, Image> CACHE = new HashMap<String, Image>();
     private final int seed;
@@ -139,7 +139,7 @@ public class Thumbnail extends Component {
             badge(g, w, h);
             return;
         }
-        g.setColor(0x222a45);
+        g.setColor(0x1c1d21);
         g.fillRect(getX(), getY(), w, h);
         int columns = 6;
         int cw = Math.max(1, w / columns);
@@ -170,11 +170,11 @@ public class Thumbnail extends Component {
         int x = getX() + pad * 2;
         int y = getY() + pad * 2;
         g.setAntiAliased(true);
-        g.setColor(0x161b2e);
+        g.setColor(0x121215);
         g.setAlpha(190);
         g.fillRoundRect(x, y, tw, th, th, th);
         g.setAlpha(255);
-        g.setColor(0xffc400);
+        g.setColor(0xffffff);
         g.setFont(font);
         g.drawString(text, x + pad, y + pad / 2);
     }

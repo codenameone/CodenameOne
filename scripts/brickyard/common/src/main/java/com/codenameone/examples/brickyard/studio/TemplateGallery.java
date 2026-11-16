@@ -103,6 +103,9 @@ final class TemplateGallery {
         if ("obby".equals(id)) {
             return "Obby";
         }
+        if ("rainbow".equals(id)) {
+            return "Rainbow Obby";
+        }
         if ("tycoon".equals(id)) {
             return "Tycoon";
         }
@@ -123,6 +126,9 @@ final class TemplateGallery {
         if ("baseplate".equals(id)) {
             return "Adventure";
         }
+        if ("rainbow".equals(id)) {
+            return "Obby";
+        }
         return "arena".equals(id) ? "Fighting" : title(id);
     }
 
@@ -132,6 +138,9 @@ final class TemplateGallery {
         }
         if ("obby".equals(id)) {
             return "Islands over the bay, a spinner and a trophy at the top.";
+        }
+        if ("rainbow".equals(id)) {
+            return "Classic brick jumps in the sky, a stage for every colour.";
         }
         if ("tycoon".equals(id)) {
             return "Droppers, conveyors and upgrades that pay out.";
@@ -188,7 +197,7 @@ final class TemplateGallery {
             if (img != null) {
                 g.drawImage(img, getX(), getY(), getWidth(), getHeight());
             } else {
-                g.setColor(0x222a45);
+                g.setColor(0x1c1d21);
                 g.fillRect(getX(), getY(), getWidth(), getHeight());
             }
         }

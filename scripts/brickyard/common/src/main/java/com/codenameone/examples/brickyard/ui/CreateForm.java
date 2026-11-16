@@ -26,6 +26,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.brickyard.api.AccountDto;
 import com.codenameone.examples.brickyard.api.ExperienceDto;
@@ -102,19 +103,24 @@ public final class CreateForm {
         Label status = Ui.label(published ? "Live, v" + x.publishedVersion() : "Draft",
                 published ? "CreatorLive" : "CreatorDraft");
         long votes = x.upVotes() + x.downVotes();
-        String rating = votes == 0 ? "No ratings yet" : Math.round(100.0 * x.upVotes() / votes) + "% liked";
-        Container text = BoxLayout.encloseY(
-                BorderLayout.centerEastWest(Ui.label(x.title(), "CardTitle"), status, null),
+        String rating = votes == 0 ? "New" : Math.round(100.0 * x.upVotes() / votes) + "% liked";
+        // The name gets the whole line and the status sits under it, and the
+        // buttons span the card below: side by side with the picture, a phone
+        // cut all three down to their first letters.
+        Container text = BoxLayout.encloseY(Ui.label(x.title(), "CardTitle"),
+                FlowLayout.encloseIn(status),
                 Ui.label(x.visits() + " visits  -  " + rating, "CardMeta"));
-        Container actions = new Container(new GridLayout(1, 2));
-        actions.add(Ui.secondary("Open in Studio", "edit" + x.id(), e -> Studio.open(x.id())));
-        actions.add(Ui.button("Dashboard", "CreatorGhostButton", "dashboard" + x.id(), e -> DashboardForm.show(x)));
-        text.add(actions);
         text.setUIID("CreatorCardText");
-        Container card = new Container(new BorderLayout());
+        Container top = new Container(new BorderLayout());
+        top.add(BorderLayout.WEST, new Thumbnail(x, CN.isTablet() ? 44 : 26));
+        top.add(BorderLayout.CENTER, text);
+        Container actions = new Container(new GridLayout(1, 2));
+        com.codename1.ui.Button edit = Ui.secondary("Edit", "edit" + x.id(), e -> Studio.open(x.id()));
+        edit.setAccessibilityText("Open in Studio");
+        actions.add(edit);
+        actions.add(Ui.button("Dashboard", "CreatorGhostButton", "dashboard" + x.id(), e -> DashboardForm.show(x)));
+        Container card = BoxLayout.encloseY(top, actions);
         card.setUIID("Panel");
-        card.add(BorderLayout.WEST, new Thumbnail(x, CN.isTablet() ? 44 : 30));
-        card.add(BorderLayout.CENTER, text);
         return card;
     }
 

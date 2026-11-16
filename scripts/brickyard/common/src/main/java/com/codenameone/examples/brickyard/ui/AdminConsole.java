@@ -70,7 +70,7 @@ public final class AdminConsole {
         FontImage.MATERIAL_PEOPLE, FontImage.MATERIAL_SAVINGS, FontImage.MATERIAL_STAR,
         FontImage.MATERIAL_BUILD, FontImage.MATERIAL_HISTORY};
     static final int TRACTION_DAYS = 14;
-    private static final int CHART_BG = 0xff161b2e;
+    private static final int CHART_BG = 0xff121215;
 
     private final Form form;
     private final Container center = new Container(new BorderLayout());
@@ -336,7 +336,7 @@ public final class AdminConsole {
         data.addSeries(visits);
         data.addSeries(players);
         XYMultipleSeriesRenderer r = renderer(days);
-        r.addSeriesRenderer(line(0xff5c8dff));
+        r.addSeriesRenderer(line(0xff335fff));
         r.addSeriesRenderer(line(0xff5ee6a0));
         r.setShowLegend(true);
         r.setLegendTextSize(CN.convertToPixels(2.4f));
@@ -387,12 +387,12 @@ public final class AdminConsole {
         r.setApplyBackgroundColor(true);
         r.setBackgroundColor(CHART_BG);
         r.setMarginsColor(CHART_BG);
-        r.setAxesColor(0xff3a4468);
-        r.setGridColor(0xff2a3352);
+        r.setAxesColor(0xff3a3c42);
+        r.setGridColor(0xff2a2b30);
         r.setShowGridY(true);
-        r.setLabelsColor(0xffaab3cf);
-        r.setXLabelsColor(0xffaab3cf);
-        r.setYLabelsColor(0, 0xffaab3cf);
+        r.setLabelsColor(0xffa0a3ab);
+        r.setXLabelsColor(0xffa0a3ab);
+        r.setYLabelsColor(0, 0xffa0a3ab);
         r.setLabelsTextSize(CN.convertToPixels(2.2f));
         int m = CN.convertToPixels(3);
         r.setMargins(new int[] {m / 2, m * 2, m * 2, m / 2});
