@@ -90,6 +90,12 @@ public final class Lang {
         return UIManager.getInstance().localize(text, text);
     }
 
+    /// `one` translated when `count` is 1, otherwise `many` with the count in
+    /// place of `{0}`: "1 job left", "3 jobs left".
+    public static String count(int count, String one, String many) {
+        return count == 1 ? tr(one) : tr(many, String.valueOf(count));
+    }
+
     /// Translates `pattern` and puts `values` where it says `{0}`, `{1}`...
     public static String tr(String pattern, Object... values) {
         String text = tr(pattern);

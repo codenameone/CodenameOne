@@ -211,6 +211,35 @@ public final class Ui {
         return new Label(text == null ? "" : text, uiid);
     }
 
+    /// Lays `form` out after wrapped text was added to it while it is on
+    /// screen. The first pass measures new text before it knows how wide it
+    /// may be, and keeps that answer: a paragraph came out as one clipped
+    /// line. A second pass, once the widths are settled, measures it again.
+    public static void relayout(final Form form, final Runnable then) {
+        form.revalidate();
+        CN.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                form.getContentPane().setShouldCalcPreferredSize(true);
+                form.revalidate();
+                if (then != null) {
+                    then.run();
+                }
+            }
+        });
+    }
+
+    /// [#relayout(Form, Runnable)] for the form `inside` is on, or just
+    /// `inside` while it is on none.
+    public static void relayout(Container inside) {
+        Form form = inside.getComponentForm();
+        if (form == null) {
+            inside.revalidate();
+        } else {
+            relayout(form, null);
+        }
+    }
+
     /// Text that wraps.
     public static SpanLabel text(String text, String uiid) {
         SpanLabel label = new SpanLabel(text == null ? "" : text);

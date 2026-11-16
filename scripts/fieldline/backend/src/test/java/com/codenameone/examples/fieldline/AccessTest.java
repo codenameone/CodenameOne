@@ -95,18 +95,18 @@ class AccessTest {
     @Test
     void placesAreFoundThroughTheServer() throws Exception {
         String tech = SignIn.token(mvc, DemoAccounts.TECHNICIAN, DemoAccounts.PASSWORD);
-        mvc.perform(get("/api/geo/search?q=pier&lat=37.8&lng=-122.4"))
+        mvc.perform(get("/api/geo/search?q=pioneer&lat=45.52&lng=-122.68"))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(as(get("/api/geo/search?q=PIER&lat=37.8&lng=-122.4"), tech))
+        mvc.perform(as(get("/api/geo/search?q=PIONEER&lat=45.52&lng=-122.68"), tech))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Pier 39"));
+                .andExpect(jsonPath("$[0].name").value("Pioneer Courthouse Square"));
         // Too little to search for.
-        mvc.perform(as(get("/api/geo/search?q=pi&lat=37.8&lng=-122.4"), tech))
+        mvc.perform(as(get("/api/geo/search?q=pi&lat=45.52&lng=-122.68"), tech))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
-        mvc.perform(as(get("/api/geo/reverse?lat=37.7956&lng=-122.3936"), tech))
+        mvc.perform(as(get("/api/geo/reverse?lat=45.5290&lng=-122.6766"), tech))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Ferry Building"))
-                .andExpect(jsonPath("$.lat").value(37.7956));
+                .andExpect(jsonPath("$.name").value("Union Station"))
+                .andExpect(jsonPath("$.lat").value(45.5290));
     }
 }

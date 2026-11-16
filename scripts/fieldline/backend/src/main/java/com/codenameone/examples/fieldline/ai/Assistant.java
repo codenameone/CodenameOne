@@ -91,6 +91,12 @@ public class Assistant {
             }
         }
         String reply = rules(user, request, turn);
+        if (turn.run != null) {
+            // The tool result lists every change for a model to summarize.
+            // Without a model it was shown as is, a dozen bullets above the
+            // run card that shows the same changes with their figures.
+            reply = "Done. Here is what changed:";
+        }
         return new AssistantReplyDto(reply, turn.actions, turn.run, "demo");
     }
 
@@ -533,7 +539,12 @@ public class Assistant {
         }
         if (request.jobId() != null && request.jobId().length() > 0 || Words.any(q, "how", "why",
                 "fault", "error", "code", "noise", "leak", "reset", "replace", "pressure", "test")) {
-            List<Manuals.Hit> hits = manuals.search(request.message(), assetOf(request.jobId()), 2);
+            // From a job, "what could cause this?" means this job: its title
+            // and reported problem are part of the question. Asked alone,
+            // the one word worth matching was "cause", and the manual that
+            // said it first -- a solar inverter's -- answered an HVAC call.
+            List<Manuals.Hit> hits = manuals.search(request.message() + " " + aboutJob(request.jobId()),
+                    assetOf(request.jobId()), 2);
             if (!hits.isEmpty()) {
                 Manuals.Hit best = hits.get(0);
                 return "From \"" + best.chunk.getTitle() + "\":\n" + best.chunk.getBody()
@@ -552,6 +563,16 @@ public class Assistant {
 
     /// The kind of equipment a job is on, or null.
     @Transactional(readOnly = true)
+    /// The words a job adds to a question asked from it: its title and the
+    /// problem reported, or nothing outside a job.
+    String aboutJob(String jobId) {
+        Job job = jobId == null || jobId.length() == 0 ? null : jobs.findById(jobId);
+        if (job == null) {
+            return "";
+        }
+        return job.getTitle() + " " + (job.getDescription() == null ? "" : job.getDescription());
+    }
+
     String assetOf(String jobId) {
         Job job = jobId == null || jobId.length() == 0 ? null : jobs.findById(jobId);
         Site site = job == null ? null : sites.findById(job.getSiteId());

@@ -105,6 +105,19 @@ public class Manuals {
             }
             out.add(new Hit(c, score));
         }
+        if (assetType != null) {
+            // The equipment in front of the technician is what they asked
+            // about. Other manuals answer only when none of its own does.
+            List<Hit> own = new ArrayList<Hit>();
+            for (Hit h : out) {
+                if (assetType.equals(h.chunk.getAssetType())) {
+                    own.add(h);
+                }
+            }
+            if (!own.isEmpty()) {
+                out = own;
+            }
+        }
         sort(out);
         return out.size() > limit ? new ArrayList<Hit>(out.subList(0, limit)) : out;
     }

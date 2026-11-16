@@ -65,7 +65,7 @@ public final class SignOffForm {
         if (na > 0) {
             counts.add(Ui.badge(Lang.tr("{0} not applicable", String.valueOf(na)), "FlBadge"));
         }
-        counts.add(Ui.badge(Lang.tr("{0} photos", String.valueOf(job.photos())), "FlBadge"));
+        counts.add(Ui.badge(Lang.count(job.photos(), "1 photo", "{0} photos"), "FlBadge"));
         summary.add(counts);
         for (CheckDto c : job.checklist()) {
             if ("FAIL".equals(c.result())) {

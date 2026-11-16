@@ -124,7 +124,7 @@ final class BackOffice {
                     "No job on the board matches."));
         }
         Layouts.dress(list);
-        list.revalidate();
+        Ui.relayout(list);
     }
 
     private static Component job(JobDto j) {
@@ -207,7 +207,7 @@ final class BackOffice {
                 }));
             }
             Layouts.dress(list);
-            list.revalidate();
+            Ui.relayout(list);
         }, Ui::fail));
         return list;
     }
@@ -229,7 +229,7 @@ final class BackOffice {
                 }));
             }
             Layouts.dress(list);
-            list.revalidate();
+            Ui.relayout(list);
         }, Ui::fail));
         return list;
     }
@@ -324,7 +324,7 @@ final class BackOffice {
             rates.add(Ui.choice("rate", labels, ids, rate[0], v -> rate[0] = v, 2));
             Layouts.dress(rates);
             if (rates.getComponentForm() != null) {
-                rates.getComponentForm().revalidate();
+                Ui.relayout(rates);
             }
         }, Ui::fail));
         final boolean[] active = {c.active()};
@@ -379,7 +379,7 @@ final class BackOffice {
             fillRules(page, p);
             Layouts.dress(page);
             if (page.getComponentForm() != null) {
-                page.getComponentForm().revalidate();
+                Ui.relayout(page);
             }
         }, Ui::fail));
         return page;
@@ -463,7 +463,7 @@ final class BackOffice {
                 page.removeAll();
                 fillRules(page, saved);
                 Layouts.dress(page);
-                page.getComponentForm().revalidate();
+                Ui.relayout(page);
             }, Ui::fail));
         }));
     }
@@ -491,7 +491,7 @@ final class BackOffice {
                 }));
             }
             Layouts.dress(list);
-            list.revalidate();
+            Ui.relayout(list);
         }, Ui::fail));
         return list;
     }

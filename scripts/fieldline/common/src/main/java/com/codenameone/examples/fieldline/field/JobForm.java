@@ -285,7 +285,7 @@ public final class JobForm {
         showSignature();
         page.add(Ui.label(" ", "FlSpacer"));
         updateBar();
-        form.revalidate();
+        Ui.relayout(form, null);
     }
 
     private Container hero() {
@@ -644,7 +644,7 @@ public final class JobForm {
             Ui.say("Added to your notes");
         }));
         report.add(card);
-        form.revalidate();
+        Ui.relayout(form, null);
     }
 
     private void showSignature() {
@@ -692,7 +692,7 @@ public final class JobForm {
                 ? "The checklist, photos, notes and signature still hash to this value."
                 : "The record no longer matches what was signed.", "WlMuted"));
         signature.add(card);
-        form.revalidate();
+        Ui.relayout(form, null);
     }
 
     private static String shortHash(String hash) {
@@ -748,7 +748,7 @@ public final class JobForm {
             }
         }
         if (open > 0) {
-            return Lang.tr("{0} checklist items to answer", String.valueOf(open));
+            return Lang.count(open, "1 checklist item to answer", "{0} checklist items to answer");
         }
         if ("INSPECTION".equals(job.kind()) && !job.signed()) {
             return Lang.tr("Needs the customer's signature");

@@ -280,7 +280,7 @@ public final class TodaySplit implements Nav.Home {
         } else if (!picked.equals(shown)) {
             open(picked);
         }
-        form.revalidate();
+        Ui.relayout(form, null);
     }
 
     private void open(String id) {

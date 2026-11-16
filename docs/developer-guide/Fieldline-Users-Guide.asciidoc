@@ -8,9 +8,9 @@ around skills, working hours, time off and travel. Technicians work the day from
 their phone. Dispatchers see the whole crew and move work between people. The app
 and the server are one Maven project, written in Java on both sides.
 
-This chapter is the user's guide: what each kind of user sees and can do. The
-project's `README.adoc` in `scripts/fieldline` explains how the project builds, how
-to test it and how to configure it.
+This chapter is the user's guide: what each kind of user sees and can do.
+<<fieldline-implementors-guide>> is the other half. It explains how the project is
+built and what to change to make it yours.
 
 One app serves everyone. The server gives every account a set of roles, and the
 app opens on the screens for the role the account holds.
@@ -67,58 +67,210 @@ change made on one reaches the other as it happens.
 
 === The technician
 
-The technician's day opens as a numbered route on a map, with the travel time
-between stops.
+image::img/fieldline-welcome.png["The Fieldline welcome screen with buttons to sign in and to create an account",scaledwidth=40%]
 
-image::img/fieldline-today.png["The technician's day: the jobs as a numbered route on a map, with the list of stops below",scaledwidth=40%]
+A technician signs in with the account the office set up. The app remembers the
+session, so the next time it opens straight on the day.
 
-Opening a job shows the site, the equipment and the checklist. From there the
-technician:
+==== The day
 
-* starts driving, which shows the dispatcher who is on the way,
-  and checks in on arrival;
-* works through the checklist, which saves after every answer;
-* photographs what they find and asks the assistant to diagnose it, which returns
-  the likely issue, its severity, the probable cause, the recommended action and
-  the parts;
-* asks the assistant about the job in hand, and has it draft the inspection
-  report;
-* has the customer sign on the screen. The signature is sealed with a hash of
-  the signature, the time and the place, so the report can be verified later.
+The day opens on a map of the area with a sheet over it. The sheet greets the
+technician by name and says how many jobs are left, how long the driving takes
+and how much of the day is done. Below that are the clock and the next job, with
+a button to start driving to it.
 
-The menu holds the rest: clocking in and out (the unpaid meal break comes off the
-timesheet by the pay rules), the working hours
-and limits the planner must respect, time-off requests, and adding the day's jobs
-to the phone's calendar.
+image::img/fieldline-today.png["The technician's day: the map above, and a sheet with the jobs left, the clock and the next job",scaledwidth=40%]
+
+Dragging the sheet up shows the whole route: the number of jobs, the time on the
+road and how full the day is, then every stop in order with the drive between
+each one. The same stops are numbered on the map, and the route button above the
+sheet fits them all on the screen.
+
+image::img/fieldline-today-route.png["The route: each stop with its time and length, numbered, with the drive between stops",scaledwidth=40%]
+
+The switch on the sheet clocks the technician in and out. The time worked goes to
+the timesheet, and the unpaid meal break comes off it by the company's pay rules.
+A finished job drops off the count, and the ring fills.
+
+==== A job
+
+Opening a job shows what the dispatcher knows about it: the site and its address,
+the window it's booked for, the customer with a button to call them, directions,
+and the problem as it was reported. The steps along the bottom show how far the job
+has gone, from scheduled to completed.
+
+image::img/fieldline-job.png["A job: the title, the site and window, buttons to call, get directions and ask the assistant, and the job's progress",scaledwidth=40%]
+
+*Start driving* tells the dispatcher the technician is on the way. On arrival,
+*Check in* records the time and how far the phone is from the site, and the job
+moves to on site.
+
+The checklist comes from the kind of job: a quarterly HVAC service checks
+different things than a fire alarm test. Every item is a pass, a fail or not
+applicable, and each answer is saved the moment it's given, so a phone that loses
+signal or runs out of battery loses nothing. The job can't be completed while
+an item is unanswered, and the button says how many are left.
+
+image::img/fieldline-checklist.png["The checklist: each item answered pass, fail or not applicable, with the count still to answer",scaledwidth=40%]
+
+A photo taken from the job goes to the assistant, which says what it sees: the
+likely issue, its severity, the probable cause, what to do and the parts
+it needs. The diagnosis shows as a card on the job.
+
+==== The assistant
+
+The assistant answers from the manuals for the equipment the crew services. Asked
+from a job, it knows the job, its checklist and its photos, so a question about a
+fault is answered from the manual for that unit, never from one for something
+else. Each answer names the manual it came from.
+
+image::img/fieldline-assistant.png["The field assistant answering a question from the manual it names",scaledwidth=40%]
+
+On a server with no model configured, the assistant answers from rules and a
+search of the manuals, and says so under the conversation. A model configured
+on the server makes the answers conversational. Nothing else changes.
+
+When the work is done, *Draft report* writes up the visit from the checklist,
+the findings and the follow-up, and the button under it puts the draft into the
+report for the technician to edit.
+
+image::img/fieldline-draft.png["A drafted report with the findings and follow-up, and a button to use it as the technician's notes",scaledwidth=40%]
+
+==== Sign-off
+
+The customer signs on the screen, under a summary of what passed, what failed
+and how many photos were taken.
+
+image::img/fieldline-signoff.png["The sign-off screen: the job's summary, the customer's name and the signature",scaledwidth=40%]
+
+The signature is sealed with a hash of the signature, the checklist, the photos,
+the notes, the time and the place. The job shows the hash and checks it again
+each time it opens: if anything in the report has changed since the customer
+signed, it's no longer marked verified.
+
+image::img/fieldline-sealed.png["A sealed sign-off: the signature, the time, the hash and the word Verified",scaledwidth=40%]
+
+==== Hours and time off
+
+The menu holds everything besides the day's work.
+
+image::img/fieldline-menu.png["The technician's menu: the field assistant, working hours, time off, settings and sign out",scaledwidth=40%]
+
+*Working hours* is the week the planner books into: the days the technician
+works, the hours on each, the longest drive they accept between jobs and the
+most hours in a week. The planner never books outside them, and saving them
+re-plans the week at once.
+
+image::img/fieldline-hours.png["Working hours: each day of the week switched on or off, with its start and end",scaledwidth=40%]
+
+*Time off* asks the dispatcher for days away, with a reason. The request shows as
+waiting until the dispatcher decides, and then as approved or declined. The
+day's jobs can also be added to the phone's calendar from the settings.
+
+image::img/fieldline-timeoff.png["Time off: the dates and reason of a new request, and the requests sent so far",scaledwidth=40%]
 
 === The dispatcher
 
-The dispatch board shows the crew as rows on a timeline and a Gantt chart against
-the last plan, and a map of where everyone is.
+The dispatcher works at a desk, so the screens are laid out for a wide window
+with the places down the side. The same screens fit a tablet, and on a phone
+they stack.
 
-image::img/fieldline-board.png["The dispatch board: the crew as rows of jobs on a timeline, with the map of the crew beside it",scaledwidth=80%]
+==== The board
 
-A job dragged to another technician or time is checked against every rule before
-the move goes through: the technician's skills, hours and time off, the job's time window,
-the travel between jobs. A new job is placed by the planner. When a technician is
-out, one tap covers their jobs, moving as few others as it can.
+The board opens on today's numbers: jobs scheduled, jobs no one can take, jobs
+past their deadline, the hours on the road and how much of the crew's time is
+booked. Below them, the crew is one row each on a timeline, with the breaks
+striped. Beside it, *Needs attention* lists the time-off requests waiting and
+each unassigned job with the reason the planner couldn't place it.
 
-Optimizing plans the week again. Every run is kept with what it changed and why,
-and with its drive time, deadlines met and overtime against the plan before it.
-The assistant takes the same requests in plain words, such as
-"Dana is out Thursday, cover her jobs."
+image::img/fieldline-board.png["The dispatch board: the crew as rows of jobs on a timeline, with the jobs that need attention beside it",scaledwidth=80%]
 
-Time-off requests wait in a queue for the dispatcher to approve or decline.
+Tapping a job opens it. Dragging it to another row or time moves it, and the
+move is checked against every rule before it goes through: the technician's
+skills and certificates, their hours and time off, the job's window and the
+drive from the job before. A move that breaks one is refused with the reason. A
+new job goes to the planner, which finds it a place.
+
+The Gantt view shows every technician's jobs as bars against the plan before the
+last change, so what moved stands out.
+
+image::img/fieldline-gantt.png["The Gantt view: each technician's jobs as bars under their name, against a timeline",scaledwidth=80%]
+
+The map view shows where every technician is and the jobs no one has yet.
+
+image::img/fieldline-board-map.png["The map view: the technicians and the unassigned jobs on a map of the city",scaledwidth=80%]
+
+==== The planner
+
+*Optimize* plans the week again. The result shows how the numbers changed and
+every job that moved, with where it went and why. Each run is kept under
+*Planner runs*, so a change can be traced to the run that made it.
+
+image::img/fieldline-optimize.png["An optimizer run: the change in unassigned jobs, deadlines, driving and overtime, and each job it moved",scaledwidth=80%]
+
+The planner keeps to the same rules as a move, and then weighs the rest: less
+driving, fewer missed deadlines, less overtime, each technician's preferences,
+an even share of work, and the same technician for a site they visited before.
+When something changes in the middle of a week, it repairs the plan instead of
+starting again, and moves as few jobs as it can. Work already started is never
+moved.
+
+==== Time off and absences
+
+A technician's time-off request waits under *Time-off requests*. A decision shows
+on the technician's request. *Approve and cover* approves it and re-plans their jobs on those
+days onto the rest of the crew in one step.
+
+image::img/fieldline-timeoff-queue.png["A time-off request waiting, with buttons to decline it or approve it and cover the jobs",scaledwidth=80%]
+
+==== The assistant
+
+The dispatcher's assistant takes requests in plain words, such as "Dana is out
+Thursday, cover her jobs." It works through the same planner as the board, and
+shows the run it made with the same figures and the same list of moves.
+
+image::img/fieldline-dispatch-assistant.png["The dispatcher's assistant covering an absence, with the run it made",scaledwidth=80%]
+
+It also answers questions about the day: who is unassigned, who is qualified for a
+job, and what a technician has on today or tomorrow.
+
+==== Staffing
+
+*Staffing* sets the work booked against the hours the crew has, day by day for
+this week or two. A day above 90% is understaffed and a day below 55% has people
+waiting for work. Below the chart, each technician's share of the work shows who
+is carrying the week.
+
+image::img/fieldline-staffing.png["Staffing: the crew's load per day as bars, colored understaffed, right size or overstaffed",scaledwidth=80%]
 
 === The administrator
 
-The administrator sees everything the dispatcher sees, and the back office adds:
+The administrator sees everything the dispatcher sees, and an admin section of
+the back office.
 
-* each technician's skills, weekly hours and maximum drive;
-* the labor rates, overtime and weekend pay, and the rush hours that slow
-  travel;
-* time tracking and the weekly timesheets it produces;
-* the accounts, with the roles each one holds.
+*Crew* is each technician's skills, certificates with the date they lapse,
+territories, home base and limits. A job that needs a certificate goes only to
+someone whose certificate is valid on the day.
+
+image::img/fieldline-crew.png["A technician's record: skills, certificates with their expiry, territories and limits",scaledwidth=80%]
+
+*Timesheets* add up the week from the clock: hours worked against hours rostered,
+overtime, and what the week costs. Each technician's sheet lists their days, the
+time driving and on site, and the breaks taken.
+
+image::img/fieldline-timesheets.png["Timesheets: the crew's week totals, and each technician's hours and cost",scaledwidth=80%]
+
+The labor rates set what an hour costs for each grade of technician, with the
+uplift for overtime and weekends and the fee for an urgent call-out. The
+company settings hold the rest of the pay rules and the rush hours that slow
+travel.
+
+image::img/fieldline-rates.png["A labor rate: the hourly rate, the overtime and weekend uplift and the call-out fee",scaledwidth=80%]
+
+*Accounts* lists everyone who can sign in, with the roles each one holds. An
+account can be suspended, which signs it out everywhere at once.
+
+image::img/fieldline-accounts.png["An account with its roles switched on or off, and the switch that suspends it",scaledwidth=80%]
 
 Outside the development profile the server creates only one account, the
 administrator named in its settings, who grants everyone else their roles.

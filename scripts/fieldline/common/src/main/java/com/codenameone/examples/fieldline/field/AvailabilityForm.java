@@ -57,10 +57,15 @@ public final class AvailabilityForm {
             to[d] = time(d, "to", 17 * 60);
         }
         for (WindowDto w : a.week()) {
-            if (w.day() >= 0 && w.day() < 7) {
-                on[w.day()] = true;
-                from[w.day()].setTime(w.start());
-                to[w.day()].setTime(w.end());
+            // The server numbers the week 1 (Monday) to 7; the rows here
+            // are 0 to 6. Read as row numbers, Monday's hours showed under
+            // Tuesday, Sunday's were dropped, and saving Monday sent a 0 the
+            // server refuses.
+            int row = w.day() - 1;
+            if (row >= 0 && row < 7) {
+                on[row] = true;
+                from[row].setTime(w.start());
+                to[row].setTime(w.end());
             }
         }
         Ui.section(page, "Week");
@@ -105,7 +110,7 @@ public final class AvailabilityForm {
                         Ui.say(Lang.tr("{0} ends before it starts", Lang.tr(DAYS[d])));
                         return;
                     }
-                    windows.add(new WindowDto(d, from[d].getTime(), to[d].getTime()));
+                    windows.add(new WindowDto(d + 1, from[d].getTime(), to[d].getTime()));
                 }
             }
             save.setEnabled(false);

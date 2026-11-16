@@ -63,7 +63,7 @@ final class Labour {
                     Lang.tr("{0} an hour", money(r.hourlyCents())) + Ui.DOT
                     + Lang.tr("overtime {0}%", String.valueOf(r.overtimePct())) + Ui.DOT
                     + Lang.tr("weekend {0}%", String.valueOf(r.weekendPct())),
-                    Ui.badge(Lang.tr("{0} people", String.valueOf(r.members())), "FlBadge"));
+                    Ui.badge(Lang.count(r.members(), "1 person", "{0} people"), "FlBadge"));
             list.add(Ui.tap(row, "rate-" + r.id(), e -> {
                 host.picked(row);
                 host.detail(r.name(), "Rate", rate(host, r));
@@ -150,18 +150,18 @@ final class Labour {
             overtime += r.overtimeMinutes();
         }
         StatRow stats = Ui.stats(4);
-        stats.stat(BackOffice.hours(worked), Lang.tr("Hours worked"), "stat-worked");
-        stats.stat(BackOffice.hours(planned), Lang.tr("Hours rostered"), "stat-rostered");
-        stats.stat(BackOffice.hours(overtime), Lang.tr("Overtime"), "stat-overtime");
+        stats.stat(span(worked), Lang.tr("Hours worked"), "stat-worked");
+        stats.stat(span(planned), Lang.tr("Hours rostered"), "stat-rostered");
+        stats.stat(span(overtime), Lang.tr("Overtime"), "stat-overtime");
         stats.stat(money(sheet.totalCostCents()), Lang.tr("Labour cost"), "stat-cost");
         top.add(stats);
         top.add(Ui.label(Lang.tr("Week of {0}", Ui.day(sheet.weekStart())), "WlMuted"));
         for (final TimesheetRowDto r : sheet.rows()) {
             int paid = r.shiftMinutes() - r.breakMinutes();
-            String detail = Lang.tr("{0} worked", BackOffice.hours(paid)) + Ui.DOT
-                    + Lang.tr("{0} rostered", BackOffice.hours(r.plannedMinutes()))
+            String detail = Lang.tr("{0} worked", span(paid)) + Ui.DOT
+                    + Lang.tr("{0} rostered", span(r.plannedMinutes()))
                     + (r.overtimeMinutes() > 0 ? Ui.DOT + Lang.tr("{0} overtime",
-                            BackOffice.hours(r.overtimeMinutes())) : "");
+                            span(r.overtimeMinutes())) : "");
             final Container row = Ui.row(FontImage.MATERIAL_PUNCH_CLOCK, r.name(), detail,
                     Ui.badge(money(r.costCents()), r.overtimeMinutes() > 0 ? "FlBadgeWarn" : "FlBadge"));
             list.add(Ui.tap(row, "sheet-" + r.techId(), e -> {
@@ -181,16 +181,16 @@ final class Labour {
         int paid = r.shiftMinutes() - r.breakMinutes();
         int pct = r.plannedMinutes() <= 0 ? 0 : paid * 100 / r.plannedMinutes();
         page.add(new Reports.Bar(Lang.tr("Worked against rostered"), Math.min(pct, 150), 80, 110,
-                BackOffice.hours(paid) + " / " + BackOffice.hours(r.plannedMinutes()), "sheetLoad"));
+                span(paid) + " / " + span(r.plannedMinutes()), "sheetLoad"));
         Ui.section(page, "Week");
         page.add(Ui.fact("Rate", r.rateName().length() == 0 ? Lang.tr("None set") : r.rateName()));
-        page.add(Ui.fact("On shift", BackOffice.hours(r.shiftMinutes())));
-        page.add(Ui.fact("Unpaid breaks", BackOffice.hours(r.breakMinutes())));
-        page.add(Ui.fact("Driving", BackOffice.hours(r.travelMinutes())));
-        page.add(Ui.fact("On site", BackOffice.hours(r.jobMinutes())));
-        page.add(Ui.fact("Overtime", BackOffice.hours(r.overtimeMinutes()),
+        page.add(Ui.fact("On shift", span(r.shiftMinutes())));
+        page.add(Ui.fact("Unpaid breaks", span(r.breakMinutes())));
+        page.add(Ui.fact("Driving", span(r.travelMinutes())));
+        page.add(Ui.fact("On site", span(r.jobMinutes())));
+        page.add(Ui.fact("Overtime", span(r.overtimeMinutes()),
                 r.overtimeMinutes() > 0 ? "FlFactBad" : null));
-        page.add(Ui.fact("Weekend", BackOffice.hours(r.weekendMinutes())));
+        page.add(Ui.fact("Weekend", span(r.weekendMinutes())));
         page.add(Ui.fact("Urgent call-outs", String.valueOf(r.callouts())));
         page.add(Ui.fact("Cost", money(r.costCents())));
         Ui.section(page, "Shifts");
@@ -202,7 +202,7 @@ final class Labour {
             page.add(Ui.row(FontImage.MATERIAL_SCHEDULE, Ui.weekday(e.start()),
                     Ui.clock(e.start()) + " - " + (e.end() <= 0 ? Lang.tr("on the clock") : Ui.clock(e.end())),
                     minutes < 0 ? Ui.badge(Lang.tr("Open"), "FlBadgeWarn")
-                            : Ui.badge(BackOffice.hours(minutes), "FlBadge")));
+                            : Ui.badge(span(minutes), "FlBadge")));
         }
         return page;
     }
@@ -261,5 +261,13 @@ final class Labour {
             value = value * 10 + (ch - '0');
         }
         return value;
+    }
+
+    /// A span of time as hours and minutes, always with both: a column of
+    /// "42:30" beside a bare "46" read as a different unit. The editable
+    /// fields keep [BackOffice#hours(int)], where "8" is what people type.
+    static String span(int minutes) {
+        int m = Math.abs(minutes) % 60;
+        return (minutes < 0 ? "-" : "") + (Math.abs(minutes) / 60) + ":" + (m < 10 ? "0" : "") + m;
     }
 }

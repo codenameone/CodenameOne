@@ -204,16 +204,9 @@ public final class TodayForm implements Nav.Home {
         stats.stat(today.me().utilizationPct() + "%", "Booked", "statBooked");
         more.add(stats);
         more.add(Ui.label("Your route", "FlSectionTitle"));
-        Container timeline = new Container(BoxLayout.y()) {
-            @Override
-            protected Dimension calcPreferredSize() {
-                Dimension d = super.calcPreferredSize();
-                d.setHeight(Math.min(d.getHeight(), CN.getDisplayHeight() * 11 / 20));
-                return d;
-            }
-        };
-        timeline.setScrollableY(true);
-        timeline.setScrollVisible(false);
+        // Not a scroller of its own: the sheet scrolls everything under its
+        // handle, and a list scrolling inside that fought it for the drag.
+        Container timeline = new Container(BoxLayout.y());
         timeline.setName("timeline");
         int n = 0;
         for (JobDto job : today.jobs()) {
@@ -225,7 +218,7 @@ public final class TodayForm implements Nav.Home {
         }
         more.add(timeline);
         stage.sheet().ready(false);
-        form.revalidate();
+        Ui.relayout(form, null);
     }
 
     private Container nextCard(final JobDto job) {
@@ -270,7 +263,16 @@ public final class TodayForm implements Nav.Home {
     private Component stop(int number, final JobDto job, boolean current) {
         Container row = new Container(new BorderLayout());
         row.setUIID(current ? "FlStopCurrent" : "FlStop");
-        Container time = new Container(BoxLayout.y());
+        // One width for every row, so the cards line up whatever the hour
+        // and length say: "12:16 / 2 h" is narrower than "08:00 / 1 h 30".
+        Container time = new Container(BoxLayout.y()) {
+            @Override
+            protected Dimension calcPreferredSize() {
+                Dimension d = super.calcPreferredSize();
+                d.setWidth(Math.max(d.getWidth(), CN.convertToPixels(13f)));
+                return d;
+            }
+        };
         time.setUIID("FlStopTime");
         time.add(Ui.label(Ui.clock(job.plannedStart()), "FlStopClock"));
         time.add(Ui.label(Ui.duration(job.durationMinutes()), "FlStopLength"));
@@ -280,11 +282,15 @@ public final class TodayForm implements Nav.Home {
         Label badge = new Label(String.valueOf(number), "FlStopNumber");
         body.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(badge));
         Container lines = new Container(BoxLayout.y());
-        lines.add(Ui.label(job.title(), "FlStopTitle"));
-        lines.add(Ui.label(job.siteName(), "FlStopDetail"));
+        // Wraps: a title cut to "Quarterly HV" told the technician nothing.
+        lines.add(Ui.text(job.title(), "FlStopTitle"));
+        lines.add(Ui.text(job.siteName(), "FlStopDetail"));
+        // The status under the words, not beside them: beside them it took
+        // a third of a phone's width from the title.
+        Container chips = new Container(new FlowLayout());
+        chips.add(Ui.badge(Ui.status(job.status()), Ui.statusBadge(job.status())));
+        lines.add(chips);
         body.add(BorderLayout.CENTER, lines);
-        body.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(
-                Ui.badge(Ui.status(job.status()), Ui.statusBadge(job.status()))));
         row.add(BorderLayout.CENTER, body);
         return Ui.tap(row, "job-" + job.id(), e -> JobForm.show(form, job.id()));
     }
@@ -390,7 +396,7 @@ public final class TodayForm implements Nav.Home {
             // says so before anything else.
             return Lang.tr("Up next: {0}", Ui.weekday(today.day()));
         }
-        return Lang.tr("{0} jobs left", String.valueOf(left)) + Ui.DOT
+        return Lang.count(left, "1 job left", "{0} jobs left") + Ui.DOT
                 + Lang.tr("{0} on the road", Ui.duration(today.driveMinutes()));
     }
 

@@ -401,7 +401,7 @@ public final class BoardForm implements Nav.Home {
         for (TechnicianDto t : board.technicians()) {
             Integer c = counts.get(t.id());
             model.addResource(new ScheduleResource(t.id(), t.name()).setColor(color(t))
-                    .setDetail(Lang.tr("{0} jobs", String.valueOf(c == null ? 0 : c.intValue())))
+                    .setDetail(Lang.count(c == null ? 0 : c.intValue(), "1 job", "{0} jobs"))
                     .setUserObject(t));
         }
         for (JobDto j : board.jobs()) {
@@ -674,8 +674,8 @@ public final class BoardForm implements Nav.Home {
         head.add(BorderLayout.WEST, Ui.avatar(t.name()));
         Container words = new Container(BoxLayout.y());
         words.add(Ui.label(t.name(), "FlSheetTitle"));
-        words.add(Ui.label(techStatus(t.status()) + Ui.DOT + Lang.tr("{0} jobs today",
-                String.valueOf(t.jobsToday())), "FlSheetDetail"));
+        words.add(Ui.label(techStatus(t.status()) + Ui.DOT + Lang.count(t.jobsToday(),
+                "1 job today", "{0} jobs today"), "FlSheetDetail"));
         head.add(BorderLayout.CENTER, words);
         head.add(BorderLayout.EAST, Ui.flat(FontImage.MATERIAL_CLOSE, "closeSheet",
                 e -> closeSheet()));
@@ -785,7 +785,7 @@ public final class BoardForm implements Nav.Home {
         inspector.add(Ui.text("Pick a job or a technician on the plan to see it here; drag "
                 + "a job to propose a move.", "FlInspectorHint"));
         Layouts.dress(inspector);
-        form.revalidate();
+        Ui.relayout(form, null);
     }
 
     // ---- Moves and the optimizer -------------------------------------------

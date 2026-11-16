@@ -20,7 +20,8 @@ package com.codenameone.examples.fieldline.api;
 
 import com.codename1.annotations.Mapped;
 
-/// A weekly working window: `day` 0 (Monday) to 6, minutes from midnight.
+/// A weekly working window: `day` 1 (Monday) to 7 (Sunday), as the server
+/// stores it, and minutes from midnight.
 @Mapped
 public record WindowDto(
         int day,

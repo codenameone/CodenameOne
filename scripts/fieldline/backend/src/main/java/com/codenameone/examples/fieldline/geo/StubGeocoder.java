@@ -23,20 +23,21 @@ import com.codenameone.examples.fieldline.api.PlaceDto;
 import java.util.ArrayList;
 import java.util.List;
 
-/// A geocoder that knows ten places and asks nobody. What the tests run
+/// A geocoder that knows ten places in Portland, where the demonstration
+/// company works, and asks nobody. What the tests run
 /// against, so they neither depend on a public service nor lean on one.
 public class StubGeocoder implements Geocoder {
     private static final Object[][] PLACES = {
-        {"Ferry Building", "1 Ferry Building, San Francisco", 37.7955, -122.3937},
-        {"Pier 39", "The Embarcadero, San Francisco", 37.8087, -122.4098},
-        {"Coit Tower", "1 Telegraph Hill Blvd, San Francisco", 37.8024, -122.4058},
-        {"Ghirardelli Square", "900 North Point St, San Francisco", 37.8059, -122.4229},
-        {"Lombard Street", "Lombard St, San Francisco", 37.8021, -122.4187},
-        {"Palace of Fine Arts", "3601 Lyon St, San Francisco", 37.8029, -122.4484},
-        {"Union Square", "333 Post St, San Francisco", 37.7880, -122.4075},
-        {"Oracle Park", "24 Willie Mays Plaza, San Francisco", 37.7786, -122.3893},
-        {"Fort Mason", "2 Marina Blvd, San Francisco", 37.8066, -122.4310},
-        {"Transamerica Pyramid", "600 Montgomery St, San Francisco", 37.7952, -122.4028},
+        {"Union Station", "800 NW 6th Ave, Portland", 45.5289, -122.6767},
+        {"Pioneer Courthouse Square", "701 SW 6th Ave, Portland", 45.5189, -122.6793},
+        {"Powell's City of Books", "1005 W Burnside St, Portland", 45.5231, -122.6814},
+        {"Pittock Mansion", "3229 NW Pittock Dr, Portland", 45.5252, -122.7163},
+        {"Moda Center", "1 N Center Ct St, Portland", 45.5316, -122.6668},
+        {"Oregon Convention Center", "777 NE Martin Luther King Jr Blvd, Portland", 45.5287, -122.6630},
+        {"Lloyd Center", "2201 Lloyd Center, Portland", 45.5320, -122.6537},
+        {"OMSI", "1945 SE Water Ave, Portland", 45.5084, -122.6655},
+        {"Providence Park", "1844 SW Morrison St, Portland", 45.5215, -122.6917},
+        {"Portland International Airport", "7000 NE Airport Way, Portland", 45.5887, -122.5975},
     };
 
     @Override

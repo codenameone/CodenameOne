@@ -72,14 +72,14 @@ final class Reports {
     private static void load(final Container body, int days) {
         body.removeAll();
         body.add(Ui.text("Planning the coming days...", "WlMuted"));
-        body.revalidate();
+        Ui.relayout(body);
         Api.dispatch().staffing(days, Net.to(report -> {
             body.removeAll();
             fill(body, report);
             Layouts.dress(body);
             Component top = body.getComponentForm();
             if (top != null) {
-                body.getComponentForm().revalidate();
+                Ui.relayout(body);
             }
         }, Ui::fail));
     }
@@ -135,7 +135,7 @@ final class Reports {
             int used = t.workMinutes() + t.driveMinutes();
             int pct = t.availableMinutes() <= 0 ? 0 : used * 100 / t.availableMinutes();
             body.add(new Bar(t.name(), pct, r.lowPct(), r.highPct(),
-                    Lang.tr("{0} jobs", String.valueOf(t.jobs())) + Ui.DOT
+                    Lang.count(t.jobs(), "1 job", "{0} jobs") + Ui.DOT
                     + Lang.tr("{0} driving", Ui.duration(t.driveMinutes()))
                     + (t.overtimeMinutes() > 0 ? Ui.DOT + Lang.tr("{0} overtime",
                             Ui.duration(t.overtimeMinutes())) : ""), "tech-" + t.id()));
@@ -147,7 +147,7 @@ final class Reports {
         for (SkillLoadDto s : r.skills()) {
             int pct = s.capacityMinutes() <= 0 ? 100 : s.demandMinutes() * 100 / s.capacityMinutes();
             body.add(new Bar(s.skill(), pct, -1, r.highPct(),
-                    Lang.tr("{0} people", String.valueOf(s.technicians())) + Ui.DOT
+                    Lang.count(s.technicians(), "1 person", "{0} people") + Ui.DOT
                     + Lang.tr("{0} booked", Ui.duration(s.demandMinutes())), "skill-" + s.skill()));
         }
 

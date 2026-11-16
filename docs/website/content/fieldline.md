@@ -9,7 +9,7 @@ ShowToc: true
 
 Fieldline is a complete, full-stack field service and inspection application in Java. Technicians open their day as a route on a map, drive to each job, work through its checklist, photograph what they find, ask the assistant what is wrong and have the customer sign on the screen. Dispatchers see the whole crew on a timeline, a Gantt chart and a map, drag work between people, and let the optimizer plan the week. When someone is out, the plan is repaired around them, moving as few jobs as it can. The same project serves HVAC, electrical, plumbing, elevator, solar and fire-safety contractors, and inspection teams. Use it to build your own field service app with Codename One.
 
-**[Generate your project](/initializr/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/fieldline)**
+**[Generate your project](/initializr/)** · **[Read the user's guide](/developer-guide/fieldline-users-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/fieldline)**
 
 In the Initializr, choose the **Fieldline** field service template, set your application name and package, and generate the project. The application source is licensed under [MIT-0](https://github.com/codenameone/CodenameOne/blob/master/scripts/fieldline/LICENSE): you can modify it, use it commercially and keep your changes private without royalties.
 
@@ -26,8 +26,15 @@ In the Initializr, choose the **Fieldline** field service template, set your app
 
 The account's roles decide which screens a person sees. The same client project targets iOS, Android, desktop and the web, and the server runs on SQLite, PostgreSQL, MySQL and MariaDB.
 
-![Fieldline technician day with the route](/developer-guide/img/fieldline-today.png)
+![Fieldline technician day](/developer-guide/img/fieldline-today.png)
+![Fieldline route with every stop](/developer-guide/img/fieldline-today-route.png)
+![Fieldline job checklist](/developer-guide/img/fieldline-checklist.png)
+![Fieldline field assistant answering from a manual](/developer-guide/img/fieldline-assistant.png)
+![Fieldline customer signature sealed with a hash](/developer-guide/img/fieldline-sealed.png)
 ![Fieldline dispatch board](/developer-guide/img/fieldline-board.png)
+![Fieldline optimizer run with what it moved](/developer-guide/img/fieldline-optimize.png)
+![Fieldline dispatcher's assistant covering an absence](/developer-guide/img/fieldline-dispatch-assistant.png)
+![Fieldline staffing against booked work](/developer-guide/img/fieldline-staffing.png)
 
 ## From first run to customization
 

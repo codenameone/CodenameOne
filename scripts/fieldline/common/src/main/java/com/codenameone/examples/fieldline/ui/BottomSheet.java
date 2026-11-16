@@ -25,6 +25,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 
@@ -46,14 +47,25 @@ public final class BottomSheet extends Container {
     private boolean expanded;
 
     public BottomSheet() {
-        super(BoxLayout.y());
+        super(new BorderLayout());
         setUIID("WlSheet");
         setName("panel");
         setSafeArea(true);
         // A touch on the sheet is the sheet's, and does not reach through to
         // drag the map under it.
         setGrabsPointerEvents(true);
-        add(grip).add(peek).add(more);
+        // The handle stays put and everything under it scrolls. A day of
+        // stops is taller than a phone, and the sheet is the south of a
+        // BorderLayout, which gives it its preferred height and nothing
+        // more: unscrolled, the last stops were below the screen with no
+        // way to reach them. The summary scrolls too -- pinned, it left a
+        // sliver of the screen for the stops.
+        Container body = new Container(BoxLayout.y());
+        body.add(peek).add(more);
+        body.setScrollableY(true);
+        body.setScrollVisible(false);
+        add(BorderLayout.NORTH, grip);
+        add(BorderLayout.CENTER, body);
         more.setHidden(true);
     }
 
@@ -93,7 +105,14 @@ public final class BottomSheet extends Container {
     @Override
     protected Dimension calcPreferredSize() {
         clearOfTheDevice();
-        return super.calcPreferredSize();
+        Dimension size = super.calcPreferredSize();
+        // Never taller than most of the screen, so some map stays in view
+        // and `more` scrolls inside the rest.
+        int most = CN.getDisplayHeight() * 85 / 100;
+        if (size.getHeight() > most) {
+            size.setHeight(most);
+        }
+        return size;
     }
 
     @Override

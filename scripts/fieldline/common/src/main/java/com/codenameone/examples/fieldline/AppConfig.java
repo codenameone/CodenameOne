@@ -44,9 +44,11 @@ public final class AppConfig {
     /// and a phone in a pocket simply hears nothing until it is opened.
     public static final String PUSH_APP_KEY = "";
     // end::fieldline-push-key[]
-    /// Where the map opens when the device will not say where it is.
-    public static final double DEFAULT_LAT = 37.8080;
-    public static final double DEFAULT_LNG = -122.4120;
+    /// Where the map opens when the device will not say where it is, and
+    /// where the simulator stands: downtown Portland, among the demonstration
+    /// company's sites. Change it to your own service area.
+    public static final double DEFAULT_LAT = 45.5200;
+    public static final double DEFAULT_LNG = -122.6780;
 
     private static final String SERVER_KEY = "fieldline.server";
     private static final String MODE_KEY = "fieldline.mode";

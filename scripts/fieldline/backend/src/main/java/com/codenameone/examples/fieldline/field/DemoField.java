@@ -255,7 +255,7 @@ public class DemoField {
     }
 
     /// Calls a day, Monday to Friday.
-    static final int[] DEMAND = {24, 44, 54, 38, 12};
+    static final int[] DEMAND = {40, 46, 54, 44, 28};
 
     /// The certificates a trade needs, valid for a year; one technician's gas
     /// certificate lapses in three days, so the planner stops sending them to

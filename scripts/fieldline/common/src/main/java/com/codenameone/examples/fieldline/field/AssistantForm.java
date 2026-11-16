@@ -65,6 +65,10 @@ public final class AssistantForm {
         Button send = Ui.round(FontImage.MATERIAL_ARROW_UPWARD, "send",
                 e -> send(input.getText()));
         send.setUIID("FlSend");
+        // Drawn again in the send button's own colours: the icon is painted
+        // from the style it is made with, and the round map button's white
+        // background had come along as a square behind the arrow.
+        Ui.icon(send, FontImage.MATERIAL_ARROW_UPWARD, 4f);
         compose.add(BorderLayout.CENTER, input);
         compose.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(send));
         Container south = new Container(BoxLayout.y());
@@ -160,13 +164,10 @@ public final class AssistantForm {
         if (reply.run() != null) {
             thread.add(RunView.card(form, reply.run()));
         }
-        if (reply.actions() != null) {
-            for (final String action : reply.actions()) {
-                Button chip = new Button(action, "FlSuggestion");
-                chip.addActionListener(e -> send(chip.getText()));
-                suggestions.add(chip);
-            }
-        }
+        // reply.actions() records what the assistant already did. It is not
+        // offered as suggestion chips: tapping one sent the summary of a
+        // finished re-plan back as a new question, under a card that already
+        // shows the same change.
         if ("demo".equals(reply.source())) {
             thread.add(FlowLayout.encloseCenter(Ui.label("Demo answers: no model is configured "
                     + "on this server", "FlDemoNote")));
@@ -211,8 +212,7 @@ public final class AssistantForm {
     }
 
     private void scrollToEnd() {
-        form.revalidate();
-        CN.callSerially(() -> {
+        Ui.relayout(form, () -> {
             if (thread.getComponentCount() > 0) {
                 thread.scrollComponentToVisible(thread.getComponentAt(
                         thread.getComponentCount() - 1));
