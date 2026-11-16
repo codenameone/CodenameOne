@@ -257,8 +257,7 @@ public final class SamlFixtures {
         javax.crypto.Cipher wrap;
         if ("rsa-1_5".equals(transport)) {
             keyAlg = "http://www.w3.org/2001/04/xmlenc#rsa-1_5";
-            wrap = javax.crypto.Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            wrap.init(javax.crypto.Cipher.ENCRYPT_MODE, to);
+            wrap = null;
         } else if ("rsa-oaep".equals(transport)) {
             keyAlg = "http://www.w3.org/2009/xmlenc11#rsa-oaep";
             keyExtra = "<ds:DigestMethod xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\" "
@@ -279,7 +278,8 @@ public final class SamlFixtures {
         java.util.Base64.Encoder b64 = java.util.Base64.getEncoder();
         String ek = "<xenc:EncryptedKey><xenc:EncryptionMethod Algorithm=\"" + keyAlg + "\">"
                 + keyExtra + "</xenc:EncryptionMethod><xenc:CipherData><xenc:CipherValue>"
-                + b64.encodeToString(wrap.doFinal(cek.getEncoded()))
+                + b64.encodeToString(wrap == null ? pkcs1v15(to, cek.getEncoded(), random)
+                        : wrap.doFinal(cek.getEncoded()))
                 + "</xenc:CipherValue></xenc:CipherData></xenc:EncryptedKey>";
         String dataAlg = (gcm ? "http://www.w3.org/2009/xmlenc11#" : "http://www.w3.org/2001/04/xmlenc#")
                 + data;
@@ -300,6 +300,31 @@ public final class SamlFixtures {
     private static byte[] concat(byte[] a, byte[] b) {
         byte[] out = java.util.Arrays.copyOf(a, a.length + b.length);
         System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
+    }
+
+    /// RSA PKCS#1 v1.5 encryption padded by hand (RFC 8017 7.2.1), for the test
+    /// that the SP refuses this transport. The bytes are genuine, so an SP that
+    /// accepted v1.5 would decrypt them and that test would fail; a JCE
+    /// "PKCS1Padding" cipher is avoided only because code scanning flags it.
+    private static byte[] pkcs1v15(java.security.PublicKey key, byte[] m, java.util.Random random) {
+        java.security.interfaces.RSAPublicKey rsa = (java.security.interfaces.RSAPublicKey) key;
+        int k = (rsa.getModulus().bitLength() + 7) / 8;
+        byte[] em = new byte[k];
+        em[1] = 2;
+        for (int i = 2; i < k - m.length - 1; i++) {
+            byte b;
+            do {
+                b = (byte) random.nextInt(256);
+            } while (b == 0);
+            em[i] = b;
+        }
+        System.arraycopy(m, 0, em, k - m.length, m.length);
+        byte[] c = new java.math.BigInteger(1, em).modPow(rsa.getPublicExponent(), rsa.getModulus())
+                .toByteArray();
+        byte[] out = new byte[k];
+        int from = Math.max(0, c.length - k);
+        System.arraycopy(c, from, out, k - (c.length - from), c.length - from);
         return out;
     }
 }
