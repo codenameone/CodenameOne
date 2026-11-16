@@ -67,7 +67,12 @@ jobs:
           # a java is on PATH.
           export PATH="$(echo "$PATH" | tr ':' '\n' | grep -v -i -E 'java|jdk|hostedtoolcache/Java' | paste -sd: -)"
           unset JAVA_HOME
-          if command -v java >/dev/null; then
+          if [ "$RUNNER_OS" = macOS ]; then
+            # /usr/bin/java is a stub that is always on PATH, and /usr/libexec/java_home
+            # still lists the runner's JDKs; unregister them so it finds none.
+            sudo rm -rf /Library/Java/JavaVirtualMachines/* ~/Library/Java/JavaVirtualMachines/*
+            /usr/libexec/java_home >/dev/null 2>&1 && { echo "java_home still answers"; exit 1; }
+          elif command -v java >/dev/null; then
             # A system JDK in /usr/bin (Ubuntu runners) cannot be taken off PATH without
             # losing bash and curl; shadow it with a java that is no JDK, which the
             # script skips, so the download branch runs as on a bare machine.
