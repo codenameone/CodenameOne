@@ -243,12 +243,15 @@ public class PdfViewer extends Component {
 
     @Override
     public boolean isScrollableY() {
-        return true;
+        // Only when the pages are taller than the view: a viewer that
+        // claims to scroll with nothing to scroll paints a scroll thumb
+        // filling the whole track.
+        return getPreferredH() > getHeight();
     }
 
     @Override
     public boolean isScrollableX() {
-        return zoom > 1f;
+        return zoom > 1f && getPreferredW() > getWidth();
     }
 
     @Override
