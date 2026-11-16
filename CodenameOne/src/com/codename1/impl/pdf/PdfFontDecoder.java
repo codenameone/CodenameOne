@@ -377,6 +377,9 @@ public final class PdfFontDecoder {
         java.util.ArrayList<Object> operands = new java.util.ArrayList<Object>();
         int[] lens = new int[5];
         boolean anyLen = false;
+        // Ranges are cheap to write and each expands to up to 65536 entries;
+        // past this many entries in total the rest of the map is ignored.
+        int budget = 1 << 20;
         while (true) {
             Object o = lx.next();
             if (o == PdfLexer.EOF) { // NOPMD CompareObjectsWithEquals - identity of a sentinel object is intended
@@ -417,7 +420,11 @@ public final class PdfFontDecoder {
                     }
                     int lo = code(((PdfString) a).bytes);
                     int hi = Math.min(code(((PdfString) b).bytes), lo + 65535);
-                    if (c instanceof PdfString) {
+                    if (hi < lo || hi - lo >= budget) {
+                        continue;
+                    }
+                    budget -= hi - lo + 1;
+                    if (c instanceof PdfString && ((PdfString) c).bytes.length <= 64) {
                         byte[] dst = ((PdfString) c).bytes;
                         for (int k = lo; k <= hi; k++) {
                             byte[] t = new byte[dst.length];

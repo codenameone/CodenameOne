@@ -18,7 +18,7 @@ The canvas covers what a page needs: paths with lines, curves, rectangles, round
 
 ==== Fonts
 
-The 14 standard PDF fonts (Helvetica, Times, Courier with their bold and italic variants, Symbol and Zapf Dingbats) are constants of `PdfFont`. They cost nothing to use, since every PDF reader has them, but they cover only Western European characters.
+The 14 standard PDF fonts (Helvetica, Times, Courier with their bold and italic variants, Symbol and Zapf Dingbats) are constants of `PdfFont`. They cost nothing to use, since every PDF reader has them, but they cover only Western European characters: any other character drawn in one of them comes out as a question mark.
 
 For any other text, load a TrueType or OpenType font with `PdfFont.loadTrueType(byte[])`. Only the glyphs the document uses are embedded, together with a map from each glyph back to its text, so readers can search and copy the text.
 
@@ -72,7 +72,7 @@ Text comes out in reading order, line by line, with right-to-left lines reordere
 include::../demos/common/src/main/java/com/codenameone/developerguide/pdf/PdfSnippets.java[tag=pdf-viewer,indent=0]
 ----
 
-Pages are drawn on the EDT one at a time, between other events, so scrolling stays responsive, and only the pages near the view are kept in memory. `renderPage(index, scale)` draws a single page to an `Image`, for a thumbnail or a share sheet, without showing the viewer.
+Pages are drawn on the EDT one at a time, between other events, and only the pages near the view are kept in memory. A heavy page, such as a detailed map, holds input until it's done. `renderPage(index, scale)` draws a single page to an `Image`, for a thumbnail or a share sheet, without showing the viewer.
 
 The renderer draws what the PDF specification defines: vector graphics with dashes, clipping and every blend mode; transparency groups, knockout groups and soft masks; axial, radial, function-based and mesh shadings; tiling patterns; embedded TrueType, OpenType, CFF, Type 1 and Type 3 fonts, including vertical writing; and images in every format PDF defines, among them JPEG, JPEG 2000, JBIG2 and CCITT fax, with their masks. Form fields and annotations are drawn from their appearances.
 

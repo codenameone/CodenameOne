@@ -246,7 +246,7 @@ public final class PdfFile {
                 len = ((Integer) r).intValue();
             }
         }
-        boolean valid = len >= 0 && start + len <= data.length
+        boolean valid = len >= 0 && (long) start + len <= data.length
                 && indexOf(data, "endstream", start + len, Math.min(data.length, start + len + 32)) >= 0;
         if (!valid) {
             int end = indexOf(data, "endstream", start, data.length);
@@ -335,8 +335,13 @@ public final class PdfFile {
             }
             PdfStream st = (PdfStream) s;
             byte[] d = st.getData();
-            int n = st.getInt("N", 0);
+            // Every entry takes at least two bytes of header, which bounds a
+            // hostile /N before anything is allocated for it.
+            int n = Math.max(0, Math.min(st.getInt("N", 0), d.length / 2));
             int first = st.getInt("First", 0);
+            if (first < 0 || first > d.length) {
+                n = 0;
+            }
             PdfLexer header = new PdfLexer(d, 0, d.length, false);
             int[] nums = new int[n];
             int[] offs = new int[n];
@@ -350,7 +355,7 @@ public final class PdfFile {
             for (int i = 0; i < n; i++) {
                 objs[i * 2] = Integer.valueOf(nums[i]);
                 Object o = null;
-                if (offs[i] >= 0 && first + offs[i] < d.length) {
+                if (offs[i] >= 0 && (long) first + offs[i] < d.length) {
                     o = new PdfLexer(d, first + offs[i], d.length, true).next();
                     // Objects inside an object stream are never encrypted
                     // themselves: the stream was.
@@ -462,6 +467,13 @@ public final class PdfFile {
         int[] widths = new int[3];
         for (int i = 0; i < 3; i++) {
             widths[i] = w.get(i) instanceof Integer ? ((Integer) w.get(i)).intValue() : 0;
+            if (widths[i] < 0 || widths[i] > 8) {
+                return s;
+            }
+        }
+        int entry = widths[0] + widths[1] + widths[2];
+        if (entry == 0) {
+            return s;
         }
         List<Object> index = s.getArray("Index");
         int size = s.getInt("Size", 0);
@@ -469,10 +481,17 @@ public final class PdfFile {
         int pos = 0;
         int sections = index == null ? 1 : index.size() / 2;
         for (int sec = 0; sec < sections; sec++) {
-            int first = index == null ? 0 : ((Number) index.get(sec * 2)).intValue();
-            int count = index == null ? size : ((Number) index.get(sec * 2 + 1)).intValue();
+            Object fo = index == null ? null : index.get(sec * 2);
+            Object co = index == null ? null : index.get(sec * 2 + 1);
+            if (index != null && !(fo instanceof Number && co instanceof Number)) {
+                continue;
+            }
+            int first = index == null ? 0 : ((Number) fo).intValue();
+            int count = index == null ? size : ((Number) co).intValue();
+            // The data holds at most this many entries, whatever /Size says.
+            count = Math.min(count, (d.length - pos) / entry);
             for (int i = 0; i < count; i++) {
-                if (pos + widths[0] + widths[1] + widths[2] > d.length) {
+                if (pos + entry > d.length) {
                     break;
                 }
                 int type = widths[0] == 0 ? 1 : (int) field(d, pos, widths[0]);
@@ -598,10 +617,13 @@ public final class PdfFile {
     private void indexObjectStream(int streamNum, PdfStream s) {
         try {
             byte[] d = s.getData();
-            int n = s.getInt("N", 0);
+            int n = Math.min(s.getInt("N", 0), d.length / 2);
             PdfLexer header = new PdfLexer(d, 0, d.length, false);
             for (int i = 0; i < n; i++) {
                 Object a = header.next();
+                if (a == PdfLexer.EOF) { // NOPMD CompareObjectsWithEquals - identity of a sentinel object is intended
+                    break;
+                }
                 header.next();
                 if (a instanceof Integer && !xref.containsKey(a)) {
                     xref.put((Integer) a, new int[] {-1, streamNum, i});

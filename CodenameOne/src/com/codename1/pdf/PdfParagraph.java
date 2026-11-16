@@ -239,16 +239,26 @@ public final class PdfParagraph {
                 }
                 if (ww > avail) {
                     // A word wider than a whole line: break between characters.
+                    // Breaks fall only between clusters (never inside a
+                    // surrogate pair or before a combining mark), and the
+                    // width is summed cluster by cluster so a 100k character
+                    // token costs linear time.
                     int start = pos;
-                    for (int i = pos + 1; i <= end; i++) {
-                        float w = run.font.getStringWidth(t.substring(start, i), run.size);
-                        if (w > avail - line.width && i - 1 > start) {
-                            add(line, run, t.substring(start, i - 1));
+                    float w = 0;
+                    int i = pos;
+                    while (i < end) {
+                        int next = nextCluster(t, i, end);
+                        float cw = run.font.getStringWidth(t.substring(i, next), run.size);
+                        if (w + cw > avail - line.width && i > start) {
+                            add(line, run, t.substring(start, i));
                             finish(lines, line, run);
                             line = new Line();
                             avail = width;
-                            start = i - 1;
+                            start = i;
+                            w = 0;
                         }
+                        w += cw;
+                        i = next;
                     }
                     add(line, run, t.substring(start, withSpace));
                 } else {
@@ -458,5 +468,48 @@ public final class PdfParagraph {
             d = Math.max(d, r.font.getDescent(r.size));
         }
         return d;
+    }
+
+    /// The index after the cluster starting at `i`: a character with its
+    /// low surrogate, and any combining marks, joiners and variation
+    /// selectors after it.
+    static int nextCluster(String t, int i, int end) {
+        int j = i + 1;
+        if (j < end && isHigh(t.charAt(i)) && isLow(t.charAt(j))) {
+            j++;
+        }
+        while (j < end) {
+            char c = t.charAt(j);
+            boolean extend = c >= 0x0300 && c <= 0x036f || c >= 0x0483 && c <= 0x0489 || c >= 0x0591 && c <= 0x05c7
+                    || c >= 0x0610 && c <= 0x061a || c >= 0x064b && c <= 0x065f || c == 0x0670
+                    || c >= 0x06d6 && c <= 0x06ed || c == 0x200c || c == 0x200d || c >= 0xfe00 && c <= 0xfe0f
+                    || c >= 0x20d0 && c <= 0x20ff;
+            if (c == 0x200d && j + 1 < end) {
+                // A joiner glues the next character (and its own low
+                // surrogate) onto this cluster, as in emoji sequences.
+                j++;
+                if (j + 1 < end && isHigh(t.charAt(j))) {
+                    j++;
+                }
+                j++;
+                continue;
+            }
+            if (isLow(c)) {
+                extend = true;
+            }
+            if (!extend) {
+                break;
+            }
+            j++;
+        }
+        return Math.min(j, end);
+    }
+
+    private static boolean isHigh(char c) {
+        return c >= 0xd800 && c <= 0xdbff;
+    }
+
+    private static boolean isLow(char c) {
+        return c >= 0xdc00 && c <= 0xdfff;
     }
 }

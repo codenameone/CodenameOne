@@ -749,13 +749,22 @@ public final class CffFont {
             return i >= 0 && i < sp ? stack[i] : 0;
         }
 
+        // True while drawing the base or accent of a seac.
+        boolean component;
+
         private void seac(double adx, double ady, int bchar, int achar) {
+            // A seac component may not use seac itself (Type 1 spec, 6.4); a
+            // glyph naming itself would otherwise recurse without end.
+            if (component) {
+                return;
+            }
             String[] std = PdfFontDecoder.encoding("StandardEncoding");
             int base = bchar >= 0 && bchar < 256 && std[bchar] != null ? glyphForName(std[bchar]) : -1;
             int accent = achar >= 0 && achar < 256 && std[achar] != null ? glyphForName(std[achar]) : -1;
             finish();
             if (base >= 0) {
                 Type2 t = new Type2(sink, subrs);
+                t.component = true;
                 t.widthSeen = true;
                 t.run(charStrings[base + 1], charStrings[base + 2], 1);
                 t.finish();
@@ -790,6 +799,7 @@ public final class CffFont {
                     }
                 };
                 Type2 t = new Type2(shifted, subrs);
+                t.component = true;
                 t.widthSeen = true;
                 t.run(charStrings[accent + 1], charStrings[accent + 2], 1);
                 t.finish();

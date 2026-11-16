@@ -141,18 +141,24 @@ public final class PdfFilters {
         return out;
     }
 
+    /// The most any one filter may produce. A few kilobytes of deflated
+    /// zeros expand to gigabytes, so a decoder stops here rather than run the
+    /// process out of memory; the truncated output is treated like any other
+    /// damaged stream.
+    static final int MAX_DECODED = 1 << 27;
+
     private static byte[] inflate(byte[] in, boolean nowrap) {
         Inflater inf = new Inflater();
         inf.init(15, nowrap);
         inf.setInput(in, 0, in.length, false);
-        ByteArrayOutputStream bo = new ByteArrayOutputStream(in.length * 4 + 64);
+        ByteArrayOutputStream bo = new ByteArrayOutputStream((int) Math.min(MAX_DECODED, in.length * 4L + 64));
         byte[] buf = new byte[16384];
         while (true) {
             inf.setOutput(buf, 0, buf.length);
             int err = inf.inflate(JZlib.Z_NO_FLUSH);
             int n = buf.length - inf.getAvailOut();
             bo.write(buf, 0, n);
-            if (err != JZlib.Z_OK || n == 0 && inf.getAvailIn() == 0) {
+            if (err != JZlib.Z_OK || n == 0 && inf.getAvailIn() == 0 || bo.size() >= MAX_DECODED) {
                 break;
             }
         }
@@ -173,7 +179,12 @@ public final class PdfFilters {
         int bits = Math.max(1, p.getInt("BitsPerComponent", 8));
         int columns = Math.max(1, p.getInt("Columns", 1));
         int bpp = Math.max(1, colors * bits / 8);
-        int stride = (columns * colors * bits + 7) / 8;
+        long wide = ((long) columns * colors * bits + 7) / 8;
+        if (wide > data.length + 1L) {
+            // A row wider than the whole stream cannot be real.
+            return data;
+        }
+        int stride = (int) wide;
         if (predictor == 2) {
             if (bits != 8) {
                 return data;
@@ -329,7 +340,7 @@ public final class PdfFilters {
     }
 
     static byte[] lzw(byte[] in, int early) {
-        ByteArrayOutputStream bo = new ByteArrayOutputStream(in.length * 3);
+        ByteArrayOutputStream bo = new ByteArrayOutputStream((int) Math.min(MAX_DECODED, in.length * 3L));
         byte[][] table = new byte[4096][];
         for (int i = 0; i < 256; i++) {
             table[i] = new byte[] {(byte) i};
@@ -370,6 +381,9 @@ public final class PdfFilters {
                 break;
             }
             bo.write(entry, 0, entry.length);
+            if (bo.size() >= MAX_DECODED) {
+                break;
+            }
             if (prev != null && next < 4096) {
                 byte[] add = new byte[prev.length + 1];
                 System.arraycopy(prev, 0, add, 0, prev.length);

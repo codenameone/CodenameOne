@@ -44,6 +44,9 @@ public final class PdfBookmark {
 
     /// Adds a nested entry that jumps to `y` points from the top of `page`.
     public PdfBookmark addChild(String title, PdfPage page, float y) {
+        if (page.document() != this.page.document()) { // NOPMD CompareObjectsWithEquals - the same document object is required
+            throw new IllegalArgumentException("The page belongs to another document");
+        }
         PdfBookmark b = new PdfBookmark(title, page, y);
         children.add(b);
         return b;

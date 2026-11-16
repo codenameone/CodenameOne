@@ -63,6 +63,12 @@ import java.util.List;
 public class PdfViewer extends Component {
     private static final int GAP = 8;
     private static final int CACHED_PAGES = 6;
+    // The most pixels one cached page image may hold (about 64 MB of ARGB).
+    // A zoomed page past it is rendered at this size and scaled up on
+    // screen, softer but without running the device out of memory.
+    private static final double MAX_PAGE_PIXELS = 16.0 * 1024 * 1024;
+    // The most pixels all cached page images may hold together.
+    private static final double MAX_CACHED_PIXELS = 3 * MAX_PAGE_PIXELS;
     private static final float MAX_ZOOM = 5f;
 
     private final PdfFile file;
@@ -208,7 +214,10 @@ public class PdfViewer extends Component {
         return paper;
     }
 
-    /// Pixels per point at the current width and zoom.
+    /// Pixels per point at the current width and zoom. One scale for the
+    /// whole document, fitted to its widest page, keeps pages in proportion
+    /// to each other as a reader expects; a narrow page beside a very wide
+    /// one is zoomed into rather than enlarged on its own.
     private double scale() {
         int w = getWidth();
         if (w <= 0) {
@@ -318,17 +327,30 @@ public class PdfViewer extends Component {
                     return;
                 }
                 double now = scale();
+                double area = widths[page] * heights[page] * now * now;
+                double drawn = area > MAX_PAGE_PIXELS ? now * Math.sqrt(MAX_PAGE_PIXELS / area) : now;
                 Image img;
                 try {
-                    img = renderPage(page, now);
-                } catch (RuntimeException e) {
-                    // Draw a malformed page as blank rather than retrying it.
+                    img = renderPage(page, drawn);
+                } catch (Throwable e) { // NOPMD AvoidCatchingThrowable - out of memory on a huge page must not retry it on every paint
+                    // A page that fails is stored as blank paper, so the
+                    // next paint does not schedule it again.
                     img = Image.createImage(1, 1, 0xffffffff);
                 }
                 store(page, img, now);
                 repaint();
             }
         });
+    }
+
+    private double cachedPixels() {
+        double total = 0;
+        for (int i = 0; i < cache.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding loops
+            if (cache[i] != null) {
+                total += (double) cache[i].getWidth() * cache[i].getHeight();
+            }
+        }
+        return total;
     }
 
     private void store(int page, Image img, double s) {
@@ -341,7 +363,7 @@ public class PdfViewer extends Component {
                 count++;
             }
         }
-        while (count > CACHED_PAGES) {
+        while (count > CACHED_PAGES || count > 1 && cachedPixels() > MAX_CACHED_PIXELS) {
             int oldest = -1;
             for (int i = 0; i < cache.length; i++) {
                 if (cache[i] != null && i != page && (oldest < 0 || cacheUse[i] < cacheUse[oldest])) {

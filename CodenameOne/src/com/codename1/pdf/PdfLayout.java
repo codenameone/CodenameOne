@@ -221,8 +221,18 @@ public final class PdfLayout {
         }
         List<List<PdfTable.Cell>> rows = table.rows();
         int headers = Math.min(table.headerRows, rows.size());
+        boolean repeat = headers > 0;
+        int startPage = pages.size();
+        float startY = y;
         for (int r = 0; r < rows.size(); r++) {
-            drawRow(table, rows.get(r), colX, r >= headers ? rows.subList(0, headers) : null);
+            if (r == headers && repeat) {
+                // A header that fills more than half a page would leave a
+                // line or two of body per continuation page; it is drawn
+                // once and not repeated.
+                float height = pages.size() == startPage ? y - startY : y - top;
+                repeat = height <= (limit() - top) / 2;
+            }
+            drawRow(table, rows.get(r), colX, r >= headers && repeat ? rows.subList(0, headers) : null);
         }
         y += table.spaceAfter;
         return this;
@@ -328,9 +338,8 @@ public final class PdfLayout {
         }
         for (int i = 0; i < pages.size(); i++) {
             PdfPage p = pages.get(i);
-            p.getCanvas().save();
+            p.getCanvas().beginOverlay();
             decorator.decorate(p, i + 1, pages.size());
-            p.getCanvas().restore();
         }
     }
 }

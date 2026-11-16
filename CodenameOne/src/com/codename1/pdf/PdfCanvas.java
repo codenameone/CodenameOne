@@ -79,13 +79,31 @@ public final class PdfCanvas {
     PdfCanvas(PdfPage page) {
         this.fontState = null;
         this.page = page;
+        // The page's own drawing runs inside an outer q, so an overlay can
+        // start again from the default state whatever was left open.
+        content.append("q\n");
+        baseMatrix();
+    }
+
+    private void baseMatrix() {
         content.append("1 0 0 -1 0 ");
         PdfFormat.number(content, page.getHeight());
         content.append(" cm\n");
     }
 
+    /// Closes every open save and every transform, clip or color the page
+    /// content left behind, so what is drawn next (a header or footer)
+    /// starts from the default state.
+    void beginOverlay() {
+        while (depth > 0) {
+            restore();
+        }
+        content.append("Q\nq\n");
+        baseMatrix();
+    }
+
     String content() {
-        return content.toString();
+        return content.toString() + "Q\n";
     }
 
     private PdfCanvas op(String operator) {

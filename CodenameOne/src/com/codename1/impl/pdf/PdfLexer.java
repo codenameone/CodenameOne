@@ -95,13 +95,30 @@ public final class PdfLexer {
     /// The next complete object or operator, or [#EOF].
     public Object next() {
         Object o = token();
-        if (o == END_ARRAY || o == END_DICT) {
-            return next();
+        while (o == END_ARRAY || o == END_DICT) {
+            o = token();
         }
         return o;
     }
 
+    // Arrays and dictionaries nest by recursion; past this depth an opening
+    // bracket reads as an empty container, so hostile input cannot overflow
+    // the stack (a native crash on ParparVM).
+    private static final int MAX_NESTING = 64;
+    private int nesting;
+
     private Object token() {
+        while (true) {
+            Object o = tokenOnce();
+            if (o != SKIP) { // NOPMD CompareObjectsWithEquals - identity of a sentinel object is intended
+                return o;
+            }
+        }
+    }
+
+    private static final Object SKIP = new Object();
+
+    private Object tokenOnce() {
         skipWhitespace();
         if (pos >= end) {
             return EOF;
@@ -115,9 +132,14 @@ public final class PdfLexer {
             case '[': {
                 pos++;
                 List<Object> list = new ArrayList<Object>();
+                if (nesting >= MAX_NESTING) {
+                    return list;
+                }
+                nesting++;
                 while (true) {
                     Object o = token();
                     if (o == END_ARRAY || o == EOF) {
+                        nesting--;
                         return list;
                     }
                     if (o == END_DICT) {
@@ -144,7 +166,7 @@ public final class PdfLexer {
                 return new Op(String.valueOf((char) c));
             case ')':
                 pos++;
-                return token();
+                return SKIP;
             default:
                 break;
         }
@@ -171,7 +193,7 @@ public final class PdfLexer {
         }
         if (pos == start) {
             pos++;
-            return token();
+            return SKIP;
         }
         String word = ascii(start, pos);
         if ("true".equals(word)) {
@@ -202,6 +224,18 @@ public final class PdfLexer {
 
     private PdfDict dictionary() {
         PdfDict dict = new PdfDict();
+        if (nesting >= MAX_NESTING) {
+            return dict;
+        }
+        nesting++;
+        try {
+            return fillDictionary(dict);
+        } finally {
+            nesting--;
+        }
+    }
+
+    private PdfDict fillDictionary(PdfDict dict) {
         while (true) {
             Object k = token();
             if (k == END_DICT || k == EOF) {

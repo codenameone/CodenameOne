@@ -84,6 +84,9 @@ public final class PdfPage {
     /// Makes the rectangle `(x, y, w, h)` jump to the top of `target`, a
     /// page of the same document, when clicked.
     public PdfPage addLink(float x, float y, float w, float h, PdfPage target) {
+        if (target.document != document) { // NOPMD CompareObjectsWithEquals - the same document object is required
+            throw new IllegalArgumentException("The page belongs to another document");
+        }
         links.add(new Object[] {new float[] {x, y, w, h}, target});
         return this;
     }
@@ -154,7 +157,7 @@ public final class PdfPage {
                 sb.append(" /Dest [").append(((PdfPage) link[1]).objectNumber).append(" 0 R /XYZ null null null]");
             } else {
                 sb.append(" /A <</S /URI /URI ");
-                PdfFormat.literal(sb, String.valueOf(link[1]));
+                PdfFormat.literal(sb, PdfFormat.uri(String.valueOf(link[1])));
                 sb.append(">>");
             }
             sb.append(">> ");

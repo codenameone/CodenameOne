@@ -548,13 +548,22 @@ public final class Type1Font {
             }
         }
 
+        // True while drawing the base or accent of a seac.
+        boolean component;
+
         private void seac(double adx, double ady, int bchar, int achar, int depth) {
+            // A seac component may not use seac itself (Type 1 spec, 6.4); a
+            // glyph naming itself would otherwise recurse without end.
+            if (component) {
+                return;
+            }
             String[] std = PdfFontDecoder.encoding("StandardEncoding");
             finish();
             String base = bchar >= 0 && bchar < 256 ? std[bchar] : null;
             String accent = achar >= 0 && achar < 256 ? std[achar] : null;
             if (base != null && charStrings.containsKey(base)) {
                 Interp t = new Interp(sink);
+                t.component = true;
                 t.run(charStrings.get(base), depth + 1);
                 t.finish();
             }
@@ -588,6 +597,7 @@ public final class Type1Font {
                     }
                 };
                 Interp t = new Interp(shifted);
+                t.component = true;
                 t.run(charStrings.get(accent), depth + 1);
                 t.finish();
             }

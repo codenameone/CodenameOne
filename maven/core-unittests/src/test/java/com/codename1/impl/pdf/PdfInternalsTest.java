@@ -153,6 +153,26 @@ class PdfInternalsTest {
     }
 
     @Test
+    void deepNestingAndStrayClosersDoNotOverflowTheStack() {
+        byte[] open = new byte[200000];
+        java.util.Arrays.fill(open, (byte) '[');
+        assertNotNull(new PdfLexer(open, 0, open.length, false).next());
+        byte[] close = new byte[200000];
+        java.util.Arrays.fill(close, (byte) ']');
+        assertSame(PdfLexer.EOF, new PdfLexer(close, 0, close.length, false).next());
+        byte[] parens = new byte[200000];
+        java.util.Arrays.fill(parens, (byte) ')');
+        assertSame(PdfLexer.EOF, new PdfLexer(parens, 0, parens.length, false).next());
+    }
+
+    @Test
+    void calculatorStopsOnTooFewOperands() {
+        double[] out = PdfCalculator.run(PdfCalculator.compile("{ pop pop add }".getBytes()), new double[] {1}, 1);
+        assertEquals(1, out.length);
+        PdfCalculator.run(PdfCalculator.compile("{ true }".getBytes()), new double[0], 1);
+    }
+
+    @Test
     void cidCollectionsMapToUnicode() {
         assertEquals(0x3042, CidToUnicode.lookup("Japan1", 843));
         assertEquals(0x65e5, CidToUnicode.lookup("Japan1", 3284));

@@ -97,6 +97,9 @@ public final class PdfDocument {
     /// Adds a top-level outline entry that jumps to `y` points from the
     /// top of `page`.
     public PdfBookmark addBookmark(String title, PdfPage page, float y) {
+        if (page.document() != this) { // NOPMD CompareObjectsWithEquals - the same document object is required
+            throw new IllegalArgumentException("The page belongs to another document");
+        }
         PdfBookmark b = new PdfBookmark(title, page, y);
         bookmarks.add(b);
         return b;

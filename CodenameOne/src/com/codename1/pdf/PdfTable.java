@@ -50,13 +50,19 @@ public final class PdfTable {
     float fontSize = 10;
     float spaceAfter = 8;
 
-    /// A table with one column per weight.
+    /// A table with one column per weight; each weight must be positive.
     public PdfTable(float... columnWeights) {
         if (columnWeights == null || columnWeights.length == 0) {
             throw new IllegalArgumentException("A table needs at least one column");
         }
         weights = new float[columnWeights.length];
-        System.arraycopy(columnWeights, 0, weights, 0, weights.length);
+        for (int i = 0; i < weights.length; i++) {
+            // A zero, negative or NaN weight would place every column at NaN.
+            if (!(columnWeights[i] > 0) || columnWeights[i] == Float.POSITIVE_INFINITY) { // NOPMD LogicInversion - also rejects NaN, which every comparison fails
+                throw new IllegalArgumentException("Column weights must be positive and finite");
+            }
+            weights[i] = columnWeights[i];
+        }
     }
 
     /// The number of leading rows that form the header; 0 by default.
@@ -104,7 +110,6 @@ public final class PdfTable {
     /// Adds a cell spanning `colspan` columns, filled with `backgroundRgb`,
     /// or transparent when it is negative.
     public PdfTable addCell(PdfParagraph paragraph, int colspan, int backgroundRgb) {
-        paragraph.spaceAfter = 0;
         cells.add(new Cell(paragraph, Math.max(1, Math.min(colspan, weights.length)), backgroundRgb));
         return this;
     }

@@ -35,6 +35,10 @@ import java.util.Map;
 @com.codename1.impl.SharedWithBackend
 public final class PdfTextExtractor {
     private static final int MAX_FORM_DEPTH = 12;
+    // Tokens one extraction may read in total, across nested forms: depth
+    // alone bounds nesting, not a form that draws another a thousand times
+    // on each of twelve levels.
+    private int budget = 20 * 1000 * 1000;
 
     private final StringBuilder out = new StringBuilder(); // NOPMD AvoidStringBufferField - the builder accumulates the output for the object lifetime
     private final Map<Object, PdfFontDecoder> decoders = new HashMap<Object, PdfFontDecoder>();
@@ -90,7 +94,7 @@ public final class PdfTextExtractor {
         double scale = 1;
         double leading = 0;
         double rise = 0;
-        while (true) {
+        while (budget-- > 0) {
             Object o = lx.next();
             if (o == PdfLexer.EOF) { // NOPMD CompareObjectsWithEquals - identity of a sentinel object is intended
                 break;

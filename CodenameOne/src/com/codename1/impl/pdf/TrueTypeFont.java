@@ -582,6 +582,10 @@ public final class TrueTypeFont extends PdfFont {
                 h = 31 * h + used[i];
             }
             h = 31 * h + name.hashCode();
+            // Two font files can share a name and a glyph set (a regular and
+            // a bold cut named alike); the object number keeps their tags
+            // apart within the document.
+            h = 31 * h + objectNumber;
             StringBuilder sb = new StringBuilder(6);
             for (int i = 0; i < 6; i++) {
                 sb.append((char) ('A' + (int) ((h >>> (i * 5)) & 0x1f) % 26));
@@ -589,7 +593,23 @@ public final class TrueTypeFont extends PdfFont {
             return sb.toString();
         }
 
-        private byte[] toUnicodeCMap(int[] used) {
+        private byte[] toUnicodeCMap(int[] usedWithNotdef) {
+            // Glyph 0 is the box drawn for characters the font lacks; mapping
+            // it would make copied text read as whichever such character
+            // came last.
+            int count = 0;
+            for (int i = 0; i < usedWithNotdef.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding loops
+                if (usedWithNotdef[i] != 0) {
+                    count++;
+                }
+            }
+            int[] used = new int[count];
+            count = 0;
+            for (int i = 0; i < usedWithNotdef.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding loops
+                if (usedWithNotdef[i] != 0) {
+                    used[count++] = usedWithNotdef[i];
+                }
+            }
             StringBuilder sb = new StringBuilder();
             sb.append("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n")
                     .append("/CIDSystemInfo <</Registry (Adobe) /Ordering (UCS) /Supplement 0>> def\n")

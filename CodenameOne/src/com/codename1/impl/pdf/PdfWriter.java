@@ -91,6 +91,12 @@ public final class PdfWriter {
         sb.append("xref\n0 ").append(nextObject).append('\n');
         sb.append("0000000000 65535 f\r\n");
         for (int i = 1; i < nextObject; i++) {
+            if (offsets[i] <= 0) {
+                // Reserved and never written: a free entry, not a pointer
+                // to the header.
+                sb.append("0000000000 00001 f\r\n");
+                continue;
+            }
             String off = Long.toString(offsets[i]);
             for (int pad = off.length(); pad < 10; pad++) {
                 sb.append('0');

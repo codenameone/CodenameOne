@@ -42,6 +42,13 @@ public final class PdfFormat {
             out.append('0');
             return;
         }
+        // Clamped well inside what a long holds after scaling; no page
+        // coordinate comes near it (PDF pages are at most 14400 units).
+        if (value > 1.0e9) {
+            value = 1.0e9;
+        } else if (value < -1.0e9) {
+            value = -1.0e9;
+        }
         long scaled = Math.round(value * 10000.0);
         if (scaled < 0) {
             out.append('-');
@@ -69,19 +76,43 @@ public final class PdfFormat {
         return sb.toString();
     }
 
-    /// Appends a name object (`/Name`), escaping every byte outside the
-    /// regular-character set as `#xx`.
+    /// Appends a name object (`/Name`): its UTF-8 bytes, with every byte
+    /// outside the regular-character set escaped as `#xx`. NUL, which a
+    /// name cannot hold, is dropped.
     public static void name(StringBuilder out, String name) {
         out.append('/');
-        int len = name.length();
-        for (int i = 0; i < len; i++) {
-            char c = name.charAt(i);
+        byte[] b = utf8(name);
+        for (int i = 0; i < b.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding loops
+            int c = b[i] & 0xff;
             if (c > 0x20 && c < 0x7f && c != '#' && !isDelimiter(c)) {
-                out.append(c);
-            } else {
-                int b = c & 0xff;
-                out.append('#').append(HEX[b >> 4]).append(HEX[b & 0xf]);
+                out.append((char) c);
+            } else if (c != 0) {
+                out.append('#').append(HEX[c >> 4]).append(HEX[c & 0xf]);
             }
+        }
+    }
+
+    /// `uri` with every byte outside printable ASCII percent-encoded as
+    /// UTF-8, the form a PDF URI action holds (its string is 7-bit ASCII).
+    public static String uri(String uri) {
+        byte[] b = utf8(uri);
+        StringBuilder sb = new StringBuilder(b.length);
+        for (int i = 0; i < b.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding loops
+            int c = b[i] & 0xff;
+            if (c > 0x20 && c < 0x7f) {
+                sb.append((char) c);
+            } else {
+                sb.append('%').append(HEX[c >> 4]).append(HEX[c & 0xf]);
+            }
+        }
+        return sb.toString();
+    }
+
+    static byte[] utf8(String s) {
+        try {
+            return s.getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return new byte[0];
         }
     }
 

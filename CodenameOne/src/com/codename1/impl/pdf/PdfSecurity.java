@@ -71,6 +71,13 @@ final class PdfSecurity {
         byte[] o = bytes(enc.get("O"));
         byte[] u = bytes(enc.get("U"));
         byte[] pw = password == null ? new byte[0] : utf8(password);
+        if (revision >= 5 && pw.length > 127) {
+            // ISO 32000-2 7.6.4.3.3: an R5/R6 password is its first 127
+            // UTF-8 bytes. SASLprep is not applied, so a password that
+            // normalizes differently (rare outside some scripts) must be
+            // typed in the form the author used.
+            pw = sub(pw, 0, 127);
+        }
         if (revision >= 5) {
             key = aes256Key(pw, o, u, bytes(enc.get("OE")), bytes(enc.get("UE")));
         } else {
@@ -274,6 +281,9 @@ final class PdfSecurity {
             return rc4(k, data);
         }
         if (data.length < 32) {
+            // The IV and one padded block are the smallest AES ciphertext,
+            // even for an empty string, so anything shorter decrypts to
+            // nothing; that is what other readers show for it too.
             return new byte[0];
         }
         return new PdfAes(k).decryptCbc(sub(data, 0, 16), data, 16, data.length - 16, true);

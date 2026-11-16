@@ -251,4 +251,28 @@ class PdfDocumentTest {
         }
         return sb.toString();
     }
+
+    @Test
+    void longWordsBreakBetweenClustersOnly() {
+        String emoji = "\ud83d\ude00";
+        assertEquals(2, PdfParagraph.nextCluster(emoji + "a", 0, 3));
+        assertEquals(2, PdfParagraph.nextCluster("e\u0301x", 0, 3));
+        assertEquals(5, PdfParagraph.nextCluster(emoji + "\u200d" + emoji, 0, 5));
+        PdfDocument doc = new PdfDocument();
+        PdfLayout layout = new PdfLayout(doc,
+                PdfPageSize.A5, 20);
+        StringBuilder word = new StringBuilder();
+        for (int i = 0; i < 400; i++) {
+            word.append(emoji);
+        }
+        layout.add(new PdfParagraph(word.toString(), PdfFont.HELVETICA, 12));
+        layout.finish();
+        assertTrue(doc.getPageCount() >= 1);
+    }
+
+    @Test
+    void tableRejectsWeightsThatAreNotPositive() {
+        assertThrows(IllegalArgumentException.class, () -> new PdfTable(0f, 0f));
+        assertThrows(IllegalArgumentException.class, () -> new PdfTable(1f, -1f));
+    }
 }

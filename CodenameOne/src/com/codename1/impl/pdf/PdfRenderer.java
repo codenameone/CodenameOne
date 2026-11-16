@@ -264,10 +264,24 @@ public final class PdfRenderer {
         return (a << 24) | (rgb & 0xffffff);
     }
 
+    // Patterns and soft masks start their content at a fixed depth, so the
+    // depth argument alone cannot stop a pattern that paints with itself;
+    // this counts every content stream actually on the stack.
+    private int active;
+
     private void run(byte[] data, PdfDict resources, State initial, int depth) {
-        if (depth > MAX_DEPTH) {
+        if (depth > MAX_DEPTH || active >= MAX_DEPTH * 2) {
             return;
         }
+        active++;
+        try {
+            runContent(data, resources, initial, depth);
+        } finally {
+            active--;
+        }
+    }
+
+    private void runContent(byte[] data, PdfDict resources, State initial, int depth) {
         PdfLexer lx = new PdfLexer(data, 0, data.length, false);
         List<Object> ops = new ArrayList<Object>();
         List<State> stack = new ArrayList<State>();

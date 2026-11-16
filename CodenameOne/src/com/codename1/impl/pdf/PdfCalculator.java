@@ -148,10 +148,11 @@ final class PdfCalculator {
                 continue;
             }
             String op = (String) o;
-            if (sp < 1 && !"true".equals(op)) {
+            if (sp < arity(op)) {
+                // Too few operands: the function is malformed, stop here.
                 break;
             }
-            double a = st[sp - 1];
+            double a = sp >= 1 ? st[sp - 1] : 0;
             double b = sp >= 2 ? st[sp - 2] : 0;
             if ("add".equals(op)) {
                 st[sp - 2] = b + a;
@@ -298,6 +299,21 @@ final class PdfCalculator {
             return com.codename1.util.MathUtil.atan(y / x) + (y >= 0 ? Math.PI : -Math.PI);
         }
         return y > 0 ? Math.PI / 2 : y < 0 ? -Math.PI / 2 : 0;
+    }
+
+    /// How many operands `op` takes off the stack.
+    private static int arity(String op) {
+        if ("true".equals(op) || "false".equals(op)) {
+            return 0;
+        }
+        if ("add".equals(op) || "sub".equals(op) || "mul".equals(op) || "div".equals(op) || "idiv".equals(op)
+                || "mod".equals(op) || "atan".equals(op) || "exp".equals(op) || "exch".equals(op)
+                || "roll".equals(op) || "eq".equals(op) || "ne".equals(op) || "gt".equals(op) || "ge".equals(op)
+                || "lt".equals(op) || "le".equals(op) || "and".equals(op) || "or".equals(op) || "xor".equals(op)
+                || "bitshift".equals(op)) {
+            return 2;
+        }
+        return 1;
     }
 
     /// `v` rounded toward zero, as integer division rounds.
