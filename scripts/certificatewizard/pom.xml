@@ -49,9 +49,13 @@
         <cn1.version>8.0-SNAPSHOT</cn1.version>
         <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>17</java.version>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <!-- Java 11, not 17: the wizard runs on the JVM running Maven or Gradle, and
+             DesktopTool refuses to start it on an older one. 11 is the floor the JavaSE
+             port already has. release (not source/target) also rejects newer JDK APIs. -->
+        <java.version>11</java.version>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.release>11</maven.compiler.release>
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
         <cn1app.name>cn1-certificatewizard</cn1app.name>
     </properties>

@@ -31,16 +31,16 @@ import javax.imageio.ImageIO;
  * ScreenshotSanity catches a blank window. It cannot catch issue #6255: the
  * Certificate Wizard opened with every label in place but no theme at all --
  * no fills, no borders, plain text on white -- which has plenty of "content".
- * The tools' themes paint the selected navigation item in the Codename One
- * accent (#2F6BFF light, #4D86FF dark) on every platform theme, and nothing
- * unthemed is that colour, so a solid block of it is the signal.
+ * The tools' themes fill the selected navigation item with the accent. Its exact
+ * shade is not fixed -- the runtime retunes bound colours to the installed
+ * desktop theme -- but it is always a saturated blue, and an unthemed window
+ * has almost none (anti-aliased icon edges at most), so a block of it is the
+ * signal. Measured: 3,100-6,800 such pixels on themed captures (macOS, Windows
+ * light and dark), 31 on the #6255 capture.
  *
  * Usage: java ThemeApplied.java &lt;file.png&gt; [minAccentPixels]
  */
 public class ThemeApplied {
-    private static final int[][] ACCENTS = {{0x2F, 0x6B, 0xFF}, {0x4D, 0x86, 0xFF}};
-    private static final int TOLERANCE = 28;
-
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             fail("usage: ThemeApplied <file.png> [minAccentPixels]");
@@ -70,13 +70,7 @@ public class ThemeApplied {
         int r = (rgb >> 16) & 0xff;
         int g = (rgb >> 8) & 0xff;
         int b = rgb & 0xff;
-        for (int[] a : ACCENTS) {
-            if (Math.abs(r - a[0]) <= TOLERANCE && Math.abs(g - a[1]) <= TOLERANCE
-                    && Math.abs(b - a[2]) <= TOLERANCE) {
-                return true;
-            }
-        }
-        return false;
+        return b >= 180 && b - r >= 100 && b - g >= 40;
     }
 
     private static void fail(String message) {

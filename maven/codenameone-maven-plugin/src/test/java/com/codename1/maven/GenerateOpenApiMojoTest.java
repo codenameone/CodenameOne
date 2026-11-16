@@ -195,6 +195,10 @@ class GenerateOpenApiMojoTest {
         assertTrue(petSrc.contains("public Long id;"), "Pet class should declare Long id field");
         assertTrue(petSrc.contains("public String name;"), "Pet class should declare String name field");
         assertTrue(petSrc.contains("public Pet() {}"), "Pet class should have a public no-arg ctor");
+        // The record form's API as well, so the same calling code compiles at either target.
+        assertTrue(petSrc.contains("public Long id() {"), "Pet class should have a record-style id() accessor:\n" + petSrc);
+        assertTrue(petSrc.contains("public String name() {"), "Pet class should have a record-style name() accessor");
+        assertTrue(petSrc.contains("this.id = id;"), "Pet class should have the record's canonical constructor");
     }
 
     @Test
