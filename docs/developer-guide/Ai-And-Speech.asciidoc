@@ -373,6 +373,20 @@ in focus even when continuous focus has settled on the background.
 `BarcodeScanner` used directly takes the same restriction through
 `VisionOptions.barcodeFormats(...)`.
 
+A code's payload is bytes, and `getValue()` is those bytes read as text.
+On Android, a PDF417 whose payload is not valid in the charset ML Kit
+assumes is read as UTF-8 when it is valid UTF-8 and as ISO-8859-1
+otherwise, so it is never dropped for its encoding; `getRawBytes()`
+always carries the exact payload. A PDF417 in another charset, such as
+ISO-8859-2, reads correctly once the application names that charset
+before scanning. On iOS the system picks the charset itself, so the
+property is Android only:
+
+[source,java]
+----
+Display.getInstance().setProperty("android.barcodeCharset", "ISO-8859-2");
+----
+
 IMPORTANT: Three classes share the name `CodeScanner`. Import
 `com.codename1.ai.vision.CodeScanner`. The other two are the
 `cn1-codescan` cn1lib's `com.codename1.ext.codescan.CodeScanner` and the

@@ -27,6 +27,7 @@ import android.graphics.Point;
 import com.codename1.ai.vision.Barcode;
 import com.codename1.ai.vision.VisionOptions;
 import com.codename1.ai.vision.VisionPoint;
+import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
@@ -34,6 +35,10 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
 import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.common.InputImage;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -142,7 +147,7 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
                                 points[p].x / (float) imageWidth,
                                 points[p].y / (float) imageHeight);
                     }
-                    result[i] = new Barcode(value.getRawValue(),
+                    result[i] = new Barcode(text(value),
                             barcodeFormat(value.getFormat()),
                             value.getRawBytes(),
                             normalized(value.getBoundingBox(),
@@ -152,6 +157,61 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
                 complete(out, result);
             }
         }).addOnFailureListener(failure(out));
+    }
+
+    /// ML Kit on Android answers a null raw value when the payload bytes are
+    /// not valid in the charset it assumes, though the code itself decoded --
+    /// a PDF417 payload in a single-byte charset such as ISO-8859-2 is the
+    /// measured case. A null value is dropped by CodeScanner, so the scanner
+    /// looked as if it never found such a code. Apple Vision, the iOS
+    /// default, picks the charset itself and reads the same code correctly.
+    ///
+    /// For a PDF417 the bytes are decoded here: with the charset named by the
+    /// Display property android.barcodeCharset whenever the app sets one
+    /// (also when ML Kit answered a value, since ML Kit's own guess may be
+    /// the wrong charset), else -- only when ML Kit answered null -- as UTF-8
+    /// when they are valid UTF-8, else as ISO-8859-1, which maps every byte
+    /// and so never fails. getRawBytes() still carries the exact payload.
+    ///
+    /// Only PDF417 is decoded from bytes because only there are getRawBytes()
+    /// measured to be the payload; for a QR code they can be the codeword
+    /// stream, mode and length bits included, and decoding those would hand
+    /// the app a wrong value instead of none.
+    static String text(com.google.mlkit.vision.barcode.common.Barcode value) {
+        String raw = value.getRawValue();
+        byte[] bytes = value.getRawBytes();
+        if (bytes == null || value.getFormat()
+                != com.google.mlkit.vision.barcode.common.Barcode.FORMAT_PDF417) {
+            return raw;
+        }
+        String charset = Display.getInstance().getProperty("android.barcodeCharset", null);
+        if (raw != null && (charset == null || charset.length() == 0)) {
+            return raw;
+        }
+        return decode(bytes, charset, raw);
+    }
+
+    static String decode(byte[] bytes, String charsetName, String raw) {
+        if (charsetName != null && charsetName.length() > 0) {
+            try {
+                return new String(bytes, Charset.forName(charsetName));
+            } catch (IllegalArgumentException unsupported) {
+                // An unknown name never replaces the value ML Kit answered;
+                // with none, it falls through to the default decoding
+                // rather than losing the code.
+                if (raw != null) {
+                    return raw;
+                }
+            }
+        }
+        try {
+            return Charset.forName("UTF-8").newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes)).toString();
+        } catch (CharacterCodingException notUtf8) {
+            return new String(bytes, Charset.forName("ISO-8859-1"));
+        }
     }
 
     @Override
