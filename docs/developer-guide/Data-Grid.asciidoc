@@ -245,8 +245,8 @@ A cell is edited when its column and its model both allow it:
 a tap. Any other value is edited in place: a double tap or Enter lays an editor
 over the cell, and the cell is painted again when the edit ends.
 
-.A customer being edited in place
-image::img/generated/datagrid-editing.png["The orders grid with a text field over the customer of the third row",scaledwidth=70%]
+.The third order after its customer was edited in place
+image::img/generated/datagrid-editing.png["The orders grid with the third row selected and its customer changed to Kestrel Aviation",scaledwidth=70%]
 
 The editor is a component of the form's layered pane, not a child of the grid,
 and it lives only while the cell is edited. Tapping elsewhere, moving to another

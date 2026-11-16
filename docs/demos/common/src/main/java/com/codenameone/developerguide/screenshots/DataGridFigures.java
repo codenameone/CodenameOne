@@ -25,7 +25,6 @@ package com.codenameone.developerguide.screenshots;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
-import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.UIManager;
@@ -116,17 +115,11 @@ public final class DataGridFigures {
             g.selectRows(6, 6, true);
         }));
         v.add(wide("datagrid-editing", grid(DataGridSnippets::editing), (form, g) -> {
-            g.editCellAt(2, 1);
-            // The simulator edits in a native field the capture can't see,
-            // and starts it from the event queue. Let it start, then end that
-            // session and keep the grid's edit, so the field draws itself
-            // over the cell.
-            GuideFigure.settleAnimations(300);
-            TextArea field = editor(form.getFormLayeredPane(DataGrid.class, false));
-            if (field != null) {
-                field.setText("Kestrel Aviation");
-                field.stopEditing();
-            }
+            // The simulator edits in a native field that a capture can't
+            // see, so the figure shows the edit once it has been written
+            // back, the way the cell looks when the field closes.
+            g.getTableModel().setValueAt(2, 1, "Kestrel Aviation");
+            g.setSelectedRow(2);
         }));
         v.add(wide("datagrid-tree", grid("Files", DataGridSnippets::tree), (form, g) -> {
             g.expandAll();
@@ -163,22 +156,6 @@ public final class DataGridFigures {
 
     private static FigureVariant wide(String name, Scene scene, Act act) {
         return new FigureVariant(new Fig(name, scene, act, false), FigureDevice.ANDROID, false, true, name + ".png");
-    }
-
-    private static TextArea editor(Container c) {
-        for (int i = 0; i < c.getComponentCount(); i++) {
-            Component k = c.getComponentAt(i);
-            if (k instanceof TextArea) {
-                return (TextArea) k;
-            }
-            if (k instanceof Container) {
-                TextArea t = editor((Container) k);
-                if (t != null) {
-                    return t;
-                }
-            }
-        }
-        return null;
     }
 
     private static DataGrid find(Container c) {
