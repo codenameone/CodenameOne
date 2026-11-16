@@ -32,7 +32,9 @@ import com.codename1.ui.Graphics;
 /// The row's background is already painted when `paint` is called.
 ///
 /// ```java
-/// grid.getColumn(3).setRenderer(new DefaultGridCellRenderer() {
+/// DataGrid grid = new DataGrid(new DefaultTableModel(new String[]{"Item", "Balance"},
+///         new Object[][]{{"rent", -1200}, {"salary", 4000}}, false));
+/// grid.getColumn(1).setRenderer(new DefaultGridCellRenderer() {
 ///     protected int textColor(GridCell cell, int defaultColor) {
 ///         Object v = cell.getValue();
 ///         return v instanceof Number && ((Number) v).doubleValue() < 0 ? 0xc62828 : defaultColor;

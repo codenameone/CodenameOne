@@ -53,12 +53,16 @@ import java.util.List;
 /// is the class for a small form laid out as a table.
 ///
 /// ```java
+/// TableModel model = new DefaultTableModel(new String[]{"Name", "Team", "Score"}, new Object[][]{
+///         {"dana", "red", 7}, {"Ann", "blue", 3}, {"carl", "red", 9}}, true);
+/// Form form = new Form("Scores", new BorderLayout());
 /// DataGrid grid = new DataGrid(model);
 /// grid.getColumn(0).setFlex(1);
 /// grid.getColumn(2).setKind(GridColumn.Kind.NUMBER).setAggregate(GridAggregate.SUM);
 /// grid.setFrozenColumns(1);
 /// grid.sortBy(grid.getColumn(2), false);
 /// form.add(BorderLayout.CENTER, grid);
+/// form.show();
 /// ```
 ///
 /// #### Rows

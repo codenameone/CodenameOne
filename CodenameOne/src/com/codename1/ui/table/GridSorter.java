@@ -32,9 +32,11 @@ import java.util.Comparator;
 /// they came in. A million rows cost a million reads per key.
 ///
 /// ```java
+/// String[] names = {"dana", "Ann", "carl"};
+/// int n = names.length;
 /// Object[][] keys = new Object[1][n];
 /// for (int i = 0; i < n; i++) {
-///     keys[0][i] = model.getValueAt(i, column);
+///     keys[0][i] = names[i];
 /// }
 /// int[] order = GridSorter.order(n, keys, null, new boolean[]{true});
 /// // order[k] is the position that sorts k-th

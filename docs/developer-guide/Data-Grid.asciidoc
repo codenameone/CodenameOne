@@ -4,7 +4,7 @@
 A list of orders, an inventory, a log, a file browser: each is rows of records
 under a row of column titles, and users expect to sort them, filter them, resize
 the columns and edit a value where it stands. `DataGrid` in
-`com.codename1.ui.table` is that component, and it shows a tree as readily as a
+`com.codename1.ui.table` is that component, and it shows a tree as well as a
 flat list.
 
 The grid paints its cells itself, the way the scheduler and the Gantt chart do.
@@ -89,7 +89,7 @@ changes, or `refreshNode(node)` after one node's children change.
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-selection,indent=0]
 ----
 
-Rows the grid reports are view rows, counted in what is on screen after
+Rows the grid reports are view rows, counted in what's on screen after
 sorting, filtering, grouping and opening nodes. `getModelRow` and `getNode`
 translate one to your data.
 
@@ -115,7 +115,7 @@ Only colours, fonts and paddings are read; nothing has a border. The UIIDs are
 `DataGrid` for the background, `DataGridHeader`, `DataGridRow` and its selected
 state, `DataGridRowAlt` for every other row, `DataGridGroupRow`, `DataGridLine`,
 whose foreground colours the grid lines, `DataGridCheck` and `DataGridEditor`.
-The native themes style all of them for light and dark mode.
+The native themes style all these for light and dark mode.
 
 === Swing applications
 

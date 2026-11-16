@@ -57,6 +57,34 @@
       ]
     },
     {
+      "test": "DataGridThemeScreenshotTest",
+      "reason": "The data grid baseline is a grid of columns and rows. A watch face has room for a column or two at most, so the capture there would only record how the grid fails to fit.",
+      "platform_support": "DataGrid compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the grid in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "data-grid-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "TreeGridThemeScreenshotTest",
+      "reason": "The tree grid baseline is a grid of columns and rows. A watch face has room for a column or two at most, so the capture there would only record how the grid fails to fit.",
+      "platform_support": "DataGrid compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the grid in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "data-grid-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "NodeGraphThemeScreenshotTest",
       "reason": "The node graph baseline is a diagram of five connected nodes in a group. A watch face has no room for it, so the capture there would only record how the diagram fails to fit.",
       "platform_support": "The NodeGraph component compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
