@@ -218,7 +218,7 @@ a run takes: 2500, about a second for the demo crew.
 `Timekeeping` holds the labor rates, the clock and the timesheets. A technician
 clocks a shift in and out, and the job flow records the rest without being asked:
 setting off opens a travel span, arriving closes it and opens a job span, and
-finishing closes that. Setting off while off the clock clocks the technician in.
+finishing closes that. A technician who sets off without clocking in is clocked in then.
 
 Times are rounded to the company's increment when they're written, 15 minutes by
 default. A shift left open longer than the company allows, 12 hours by default,
