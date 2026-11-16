@@ -54,7 +54,7 @@ jobs:
           # Watch-app samples (dash, pulse, splat, slate) are the slow ones;
           # they are split across the shards.
           - shard: a
-            samples: ' parley savor dash pulse bastion '
+            samples: ' parley savor dash pulse bastion fieldline '
           - shard: b
             samples: ' wayline reel splat slate skirmish '
     steps:
@@ -165,6 +165,10 @@ jobs:
       - name: 'iOS: slate'
         if: ${{ !cancelled() && contains(matrix.samples, ' slate ') }}
         run: scripts/ci/build-sample-ios-simulator.sh scripts/slate --watch
+        timeout-minutes: 45
+      - name: 'iOS: fieldline'
+        if: ${{ !cancelled() && contains(matrix.samples, ' fieldline ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/fieldline
         timeout-minutes: 45
       - name: 'iOS: skirmish'
         if: ${{ !cancelled() && contains(matrix.samples, ' skirmish ') }}

@@ -192,6 +192,10 @@ include::Slate-Users-Guide.asciidoc[]
 
 include::Slate-Implementors-Guide.asciidoc[]
 
+include::Fieldline-Users-Guide.asciidoc[]
+
+include::Fieldline-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

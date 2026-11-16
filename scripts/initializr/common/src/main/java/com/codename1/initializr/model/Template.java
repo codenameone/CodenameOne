@@ -135,7 +135,17 @@ public enum Template {
             "com.codenameone.examples.slate", "Slate", "/slate-preview.jpg",
             "The booking template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
-            new String[0], "/slate-modules.zip", "/slate-settings.properties");
+            new String[0], "/slate-modules.zip", "/slate-settings.properties"),
+    // The same kind of template as WAYLINE: field service and inspections
+    // (technicians and the dispatch desk) and its server, with the scheduling
+    // engine in the `shared` module both halves depend on. It is the project in
+    // scripts/fieldline, and its resources come from
+    // `scripts/sync-initializr-template.py fieldline`.
+    FIELDLINE(false, "/fieldline-src.zip", "/fieldline-css.zip", "/fieldline-pom.xml",
+            "com.codenameone.examples.fieldline", "Fieldline", "/fieldline-preview.jpg",
+            "The field service template is an app, a server and the module they share, "
+                    + "which holds the contract and the scheduling engine; an Initializr Gradle project is a single project.",
+            new String[0], "/fieldline-modules.zip", "/fieldline-settings.properties");
 
     /// The resource holding the picture shown for a template that has no live
     /// preview, or null for one that has.
@@ -178,6 +188,13 @@ public enum Template {
         GRADLE_DEPENDENCIES = gradleDependencies;
         MODULES_ZIP = modulesZip;
         SETTINGS = settings;
+    }
+
+    /// Whether the template carries a `rules` module: logic that depends on
+    /// nothing, built ahead of the contract, which the app and the server both
+    /// depend on -- a game's simulation.
+    public boolean hasRules() {
+        return this == SKIRMISH || this == DASH || this == SPLAT;
     }
 
     /// Whether the template is an app together with its server: the project is

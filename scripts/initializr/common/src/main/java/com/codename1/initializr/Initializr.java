@@ -469,7 +469,7 @@ public class Initializr extends Lifecycle {
         }
         Template[] apps = {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.DASH, Template.SPLAT, Template.PARLEY,
             Template.BASTION, Template.REEL, Template.PULSE,
-            Template.SLATE};
+            Template.SLATE, Template.FIELDLINE};
         int offered = 0;
         for (Template app : apps) {
             if (GeneratorModel.isTemplateOffered(app)) {
@@ -518,6 +518,7 @@ public class Initializr extends Lifecycle {
                 : template == Template.REEL ? "Video streaming"
                 : template == Template.PULSE ? "Fitness studio"
                 : template == Template.SLATE ? "Appointment booking"
+                : template == Template.FIELDLINE ? "Field service"
                 : template.IS_KOTLIN ? "Empty app, Kotlin" : "Empty app, Java";
     }
 
