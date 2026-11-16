@@ -34,6 +34,9 @@ import com.codename1.ui.table.GridColumn;
 /// A flat grid, sorted, grouped by team with a sum on the group rows, a frozen
 /// first column and a selected row.
 public class DataGridThemeScreenshotTest extends DualAppearanceBaseTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
+
     @Override
     public boolean runTest() {
         if (CN.isWatch()) {

@@ -34,6 +34,9 @@ import java.util.Vector;
 
 /// A tree grid with two levels open and one closed.
 public class TreeGridThemeScreenshotTest extends DualAppearanceBaseTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
+
     @Override
     public boolean runTest() {
         if (CN.isWatch()) {
