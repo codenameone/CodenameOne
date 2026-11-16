@@ -338,8 +338,7 @@ public final class OAuth2LoginConfigurer extends SecurityConfigurer {
             entryPoint.target = links.get(0)[0];
         }
         if (ownPage) {
-            http.addFilter(new LoginLinksPage(http.loginPage(), links),
-                    HttpSecurity.ORDER_LOGIN_PAGE);
+            http.addLoginLinksPage();
         }
     }
 
@@ -372,44 +371,6 @@ public final class OAuth2LoginConfigurer extends SecurityConfigurer {
         public HttpServer.Response commence(HttpServer.Request request,
                                             AuthenticationException authException) {
             return Responses.redirect(target);
-        }
-    }
-
-    /// The login page of a chain whose only ways in are other providers: a
-    /// link to each.
-    private static final class LoginLinksPage implements SecurityFilter {
-        private final String loginPage;
-        private final List<String[]> links;
-
-        LoginLinksPage(String loginPage, List<String[]> links) {
-            this.loginPage = loginPage;
-            this.links = links;
-        }
-
-        @Override
-        public HttpServer.Response doFilter(HttpServer.Request request, FilterChain chain)
-                throws Exception {
-            if (!"GET".equals(request.getMethod())
-                    || !loginPage.equals(SecurityExchange.path(request))) {
-                return chain.doFilter(request);
-            }
-            StringBuilder page = new StringBuilder(512);
-            page.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n")
-                    .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
-                    .append("<title>Please sign in</title>\n</head>\n<body>\n<h2>Please sign in</h2>\n");
-            if (request.queryParam("error") != null) {
-                page.append("<p role=\"alert\">The sign-in did not complete</p>\n");
-            }
-            if (request.queryParam("logout") != null) {
-                page.append("<p role=\"status\">You have been signed out</p>\n");
-            }
-            for (String[] link : links) {
-                page.append("<p><a href=\"").append(Responses.escape(link[0]))
-                    .append("\">Sign in with ").append(Responses.escape(link[1]))
-                    .append("</a></p>\n");
-            }
-            page.append("</body>\n</html>\n");
-            return Responses.html(200, page.toString());
         }
     }
 }

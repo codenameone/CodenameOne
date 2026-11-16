@@ -678,3 +678,53 @@ JAVA_OBJECT com_codename1_backend_Crypto_aesCbcImpl___boolean_byte_1ARRAY_byte_1
     ERR_clear_error();
     return result;
 }
+
+/*
+ * RSA-OAEP decryption with a PKCS#8 RSA key; `digest` hashes the empty label
+ * and `mgf` drives MGF1 (codes of cn1DigestFor). Null for every failure, so
+ * a padding error is indistinguishable from a wrong key.
+ */
+JAVA_OBJECT com_codename1_backend_Crypto_rsaOaepDecryptImpl___int_int_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_INT digest, JAVA_INT mgf, JAVA_OBJECT pkcs8, JAVA_OBJECT ciphertext) {
+    JAVA_ARRAY keyArr;
+    JAVA_ARRAY inArr;
+    const unsigned char* p;
+    EVP_PKEY* key;
+    EVP_PKEY_CTX* ctx = NULL;
+    unsigned char* out = NULL;
+    size_t outLength = 0;
+    JAVA_OBJECT result = JAVA_NULL;
+    const EVP_MD* md = cn1DigestFor(digest);
+    const EVP_MD* mgfMd = cn1DigestFor(mgf);
+    if(pkcs8 == JAVA_NULL || ciphertext == JAVA_NULL || md == NULL || mgfMd == NULL) {
+        return JAVA_NULL;
+    }
+    keyArr = (JAVA_ARRAY)pkcs8;
+    inArr = (JAVA_ARRAY)ciphertext;
+    p = (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(keyArr);
+    key = d2i_AutoPrivateKey(NULL, &p, (long)keyArr->length);
+    if(key == NULL) {
+        ERR_clear_error();
+        return JAVA_NULL;
+    }
+    if(EVP_PKEY_base_id(key) == EVP_PKEY_RSA
+            && (ctx = EVP_PKEY_CTX_new(key, NULL)) != NULL
+            && EVP_PKEY_decrypt_init(ctx) == 1
+            && EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) == 1
+            && EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md) == 1
+            && EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, mgfMd) == 1
+            && EVP_PKEY_decrypt(ctx, NULL, &outLength,
+                    (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(inArr), (size_t)inArr->length) == 1
+            && (out = (unsigned char*)malloc(outLength)) != NULL
+            && EVP_PKEY_decrypt(ctx, out, &outLength,
+                    (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(inArr), (size_t)inArr->length) == 1) {
+        result = cn1BytesToArray(threadStateData, out, (int)outLength);
+    }
+    if(out != NULL) {
+        OPENSSL_cleanse(out, outLength);
+        free(out);
+    }
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_free(key);
+    ERR_clear_error();
+    return result;
+}

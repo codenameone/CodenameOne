@@ -1,0 +1,77 @@
+name: Backend identity
+
+# saml2Login, saml2Logout and the LDAP providers against real servers: a
+# Keycloak acting as the SAML identity provider (signed, encrypted assertions
+# and Single Logout, driven as a browser drives them) and an OpenLDAP served
+# plain, over LDAPS and over StartTLS with a CA of its own.
+# maven/integration-tests/backend-identity/run.sh starts both, exports their
+# addresses and runs the *E2ETest classes. Those skip when the addresses are
+# unset, and a skipped suite is green, so the step then requires that both ran.
+#
+# Runs on a pull request that touches the identity code or the harness, and
+# nightly on master (see "Nightly CI" in CLAUDE.md).
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/backend-identity.yml'
+      - '.github/scripts/require-no-skipped-tests.sh'
+      - 'scripts/ci/retry.sh'
+      - 'maven/integration-tests/backend-identity/**'
+      - 'vm/backend/src/com/codename1/backend/security/saml2/**'
+      - 'vm/backend/src/com/codename1/backend/security/ldap/**'
+      - 'vm/backend/src/com/codename1/backend/security/Saml2*.java'
+      - 'vm/backend/src/com/codename1/backend/security/LogoutConfigurer.java'
+      - 'vm/backend/src/com/codename1/backend/security/LogoutHooks.java'
+      - 'vm/backend/src/com/codename1/backend/security/pki/**'
+      - 'vm/backend/impl/javase/com/codename1/backend/Crypto.java'
+      - 'vm/backend/impl/javase/com/codename1/backend/Tcp.java'
+      - 'maven/backend/src/test/java/com/codename1/backend/security/KeycloakSamlE2ETest.java'
+      - 'maven/backend/src/test/java/com/codename1/backend/security/ldap/**'
+      - 'maven/backend/pom.xml'
+  schedule:
+    - cron: '11 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+
+      - name: Install core and the backend
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl backend -am install -DskipTests \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+
+      - name: Pull the servers
+        run: |
+          bash scripts/ci/retry.sh docker pull alpine:3.20
+          bash scripts/ci/retry.sh docker pull quay.io/keycloak/keycloak:26.0.7
+
+      # Not through retry.sh: a failing test must fail once, not three times.
+      - name: SAML against Keycloak, LDAP against OpenLDAP
+        env:
+          CONTAINER_ENGINE: docker
+          MAVEN_REPO_LOCAL: ${{ github.workspace }}/.m2-repo
+          CN1_E2E_MVN_OFFLINE: ''
+        run: |
+          maven/integration-tests/backend-identity/run.sh \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true
+          bash .github/scripts/require-no-skipped-tests.sh maven/backend/target/surefire-reports \
+            LdapE2ETest KeycloakSamlE2ETest
