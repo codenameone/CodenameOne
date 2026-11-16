@@ -156,6 +156,10 @@ public final class LogoutConfigurer extends SecurityConfigurer {
                 http.sessionCreationPolicy() == SessionCreationPolicy.STATELESS));
         LogoutSuccessHandler success = logoutSuccessHandler != null ? logoutSuccessHandler
                 : new SimpleUrlLogoutSuccessHandler(successUrl(http));
+        LogoutHooks hooks = http.logoutHooks();
+        hooks.handlers.addAll(all);
+        hooks.successUrl = logoutSuccessHandler != null ? null : successUrl(http);
+        success = hooks.wrapped(success);
         http.addFilter(new LogoutFilter(matcher(http), all, success), HttpSecurity.ORDER_LOGOUT);
     }
 

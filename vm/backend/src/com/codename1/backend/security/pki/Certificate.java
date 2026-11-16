@@ -136,7 +136,7 @@ public final class Certificate {
     }
 
     /// A self-signed X.509 v3 certificate for `privateKey`: issuer and subject
-    /// are both `subject`, valid from now for `days` days, with a random
+    /// are both `subject`, valid from an hour ago for `days` days from now, with a random
     /// 128-bit serial number and no extensions. For tests, a development TLS
     /// endpoint, or an identity a peer pins by its key rather than its issuer.
     ///
@@ -158,10 +158,14 @@ public final class Certificate {
         // full 16 bytes and nothing reads it as negative.
         serial[0] = (byte) ((serial[0] & 0x7f) | 0x40);
         long now = System.currentTimeMillis() / 1000L * 1000L;
+        // Backdated an hour, as public CAs do: a peer whose clock runs a few
+        // minutes behind this one would otherwise refuse the certificate as
+        // not yet valid (Keycloak does, for a client signing certificate).
+        long from = now - 3600000L;
         byte[] id = SignatureAlgorithms.identifier(algorithm);
         byte[] tbs = Asn1.sequence(Asn1.tlv(Asn1.explicit(0), Asn1.integer(2)),
                 Asn1.unsignedInteger(serial), id, subject.der(),
-                Asn1.sequence(validity(now), validity(now + days * 86400000L)),
+                Asn1.sequence(validity(from), validity(now + days * 86400000L)),
                 subject.der(), publicKey);
         byte[] signature = Crypto.sign(algorithm, privateKey, tbs);
         return new Certificate(Asn1.sequence(tbs, id, Asn1.bitString(signature)));

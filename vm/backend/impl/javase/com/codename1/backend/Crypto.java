@@ -666,6 +666,45 @@ public final class Crypto {
         }
     }
 
+    /// Decrypts RSA-OAEP with a PKCS#8 RSA private key: the key transport of
+    /// XML Encryption and JWE. `digest` hashes the (empty) label and
+    /// `mgfDigest` drives MGF1; XML Encryption's `rsa-oaep-mgf1p` is SHA-1 for
+    /// both, and `rsa-oaep` names each.
+    ///
+    /// Every failure is the same exception with the same text -- a wrong key,
+    /// a malformed block and a padding error are not told apart -- so a caller
+    /// that reports the failure leaks nothing an attacker could steer by.
+    ///
+    /// @param digest [#SHA1], [#SHA256], [#SHA384] or [#SHA512]
+    /// @param mgfDigest the same choices
+    /// @throws IOException when the block does not decrypt under the key
+    public static byte[] rsaOaepDecrypt(String digest, String mgfDigest, byte[] privateKey,
+                                        byte[] ciphertext) throws IOException {
+        String d = jdkDigest(digest);
+        String m = jdkDigest(mgfDigest);
+        if (privateKey == null || ciphertext == null) {
+            throw new IOException("RSA-OAEP decryption failed");
+        }
+        try {
+            PrivateKey key = KeyFactory.getInstance("RSA")
+                    .generatePrivate(new PKCS8EncodedKeySpec(privateKey));
+            Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPPadding");
+            cipher.init(Cipher.DECRYPT_MODE, key, new javax.crypto.spec.OAEPParameterSpec(d,
+                    "MGF1", new MGF1ParameterSpec(m), javax.crypto.spec.PSource.PSpecified.DEFAULT));
+            return cipher.doFinal(ciphertext);
+        } catch (GeneralSecurityException | RuntimeException err) {
+            throw new IOException("RSA-OAEP decryption failed", err);
+        }
+    }
+
+    private static String jdkDigest(String digest) {
+        if (SHA1.equals(digest) || SHA256.equals(digest) || SHA384.equals(digest)
+                || SHA512.equals(digest)) {
+            return digest;
+        }
+        throw new IllegalArgumentException("Not a supported digest: " + digest);
+    }
+
     private static int curveCode(String curve) throws IOException {
         if (P256.equals(curve)) {
             return 1;

@@ -240,7 +240,7 @@ class PkiTest {
             assertTrue(ours.isSelfIssued());
             assertTrue(ours.isSignedBy(Der.publicKeyOf(key)), String.valueOf(curve));
             assertArrayEquals(Der.publicKeyOf(key), ours.getPublicKey());
-            assertEquals(30L * 86400000L, ours.getNotAfter() - ours.getNotBefore());
+            assertEquals(30L * 86400000L + 3600000L, ours.getNotAfter() - ours.getNotBefore());
             assertTrue(ours.isValidAt(System.currentTimeMillis()));
             X509Certificate jdk = (X509Certificate) CertificateFactory.getInstance("X.509")
                     .generateCertificate(new ByteArrayInputStream(ours.getEncoded()));

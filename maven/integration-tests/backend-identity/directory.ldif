@@ -1,0 +1,39 @@
+dn: dc=corp,dc=example
+objectClass: dcObject
+objectClass: organization
+dc: corp
+o: Corp
+
+dn: ou=people,dc=corp,dc=example
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=corp,dc=example
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=ada,ou=people,dc=corp,dc=example
+objectClass: inetOrgPerson
+uid: ada
+cn: Ada Lovelace
+sn: Lovelace
+mail: ada@corp.example
+userPassword: s3cret
+
+dn: uid=bob,ou=people,dc=corp,dc=example
+objectClass: inetOrgPerson
+uid: bob
+cn: Bob
+sn: Builder
+userPassword: b0bpass
+
+dn: cn=admins,ou=groups,dc=corp,dc=example
+objectClass: groupOfNames
+cn: admins
+member: uid=ada,ou=people,dc=corp,dc=example
+
+dn: cn=staff,ou=groups,dc=corp,dc=example
+objectClass: groupOfNames
+cn: staff
+member: uid=ada,ou=people,dc=corp,dc=example
+member: uid=bob,ou=people,dc=corp,dc=example
