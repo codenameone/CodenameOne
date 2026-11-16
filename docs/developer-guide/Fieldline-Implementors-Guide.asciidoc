@@ -38,25 +38,23 @@ technicians, and `admin@fieldline.example` is the admin.
 
 === The modules
 
-The project has four modules:
+The project has three modules:
 
 [cols="1,3"]
 |===
 | Module | What it holds
 
-| `rules`
-| The scheduling engine, package `scheduler`. It depends on nothing outside
-  `java.lang` and `java.util`.
-
 | `shared`
 | The data classes (`api/*Dto`) and the `@RestClient` interfaces, such as
-  `AdminApi` and `GeoApi`, that both sides build from.
+  `AdminApi` and `GeoApi`, that both sides build from, and the scheduling
+  engine, package `scheduler`, which depends on nothing outside `java.lang` and
+  `java.util`.
 
 | `common`
-| The app, for every platform. Its pom depends on `shared` and `rules`.
+| The app, for every platform. Its pom depends on `shared`.
 
 | `backend`
-| The server. It depends on `shared` and `rules`, and runs the engine.
+| The server. It depends on `shared`, and runs the engine.
 |===
 
 The server is in packages by subject:
@@ -96,7 +94,7 @@ offers the others from its menu.
 
 === The scheduling engine
 
-The engine is in `rules`, in `com.codenameone.examples.fieldline.scheduler`. Start
+The engine is in `shared`, in `com.codenameone.examples.fieldline.scheduler`. Start
 at `Problem`, `Solver` and `Reoptimizer`. It uses integer arithmetic throughout, so
 the same seed and problem give the same plan on the server, in the app and in the
 tests.

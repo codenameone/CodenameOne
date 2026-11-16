@@ -18,7 +18,6 @@
   <modules>
     <!-- The scheduling engine: plain Java with JUnit tests and no dependencies,
          which the server plans with. Built first; it depends on nothing. -->
-    <module>rules</module>
     <!-- What the app and its server have in common: the REST contract and the
          objects it transfers. Always built, because both depend on it. -->
     <module>shared</module>

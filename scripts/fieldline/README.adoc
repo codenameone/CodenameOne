@@ -26,20 +26,19 @@ To see it running first, the two commands under <<Running it>> are all it takes.
 
 [cols="1,4"]
 |===
-| `rules`
-| The scheduling engine, with no dependencies and no I/O: the model
+| `shared`
+| The contract: the data classes both sides exchange and the `@RestClient`
+  interfaces that name every call. The app's build generates a client from them
+  and the server's build generates the interfaces it implements, so a change the
+  other side did not follow is a compile error.
+  It also holds the scheduling engine, package `scheduler`, with no
+  dependencies and no I/O: the model
   (`Technician`, `Job`, `Shift`), the hard and soft constraints and their
   `Weights`, the `Solver` (regret insertion, then adaptive large neighbourhood
   search, seeded so one seed gives one plan) and the `Reoptimizer` that repairs
   a plan when the day changes while keeping work in place. Travel comes from a
   `TravelModel`; `GeoTravel` is the straight-line estimate. The server runs it;
   it builds for the client too, under the same Java subset.
-
-| `shared`
-| The contract: the data classes both sides exchange and the `@RestClient`
-  interfaces that name every call. The app's build generates a client from them
-  and the server's build generates the interfaces it implements, so a change the
-  other side did not follow is a compile error.
 
 | `common`
 | The application: sign-in, the technician's day and jobs, the dispatch board and

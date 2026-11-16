@@ -28,6 +28,10 @@
     and the client's callback types, so the core is here at provided scope: the
     app brings its own, and the server must not receive it at all.
 
+    The scheduling engine is here too, in package scheduler: the server plans
+    with it and the app may re-run it for a preview. It uses nothing outside
+    java.lang and java.util, integer arithmetic and its own seeded generator,
+    so one seed gives one plan on every runtime. Its tests are plain JUnit 5.
     Keep it to what both sides can run. No UI classes, and no JDK API the
     devices lack. The language is Java 17, the app's level, so that the
     transfer objects are records: both the app's generated mappers and the
@@ -45,5 +49,20 @@
       <artifactId>codenameone-core</artifactId>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.9.3</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.0.0-M5</version>
+      </plugin>
+    </plugins>
+  </build>
 </project>

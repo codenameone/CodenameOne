@@ -1,8 +1,8 @@
 name: Fieldline (full-stack sample)
 
 # scripts/fieldline is one Maven project holding a field service application and
-# its server: a `rules` module holding the scheduling engine, a `shared` module
-# of transfer objects and @RestClient contracts,
+# its server: a `shared` module of transfer objects, @RestClient contracts and
+# the scheduling engine,
 # the Codename One client that calls them, and a Codename One Backend that
 # implements them.
 #
@@ -112,7 +112,7 @@ jobs:
       - name: Run the server tests on the JVM and compiled
         working-directory: scripts/fieldline
         run: |
-          mvn -B -Dcodename1.platform=backend -pl rules,shared,backend test \
+          mvn -B -Dcodename1.platform=backend -pl shared,backend test \
             -Dcn1.backend.compiledTests=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
         env:

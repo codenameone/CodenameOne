@@ -24,12 +24,6 @@
             <artifactId>fieldline-shared</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- The scheduling engine the server plans with; see rules/pom.xml. -->
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>fieldline-rules</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <!-- The Codename One app kit, a cn1lib. -->
         <dependency>
             <groupId>com.codenameone</groupId>

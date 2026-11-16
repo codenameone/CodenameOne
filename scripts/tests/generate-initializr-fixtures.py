@@ -148,10 +148,10 @@ def check_full_stack_fixture(archive, z, template):
     full = archive.name.split('-')[1] == 'FULL'
     root_pom = ''.join(z.read('pom.xml').decode().split())
     assert '<module>shared</module><module>common</module>' in root_pom, archive.name
-    # SKIRMISH, DASH and SPLAT also have the game's rules as a module of its own, ahead of the contract,
-    # and FIELDLINE its scheduling engine there.
+    # SKIRMISH, DASH and SPLAT also have the game's rules as a module of its own, ahead of the contract.
+    # FIELDLINE keeps its scheduling engine in shared.
     game = template in ('SKIRMISH', 'DASH', 'SPLAT')
-    rules = game or template == 'FIELDLINE'
+    rules = game
     assert (not rules) or '<module>rules</module><module>shared</module>' in root_pom, archive.name
     for module in ('shared', 'common', 'backend') + (('rules',) if rules else ()):
         assert module + '/pom.xml' in names, (archive.name, module)
