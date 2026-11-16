@@ -384,7 +384,7 @@ property is Android only:
 
 [source,java]
 ----
-Display.getInstance().setProperty("android.barcodeCharset", "ISO-8859-2");
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/VisionSnippets.java[tag=vision-barcode-charset,indent=0]
 ----
 
 IMPORTANT: Three classes share the name `CodeScanner`. Import
