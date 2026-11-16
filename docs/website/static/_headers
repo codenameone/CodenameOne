@@ -1,0 +1,7 @@
+# Cloudflare Pages: the agent scripts are piped into a shell, so serve them as
+# text. Without this .ps1 goes out as application/octet-stream and PowerShell's
+# irm / Invoke-WebRequest hand back bytes, which [scriptblock]::Create rejects.
+/agents/*.ps1
+  Content-Type: text/plain; charset=utf-8
+/agents/*.sh
+  Content-Type: text/plain; charset=utf-8
