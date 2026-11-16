@@ -276,6 +276,15 @@ final class BackOffice {
             expiries.add(until);
             page.add(line);
         }
+        // One column for the names: each date field otherwise starts where its
+        // own chip ends, and the six fields form a ragged edge.
+        int nameW = 0;
+        for (CheckBox box : certs) {
+            nameW = Math.max(nameW, box.getPreferredW());
+        }
+        for (CheckBox box : certs) {
+            box.setPreferredW(nameW);
+        }
         Ui.section(page, "Territories");
         page.add(Ui.text("Where they are sent first. Outside them costs the plan extra, or is "
                 + "refused when the rules say territories are strict; none means anywhere.",

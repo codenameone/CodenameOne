@@ -9,6 +9,28 @@ ShowToc: true
 
 Fieldline is a complete, full-stack field service and inspection application in Java. Technicians open their day as a route on a map, drive to each job, work through its checklist, photograph what they find, ask the assistant what is wrong and have the customer sign on the screen. Dispatchers see the whole crew on a timeline, a Gantt chart and a map, drag work between people, and let the optimizer plan the week. When someone is out, the plan is repaired around them, moving as few jobs as it can. The same project serves HVAC, electrical, plumbing, elevator, solar and fire-safety contractors, and inspection teams. Use it to build your own field service app with Codename One.
 
+{{< guide-block >}}
+<video controls playsinline preload="metadata" poster="/fieldline/fieldline-backoffice-desktop-poster.jpg" style="width:100%;max-width:960px;height:auto;display:block;margin:0 auto" aria-label="The back office on a desktop: the dispatch board, staffing against capacity, each technician's pay rate, labour rates, company settings and time tracking">
+<source src="/fieldline/fieldline-backoffice-desktop.mp4" type="video/mp4">
+<a href="/fieldline/fieldline-backoffice-desktop.mp4">Download the video</a>.
+</video>
+
+<video controls playsinline preload="metadata" poster="/fieldline/fieldline-technician-tablet-poster.jpg" style="width:100%;max-width:960px;height:auto;display:block;margin:1.5rem auto 0" aria-label="A technician's day on a tablet: the route on a map, driving to the job, the checklist and the stop list following as each job is done">
+<source src="/fieldline/fieldline-technician-tablet.mp4" type="video/mp4">
+<a href="/fieldline/fieldline-technician-tablet.mp4">Download the video</a>.
+</video>
+
+<video controls playsinline preload="metadata" poster="/fieldline/fieldline-technician-mobile-poster.jpg" style="width:100%;max-width:360px;height:auto;display:block;margin:1.5rem auto 0" aria-label="A technician on a phone: the day, a job from setting off to the checklist, the customer's signature, working hours and a time-off request">
+<source src="/fieldline/fieldline-technician-mobile.mp4" type="video/mp4">
+<a href="/fieldline/fieldline-technician-mobile.mp4">Download the video</a>.
+</video>
+
+<video controls playsinline preload="metadata" poster="/fieldline/fieldline-dispatcher-mobile-poster.jpg" style="width:100%;max-width:360px;height:auto;display:block;margin:1.5rem auto 0" aria-label="A dispatcher on a phone: the crew timeline, the map, an optimizer run with what it changed, the Gantt chart, timesheets and company settings">
+<source src="/fieldline/fieldline-dispatcher-mobile.mp4" type="video/mp4">
+<a href="/fieldline/fieldline-dispatcher-mobile.mp4">Download the video</a>.
+</video>
+{{< /guide-block >}}
+
 **[Generate your project](/initializr/)** · **[Read the user's guide](/developer-guide/fieldline-users-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/fieldline)**
 
 In the Initializr, choose the **Fieldline** field service template, set your application name and package, and generate the project. The application source is licensed under [MIT-0](https://github.com/codenameone/CodenameOne/blob/master/scripts/fieldline/LICENSE): you can modify it, use it commercially and keep your changes private without royalties.
