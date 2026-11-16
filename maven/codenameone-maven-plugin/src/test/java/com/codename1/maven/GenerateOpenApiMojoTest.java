@@ -202,6 +202,25 @@ class GenerateOpenApiMojoTest {
     }
 
     @Test
+    void classFormSkipsAccessorsThatWouldRedeclareObjectMethods(@TempDir Path tmp) throws Exception {
+        // A field named like an Object method is legal; an accessor of that name is not
+        // (getClass is final, hashCode/toString would clash on return type).
+        Map<String, Object> doc = parse("{\"openapi\":\"3.0.0\","
+                + "\"info\":{\"title\":\"T\",\"version\":\"1\"},\"paths\":{},"
+                + "\"components\":{\"schemas\":{\"Odd\":{\"type\":\"object\",\"properties\":{"
+                + "\"getClass\":{\"type\":\"string\"},\"hashCode\":{\"type\":\"string\"},"
+                + "\"name\":{\"type\":\"string\"}}}}}}");
+        File out = tmp.toFile();
+        new GenerateOpenApiMojo.Generator(doc, "com.example.odd", out, true,
+                /*emitRecords*/ false, new SystemStreamLog()).run();
+        String src = readString(new File(out, "com/example/odd/model/Odd.java"));
+        assertTrue(src.contains("public String getClass;"), src);
+        assertTrue(src.contains("public String name() {"), src);
+        assertFalse(src.contains("getClass() {"), "getClass() is final in Object:\n" + src);
+        assertFalse(src.contains("hashCode() {"), "hashCode() must stay Object's int method:\n" + src);
+    }
+
+    @Test
     void respectsOverwriteFalseAndPreservesUserEdits(@TempDir Path tmp) throws Exception {
         Map<String, Object> doc = parse(SAMPLE_SPEC);
         File out = tmp.toFile();

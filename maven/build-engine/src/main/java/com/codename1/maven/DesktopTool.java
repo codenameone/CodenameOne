@@ -273,7 +273,9 @@ public final class DesktopTool {
     /// build still reports success (a customer on JDK 15 hit exactly this with
     /// the Certificate Wizard, compiled for 17). The required version is read
     /// from the main class itself, so it can never drift from how the tool is built.
-    void requireCompatibleRuntime(File primaryJar) throws BuildExecutionException {
+    /// Both plugins also call it as soon as the tool is resolved, before anything
+    /// slow (the Certificate Wizard's browser sign-in), and [#launch] calls it again.
+    public void requireCompatibleRuntime(File primaryJar) throws BuildExecutionException {
         int needed = primaryJar == null ? -1 : classFileMajorVersion(primaryJar, mainClass);
         int supported = runtimeMaxClassFileVersion();
         if (needed > 0 && supported > 0 && needed > supported) {
