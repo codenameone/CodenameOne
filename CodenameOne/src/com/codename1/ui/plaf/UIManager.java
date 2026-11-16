@@ -2127,6 +2127,26 @@ public class UIManager {
     /// give each one the default black on white, and a week view would be a
     /// white rectangle. A theme that styles a UIID owns it whole, so nothing
     /// here is merged into a UIID the theme mentions.
+    // The bold of the titles and group rows, at the size of the theme's own
+    // text. A grid's rows take the theme's text font, so a bold at a fixed
+    // size reads as a different scale wherever a theme's text is larger or
+    // smaller than it -- titles half the height of the rows under a desktop
+    // theme.
+    private static Font gridBold(HashMap<String, Object> installedTheme, Font fallback) {
+        if (installedTheme == null || !Font.isNativeFontSchemeSupported()) {
+            return fallback;
+        }
+        Object base = installedTheme.get("Label.font");
+        if (!(base instanceof Font)) {
+            base = installedTheme.get("font");
+        }
+        if (!(base instanceof Font) || !((Font) base).isTTFNativeFont() || ((Font) base).getPixelSize() <= 0) {
+            return fallback;
+        }
+        return Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD, Font.NATIVE_MAIN_BOLD)
+                .derive(((Font) base).getPixelSize(), Font.STYLE_BOLD);
+    }
+
     private void installSchedulingDefaults(HashMap<String, Object> installedTheme, boolean darkMode,
                                            Font plain, Font bold) {
         java.util.HashSet<String> themed = new java.util.HashSet<String>();
@@ -2256,13 +2276,14 @@ public class UIManager {
         schedulingStyle("GanttOverload", onPrimary, error, "255", null, small);
 
         // the data grid: painted, so only colours, fonts and paddings are read
+        Font gridBold = gridBold(installedTheme, bold);
         schedulingStyle("DataGrid", onSurface, surface, "255", "0,0,0,0", null);
-        schedulingStyle("DataGridHeader", variant, raised, "255", "0,0,1.5,1.5", bold);
+        schedulingStyle("DataGridHeader", variant, raised, "255", "0,0,1.5,1.5", gridBold);
         if (schedulingStyle("DataGridRow", onSurface, surface, "255", "0,0,1.5,1.5", null)) {
             schedulingState("DataGridRow", "sel#", onTint, tint, "255");
         }
         schedulingStyle("DataGridRowAlt", onSurface, dark ? "232227" : "f8f9fa", "255", "0,0,1.5,1.5", null);
-        schedulingStyle("DataGridGroupRow", onSurface, raised, "255", "0,0,1.5,1.5", bold);
+        schedulingStyle("DataGridGroupRow", onSurface, raised, "255", "0,0,1.5,1.5", gridBold);
         schedulingStyle("DataGridLine", line, surface, "0", null, null);
         schedulingStyle("DataGridCheck", onPrimary, primary, "255", null, null);
         if (!themed.contains("DataGridEditor")) {

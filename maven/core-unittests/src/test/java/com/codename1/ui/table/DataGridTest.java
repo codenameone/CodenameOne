@@ -223,6 +223,18 @@ class DataGridTest extends UITestBase {
     }
 
     @FormTest
+    void groupingAfterLayoutWidensTheIndentedColumn() {
+        DataGrid g = show(new DataGrid(people()));
+        int[] b = new int[4];
+        g.getCellBounds(0, 0, b);
+        int plain = b[2];
+        g.setGroupColumn(g.getColumn(1));
+        g.getCellBounds(1, 0, b);
+        assertTrue(b[2] > plain, "the first column makes room for the indent and the arrow, "
+                + plain + " -> " + b[2]);
+    }
+
+    @FormTest
     void scrollingCommitsTheEdit() {
         DefaultTableModel m = big(200);
         DataGrid g = show(new DataGrid(m));

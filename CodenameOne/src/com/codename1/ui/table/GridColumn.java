@@ -79,6 +79,7 @@ public class GridColumn {
     private GridAggregate aggregate;
     private Object[] choices;
     private int width = -1;
+    private boolean resized;
 
     /// A column showing column `modelColumn` of the model, titled `title`.
     public GridColumn(int modelColumn, String title) {
@@ -124,6 +125,7 @@ public class GridColumn {
     public GridColumn setWidthMM(float widthMM) {
         this.widthMM = Math.max(0, widthMM);
         width = -1;
+        resized = false;
         return this;
     }
 
@@ -377,5 +379,16 @@ public class GridColumn {
 
     void width(int w) {
         width = w;
+        resized = false;
+    }
+
+    // A width the user dragged the column to, which no re-measuring replaces.
+    void resizedTo(int w) {
+        width = w;
+        resized = true;
+    }
+
+    boolean measured() {
+        return widthMM <= 0 && !resized;
     }
 }

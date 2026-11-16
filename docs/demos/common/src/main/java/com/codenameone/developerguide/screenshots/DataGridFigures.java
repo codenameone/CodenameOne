@@ -117,9 +117,11 @@ public final class DataGridFigures {
         }));
         v.add(wide("datagrid-editing", grid(DataGridSnippets::editing), (form, g) -> {
             g.editCellAt(2, 1);
-            // The simulator edits in a native field the capture can't see;
-            // end that session and keep the grid's edit, so the field draws
-            // itself over the cell.
+            // The simulator edits in a native field the capture can't see,
+            // and starts it from the event queue. Let it start, then end that
+            // session and keep the grid's edit, so the field draws itself
+            // over the cell.
+            GuideFigure.settleAnimations(300);
             TextArea field = editor(form.getFormLayeredPane(DataGrid.class, false));
             if (field != null) {
                 field.setText("Kestrel Aviation");

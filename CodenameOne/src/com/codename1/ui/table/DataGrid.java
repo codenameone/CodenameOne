@@ -613,7 +613,9 @@ public class DataGrid extends ScrollSurface {
     /// Sets the column a tree grid draws the tree in; null, the default, is
     /// the first visible one.
     public void setTreeColumn(GridColumn c) {
+        GridColumn before = effectiveTreeColumn();
         treeColumn = c;
+        remeasureIndented(before);
         dirty = true;
         repaint();
     }
@@ -709,8 +711,28 @@ public class DataGrid extends ScrollSurface {
             return;
         }
         cancelEdit();
+        GridColumn before = effectiveTreeColumn();
         flat.setGroupColumn(c);
+        remeasureIndented(before);
         refreshRows();
+    }
+
+    // The column that is indented and carries the arrows measures wider
+    // than it would otherwise; when another column takes that role, a width
+    // measured before would cut its text, so both are measured again. A
+    // width set in millimetres, or dragged to by the user, is kept.
+    private void remeasureIndented(GridColumn before) {
+        GridColumn after = effectiveTreeColumn();
+        if (before == after) { //NOPMD CompareObjectsWithEquals - a column is an identity
+            return;
+        }
+        if (before != null && before.measured()) {
+            before.width(-1);
+        }
+        if (after != null && after.measured()) {
+            after.width(-1);
+        }
+        dirty = true;
     }
 
     // --------------------------------------------------------------- rows
@@ -1720,7 +1742,7 @@ public class DataGrid extends ScrollSurface {
         if (gesture == GESTURE_RESIZE) {
             GridColumn c = vis[dragColumn];
             int w = Math.max(GridLook.mm(c.getMinWidthMM()), dragStartW + (x - dragStartX));
-            c.width(w);
+            c.resizedTo(w);
             dirty = true;
         } else if (gesture == GESTURE_MOVE) {
             dragX = x;

@@ -333,6 +333,9 @@ public final class DataGridSnippets {
         grid.getColumn(ORDER).setAggregate(GridAggregate.COUNT);
         grid.getColumn(PAID).setAggregate(new CountFalse());
         grid.setGroupColumn(grid.getColumn(REGION));
+        // The arrows and the indent go in the customer column, which has
+        // room for them.
+        grid.setTreeColumn(grid.getColumn(CUSTOMER));
         grid.sortBy(grid.getColumn(AMOUNT), false);
         // end::grid-group[]
         return grid;
