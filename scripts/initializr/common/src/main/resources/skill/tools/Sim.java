@@ -27,7 +27,9 @@
 ///   java Sim.java tap <nodeId | label text>    tap a node (first label match)
 ///   java Sim.java type <nodeId | label> <text> type into an editable node
 ///   java Sim.java screenshot <out.png>         PNG of the current form
-///   java Sim.java record-start <out.mp4|.gif>  start a video (simulator only, needs ffmpeg)
+///   java Sim.java record-start <out.mp4|.gif> [json]  start a video (simulator only, needs ffmpeg);
+///                                              json adds options: frame, fps, script, ...
+///   java Sim.java fold <flat|half|closed>      fold a foldable skin (animated)
 ///   java Sim.java caption <text>               caption over the recording
 ///   java Sim.java record-stop                  finish the video, prints its path
 ///   java Sim.java tools                        list every tool the app publishes
@@ -103,6 +105,22 @@ public class Sim {
         }
     }
 
+    /// `record-start <out.mp4> [json]`: the optional JSON object adds any
+    /// other `sim_record_start` option, such as
+    /// `{"frame":"skin","fps":60,"script":[{"at":1000,"posture":"half"}]}`.
+    private static String recordOptions(List<String> args) {
+        String path = "\"path\":" + q(Path.of(need(args, 1)).toAbsolutePath().toString());
+        if (args.size() < 3) {
+            return "{" + path + "}";
+        }
+        String extra = args.get(2).trim();
+        if (!extra.startsWith("{") || !extra.endsWith("}")) {
+            throw new IllegalArgumentException("record-start options must be a JSON object: " + extra);
+        }
+        String body = extra.substring(1, extra.length() - 1).trim();
+        return "{" + path + (body.isEmpty() ? "" : "," + body) + "}";
+    }
+
     private static void dispatch(List<String> args) throws Exception {
         String cmd = args.get(0);
         switch (cmd) {
@@ -113,8 +131,8 @@ public class Sim {
             case "type" -> print(callTool("ui_set_text", "{\"nodeId\":" + resolveNode(need(args, 1))
                     + ",\"text\":" + q(rest(args, 2)) + "}"));
             case "screenshot" -> screenshot(need(args, 1));
-            case "record-start" -> print(callTool("sim_record_start",
-                    "{\"path\":" + q(Path.of(need(args, 1)).toAbsolutePath().toString()) + "}"));
+            case "record-start" -> print(callTool("sim_record_start", recordOptions(args)));
+            case "fold" -> print(callTool("sim_fold", "{\"posture\":" + q(need(args, 1)) + "}"));
             case "caption" -> print(callTool("sim_record_caption", "{\"text\":" + q(rest(args, 1)) + "}"));
             case "record-stop" -> print(callTool("sim_record_stop", "{}"));
             case "tools" -> print(request("tools/list", "{}"));
@@ -131,7 +149,7 @@ public class Sim {
 
     private static void usage() {
         System.err.println("usage: java Sim.java [--port N] wait|snapshot|find|tap|type|screenshot|"
-                + "record-start|caption|record-stop|tools|call|device-screenshot|device-record ...");
+                + "record-start|fold|caption|record-stop|tools|call|device-screenshot|device-record ...");
         System.err.println("See the comment at the top of Sim.java for every command.");
     }
 

@@ -1482,6 +1482,11 @@ final class AppSupport {
             JavaExec exec = (JavaExec) task;
             exec.environment("CN1_MCP_PORT", String.valueOf(port));
             exec.environment("CN1_AGENT_BACKGROUND", "1");
+            // -Pcn1.agent.hidden=true: no window at all, everything still renders.
+            Object hiddenProp = task.getProject().findProperty("cn1.agent.hidden");
+            if (hiddenProp != null && "true".equalsIgnoreCase(String.valueOf(hiddenProp).trim())) {
+                exec.environment("CN1_SIMULATOR_HIDDEN", "1");
+            }
             task.getLogger().lifecycle("[cn1.mcp] agent mode: the simulator will serve MCP on 127.0.0.1:" + port);
         }
 

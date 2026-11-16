@@ -291,6 +291,10 @@ public class AppPanel extends JPanel {
     }
 
 
+    /// Action key: when true, the action's toolbar button is shown only while
+    /// the action is enabled.
+    public static final String HIDE_WHEN_DISABLED = "cn1.hideWhenDisabled";
+
     public void addAction(Action action) {
         if (action instanceof SeparatorAction) {
             leftToolBar.addSeparator();
@@ -301,6 +305,20 @@ public class AppPanel extends JPanel {
             JButton btn = leftToolBar.add(action);
             if (action instanceof CompanionMenuAction) {
                 btn.setBorder(new EmptyBorder(5, 0, 5, 10));
+            }
+            if (Boolean.TRUE.equals(action.getValue(HIDE_WHEN_DISABLED))) {
+                // A button only some skins use (fold) is hidden rather than
+                // greyed, so the toolbar of every other skin is unchanged.
+                final JButton hideable = btn;
+                hideable.setVisible(action.isEnabled());
+                action.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
+                    public void propertyChange(java.beans.PropertyChangeEvent e) {
+                        if ("enabled".equals(e.getPropertyName())) {
+                            hideable.setVisible(Boolean.TRUE.equals(e.getNewValue()));
+                            leftToolBar.revalidate();
+                        }
+                    }
+                });
             }
         }
     }

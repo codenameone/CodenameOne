@@ -33,6 +33,11 @@ reads the file. Pass `-Dcn1.mcp.port=N` (`-Pcn1.mcp.port=N`) to insist on a port
 
 Every action returns a fresh snapshot, so one call tells you what the screen became.
 
+**No window at all:** `./mvnw cn1:agent -Dcn1.agent.hidden=true &` (Gradle
+`-Pcn1.agent.hidden=true`) renders without ever showing the simulator; screenshots,
+recordings and every tool still work. For promo videos, device skins and foldables see
+`references/promo-videos-and-skins.md`.
+
 ## Native: the iOS simulator and an Android emulator
 
 The same commands drive a development build running natively, because the app serves

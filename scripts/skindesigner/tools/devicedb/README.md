@@ -100,3 +100,12 @@ changed. Trigger it manually via the Actions tab when you want a fresh dump.
   straight from GSMArena.
 - IP bans: if the scraper starts seeing 429s or HTML we can't parse,
   bump `--delay` and let the cache from previous runs carry us through.
+- Foldables: the scrape can tell that a phone folds, but not where its hinge
+  is or what its cover display is. `foldables.json` holds that data by hand
+  for each curated device: book or flip, single panel or dual screen, the
+  cover display's resolution and diagonal (its density is derived), and an
+  inner resolution where GSMArena records it in the other orientation.
+  `apply_curated_folds` writes it over every run's output. It also turns
+  clamshell feature phones (`notFoldable`) back into phones. A foldable not
+  yet in the table gets an estimated fold (a flip if its name says so) with
+  no cover display. To add a device, add its row and re-run the script.

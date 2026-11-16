@@ -952,6 +952,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static final String[] BUNDLED_WATCH_SKINS = {
         "/AppleWatch45mm.skin", "/AppleWatch41mm.skin", "/WearRound.skin", "/WearSquare.skin"
     };
+    /// Foldable skins shipped on the classpath (tools/foldable-skins), offered
+    /// in the skin menu beside the watch skins for the same reason.
+    private static final String[] BUNDLED_FOLDABLE_SKINS = {"/iPhoneDuo.skin"};
 
     /// Adds the bundled watch skins that are actually on the classpath to the skin menu's list.
     ///
@@ -968,6 +971,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 continue;
             }
             merged = SkinPath.append(merged, skin);
+        }
+        for (String skin : BUNDLED_FOLDABLE_SKINS) {
+            if (JavaSEPort.class.getResource(skin) != null) {
+                merged = SkinPath.append(merged, skin);
+            }
         }
         if (!merged.equals(skinNames)) {
             pref.put("skins", merged);
@@ -3776,6 +3784,18 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static int simulatedPosture = com.codename1.ui.DevicePosture.POSTURE_FLAT;
     private static int simulatedFoldOrientation = com.codename1.ui.DevicePosture.FOLD_ORIENTATION_VERTICAL;
     private static int simulatedHingeAngle = 180;
+    // The loaded skin's foldable description, or null for an ordinary skin.
+    private static FoldableSkin foldableSkin;
+
+    static String postureName(int posture) {
+        if (posture == com.codename1.ui.DevicePosture.POSTURE_CLOSED) {
+            return FoldableSkin.POSTURE_CLOSED;
+        }
+        if (posture == com.codename1.ui.DevicePosture.POSTURE_HALF_OPENED) {
+            return FoldableSkin.POSTURE_HALF;
+        }
+        return FoldableSkin.POSTURE_FLAT;
+    }
 
     /// Enables or disables foldable device simulation in the desktop simulator.
     public static void setSimulatedFoldable(boolean foldable) {
@@ -3785,6 +3805,12 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// Sets the simulated fold posture (a `com.codename1.ui.DevicePosture` POSTURE_* constant).
     public static void setSimulatedPosture(int posture) {
+        if (foldableSkin != null && instance != null) {
+            // A foldable skin folds for real: the hinge animates and the
+            // display moves to the cover screen when closed.
+            instance.setFoldStateAndWait(postureName(posture), -1, -1);
+            return;
+        }
         simulatedPosture = posture;
         Display.getInstance().postureChanged();
     }
@@ -3797,8 +3823,742 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// Sets the simulated hinge angle in degrees (0 closed, 180 flat).
     public static void setSimulatedHingeAngle(int angle) {
+        if (foldableSkin != null && instance != null) {
+            instance.setFoldStateAndWait(null, Math.max(0, angle), -1);
+            return;
+        }
         simulatedHingeAngle = angle;
         Display.getInstance().postureChanged();
+    }
+
+    // ---- Foldable skins -------------------------------------------------
+    // A skin with `foldable=true` (see FoldableSkin) is folded by a
+    // FoldController, drawn by a FoldRenderer while it is not flat, and swaps
+    // the whole display to its cover screen while fully closed.
+
+    private BufferedImage coverPortraitSkin;
+    private BufferedImage coverLandscapeSkin;
+    private java.util.List<Rectangle> coverCutoutsPortrait;
+    /// The inner display's skin state while the cover display is shown, or
+    /// null while the inner display is shown.
+    private Object[] innerSkinState;
+    private FoldController foldController;
+    private FoldRenderer foldRenderer;
+    private javax.swing.Timer foldTimer;
+    private BufferedImage foldComposite;
+    private BufferedImage coverComposite;
+    private boolean coverCompositePortrait;
+    private long foldAnimationMs = FoldController.DEFAULT_DURATION_MS;
+
+    /// The loaded skin's foldable description, or null.
+    FoldableSkin getFoldableSkin() {
+        return foldableSkin;
+    }
+
+    synchronized FoldController getFoldController() {
+        if (foldController == null) {
+            foldController = new FoldController(new FoldController.Host() {
+                public void angleChanged(int angle, boolean animating) {
+                    simulatedHingeAngle = angle;
+                    if (canvas != null) {
+                        canvas.repaint();
+                    }
+                }
+
+                public void postureChanged(int posture) {
+                    simulatedPosture = posture;
+                    Display d = Display.getInstance();
+                    if (d.isInitialized()) {
+                        d.postureChanged();
+                    }
+                }
+
+                public void coverChanged(boolean closed) {
+                    showCoverDisplay(closed);
+                }
+            });
+        }
+        return foldController;
+    }
+
+    /// Folds the loaded foldable skin to a named posture (`flat`, `half`,
+    /// `closed`) or to `angle` degrees when it is not negative. Animates over
+    /// `animateMs` milliseconds (negative: the simulator default, 0: at once).
+    /// Must be called on the AWT event thread.
+    public void setFoldState(String posture, int angle, long animateMs) {
+        if (foldableSkin == null) {
+            throw new IllegalStateException("The current skin is not foldable");
+        }
+        int target = angle >= 0 ? Math.min(180, angle) : FoldableSkin.angleForPosture(posture);
+        long ms = animateMs < 0 ? foldAnimationMs : animateMs;
+        FoldController fc = getFoldController();
+        fc.moveTo(target, ms, AnimationClock.now());
+        if (fc.isAnimating()) {
+            startFoldAnimation();
+        } else if (canvas != null) {
+            canvas.repaint();
+        }
+    }
+
+    /// The same as setFoldState, from any thread; blocks until applied.
+    public void setFoldStateAndWait(final String posture, final int angle, final long animateMs) {
+        runOnAwtAndWait(new Runnable() {
+            public void run() {
+                setFoldState(posture, angle, animateMs);
+            }
+        });
+    }
+
+    private static void runOnAwtAndWait(Runnable r) {
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+            return;
+        }
+        try {
+            EventQueue.invokeAndWait(r);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable c = e.getCause();
+            if (c instanceof RuntimeException) {
+                throw (RuntimeException) c;
+            }
+            throw new IllegalStateException(c);
+        }
+    }
+
+    private void startFoldAnimation() {
+        if (foldTimer == null) {
+            foldTimer = new javax.swing.Timer(16, new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    FoldController fc = foldController;
+                    if (fc == null || !fc.step(AnimationClock.now())) {
+                        stopFoldAnimation();
+                    }
+                }
+            });
+            foldTimer.setCoalesce(true);
+        }
+        foldTimer.start();
+    }
+
+    private void stopFoldAnimation() {
+        if (foldTimer != null) {
+            foldTimer.stop();
+        }
+    }
+
+    /// True while the canvas draws the device folded in 3D instead of flat.
+    boolean isFoldVisualActive() {
+        FoldController fc = foldController;
+        return foldableSkin != null && innerSkinState == null && fc != null
+                && (fc.isAnimating() || fc.getExactAngle() < 179.5);
+    }
+
+    /// Pointer input is dropped while the hinge moves: the screen is not
+    /// where the flat hit test thinks it is. At rest part way open it is
+    /// delivered as if flat, which the fixed half matches exactly.
+    boolean isFoldInputBlocked() {
+        FoldController fc = foldController;
+        return isRotationAnimating() || foldableSkin != null && fc != null && fc.isAnimating();
+    }
+
+    // ---- 3D rotation ----------------------------------------------------
+    // Turning between portrait and landscape is shown as the device itself
+    // turning: the last portrait (or landscape) frame, as a solid device,
+    // rolls a quarter turn while lifted toward the viewer, then cross fades
+    // into the application's first frame in the new orientation.
+
+    static final long ROTATION_MS = 650;
+    private BufferedImage rotationFrom;
+    private long rotationStart;
+    private boolean rotationClockwise;
+    /// The scale the turn renders at, relative to skin pixels.
+    private double rotationScale = 1;
+    /// The hinge angle the turn started at (180 when flat), and the fold
+    /// it is drawn with when less.
+    private double rotationFoldAngle = 180;
+    private boolean rotationVertical;
+    private Rectangle rotationHinge;
+    private BufferedImage rotationBack;
+    private javax.swing.Timer rotationTimer;
+    /// The last frame the canvas drew in 3D and its zoom, reused by the
+    /// recorder so a frame is never rendered twice.
+    private BufferedImage lastAnimatedFrame;
+    private double lastAnimatedZoom = 1;
+
+    boolean isRotationAnimating() {
+        return rotationFrom != null && AnimationClock.now() - rotationStart < ROTATION_MS;
+    }
+
+    /// The longest side, in raster pixels, the device is rendered at in 3D
+    /// while it moves. A retina window would otherwise rasterize 2600 pixel
+    /// frames in software and fall to a handful a second; moving, a softer
+    /// frame scaled up by the window is invisible, a dropped one is not.
+    /// At rest (a device left half open) it renders sharp, at full size.
+    static final int MOTION_MAX_SIDE = 1100;
+
+    /// The fold renderer on the GPU when JOGL loads, else in software.
+    /// `-Dcn1.fold.software=true` forces software.
+    private static FoldRenderer createFoldRenderer() {
+        if (!Boolean.getBoolean("cn1.fold.software")) {
+            try {
+                Class<?> c = Class.forName("com.codename1.impl.javase.JavaSEJoglFoldTarget");
+                java.lang.reflect.Constructor<?> ctor = c.getDeclaredConstructor();
+                ctor.setAccessible(true);
+                return new FoldRenderer((FoldRenderer.Target) ctor.newInstance());
+            } catch (Throwable t) {
+                Throwable cause = t instanceof java.lang.reflect.InvocationTargetException
+                        && t.getCause() != null ? t.getCause() : t;
+                System.out.println("Simulator fold: GPU unavailable, rendering in software (" + cause + ")");
+            }
+        }
+        return new FoldRenderer();
+    }
+
+    double motionScale(double zoom, boolean moving) {
+        BufferedImage skin = getSkin();
+        FoldRenderer r;
+        synchronized (this) {
+            if (foldRenderer == null) {
+                foldRenderer = createFoldRenderer();
+            }
+            r = foldRenderer;
+        }
+        // Capped on the GPU too: a retina-sized fold still cost ~60 ms a
+        // frame there, mostly texture upload and readback, against ~13 ms at
+        // this size. The resting device is always drawn at full resolution.
+        if (!moving || skin == null || r == null) {
+            return 1;
+        }
+        return Math.min(1, MOTION_MAX_SIDE / (Math.max(skin.getWidth(), skin.getHeight()) * zoom));
+    }
+
+    /// The device as drawn now (skin over screen) at `scale`, or null.
+    private BufferedImage snapshotSkinFrame(double scale) {
+        BufferedImage skin = getSkin();
+        Rectangle sc = getScreenCoordinates();
+        if (skin == null || sc == null || canvas == null) {
+            return null;
+        }
+        BufferedImage screen = canvas.presentedFrame();
+        if (screen == null) {
+            screen = canvas.buffer;
+        }
+        if (screen == null) {
+            return null;
+        }
+        int w = Math.max(1, (int) (skin.getWidth() * scale));
+        int h = Math.max(1, (int) (skin.getHeight() * scale));
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(screen, (int) (sc.x * scale), (int) (sc.y * scale),
+                (int) (sc.width * scale), (int) (sc.height * scale), null);
+        g.drawImage(skin, 0, 0, w, h, null);
+        g.dispose();
+        return out;
+    }
+
+    /// Called before the orientation flips: keeps the outgoing frame.
+    private void beginRotationAnimation() {
+        rotationFrom = null;
+        if (foldAnimationMs <= 0) {
+            return;
+        }
+        rotationScale = zoomLevel * motionScale(zoomLevel, true);
+        rotationFrom = snapshotSkinFrame(rotationScale);
+        // Landscape skins are the portrait art turned clockwise.
+        rotationClockwise = portrait;
+        // A device held part way folded turns folded.
+        rotationFoldAngle = 180;
+        rotationHinge = null;
+        rotationBack = null;
+        if (foldableSkin != null && foldController != null && innerSkinState == null) {
+            double a = foldController.getExactAngle();
+            Rectangle sc = getScreenCoordinates();
+            if (a < 179.5 && sc != null) {
+                rotationFoldAngle = a;
+                rotationVertical = foldableSkin.isVertical() == portrait;
+                Rectangle hinge = foldableSkin.getHinge(portrait);
+                if (hinge == null) {
+                    hinge = rotationVertical
+                            ? new Rectangle(sc.x + sc.width / 2, sc.y, 0, sc.height)
+                            : new Rectangle(sc.x, sc.y + sc.height / 2, sc.width, 0);
+                }
+                rotationHinge = new Rectangle((int) (hinge.x * rotationScale), (int) (hinge.y * rotationScale),
+                        (int) (hinge.width * rotationScale), (int) (hinge.height * rotationScale));
+                rotationBack = coverBackImage();
+            }
+        }
+    }
+
+    /// Called after the orientation flipped and the canvas took its new size.
+    private void startRotationAnimation() {
+        if (rotationFrom == null) {
+            return;
+        }
+        rotationStart = AnimationClock.now();
+        installRotationOverlay();
+        if (rotationTimer == null) {
+            rotationTimer = new javax.swing.Timer(16, new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    if (!isRotationAnimating()) {
+                        rotationTimer.stop();
+                        rotationFrom = null;
+                        lastAnimatedFrame = null;
+                        removeRotationOverlay();
+                    } else if (rotationOverlay != null && rotationOverlay.getParent() != null) {
+                        rotationOverlay.repaint();
+                    }
+                    if (canvas != null) {
+                        canvas.repaint();
+                    }
+                }
+            });
+            rotationTimer.setCoalesce(true);
+        }
+        rotationTimer.start();
+    }
+
+    /// Draws the turning device above the whole window. The canvas has
+    /// already taken the new orientation's shape, so inside it the device
+    /// would have to shrink to fit at the start of the turn (or the end);
+    /// over the window it keeps its size and only the window clips it.
+    private javax.swing.JComponent rotationOverlay;
+
+    private void installRotationOverlay() {
+        if (canvas == null) {
+            return;
+        }
+        javax.swing.JRootPane rp = SwingUtilities.getRootPane(canvas);
+        if (rp == null) {
+            return;
+        }
+        javax.swing.JLayeredPane lp = rp.getLayeredPane();
+        if (rotationOverlay == null) {
+            rotationOverlay = new javax.swing.JComponent() {
+                @Override
+                protected void paintComponent(java.awt.Graphics g) {
+                    paintRotationOverlay((Graphics2D) g, this);
+                }
+            };
+            rotationOverlay.setOpaque(false);
+        }
+        if (rotationOverlay.getParent() != lp) {
+            lp.add(rotationOverlay, javax.swing.JLayeredPane.DRAG_LAYER);
+        }
+        rotationOverlay.setBounds(0, 0, lp.getWidth(), lp.getHeight());
+        rotationOverlay.repaint();
+    }
+
+    private void removeRotationOverlay() {
+        javax.swing.JComponent o = rotationOverlay;
+        if (o != null && o.getParent() != null) {
+            java.awt.Container p = o.getParent();
+            p.remove(o);
+            p.repaint();
+        }
+    }
+
+    /// The device in its new orientation, as the turn fades into it: folded
+    /// like the turning device when it was folded.
+    private BufferedImage rotationIncoming() {
+        if (rotationFoldAngle < 179.5 && foldableSkin != null && canvas != null) {
+            BufferedImage scr = canvas.presentedFrame();
+            if (scr == null) {
+                scr = canvas.buffer;
+            }
+            if (scr != null) {
+                BufferedImage f = renderFoldedSkin(scr, rotationScale);
+                if (f != null) {
+                    return f;
+                }
+            }
+        }
+        return snapshotSkinFrame(rotationScale);
+    }
+
+    /// True while the overlay, not the canvas, draws the device.
+    boolean isRotationOnOverlay() {
+        javax.swing.JComponent o = rotationOverlay;
+        return o != null && o.getParent() != null && isRotationAnimating();
+    }
+
+    private void paintRotationOverlay(Graphics2D g, javax.swing.JComponent overlay) {
+        BufferedImage skin = getSkin();
+        if (canvas == null || skin == null || !isRotationAnimating()) {
+            return;
+        }
+        double cs = canvas.canvasScale();
+        int side = (int) Math.ceil(Math.max(skin.getWidth(), skin.getHeight()) * zoomLevel);
+        int small = (int) Math.ceil(Math.max(skin.getWidth(), skin.getHeight()) * rotationScale);
+        BufferedImage turned = renderRotationFrame(rotationIncoming(), small, small);
+        if (turned == null) {
+            return;
+        }
+        lastAnimatedFrame = turned;
+        lastAnimatedZoom = rotationScale;
+        java.awt.Point origin = SwingUtilities.convertPoint(canvas, 0, 0, overlay);
+        // The canvas draws the skin at (x, y) * zoom in raster pixels.
+        double cx = origin.x * cs + (canvas.x + skin.getWidth() / 2.0) * zoomLevel;
+        double cy = origin.y * cs + (canvas.y + skin.getHeight() / 2.0) * zoomLevel;
+        AffineTransform t = g.getTransform();
+        g.scale(1 / cs, 1 / cs);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(turned, (int) Math.round(cx - side / 2.0), (int) Math.round(cy - side / 2.0), side, side, null);
+        g.setTransform(t);
+    }
+
+    /// One frame of the rotation, `incoming` (the new orientation, already
+    /// composited at `scale`) faded in over its last third.
+    BufferedImage renderRotationFrame(BufferedImage incoming) {
+        return incoming == null ? null
+                : renderRotationFrame(incoming, incoming.getWidth(), incoming.getHeight());
+    }
+
+    /// As above, centered in an `outW x outH` frame: a square as large as
+    /// the device's longer side holds it at its own size in both
+    /// orientations, so it neither shrinks nor clips as it turns.
+    BufferedImage renderRotationFrame(BufferedImage incoming, int outW, int outH) {
+        BufferedImage from = rotationFrom;
+        if (from == null || incoming == null) {
+            return null;
+        }
+        double f = Math.min(1, (AnimationClock.now() - rotationStart) / (double) ROTATION_MS);
+        double e = f * f * f * (f * (f * 6 - 15) + 10);
+        BufferedImage out;
+        synchronized (this) {
+            if (foldRenderer == null) {
+                foldRenderer = createFoldRenderer();
+            }
+            double turn = rotationClockwise ? -90 : 90;
+            double lift = Math.sin(Math.PI * e);
+            BufferedImage r;
+            if (e < 0.5) {
+                r = foldRenderer.renderRotation(from, rotationBack, rotationHinge, rotationVertical,
+                        rotationFoldAngle, turn * e, lift, outW, outH);
+            } else {
+                // Past half way the device shows the new orientation's
+                // content, turned back by what is left of the turn, the way
+                // a phone lays itself out again mid-turn. At exactly half
+                // way both outlines lie at 45 degrees and coincide, so the
+                // swap is a change of content, never a jump; a cross fade
+                // over the still-turning device showed both at once.
+                BufferedImage back = rotationBack;
+                Rectangle hinge = null;
+                boolean vertical = true;
+                if (rotationFoldAngle < 179.5 && foldableSkin != null) {
+                    vertical = foldableSkin.isVertical() == portrait;
+                    Rectangle sc = getScreenCoordinates();
+                    Rectangle hg = foldableSkin.getHinge(portrait);
+                    if (hg == null && sc != null) {
+                        hg = vertical ? new Rectangle(sc.x + sc.width / 2, sc.y, 0, sc.height)
+                                : new Rectangle(sc.x, sc.y + sc.height / 2, sc.width, 0);
+                    }
+                    if (hg != null) {
+                        hinge = new Rectangle((int) (hg.x * rotationScale), (int) (hg.y * rotationScale),
+                                (int) (hg.width * rotationScale), (int) (hg.height * rotationScale));
+                    }
+                    back = coverBackImage();
+                }
+                BufferedImage flat = hinge != null ? snapshotSkinFrame(rotationScale) : incoming;
+                r = foldRenderer.renderRotation(flat != null ? flat : incoming, back, hinge, vertical,
+                        rotationFoldAngle, turn * (e - 1), lift, outW, outH);
+            }
+            out = new BufferedImage(r.getWidth(), r.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = out.createGraphics();
+            g.drawImage(r, 0, 0, null);
+            g.dispose();
+        }
+        return out;
+    }
+
+    /// Composites `screen` (already at `scale`) into the skin and renders the
+    /// result folded at the current angle. Returns null when there is
+    /// nothing to fold.
+    BufferedImage renderFoldedSkin(BufferedImage screen, double scale) {
+        BufferedImage skin = getSkin();
+        Rectangle sc = getScreenCoordinates();
+        if (skin == null || sc == null || foldableSkin == null) {
+            return null;
+        }
+        int w = Math.max(1, (int) (skin.getWidth() * scale));
+        int h = Math.max(1, (int) (skin.getHeight() * scale));
+        if (foldComposite == null || foldComposite.getWidth() != w || foldComposite.getHeight() != h) {
+            foldComposite = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        }
+        Graphics2D g = foldComposite.createGraphics();
+        g.setComposite(java.awt.AlphaComposite.Clear);
+        g.fillRect(0, 0, w, h);
+        g.setComposite(java.awt.AlphaComposite.SrcOver);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(screen, (int) (sc.x * scale), (int) (sc.y * scale),
+                (int) (sc.width * scale), (int) (sc.height * scale), null);
+        g.drawImage(skin, 0, 0, w, h, null);
+        g.dispose();
+        boolean verticalAxis = foldableSkin.isVertical() == portrait;
+        Rectangle hinge = foldableSkin.getHinge(portrait);
+        if (hinge == null) {
+            hinge = verticalAxis
+                    ? new Rectangle(sc.x + sc.width / 2, sc.y, 0, sc.height)
+                    : new Rectangle(sc.x, sc.y + sc.height / 2, sc.width, 0);
+        }
+        Rectangle scaledHinge = new Rectangle((int) (hinge.x * scale), (int) (hinge.y * scale),
+                (int) (hinge.width * scale), (int) (hinge.height * scale));
+        synchronized (this) {
+            if (foldRenderer == null) {
+                foldRenderer = createFoldRenderer();
+            }
+            BufferedImage out = foldRenderer.render(foldComposite, coverBackImage(), scaledHinge,
+                    verticalAxis, foldController.getExactAngle());
+            // The renderer reuses its image; hand out a copy so the caller
+            // (the canvas, or the recorder on its own thread) keeps a stable frame.
+            BufferedImage copy = new BufferedImage(out.getWidth(), out.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D cg = copy.createGraphics();
+            cg.drawImage(out, 0, 0, null);
+            cg.dispose();
+            return copy;
+        }
+    }
+
+    /// The outside of the swinging panel: the cover skin with a dark screen.
+    private BufferedImage coverBackImage() {
+        if (foldableSkin == null || !foldableSkin.hasCover() || coverPortraitSkin == null) {
+            return null;
+        }
+        if (coverComposite == null || coverCompositePortrait != portrait) {
+            BufferedImage img = coverSkinImage(portrait);
+            Rectangle cs = coverScreen(portrait);
+            BufferedImage out = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = out.createGraphics();
+            g.setColor(new Color(0x101014));
+            g.fillRect(cs.x, cs.y, cs.width, cs.height);
+            g.drawImage(img, 0, 0, null);
+            g.dispose();
+            coverComposite = out;
+            coverCompositePortrait = portrait;
+        }
+        return coverComposite;
+    }
+
+    private BufferedImage coverSkinImage(boolean portraitValue) {
+        if (portraitValue || coverLandscapeSkin != null) {
+            return portraitValue ? coverPortraitSkin : coverLandscapeSkin;
+        }
+        return rotateImageClockwise(coverPortraitSkin);
+    }
+
+    /// The cover display in its skin image. Without landscape keys the
+    /// portrait rectangle is turned with the image, clockwise as every
+    /// landscape skin is (see rotateCutoutsForLandscape): x' = H - y - h, y' = x.
+    private Rectangle coverScreen(boolean portraitValue) {
+        Rectangle ps = foldableSkin.getCoverScreen(true);
+        if (portraitValue) {
+            return ps;
+        }
+        if (foldableSkin.hasCoverLandscape()) {
+            return foldableSkin.getCoverScreen(false);
+        }
+        return new Rectangle(coverPortraitSkin.getHeight() - ps.y - ps.height, ps.x, ps.height, ps.width);
+    }
+
+    private static BufferedImage rotateImageClockwise(BufferedImage src) {
+        BufferedImage out = new BufferedImage(src.getHeight(), src.getWidth(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.translate(src.getHeight(), 0);
+        g.rotate(Math.PI / 2);
+        g.drawImage(src, 0, 0, null);
+        g.dispose();
+        return out;
+    }
+
+    /// Moves the whole display to the cover screen (true) or back to the
+    /// inner one: skin images, screen rectangles, density, safe area and
+    /// cutouts, then the same relayout and size change a rotation does.
+    /// The safe area of a cover display: the screen minus a band along
+    /// whichever edge the cutouts sit nearest, plus a small margin. Null
+    /// without cutouts, which reads as the whole screen.
+    static Rectangle coverSafeArea(java.util.List<Rectangle> cutouts, int w, int h) {
+        if (cutouts == null || cutouts.isEmpty()) {
+            return null;
+        }
+        int top = 0;
+        int left = 0;
+        int right = 0;
+        int bottom = 0;
+        for (Rectangle c : cutouts) {
+            int dTop = c.y;
+            int dBottom = h - c.y - c.height;
+            int dLeft = c.x;
+            int dRight = w - c.x - c.width;
+            int min = Math.min(Math.min(dTop, dBottom), Math.min(dLeft, dRight));
+            int margin = Math.max(c.width, c.height) / 2;
+            if (min == dTop) {
+                top = Math.max(top, c.y + c.height + margin);
+            } else if (min == dBottom) {
+                bottom = Math.max(bottom, h - c.y + margin);
+            } else if (min == dLeft) {
+                left = Math.max(left, c.x + c.width + margin);
+            } else {
+                right = Math.max(right, w - c.x + margin);
+            }
+        }
+        return new Rectangle(left, top, Math.max(1, w - left - right), Math.max(1, h - top - bottom));
+    }
+
+    private void showCoverDisplay(boolean cover) {
+        if (foldableSkin == null || !foldableSkin.hasCover() || coverPortraitSkin == null
+                || cover == (innerSkinState != null)) {
+            return;
+        }
+        if (cover) {
+            innerSkinState = new Object[]{portraitSkin, landscapeSkin, portraitScreenCoordinates,
+                landscapeScreenCoordinates, safeAreaPortrait, safeAreaLandscape, cutoutsPortrait,
+                cutoutsLandscape, pixelMilliRatio, portraitSkinHotspots, landscapeSkinHotspots,
+                Boolean.valueOf(roundedSkin)};
+            portraitSkin = coverSkinImage(true);
+            landscapeSkin = coverSkinImage(false);
+            portraitScreenCoordinates = coverScreen(true);
+            landscapeScreenCoordinates = coverScreen(false);
+            cutoutsPortrait = coverCutoutsPortrait;
+            cutoutsLandscape = coverCutoutsPortrait == null ? null
+                    : rotateCutoutsForLandscape(coverCutoutsPortrait, portraitScreenCoordinates.height);
+            // The cover display has its own camera; without a safe area the
+            // app draws its title straight under it.
+            safeAreaPortrait = coverSafeArea(cutoutsPortrait, portraitScreenCoordinates.width,
+                    portraitScreenCoordinates.height);
+            safeAreaLandscape = coverSafeArea(cutoutsLandscape, landscapeScreenCoordinates.width,
+                    landscapeScreenCoordinates.height);
+            if (foldableSkin.getCoverPpi() > 0) {
+                pixelMilliRatio = foldableSkin.getCoverPpi() / 25.4;
+            }
+            portraitSkinHotspots = new HashMap<Point, Integer>();
+            landscapeSkinHotspots = new HashMap<Point, Integer>();
+            // A round-screen skin paints its frame over the UI, which is what
+            // rounds the screen corners; the cover keeps that, with a whole
+            // screen safe area when it has no cutouts.
+            if (roundedSkin) {
+                if (safeAreaPortrait == null) {
+                    safeAreaPortrait = new Rectangle(0, 0, portraitScreenCoordinates.width,
+                            portraitScreenCoordinates.height);
+                }
+                if (safeAreaLandscape == null) {
+                    safeAreaLandscape = new Rectangle(0, 0, landscapeScreenCoordinates.width,
+                            landscapeScreenCoordinates.height);
+                }
+            }
+        } else {
+            Object[] s = innerSkinState;
+            innerSkinState = null;
+            portraitSkin = (BufferedImage) s[0];
+            landscapeSkin = (BufferedImage) s[1];
+            portraitScreenCoordinates = (Rectangle) s[2];
+            landscapeScreenCoordinates = (Rectangle) s[3];
+            safeAreaPortrait = (Rectangle) s[4];
+            safeAreaLandscape = (Rectangle) s[5];
+            cutoutsPortrait = castRectangles(s[6]);
+            cutoutsLandscape = castRectangles(s[7]);
+            pixelMilliRatio = (Double) s[8];
+            portraitSkinHotspots = castHotspots(s[9]);
+            landscapeSkinHotspots = castHotspots(s[10]);
+            roundedSkin = ((Boolean) s[11]).booleanValue();
+        }
+        dismissSimulatedKeyboard();
+        relayoutSkinCanvas();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.List<Rectangle> castRectangles(Object o) {
+        return (java.util.List<Rectangle>) o;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<Point, Integer> castHotspots(Object o) {
+        return (Map<Point, Integer>) o;
+    }
+
+    /// Resizes the canvas and window to the current skin and tells the app
+    /// its display changed, as the Rotate menu item does.
+    private void relayoutSkinCanvas() {
+        if (canvas == null || getSkin() == null) {
+            return;
+        }
+        Container parent = canvas.getParent();
+        if (parent == null) {
+            canvas.repaint();
+            JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
+            return;
+        }
+        parent.remove(canvas);
+        java.awt.Dimension displaySize = computeSkinDisplaySize();
+        canvas.setForcedSize(displaySize);
+        if (appFrame == null && window != null) {
+            window.setSize(displaySize);
+        }
+        java.awt.Container top = ((JComponent) parent).getTopLevelAncestor();
+        if (top != null) {
+            top.revalidate();
+            top.repaint();
+        }
+        parent.add(BorderLayout.CENTER, canvas);
+        if (appFrame == null && window != null) {
+            window.pack();
+        }
+        JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
+    }
+
+    /// A faint crease down the flat inner screen, for skins that ask for one.
+    private void paintFoldCrease(Graphics2D g, int x, int y) {
+        if (foldableSkin == null || !foldableSkin.hasCrease() || innerSkinState != null
+                || foldableSkin.isDualScreen()) {
+            return;
+        }
+        Rectangle sc = getScreenCoordinates();
+        boolean verticalAxis = foldableSkin.isVertical() == portrait;
+        Rectangle hinge = foldableSkin.getHinge(portrait);
+        double c = verticalAxis
+                ? (hinge != null ? hinge.x + hinge.width / 2.0 : sc.x + sc.width / 2.0)
+                : (hinge != null ? hinge.y + hinge.height / 2.0 : sc.y + sc.height / 2.0);
+        int band = Math.max(2, (int) (6 * zoomLevel));
+        Graphics2D g2 = (Graphics2D) g.create();
+        try {
+            for (int i = -band; i <= band; i++) {
+                int a = (int) (22 * (1 - Math.abs(i) / (double) (band + 1)));
+                g2.setColor(new Color(0, 0, 0, a));
+                if (verticalAxis) {
+                    int px = (int) ((c + x) * zoomLevel) + i;
+                    g2.drawLine(px, (int) ((sc.y + y) * zoomLevel), px, (int) ((sc.y + sc.height + y) * zoomLevel));
+                } else {
+                    int py = (int) ((c + y) * zoomLevel) + i;
+                    g2.drawLine((int) ((sc.x + x) * zoomLevel), py, (int) ((sc.x + sc.width + x) * zoomLevel), py);
+                }
+            }
+        } finally {
+            g2.dispose();
+        }
+    }
+
+    /// The size every recorded frame of a foldable skin has: large enough for
+    /// the inner and the cover display, so a recording that folds keeps one
+    /// video size (a video stream cannot change size part way).
+    java.awt.Dimension foldableRecordingSize(com.codename1.impl.javase.record.RecordingOptions.Frame frame) {
+        if (foldableSkin == null || !foldableSkin.hasCover() || coverPortraitSkin == null) {
+            return null;
+        }
+        boolean skinFrame = frame == com.codename1.impl.javase.record.RecordingOptions.Frame.SKIN;
+        BufferedImage innerSkin = innerSkinState != null
+                ? (BufferedImage) innerSkinState[portrait ? 0 : 1] : getSkin();
+        Rectangle innerScreen = innerSkinState != null
+                ? (Rectangle) innerSkinState[portrait ? 2 : 3] : getScreenCoordinates();
+        BufferedImage coverSkin = coverSkinImage(portrait);
+        Rectangle coverScr = coverScreen(portrait);
+        if (innerSkin == null || innerScreen == null) {
+            return null;
+        }
+        int w = skinFrame ? Math.max(innerSkin.getWidth(), coverSkin.getWidth()) : Math.max(innerScreen.width, coverScr.width);
+        int h = skinFrame ? Math.max(innerSkin.getHeight(), coverSkin.getHeight()) : Math.max(innerScreen.height, coverScr.height);
+        return new java.awt.Dimension(w, h);
     }
 
     @Override
@@ -3823,6 +4583,10 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean isPostureSeparating() {
+        if (foldableSkin != null && foldableSkin.isDualScreen()) {
+            // Two panels with a gap between them always separate the content.
+            return simulatedPosture != com.codename1.ui.DevicePosture.POSTURE_CLOSED;
+        }
         return simulatedFoldable && simulatedPosture == com.codename1.ui.DevicePosture.POSTURE_HALF_OPENED;
     }
 
@@ -3833,6 +4597,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         int w = getDisplayWidthImpl();
         int h = getDisplayHeightImpl();
+        if (foldableSkin != null) {
+            if (simulatedPosture == com.codename1.ui.DevicePosture.POSTURE_CLOSED) {
+                // Closed, the app is on the cover display, which has no fold.
+                return null;
+            }
+            java.awt.Rectangle b = foldableSkin.foldBounds(portrait, getScreenCoordinates(), w, h);
+            return new com.codename1.ui.geom.Rectangle(b.x, b.y, b.width, b.height);
+        }
         if (simulatedFoldOrientation == com.codename1.ui.DevicePosture.FOLD_ORIENTATION_VERTICAL) {
             return new com.codename1.ui.geom.Rectangle(w / 2 - 1, 0, 2, h);
         }
@@ -4625,10 +5397,48 @@ public class JavaSEPort extends CodenameOneImplementation {
                     bg.dispose();
                 }
                 
+                boolean foldedPaint = false;
                 if (isEnabled()) {
-                    g.drawImage(composeSimulatorOverlays(accessibilityFilteredImage(buffer), false),
-                            (int) ((getScreenCoordinates().getX() + x) * zoomLevel),
-                            (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
+                    BufferedImage presented = composeSimulatorOverlays(accessibilityFilteredImage(buffer), false);
+                    if (isRotationOnOverlay()) {
+                        // The overlay draws the device; the canvas shows only its backdrop.
+                        java.awt.Container bgOwner = getParent();
+                        g.setColor(bgOwner != null ? bgOwner.getBackground() : Color.GRAY);
+                        g.fillRect(0, 0, (int) Math.ceil(getWidth() * canvasScale()) + 1,
+                                (int) Math.ceil(getHeight() * canvasScale()) + 1);
+                        foldedPaint = true;
+                    } else if (isRotationAnimating()) {
+                        BufferedImage turned = renderRotationFrame(rotationIncoming());
+                        if (turned != null) {
+                            double up = zoomLevel / rotationScale;
+                            g.drawImage(turned, (int) (x * zoomLevel), (int) (y * zoomLevel),
+                                    (int) (turned.getWidth() * up), (int) (turned.getHeight() * up), null);
+                            lastAnimatedFrame = turned;
+                            lastAnimatedZoom = rotationScale;
+                            foldedPaint = true;
+                        }
+                    }
+                    if (!foldedPaint && isFoldVisualActive()) {
+                        // The skin and screen are drawn together, folded in 3D.
+                        double q = motionScale(zoomLevel, isFoldInputBlocked());
+                        BufferedImage folded = renderFoldedSkin(presented, zoomLevel * q);
+                        lastAnimatedFrame = folded;
+                        lastAnimatedZoom = zoomLevel * q;
+                        if (folded != null) {
+                            BufferedImage sk = getSkin();
+                            ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                            g.drawImage(folded, (int) (x * zoomLevel), (int) (y * zoomLevel),
+                                    (int) (sk.getWidth() * zoomLevel), (int) (sk.getHeight() * zoomLevel), null);
+                            foldedPaint = true;
+                        }
+                    }
+                    if (!foldedPaint) {
+                        g.drawImage(presented,
+                                (int) ((getScreenCoordinates().getX() + x) * zoomLevel),
+                                (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
+                        paintFoldCrease((Graphics2D) g, x, y);
+                    }
                 } else {
                     g.setColor(Color.WHITE);
                     g.fillRect(x + (int) (getSkin().getWidth() * zoomLevel), y, getWidth(), getHeight());
@@ -4646,8 +5456,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 //updateGraphicsScale(g);
                 BufferedImage skin = getSkin();
-                g.drawImage(skin, (int) (x * zoomLevel), (int) (( y) * zoomLevel), 
-                        (int)(skin.getWidth() * zoomLevel), (int)(skin.getHeight() * zoomLevel), null);
+                if (!foldedPaint) {
+                    g.drawImage(skin, (int) (x * zoomLevel), (int) (( y) * zoomLevel), 
+                            (int)(skin.getWidth() * zoomLevel), (int)(skin.getHeight() * zoomLevel), null);
+                }
 
                 if (zoomLevel != 1) {
                     AffineTransform t3 = ((Graphics2D)g).getTransform();
@@ -5097,6 +5909,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         /// that follow are swallowed with it.
         private boolean pointerOnCutout;
         public void mousePressed(MouseEvent e) {
+            if (isFoldInputBlocked()) {
+                e.consume();
+                return;
+            }
             if (e.isPopupTrigger()) {
                 if (showContextMenu(e)) {
                     return;
@@ -5190,6 +6006,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mouseReleased(MouseEvent e) {
+            if (isFoldInputBlocked()) {
+                e.consume();
+                return;
+            }
             if (e.isPopupTrigger()) {
 
                 if (showContextMenu(e)) {
@@ -5276,6 +6096,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         public void mouseDragged(MouseEvent e) {
+            if (isFoldInputBlocked()) {
+                e.consume();
+                return;
+            }
             e.consume();
             if (pointerOnCutout) {
                 return;
@@ -6128,6 +6952,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             ZipInputStream z = new ZipInputStream(skin);
             ZipEntry e = z.getNextEntry();
             final Properties props = new Properties();
+            coverPortraitSkin = null;
+            coverLandscapeSkin = null;
+            innerSkinState = null;
+            coverComposite = null;
+            stopFoldAnimation();
             BufferedImage map = null;
             BufferedImage landscapeMap = null;
 
@@ -6160,6 +6989,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 if (name.equals("skin_l.png")) {
                     landscapeSkin = ImageIO.read(z);
+                    e = z.getNextEntry();
+                    continue;
+                }
+                if (name.equals("cover.png")) {
+                    coverPortraitSkin = ImageIO.read(z);
+                    e = z.getNextEntry();
+                    continue;
+                }
+                if (name.equals("cover_l.png")) {
+                    coverLandscapeSkin = ImageIO.read(z);
                     e = z.getNextEntry();
                     continue;
                 }
@@ -6239,6 +7078,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
             boolean roundScreen = props.getProperty("roundScreen", "false").equalsIgnoreCase("true");
+            foldableSkin = FoldableSkin.parse(props);
+            coverCutoutsPortrait = parseCutouts(props.getProperty("coverCutouts"));
+            if (foldableSkin != null) {
+                // A foldable skin always opens flat: the inner display is the
+                // one the rest of this method lays out.
+                simulatedFoldable = true;
+                simulatedFoldOrientation = foldableSkin.getFoldOrientation();
+                simulatedPosture = com.codename1.ui.DevicePosture.POSTURE_FLAT;
+                simulatedHingeAngle = 180;
+                getFoldController().reset(180);
+            }
             // Every field below describes THIS skin. Clear them up front:
             // they used to be assigned only on the branches that had a value
             // for them, so loading a legacy skin after a skin designer one
@@ -7204,6 +8054,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public void actionPerformed(ActionEvent e) {
+            beginRotationAnimation();
             setPortrait(portraitValue);
 
             Container parent = canvas.getParent();
@@ -7225,6 +8076,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             //zoomLevel = 1;
             JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
+            startRotationAnimation();
 
         }
 
@@ -7632,6 +8484,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         rotateMenu.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
+                beginRotationAnimation();
                 setPortrait(!portrait);
                 Container parent = canvas.getParent();
                 parent.remove(canvas);
@@ -7648,6 +8501,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     window.pack();
                 }
                 JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
+                startRotationAnimation();
             }
         });
         if (appFrame == null) deviceMenu.add(rotateMenu);
@@ -10966,7 +11820,117 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// posture and fold orientation, and set the hinge angle. Selections are persisted and applied
     /// through the JavaSEPort simulated-posture state, which fires the same posture-change events an
     /// app would receive on a real foldable device.
+    private static String postureLabel(String posture) {
+        if (FoldableSkin.POSTURE_CLOSED.equals(posture)) {
+            return "Closed";
+        }
+        if (FoldableSkin.POSTURE_HALF.equals(posture)) {
+            return "Half-opened";
+        }
+        return "Flat (open)";
+    }
+
+    /// The Foldable menu for a foldable skin: the skin's own postures, a live
+    /// hinge slider, and whether changes animate. The skin decides the fold
+    /// orientation, so there is no orientation choice here.
+    private JMenu installFoldableSkinMenu(final Preferences pref) {
+        JMenu foldableMenu = new JMenu("Foldable");
+        foldAnimationMs = pref.getBoolean("FoldableSim.animate", true) ? FoldController.DEFAULT_DURATION_MS : 0;
+        ButtonGroup group = new ButtonGroup();
+        String current = postureName(simulatedPosture);
+        for (final String posture : foldableSkin.getPostures()) {
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(postureLabel(posture), posture.equals(current));
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    setFoldState(posture, -1, -1);
+                }
+            });
+            group.add(item);
+            foldableMenu.add(item);
+        }
+        foldableMenu.addSeparator();
+        JMenuItem hingeItem = new JMenuItem("Hinge angle...");
+        hingeItem.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                final JSlider slider = new JSlider(0, 180, getFoldController().getTargetAngle());
+                slider.setMajorTickSpacing(30);
+                slider.setPaintTicks(true);
+                slider.setPaintLabels(true);
+                slider.addChangeListener(new javax.swing.event.ChangeListener() {
+                    public void stateChanged(javax.swing.event.ChangeEvent e) {
+                        // Follows the knob at once; the hinge tracks the hand.
+                        setFoldState(null, slider.getValue(), 0);
+                    }
+                });
+                JOptionPane.showMessageDialog(canvas, slider, "Hinge angle (0 closed - 180 flat)",
+                        JOptionPane.PLAIN_MESSAGE);
+            }
+        });
+        foldableMenu.add(hingeItem);
+        final JCheckBoxMenuItem animate = new JCheckBoxMenuItem("Animate fold", foldAnimationMs > 0);
+        animate.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                pref.putBoolean("FoldableSim.animate", animate.isSelected());
+                foldAnimationMs = animate.isSelected() ? FoldController.DEFAULT_DURATION_MS : 0;
+            }
+        });
+        foldableMenu.add(animate);
+        return foldableMenu;
+    }
+
+    /// Toolbar button beside the rotate buttons: steps a foldable skin to its
+    /// next posture (flat, half-opened, closed, and around again).
+    public class FoldAction extends AbstractAction implements AppFrame.UpdatableUI {
+        public FoldAction() {
+            super("", foldActionIcon());
+            putValue(SHORT_DESCRIPTION, "Fold or unfold the device");
+            putValue(com.codename1.impl.javase.simulator.AppPanel.HIDE_WHEN_DISABLED, Boolean.TRUE);
+            update();
+        }
+
+        private void update() {
+            setEnabled(foldableSkin != null);
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (foldableSkin == null) {
+                return;
+            }
+            java.util.List<String> postures = foldableSkin.getPostures();
+            String current = postureName(FoldableSkin.postureForAngle(getFoldController().getTargetAngle()));
+            int i = postures.indexOf(current);
+            setFoldState(postures.get((i + 1) % postures.size()), -1, -1);
+        }
+
+        @Override
+        public void onUpdateAppFrameUI(AppFrame frame) {
+            update();
+        }
+    }
+
+    /// A small drawn book-fold glyph, so the button needs no image resource.
+    private static javax.swing.Icon foldActionIcon() {
+        BufferedImage img = new BufferedImage(18, 18, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setColor(new Color(0x606060));
+        g.setStroke(new java.awt.BasicStroke(1.5f));
+        g.drawRect(2, 3, 6, 12);
+        int[] xs = {9, 16, 16, 9};
+        int[] ys = {3, 1, 13, 15};
+        g.drawPolygon(xs, ys, 4);
+        g.dispose();
+        return new ImageIcon(img);
+    }
+
     private JMenu installFoldableSimulationMenu(JMenu simulateMenu, final Preferences pref) {
+        if (foldableSkin != null) {
+            return installFoldableSkinMenu(pref);
+        }
         JMenu foldableMenu = new JMenu("Foldable");
 
         // Apply any persisted selections to the simulator state up front.
@@ -11826,6 +12790,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             RotateAction landscapeAction = new RotateAction(false);
             canvasPanel.addAction(portraitAction);
             canvasPanel.addAction(landscapeAction);
+            FoldAction foldAction = new FoldAction();
+            canvasPanel.addAction(foldAction);
+            appFrame.registerUpdateCallback(foldAction);
             ZoomAction zoomIn = new ZoomAction(true);
             ZoomAction zoomOut = new ZoomAction(false);
             canvasPanel.addAction(zoomIn);
@@ -12092,7 +13059,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // It stays focusable, so a developer who clicks into it can still type.
                 window.setAutoRequestFocus(false);
             }
-            window.setVisible(true);
+            if (Boolean.getBoolean("cn1.simulator.hidden")) {
+                // Laid out and displayable, so the app renders and every
+                // capture works, but never shown.
+                window.addNotify();
+                window.validate();
+            } else {
+                window.setVisible(true);
+            }
         }
         if (useNativeInput) {
             Display.getInstance().setDefaultVirtualKeyboard(null);
@@ -12734,15 +13708,63 @@ public class JavaSEPort extends CodenameOneImplementation {
         return touchOverlay;
     }
 
+    /// What the recorder captures from. In a lockstep recording it also
+    /// moves the fold and the turn to each frame's moment and repaints them
+    /// there before the capture, so the captured 3D frame is the one for that
+    /// moment rather than whatever the window last managed to draw.
+    private final class RecorderSource implements com.codename1.impl.javase.record.SimulatorRecorder.FrameSource,
+            com.codename1.impl.javase.record.SimulatorRecorder.Timeline {
+        public BufferedImage captureFrame(com.codename1.impl.javase.record.RecordingOptions.Frame frame) {
+            return captureSimulatorFrame(frame);
+        }
+
+        public void advanceTo(final long epochMs) {
+            AnimationClock.pin(epochMs);
+            runOnAwtAndWait(new Runnable() {
+                public void run() {
+                    FoldController fc = foldController;
+                    if (fc != null && fc.isAnimating() && !fc.step(epochMs)) {
+                        stopFoldAnimation();
+                    }
+                    if (canvas == null || !(isRotationAnimating() || isFoldVisualActive())) {
+                        return;
+                    }
+                    // Rendered here, not by painting the window: a hidden
+                    // simulator never paints, and the window keeps its own pace.
+                    BufferedImage skin = getSkin();
+                    if (skin == null) {
+                        return;
+                    }
+                    if (isRotationAnimating()) {
+                        int small = (int) Math.ceil(Math.max(skin.getWidth(), skin.getHeight()) * rotationScale);
+                        BufferedImage turned = renderRotationFrame(rotationIncoming(), small, small);
+                        if (turned != null) {
+                            lastAnimatedFrame = turned;
+                            lastAnimatedZoom = rotationScale;
+                        }
+                    } else if (canvas.buffer != null) {
+                        BufferedImage presented = composeSimulatorOverlays(accessibilityFilteredImage(canvas.buffer), false);
+                        double q = motionScale(zoomLevel, isFoldInputBlocked());
+                        BufferedImage folded = renderFoldedSkin(presented, zoomLevel * q);
+                        if (folded != null) {
+                            lastAnimatedFrame = folded;
+                            lastAnimatedZoom = zoomLevel * q;
+                        }
+                    }
+                }
+            });
+        }
+
+        public void release() {
+            AnimationClock.release();
+        }
+    }
+
     /// The screen recorder, created on first use.
     public synchronized com.codename1.impl.javase.record.SimulatorRecorder getSimulatorRecorder() {
         if (simulatorRecorder == null) {
             simulatorRecorder = new com.codename1.impl.javase.record.SimulatorRecorder(
-                    new com.codename1.impl.javase.record.SimulatorRecorder.FrameSource() {
-                        public BufferedImage captureFrame(com.codename1.impl.javase.record.RecordingOptions.Frame frame) {
-                            return captureSimulatorFrame(frame);
-                        }
-                    });
+                    new RecorderSource());
         }
         return simulatorRecorder;
     }
@@ -12947,6 +13969,216 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// A frame for the recorder: the screen with its overlays, and for
     /// [com.codename1.impl.javase.record.RecordingOptions.Frame#SKIN] the device skin
     /// around it, at the skin's own resolution.
+    /// A frame of a foldable skin: folded in 3D while the hinge is not flat,
+    /// otherwise the flat inner or cover display.
+    private BufferedImage captureFoldableFrame(com.codename1.impl.javase.record.RecordingOptions.Frame frame,
+            BufferedImage screen, Rectangle sc) {
+        boolean skinFrame = frame == com.codename1.impl.javase.record.RecordingOptions.Frame.SKIN;
+        if (skinFrame && isFoldVisualActive()) {
+            // renderFoldedSkin scales the screen into its rectangle itself.
+            BufferedImage folded = renderFoldedSkin(screen, 1.0);
+            if (folded != null) {
+                return folded;
+            }
+        }
+        BufferedImage skin = getSkin();
+        if (skinFrame && skin != null) {
+            BufferedImage out = new BufferedImage(skin.getWidth(), skin.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = out.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(screen, sc.x, sc.y, sc.width, sc.height, null);
+            g.drawImage(skin, 0, 0, null);
+            g.dispose();
+            return out;
+        }
+        BufferedImage out = new BufferedImage(sc.width, sc.height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(screen, 0, 0, sc.width, sc.height, null);
+        g.dispose();
+        return out;
+    }
+
+    /// `img` centered on the recording backdrop, a `w x h` frame (shrunk to fit when larger).
+    static BufferedImage centerOn(BufferedImage img, int w, int h) {
+        if (img.getWidth() == w && img.getHeight() == h) {
+            return img;
+        }
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        com.codename1.impl.javase.record.SimulatorRecorder.paintBackdrop(g, w, h);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        double s = Math.min(1.0, Math.min(w / (double) img.getWidth(), h / (double) img.getHeight()));
+        int dw = (int) Math.round(img.getWidth() * s);
+        int dh = (int) Math.round(img.getHeight() * s);
+        g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh, null);
+        g.dispose();
+        return out;
+    }
+
+    /// The steps of the device tour: every posture the skin supports, in
+    /// portrait and in landscape, or just a turn there and back for a skin
+    /// that does not fold. Returns the JSON list FoldScript parses.
+    java.util.List<Object> deviceTourSteps() {
+        java.util.List<Object> steps = new java.util.ArrayList<Object>();
+        long at = 1200;
+        FoldableSkin fs = foldableSkin;
+        String[] order = fs == null ? new String[0]
+                : new String[]{FoldableSkin.POSTURE_CLOSED, FoldableSkin.POSTURE_FLAT, FoldableSkin.POSTURE_HALF};
+        java.util.List<String> postures = new java.util.ArrayList<String>();
+        for (String p : order) {
+            if (fs.supports(p)) {
+                postures.add(p);
+            }
+        }
+        for (String p : postures) {
+            steps.add(tourStep(at, "posture", p));
+            at += 2400;
+        }
+        steps.add(tourStep(at, "orientation", portrait ? "landscape" : "portrait"));
+        at += 2600;
+        for (int i = postures.size() - 1; i >= 0; i--) {
+            String p = postures.get(i);
+            if (!FoldableSkin.POSTURE_CLOSED.equals(p)) {
+                steps.add(tourStep(at, "posture", p));
+                at += 2400;
+            }
+        }
+        if (postures.contains(FoldableSkin.POSTURE_FLAT)) {
+            steps.add(tourStep(at, "posture", FoldableSkin.POSTURE_FLAT));
+            at += 1800;
+        }
+        steps.add(tourStep(at, "orientation", portrait ? "portrait" : "landscape"));
+        return steps;
+    }
+
+    private static java.util.Map<String, Object> tourStep(long at, String key, String value) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<String, Object>();
+        m.put("at", Long.valueOf(at));
+        m.put(key, value);
+        if ("posture".equals(key)) {
+            m.put("animateMs", Long.valueOf(900));
+        }
+        return m;
+    }
+
+    /// Records the device tour to a video in the default recordings folder:
+    /// a staged skin recording, with no touch indicators, of the steps above,
+    /// stopped by itself once the last turn has settled.
+    void recordDeviceTour() {
+        final com.codename1.impl.javase.record.SimulatorRecorder rec = getSimulatorRecorder();
+        if (rec.isRecording()) {
+            JOptionPane.showMessageDialog(window, "A recording is already running.", "Device Tour",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        if (getSkin() == null || (rotateMenuItem == null || !rotateMenuItem.isEnabled()) && foldableSkin == null) {
+            JOptionPane.showMessageDialog(window, "The device tour needs a device skin.", "Device Tour",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        final long savedAnimation = foldAnimationMs;
+        if (foldAnimationMs <= 0) {
+            foldAnimationMs = FoldController.DEFAULT_DURATION_MS;
+        }
+        try {
+            com.codename1.impl.javase.record.RecordingOptions o = new com.codename1.impl.javase.record.RecordingOptions();
+            o.setFrame(com.codename1.impl.javase.record.RecordingOptions.Frame.SKIN);
+            o.setFormat("mp4");
+            o.setFps(60);
+            o.setLockstep(true);
+            o.setTouches(com.codename1.impl.javase.record.TouchOverlay.Style.NONE);
+            touchOverlay.setStyle(o.getTouches());
+            rec.start(o);
+        } catch (Exception ex) {
+            foldAnimationMs = savedAnimation;
+            Log.e(ex);
+            JOptionPane.showMessageDialog(window, ex.getMessage(), "Device Tour", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        FoldScript script = FoldScript.parse(deviceTourSteps());
+        script.startWithTail(new FoldScript.Target() {
+            public void fold(String posture, int angle, long animateMs) {
+                if (foldableSkin != null) {
+                    setFoldStateAndWait(posture, angle, animateMs);
+                }
+            }
+
+            public void rotate(boolean p) {
+                rotateSimulator(p);
+            }
+        }, new Runnable() {
+            public void run() {
+                // stop() joins the lockstep capture thread, which waits on
+                // the EDT every frame (advanceTo renders there), so stopping
+                // on the EDT would deadlock both. Stop on a worker; only the
+                // dialog goes to the EDT.
+                Thread stopper = new Thread(new Runnable() {
+                    public void run() {
+                        String msg;
+                        int type;
+                        try {
+                            com.codename1.impl.javase.record.SimulatorRecorder.Result r = rec.stop();
+                            msg = "Saved " + r.file.getAbsolutePath() + (r.note != null ? "\n" + r.note : "");
+                            type = JOptionPane.INFORMATION_MESSAGE;
+                        } catch (Exception ex) {
+                            Log.e(ex);
+                            msg = String.valueOf(ex.getMessage());
+                            type = JOptionPane.ERROR_MESSAGE;
+                        }
+                        final String fmsg = msg;
+                        final int ftype = type;
+                        EventQueue.invokeLater(new Runnable() {
+                            public void run() {
+                                foldAnimationMs = savedAnimation;
+                                JOptionPane.showMessageDialog(window, fmsg, "Device Tour", ftype);
+                            }
+                        });
+                    }
+                }, "DeviceTourStop");
+                stopper.setDaemon(true);
+                stopper.start();
+            }
+        }, 1800);
+    }
+
+    /// The longest a staged recording frame gets; a 2.6k pixel skin would
+    /// otherwise make a 5k video nobody can play smoothly.
+    static final int STAGE_MAX_HEIGHT = 1440;
+
+    /// A skin recording is staged: every frame is a 16:9 backdrop with the
+    /// device centered at one constant size, tall enough for the device's
+    /// longer side. Folding, moving to the cover display and turning between
+    /// portrait and landscape then never rescale or letterbox the device,
+    /// which a video stream (one size from its first frame) otherwise must.
+    /// `scale` is the size `img` was drawn at relative to skin pixels.
+    BufferedImage stageFrame(BufferedImage img, double scale) {
+        if (img == null) {
+            return null;
+        }
+        BufferedImage skin = getSkin();
+        int longest = Math.max(skin.getWidth(), skin.getHeight());
+        java.awt.Dimension fold = foldableRecordingSize(com.codename1.impl.javase.record.RecordingOptions.Frame.SKIN);
+        if (fold != null) {
+            longest = Math.max(longest, Math.max(fold.width, fold.height));
+        }
+        double stageH = longest * 1.12;
+        double k = Math.min(1.0, STAGE_MAX_HEIGHT / stageH);
+        int h = 2 * (int) Math.round(stageH * k / 2);
+        int w = 2 * (int) Math.round(stageH * k * 16 / 9 / 2);
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        com.codename1.impl.javase.record.SimulatorRecorder.paintBackdrop(g, w, h);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        double s = k / scale;
+        int dw = (int) Math.round(img.getWidth() * s);
+        int dh = (int) Math.round(img.getHeight() * s);
+        g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh, null);
+        g.dispose();
+        return out;
+    }
+
     BufferedImage captureSimulatorFrame(com.codename1.impl.javase.record.RecordingOptions.Frame frame) {
         if (canvas == null) {
             return null;
@@ -12963,7 +14195,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (sc == null) {
             return screen;
         }
-        if (frame == com.codename1.impl.javase.record.RecordingOptions.Frame.SKIN && getSkin() != null) {
+        boolean skinFrame = frame == com.codename1.impl.javase.record.RecordingOptions.Frame.SKIN;
+        BufferedImage animated = lastAnimatedFrame;
+        if (skinFrame && animated != null && (isRotationAnimating() || isFoldVisualActive())) {
+            // The canvas already rendered this motion in 3D; rendering it
+            // again here at full resolution, on this thread, held the canvas
+            // up and dropped frames from both.
+            return stageFrame(animated, lastAnimatedZoom);
+        }
+        if (skinFrame && getSkin() != null) {
+            if (foldableSkin != null) {
+                return stageFrame(captureFoldableFrame(frame, screen, sc), 1);
+            }
             BufferedImage skin = getSkin();
             BufferedImage out = new BufferedImage(skin.getWidth(), skin.getHeight(), BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = out.createGraphics();
@@ -12971,7 +14214,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             g.drawImage(screen, sc.x, sc.y, sc.width, sc.height, null);
             g.drawImage(skin, 0, 0, null);
             g.dispose();
-            return out;
+            return stageFrame(out, 1);
+        }
+        java.awt.Dimension foldSize = foldableRecordingSize(frame);
+        if (foldSize != null || foldableSkin != null) {
+            BufferedImage f = captureFoldableFrame(frame, screen, sc);
+            return foldSize == null ? f : centerOn(f, foldSize.width, foldSize.height);
         }
         if (screen.getWidth() != sc.width) {
             BufferedImage out = new BufferedImage(sc.width, sc.height, BufferedImage.TYPE_INT_ARGB);
@@ -13285,6 +14533,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
         simulateMenu.add(record);
+        final JMenuItem tour = new JMenuItem("Record Device Tour...");
+        tour.setToolTipText("Records a short video of the application as the device folds, unfolds and turns");
+        tour.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                recordDeviceTour();
+            }
+        });
+        simulateMenu.add(tour);
         // A recording started over MCP, or stopped at its time limit, changes the
         // state behind the label's back.
         simulateMenu.addMenuListener(new javax.swing.event.MenuListener() {

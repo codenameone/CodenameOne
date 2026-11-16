@@ -913,7 +913,7 @@ public class SkinDesigner extends Lifecycle {
         return chip;
     }
 
-    private final String[] sidebarTabIds = { "shape", "cutouts", "info" };
+    private final String[] sidebarTabIds = { "shape", "cutouts", "fold", "info" };
     private String activeSidebarTab = "shape";
     private Container sidebarBody;
 
@@ -924,7 +924,7 @@ public class SkinDesigner extends Lifecycle {
         Container tabs = new Container(new GridLayout(1, sidebarTabIds.length));
         tabs.setUIID("SkinDesignerSidebarTabs");
         Button[] tabBtns = new Button[sidebarTabIds.length];
-        String[] tabLabels = { "Shape", "Cutouts", "Info" };
+        String[] tabLabels = { "Shape", "Cutouts", "Fold", "Info" };
         for (int i = 0; i < sidebarTabIds.length; i++) {
             final String id = sidebarTabIds[i];
             Button t = new Button(tabLabels[i]);
@@ -981,6 +981,8 @@ public class SkinDesigner extends Lifecycle {
             buildShapeTab(sidebarBody);
         } else if ("cutouts".equals(activeSidebarTab)) {
             buildCutoutsTab(sidebarBody);
+        } else if ("fold".equals(activeSidebarTab)) {
+            buildFoldTab(sidebarBody);
         } else {
             buildInfoTab(sidebarBody);
         }
@@ -1076,12 +1078,13 @@ public class SkinDesigner extends Lifecycle {
                 skin.cutouts.add(new SkinModel.Cutout(SkinModel.CUTOUT_ISLAND, 120, 35, 0, 14, "Dynamic Island"));
                 break;
             case "hole":
-                skin.cornerR = 36; skin.bezel = 24; skin.homeIndicator = true;
-                skin.cutouts.add(new SkinModel.Cutout(SkinModel.CUTOUT_HOLE, 28, 28, 0, 20, "Camera"));
+                skin.cornerR = 36; skin.bezel = 14; skin.homeIndicator = true;
+                // About 3.4 mm across, 3 mm down: a current punch-hole camera.
+                skin.cutouts.add(new SkinModel.Cutout(SkinModel.CUTOUT_HOLE, 17, 17, 0, 15, "Camera"));
                 break;
             case "holeCorner":
-                skin.cornerR = 32; skin.bezel = 22; skin.homeIndicator = true;
-                skin.cutouts.add(new SkinModel.Cutout(SkinModel.CUTOUT_HOLE, 26, 26, -100, 18, "Camera"));
+                skin.cornerR = 32; skin.bezel = 14; skin.homeIndicator = true;
+                skin.cutouts.add(new SkinModel.Cutout(SkinModel.CUTOUT_HOLE, 16, 16, -100, 15, "Camera"));
                 break;
             case "classic":
                 skin.cornerR = 20; skin.bezel = 64; skin.homeIndicator = false;
@@ -1233,6 +1236,78 @@ public class SkinDesigner extends Lifecycle {
         String safeUnit = "ios".equals(device.platformName) ? "pt" : "dp";
         parent.add(numericPair("Top", safeUnit, skin.safeTop, v -> { skin.safeTop = Math.max(0, v); saveState(); },
                 "Bottom", safeUnit, skin.safeBottom, v -> { skin.safeBottom = Math.max(0, v); saveState(); }));
+    }
+
+    /**
+     * The foldable tab: whether the device folds, how, which postures it
+     * supports and its cover display. The preview posture buttons only
+     * change what the preview shows; the simulator animates the real fold.
+     */
+    private void buildFoldTab(Container parent) {
+        parent.add(sectionLabel("FOLD"));
+        parent.add(boolPair("Foldable device", skin.foldable, v -> {
+            skin.foldable = v;
+            if (!v) {
+                livePreview.setPosture(DevicePreview.POSTURE_FLAT);
+            }
+            saveState();
+            rebuildSidebarBody();
+            livePreview.repaint();
+        }));
+        if (!skin.foldable) {
+            Label help = new Label("Turn this on for a book or flip foldable. The simulator then shows the hinge, "
+                    + "animates between postures and switches to the cover display when closed.");
+            help.setUIID("SkinDesignerHelpBlock");
+            parent.add(help);
+            return;
+        }
+        parent.add(boolPair("Book fold (hinge top to bottom)", skin.foldVertical, v -> {
+            skin.foldVertical = v;
+            livePreview.repaint();
+            saveState();
+        }));
+        parent.add(boolPair("Two screens with a gap", skin.foldDualScreen, v -> {
+            skin.foldDualScreen = v;
+            livePreview.repaint();
+            saveState();
+        }));
+        parent.add(boolPair("Crease on the flat screen", skin.foldCrease, v -> {
+            skin.foldCrease = v;
+            livePreview.repaint();
+            saveState();
+        }));
+
+        parent.add(sectionLabel("POSTURES"));
+        parent.add(boolPair("Half opened", skin.foldHalf, v -> { skin.foldHalf = v; saveState(); }));
+        parent.add(boolPair("Closed", skin.foldClosed, v -> { skin.foldClosed = v; saveState(); }));
+
+        parent.add(sectionLabel("COVER DISPLAY (0 = none)"));
+        parent.add(numericPair("Width", "px", skin.coverW, v -> { skin.coverW = Math.max(0, v); livePreview.repaint(); saveState(); },
+                "Height", "px", skin.coverH, v -> { skin.coverH = Math.max(0, v); livePreview.repaint(); saveState(); }));
+        parent.add(numericField("PPI", "", skin.coverPpi, v -> { skin.coverPpi = Math.max(0, v); saveState(); }));
+        if (device.fold != null && device.fold.estimated) {
+            Label est = new Label("The manufacturer has not published every resolution for this device; "
+                    + "the catalog values are estimates.");
+            est.setUIID("SkinDesignerHelpBlock");
+            parent.add(est);
+        }
+
+        parent.add(sectionLabel("PREVIEW"));
+        Container postures = new Container(new GridLayout(1, 3));
+        String[][] options = {
+                { DevicePreview.POSTURE_FLAT, "Flat" },
+                { DevicePreview.POSTURE_HALF, "Half" },
+                { DevicePreview.POSTURE_CLOSED, "Closed" } };
+        for (String[] o : options) {
+            Button b = new Button(o[1]);
+            b.setUIID(o[0].equals(livePreview.getPosture()) ? "SkinDesignerSidebarTabActive" : "SkinDesignerSidebarTab");
+            b.addActionListener(e -> {
+                livePreview.setPosture(o[0]);
+                rebuildSidebarBody();
+            });
+            postures.add(b);
+        }
+        parent.add(postures);
     }
 
     private Label sectionLabel(String text) {
@@ -1480,6 +1555,11 @@ public class SkinDesigner extends Lifecycle {
                 writeEntry(zos, "skin_l.png", imageBytes(landscape));
                 writeEntry(zos, "skin_map.png", imageBytes(overlayPortrait));
                 writeEntry(zos, "skin_map_l.png", imageBytes(overlayLandscape));
+                if (hasFoldCover()) {
+                    Image cover = generateCoverImage();
+                    writeEntry(zos, "cover.png", imageBytes(cover));
+                    writeEntry(zos, "cover_l.png", imageBytes(rotate90(cover)));
+                }
 
                 String themeFile = pickNativeThemeFile(device);
                 InputStream is = Display.getInstance().getResourceAsStream(getClass(), "/" + themeFile);
@@ -1518,12 +1598,31 @@ public class SkinDesigner extends Lifecycle {
         // strategies — buildProperties wrote safePortraitY against
         // bezelPx_a but the image was generated with bezelPx_b — leaving
         // the safe area off by ~10px on high-res devices.
-        return Math.round(skin.bezel * ((float) device.resolutionW / DevicePreview.VB_W));
+        return Math.round(skin.bezel * pxPerUnit());
     }
 
     private int skinCornerInPx(int totalW) {
-        return Math.round(((float) skin.cornerR / DevicePreview.VB_W) * totalW);
+        return Math.round(skin.cornerR * pxPerUnit());
     }
+
+    /// Skin pixels per frame unit. Bezel, corner and cutout sizes are in
+    /// units of MM_PER_UNIT millimetres, converted with the device's real
+    /// density, so a camera hole or a bezel is the same physical size on
+    /// every device. They used to be a 320th of the screen width, which
+    /// made a phone's punch hole half again too large and gave a wide
+    /// foldable a bezel twice as thick as its body. Without a density, the
+    /// old width-based scale is the fallback.
+    private float pxPerUnit() {
+        if (device.ppi > 0) {
+            return (float) (device.ppi * MM_PER_UNIT / 25.4);
+        }
+        return ((float) device.resolutionW) / DevicePreview.VB_W;
+    }
+
+    /// One frame unit, in millimetres: 320 units are a typical phone
+    /// screen's width, so presets drawn in the 320-wide preview keep the
+    /// proportions they were designed with.
+    static final double MM_PER_UNIT = 0.2;
 
     /**
      * Produces a portrait skin image whose dimensions are
@@ -1535,7 +1634,7 @@ public class SkinDesigner extends Lifecycle {
         if (SkinModel.SOURCE_IMAGE.equals(source) && bodyImage != null) {
             return generateImageBased();
         }
-        float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
+        float framePxScale = pxPerUnit();
         int bezelPx = Math.round(skin.bezel * framePxScale);
         int cornerPx = Math.round(skin.cornerR * framePxScale);
         int screenCornerPx = Math.max(0, cornerPx - Math.round(8 * framePxScale));
@@ -1566,7 +1665,7 @@ public class SkinDesigner extends Lifecycle {
     }
 
     private Image generateImageBased() {
-        float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
+        float framePxScale = pxPerUnit();
         int bezelPx = Math.round(skin.bezel * framePxScale);
         int cornerPx = Math.round(skin.cornerR * framePxScale);
         int screenCornerPx = Math.max(0, cornerPx - Math.round(8 * framePxScale));
@@ -1724,23 +1823,33 @@ public class SkinDesigner extends Lifecycle {
                                          int x, int y, int rw, int rh, int radius) {
         if (radius <= 0) return;
         int r = Math.min(radius, Math.min(rw, rh) / 2);
-        int r2 = r * r;
-        int[][] corners = {
-                { x + r, y + r, -1, -1 },
-                { x + rw - r - 1, y + r, +1, -1 },
-                { x + r, y + rh - r - 1, -1, +1 },
-                { x + rw - r - 1, y + rh - r - 1, +1, +1 },
-        };
-        for (int[] c : corners) {
-            int cx = c[0], cy = c[1], dx = c[2], dy = c[3];
-            for (int yy = 0; yy < r; yy++) {
-                for (int xx = 0; xx < r; xx++) {
-                    int px = cx + dx * xx;
-                    int py = cy + dy * yy;
-                    if (px < 0 || py < 0 || px >= w || py >= h) continue;
-                    int distSq = xx * xx + yy * yy;
-                    if (distSq > r2) {
-                        data[py * w + px] = 0;
+        // Every pixel of each r x r corner box, the outermost row and column
+        // included, against the arc of a circle centred r in from both
+        // edges; coverage is measured at the pixel's centre and edge pixels
+        // are faded for a smooth curve. The box used to stop one pixel short
+        // of the image edge, which left a square of opaque edge pixels
+        // around every rounded corner: a faint rectangle around the device.
+        for (int corner = 0; corner < 4; corner++) {
+            boolean right = corner == 1 || corner == 3;
+            boolean bottom = corner >= 2;
+            float cx = right ? x + rw - r : x + r;
+            float cy = bottom ? y + rh - r : y + r;
+            int bx = right ? x + rw - r : x;
+            int by = bottom ? y + rh - r : y;
+            for (int py = by; py < by + r; py++) {
+                if (py < 0 || py >= h) continue;
+                for (int px = bx; px < bx + r; px++) {
+                    if (px < 0 || px >= w) continue;
+                    float dx = px + 0.5f - cx;
+                    float dy = py + 0.5f - cy;
+                    float d = (float) Math.sqrt(dx * dx + dy * dy) - r;
+                    int i = py * w + px;
+                    if (d >= 0.5f) {
+                        data[i] = 0;
+                    } else if (d > -0.5f) {
+                        int a = (data[i] >>> 24) & 0xff;
+                        a = Math.round(a * (0.5f - d));
+                        data[i] = (a << 24) | (data[i] & 0xffffff);
                     }
                 }
             }
@@ -1812,6 +1921,127 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
+    private boolean hasFoldCover() {
+        return skin.foldable && skin.coverW > 0 && skin.coverH > 0 && skin.coverPpi > 0;
+    }
+
+    /**
+     * The cover (outer) display of a foldable, drawn like the shape-based
+     * portrait skin at the cover resolution. The simulator reads it as
+     * {@code cover.png}, the screen at (bezelPx, bezelPx).
+     */
+    private Image generateCoverImage() {
+        float framePxScale = pxPerUnit();
+        int bezelPx = Math.round(skin.bezel * framePxScale);
+        int cornerPx = Math.round(skin.cornerR * framePxScale);
+        int screenCornerPx = Math.max(0, cornerPx - Math.round(8 * framePxScale));
+        int[] body = coverBodySize(bezelPx);
+        int totalW = body[0];
+        int totalH = body[1];
+        int[] cs = coverScreenRect(bezelPx);
+        Image base = Image.createImage(totalW, totalH, 0xff121822);
+        Graphics g = base.getGraphics();
+        g.setAntiAliased(true);
+        g.setColor(0x2a2f3a);
+        int inset = Math.max(1, totalW / 200);
+        g.fillRoundRect(inset, inset, totalW - inset * 2, totalH - inset * 2,
+                Math.max(0, (cornerPx - inset) * 2), Math.max(0, (cornerPx - inset) * 2));
+        int[] data = base.getRGB();
+        applyRoundRectAlphaMask(data, totalW, totalH, 0, 0, totalW, totalH, cornerPx);
+        carveRoundedScreenRect(data, totalW, totalH, cs[0], cs[1], cs[2], cs[3],
+                Math.min(screenCornerPx, Math.min(cs[2], cs[3]) / 4));
+        return Image.createImage(data, totalW, totalH);
+    }
+
+    /// The closed device is the folded half of the open one, so its image
+    /// is exactly half the inner skin: the 3D fold paints it on the back of
+    /// that half, and closing never changes the device's size.
+    private int[] coverBodySize(int bezelPx) {
+        int totalW = device.resolutionW + bezelPx * 2;
+        int totalH = device.resolutionH + bezelPx * 2;
+        return skin.foldVertical ? new int[]{totalW / 2, totalH} : new int[]{totalW, totalH / 2};
+    }
+
+    /// The cover display inside that half, in skin pixels: its real size
+    /// (cover pixels at the cover density) drawn at the inner display's
+    /// density, shrunk only if it would not fit inside the bezel. Centred
+    /// on a book fold; at the top of a flip, where the small outer screen
+    /// of a clamshell sits.
+    private int[] coverScreenRect(int bezelPx) {
+        int[] body = coverBodySize(bezelPx);
+        double k = device.ppi > 0 && skin.coverPpi > 0 ? device.ppi / (double) skin.coverPpi : 1;
+        double cw = skin.coverW * k;
+        double ch = skin.coverH * k;
+        double fit = Math.min(1, Math.min((body[0] - bezelPx * 2) / cw, (body[1] - bezelPx * 2) / ch));
+        int w = Math.max(1, (int) Math.round(cw * fit));
+        int h = Math.max(1, (int) Math.round(ch * fit));
+        int x = (body[0] - w) / 2;
+        int y = skin.foldVertical ? (body[1] - h) / 2 : bezelPx;
+        return new int[]{x, y, w, h};
+    }
+
+    /**
+     * Writes the keys the simulator's FoldableSkin reads. Landscape
+     * rectangles follow the simulator's clockwise rotation of the portrait
+     * image: (x, y, w, h) becomes (H - y - h, x, h, w).
+     */
+    private void putFoldProperties(Properties p, int totalW, int totalH, int bezelPx) {
+        if (!skin.foldable) {
+            return;
+        }
+        p.put("foldable", "true");
+        p.put("foldOrientation", skin.foldVertical ? "vertical" : "horizontal");
+        p.put("foldType", skin.foldDualScreen ? "dualScreen" : "continuous");
+        StringBuilder postures = new StringBuilder("flat");
+        if (skin.foldHalf) {
+            postures.append(",half");
+        }
+        if (skin.foldClosed) {
+            postures.append(",closed");
+        }
+        p.put("foldPostures", postures.toString());
+        p.put("crease", String.valueOf(skin.foldCrease && !skin.foldDualScreen));
+        float framePxScale = pxPerUnit();
+        int gap = skin.foldDualScreen ? Math.max(2, Math.round(6 * framePxScale)) : 0;
+        int hx;
+        int hy;
+        int hw;
+        int hh;
+        if (skin.foldVertical) {
+            hx = bezelPx + device.resolutionW / 2 - gap / 2;
+            hy = bezelPx;
+            hw = gap;
+            hh = device.resolutionH;
+        } else {
+            hx = bezelPx;
+            hy = bezelPx + device.resolutionH / 2 - gap / 2;
+            hw = device.resolutionW;
+            hh = gap;
+        }
+        p.put("hingePortrait", hx + "," + hy + "," + hw + "," + hh);
+        p.put("hingeLandscape", (totalH - hy - hh) + "," + hx + "," + hh + "," + hw);
+        if (hasFoldCover()) {
+            int[] cs = coverScreenRect(bezelPx);
+            int coverH = coverBodySize(bezelPx)[1];
+            p.put("coverPortraitScreenX", String.valueOf(cs[0]));
+            p.put("coverPortraitScreenY", String.valueOf(cs[1]));
+            p.put("coverPortraitScreenWidth", String.valueOf(cs[2]));
+            p.put("coverPortraitScreenHeight", String.valueOf(cs[3]));
+            // The simulator turns the cover image clockwise for landscape:
+            // (x, y, w, h) becomes (H - y - h, x, h, w).
+            p.put("coverLandscapeScreenX", String.valueOf(coverH - cs[1] - cs[3]));
+            p.put("coverLandscapeScreenY", String.valueOf(cs[0]));
+            p.put("coverLandscapeScreenWidth", String.valueOf(cs[3]));
+            p.put("coverLandscapeScreenHeight", String.valueOf(cs[2]));
+            // The cover is drawn at the inner display's density (see
+            // coverScreenRect), so that is the density it reports.
+            // Drawn at the inner density, then shrunk to fit if needed: the
+            // ppi that keeps the cover's real physical size is the cover's
+            // own scaled by how many skin pixels each cover pixel became.
+            p.put("coverPpi", String.valueOf(Math.max(1, Math.round(skin.coverPpi * (double) cs[2] / skin.coverW))));
+        }
+    }
+
     private Image rotate90(Image src) {
         return src.rotate90Degrees(true);
     }
@@ -1866,7 +2096,7 @@ public class SkinDesigner extends Lifecycle {
         // multiplying those by vbToPx too is what made an iPhone 13 Pro Max
         // reserve 189px where the hardware reserves 141px, and an iPad Pro
         // 12.9 reserve 154px where the hardware reserves 48px.
-        float vbToPx = (float) device.resolutionW / DevicePreview.VB_W;
+        float vbToPx = pxPerUnit();
         int cutoutBottomPx = 0;
         for (SkinModel.Cutout c : skin.cutouts) {
             // Measured off the rectangle that actually gets painted and
@@ -1948,6 +2178,7 @@ public class SkinDesigner extends Lifecycle {
         // bezelPx is unused now that the safe-area coords are display-relative,
         // but skin generation still needs it elsewhere.
         if (bezelPx < 0) { /* keep var alive */ }
+        putFoldProperties(p, totalW, totalH, bezelPx);
         return p;
     }
 
