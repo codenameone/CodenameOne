@@ -171,7 +171,9 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
     /// (also when ML Kit answered a value, since ML Kit's own guess may be
     /// the wrong charset), else -- only when ML Kit answered null -- as UTF-8
     /// when they are valid UTF-8, else as ISO-8859-1, which maps every byte
-    /// and so never fails. getRawBytes() still carries the exact payload.
+    /// and so never fails. A named charset that cannot be used -- an unknown
+    /// name, or bytes that are not valid in it -- falls back the same way.
+    /// getRawBytes() still carries the exact payload.
     ///
     /// Only PDF417 is decoded from bytes because only there are getRawBytes()
     /// measured to be the payload; for a QR code they can be the codeword
@@ -188,30 +190,33 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
         if (raw != null && (charset == null || charset.length() == 0)) {
             return raw;
         }
-        return decode(bytes, charset, raw);
+        return decode(bytes, charset);
     }
 
-    static String decode(byte[] bytes, String charsetName, String raw) {
+    static String decode(byte[] bytes, String charsetName) {
         if (charsetName != null && charsetName.length() > 0) {
             try {
-                return new String(bytes, Charset.forName(charsetName));
+                return strict(bytes, Charset.forName(charsetName));
             } catch (IllegalArgumentException unsupported) {
-                // An unknown name never replaces the value ML Kit answered;
-                // with none, it falls through to the default decoding
-                // rather than losing the code.
-                if (raw != null) {
-                    return raw;
-                }
+                // An unknown charset name, and...
+            } catch (CharacterCodingException notInCharset) {
+                // ...bytes that are not valid in the named charset both fall
+                // back to the default decoding rather than losing the code.
             }
         }
         try {
-            return Charset.forName("UTF-8").newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(bytes)).toString();
+            return strict(bytes, Charset.forName("UTF-8"));
         } catch (CharacterCodingException notUtf8) {
             return new String(bytes, Charset.forName("ISO-8859-1"));
         }
+    }
+
+    private static String strict(byte[] bytes, Charset charset)
+            throws CharacterCodingException {
+        return charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes)).toString();
     }
 
     @Override
