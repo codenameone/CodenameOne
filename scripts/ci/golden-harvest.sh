@@ -35,8 +35,9 @@ list() {
   # workflow without one is still to come, not finished: harvesting then would
   # take the legs that are done and leave the rest to a branch that has moved.
   # Cancelled capture runs do not count: a capture that failed part way
-  # cancels the ones it started (and marks its status as an error), and the
-  # PR's own runs harvest as usual. (A screenshot workflow dispatched by hand at a PR head counts as
+  # cancels the ones it started and marks its status as an error; the PR's
+  # own runs were cancelled too, so nothing at that head harvests until
+  # Golden capture is re-run. (A screenshot workflow dispatched by hand at a PR head counts as
   # a capture too; nothing else dispatches them.) A capture that failed after
   # one of its legs had already completed leaves that run live and the head
   # never harvests; the PR's golden-plan still names the gap, and the next

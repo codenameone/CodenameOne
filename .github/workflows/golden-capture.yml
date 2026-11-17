@@ -11,17 +11,16 @@ name: Golden capture
 # in the test (`// cn1ss-skip: <ports>`) and held to the tree both ways, so
 # the tree's goldens are complete and a gap is the whole signal: no marker, no
 # diff. When there is any gap, it:
-#   1. dispatches each screenshot workflow on the PR branch with
+#   1. cancels every other run of this PR: it is known to fail, and the point
+#      of the feature is that it spends no runners until its goldens exist;
+#   2. dispatches each screenshot workflow on the PR branch with
 #      `cn1ss_capture`: the FULL suite runs (tests leak, so a subset could
 #      render differently), non-screenshot jobs skip, and every image without
-#      a golden is uploaded instead of gated (.github/actions/cn1ss-capture).
-#      The PR's own runs are left alone: the screenshot workflows skip every
-#      job by themselves (their first job, golden-plan.yml, runs the same
-#      detector and fails naming the gaps), and every other check keeps
-#      reporting on the code;
-#   2. sets a pending "Golden capture" status on the PR's head, since GitHub
-#      does not show workflow_dispatch runs on a PR;
-#   3. exits. It does not wait: the slowest leg takes hours, often more while
+#      a golden is uploaded instead of gated (.github/actions/cn1ss-capture);
+#   3. sets a pending "Golden capture" status on the PR's head: the PR shows
+#      its runs cancelled, and GitHub does not show workflow_dispatch runs on
+#      a PR, so this is where it says what is going on;
+#   4. exits. It does not wait: the slowest leg takes hours, often more while
 #      macOS runners are queued, and a job that polled for that long held a
 #      runner the whole time and lost everything that had arrived when it hit
 #      its deadline. Each capture run's completion starts golden-harvest.yml,
@@ -32,8 +31,9 @@ name: Golden capture
 # A gap still open after that push is golden-plan's to report: its leg failed,
 # or the test captures nothing there and needs a cn1ss-skip declaration. What
 # did arrive is still committed, so the next push captures only what is left.
-# The harvest settles the status: success with the commit, or failure when a
-# leg failed or nothing arrived.
+# The harvest settles the status: success with the commit (whose push starts
+# the PR's runs again), or failure when a leg failed or nothing arrived. The
+# PR's runs stay cancelled then: they are still known to fail.
 #
 # Pull requests from forks are skipped: the dispatches need the branch in this
 # repository and the push needs a token a fork run does not get. Review the
@@ -92,7 +92,7 @@ jobs:
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
       RUNS: /tmp/golden-capture-runs.txt
     steps:
-      # Before anything is dispatched: without the token the harvest cannot
+      # Before anything is cancelled: without the token the harvest cannot
       # push what the capture renders.
       - name: Check the push token
         env:
@@ -115,8 +115,27 @@ jobs:
         with:
           persist-credentials: false
 
+      # The point of all this: a PR missing a golden is known to fail, so
+      # none of its runs may spend runners. They stay cancelled; the push
+      # that commits the goldens starts them all again, and the status below
+      # says on the PR why they were cancelled.
+      - name: Cancel the PR's other runs
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {cancelForCapture} = require('./scripts/ci/cancel-stale-pr-runs.js');
+            await cancelForCapture({github, context, core, keepRunId: context.runId});
+
       - name: Dispatch the screenshot workflows in capture mode
         run: scripts/ci/golden-capture.sh dispatch "$HEAD_REF" "$TESTS" "$RUNS"
+
+      # Workflows the triggering push started after the first pass.
+      - name: Cancel the PR's other runs again
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {cancelForCapture} = require('./scripts/ci/cancel-stale-pr-runs.js');
+            await cancelForCapture({github, context, core, keepRunId: context.runId});
 
       # The capture's runs are workflow_dispatch runs, which GitHub does not
       # show on the PR; this status is the PR's view of them, and
@@ -127,7 +146,7 @@ jobs:
         run: |
           n="$(wc -l < "$RUNS")"
           gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f state=pending -f context="Golden capture" \
-            -f description="Capturing goldens: $n screenshot workflows running" \
+            -f description="Goldens missing: other checks cancelled; capturing on $n screenshot workflows" \
             -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null \
             || echo "::warning::could not set the Golden capture status; the capture runs anyway"
 
