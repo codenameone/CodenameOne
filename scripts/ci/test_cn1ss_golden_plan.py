@@ -190,9 +190,13 @@ class GoldenPlanTest(unittest.TestCase):
         with self.assertRaises(plan.PlanError):
             Fixture({}).plan()
 
-    def test_current_tree_is_complete(self):
-        self.assertEqual(plan.plan(), ([], []))
-        self.assertEqual(plan.plan(from_git=True), ([], []))
+    def test_current_tree_declarations_hold(self):
+        # Only the declarations: a PR that adds a screenshot test has gaps
+        # until golden capture commits its goldens, and golden-plan.yml is
+        # the check that reports them. Failing here as well left such a PR
+        # with a second red check that nothing but the capture could clear.
+        self.assertEqual(plan.plan()[1], [])
+        self.assertEqual(plan.plan(from_git=True)[1], [])
 
 
 class CollectTest(unittest.TestCase):
