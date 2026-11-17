@@ -216,4 +216,83 @@ class ReplicaServerHardeningTest {
         server.receive(alice, ev.toByteArray());
         assertNotNull(server.player(alice));
     }
+
+    private static byte[] chats(int n, String text, String channel) throws IOException {
+        Wire.Writer w = new Wire.Writer();
+        for (int k = 0; k < n; k++) {
+            DataOutputStream out = w.op(Wire.CHAT);
+            out.writeUTF(text);
+            out.writeUTF(channel);
+        }
+        return w.done();
+    }
+
+    private final java.util.List<String> heard = new java.util.ArrayList<String>();
+
+    private int chatServer() {
+        server = new ReplicaServer(place(null));
+        server.getEngine().addListener(new Engine.ChatListener() {
+            @Override
+            public void chat(Instance from, String text, String channel) {
+                heard.add(text);
+            }
+        });
+        frames(2);
+        int alice = server.connect(DISCARD, 1, "Alice", "Alice");
+        frames(2);
+        return alice;
+    }
+
+    @Test
+    void chatIsRateLimitedAndOneMessageCannotCarryAFlood() throws IOException {
+        int alice = chatServer();
+        // One message with 100k chat ops relays only the burst.
+        server.receive(alice, chats(100000, "spam", "RBXGeneral"));
+        assertEquals((int) ReplicaServer.CHAT_BURST, heard.size());
+        server.receive(alice, chats(1, "more", "RBXGeneral"));
+        assertEquals((int) ReplicaServer.CHAT_BURST, heard.size(), "no tokens left this frame");
+        frames(60);
+        server.receive(alice, chats(1, "later", "RBXGeneral"));
+        assertEquals("later", heard.get(heard.size() - 1), "the allowance refills with time");
+    }
+
+    @Test
+    void chatLengthIsCappedAndForgedChannelsAreDropped() throws IOException {
+        int alice = chatServer();
+        StringBuilder longLine = new StringBuilder();
+        for (int k = 0; k < 1000; k++) {
+            longLine.append('x');
+        }
+        server.receive(alice, chats(1, longLine.toString(), "RBXGeneral"));
+        assertEquals(ReplicaServer.MAX_CHAT_LENGTH, heard.get(0).length());
+        server.receive(alice, chats(1, "hi", "<script>"));
+        server.receive(alice, chats(1, "hi", ""));
+        assertEquals(1, heard.size(), "lines on forged channels are not relayed");
+        assertTrue(ReplicaServer.validChannel("All"));
+    }
+
+    @Test
+    void invokesPastTheRateAreAnsweredEmpty() throws IOException {
+        server = new ReplicaServer(place("local q = game:GetService('ReplicatedStorage').Q\n"
+                + "local n = 0\n"
+                + "q.OnServerInvoke = function() n = n + 1 workspace:SetAttribute('n', n) return n end\n"));
+        frames(2);
+        int alice = server.connect(DISCARD, 1, "Alice", "Alice");
+        frames(2);
+        Instance q = server.getEngine().service("ReplicatedStorage").findFirstChild("Q");
+        for (int m = 0; m < 10; m++) {
+            Wire.Writer w = new Wire.Writer();
+            for (int k = 0; k < ReplicaServer.MAX_OPS_PER_MESSAGE; k++) {
+                DataOutputStream out = w.op(Wire.INVOKE);
+                out.writeInt(k);
+                Wire.ref(out, server.getEngine(), server, q);
+                Wire.values(out, server.getEngine(), server, new Object[0]);
+            }
+            server.receive(alice, w.done());
+        }
+        frames(1);
+        Object n = server.getEngine().getWorkspace().getAttribute("n");
+        assertNotNull(n, log.toString());
+        assertTrue(((Number) n).intValue() <= (int) ReplicaServer.INVOKE_BURST, "ran " + n);
+    }
 }

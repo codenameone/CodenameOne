@@ -170,4 +170,62 @@ class PlaceIoTest {
         }
         RbxlReader.checkChunkSizes(block.length, block.length, 1, block, 0);
     }
+
+    @Test
+    public void manyChunksCannotInflatePastTheFileBudget() {
+        // Each chunk is under the per-chunk cap; together they pass the total.
+        long total = 0;
+        for (int i = 0; i < 63; i++) {
+            total = RbxlReader.addInflated(total, 1024 * 1024);
+        }
+        try {
+            RbxlReader.addInflated(total, 2 * 1024 * 1024);
+            org.junit.jupiter.api.Assertions.fail("accepted a file inflating past the budget");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("decompresses past"));
+        }
+    }
+
+    @Test
+    public void hugeInstanceCountDoesNotOverflowTheBoundsCheck() {
+        // INST with count 0x40000001: count * 4 wraps to 4, which used to pass
+        // the bounds check and then allocate a 4 GB array.
+        java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+        le32(body, 0);
+        le32(body, 1);
+        body.write('A');
+        body.write(0);
+        le32(body, 0x40000001);
+        for (int i = 0; i < 8; i++) {
+            body.write(0);
+        }
+        byte[] b = body.toByteArray();
+        java.io.ByteArrayOutputStream f = new java.io.ByteArrayOutputStream();
+        byte[] magic = {'<', 'r', 'o', 'b', 'l', 'o', 'x', '!', (byte) 0x89, (byte) 0xff, 0x0d, 0x0a, 0x1a, 0x0a};
+        f.write(magic, 0, magic.length);
+        for (int i = 0; i < 18; i++) {
+            f.write(0);
+        }
+        f.write('I');
+        f.write('N');
+        f.write('S');
+        f.write('T');
+        le32(f, 0);
+        le32(f, b.length);
+        le32(f, 0);
+        f.write(b, 0, b.length);
+        try {
+            RbxlReader.read(f.toByteArray());
+            org.junit.jupiter.api.Assertions.fail("accepted a forged instance count");
+        } catch (RuntimeException expected) {
+            // a format error, not an OutOfMemoryError
+        }
+    }
+
+    private static void le32(java.io.ByteArrayOutputStream o, int v) {
+        o.write(v & 0xff);
+        o.write(v >>> 8 & 0xff);
+        o.write(v >>> 16 & 0xff);
+        o.write(v >>> 24 & 0xff);
+    }
 }

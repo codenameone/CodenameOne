@@ -84,12 +84,16 @@ public final class RbxlReader {
         // magic(14) version(2) classes(4) instances(4) reserved(8)
         int p = MAGIC.length + 2 + 4 + 4 + 8;
         List<Integer> order = new ArrayList<Integer>();
+        long inflated = 0;
         while (p + 16 <= d.length) {
             String name = new String(new char[] {(char) d[p], (char) d[p + 1], (char) d[p + 2], (char) d[p + 3]});
             int clen = le32(d, p + 4);
             int ulen = le32(d, p + 8);
             p += 16;
             checkChunkSizes(d.length - p, clen, ulen, d, p);
+            // The per-chunk cap alone lets many small Zstandard RLE chunks
+            // each inflate to the cap, gigabytes from a file of kilobytes.
+            inflated = addInflated(inflated, ulen);
             byte[] body;
             if (clen == 0) {
                 body = new byte[ulen];
@@ -125,6 +129,11 @@ public final class RbxlReader {
     /// untrusted bytes and sizes an allocation before anything is decoded.
     static final int MAX_CHUNK_BYTES = 64 * 1024 * 1024;
 
+    /// The most a whole place file may decompress to, summed over every
+    /// chunk. The shipped templates are about 130 KB as XML; a place a
+    /// thousand times larger still fits, and the server's heap is protected.
+    static final long MAX_TOTAL_BYTES = 64L * 1024 * 1024;
+
     /// LZ4 emits at most 255 output bytes per input byte of a match length
     /// extension, so a block can never expand past this ratio (plus slack).
     private static final int LZ4_MAX_RATIO = 255;
@@ -147,6 +156,17 @@ public final class RbxlReader {
             // bytes to 128 KB), so it is held to the absolute cap only.
             throw new IllegalArgumentException("Corrupt binary place file: impossible LZ4 ratio");
         }
+    }
+
+    /// Adds one chunk's decompressed size to the file's running total and
+    /// fails once the total passes [#MAX_TOTAL_BYTES].
+    static long addInflated(long total, int ulen) {
+        long t = total + ulen;
+        if (t > MAX_TOTAL_BYTES) {
+            throw new IllegalArgumentException("Corrupt binary place file: decompresses past "
+                    + MAX_TOTAL_BYTES + " bytes");
+        }
+        return t;
     }
 
     private static boolean isZstd(byte[] d, int off, int len) {
@@ -376,6 +396,8 @@ public final class RbxlReader {
             case 0x15:
                 for (PlaceNode node : t) {
                     int k = b.i32();
+                    // Each keypoint is 3 floats of 4 bytes; checked before sizing.
+                    b.need(k, 12);
                     double[] v = new double[k * 3];
                     for (int j = 0; j < v.length; j++) {
                         v[j] = b.f32();
@@ -386,6 +408,8 @@ public final class RbxlReader {
             case 0x16:
                 for (PlaceNode node : t) {
                     int k = b.i32();
+                    // Each keypoint is 5 floats of 4 bytes; checked before sizing.
+                    b.need(k, 20);
                     double[] v = new double[k * 5];
                     for (int j = 0; j < v.length; j++) {
                         v[j] = b.f32();
@@ -642,11 +666,18 @@ public final class RbxlReader {
             return RbxlxReader.utf8(b, 0, b.length);
         }
 
-        /// N interleaved big-endian 32-bit words.
-        int[] uints(int n) {
-            if (p + n * 4 > d.length) {
+        /// Fails unless `n` records of `k` bytes each fit in what is left.
+        /// `n` is an untrusted count, so `p + n * k` is never computed: it
+        /// overflows `int` for a count near 2^30 and passes as negative.
+        void need(int n, int k) {
+            if (n < 0 || n > (d.length - p) / k) {
                 throw new ArrayIndexOutOfBoundsException(n);
             }
+        }
+
+        /// N interleaved big-endian 32-bit words.
+        int[] uints(int n) {
+            need(n, 4);
             int[] o = new int[n];
             for (int i = 0; i < n; i++) {
                 o[i] = (d[p + i] & 0xff) << 24 | (d[p + n + i] & 0xff) << 16 | (d[p + 2 * n + i] & 0xff) << 8
@@ -683,9 +714,7 @@ public final class RbxlReader {
         }
 
         long[] longsRaw(int n) {
-            if (p + n * 8 > d.length) {
-                throw new ArrayIndexOutOfBoundsException(n);
-            }
+            need(n, 8);
             long[] o = new long[n];
             for (int i = 0; i < n; i++) {
                 long v = 0;

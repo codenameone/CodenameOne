@@ -142,6 +142,50 @@ class InterpTest {
     }
 
     @Test
+    void concatenationIsCappedAtMaxString() {
+        Interp vm = new Interp();
+        LuaError e = assertThrows(LuaError.class,
+                () -> run(vm, "local s = string.rep('a', 8000000) return s .. s .. s"));
+        assertTrue(e.getMessage().contains("overflow"), e.getMessage());
+        e = assertThrows(LuaError.class,
+                () -> run(vm, "local s = 'a' while true do s = s .. s end"));
+        assertTrue(e.getMessage().contains("overflow"), e.getMessage());
+        assertEquals("abc", run(vm, "local a, b = 'a', 'b' return a .. b .. 'c'")[0]);
+    }
+
+    @Test
+    void stringFormatWidthAndPrecisionAreCappedAt99() {
+        Interp vm = new Interp();
+        assertEquals(99, ((String) run(vm, "return string.format('%99d', 1)")[0]).length());
+        LuaError e = assertThrows(LuaError.class, () -> run(vm, "return string.format('%100d', 1)"));
+        assertTrue(e.getMessage().contains("invalid conversion"), e.getMessage());
+        e = assertThrows(LuaError.class, () -> run(vm, "return string.format('%.99999999999f', 1)"));
+        assertTrue(e.getMessage().contains("invalid conversion"), e.getMessage());
+        e = assertThrows(LuaError.class, () -> run(vm,
+                "local s = string.rep('a', 9000000) return string.format('%s%s', s, s)"));
+        assertTrue(e.getMessage().contains("overflow"), e.getMessage());
+    }
+
+    @Test
+    void bufferCreateIsCappedAndCharged() {
+        Interp vm = new Interp();
+        LuaError e = assertThrows(LuaError.class, () -> run(vm, "return buffer.create(1073741824)"));
+        assertTrue(e.getMessage().contains("out of range"), e.getMessage());
+        vm.setBudget(1000);
+        e = assertThrows(LuaError.class, () -> run(vm, "return buffer.create(16000000)"));
+        assertTrue(e.getMessage().contains("Script timeout"), e.getMessage());
+    }
+
+    @Test
+    void tableConcatIsCappedAtMaxString() {
+        Interp vm = new Interp();
+        LuaError e = assertThrows(LuaError.class, () -> run(vm,
+                "local s = string.rep('a', 6000000) return table.concat({s, s, s})"));
+        assertTrue(e.getMessage().contains("overflow"), e.getMessage());
+        assertEquals("a,b", run(vm, "return table.concat({'a', 'b'}, ',')")[0]);
+    }
+
+    @Test
     void backtrackingPatternIsChargedToTheBudget() {
         Interp vm = new Interp();
         vm.setBudget(1000000);

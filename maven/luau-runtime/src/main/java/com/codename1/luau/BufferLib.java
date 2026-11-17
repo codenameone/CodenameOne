@@ -68,9 +68,12 @@ final class BufferLib {
             @Override
             public Object[] call(Interp i, Object[] a) {
                 int n = Stdlib.integer(a, 0, "create");
-                if (n < 0 || n > 1 << 30) {
+                // Same ceiling and cost as a string: a buffer is a script's
+                // other way to ask the server for a large allocation.
+                if (n < 0 || n > StringLib.MAX_STRING) {
                     throw Stdlib.badArg(0, "create", "size out of range");
                 }
+                i.chargeString(n);
                 return new Object[] {new LuaBuffer(n)};
             }
         });

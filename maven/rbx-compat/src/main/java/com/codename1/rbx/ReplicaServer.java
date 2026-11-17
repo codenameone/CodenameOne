@@ -60,6 +60,22 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
         "Velocity", "MoveDirection", "Jump"};
     private static final double FRAME = 1 / 60.0;
 
+    /// Ops one message may carry; the rest of a longer message is ignored,
+    /// as a malformed tail is. A real client sends a handful per frame.
+    static final int MAX_OPS_PER_MESSAGE = 64;
+    /// Ops one player may have applied per server frame, across messages.
+    static final int MAX_OPS_PER_FRAME = 128;
+    /// Chat lines per second a player may send, and the burst allowed.
+    static final double CHAT_PER_SECOND = 2;
+    static final double CHAT_BURST = 5;
+    /// InvokeServer calls per second a player may make, and the burst.
+    static final double INVOKE_PER_SECOND = 30;
+    static final double INVOKE_BURST = 60;
+    /// Longest chat line relayed, in characters, as Roblox caps it.
+    static final int MAX_CHAT_LENGTH = 200;
+    /// Longest channel name accepted.
+    static final int MAX_CHANNEL_LENGTH = 50;
+
     private final Engine engine;
     private final Map<Instance, Integer> ids = new HashMap<Instance, Integer>();
     private final Map<Integer, Instance> byId = new HashMap<Integer, Instance>();
@@ -84,6 +100,13 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
         double walkBudget;
         double riseBudget;
         double fallBudget;
+        // Flood limits: ops this frame, and token buckets for the two ops that
+        // run server code or reach every client (refilled per frame).
+        long opsFrame = -1;
+        int opsThisFrame;
+        long rateFrame;
+        double chatTokens = CHAT_BURST;
+        double invokeTokens = INVOKE_BURST;
 
         Peer(Link link, long joined, Instance player) {
             this.link = link;
@@ -230,8 +253,20 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
             return;
         }
         DataInputStream in = Wire.reader(message); // NOPMD CloseResource - in-memory stream; nothing to close
+        long now = engine.getFrames();
+        refill(p, now);
+        if (p.opsFrame != now) {
+            p.opsFrame = now;
+            p.opsThisFrame = 0;
+        }
+        int opsInMessage = 0;
         try {
             while (in.available() > 0) {
+                // Excess ops are ignored rather than queued: a flood costs the
+                // server a counter, never a remote handler or a relay per op.
+                if (++opsInMessage > MAX_OPS_PER_MESSAGE || ++p.opsThisFrame > MAX_OPS_PER_FRAME) { // NOPMD AssignmentInOperand - op counters
+                    return;
+                }
                 int op = in.readByte();
                 switch (op) {
                     case Wire.EVENT: {
@@ -247,7 +282,13 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
                         Instance remote = Wire.ref(in, engine, this);
                         Object[] args = Wire.values(in, engine, this);
                         Object[] r = new Object[0];
-                        if (remote != null && remote.isA("RemoteFunction")) {
+                        // Past the rate the call is answered empty, so the
+                        // client's coroutine resumes instead of waiting forever.
+                        boolean allowed = p.invokeTokens >= 1;
+                        if (allowed) {
+                            p.invokeTokens--;
+                        }
+                        if (allowed && remote != null && remote.isA("RemoteFunction")) {
                             r = Network.answerServer(remote, p.player, args);
                         }
                         queue(Wire.RESULT, null, Integer.valueOf(call), p.player, r);
@@ -276,6 +317,13 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
                     case Wire.CHAT: {
                         String text = in.readUTF();
                         String channel = in.readUTF();
+                        if (!validChannel(channel) || p.chatTokens < 1) {
+                            break;
+                        }
+                        p.chatTokens--;
+                        if (text.length() > MAX_CHAT_LENGTH) {
+                            text = text.substring(0, MAX_CHAT_LENGTH);
+                        }
                         // The server filters what it relays (a client's own
                         // filter is not trusted) and its scripts hear it.
                         String clean = engine.getHost().filter(text, (long) p.player.num("UserId"));
@@ -294,6 +342,33 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
             engine.getScheduler().error(null, "Dropped a malformed message from " + p.player.getName()
                     + ": " + bad.getMessage());
         }
+    }
+
+    /// Tops up `p`'s chat and invoke allowances for the frames since the last
+    /// message, up to each burst.
+    private static void refill(Peer p, long now) {
+        if (now != p.rateFrame) {
+            double dt = Math.max(0, now - p.rateFrame) * FRAME;
+            p.rateFrame = now;
+            p.chatTokens = Math.min(CHAT_BURST, p.chatTokens + dt * CHAT_PER_SECOND);
+            p.invokeTokens = Math.min(INVOKE_BURST, p.invokeTokens + dt * INVOKE_PER_SECOND);
+        }
+    }
+
+    /// A channel is a TextChannel's name: short, letters, digits and `_`.
+    /// Anything else is not a channel any client could have, so the line is
+    /// dropped rather than relayed to every listener under a forged name.
+    static boolean validChannel(String channel) {
+        if (channel.isEmpty() || channel.length() > MAX_CHANNEL_LENGTH) {
+            return false;
+        }
+        for (int i = 0; i < channel.length(); i++) {
+            char c = channel.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_')) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void move(Peer p, CFrame cf, Vector3 dir, boolean jump) {

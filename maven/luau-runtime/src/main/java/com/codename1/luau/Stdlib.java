@@ -527,7 +527,11 @@ final class Stdlib {
                     if (!(v instanceof String) && !(v instanceof Double)) {
                         throw LuaError.rt("invalid value (at index " + k + ") in table for 'concat'");
                     }
-                    b.append(Interp.rawToString(v));
+                    String part = Interp.rawToString(v);
+                    // Checked per element so one long separator repeated over
+                    // a big table fails before the builder grows past the cap.
+                    i.chargeString((long) b.length() + part.length() + sep.length());
+                    b.append(part);
                     if (k < to) {
                         b.append(sep);
                     }

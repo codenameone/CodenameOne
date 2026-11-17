@@ -417,15 +417,26 @@ final class StringLib {
             while (i < f.length() && "-+ #0".indexOf(f.charAt(i)) >= 0) {
                 flags.append(f.charAt(i++));
             }
+            // Lua allows at most two digits of width and of precision (99);
+            // a third digit is "invalid conversion". Unbounded, "%999999999d"
+            // padded to a gigabyte and a longer run overflowed int.
             int width = 0;
+            int digits = 0;
             while (i < f.length() && Character.isDigit(f.charAt(i))) {
+                if (++digits > 2) { // NOPMD AssignmentInOperand - format scan loop
+                    throw LuaError.rt("invalid conversion to 'format'");
+                }
                 width = width * 10 + (f.charAt(i++) - '0');
             }
             int prec = -1;
             if (i < f.length() && f.charAt(i) == '.') {
                 i++;
                 prec = 0;
+                digits = 0;
                 while (i < f.length() && Character.isDigit(f.charAt(i))) {
+                    if (++digits > 2) { // NOPMD AssignmentInOperand - format scan loop
+                        throw LuaError.rt("invalid conversion to 'format'");
+                    }
                     prec = prec * 10 + (f.charAt(i++) - '0');
                 }
             }
@@ -529,6 +540,8 @@ final class StringLib {
                     body = pad + body;
                 }
             }
+            // "%s%s%s..." over one long argument repeats it per conversion.
+            in.chargeString((long) b.length() + body.length());
             b.append(body);
         }
         return b.toString();

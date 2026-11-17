@@ -129,7 +129,19 @@ public final class Interp {
         }
     }
 
+    /// The one guard every string-building path goes through: fails a
+    /// result longer than [StringLib#MAX_STRING] before it is built, and
+    /// charges one step per 64 characters so that building it costs the
+    /// budget what the equivalent Lua loop would.
+    void chargeString(long len) {
+        if (len > StringLib.MAX_STRING || len < 0) {
+            throw LuaError.rt("string length overflow");
+        }
+        charge(len / 64);
+    }
+
     /// Steps run since the last [#resetSteps()].
+
     public long getSteps() {
         return steps;
     }
@@ -1010,9 +1022,18 @@ public final class Interp {
                     break;
                 case Op.CONCATN: {
                     int n = code[f.pc++];
-                    StringBuilder b = new StringBuilder();
-                    for (int i = f.sp - n; i < f.sp; i++) {
-                        b.append(tostring(f.stk[i]));
+                    // One instruction joins up to 255 operands, each possibly
+                    // already MAX_STRING long: size the result first.
+                    String[] parts = new String[n];
+                    long len = 0;
+                    for (int i = 0; i < n; i++) {
+                        parts[i] = tostring(f.stk[f.sp - n + i]);
+                        len += parts[i].length();
+                    }
+                    chargeString(len);
+                    StringBuilder b = new StringBuilder((int) len);
+                    for (int i = 0; i < n; i++) {
+                        b.append(parts[i]);
                     }
                     clear(f, f.sp - n);
                     f.push(b.toString());
@@ -1223,7 +1244,11 @@ public final class Interp {
                 return lessEqual(b, a) ? Boolean.TRUE : Boolean.FALSE;
             case Op.CONCAT:
                 if ((a instanceof String || a instanceof Double) && (b instanceof String || b instanceof Double)) {
-                    return rawToString(a).concat(rawToString(b));
+                    String sa = rawToString(a);
+                    String sb = rawToString(b);
+                    // Doubling a string in a loop must hit the same cap.
+                    chargeString((long) sa.length() + sb.length());
+                    return sa.concat(sb);
                 }
                 return arithMeta(op, a, b);
             default:
