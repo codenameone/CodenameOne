@@ -293,11 +293,11 @@ public final class GcsStorage implements ObjectStorage {
     /// signed URL, in that order. Package-private with an explicit clock and
     /// signer so a test can hold it to Google's conformance vectors.
     String[] signingParts(String method, String bucket, String key, int seconds, long now,
-            String email) {
+            String email) throws IOException {
         requireBucket(bucket);
         requireKey(key);
         if (seconds <= 0 || seconds > MAX_EXPIRY) {
-            throw new IllegalArgumentException("A GCS signed URL lives 1 to " + MAX_EXPIRY
+            throw new IOException("A GCS signed URL lives 1 to " + MAX_EXPIRY
                     + " seconds, not " + seconds);
         }
         String stamp = timestamp(now);

@@ -90,7 +90,9 @@ public interface ObjectStorage {
     /// A URL that downloads the object with no credentials, for `seconds`.
     ///
     /// Computed, not requested, wherever the provider allows it: the URL can be
-    /// handed straight to a client.
+    /// handed straight to a client. A lifetime the provider refuses -- zero or
+    /// less, or past seven days on S3, R2 and GCS -- throws an IOException on
+    /// every provider, so moving between them does not change how it fails.
     String presignGet(String bucket, String key, int seconds) throws IOException;
 
     /// The upload counterpart: a URL a client can `PUT` the bytes to, for

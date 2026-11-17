@@ -321,7 +321,7 @@ public final class AzureBlobStorage implements ObjectStorage {
     String presign(String permissions, String bucket, String key, int seconds, long now)
             throws IOException {
         if (seconds <= 0) {
-            throw new IllegalArgumentException("A SAS lives at least one second, not "
+            throw new IOException("A SAS lives at least one second, not "
                     + seconds);
         }
         String path = blobPath(bucket, key);
@@ -378,7 +378,7 @@ public final class AzureBlobStorage implements ObjectStorage {
         long now = System.currentTimeMillis();
         long end = Math.max(until, now + DELEGATION_LIFETIME);
         if (end - now > 7L * 24 * 3600 * 1000) {
-            throw new IllegalArgumentException("A user-delegation SAS lives at most seven "
+            throw new IOException("A user-delegation SAS lives at most seven "
                     + "days");
         }
         String body = "<?xml version=\"1.0\" encoding=\"utf-8\"?><KeyInfo><Start>"

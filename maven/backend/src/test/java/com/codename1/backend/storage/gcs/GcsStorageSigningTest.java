@@ -123,7 +123,7 @@ class GcsStorageSigningTest {
     @Test
     void refusesAnExpiryPastSevenDays() {
         GcsStorage storage = GcsStorage.forMetadataServer("p");
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(java.io.IOException.class,
                 () -> storage.signingParts("GET", "bucket", "key", 604801, 0, EMAIL));
     }
 
