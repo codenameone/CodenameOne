@@ -99,7 +99,7 @@ jobs:
             exit 1
           fi
           # Set is not enough: an expired or narrowed token would pass the check
-          # above and fail only at the push, after the PR's runs were cancelled.
+          # above and fail only at the push, after the legs had all run.
           push="$(GH_TOKEN="$CN1SS_GH_TOKEN" gh api "repos/$GITHUB_REPOSITORY" --jq .permissions.push 2>/dev/null || true)"
           if [ "$push" != true ]; then
             echo "::error::secrets.CN1SS_GH_TOKEN cannot push to $GITHUB_REPOSITORY (expired, revoked or lacking Contents: write); golden harvest cannot push. Regenerate it (see the note in scripts-android.yml)."
@@ -112,6 +112,7 @@ jobs:
           token: ${{ secrets.CN1SS_GH_TOKEN }}
           path: pr
       - name: Collect, commit and push the goldens
+        id: collect
         if: steps.list.outputs.ready == '1'
         env:
           # The runs at this head are a capture's (golden-capture.yml), not
@@ -156,15 +157,29 @@ jobs:
             git commit -m "Harvest goldens rendered at ${HEAD_SHA:0:12}" \
               -m "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             git push origin "HEAD:$HEAD_REF"
-            committed="$(git rev-parse --short=12 HEAD)"
+            committed="$(git rev-parse HEAD)"
           fi
           if [ "$CAPTURE" = 1 ]; then
+            # On the captured head and, when there is one, on the commit that
+            # replaced it: that is the head the PR now shows.
             if [ -n "${committed:-}" ] && [ "$ok" = 1 ]; then
-              ../trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" success "Goldens committed in $committed"
+              state=success desc="Goldens committed in ${committed:0:12}"
             elif [ -n "${committed:-}" ]; then
-              ../trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" failure "Committed what arrived ($committed); a leg failed, see the run"
+              state=failure desc="Committed what arrived (${committed:0:12}); a leg failed, see the run"
             else
-              ../trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" failure "No leg produced a golden; golden-plan names the gaps"
+              state=failure desc="No leg produced a golden; golden-plan names the gaps"
             fi
+            for sha in "$HEAD_SHA" ${committed:-}; do
+              ../trusted/scripts/ci/golden-harvest.sh status "$sha" "$state" "$desc"
+            done
+            echo "settled=1" >> "$GITHUB_OUTPUT"
           fi
           [ "$ok" = 1 ]
+
+      # Anything above that failed before the status was settled (the token,
+      # a push that lost a race, an API error) would leave the capture's
+      # status pending for good.
+      - name: Settle a capture that could not be harvested
+        if: failure() && steps.list.outputs.capture == '1' && steps.collect.outputs.settled != '1'
+        run: |
+          trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" error "The harvest failed; see the run, then re-run Golden capture"

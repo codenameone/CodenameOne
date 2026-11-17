@@ -35,8 +35,8 @@ list() {
   # workflow without one is still to come, not finished: harvesting then would
   # take the legs that are done and leave the rest to a branch that has moved.
   # Cancelled capture runs do not count: a capture that failed part way
-  # cancels the ones it started, and the PR's own runs then harvest as
-  # usual. (A screenshot workflow dispatched by hand at a PR head counts as
+  # cancels the ones it started (and marks its status as an error), and the
+  # PR's own runs harvest as usual. (A screenshot workflow dispatched by hand at a PR head counts as
   # a capture too; nothing else dispatches them.) A capture that failed after
   # one of its legs had already completed leaves that run live and the head
   # never harvests; the PR's golden-plan still names the gap, and the next
@@ -71,7 +71,11 @@ list() {
         pending=1
       fi
       printf '%s %s\n' "$wf" "$1" >> "$runs_file"
-    done < <(jq -r '[.[] | select(.conclusion != "cancelled")] | sort_by(.id) | last // empty | "\(.id) \(.status)"' <<<"$runs")
+    # In a capture, its own run: a PR run made later at the same head (the
+    # PR closed and reopened) rendered nothing, its screenshot jobs skipped.
+    done < <(jq -r --argjson capture "$capture" '[.[] | select(.conclusion != "cancelled")
+                 | select($capture == 0 or .event == "workflow_dispatch")] | sort_by(.id) | last // empty
+                 | "\(.id) \(.status)"' <<<"$runs")
   done
   echo "capture=$capture" >> "${GITHUB_OUTPUT:-/dev/null}"
   if [ "$pending" = 0 ] && [ -s "$runs_file" ]; then
