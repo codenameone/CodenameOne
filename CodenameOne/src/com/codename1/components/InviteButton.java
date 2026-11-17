@@ -92,7 +92,10 @@ public class InviteButton extends ShareButton {
     /// Default constructor.
     public InviteButton() {
         setUIID("InviteButton");
-        FontImage.setMaterialIcon(this, FontImage.MATERIAL_GROUP_ADD);
+        // Label's own material icon is regenerated when the UIID changes, so an
+        // app that restyles the button gets an icon in the new style, not one
+        // baked against this UIID's background.
+        setMaterialIcon(FontImage.MATERIAL_GROUP_ADD);
         installChain();
     }
 

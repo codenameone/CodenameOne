@@ -65,4 +65,4 @@ Splat supplies the game and its source. Publishing one also requires your own ho
 
 ## Looking for another kind of game?
 
-[Dash](/dash/) is the endless runner and [Skirmish](/skirmish/) the real-time card battler, both on the same architecture.
+[Dash](/dash/) is the endless runner and [Skirmish](/skirmish/) the real-time card battler, both on the same architecture. [Brickyard](/brickyard/) is a whole game platform, where players make the games.

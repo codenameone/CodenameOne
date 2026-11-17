@@ -37,6 +37,7 @@ import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
 import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.geom.Rectangle;
 
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -208,6 +209,65 @@ final class SimulatorMcpTools {
                     }
                 }));
 
+        server.addTool(new Tool("sim_key_type",
+                "Types text through hardware key events on the focused component, one key per "
+                        + "character, as someone at the Mac keyboard would -- for a code editor or a "
+                        + "desktop field, which the simulated on-screen keyboard does not drive. \\n is "
+                        + "enter, \\t tab and \\b backspace; the component's own behaviour (auto "
+                        + "indent, closing brackets, completion) applies to every key.",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"text\":{\"type\":\"string\"},"
+                        + "\"perKeyDelayMs\":{\"type\":\"integer\",\"description\":\"Pause between keys, default 70\"}},"
+                        + "\"required\":[\"text\"]}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        Map<String, Object> a = parse(argumentsJson);
+                        String text = str(a, "text");
+                        if (text == null) {
+                            throw new IllegalArgumentException("text is required");
+                        }
+                        long delay = clamp(num(a, "perKeyDelayMs", 70), 0, 2000);
+                        for (int i = 0; i < text.length(); i++) {
+                            int[] code = hardwareKey(text.substring(i, i + 1));
+                            port.dispatchSimulatedKey(KeyEvent.KEY_PRESSED, code[0], (char) code[1]);
+                            port.dispatchSimulatedKey(KeyEvent.KEY_RELEASED, code[0], (char) code[1]);
+                            Thread.sleep(delay);
+                        }
+                        return ok("typed", text.length(), "released", 1);
+                    }
+                }));
+
+        server.addTool(new Tool("sim_key",
+                "Presses and/or releases a hardware key (the Mac keyboard, not the simulated "
+                        + "one) on the focused component: space, enter, up, down, left, right, or one "
+                        + "letter or digit. action is press, release or tap (default; holdMs apart). "
+                        + "Runs alongside sim_drag, so a game can jump while a joystick is held.",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"key\":{\"type\":\"string\"},"
+                        + "\"action\":{\"type\":\"string\",\"enum\":[\"tap\",\"press\",\"release\"]},"
+                        + "\"holdMs\":{\"type\":\"integer\",\"description\":\"Default 60\"}},"
+                        + "\"required\":[\"key\"]}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        Map<String, Object> a = parse(argumentsJson);
+                        Object k = a.get("key");
+                        int[] code = hardwareKey(k instanceof String ? (String) k : "");
+                        Object act = a.get("action");
+                        String action = act instanceof String ? (String) act : "tap";
+                        char ch = (char) code[1];
+                        if (!"release".equals(action)) {
+                            port.dispatchSimulatedKey(KeyEvent.KEY_PRESSED, code[0], ch);
+                        }
+                        if ("tap".equals(action)) {
+                            Thread.sleep(clamp(num(a, "holdMs", 60), 0, MAX_GESTURE_MS));
+                        }
+                        if (!"press".equals(action)) {
+                            port.dispatchSimulatedKey(KeyEvent.KEY_RELEASED, code[0], ch);
+                        }
+                        return ok("keyCode", code[0], "released", "press".equals(action) ? 0 : 1);
+                    }
+                }));
+
         server.addTool(new Tool("sim_rotate",
                 "Rotates the simulated device to portrait or landscape, as the Rotate menu does.",
                 "{\"type\":\"object\",\"properties\":{\"orientation\":{\"type\":\"string\","
@@ -291,6 +351,101 @@ final class SimulatorMcpTools {
                     }
                 }));
 
+        server.addTool(new Tool("sim_menu",
+                "Drives the window's real desktop menu bar (desktop mode with native menus). path "
+                        + "is item texts separated by /, e.g. Insert/Models/Coin: each menu opens "
+                        + "visibly for holdMs (default 700) so a recording shows the dropdown and "
+                        + "submenu, then the leaf is clicked; activate=false leaves it open. "
+                        + "close=true closes any open menu. Use sim_menu_list to discover paths.",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"path\":{\"type\":\"string\"},"
+                        + "\"holdMs\":{\"type\":\"integer\",\"description\":\"Per level, default 700\"},"
+                        + "\"activate\":{\"type\":\"boolean\",\"description\":\"Default true\"},"
+                        + "\"close\":{\"type\":\"boolean\"}}}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        Map<String, Object> a = parse(argumentsJson);
+                        if (flag(a, "close", false)) {
+                            onAwt(new Runnable() {
+                                public void run() {
+                                    javax.swing.MenuSelectionManager.defaultManager().clearSelectedPath();
+                                }
+                            });
+                            return "{\"closed\":true}";
+                        }
+                        final String path = str(a, "path");
+                        final long hold = clamp(num(a, "holdMs", 700), 0, MAX_GESTURE_MS);
+                        final boolean activate = flag(a, "activate", true);
+                        final javax.swing.JMenuBar[] bar = new javax.swing.JMenuBar[1];
+                        final java.util.List<javax.swing.JMenuItem>[] items = new java.util.List[1];
+                        onAwt(new Runnable() {
+                            public void run() {
+                                bar[0] = SimulatorMenus.menuBar(port.getSimulatorFrameForMenus());
+                                items[0] = SimulatorMenus.resolve(bar[0], SimulatorMenus.splitPath(path));
+                            }
+                        });
+                        final int n = items[0].size();
+                        final boolean leafIsMenu = items[0].get(n - 1) instanceof javax.swing.JMenu;
+                        int menus = leafIsMenu ? n : n - 1;
+                        for (int d = 1; d <= menus; d++) {
+                            final int depth = d;
+                            onAwt(new Runnable() {
+                                public void run() {
+                                    javax.swing.MenuSelectionManager.defaultManager().setSelectedPath(
+                                            SimulatorMenus.selectionPath(bar[0], items[0], depth, false));
+                                }
+                            });
+                            Thread.sleep(hold);
+                        }
+                        if (!leafIsMenu) {
+                            onAwt(new Runnable() {
+                                public void run() {
+                                    javax.swing.MenuSelectionManager.defaultManager().setSelectedPath(
+                                            SimulatorMenus.selectionPath(bar[0], items[0], n - 1, true));
+                                }
+                            });
+                            Thread.sleep(Math.min(hold, 400));
+                        }
+                        boolean clicked = false;
+                        if (activate && !leafIsMenu) {
+                            final javax.swing.JMenuItem leaf = items[0].get(n - 1);
+                            if (!leaf.isEnabled()) {
+                                throw new IllegalStateException("\"" + leaf.getText() + "\" is disabled");
+                            }
+                            onAwt(new Runnable() {
+                                public void run() {
+                                    javax.swing.MenuSelectionManager.defaultManager().clearSelectedPath();
+                                    leaf.doClick(0);
+                                }
+                            });
+                            clicked = true;
+                        }
+                        Map<String, Object> out = new LinkedHashMap<String, Object>();
+                        out.put("path", path);
+                        out.put("activated", Boolean.valueOf(clicked));
+                        out.put("open", Boolean.valueOf(!clicked));
+                        return JSONParser.toJson(out);
+                    }
+                }));
+
+        server.addTool(new Tool("sim_menu_list",
+                "Returns the window's desktop menu bar as a tree of {text, enabled, children}, "
+                        + "the paths sim_menu accepts.",
+                "{\"type\":\"object\",\"properties\":{}}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        final Object[] tree = new Object[1];
+                        onAwt(new Runnable() {
+                            public void run() {
+                                tree[0] = SimulatorMenus.tree(SimulatorMenus.menuBar(port.getSimulatorFrameForMenus()));
+                            }
+                        });
+                        Map<String, Object> out = new LinkedHashMap<String, Object>();
+                        out.put("menus", tree[0]);
+                        return JSONParser.toJson(out);
+                    }
+                }));
+
         server.addTool(new Tool("sim_record_start",
                 "Starts recording the simulator screen to a video. format: mp4 (default), mov, webm "
                         + "or gif. frame: screen (the device screen only) or skin (inside the device "
@@ -342,6 +497,8 @@ final class SimulatorMcpTools {
                             o.setLockstep(true);
                         }
                         SimulatorRecorder rec = port.getSimulatorRecorder();
+                        // Recordings paint the real menu bar; on macOS that needs it in the window.
+                        port.setRecordingMenusInWindow(true);
                         rec.start(o);
                         startFoldScript(script);
                         Map<String, Object> out = new LinkedHashMap<String, Object>();
@@ -358,6 +515,7 @@ final class SimulatorMcpTools {
                 "{\"type\":\"object\",\"properties\":{}}",
                 new ToolHandler() {
                     public String invoke(String argumentsJson) throws IOException {
+                        port.setRecordingMenusInWindow(false);
                         SimulatorRecorder rec = port.getSimulatorRecorder();
                         SimulatorRecorder.Result r;
                         boolean auto = false;
@@ -493,6 +651,68 @@ final class SimulatorMcpTools {
 
     /// A tap point in screen pixels from x/y or from the centre of a node. Node
     /// bounds are in application coordinates, which the pan shift moves on screen.
+    /// {AWT key code, key char} for a sim_key name.
+    static int[] hardwareKey(String name) {
+        if ("space".equals(name)) {
+            return new int[]{KeyEvent.VK_SPACE, ' '};
+        }
+        if ("enter".equals(name) || "return".equals(name)) {
+            return new int[]{KeyEvent.VK_ENTER, '\n'};
+        }
+        if ("up".equals(name)) {
+            return new int[]{KeyEvent.VK_UP, KeyEvent.CHAR_UNDEFINED};
+        }
+        if ("down".equals(name)) {
+            return new int[]{KeyEvent.VK_DOWN, KeyEvent.CHAR_UNDEFINED};
+        }
+        if ("left".equals(name)) {
+            return new int[]{KeyEvent.VK_LEFT, KeyEvent.CHAR_UNDEFINED};
+        }
+        if ("right".equals(name)) {
+            return new int[]{KeyEvent.VK_RIGHT, KeyEvent.CHAR_UNDEFINED};
+        }
+        if (name.length() == 1) {
+            char c = name.charAt(0);
+            if (c >= 'a' && c <= 'z') {
+                return new int[]{KeyEvent.VK_A + (c - 'a'), c};
+            }
+            if (c >= 'A' && c <= 'Z') {
+                return new int[]{KeyEvent.VK_A + (c - 'A'), c};
+            }
+            if (c >= '0' && c <= '9') {
+                return new int[]{KeyEvent.VK_0 + (c - '0'), c};
+            }
+            if (c == '\n') {
+                return new int[]{KeyEvent.VK_ENTER, '\n'};
+            }
+            if (c == '\t') {
+                return new int[]{KeyEvent.VK_TAB, '\t'};
+            }
+            if (c == '\b') {
+                return new int[]{KeyEvent.VK_BACK_SPACE, '\b'};
+            }
+            if (c == ' ') {
+                return new int[]{KeyEvent.VK_SPACE, ' '};
+            }
+            if (c > ' ' && c < 127) {
+                // Punctuation: the key code AWT gives the character, which is
+                // never one of the arrow or fire codes the cases above map.
+                return new int[]{KeyEvent.getExtendedKeyCodeForChar(c), c};
+            }
+        }
+        if ("backspace".equals(name)) {
+            return new int[]{KeyEvent.VK_BACK_SPACE, '\b'};
+        }
+        if ("tab".equals(name)) {
+            return new int[]{KeyEvent.VK_TAB, '\t'};
+        }
+        if ("escape".equals(name)) {
+            return new int[]{KeyEvent.VK_ESCAPE, (char) 27};
+        }
+        throw new IllegalArgumentException("Unknown key: " + name
+                + " (space, enter, up, down, left, right, backspace, tab, escape, or one printable character)");
+    }
+
     private int[] point(Map<String, Object> a, String xKey, String yKey, String nodeKey) {
         if (a.get(nodeKey) instanceof Number) {
             final long id = ((Number) a.get(nodeKey)).longValue();
@@ -517,6 +737,34 @@ final class SimulatorMcpTools {
             throw new IllegalArgumentException("Give x and y, or nodeId");
         }
         return new int[]{((Number) a.get(xKey)).intValue(), ((Number) a.get(yKey)).intValue()};
+    }
+
+    private static boolean flag(Map<String, Object> a, String key, boolean def) {
+        Object v = a.get(key);
+        if (v instanceof Boolean) {
+            return ((Boolean) v).booleanValue();
+        }
+        if (v instanceof String) {
+            return "true".equalsIgnoreCase((String) v);
+        }
+        return def;
+    }
+
+    /// Runs on the AWT event thread and waits, rethrowing what it threw.
+    private static void onAwt(final Runnable r) throws Exception {
+        if (java.awt.EventQueue.isDispatchThread()) {
+            r.run();
+            return;
+        }
+        try {
+            java.awt.EventQueue.invokeAndWait(r);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable t = e.getCause();
+            if (t instanceof Exception) {
+                throw (Exception) t;
+            }
+            throw e;
+        }
     }
 
     private static void onEdt(final Runnable r) {

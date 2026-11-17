@@ -83,7 +83,10 @@ public class ShareButton extends Button implements ActionListener {
         setUIIDFinal("ShareButton");
         //Image shareIcon =  Resources.getSystemResource().getImage("share.png");
         //setIcon(shareIcon);
-        FontImage.setMaterialIcon(this, FontImage.MATERIAL_SHARE);
+        // Label's own material icon is regenerated when the UIID changes, so an
+        // app that restyles the button gets an icon in the new style, not one
+        // baked against this UIID's background.
+        setMaterialIcon(FontImage.MATERIAL_SHARE);
         super.addActionListener(this);
         shareServices.addElement(new SMSShare());
         shareServices.addElement(new EmailShare());

@@ -373,6 +373,14 @@ public class JSONParser implements JSONParseCallback {
                                     case 'r':
                                         currentToken.append('\r');
                                         continue;
+                                    case 'b':
+                                        currentToken.append('\b');
+                                        continue;
+                                    case 'f':
+                                        currentToken.append('\f');
+                                        continue;
+                                    default:
+                                        break;
                                 }
                             }
                             currentToken.append(c);
