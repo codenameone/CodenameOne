@@ -226,6 +226,12 @@ final class ToolSupport {
                 throw new GradleException("Could not resolve " + tool.displayName() + " (com.codenameone:"
                         + tool.artifactId() + ":" + getCodenameOneVersion().get() + ")");
             }
+            // Before the Certificate Wizard's browser sign-in, not after it.
+            try {
+                tool.requireCompatibleRuntime(primary);
+            } catch (com.codename1.build.BuildExecutionException ex) {
+                throw new GradleException(ex.getMessage(), ex);
+            }
             Properties effective = effectiveSettings();
             ProjectDescriptor binding = ProjectDescriptor.fromLayout(layout);
             if (!getSourceRoots().get().isEmpty()) {

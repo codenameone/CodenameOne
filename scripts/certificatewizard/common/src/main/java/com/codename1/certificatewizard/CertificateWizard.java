@@ -419,17 +419,39 @@ public class CertificateWizard extends Lifecycle {
     private void renderPage() {
         page.removeAll();
         switch (section) {
-            case CREDENTIAL -> credentialPage();
-            case CERTIFICATES -> certificatesPage();
-            case BUNDLES -> bundlesPage();
-            case DEVICES -> devicesPage();
-            case PROFILES -> profilesPage();
-            case APNS -> apnsPage();
-            case MAC -> macPage();
-            case ANDROID -> androidPage();
-            case WINDOWS -> windowsPage();
-            case MAINTENANCE -> maintenancePage();
-            default -> overviewPage();
+            case CREDENTIAL:
+                credentialPage();
+                break;
+            case CERTIFICATES:
+                certificatesPage();
+                break;
+            case BUNDLES:
+                bundlesPage();
+                break;
+            case DEVICES:
+                devicesPage();
+                break;
+            case PROFILES:
+                profilesPage();
+                break;
+            case APNS:
+                apnsPage();
+                break;
+            case MAC:
+                macPage();
+                break;
+            case ANDROID:
+                androidPage();
+                break;
+            case WINDOWS:
+                windowsPage();
+                break;
+            case MAINTENANCE:
+                maintenancePage();
+                break;
+            default:
+                overviewPage();
+                break;
         }
     }
 
@@ -3354,13 +3376,23 @@ public class CertificateWizard extends Lifecycle {
     private void populateTableBody(Section tableSection, Container body) {
         body.removeAll();
         switch (tableSection) {
-            case CERTIFICATES -> populateCertificateTable(body);
-            case BUNDLES -> populateBundleTable(body);
-            case DEVICES -> populateDeviceTable(body);
-            case PROFILES -> populateProfileTable(body);
-            case APNS -> populateApnsTable(body);
-            default -> {
-            }
+            case CERTIFICATES:
+                populateCertificateTable(body);
+                break;
+            case BUNDLES:
+                populateBundleTable(body);
+                break;
+            case DEVICES:
+                populateDeviceTable(body);
+                break;
+            case PROFILES:
+                populateProfileTable(body);
+                break;
+            case APNS:
+                populateApnsTable(body);
+                break;
+            default:
+                break;
         }
     }
 
@@ -3866,10 +3898,18 @@ public class CertificateWizard extends Lifecycle {
                 int col = tableSortColumns[Section.CERTIFICATES.ordinal()];
                 int v;
                 switch (col) {
-                    case 1 -> v = cmp(typeLabel(a.certificateType()), typeLabel(b.certificateType()));
-                    case 2 -> v = cmpLong(a.expiresAt(), b.expiresAt());
-                    case 3 -> v = cmp(a.status(), b.status());
-                    default -> v = cmp(a.displayName(), b.displayName());
+                    case 1:
+                        v = cmp(typeLabel(a.certificateType()), typeLabel(b.certificateType()));
+                        break;
+                    case 2:
+                        v = cmpLong(a.expiresAt(), b.expiresAt());
+                        break;
+                    case 3:
+                        v = cmp(a.status(), b.status());
+                        break;
+                    default:
+                        v = cmp(a.displayName(), b.displayName());
+                        break;
                 }
                 return sortDir(Section.CERTIFICATES, v);
             }
@@ -3890,10 +3930,18 @@ public class CertificateWizard extends Lifecycle {
                 int col = tableSortColumns[Section.BUNDLES.ordinal()];
                 int v;
                 switch (col) {
-                    case 1 -> v = cmp(a.name(), b.name());
-                    case 2 -> v = cmp(a.platform(), b.platform());
-                    case 3 -> v = cmp(pushLabel(a), pushLabel(b));
-                    default -> v = cmp(a.identifier(), b.identifier());
+                    case 1:
+                        v = cmp(a.name(), b.name());
+                        break;
+                    case 2:
+                        v = cmp(a.platform(), b.platform());
+                        break;
+                    case 3:
+                        v = cmp(pushLabel(a), pushLabel(b));
+                        break;
+                    default:
+                        v = cmp(a.identifier(), b.identifier());
+                        break;
                 }
                 return sortDir(Section.BUNDLES, v);
             }
@@ -3914,10 +3962,18 @@ public class CertificateWizard extends Lifecycle {
                 int col = tableSortColumns[Section.DEVICES.ordinal()];
                 int v;
                 switch (col) {
-                    case 1 -> v = cmp(a.udid(), b.udid());
-                    case 2 -> v = cmp(a.platform(), b.platform());
-                    case 3 -> v = cmp(a.status(), b.status());
-                    default -> v = cmp(a.name(), b.name());
+                    case 1:
+                        v = cmp(a.udid(), b.udid());
+                        break;
+                    case 2:
+                        v = cmp(a.platform(), b.platform());
+                        break;
+                    case 3:
+                        v = cmp(a.status(), b.status());
+                        break;
+                    default:
+                        v = cmp(a.name(), b.name());
+                        break;
                 }
                 return sortDir(Section.DEVICES, v);
             }
@@ -3939,10 +3995,18 @@ public class CertificateWizard extends Lifecycle {
                 int col = tableSortColumns[Section.PROFILES.ordinal()];
                 int v;
                 switch (col) {
-                    case 1 -> v = cmp(profileTypeLabel(a.profileType()), profileTypeLabel(b.profileType()));
-                    case 2 -> v = cmp(a.bundleId(), b.bundleId());
-                    case 3 -> v = cmpLong(a.expiresAt(), b.expiresAt());
-                    default -> v = cmp(a.name(), b.name());
+                    case 1:
+                        v = cmp(profileTypeLabel(a.profileType()), profileTypeLabel(b.profileType()));
+                        break;
+                    case 2:
+                        v = cmp(a.bundleId(), b.bundleId());
+                        break;
+                    case 3:
+                        v = cmpLong(a.expiresAt(), b.expiresAt());
+                        break;
+                    default:
+                        v = cmp(a.name(), b.name());
+                        break;
                 }
                 return sortDir(Section.PROFILES, v);
             }
@@ -3963,10 +4027,18 @@ public class CertificateWizard extends Lifecycle {
                 int col = tableSortColumns[Section.APNS.ordinal()];
                 int v;
                 switch (col) {
-                    case 1 -> v = cmp(a.keyId(), b.keyId());
-                    case 2 -> v = cmp(a.teamId(), b.teamId());
-                    case 3 -> v = cmpLong(a.createdAt(), b.createdAt());
-                    default -> v = cmp(a.displayName(), b.displayName());
+                    case 1:
+                        v = cmp(a.keyId(), b.keyId());
+                        break;
+                    case 2:
+                        v = cmp(a.teamId(), b.teamId());
+                        break;
+                    case 3:
+                        v = cmpLong(a.createdAt(), b.createdAt());
+                        break;
+                    default:
+                        v = cmp(a.displayName(), b.displayName());
+                        break;
                 }
                 return sortDir(Section.APNS, v);
             }

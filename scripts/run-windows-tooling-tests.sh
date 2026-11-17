@@ -14,6 +14,9 @@
 #      launcher, binding file, file:// URL round trip) against a project in a
 #      directory WITH SPACES, asserting the captured window isn't the black
 #      screen from issue #5443.
+#   1d. cn1:certificatewizard through the real goal in an archetype project,
+#      gated on the wizard's own theme being applied (issue #6255) and on a
+#      too-old JDK being refused by name.
 #   2. The JavaSE simulator (single + multi window) via the shared
 #      SimulatorWindowModeVerifier harness, which self-validates content.
 set -euo pipefail
@@ -289,6 +292,93 @@ if [ ${#WIZARD_FAILURES[@]} -gt 0 ]; then
   exit 1
 fi
 wt_log "Certificate Wizard render matrix passed"
+
+# ---------------------------------------------------------------------------
+# 1d. Certificate Wizard the way a user starts it: cn1:certificatewizard in a
+#     project generated from the archetype (what the Initializr hands out).
+#     1c drives the launcher with java.exe and a classpath assembled here; a
+#     user gets javaw.exe, the binding the goal writes and the jars the plugin
+#     resolves, and nothing covered that path. Issue #6255 (wizard opens with
+#     no theme at all on Windows) and the customer report before it (a JNI
+#     error dialog with BUILD SUCCESS on JDK 15) both lived only there.
+#     Only the Apple account is mocked; sign-in is off because CI has no browser.
+# ---------------------------------------------------------------------------
+GOAL_PARENT="$TEMP_BASE/cn1 tooling tests/wizard goal"
+rm -rf "$GOAL_PARENT"
+mkdir -p "$GOAL_PARENT"
+(
+  cd "$GOAL_PARENT"
+  mvn -B -ntp archetype:generate \
+    -DarchetypeGroupId=com.codenameone -DarchetypeArtifactId=cn1app-archetype \
+    "-DarchetypeVersion=$CN1_VERSION" \
+    -DgroupId=com.example.wizardgoal -DartifactId=wizardgoal -Dversion=1.0-SNAPSHOT \
+    -DmainName=WizardGoal -DinteractiveMode=false
+)
+GOAL_PROJECT="$GOAL_PARENT/wizardgoal"
+GOAL_POM_W="$(winpath "$GOAL_PROJECT/pom.xml")"
+WIZARD_GOAL_FAILURES=()
+
+# run_wizard_goal <name> <goal> [extra maven args...]
+run_wizard_goal() {
+  local name="$1"; local goal="$2"; shift 2
+  local png="$ARTIFACTS_DIR/certificatewizard-goal-$name.png"
+  wt_log "Certificate Wizard through the goal: $name ($goal $*)"
+  # spawn=false waits for the window: the wizard exits by itself after the capture.
+  if ! mvn -B -ntp -f "$GOAL_POM_W" "$@" "$goal" \
+      -Dcertificatewizard.spawn=false \
+      -Dcertificatewizard.login=false \
+      -Dcertificatewizard.mock=true \
+      -Dcertificatewizard.darkMode=false \
+      "-Dcertificatewizard.screenshot=$(winpath "$png")" \
+      -Dcertificatewizard.screenshot.delay=8000 \
+      > "$ARTIFACTS_DIR/certificatewizard-goal-$name.log" 2>&1; then
+    wt_log "  $name: the goal failed; see certificatewizard-goal-$name.log"
+    tail -n 30 "$ARTIFACTS_DIR/certificatewizard-goal-$name.log" || true
+    WIZARD_GOAL_FAILURES+=("$name (goal)")
+    return 0
+  fi
+  local gate="$ARTIFACTS_DIR/certificatewizard-goal-$name.onscreen.png"
+  if [ ! -s "$gate" ]; then
+    gate="$png"
+  fi
+  if ! "$JAVA_BIN" "$SANITY_SRC_W" "$(winpath "$gate")" 300 200; then
+    WIZARD_GOAL_FAILURES+=("$name (blank)")
+  elif ! "$JAVA_BIN" "$(winpath "$SCRIPT_DIR/windows/ThemeApplied.java")" "$(winpath "$gate")"; then
+    WIZARD_GOAL_FAILURES+=("$name (unthemed)")
+  fi
+}
+
+# What NetBeans' "Certificate Wizard" action runs: the prefix, from the root, every module.
+run_wizard_goal root-prefix cn1:certificatewizard
+# What issue #6255 runs.
+run_wizard_goal non-recursive "com.codenameone:codenameone-maven-plugin:$CN1_VERSION:certificatewizard" -N
+
+# A JDK too old for the wizard must fail the goal and say which Java it needs. It used
+# to report BUILD SUCCESS while javaw.exe showed only "A JNI error has occurred".
+if [ -n "${JAVA_HOME_8_X64:-}" ]; then
+  OLD_JDK_LOG="$ARTIFACTS_DIR/certificatewizard-goal-old-jdk.log"
+  wt_log "Certificate Wizard through the goal on JDK 8 (must be refused)"
+  if JAVA_HOME="$JAVA_HOME_8_X64" mvn -B -ntp -f "$GOAL_POM_W" cn1:certificatewizard \
+      -Dcertificatewizard.spawn=false -Dcertificatewizard.login=false > "$OLD_JDK_LOG" 2>&1; then
+    wt_log "  old-jdk: the goal succeeded on JDK 8 instead of refusing it"
+    WIZARD_GOAL_FAILURES+=("old-jdk (accepted)")
+  elif ! grep -q "requires Java " "$OLD_JDK_LOG"; then
+    wt_log "  old-jdk: the goal failed without naming the Java version it needs"
+    tail -n 30 "$OLD_JDK_LOG" || true
+    WIZARD_GOAL_FAILURES+=("old-jdk (message)")
+  fi
+else
+  wt_log "JAVA_HOME_8_X64 is not set; skipping the old-JDK launch check"
+fi
+
+if [ -f "$HOME/.certificateWizard/certificatewizard.log" ]; then
+  cp "$HOME/.certificateWizard/certificatewizard.log" "$ARTIFACTS_DIR/certificatewizard.log" || true
+fi
+if [ ${#WIZARD_GOAL_FAILURES[@]} -gt 0 ]; then
+  wt_log "Certificate Wizard goal checks failed for: ${WIZARD_GOAL_FAILURES[*]}" >&2
+  exit 1
+fi
+wt_log "Certificate Wizard goal checks passed"
 
 # ---------------------------------------------------------------------------
 # 2. JavaSE simulator smoke via the shared verifier harness.

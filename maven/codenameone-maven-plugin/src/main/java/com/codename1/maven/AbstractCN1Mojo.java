@@ -1425,6 +1425,13 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                     + tool.artifactId() + ":" + version + ").\n"
                     + "It is published alongside the Codename One plugin.\n" + toWorkOnIt);
         }
+        // Here rather than only at launch, so a goal that does slow work between resolving
+        // and launching (the Certificate Wizard's browser sign-in) refuses a too-old JDK first.
+        try {
+            tool.requireCompatibleRuntime(tool.primaryJar(files));
+        } catch (com.codename1.build.BuildExecutionException ex) {
+            throw new MojoFailureException(ex.getMessage(), ex);
+        }
         return files;
     }
 
