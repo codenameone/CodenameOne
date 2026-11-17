@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.security.oauth2.client.credentials;
 
+import com.codename1.backend.Crypto;
 import com.codename1.backend.Json;
 import com.codename1.backend.security.crypto.Jwk;
 import com.codename1.backend.security.crypto.KeyFiles;
@@ -54,11 +55,13 @@ public final class GoogleServiceAccountCredentials {
     private final Jwk key;
     private final String tokenUri;
     private final String projectId;
+    private final byte[] privateKey;
 
-    private GoogleServiceAccountCredentials(String clientEmail, Jwk key, String tokenUri,
-                                            String projectId) {
+    private GoogleServiceAccountCredentials(String clientEmail, Jwk key, byte[] privateKey,
+                                            String tokenUri, String projectId) {
         this.clientEmail = clientEmail;
         this.key = key;
+        this.privateKey = privateKey;
         this.tokenUri = tokenUri;
         this.projectId = projectId;
     }
@@ -93,8 +96,10 @@ public final class GoogleServiceAccountCredentials {
                     + "private_key");
         }
         Jwk key;
+        byte[] der;
         try {
-            key = Jwk.ofPrivateKey(KeyFiles.privateKey(pem));
+            der = KeyFiles.privateKey(pem);
+            key = Jwk.ofPrivateKey(der);
         } catch (IOException unreadable) {
             // KeyFiles' message describes the PEM's shape, not its contents.
             throw new IOException("The service-account private_key could not be read: "
@@ -105,7 +110,7 @@ public final class GoogleServiceAccountCredentials {
             key = key.withKeyId(keyId);
         }
         String tokenUri = text(document, "token_uri");
-        return new GoogleServiceAccountCredentials(email, key,
+        return new GoogleServiceAccountCredentials(email, key, der,
                 tokenUri == null ? TOKEN_URI : tokenUri, text(document, "project_id"));
     }
 
@@ -124,6 +129,15 @@ public final class GoogleServiceAccountCredentials {
 
     public String getTokenUri() {
         return tokenUri;
+    }
+
+    /// An RSA-SHA256 (RSASSA-PKCS1-v1_5) signature of `data` with the account's
+    /// private key -- what a Cloud Storage V4 signed URL is signed with. The key
+    /// itself never leaves this object.
+    ///
+    /// @throws IOException when signing fails
+    public byte[] signRsaSha256(byte[] data) throws IOException {
+        return Crypto.sign(Crypto.RS256, privateKey, data);
     }
 
     /// A grant for these scopes, acting as the service account itself.

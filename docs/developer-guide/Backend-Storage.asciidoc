@@ -1,0 +1,166 @@
+[[backend-storage]]
+== Backend object storage
+
+Uploaded images, generated reports, and backups don't belong in a database. They
+belong in an object store: a bucket of named blobs, priced by the gigabyte, served
+straight to clients. Every cloud has one, and they don't agree on an API.
+`ObjectStorage` is one interface over all of them. The provider is chosen by a
+property, so the same code moves from Amazon to Google to Azure, or onto a local
+emulator, by changing one line.
+
+Each provider is implemented over the backend's own HTTP client, with no cloud
+SDK. The build links only the provider the configuration names. The scheme
+decides: `r2://${CF_ACCOUNT_ID}` links R2 alone. When the URL is not in the
+application's properties at all, because the deployment supplies it, the build
+links every provider; `cn1.storage.providers=gs` names the set instead.
+
+=== Choosing a provider
+
+`cn1.storage.url` names the provider:
+
+[cols="1,2"]
+|===
+|URL |Provider
+
+|`memory:`
+|An in-process store for tests and development. This is the default when no URL is set.
+
+|`s3://us-east-1`
+|Amazon S3 in that region. `s3://` alone reads `AWS_REGION`.
+
+|`s3://us-east-1` with `cn1.storage.s3.endpoint`
+|An S3-compatible service such as MinIO, Ceph, Backblaze B2 or Wasabi, addressed path-style.
+
+|`r2://<account id>`
+|Cloudflare R2. Set `cn1.storage.r2.jurisdiction=eu` for an EU bucket.
+
+|`gs://` or `gs://<project>`
+|Google Cloud Storage.
+
+|`azblob://<account>`
+|Azure Blob Storage. A bucket here is a container.
+|===
+
+=== Credentials
+
+Each provider takes its credentials from the configuration first and then from
+the environment variables its own tools use, so a server deployed on a cloud
+usually needs no secret at all.
+
+[source,properties]
+----
+# Amazon S3: explicit keys, else the standard AWS chain (environment,
+# web identity, ECS, EC2 instance role)
+cn1.storage.url=s3://eu-west-1
+
+# Cloudflare R2: an R2 API token's S3 keys
+cn1.storage.url=r2://${CF_ACCOUNT_ID}
+cn1.storage.r2.access-key-id=${R2_KEY_ID}
+cn1.storage.r2.secret-access-key=${R2_SECRET}
+
+# Google Cloud Storage: a service account key file
+# (GOOGLE_APPLICATION_CREDENTIALS), else the metadata server on GCE,
+# Cloud Run and GKE
+cn1.storage.url=gs://my-project
+
+# Azure: a connection string or an account key, else the managed identity
+cn1.storage.url=azblob://myaccount
+cn1.storage.azure.account-key=${AZURE_STORAGE_KEY}
+----
+
+[cols="1,2"]
+|===
+|Property |Meaning
+
+|`cn1.storage.s3.access-key-id`, `cn1.storage.s3.secret-access-key`
+|S3 keys. The same keys under `cn1.storage.r2.` are used for R2.
+
+|`cn1.storage.s3.endpoint`
+|The base URL of an S3-compatible service.
+
+|`cn1.storage.gcs.credentials`
+|A service account key file. Falls back to `GOOGLE_APPLICATION_CREDENTIALS`.
+
+|`cn1.storage.gcs.project`
+|The project new buckets are created in. Used when the URL names none. Falls back to `GOOGLE_CLOUD_PROJECT`.
+
+|`cn1.storage.gcs.location`
+|The location new buckets are created in.
+
+|`cn1.storage.gcs.emulator-host`
+|A fake-gcs-server URL. Falls back to `STORAGE_EMULATOR_HOST`.
+
+|`cn1.storage.azure.connection-string`
+|An Azure connection string. Falls back to `AZURE_STORAGE_CONNECTION_STRING`. `UseDevelopmentStorage=true` is Azurite.
+
+|`cn1.storage.azure.account-key`
+|The account key. Falls back to `AZURE_STORAGE_KEY`.
+
+|`cn1.storage.azure.client-id`
+|A user-assigned managed identity. Falls back to `AZURE_CLIENT_ID`.
+
+|`cn1.storage.azure.endpoint`
+|Another endpoint: a sovereign cloud, a private endpoint, or an emulator.
+|===
+
+A managed identity on Azure needs a data-plane role such as Storage Blob Data
+Contributor. On Google Cloud without a key file, the service account needs the
+Service Account Token Creator role on itself to sign URLs.
+
+=== Uploads straight from the app
+
+The object bytes of a mobile upload shouldn't pass through the server. The server
+hands the app a presigned URL, and the app sends the file to the provider
+directly:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/storage/Avatars.java[tag=backend-storage-presign,indent=0]
+----
+
+The URL carries its own short-lived authorization, so the app needs no
+credentials. The app sends the bytes with a plain HTTP `PUT`. Azure requires one
+extra header on that `PUT`, `x-ms-blob-type: BlockBlob`. S3 and Google Cloud
+Storage ignore it, so an app that targets several providers can always send it.
+
+How each provider signs:
+
+* S3 and R2 use AWS Signature Version 4, computed locally.
+* Google Cloud Storage uses a V4 signed URL. It's signed with the service
+  account key, or, on the metadata server, through the IAM `signBlob` API.
+* Azure uses a service SAS with an account key, or a user delegation SAS with a
+  managed identity. The user delegation SAS costs one call a day to fetch the
+  delegation key.
+
+The in-memory store refuses to presign, because no server would answer the URL.
+
+=== The rest of the interface
+
+`putObject`, `getObject`, `headObject`, `deleteObject` and `listObjects` act on
+objects from the server itself. Deleting a missing object isn't an error, and
+`headObject` answers `null` for one. `createBucket` succeeds when the account
+already owns the bucket, so a first run against an emulator can call it
+unconditionally.
+
+Outside a bean, `ObjectStorages.current()` returns the same instance. In a server
+wired by hand, `ObjectStorages.register` adds a provider.
+
+=== Local development
+
+All three providers have emulators, and the backend talks to each through
+configuration alone:
+
+[source,properties]
+----
+# MinIO
+cn1.storage.url=s3://us-east-1
+cn1.storage.s3.endpoint=http://localhost:9000
+
+# fake-gcs-server
+cn1.storage.url=gs://demo
+cn1.storage.gcs.emulator-host=http://localhost:4443
+
+# Azurite
+cn1.storage.url=azblob://
+cn1.storage.azure.connection-string=UseDevelopmentStorage=true
+----

@@ -258,6 +258,16 @@ final class BackendWiringWriter {
                   .append(t.substring(space + 1)).append("());\n");
             }
         }
+        if (model.usesStorage()) {
+            // Only the provider the configuration names is referenced, so only
+            // that one is compiled in.
+            for (String t : model.storageProviders()) {
+                int space = t.indexOf(' ');
+                sb.append("        com.codename1.backend.storage.ObjectStorages.register(")
+                  .append(BackendSources.quote(t.substring(0, space))).append(", new ")
+                  .append(t.substring(space + 1)).append("());\n");
+            }
+        }
         sb.append("        entities = environment.getEntityManager();\n");
         if (model.needsSession) {
             sb.append("        transactionSession = new com.codename1.impl.backend."
@@ -633,6 +643,10 @@ final class BackendWiringWriter {
             }
             if ("session".equals(p.builtin)) {
                 return "transactionSession";
+            }
+            if ("objectStorage".equals(p.builtin)) {
+                // The server's storage, opened from cn1.storage.url on first use.
+                return "com.codename1.backend.storage.ObjectStorages.current()";
             }
             if ("mailSender".equals(p.builtin)) {
                 return "new com.codename1.backend.mail.MailSender()";

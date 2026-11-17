@@ -107,6 +107,8 @@ final class BackendBeans {
     static final String MESSAGE_TEMPLATE_TYPE = "com/codename1/backend/messaging/MessageTemplate";
     /// Injected to send mail; see [#usesMail].
     static final String MAIL_SENDER_TYPE = "com/codename1/backend/mail/MailSender";
+    /// Injected for object storage; see [#storageProviders].
+    static final String OBJECT_STORAGE_TYPE = "com/codename1/backend/storage/ObjectStorage";
     static final String MESSAGE_TYPE = "com/codename1/backend/messaging/Message";
     static final String CACHEABLE = PKG + "Cacheable;";
     static final String CACHE_PUT = PKG + "CachePut;";
@@ -520,6 +522,8 @@ final class BackendBeans {
     /// Whether a bean injects the MessageTemplate.
     boolean usesMessageTemplate;
     boolean usesMailSender;
+    /// Whether a bean is given the `ObjectStorage`.
+    boolean usesStorage;
     boolean needsEntities;
     boolean needsSession;
     /// The `@Repository` interfaces injected anywhere, by internal name, each
@@ -824,6 +828,23 @@ final class BackendBeans {
                 "cn1.mail.transports")
                 || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
                 "spring.mail.host");
+    }
+
+    /// Whether the module uses object storage: a bean is given an
+    /// `ObjectStorage`, or the configuration names a provider for code that asks
+    /// `ObjectStorages.current()`. Code that asks with neither in its
+    /// properties gets the in-memory store, or names its providers with
+    /// `cn1.storage.providers` when the URL comes from the deployment.
+    boolean usesStorage() {
+        return usesStorage
+                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx, "cn1.storage.url")
+                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
+                        "cn1.storage.providers");
+    }
+
+    /// [#storageProviders] of this module.
+    List<String> storageProviders() {
+        return storageProviders(ctx);
     }
 
     /// [#mailTransports] of this module.
@@ -2010,6 +2031,78 @@ final class BackendBeans {
         return out;
     }
 
+    /// The storage providers the module's configuration names, as `scheme
+    /// factory` pairs. Shaped like [#messagingTransports]: the scheme of
+    /// `cn1.storage.url`; every provider when that scheme is a `${...}` the
+    /// build cannot read (`r2://${CF_ACCOUNT}` names R2 alone -- only the
+    /// scheme decides) or when no URL is configured at all, since the URL is
+    /// then left to the deployment (an environment variable, a file beside
+    /// the server) and the build cannot know which; and none for `memory:`,
+    /// which is part of the storage package. `cn1.storage.providers` --
+    /// `gs,azblob` -- names the set outright.
+    static List<String> storageProviders(ProcessorContext ctx) {
+        Set<String> schemes = new LinkedHashSet<String>();
+        for (String list : RestControllerAnnotationProcessor.applicationPropertyValues(ctx,
+                "cn1.storage.providers")) {
+            int from = 0;
+            while (from <= list.length()) {
+                int comma = list.indexOf(',', from);
+                int end = comma < 0 ? list.length() : comma;
+                addStorageScheme(schemes, list.substring(from, end).trim());
+                from = end + 1;
+            }
+        }
+        boolean named = !schemes.isEmpty();
+        boolean anyUrl = false;
+        for (String url : RestControllerAnnotationProcessor.applicationPropertyValues(ctx,
+                "cn1.storage.url")) {
+            String trimmed = url.trim();
+            if (trimmed.length() == 0) {
+                continue;
+            }
+            anyUrl = true;
+            if (named) {
+                continue;
+            }
+            int colon = trimmed.indexOf(':');
+            String scheme = colon < 0 ? trimmed : trimmed.substring(0, colon);
+            if (scheme.indexOf("${") >= 0) {
+                schemes.addAll(STORAGE_PROVIDERS.keySet());
+                continue;
+            }
+            addStorageScheme(schemes, scheme);
+        }
+        if (!named && !anyUrl) {
+            schemes.addAll(STORAGE_PROVIDERS.keySet());
+        }
+        List<String> out = new ArrayList<String>();
+        for (String scheme : schemes) {
+            out.add(scheme + " " + STORAGE_PROVIDERS.get(scheme));
+        }
+        return out;
+    }
+
+    private static void addStorageScheme(Set<String> schemes, String scheme) {
+        for (String known : STORAGE_PROVIDERS.keySet()) {
+            // Schemes are case-insensitive; never toLowerCase (locale).
+            if (known.equalsIgnoreCase(scheme)) {
+                schemes.add(known);
+            }
+        }
+    }
+
+    /// The object storage providers by scheme. R2 is S3's API at Cloudflare's
+    /// endpoint, so both schemes open through the S3 factory.
+    static final Map<String, String> STORAGE_PROVIDERS = new LinkedHashMap<String, String>();
+
+    static {
+        STORAGE_PROVIDERS.put("s3", "com.codename1.backend.aws.S3.Factory");
+        STORAGE_PROVIDERS.put("r2", "com.codename1.backend.aws.S3.Factory");
+        STORAGE_PROVIDERS.put("gs", "com.codename1.backend.storage.gcs.GcsStorage.Factory");
+        STORAGE_PROVIDERS.put("azblob",
+                "com.codename1.backend.storage.azure.AzureBlobStorage.Factory");
+    }
+
     /// The mail transports by scheme. `memory:` and `log:` are part of the
     /// mail package itself.
     static final Map<String, String> MAIL_TRANSPORTS = new LinkedHashMap<String, String>();
@@ -2714,6 +2807,11 @@ final class BackendBeans {
         if (MESSAGE_TEMPLATE_TYPE.equals(type)) {
             p.builtin = "messageTemplate";
             usesMessageTemplate = true;
+            return;
+        }
+        if (OBJECT_STORAGE_TYPE.equals(type)) {
+            p.builtin = "objectStorage";
+            usesStorage = true;
             return;
         }
         if (MAIL_SENDER_TYPE.equals(type)) {

@@ -1681,6 +1681,58 @@ public class BackendBeansTest {
         }
     }
 
+    /// Object storage follows the same rule: only the provider `cn1.storage.url`
+    /// names is registered, so only that one is compiled in.
+    @Test
+    public void storageRegistersOnlyTheProviderTheConfigurationNames() throws Exception {
+        String user = PKG + "@Component public class Avatars {\n"
+                + "    private final com.codename1.backend.storage.ObjectStorage storage;\n"
+                + "    public Avatars(com.codename1.backend.storage.ObjectStorage storage) {\n"
+                + "        this.storage = storage;\n"
+                + "    }\n"
+                + "}\n";
+        // {injects ObjectStorage, properties, providers referenced, registry referenced}
+        String[][] cases = {
+            // No URL in the properties: it may come from the deployment, so
+            // every provider, the way messaging transports are wired.
+            {"y", "", "S3 Gcs Azure", "y"},
+            {"y", "cn1.storage.url=memory:\n", "", "y"},
+            // Only the scheme of a URL decides; a placeholder after it does not.
+            {"y", "cn1.storage.url=r2://${CF_ACCOUNT}\n", "S3", "y"},
+            {"y", "cn1.storage.url=${STORAGE_URL}\ncn1.storage.providers=gs\n", "Gcs", "y"},
+            {"n", "cn1.storage.providers=azblob\n", "Azure", "y"},
+            {"y", "cn1.storage.url=s3://us-east-1\n", "S3", "y"},
+            {"y", "cn1.storage.url=r2://0123abcd\n", "S3", "y"},
+            {"y", "cn1.storage.url=gs://proj\n", "Gcs", "y"},
+            {"y", "cn1.storage.url=AZBLOB://acct\n", "Azure", "y"},
+            {"y", "cn1.storage.url=${STORAGE}\n", "S3 Gcs Azure", "y"},
+            {"n", "cn1.storage.url=gs://proj\n", "Gcs", "y"},
+            {"n", "", "", "n"},
+        };
+        for (String[] c : cases) {
+            Map<String, String> s = new LinkedHashMap<String, String>();
+            s.put("com.example.Inbox", PKG + "@Component public class Inbox {\n"
+                    + "    @MessageListener(\"q\") public void on(String text) { }\n"
+                    + "}\n");
+            if ("y".equals(c[0])) {
+                s.put("com.example.Avatars", user);
+            }
+            File classes = compile(s);
+            writeProperties(classes, "application.properties", c[1]);
+            assertNoErrors(process(classes));
+            String wiring = new String(Files.readAllBytes(new File(classes,
+                    "com/example/BackendWiring.class").toPath()), "ISO-8859-1");
+            String what = c[0] + " " + c[1];
+            assertEquals(what, c[2].indexOf("S3") >= 0, wiring.indexOf("aws/S3$Factory") >= 0);
+            assertEquals(what, c[2].indexOf("Gcs") >= 0,
+                    wiring.indexOf("gcs/GcsStorage$Factory") >= 0);
+            assertEquals(what, c[2].indexOf("Azure") >= 0,
+                    wiring.indexOf("azure/AzureBlobStorage$Factory") >= 0);
+            assertEquals(what, "y".equals(c[3]),
+                    wiring.indexOf("storage/ObjectStorages") >= 0);
+        }
+    }
+
     @Test
     public void messageListenersReceiveRetryAndDeadLetter() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
