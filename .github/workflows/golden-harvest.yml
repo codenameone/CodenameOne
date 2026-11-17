@@ -77,7 +77,9 @@ jobs:
       actions: read
       # The "Golden capture" status golden-capture.yml leaves pending.
       statuses: write
-      pull-requests: read
+      # The Golden capture comment on the PR (github-actions[bot]).
+      pull-requests: write
+      issues: write
     env:
       GH_TOKEN: ${{ github.token }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha || inputs.head_sha }}
