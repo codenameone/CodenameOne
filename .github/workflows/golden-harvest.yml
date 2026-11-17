@@ -191,12 +191,20 @@ jobs:
             committed="$(git rev-parse HEAD)"
           fi
           if [ "$CAPTURE" = 1 ]; then
+            # A leg that failed still uploads what it rendered, so a commit
+            # does not mean every leg came back.
+            failed=""
+            while read -r wf id; do
+              c="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq .conclusion)" || c=unknown
+              [ "$c" = success ] || failed="$failed ${wf%.yml}"
+            done < ../runs.txt
+            [ -z "$failed" ] || ok=0
             # On the captured head and, when there is one, on the commit that
             # replaced it: that is the head the PR now shows.
             if [ -n "${committed:-}" ] && [ "$ok" = 1 ]; then
               state=success desc="Goldens committed in ${committed:0:12}"
             elif [ -n "${committed:-}" ]; then
-              state=failure desc="Committed what arrived (${committed:0:12}); a leg failed, see the run"
+              state=failure desc="Committed what arrived (${committed:0:12}); failed:${failed:- collect}"
             else
               state=failure desc="No leg produced a golden; golden-plan names the gaps"
             fi
