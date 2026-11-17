@@ -78,6 +78,7 @@ final class GraphQLSchemaModel {
     static final class ObjectTypeDef {
         String name;
         boolean input;
+        boolean isInterface;
         final List<FieldDef> fields = new ArrayList<FieldDef>();
     }
 
@@ -95,6 +96,10 @@ final class GraphQLSchemaModel {
         String queryType = "Query";
         String mutationType = "Mutation";
         String subscriptionType = "Subscription";
+        /// Types defined, not extended, more than once.
+        final java.util.Set<String> duplicates = new java.util.LinkedHashSet<String>();
+        /// Types seen only in `extend` so far.
+        final java.util.Set<String> extendedOnly = new java.util.LinkedHashSet<String>();
 
         ObjectTypeDef object(String name) {
             return objects.get(name);
@@ -139,6 +144,7 @@ final class GraphQLSchemaModel {
 
         Schema parse() {
             Schema schema = new Schema();
+            boolean extend = false;
             while (true) {
                 skipIgnored();
                 if (pos >= src.length()) break;
@@ -149,18 +155,28 @@ final class GraphQLSchemaModel {
                 if (peekWord("schema")) {
                     parseSchemaBlock(schema);
                 } else if (peekWord("type")) {
-                    ObjectTypeDef o = parseObject("type");
-                    schema.objects.put(o.name, o);
+                    merge(schema, schema.objects, parseObject("type"), extend);
                 } else if (peekWord("input")) {
                     ObjectTypeDef o = parseObject("input");
                     o.input = true;
-                    schema.inputs.put(o.name, o);
+                    merge(schema, schema.inputs, o, extend);
                 } else if (peekWord("interface")) {
                     ObjectTypeDef o = parseObject("interface");
-                    schema.objects.put(o.name, o);
+                    o.isInterface = true;
+                    merge(schema, schema.objects, o, extend);
                 } else if (peekWord("enum")) {
                     EnumDef e = parseEnum();
-                    schema.enums.put(e.name, e);
+                    EnumDef prev = schema.enums.get(e.name);
+                    if (prev == null) {
+                        schema.enums.put(e.name, e);
+                    } else {
+                        // An extension, or the definition after one: one enum.
+                        for (String v : e.values) {
+                            if (!prev.values.contains(v)) {
+                                prev.values.add(v);
+                            }
+                        }
+                    }
                 } else if (peekWord("union")) {
                     parseUnion(schema);
                 } else if (peekWord("scalar")) {
@@ -172,19 +188,46 @@ final class GraphQLSchemaModel {
                     skipDirectiveDefinition();
                 } else if (peekWord("extend")) {
                     consumeWord("extend");
-                    // Skip the extend keyword and re-loop to parse the
-                    // following definition as if standalone (fields are
-                    // merged into the map; good enough for codegen).
+                    // The definition that follows is read as if standalone,
+                    // its fields merged into the type it extends.
+                    extend = true;
+                    continue;
                 } else {
                     throw err("Unexpected token at top level: '" + preview() + "'");
                 }
+                extend = false;
             }
             return schema;
+        }
+
+        /// Adds `o`, or its fields to the type of that name already read: an
+        /// `extend type`, or a type spread over several files, is one type.
+        private static void merge(Schema schema, Map<String, ObjectTypeDef> into,
+                                  ObjectTypeDef o, boolean extend) {
+            ObjectTypeDef prev = into.get(o.name);
+            if (prev == null) {
+                into.put(o.name, o);
+                if (extend) {
+                    schema.extendedOnly.add(o.name);
+                }
+            } else {
+                if (!extend && !schema.extendedOnly.remove(o.name)) {
+                    schema.duplicates.add(o.name);
+                }
+                if (!extend) {
+                    prev.isInterface = o.isInterface;
+                }
+                prev.fields.addAll(o.fields);
+            }
         }
 
         private void parseSchemaBlock(Schema schema) {
             consumeWord("schema");
             skipDirectives();
+            skipIgnored();
+            if (!peekChar('{')) {
+                return; // `extend schema @dir` has no body
+            }
             expect('{');
             while (true) {
                 skipIgnored();
@@ -292,6 +335,10 @@ final class GraphQLSchemaModel {
             EnumDef e = new EnumDef();
             e.name = readName();
             skipDirectives();
+            skipIgnored();
+            if (!peekChar('{')) {
+                return e; // `extend enum E @dir` has no body
+            }
             expect('{');
             while (true) {
                 skipIgnored();
@@ -308,6 +355,10 @@ final class GraphQLSchemaModel {
             consumeWord("union");
             String name = readName();
             skipDirectives();
+            skipIgnored();
+            if (!peekChar('=')) {
+                return; // `extend union U @dir` has no members
+            }
             expect('=');
             List<String> members = new ArrayList<String>();
             while (true) {
@@ -318,7 +369,16 @@ final class GraphQLSchemaModel {
                 skipIgnored();
                 if (!peekChar('|')) break;
             }
-            schema.unions.put(name, members);
+            List<String> prev = schema.unions.get(name);
+            if (prev == null) {
+                schema.unions.put(name, members);
+            } else {
+                for (String m : members) {
+                    if (!prev.contains(m)) {
+                        prev.add(m);
+                    }
+                }
+            }
         }
 
         // -- skipping helpers ----------------------------------------

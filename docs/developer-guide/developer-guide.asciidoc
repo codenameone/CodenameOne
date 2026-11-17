@@ -153,6 +153,8 @@ include::Backend-Storage.asciidoc[]
 
 include::Backend-Observability.asciidoc[]
 
+include::Backend-GraphQL.asciidoc[]
+
 include::Backend-MCP.asciidoc[]
 
 include::Backend-Operations.asciidoc[]

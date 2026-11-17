@@ -147,6 +147,9 @@ final class BackendWiringWriter {
 
     private void fields(StringBuilder sb) {
         sb.append("    private com.codename1.backend.Config config;\n");
+        if (model.hasGraphQL()) {
+            sb.append("    private com.codename1.backend.graphql.GraphQLEndpoint graphQL;\n");
+        }
         sb.append("    private com.codename1.backend.DataSource dataSource;\n");
         sb.append("    private com.codename1.backend.orm.EntityManager entities;\n");
         sb.append("    private com.codename1.impl.backend.TransactionSession transactionSession;\n");
@@ -381,6 +384,7 @@ final class BackendWiringWriter {
               .append(BackendSources.quote(r.controllerBinary))
               .append(");\n            }\n        }\n        }\n");
         }
+        graphQL(sb);
         if (Boolean.TRUE.equals(model.ctx.getAttribute("cn1.backend.mvc"))) {
             sb.append("        handlers.add(new com.codename1.generated.mvc.Assets());\n");
         }
@@ -393,6 +397,39 @@ final class BackendWiringWriter {
           .append("            out[i] = (com.codename1.backend.HttpServer.Handler) handlers.get(i);\n")
           .append("        }\n");
         sb.append("        return out;\n    }\n\n");
+    }
+
+    /// The GraphQL endpoint: the schema the build checked, embedded, and every
+    /// bean's resolvers registered on one builder.
+    private void graphQL(StringBuilder sb) {
+        if (!model.hasGraphQL()) {
+            return;
+        }
+        sb.append("        graphQL = null;\n");
+        sb.append("        {\n        StringBuilder sdl = new StringBuilder();\n");
+        String schema = model.graphQLSchema;
+        // A string constant is limited to 65535 bytes of modified UTF-8.
+        for (int i = 0; i < schema.length(); i += 16000) {
+            sb.append("        sdl.append(").append(BackendSources.quote(
+                    schema.substring(i, Math.min(schema.length(), i + 16000)))).append(");\n");
+        }
+        sb.append("        com.codename1.backend.graphql.GraphQL.Builder gql = "
+                + "com.codename1.backend.graphql.GraphQL.newGraphQL(\n"
+                + "                com.codename1.backend.graphql.GraphQLSchema.parse(sdl.toString()));\n");
+        for (BackendBeans.Bean b : model.beans) {
+            if (b.graphqlAdapter == null) {
+                continue;
+            }
+            String ref = "resolving" + b.var;
+            sb.append("        ").append(typeOf(b)).append(' ').append(ref).append(" = ")
+              .append(reference(b)).append(";\n");
+            sb.append("        if (").append(ref).append(" != null) {\n");
+            sb.append("            new ").append(b.graphqlAdapter).append('(').append(ref)
+              .append(").register(gql);\n        }\n");
+        }
+        sb.append("        graphQL = com.codename1.backend.graphql.GraphQLEndpoint.fromConfig("
+                + "environment.getConfig(), gql);\n");
+        sb.append("        handlers.add(graphQL);\n        }\n");
     }
 
     /// `if (condition) {` before a conditional bean's statement, nothing otherwise.
@@ -861,6 +898,10 @@ final class BackendWiringWriter {
         sb.append("    public void registerWebSockets(\n")
           .append("            com.codename1.backend.HttpServer.WebSocketRegistry registry) "
                   + "throws Exception {\n");
+        if (model.hasGraphQL()) {
+            sb.append("        if (graphQL != null) {\n            graphQL.registerWebSocket(registry);\n"
+                    + "        }\n");
+        }
         for (Map.Entry<String, String> e : sockets.entrySet()) {
             BackendBeans.Bean b = model.beanOfClass(e.getValue());
             String ref = reference(b);

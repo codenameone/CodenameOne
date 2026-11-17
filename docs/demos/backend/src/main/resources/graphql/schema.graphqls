@@ -1,0 +1,30 @@
+# tag::backend-graphql-schema[]
+type Query {
+  book(id: ID!): Book
+  books: [Book!]!
+}
+
+type Mutation {
+  addBook(input: BookInput!): Book!
+}
+
+type Subscription {
+  bookAdded: Book!
+}
+
+input BookInput {
+  title: String!
+  authorId: ID!
+}
+
+type Book {
+  id: ID!
+  title: String!
+  author: Author
+}
+
+type Author {
+  id: ID!
+  name: String!
+}
+# end::backend-graphql-schema[]
