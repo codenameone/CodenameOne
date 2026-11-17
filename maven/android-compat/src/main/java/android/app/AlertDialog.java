@@ -316,7 +316,10 @@ public class AlertDialog extends Dialog implements DialogInterface {
                 ((LinearLayout.LayoutParams) child.getLayoutParams()).height = Math.max(0, h - share);
             }
             try {
-                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+                // AT_MOST even under an exact height: the weight pass would
+                // otherwise spread the leftover over the panels and stretch
+                // a one-line message.
+                super.onMeasure(widthMeasureSpec, bound);
             } finally {
                 for (int i = 0; i < getChildCount(); i++) {
                     View child = getChildAt(i);
