@@ -13,8 +13,8 @@ name: Golden harvest
 # It is also the second half of golden-capture.yml: that dispatches the
 # screenshot workflows in capture mode (workflow_dispatch runs on the PR
 # branch) and exits, and this collects them the same way once the last one has
-# completed. When a capture brings back nothing, the PR's runs it cancelled are
-# re-run, so golden-plan names the gap on the PR.
+# completed, and settles the "Golden capture" status the capture left pending
+# on the PR.
 #
 # workflow_run always runs the default branch's copy of this file, so the
 # harvest does nothing for any PR until it is on master, including the PR
@@ -37,6 +37,17 @@ on:
       - Windows cross-build + run (Linux build -> Windows run)
       - Test macOS UI build scripts
     types: [completed]
+  # By hand, for a head whose capture completed without starting this (see
+  # DISPATCH_TOKEN in golden-capture.yml): runs this file from master, like
+  # workflow_run does.
+  workflow_dispatch:
+    inputs:
+      head_ref:
+        description: PR branch to harvest
+        required: true
+      head_sha:
+        description: "Commit the screenshot runs rendered (default: the branch head)"
+        required: false
 
 permissions:
   contents: read
@@ -49,12 +60,13 @@ permissions:
 # head branch. That is the commit the next run compares on as well, so the
 # golden matches what CI will render.
 concurrency:
-  group: golden-harvest-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  group: golden-harvest-${{ github.event.workflow_run.head_repository.full_name || github.repository }}-${{ github.event.workflow_run.head_branch || inputs.head_ref }}
   cancel-in-progress: false
 
 jobs:
   harvest:
     if: >-
+      github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.event == 'pull_request' ||
        github.event.workflow_run.event == 'workflow_dispatch') &&
       github.event.workflow_run.head_repository.full_name == github.repository
@@ -62,13 +74,14 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      # write: re-running the PR's cancelled runs after an empty capture.
-      actions: write
+      actions: read
+      # The "Golden capture" status golden-capture.yml leaves pending.
+      statuses: write
       pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-      HEAD_REF: ${{ github.event.workflow_run.head_branch }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha || inputs.head_sha }}
+      HEAD_REF: ${{ github.event.workflow_run.head_branch || inputs.head_ref }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -78,16 +91,35 @@ jobs:
         id: list
         run: |
           set -euo pipefail
+          if [ -z "$HEAD_SHA" ]; then
+            HEAD_SHA="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_REF" --jq .sha)"
+            echo "HEAD_SHA=$HEAD_SHA" >> "$GITHUB_ENV"
+          fi
           # A PR's last runs often complete after it merged or closed, and
           # the branch is usually deleted by then: there is nothing to push
           # to, and goldens must never land on a merged branch either.
-          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD_REF" --state open --json number --jq length)"
+          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD_REF" --state open --json isCrossRepository,baseRefName --jq "[.[] | select(.isCrossRepository | not) | select(.baseRefName != \"$HEAD_REF\")] | length")"
+          # Same-repo PRs only, and never a base branch: a hand dispatch names
+          # the branch freely, and a fork PR can share a branch name.
+          [ "$HEAD_REF" != "${{ github.event.repository.default_branch }}" ] || open=0
           if [ "$open" = 0 ]; then
             echo "No open pull request for $HEAD_REF (merged, closed or deleted); nothing to harvest."
             echo "ready=0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           trusted/scripts/ci/golden-harvest.sh list "$HEAD_SHA" runs.txt
+      # A capture leg cancelled after it started (a timeout, by hand) stops
+      # counting as a capture run, so the listing above waits for it, and if
+      # it was the last to complete nothing else would ever settle the status.
+      # (A newer push cancelling an older capture lands on that older head.)
+      - name: Settle a capture whose leg was cancelled
+        if: >-
+          github.event.workflow_run.event == 'workflow_dispatch' &&
+          github.event.workflow_run.conclusion == 'cancelled'
+        env:
+          WF: ${{ github.event.workflow_run.name }}
+        run: |
+          trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" failure "$WF capture was cancelled; re-run Golden capture"
       - name: Check the push token
         if: steps.list.outputs.ready == '1'
         env:
@@ -98,7 +130,7 @@ jobs:
             exit 1
           fi
           # Set is not enough: an expired or narrowed token would pass the check
-          # above and fail only at the push, after the PR's runs were cancelled.
+          # above and fail only at the push, after the legs had all run.
           push="$(GH_TOKEN="$CN1SS_GH_TOKEN" gh api "repos/$GITHUB_REPOSITORY" --jq .permissions.push 2>/dev/null || true)"
           if [ "$push" != true ]; then
             echo "::error::secrets.CN1SS_GH_TOKEN cannot push to $GITHUB_REPOSITORY (expired, revoked or lacking Contents: write); golden harvest cannot push. Regenerate it (see the note in scripts-android.yml)."
@@ -107,10 +139,11 @@ jobs:
       - uses: actions/checkout@v6
         if: steps.list.outputs.ready == '1'
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.workflow_run.head_branch || inputs.head_ref }}
           token: ${{ secrets.CN1SS_GH_TOKEN }}
           path: pr
       - name: Collect, commit and push the goldens
+        id: collect
         if: steps.list.outputs.ready == '1'
         env:
           # The runs at this head are a capture's (golden-capture.yml), not
@@ -155,10 +188,31 @@ jobs:
             git commit -m "Harvest goldens rendered at ${HEAD_SHA:0:12}" \
               -m "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             git push origin "HEAD:$HEAD_REF"
-          elif [ "$CAPTURE" = 1 ]; then
-            # A capture that brought nothing back: its runs replaced the PR's,
-            # which golden-capture.yml cancelled. Without this the PR's checks
-            # would stay cancelled and nothing would name the gap.
-            ../trusted/scripts/ci/golden-harvest.sh rerun "$HEAD_SHA"
+            committed="$(git rev-parse HEAD)"
+          fi
+          if [ "$CAPTURE" = 1 ]; then
+            # On the captured head and, when there is one, on the commit that
+            # replaced it: that is the head the PR now shows.
+            if [ -n "${committed:-}" ] && [ "$ok" = 1 ]; then
+              state=success desc="Goldens committed in ${committed:0:12}"
+            elif [ -n "${committed:-}" ]; then
+              state=failure desc="Committed what arrived (${committed:0:12}); a leg failed, see the run"
+            else
+              state=failure desc="No leg produced a golden; golden-plan names the gaps"
+            fi
+            for sha in "$HEAD_SHA" ${committed:-}; do
+              ../trusted/scripts/ci/golden-harvest.sh status "$sha" "$state" "$desc"
+            done
+            echo "settled=1" >> "$GITHUB_OUTPUT"
           fi
           [ "$ok" = 1 ]
+
+      # Anything above that failed before the status was settled (the token,
+      # a push that lost a race, an API error) would leave the capture's
+      # status pending for good.
+      - name: Settle a capture that could not be harvested
+        if: >-
+          (failure() || cancelled()) && steps.collect.outputs.settled != '1' &&
+          (steps.list.outputs.capture == '1' || github.event.workflow_run.event == 'workflow_dispatch')
+        run: |
+          trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" error "The harvest failed; see the run, then re-run Golden capture"
