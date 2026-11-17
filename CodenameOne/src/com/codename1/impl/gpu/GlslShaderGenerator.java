@@ -1011,27 +1011,16 @@ public final class GlslShaderGenerator {
                 + "    }\n"
                 + "    if (DFX.x > 0.0 && d0 < 0.99999) {\n"
                 + "      float occ = 0.0;\n"
-                // Opposite samples in pairs, counted only when BOTH are
-                // nearer than the centre: on any plane, however grazing, one
-                // side of a pair is farther, so open ground is not darkened
-                // and a thin object beside a pixel stamps no copy of itself;
-                // only a crease is. A pair with a sample far in front
-                // -- an object's silhouette -- is skipped whole rather than
-                // half counted, which left a bright ring around every object.
-                + "      for (int i = 0; i < 4; i++) {\n"
+                + "      for (int i = 0; i < 8; i++) {\n"
                 + "        float fi = float(i);\n"
                 + "        float a = fi * 2.399963 + 0.7;\n"
-                + "        float r = (fi + 1.0) * 0.25 * DFX.y;\n"
-                + "        V2 o = V2(cos(a), sin(a)) * r * px1;\n"
-                + "        float da = DEPTH(uv0 + o);\n"
-                + "        float db = DEPTH(uv0 - o);\n"
-                + "        float za = 2.0 * zn * zf / (zf + zn - (2.0 * da - 1.0) * (zf - zn));\n"
-                + "        float zb = 2.0 * zn * zf / (zf + zn - (2.0 * db - 1.0) * (zf - zn));\n"
-                + "        float nr = max(z0 - za, z0 - zb) / z0;\n"
-                + "        float dz = min(z0 - za, z0 - zb) / z0;\n"
-                + "        occ += smoothstep(0.003, 0.03, dz) * (1.0 - smoothstep(0.1, 0.2, nr));\n"
+                + "        float r = (fi + 1.0) * 0.125 * DFX.y;\n"
+                + "        float ds = DEPTH(uv0 + V2(cos(a), sin(a)) * r * px1);\n"
+                + "        float zs = 2.0 * zn * zf / (zf + zn - (2.0 * ds - 1.0) * (zf - zn));\n"
+                + "        float dz = (z0 - zs) / z0;\n"
+                + "        occ += smoothstep(0.005, 0.04, dz) * (1.0 - smoothstep(0.15, 0.3, dz));\n"
                 + "      }\n"
-                + "      c *= 1.0 - DFX.x * occ * 0.25;\n"
+                + "      c *= 1.0 - DFX.x * occ * 0.125;\n"
                 + "    }\n"
                 + "    if (DFX2.x > 0.0) {\n"
                 + "      float e = 0.0;\n"
