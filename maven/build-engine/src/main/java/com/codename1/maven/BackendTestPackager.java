@@ -78,6 +78,13 @@ public abstract class BackendTestPackager extends BackendPackager {
     /// The test resources as the build tool processed them, or null.
     protected abstract File testOutputDirectory();
 
+    @Override
+    protected List<File> additionalResourceDirectories() {
+        File test = testOutputDirectory();
+        return test == null ? java.util.Collections.<File>emptyList()
+                : java.util.Collections.singletonList(test);
+    }
+
     /// Whether the JVM run discovers the test class `binaryName`, so the compiled
     /// run runs it too. Every class by default, as Gradle's JUnit Platform scan
     /// finds them; the Maven goal answers with Surefire's includes and excludes.

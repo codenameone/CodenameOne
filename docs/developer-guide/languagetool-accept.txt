@@ -820,6 +820,13 @@ aarch64
 Parley
 Savor
 Wayline
+# The Brickyard game platform sample: its name, the scripting language it runs and the terms of its games.
+Brickyard
+Luau
+Roblox
+leaderstats
+[Oo]bby
+[Oo]bbies
 # The sample application the Bastion chapters walk through, and the units its ledger keeps coins in.
 Bastion
 satoshi

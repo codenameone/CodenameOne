@@ -195,6 +195,15 @@ public class BackendPackager {
         return host.outputDirectory();
     }
 
+    /// Further processed-resource directories whose files are compiled into the
+    /// server over the module's own, in order: a later one wins on the same path.
+    /// The compiled-test packager adds the test output directory, so a test's
+    /// `getResourceAsStream` answers natively what it answers on the JVM, where
+    /// test resources are on the class path ahead of the main ones.
+    protected List<File> additionalResourceDirectories() {
+        return java.util.Collections.emptyList();
+    }
+
     /// Whether the module declares resources at all, for the warning when none
     /// were processed.
     protected boolean declaresResources() {
@@ -733,6 +742,11 @@ public class BackendPackager {
         if (processed != null && processed.isDirectory()) {
             File migrations = new File(processed, "db" + File.separator + "migration");
             collectResources(processed, "", migrations, files);
+        }
+        for (File extra : additionalResourceDirectories()) {
+            if (extra != null && extra.isDirectory()) {
+                collectResources(extra, "", null, files);
+            }
         }
         StringBuilder sb = new StringBuilder();
         sb.append("package com.codename1.backend;\n\n")

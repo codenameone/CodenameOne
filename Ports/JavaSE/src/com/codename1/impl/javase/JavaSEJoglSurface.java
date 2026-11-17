@@ -278,4 +278,9 @@ class JavaSEJoglSurface extends JComponent implements JavaSEGpuSurface {
             g.drawImage(frame, 0, 0, null);
         }
     }
+
+    @Override
+    public BufferedImage lastFrame() {
+        return frame;
+    }
 }
