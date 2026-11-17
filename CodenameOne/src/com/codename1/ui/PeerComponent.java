@@ -283,22 +283,6 @@ public class PeerComponent extends Component {
     protected void onPositionSizeChange() {
     }
 
-    /// Draws this peer as a snapshot image instead of natively while `l` is true.
-    ///
-    /// A native peer sits above everything Codename One paints, so a lightweight
-    /// popup, sheet or menu laid over it is hidden or torn by the native view.
-    /// Turn lightweight mode on while such an overlay is showing and off when it
-    /// is dismissed. Transitions and dialogs do this for themselves; this is for
-    /// overlays in the form's own layer, such as an `InteractionDialog`.
-    ///
-    /// #### Parameters
-    ///
-    /// - `l`: true to draw the peer as an image, false to show it natively again
-    public final void setLightweight(boolean l) {
-        setLightweightMode(l);
-        repaint();
-    }
-
     /// An optional callback for peers indicating that the peer is now rendered as part of
     /// a transition or some other state and is thus not truly visible. In this case the
     /// peer should either make itself invisible or render itself as an image instead of

@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.brickyard.studio;
 
-import com.codename1.components.InteractionDialog;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
@@ -187,8 +187,7 @@ final class StudioActions {
     }
 
     private void showOverflow(Form f) {
-        final Overlay d = new Overlay(new BorderLayout());
-        d.setUIID("StudioSheet");
+        final Dialog d = new Dialog(new BorderLayout());
         d.setDialogUIID("StudioPopup");
         d.getContentPane().setUIID("StudioPopup");
         d.setDisposeWhenPointerOutOfBounds(true);
@@ -226,12 +225,10 @@ final class StudioActions {
     /// sliding up from the bottom edge, as a touch app inserts. Opened by the
     /// bar's Insert button; a tap on a tile inserts and closes it.
     void showInsertSheet(Form f) {
-        final Overlay d = new Overlay(new BorderLayout());
-        d.setUIID("StudioSheet");
+        final Dialog d = new Dialog(new BorderLayout());
         d.setDialogUIID("StudioSheet");
         d.getContentPane().setUIID("StudioSheetBody");
         d.setDisposeWhenPointerOutOfBounds(true);
-        d.setAnimateShow(true);
         final Container grid = new Container();
         final Container chips = new Container(BoxLayout.x());
         chips.setScrollableX(true);
@@ -261,8 +258,7 @@ final class StudioActions {
     /// index. The selected one is highlighted.
     void showTileSheet(Form f, String title, String[] labels, char[] icons, int selected,
             final java.util.function.IntConsumer chosen) {
-        final Overlay d = new Overlay(new BorderLayout());
-        d.setUIID("StudioSheet");
+        final Dialog d = new Dialog(new BorderLayout());
         d.setDialogUIID("StudioSheet");
         d.getContentPane().setUIID("StudioSheetBody");
         d.setDisposeWhenPointerOutOfBounds(true);
@@ -288,7 +284,7 @@ final class StudioActions {
         d.show(Math.max(0, f.getHeight() - h), 0, 0, 0);
     }
 
-    private void fillSheet(final InteractionDialog d, final Container grid, final Container chips, final int cat) {
+    private void fillSheet(final Dialog d, final Container grid, final Container chips, final int cat) {
         chips.removeAll();
         for (int i = 0; i < SHEET_TABS.length; i++) {
             final int k = i;

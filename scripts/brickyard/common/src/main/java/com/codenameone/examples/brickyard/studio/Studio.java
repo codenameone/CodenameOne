@@ -611,14 +611,7 @@ public final class Studio implements AgentTools.Studio {
         final TextField notes = new TextField("", "What changed", 30, TextField.ANY);
         notes.setUIID("StudioField");
         notes.setName("publishNotes");
-        // An in-form dialog, not a modal one: a modal Dialog is a form of
-        // its own, and the 3D viewport behind it stops rendering and shows
-        // as a grey slab for as long as the prompt is open.
-        final Overlay d = new Overlay("Publish", new BorderLayout());
-        d.setUIID("StudioDialog");
-        d.getTitleComponent().setUIID("StudioDialogTitle");
-        d.getContentPane().setUIID("StudioDialogBody");
-        d.setAnimateShow(false);
+        final Dialog d = darkDialog("Publish");
         Container buttons = new Container(new GridLayout(1, 2));
         Button cancel = new Button("Cancel", "StudioDialogButton");
         cancel.addActionListener(ev -> d.dispose());
@@ -638,8 +631,8 @@ public final class Studio implements AgentTools.Studio {
         int h = d.getPreferredH();
         int side = (fw - w) / 2;
         int top = Math.max(0, (fh - h) / 2);
+        d.addShowListener(ev -> notes.startEditingAsync());
         d.show(top, Math.max(0, fh - h - top), side, side);
-        notes.startEditingAsync();
     }
 
     /// A dialog in the editor's dark palette rather than the native theme's.
