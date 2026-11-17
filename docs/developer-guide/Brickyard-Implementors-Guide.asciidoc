@@ -12,19 +12,19 @@ platform is compatible with Luau and Roblox place files: a creator can bring an
 A game platform tests a cross-platform framework harder than any other kind of app. It
 needs:
 
-* A scripting VM that runs code written by strangers and still cannot freeze the device.
+* A scripting VM that runs code written by strangers and still can't freeze the device.
 * 3D rendering and physics at frame rate, on every platform.
-* An authoritative multiplayer server, so a client cannot cheat its way up a leaderboard.
+* An authoritative multiplayer server, so a client can't cheat its way up a leaderboard.
 * An economy with store purchases, a subscription and creator payouts.
 * Social features with child-safety rules, moderation and analytics.
 
-Brickyard does all of it in Java, from one codebase, on Codename One's own APIs: `gpu`
+Brickyard does all this in Java, from one codebase, on Codename One's own APIs: `gpu`
 for the renderer, `payment` and `paywall` for the store, `analytics.invite` for
 referrals, `gaming.GameServices` for presence and achievements, `ads` for rewarded
 currency and the built-in MCP server for agentic creation. The server is a Codename One
 Backend.
 
-Everything in it is original and written clean room: the interpreter, the engine API,
+Everything here is original and written clean room: the interpreter, the engine API,
 the file readers, the renderer and the templates. Brickyard is its own name and art.
 Nothing is fetched from Roblox; a place's assets come from the file or are replaced by
 placeholders, which the compatibility report lists.
@@ -68,8 +68,8 @@ hats, faces and shirts for the player's block avatar in the shop, and they can b
 bought as packs or come with the Plus subscription. Friends who accept an invite earn
 Bricks on both sides.
 
-image::img/brickyard-season-pass.png["The Me tab: level, daily streak and the season pass with its free and Plus tracks",scaledwidth=30%]
-image::img/brickyard-avatar.png["The Me tab: the player's character and its four looks",scaledwidth=30%]
+image::img/brickyard-season-pass.png["The profile tab: level, daily streak and the season pass with its free and Plus tracks",scaledwidth=30%]
+image::img/brickyard-avatar.png["The profile tab: the player's character and its four looks",scaledwidth=30%]
 image::img/brickyard-quests.png["Daily and weekly quests with their XP and Bricks rewards, two ready to claim",scaledwidth=30%]
 
 image::img/brickyard-shop-owned.png["The avatar shop: hats, faces and shirts priced in Bricks, one already owned",scaledwidth=30%]
@@ -106,9 +106,9 @@ image::img/brickyard-templates.png["Starting something new: pick a template and 
 image::img/brickyard-studio-phone.png["The phone studio: the viewport above the explorer",scaledwidth=30%]
 image::img/brickyard-insert-scripts.png["The Insert sheet: parts, models, scripts and effects",scaledwidth=30%]
 
-The Insert sheet adds parts, ready-made models, scripts and effects. A script is
+The Insert sheet adds parts, ready-made models, scripts, and effects. A script is
 Luau, and the editor colors it, checks its syntax and completes names as the creator
-types. *Play* runs a test copy of the place on the spot.
+types. *Play* runs a test copy of the place right away.
 
 image::img/brickyard-script-editor.png["The script editor with a Luau goal script and Save script",scaledwidth=30%]
 image::img/brickyard-playtest.png["Play testing: the goal script puts the objective on screen",scaledwidth=30%]
@@ -119,7 +119,7 @@ image::img/brickyard-playtest.png["Play testing: the goal script puts the object
 On a tablet the explorer, the viewport and the properties panel share the screen,
 with the output and script panes below the viewport. The Insert sheet adds ready-made
 models, such as a lamp post with its own light, and the Lighting tab switches the
-whole place between noon, dusk and night.
+whole place between noon, dusk, and night.
 
 image::img/brickyard-studio-tablet.png["The tablet studio: explorer, viewport and properties side by side",scaledwidth=90%]
 image::img/brickyard-insert-models.png["A lamp post model inserted and selected, its toolbox script in the output",scaledwidth=90%]
@@ -154,7 +154,7 @@ through the same tools, so an agent can do whatever a creator can, and its edits
 live in the explorer.
 
 [[brickyard-modules]]
-=== How it is built
+=== How it's built
 
 The engine is three framework modules that any Codename One app can use, and the
 application is an ordinary project with the usual module layout:
@@ -174,7 +174,7 @@ application is an ordinary project with the usual module layout:
 ==== The Luau runtime
 
 The interpreter covers the full Luau syntax and the standard libraries. Coroutines are
-interpreter frames, not threads, so a script that waits does not hold a thread. Every
+interpreter frames, not threads, so a script that waits doesn't hold a thread. Every
 script resume runs under an instruction budget, so an infinite loop in a creator's
 script becomes a reported error, never a hung app.
 
@@ -194,7 +194,7 @@ neither does anything in `ServerScriptService` or `ServerStorage`. Each client r
 snapshot of the replicated services, followed by property deltas, remote events and
 remote function calls (`ReplicaServer` and `ReplicaClient`). Each client drives its own
 character, and the server accepts a move only if the humanoid could make it at its own
-speed, correcting the client when it could not. Offline, the same place runs with the
+speed, correcting the client when it couldn't. Offline, the same place runs with the
 server and the client in one process.
 
 [[brickyard-backend]]
@@ -257,7 +257,7 @@ PostgreSQL and MySQL, and the client compile.
   validator is configured; elsewhere the receipt endpoint answers 503. Configure your
   own products and validator.
 * The server runs on the JVM backend runtime. `rbx-compat` needs the client core, so a
-  ParparVM-compiled server is not supported yet.
+  ParparVM-compiled server isn't supported yet.
 * Assets a place file references by URL are replaced by placeholders, and the
   compatibility report names them. A live platform needs its own asset hosting.
 * Your own hosting, a database, a push key and ad units.

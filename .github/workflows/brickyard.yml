@@ -64,6 +64,14 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
+      - name: Starter templates match their generator
+        # The .rbxlx templates are checked in so the jar needs no Python, and
+        # generated so their scripts stay editable: a hand edit to either side
+        # is drift.
+        run: |
+          python3 maven/rbx-compat/tools/gen-templates.py
+          git diff --exit-code -- maven/rbx-compat/src/main/resources/com/codename1/rbx/templates
+
       - name: Test both engine modules
         working-directory: maven
         run: |
