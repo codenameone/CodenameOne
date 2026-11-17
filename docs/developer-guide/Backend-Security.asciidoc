@@ -888,6 +888,212 @@ provider until they set one. The identities are kept in a
 table.
 
 [[backend-security-outbound]]
+=== Signing in through a SAML identity provider
+
+`saml2Login` signs users in through a SAML 2.0 identity provider, such as Okta,
+Microsoft Entra ID, ADFS, Ping, Google Workspace, Keycloak, or Shibboleth. This
+server is the service provider:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-saml2-login,indent=0]
+----
+
+The identity providers come from the configuration. The simplest registration
+names the provider's metadata, which holds its entity ID, its sign-in address
+and the certificates it signs with:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-saml2,indent=0]
+----
+
+Without metadata, describe the provider under
+`assertingparty.`: `entity-id`, `singlesignon.url`, `singlesignon.binding`
+(`REDIRECT` or `POST`), `singlesignon.sign-request`, and
+`verification.certificate-location`, a comma separated list of PEM files. A
+registration that signs its requests also sets
+`signing.private-key-location` and `signing.certificate-location`. An
+application that builds its registrations in code declares a
+`RelyingPartyRegistrationRepository` bean instead.
+
+A sign-in starts at `GET /saml2/authenticate/{registrationId}`. That sends the
+browser to the identity provider with an AuthnRequest. It ends at
+`POST /login/saml2/sso/{registrationId}`, where the provider posts its
+response. That's the Assertion Consumer Service address to give the provider.
+The rest of what the provider's administrator needs is this server's
+metadata, at `GET /saml2/service-provider-metadata/{registrationId}`. As with
+`oauth2Login`, a chain with no login page serves one with a link for each
+provider. With a single provider, a request that must sign in goes straight to
+it.
+
+Give the entity ID and the ACS address as whole URLs in production. Their
+defaults contain `{baseUrl}`, which is read from the `Host` header of the
+request.
+
+==== What a response must prove
+
+A response signs the user in only when these hold:
+
+* The response or its assertion carries an XML signature that verifies under a
+  configured certificate. A key the document itself carries is never used, and
+  SHA-1 signatures are refused unless the registration sets `sha1-allowed`.
+* The signature covers the element it's read from. A signed assertion
+  moved elsewhere in the document, or a second unsigned one beside it, is
+  refused rather than read.
+* The `Destination`, the `Issuer`, the audience and the bearer confirmation's
+  `Recipient` name this server and this provider.
+* The time is inside the assertion's validity window, give or take the
+  registration's clock skew (three minutes unless set).
+* `InResponseTo` names the request this browser was sent with. A response with
+  none is taken as unsolicited, which is how a sign-in from the provider's own
+  portal arrives.
+* The assertion was never used before on this server.
+
+The reader accepts no document type declaration, no entities beyond the
+five predefined ones, and no duplicate IDs. A comment inside a value doesn't
+cut the value short.
+
+The request the browser was sent with is kept in a short-lived signed cookie
+rather than in the session. The provider's answer is a cross-site POST, and a
+`SameSite=Lax` session cookie doesn't come with it. The cookie is signed with
+`cn1.security.saml2.cookie-secret`. When it isn't set, each process makes its
+own key, so set it on any server behind a load balancer.
+
+==== Roles and attributes
+
+Every user signed in through SAML has `ROLE_USER`. The authentication
+converter decides otherwise, typically from a group attribute the provider
+sends:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-saml2-roles,indent=0]
+----
+
+Return null from the converter to refuse the user. A request reads the
+attributes from the principal:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-saml2-user,indent=0]
+----
+
+==== Encrypted assertions
+
+A provider that encrypts its assertions encrypts them to this server's
+certificate. Give the registration the matching key pair with
+`decryption.private-key-location` and `decryption.certificate-location`, or
+`decryptionCredential(...)` in code. Several pairs may be listed, comma
+separated, to roll a key over. The certificate then appears in the metadata as
+an encryption key, with the algorithms this server reads.
+
+Content encrypted with AES-GCM or AES-CBC, 128 to 256 bits, is read, with the
+key wrapped by RSA-OAEP. RSA PKCS#1 v1.5 key transport is refused, as it
+allows the provider's ciphertext to be decrypted by trial. Every failure to
+decrypt is reported as one error with one message, so a refusal reveals
+nothing about the padding. A response signature is verified before anything
+is decrypted, and the decrypted assertion must still carry a signature of its
+own unless the response is signed.
+
+==== Single Logout
+
+`saml2Logout` signs a user out at the identity provider as well, and so out of
+every application the provider signed them in to:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-saml2-logout,indent=0]
+----
+
+The chain's own sign-out, `POST /logout`, ends the session here and then
+sends the browser to the provider with a signed `LogoutRequest`. The provider
+answers at `/logout/saml2/slo/{registrationId}`, and the browser goes on to the
+sign-out page. A sign-out that starts at the provider arrives at the same
+address: the session of the user it names ends, and the browser goes back with
+a signed `LogoutResponse`.
+
+A registration takes part when it has a signing key pair and the provider's
+logout address. The address comes from the provider's metadata, or from
+`assertingparty.singlelogout.url`, with `.response-url` and `.binding` when
+they differ from the defaults. This server's own address, which the metadata
+publishes, is `singlelogout.url`. Every logout message has to be signed both
+ways: one that arrives unsigned is refused, since anyone could otherwise end
+anyone's session.
+
+Configure the provider to send its logout messages with the HTTP-Redirect
+binding. A sign-out the provider starts is a cross-site request, and only a
+top-level GET carries the `SameSite=Lax` session cookie. A message that
+arrives by POST finds no session, is answered with success, and the session
+here lasts until it expires. Spring Security has the same limit. SOAP (back
+channel) logout isn't supported.
+
+=== Signing in against LDAP or Active Directory
+
+`LdapAuthenticationProvider` checks a username and password against a
+directory. It plugs into form login and HTTP Basic alike:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-ldap,indent=0]
+----
+
+`BindAuthenticator` checks the password by binding to the directory as the
+user, so the directory's own policy for lockout and expiry applies. It finds
+the user's DN from patterns such as `uid={0},ou=people`, or with a
+`FilterBasedLdapUserSearch` when users live in more than one place.
+`DefaultLdapAuthoritiesPopulator` makes a role of each group whose `member`
+names the user: group `admins` becomes `ROLE_ADMINS`.
+
+The same setup from the configuration:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-security.properties[tag=backend-security-properties-ldap,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-ldap-config,indent=0]
+----
+
+Without `user-dn-patterns`, users are found with `user-search-base` and
+`user-search-filter`, `(uid={0})` by default. The other settings are
+`starttls`, `ca-file`, `connect-timeout-millis`, `read-timeout-millis`,
+`group-search-filter` and `group-role-attribute`.
+
+For Active Directory, `ActiveDirectoryLdapAuthenticationProvider` binds as
+`user@domain` and makes each group in the user's `memberOf` an authority named
+by the group:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-active-directory,indent=0]
+----
+
+It reports a locked account, an expired password, a disabled account and an
+expired account as such, rather than as a wrong password.
+
+`memberOf` lists only a user's direct groups. To include the groups those
+groups are members of, turn on nested groups, which costs one more
+search for each sign-in:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/SecuritySnippets.java[tag=backend-security-active-directory-nested,indent=0]
+----
+
+What the user types is escaped before it reaches a filter or a DN, so a
+username such as `*` or `admin)(uid=*` matches only itself. An empty password is
+refused without asking the directory. A bind with a name and no password is an
+unauthenticated bind, and many directories answer it with success.
+
+Use `ldaps://`, or `starttls`, for every directory reached over a network. The
+password travels as the directory reads it, so plain `ldap://` shows every
+password to anyone on the path. Connections aren't pooled: each sign-in opens
+one and closes it. Referrals aren't followed: a search returns what the server
+it asked holds. SASL binds and changes to the directory aren't supported.
+
 === Calling other services
 
 A server that calls another API as itself, not on behalf of a user, needs an

@@ -455,6 +455,32 @@ public final class Crypto {
         return out;
     }
 
+    /// Decrypts RSA-OAEP with a PKCS#8 RSA private key: the key transport of
+    /// XML Encryption and JWE. `digest` hashes the (empty) label and
+    /// `mgfDigest` drives MGF1; XML Encryption's `rsa-oaep-mgf1p` is SHA-1 for
+    /// both, and `rsa-oaep` names each.
+    ///
+    /// Every failure is the same exception with the same text -- a wrong key,
+    /// a malformed block and a padding error are not told apart -- so a caller
+    /// that reports the failure leaks nothing an attacker could steer by.
+    ///
+    /// @param digest [#SHA1], [#SHA256], [#SHA384] or [#SHA512]
+    /// @param mgfDigest the same choices
+    /// @throws IOException when the block does not decrypt under the key
+    public static byte[] rsaOaepDecrypt(String digest, String mgfDigest, byte[] privateKey,
+                                        byte[] ciphertext) throws IOException {
+        int d = digestCode(digest);
+        int m = digestCode(mgfDigest);
+        if (privateKey == null || ciphertext == null) {
+            throw new IOException("RSA-OAEP decryption failed");
+        }
+        byte[] out = rsaOaepDecryptImpl(d, m, privateKey, ciphertext);
+        if (out == null) {
+            throw new IOException("RSA-OAEP decryption failed");
+        }
+        return out;
+    }
+
     private static int curveCode(String curve) throws IOException {
         if (P256.equals(curve)) {
             return 1;
@@ -588,6 +614,8 @@ public final class Crypto {
     private static native byte[] generateEcKeyImpl(int curve);
     private static native byte[] ecdhImpl(byte[] pkcs8, byte[] spki);
     private static native byte[] aesCbcImpl(boolean encrypt, byte[] key, byte[] iv, byte[] input);
+    private static native byte[] rsaOaepDecryptImpl(int digest, int mgfDigest, byte[] pkcs8,
+            byte[] ciphertext);
     private static native byte[] aesGcmImpl(boolean encrypt, byte[] key, byte[] iv, byte[] aad,
                                             byte[] input);
 }

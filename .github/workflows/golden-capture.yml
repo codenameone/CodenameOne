@@ -18,13 +18,19 @@ name: Golden capture
 #      `cn1ss_capture`: the FULL suite runs (tests leak, so a subset could
 #      render differently), non-screenshot jobs skip, and every image without
 #      a golden is uploaded instead of gated (.github/actions/cn1ss-capture);
-#   3. commits the images to the branch and pushes with CN1SS_GH_TOKEN, so the
-#      push starts the normal CI, where the detector now finds nothing.
+#   3. exits. It does not wait: the slowest leg takes hours, often more while
+#      macOS runners are queued, and a job that polled for that long held a
+#      runner the whole time and lost everything that had arrived when it hit
+#      its deadline. Each capture run's completion starts golden-harvest.yml,
+#      and once the last one at this head has completed, that collects every
+#      image without a golden, commits them and pushes with CN1SS_GH_TOKEN, so
+#      the push starts the normal CI, where the detector now finds nothing.
 #
-# Only images that fill a gap are committed. A gap still open afterwards fails
-# this job by name: its leg failed, or the test captures nothing there and
-# needs a cn1ss-skip declaration. What did arrive is still committed, so the
-# next push captures only what is left.
+# A gap still open after that push is golden-plan's to report: its leg failed,
+# or the test captures nothing there and needs a cn1ss-skip declaration. What
+# did arrive is still committed, so the next push captures only what is left.
+# When nothing arrives at all, the harvest re-runs the PR's cancelled runs, and
+# their golden-plan job fails naming the gap.
 #
 # Pull requests from forks are skipped: the dispatches need the branch in this
 # repository and the push needs a token a fork run does not get. Review the
@@ -69,8 +75,10 @@ jobs:
     needs: detect
     if: needs.detect.outputs.tests != ''
     runs-on: ubuntu-24.04
-    # The slowest screenshot leg runs about two hours; this job only waits.
-    timeout-minutes: 330
+    # Dispatching only; golden-harvest.yml collects. golden-capture.sh waits
+    # up to five minutes for each of seven runs to appear, and a timeout
+    # would skip the re-run below.
+    timeout-minutes: 45
     permissions:
       contents: read
       actions: write
@@ -79,10 +87,10 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TESTS: ${{ needs.detect.outputs.tests }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
-      BASE_SHA: ${{ github.event.pull_request.base.sha }}
       RUNS: /tmp/golden-capture-runs.txt
     steps:
-      # Before anything is cancelled: without the token nothing can be pushed.
+      # Before anything is cancelled: without the token the harvest cannot
+      # push what the capture renders.
       - name: Check the push token
         env:
           CN1SS_GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
@@ -99,10 +107,10 @@ jobs:
             exit 1
           fi
 
+      # Only for the scripts: the dispatched runs check out the branch themselves.
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          token: ${{ secrets.CN1SS_GH_TOKEN }}
+          persist-credentials: false
 
       - name: Cancel the PR's other runs
         id: cancel1
@@ -124,53 +132,24 @@ jobs:
             const {cancelForCapture} = require('./scripts/ci/cancel-stale-pr-runs.js');
             core.setOutput('ids', (await cancelForCapture({github, context, core, keepRunId: context.runId})).join(' '));
 
-      - name: Wait for the capture runs
-        run: scripts/ci/golden-capture.sh wait "$RUNS"
-
-      - name: Collect, commit and push the goldens
-        id: push
+      # Failed or cancelled (a new push replaced this job mid-dispatch):
+      # nothing else stops the captures it did start.
+      - name: Cancel the captures that did start
+        if: failure() || cancelled()
         run: |
-          set -euo pipefail
-          # Pull the branch again first: someone may have pushed while the legs
-          # ran. A capture only adds files, so it applies on top of any head.
-          git pull --ff-only origin "$HEAD_REF"
-          git fetch --no-tags origin "$BASE_SHA"
-          base="$(git merge-base HEAD "$BASE_SHA")"
-          ok=1
-          scripts/ci/golden-capture.sh collect "$RUNS" "$GITHUB_WORKSPACE" "$base" || ok=0
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A -- scripts
-          if git diff --cached --quiet; then
-            echo "::error::No capture leg produced an image for: $TESTS"
-            exit 1
-          fi
-          git commit -m "Capture goldens for $TESTS" \
-            -m "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          git push origin "HEAD:$HEAD_REF"
-          echo "pushed=1" >> "$GITHUB_OUTPUT"
-          if [ "$ok" != 1 ]; then
-            echo "::error::At least one capture leg failed; see the log above for which."
-            exit 1
-          fi
+          [ -f "$RUNS" ] || exit 0
+          while read -r wf id; do
+            gh run cancel "$id" --repo "$GITHUB_REPOSITORY" || true
+          done < "$RUNS"
 
-      # A capture that never pushed would leave the PR's other checks cancelled
-      # for good; start them again.
+      # A capture that never got going would leave the PR's other checks
+      # cancelled for good; start them again. Not when cancelled: the push
+      # that replaced this job started them.
       - name: Re-run what was cancelled
-        # Not after a push: that started CI on the new head already.
-        if: failure() && steps.push.outputs.pushed != '1'
+        if: failure()
         env:
           IDS: ${{ steps.cancel1.outputs.ids }} ${{ steps.cancel2.outputs.ids }}
         run: |
           for id in $IDS; do
             gh run rerun "$id" --repo "$GITHUB_REPOSITORY" || echo "could not re-run $id"
           done
-
-      # Superseded (a new push) or timed out: the dispatched suites are ours.
-      - name: Cancel the capture runs
-        if: cancelled() || failure()
-        run: |
-          [ -f "$RUNS" ] || exit 0
-          while read -r wf id; do
-            gh run cancel "$id" --repo "$GITHUB_REPOSITORY" || true
-          done < "$RUNS"

@@ -108,9 +108,12 @@ public final class HttpSecurity {
     static final int ORDER_HEADERS = 200;
     static final int ORDER_CSRF = 400;
     static final int ORDER_LOGOUT = 500;
+    static final int ORDER_SAML2_LOGOUT = 520;
     static final int ORDER_OAUTH2_AUTHORIZATION_REQUEST = 600;
+    static final int ORDER_SAML2_AUTHENTICATION_REQUEST = 650;
     static final int ORDER_AUTHORIZATION_SERVER = 700;
     static final int ORDER_OAUTH2_LOGIN = 900;
+    static final int ORDER_SAML2_LOGIN = 925;
     static final int ORDER_WEBAUTHN_LOGIN = 950;
     static final int ORDER_FORM_LOGIN = 1000;
     static final int ORDER_SECOND_FACTOR = 1050;
@@ -169,12 +172,17 @@ public final class HttpSecurity {
         filterOrder.put(PACKAGE + "HeaderWriterFilter", Integer.valueOf(ORDER_HEADERS));
         filterOrder.put(PACKAGE + "CsrfFilter", Integer.valueOf(ORDER_CSRF));
         filterOrder.put(PACKAGE + "LogoutFilter", Integer.valueOf(ORDER_LOGOUT));
+        filterOrder.put(PACKAGE + "Saml2LogoutFilter", Integer.valueOf(ORDER_SAML2_LOGOUT));
         filterOrder.put(PACKAGE + "OAuth2AuthorizationRequestRedirectFilter",
                 Integer.valueOf(ORDER_OAUTH2_AUTHORIZATION_REQUEST));
         filterOrder.put(PACKAGE + "OAuth2AuthorizationServerFilter",
                 Integer.valueOf(ORDER_AUTHORIZATION_SERVER));
         filterOrder.put(PACKAGE + "OAuth2LoginAuthenticationFilter",
                 Integer.valueOf(ORDER_OAUTH2_LOGIN));
+        filterOrder.put(PACKAGE + "Saml2WebSsoAuthenticationRequestFilter",
+                Integer.valueOf(ORDER_SAML2_AUTHENTICATION_REQUEST));
+        filterOrder.put(PACKAGE + "Saml2WebSsoAuthenticationFilter",
+                Integer.valueOf(ORDER_SAML2_LOGIN));
         filterOrder.put(PACKAGE + "WebAuthnAuthenticationFilter",
                 Integer.valueOf(ORDER_WEBAUTHN_LOGIN));
         filterOrder.put(PACKAGE + "UsernamePasswordAuthenticationFilter",
@@ -295,6 +303,34 @@ public final class HttpSecurity {
         OAuth2LoginConfigurer configurer = getConfigurer(OAuth2LoginConfigurer.class);
         if (configurer == null) {
             configurer = new OAuth2LoginConfigurer();
+            apply(configurer);
+            sessionMechanism();
+        }
+        customizer.customize(configurer);
+        return this;
+    }
+
+    /// Sign-in through a SAML 2.0 identity provider; see
+    /// [Saml2LoginConfigurer]. Brings sign-out and the memory of where a
+    /// request was going with it, as [#formLogin] does.
+    public HttpSecurity saml2Login(Customizer<Saml2LoginConfigurer> customizer) {
+        Saml2LoginConfigurer configurer = getConfigurer(Saml2LoginConfigurer.class);
+        if (configurer == null) {
+            configurer = new Saml2LoginConfigurer();
+            apply(configurer);
+            sessionMechanism();
+        }
+        customizer.customize(configurer);
+        return this;
+    }
+
+    /// SAML Single Logout for the users [#saml2Login] signs in; see
+    /// [Saml2LogoutConfigurer]. Needs `saml2Login`, and a signing key on each
+    /// registration that takes part.
+    public HttpSecurity saml2Logout(Customizer<Saml2LogoutConfigurer> customizer) {
+        Saml2LogoutConfigurer configurer = getConfigurer(Saml2LogoutConfigurer.class);
+        if (configurer == null) {
+            configurer = new Saml2LogoutConfigurer();
             apply(configurer);
             sessionMechanism();
         }
@@ -889,6 +925,37 @@ public final class HttpSecurity {
 
     List<String[]> loginLinks() {
         return loginLinks;
+    }
+
+    private boolean loginLinksPageAdded;
+    private final LogoutHooks logoutHooks = new LogoutHooks();
+    private String saml2LogoutBase;
+
+    LogoutHooks logoutHooks() {
+        return logoutHooks;
+    }
+
+    /// The path SAML logout messages arrive at, before the registration's id;
+    /// null without `saml2Logout`. A string, not the configurer, so that the
+    /// SAML login asks it without linking the logout.
+    String saml2LogoutBase() {
+        return saml2LogoutBase;
+    }
+
+    void saml2LogoutBase(String base) {
+        this.saml2LogoutBase = base;
+    }
+
+    /// Adds the page of links to [#loginLinks] once, for whichever of the
+    /// sign-ins through another provider configures first. A flag here rather
+    /// than one configurer asking for the other, which would link the other
+    /// into every server that declares only one.
+    void addLoginLinksPage() {
+        if (!loginLinksPageAdded) {
+            loginLinksPageAdded = true;
+            addFilter(new LoginLinksPage(loginPage(), new ArrayList<String[]>(loginLinks)),
+                    ORDER_LOGIN_PAGE);
+        }
     }
 
     private final List<String> passwordResetPages = new ArrayList<String>();

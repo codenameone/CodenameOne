@@ -32,11 +32,20 @@ import com.codename1.backend.security.Customizer;
 import com.codename1.backend.security.HttpSecurity;
 import com.codename1.backend.security.HttpStatusEntryPoint;
 import com.codename1.backend.security.SecurityContextHolder;
+import com.codename1.backend.security.GrantedAuthority;
+import com.codename1.backend.security.SimpleGrantedAuthority;
 import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.security.SessionCreationPolicy;
 import com.codename1.backend.security.apikey.ApiKeyGenerator;
 import com.codename1.backend.security.apikey.GeneratedApiKey;
 import com.codename1.backend.security.apikey.JdbcApiKeyRepository;
+import com.codename1.backend.security.ldap.ActiveDirectoryLdapAuthenticationProvider;
+import com.codename1.backend.security.ldap.BindAuthenticator;
+import com.codename1.backend.security.ldap.DefaultLdapAuthoritiesPopulator;
+import com.codename1.backend.security.ldap.LdapAuthenticationProvider;
+import com.codename1.backend.security.ldap.LdapContextSource;
+import com.codename1.backend.security.saml2.Saml2Authentication;
+import com.codename1.backend.security.saml2.Saml2AuthenticatedPrincipal;
 import com.codename1.backend.security.mfa.RecoveryCodeService;
 import com.codename1.backend.security.mfa.TotpEnrollment;
 import com.codename1.backend.security.mfa.TotpService;
@@ -175,6 +184,80 @@ http.rateLimit("/api/**",
 http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
     .oauth2Login(Customizer.withDefaults());
 // end::backend-security-oauth2-login[]
+    }
+
+    public static void saml2Login(HttpSecurity http) {
+// tag::backend-security-saml2-login[]
+http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+    .saml2Login(Customizer.withDefaults());
+// end::backend-security-saml2-login[]
+    }
+
+    public static void saml2Logout(HttpSecurity http) {
+// tag::backend-security-saml2-logout[]
+http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+    .saml2Login(Customizer.withDefaults())
+    .saml2Logout(Customizer.withDefaults());
+// end::backend-security-saml2-logout[]
+    }
+
+    public static void activeDirectoryNested(HttpSecurity http) {
+// tag::backend-security-active-directory-nested[]
+ActiveDirectoryLdapAuthenticationProvider ad = new ActiveDirectoryLdapAuthenticationProvider(
+        "corp.example", "ldaps://dc1.corp.example");
+ad.setSearchNestedGroups(true);
+http.authenticationProvider(ad).formLogin(Customizer.withDefaults());
+// end::backend-security-active-directory-nested[]
+    }
+
+    public static void saml2Roles(HttpSecurity http) {
+// tag::backend-security-saml2-roles[]
+http.saml2Login(saml -> saml.authenticationConverter(principal -> {
+    List<GrantedAuthority> roles = new java.util.ArrayList<>();
+    for (String group : principal.getAttribute("groups")) {
+        roles.add(new SimpleGrantedAuthority("ROLE_" + group));
+    }
+    return new Saml2Authentication(principal, roles);
+}));
+// end::backend-security-saml2-roles[]
+    }
+
+    public static String saml2User() {
+// tag::backend-security-saml2-user[]
+Saml2AuthenticatedPrincipal user =
+        ((Saml2Authentication) SecurityContextHolder.getContext().getAuthentication())
+                .getPrincipal();
+String email = user.getFirstAttribute("email");
+// end::backend-security-saml2-user[]
+        return email;
+    }
+
+    public static void ldap(HttpSecurity http) {
+// tag::backend-security-ldap[]
+LdapContextSource directory = new LdapContextSource("ldaps://ldap.corp.example/dc=corp,dc=example");
+directory.setUserDn("cn=reader,dc=corp,dc=example");
+directory.setPassword(System.getenv("LDAP_READER_PASSWORD"));
+BindAuthenticator bind = new BindAuthenticator(directory);
+bind.setUserDnPatterns("uid={0},ou=people");
+http.authenticationProvider(new LdapAuthenticationProvider(bind,
+        new DefaultLdapAuthoritiesPopulator(directory, "ou=groups")))
+    .formLogin(Customizer.withDefaults());
+// end::backend-security-ldap[]
+    }
+
+    public static void ldapFromConfig(HttpSecurity http) throws IOException {
+// tag::backend-security-ldap-config[]
+http.authenticationProvider(LdapAuthenticationProvider.fromConfig(http.getConfig()))
+    .httpBasic(Customizer.withDefaults());
+// end::backend-security-ldap-config[]
+    }
+
+    public static void activeDirectory(HttpSecurity http) {
+// tag::backend-security-active-directory[]
+http.authenticationProvider(new ActiveDirectoryLdapAuthenticationProvider(
+        "corp.example", "ldaps://dc1.corp.example"))
+    .formLogin(Customizer.withDefaults());
+// end::backend-security-active-directory[]
     }
 
     public static void rememberMe(HttpSecurity http, DataSource dataSource) {
