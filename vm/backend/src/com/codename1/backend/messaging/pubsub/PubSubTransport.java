@@ -31,9 +31,9 @@ import com.codename1.backend.messaging.MessageTransport;
 import com.codename1.backend.messaging.Messaging;
 import com.codename1.backend.messaging.PollingTransport;
 import com.codename1.backend.messaging.RetryPolicy;
-import com.codename1.backend.security.oauth2.client.credentials.AccessToken;
 import com.codename1.backend.security.oauth2.client.credentials.AccessTokenGrant;
 import com.codename1.backend.security.oauth2.client.credentials.AccessTokenProvider;
+import com.codename1.backend.security.oauth2.client.credentials.GoogleMetadataServerGrant;
 import com.codename1.backend.security.oauth2.client.credentials.GoogleServiceAccountCredentials;
 import com.codename1.backend.security.oauth2.client.credentials.TokenAcquisitionException;
 import com.codename1.impl.backend.WireBuffer;
@@ -83,8 +83,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class PubSubTransport extends PollingTransport {
     private static final String API = "https://pubsub.googleapis.com/v1/";
     private static final String SCOPE = "https://www.googleapis.com/auth/pubsub";
-    private static final String METADATA_TOKEN = "http://metadata.google.internal/computeMetadata"
-            + "/v1/instance/service-accounts/default/token";
     private static final String KEY = "cn1-key";
     private static final String EMPTY = "cn1-empty";
     private static final int MAX_DEADLINE = 600;
@@ -151,7 +149,7 @@ public final class PubSubTransport extends PollingTransport {
             base = API;
             AccessTokenGrant grant = keyFile != null && keyFile.trim().length() > 0
                     ? GoogleServiceAccountCredentials.fromFile(keyFile.trim()).grant(SCOPE)
-                    : new MetadataServerGrant();
+                    : new GoogleMetadataServerGrant();
             tokens = new AccessTokenProvider(grant);
         }
         leaseSeconds = Math.max(10, Math.min(MAX_DEADLINE, leaseMillis / 1000));
@@ -160,37 +158,6 @@ public final class PubSubTransport extends PollingTransport {
     @Override
     public String getName() {
         return "pubsub";
-    }
-
-    /// The default service account of the Google Cloud machine this runs on.
-    private static final class MetadataServerGrant implements AccessTokenGrant {
-        @Override
-        public AccessToken fetch() {
-            List<String> headers = new ArrayList<String>(1);
-            headers.add("Metadata-Flavor: Google");
-            try {
-                Web.Result r = Web.request("GET", METADATA_TOKEN, headers, null);
-                if (!r.isSuccess()) {
-                    throw new TokenAcquisitionException("The metadata server refused a token ("
-                            + r.getStatus() + ")", r.getStatus(), null, true, null);
-                }
-                Map reply = Json.parseObject(r.getBodyAsString());
-                Object token = reply.get("access_token");
-                Object expires = reply.get("expires_in");
-                if (!(token instanceof String)) {
-                    throw new TokenAcquisitionException("The metadata server sent no token",
-                            r.getStatus(), null, true, null);
-                }
-                long seconds = expires instanceof Number ? ((Number) expires).longValue() : 300;
-                return new AccessToken((String) token, "Bearer",
-                        System.currentTimeMillis() + seconds * 1000,
-                        Collections.<String>emptySet());
-            } catch (IOException err) {
-                throw new TokenAcquisitionException("No Google credentials: no key file is "
-                        + "configured and the metadata server did not answer: "
-                        + err.getMessage(), 0, null, true, err);
-            }
-        }
     }
 
     /// One REST call; the reply, or null when `tolerate` is its status.
