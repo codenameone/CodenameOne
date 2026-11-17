@@ -39,14 +39,7 @@ public final class HomeForm {
 
     public static void show() {
         final Form f = Ui.section("Brickyard", "home", 0);
-        com.codename1.ui.Command settings = f.getToolbar().addMaterialCommandToRightBar("",
-                com.codename1.ui.FontImage.MATERIAL_SETTINGS, e -> SettingsForm.show());
-        // An icon-only button still needs a name: a screen reader (and an
-        // agent driving the app over MCP) has nothing else to go by.
-        com.codename1.ui.Button gear = f.getToolbar().findCommandComponent(settings);
-        if (gear != null) {
-            gear.setAccessibilityText("Settings");
-        }
+        Ui.settingsButton(f);
         final Container content = Ui.content(f);
         content.add(Ui.bricks());
         content.add(Ui.label("Loading...", "Muted"));

@@ -223,4 +223,20 @@ public final class Ui {
     public static void later(Runnable r) {
         CN.callSerially(r);
     }
+
+    /// The settings gear on a section's title bar. The command carries the
+    /// word "Settings" so a desktop window, which hides the toolbar and
+    /// lists the form's commands in its menu bar, has an item to show: an
+    /// unnamed command left settings and sign out unreachable there. The
+    /// phone button shows the gear alone and keeps the word for screen
+    /// readers and agents.
+    static void settingsButton(Form f) {
+        Command settings = f.getToolbar().addMaterialCommandToRightBar("Settings",
+                FontImage.MATERIAL_SETTINGS, e -> SettingsForm.show());
+        Button gear = f.getToolbar().findCommandComponent(settings);
+        if (gear != null) {
+            gear.setText("");
+            gear.setAccessibilityText("Settings");
+        }
+    }
 }

@@ -92,4 +92,29 @@ class CharacterWalkTest {
         assertTrue(at.z > -10.5, "stopped in front of the crate, at z=" + at.z);
         assertTrue(at.y < 5, "still on the floor, not on top of the crate, at y=" + at.y);
     }
+
+    /// Two characters spawned on one spot overlap. Each one's parts were a
+    /// wall to the other in every direction, so the second player could not
+    /// walk off: frozen in a crowded lobby until the first one moved.
+    @Test
+    void walksOutOfAnotherCharacter() {
+        Engine e = new Engine(Engine.SOLO);
+        e.setPhysics(new RigidBodies());
+        part(e, "Part", 0, -1, 0, 100, 2, 100, 1, 1);
+        part(e, "SpawnLocation", 0, 0.5, 0, 2, 1, 2, 1, 1);
+        e.addPlayer(1, "First", null);
+        e.addPlayer(2, "Second", null);
+        for (int i = 0; i < 60; i++) {
+            e.step(1 / 60.0);
+        }
+        Instance second = (Instance) e.service("Players").getChildren().get(1).prop("Character");
+        Instance root = second.findFirstChild("HumanoidRootPart");
+        double z0 = Behaviors.cf(root).z;
+        Instance hum = second.findFirstChildOfClass("Humanoid", false);
+        for (int i = 0; i < 60; i++) {
+            hum.put("MoveDirection", new Vector3(0, 0, -1));
+            e.step(1 / 60.0);
+        }
+        assertTrue(Behaviors.cf(root).z < z0 - 8, "walked away from the other character, z " + z0 + " -> " + Behaviors.cf(root).z);
+    }
 }

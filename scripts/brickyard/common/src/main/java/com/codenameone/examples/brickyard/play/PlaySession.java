@@ -259,6 +259,12 @@ public final class PlaySession {
             leaveButton.setAccessibilityText("Leave");
             leaveButton.setName("leaveButton");
         }
+        if (CN.isDesktop()) {
+            // A desktop window shows the form's commands in its menu bar and
+            // no toolbar back arrow, so Leave must be a menu item there or a
+            // player has no way out of a game but closing the app.
+            f.getToolbar().addCommandToOverflowMenu(leaveCmd);
+        }
         f.getToolbar().addCommandToOverflowMenu(new Command("Players") {
             @Override
             public void actionPerformed(ActionEvent evt) {
