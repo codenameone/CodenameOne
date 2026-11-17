@@ -522,7 +522,9 @@ jobs:
         # Deliberately NOT expressed as a count against the reference directory:
         # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
         # reference set, which is exactly the situation a seeding run is in.
-        if: ${{ !cancelled() }}
+        # Not in a capture (cn1ss_capture): it renders goldens nobody has, so
+        # there is no comparison report, and the capture artifact is the check.
+        if: ${{ (!cancelled()) && inputs.cn1ss_capture == '' }}
         env:
           # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
           # screenshot step's own env block, and step env does not reach other
@@ -980,7 +982,9 @@ jobs:
         # Deliberately NOT expressed as a count against the reference directory:
         # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
         # reference set, which is exactly the situation a seeding run is in.
-        if: ${{ !cancelled() }}
+        # Not in a capture (cn1ss_capture): it renders goldens nobody has, so
+        # there is no comparison report, and the capture artifact is the check.
+        if: ${{ (!cancelled()) && inputs.cn1ss_capture == '' }}
         env:
           # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
           # screenshot step's own env block, and step env does not reach other
