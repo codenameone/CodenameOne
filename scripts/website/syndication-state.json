@@ -3413,6 +3413,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-17T01:01:09+00:00"
+      },
+      "devto": {
+        "id": 5057860,
+        "url": "https://dev.to/codenameone/packaging-java-apps-for-xbox-developer-mode-and-why-consoles-need-help-4ob",
+        "syndicated_at": "2026-11-17T14:15:41+00:00"
       }
     }
   }
