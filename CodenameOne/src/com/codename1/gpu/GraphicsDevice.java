@@ -503,17 +503,8 @@ public abstract class GraphicsDevice {
         int colorSlot = sm == null ? -1 : sm.getUniformSlot(ShaderMaterial.INSTANCE_COLOR);
         float[] u = sm == null ? null : sm.getUniformValues();
         float[] m = instanceMatrix;
-        // A material without a shader has no instanceColor uniform to carry
-        // the copy's colour, so it reaches the copy through the material's
-        // base colour instead (modulated by it, then restored). Without this
-        // every copy of a plain PBR material drew in its base colour alone.
-        boolean tintBase = colorSlot < 0 && colors != null;
-        int base = material.getColor();
         for (int i = 0; i < count; i++) {
             System.arraycopy(matrices, i * 16, m, 0, 16);
-            if (tintBase) {
-                material.setColor(modulate(base, colors[i]));
-            }
             if (idSlot >= 0) {
                 u[idSlot * 4] = i;
                 // a cheap integer hash, the same copy always gets the same number
@@ -536,18 +527,6 @@ public abstract class GraphicsDevice {
             u[idSlot * 4] = 0f;
             u[idSlot * 4 + 1] = 0f;
         }
-        if (tintBase) {
-            material.setColor(base);
-        }
-    }
-
-    /// The channel-wise product of two ARGB colours.
-    static int modulate(int a, int b) {
-        int r = (((a >> 16) & 0xff) * ((b >> 16) & 0xff) + 127) / 255;
-        int g = (((a >> 8) & 0xff) * ((b >> 8) & 0xff) + 127) / 255;
-        int bl = ((a & 0xff) * (b & 0xff) + 127) / 255;
-        int al = (((a >>> 24) & 0xff) * ((b >>> 24) & 0xff) + 127) / 255;
-        return (al << 24) | (r << 16) | (g << 8) | bl;
     }
 
     /// Releases the GPU resources backing a vertex buffer.

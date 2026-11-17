@@ -195,6 +195,29 @@ class GenerateOpenApiMojoTest {
         assertTrue(petSrc.contains("public Long id;"), "Pet class should declare Long id field");
         assertTrue(petSrc.contains("public String name;"), "Pet class should declare String name field");
         assertTrue(petSrc.contains("public Pet() {}"), "Pet class should have a public no-arg ctor");
+        // The record form's API as well, so the same calling code compiles at either target.
+        assertTrue(petSrc.contains("public Long id() {"), "Pet class should have a record-style id() accessor:\n" + petSrc);
+        assertTrue(petSrc.contains("public String name() {"), "Pet class should have a record-style name() accessor");
+        assertTrue(petSrc.contains("this.id = id;"), "Pet class should have the record's canonical constructor");
+    }
+
+    @Test
+    void classFormSkipsAccessorsThatWouldRedeclareObjectMethods(@TempDir Path tmp) throws Exception {
+        // A field named like an Object method is legal; an accessor of that name is not
+        // (getClass is final, hashCode/toString would clash on return type).
+        Map<String, Object> doc = parse("{\"openapi\":\"3.0.0\","
+                + "\"info\":{\"title\":\"T\",\"version\":\"1\"},\"paths\":{},"
+                + "\"components\":{\"schemas\":{\"Odd\":{\"type\":\"object\",\"properties\":{"
+                + "\"getClass\":{\"type\":\"string\"},\"hashCode\":{\"type\":\"string\"},"
+                + "\"name\":{\"type\":\"string\"}}}}}}");
+        File out = tmp.toFile();
+        new GenerateOpenApiMojo.Generator(doc, "com.example.odd", out, true,
+                /*emitRecords*/ false, new SystemStreamLog()).run();
+        String src = readString(new File(out, "com/example/odd/model/Odd.java"));
+        assertTrue(src.contains("public String getClass;"), src);
+        assertTrue(src.contains("public String name() {"), src);
+        assertFalse(src.contains("getClass() {"), "getClass() is final in Object:\n" + src);
+        assertFalse(src.contains("hashCode() {"), "hashCode() must stay Object's int method:\n" + src);
     }
 
     @Test

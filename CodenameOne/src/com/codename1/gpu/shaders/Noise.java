@@ -178,42 +178,6 @@ public final class Noise {
         return best;
     }
 
-    /// The edges of cellular noise: the second-nearest feature point's
-    /// distance minus the nearest's (F2 - F1). It is 0 on the border between
-    /// two cells and grows toward each cell's middle, so a `smoothstep` of it
-    /// draws a connected network of cracks or seams of even width -- lava
-    /// crust, dried mud, cracked ice, cobble joints -- where `cellular` draws
-    /// round spots.
-    ///
-    /// #### Parameters
-    ///
-    /// - `p`: a `VEC2`
-    ///
-    /// - `phase`: a `FLOAT` that animates the points, or null for still ones
-    ///
-    /// #### Returns
-    ///
-    /// a `FLOAT`, 0 on a cell border
-    public static ShaderNode cellularEdge(ShaderNode p, ShaderNode phase) {
-        ShaderNode i = floor(p);
-        ShaderNode fr = fract(p);
-        ShaderNode f1 = f(8f);
-        ShaderNode f2 = f(8f);
-        for (int y = -1; y <= 1; y++) {
-            for (int x = -1; x <= 1; x++) {
-                ShaderNode o = vec2(x, y);
-                ShaderNode pt = hash2(i.add(o));
-                if (phase != null) {
-                    pt = sin(pt.mul((float) (2 * Math.PI)).add(phase)).mul(0.5f).add(0.5f);
-                }
-                ShaderNode d = length(o.add(pt).sub(fr));
-                f2 = min(f2, max(f1, d));
-                f1 = min(f1, d);
-            }
-        }
-        return f2.sub(f1);
-    }
-
     /// The slope of fractal noise, as a tangent space normal for
     /// `ShaderNode.perturbNormal`: bumps without a normal map.
     ///

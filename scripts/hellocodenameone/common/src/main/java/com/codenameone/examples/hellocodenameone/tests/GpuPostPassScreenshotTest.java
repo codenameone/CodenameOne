@@ -47,6 +47,8 @@ import com.codename1.ui.util.UITimer;
 /// edges, and one that drops the built-in chain after the passes loses the
 /// dark corners.
 public class GpuPostPassScreenshotTest extends BaseTest {
+    // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
+    // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private RenderView view;
 
     private static float[] mul(float[] a, float[] b) {

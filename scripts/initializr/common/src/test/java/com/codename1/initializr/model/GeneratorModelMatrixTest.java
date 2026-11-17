@@ -132,6 +132,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateReelGate();
         validateSplatGate();
         validateSlateGate();
+        validateFieldlineGate();
         validateCommandLineProject();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
@@ -274,6 +275,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertNull(entries.get("icon.png"), label + "a backend has no icon");
             assertNull(entries.get("src/main/css/theme.css"), label + "a backend has no theme");
             assertNull(entries.get("AGENTS.md"), label + "the UI authoring skill is not shipped with a backend");
+            assertNull(entries.get(".mcp.json"), label + "the BuildCloud MCP server is for apps, not a backend");
             assertNotNull(entries.get("application.properties"), label + "backend settings belong at the root");
             assertContains(getText(entries, "build.gradle.kts"), "runBackend",
                     label + "a backend-only root build script is the backend template");
@@ -319,6 +321,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             }
             assertContains(getText(entries, "AGENTS.md"), "./gradlew run", label + "AGENTS.md should use Gradle");
             assertNotNull(entries.get(".agent-skills/codename-one/SKILL.md"), label + "the skill ships with Gradle apps");
+            assertContains(getText(entries, ".mcp.json"), "https://cloud.codenameone.com/api/v1/mcp",
+                    label + "apps name the BuildCloud MCP server for agents");
             apiPath = "backend/src/main/java/" + packagePath + "/Api.java";
             if (type == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
                 assertNotNull(entries.get("backend/application.properties"), label + "backend settings");
@@ -418,6 +422,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         boolean video = template == Template.REEL;
         boolean studio = template == Template.PULSE;
         boolean booking = template == Template.SLATE;
+        boolean field = template == Template.FIELDLINE;
         String name = template.SOURCE_MAIN_CLASS;
         String upper = template.name();
         String lower = GeneratorModel.toLowerCaseInvariant(name);
@@ -432,16 +437,16 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
+        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : field ? "field service app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
-            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : booking ? "`client@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
+            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : field ? "`tech@" : booking ? "`client@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
                     label + "README lists the template's own demo accounts");
-            assertFalse(readme.indexOf(rides || chat || bank || video || studio || booking ? "courier@" : "rider@") >= 0,
+            assertFalse(readme.indexOf(rides || chat || bank || video || studio || booking || field ? "courier@" : "rider@") >= 0,
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
-        if (game) {
+        if (template.hasRules()) {
             assertContains(rootPom, "<module>rules</module><module>shared</module>",
                     label + "the rules module is built ahead of the contract");
             assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
@@ -458,15 +463,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
-        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : video ? "/api/CatalogApi.java" : studio ? "/api/BookingApi.java" : booking ? "/api/AppointmentApi.java" : "/api/OrderApi.java")),
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : video ? "/api/CatalogApi.java" : studio ? "/api/BookingApi.java" : field ? "/api/FieldApi.java" : booking ? "/api/AppointmentApi.java" : "/api/OrderApi.java")),
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
         assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : studio || booking ? "V2__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : booking ? "/booking/BookingFlowTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : field ? "/FieldTest.java" : booking ? "/booking/BookingFlowTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : studio ? "/member/MemberForm.java" : booking ? "/client/ClientForm.java" : "/customer/CustomerForm.java")),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : studio ? "/member/MemberForm.java" : field ? "/field/TodayForm.java" : booking ? "/client/ClientForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
         if (!game) {
             assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
@@ -666,6 +671,20 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 GeneratorModel.SLATE_SINCE, "Slate is not generated before its gate");
         assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
                 GeneratorModel.SLATE_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.SLATE)), "The page offers Slate from its gate on");
+    }
+
+    /// The field service template needs the scheduler, calendar and camera
+    /// APIs of a newer core: below its own gate it is refused, and the page
+    /// does not list it.
+    private void validateFieldlineGate() throws Exception {
+        assertFalse(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.FIELDLINE_SINCE),
+                "Fieldline's gate is past the other complete apps'");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.FIELDLINE, "OldFieldline",
+                "com.acme.oldfieldline", ProjectOptions.defaults().forFullStack(), FULL_STACK_VERSION),
+                GeneratorModel.FIELDLINE_SINCE, "Fieldline is not generated before its gate");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
+                GeneratorModel.FIELDLINE_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.FIELDLINE)),
+                "The page offers Fieldline from its gate on");
     }
 
     private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {

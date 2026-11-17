@@ -97,6 +97,14 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
         }
         outputDir.mkdirs();
 
+        // Resolved before signing in: resolving also refuses a JDK too old for the wizard,
+        // and that should not wait behind a browser sign-in.
+        List<File> classpath = resolveDesktopTool(TOOL, pluginVersion(),
+                "To work on the wizard itself, run:\n"
+                + "    cd scripts/certificatewizard && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase\n"
+                + "    java -cp \"javase/target/codenameone-certificatewizard-*.jar:javase/target/libs/*\" "
+                + "com.codename1.certificatewizard.CertificateWizardLauncher");
+
         // See CodenameOneLogin, shared with the Gradle plugin.
         CodenameOneLogin.LoginResult signIn = new CodenameOneLogin(MavenLog.of(getLog()))
                 .resolve(token, user, login, loginTimeoutSeconds, baseUrl);
@@ -107,11 +115,6 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
         File outputFile = new File(runtimeDir, UUID.randomUUID().toString() + ".output");
         writeBinding(inputFile, projectDir, outputDir, outputFile, effectiveUser, effectiveToken);
 
-        List<File> classpath = resolveDesktopTool(TOOL, pluginVersion(),
-                "To work on the wizard itself, run:\n"
-                + "    cd scripts/certificatewizard && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase\n"
-                + "    java -cp \"javase/target/codenameone-certificatewizard-*.jar:javase/target/libs/*\" "
-                + "com.codename1.certificatewizard.CertificateWizardLauncher");
         getLog().info("Launching certificate wizard bound to " + projectDir);
         if (effectiveToken.length() == 0) {
             getLog().warn("No Codename One bearer token was found. The wizard will open in offline mode unless "

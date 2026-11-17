@@ -53,50 +53,24 @@ public final class Liquid {
                 .setUniform(SCALE, scale);
     }
 
-    /// Lava: a black basalt crust broken into large plates that drift apart
-    /// over a molten flow. The seams glow white-yellow at their core and cool
-    /// to orange and deep red toward the crust, and the molten pools churn.
-    /// Fine detail fades with distance, so a sea of it reads as plates and
-    /// glowing rivers at the horizon rather than shimmering speckle.
+    /// Lava: dark cooling plates drifting over molten cracks that pulse.
     ///
     /// #### Returns
     ///
     /// a new shader material
     public static ShaderMaterial lava() {
-        ShaderMaterial m = base(0x100807, 0xff6a18, 3.2f, 0.05f);
+        ShaderMaterial m = base(0x2a1610, 0xff5a10, 2.5f, 0.7f);
         ShaderNode p = Shading.worldUv(1f).mul(uniform(SCALE, ShaderType.FLOAT));
-        ShaderNode flow = time().mul(0.035f);
-        ShaderNode warp = vec(Noise.fbm(p.mul(0.6f).add(flow), 3), Noise.fbm(p.mul(0.6f).add(vec2(5.2f, 1.3f)).sub(flow), 3));
-        ShaderNode q = p.add(warp.mul(0.9f));
-        // Distance to the nearest plate seam: large plates, then a second
-        // octave of cracks inside each plate that fades out far away.
-        ShaderNode near = Shading.distanceFade(30f, 140f);
-        ShaderNode cells = Noise.cellularEdge(q, time().mul(0.12f));
-        ShaderNode fine = Noise.cellularEdge(q.mul(3.1f).add(vec2(1.7f, 9.2f)), time().mul(0.2f));
-        ShaderNode seam = smoothstep(0.14f, 0.0f, cells);
-        ShaderNode hair = smoothstep(0.07f, 0.0f, fine).mul(near).mul(0.5f);
-        // Here and there the crust has melted through into a pool.
-        ShaderNode pool = smoothstep(0.72f, 0.82f, Noise.fbm(q.mul(0.45f).add(vec2(3.1f, 7.7f)), 3));
-        ShaderNode molten = max(max(seam, hair), pool);
-        // The molten flow under the crust: churning brightness, so the
-        // rivers between plates are never one flat colour.
-        ShaderNode churn = Noise.fbm(q.mul(2.3f).sub(flow.mul(3f)), 3);
-        ShaderNode heat = clamp(molten.mul(churn.mul(0.7f).add(0.6f)), 0f, 1f);
-        ShaderNode deep = vec3(0.55f, 0.06f, 0.01f);
-        ShaderNode hot = uniform(GLOW, ShaderType.VEC3);
-        ShaderNode core = vec3(1f, 0.86f, 0.45f);
-        ShaderNode glow = Shading.ramp(heat, deep, hot, core);
-        // Crust: dark, rough, with a faint ember tint near the seams.
-        ShaderNode crustTone = Noise.fbm(q.mul(4f), 2).mul(0.5f).add(0.5f);
-        ShaderNode crust = uniform(COLOR, ShaderType.VEC3).mul(crustTone)
-                .add(vec3(0.18f, 0.03f, 0f).mul(smoothstep(0.25f, 0.02f, cells)).mul(0.5f));
-        ShaderNode pulse = sin(time().mul(1.3f).add(p.x().mul(2f)).add(p.y())).mul(0.12f).add(0.88f);
-        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(mix(crust, glow.mul(0.3f), molten), f(1f)));
-        m.set(ShaderMaterial.Hook.ROUGHNESS, mix(f(0.95f), f(0.35f), molten));
+        ShaderNode warp = vec(Noise.fbm(p.add(time().mul(0.05f)), 3), Noise.fbm(p.add(vec2(4f, 1f)).sub(time().mul(0.04f)), 3));
+        ShaderNode cells = Noise.cellular(p.add(warp.mul(0.8f)), time().mul(0.3f));
+        ShaderNode crack = smoothstep(0.25f, 0.05f, cells);
+        ShaderNode pulse = sin(time().mul(1.7f).add(p.x())).mul(0.2f).add(0.8f);
+        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(mix(uniform(COLOR, ShaderType.VEC3), vec3(0.1f, 0.03f, 0f), crack), f(1f)));
+        m.set(ShaderMaterial.Hook.ROUGHNESS, mix(f(0.9f), f(0.4f), crack));
         m.set(ShaderMaterial.Hook.METALLIC, f(0f));
-        m.set(ShaderMaterial.Hook.EMISSIVE, glow.mul(heat.mul(pulse).mul(uniform(INTENSITY, ShaderType.FLOAT))));
-        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(mix(Noise.bumpNormal(q.mul(5f), 2, 0.8f), vec3(0f, 0f, 1f),
-                max(molten, f(1f).sub(near)))));
+        m.set(ShaderMaterial.Hook.EMISSIVE, uniform(GLOW, ShaderType.VEC3)
+                .mul(crack.mul(pulse).mul(uniform(INTENSITY, ShaderType.FLOAT))));
+        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(mix(Noise.bumpNormal(p.mul(3f), 2, 0.5f), vec3(0f, 0f, 1f), crack)));
         return m;
     }
 

@@ -1,0 +1,133 @@
+name: Agent kit (create-app on every OS)
+
+# What codenameone.com/agents/ hands an AI agent: build the kit exactly as the
+# website build does, serve it over HTTP, and run the one-line create path on
+# Linux, macOS and Windows from a machine with no JDK on PATH -- the branch
+# that downloads Temurin is the one an agent on a fresh laptop takes. The
+# generated project must then build with its own Maven wrapper (mvnw.cmd on
+# Windows), into an empty local repository.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/agent-kit/**'
+      - 'scripts/website/build_agent_kit.py'
+      - 'scripts/initializr/agent-cli/**'
+      - 'scripts/initializr/common/src/main/java/com/codename1/initializr/model/**'
+      - 'scripts/initializr/common/src/main/resources/**'
+      - 'maven/build-engine/src/main/resources/com/codename1/project/templates/gradle/**'
+      - '.github/workflows/agent-kit.yml'
+  workflow_dispatch:
+
+jobs:
+  create-app:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build the kit
+        shell: bash
+        run: python3 scripts/website/build_agent_kit.py "$RUNNER_TEMP/site/agents" --self-test
+
+      - name: Serve it
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/site"
+          # Serve the scripts as text, as docs/website/static/_headers makes Cloudflare Pages do.
+          cat > "$RUNNER_TEMP/serve.py" <<'PY'
+          import http.server
+          H = http.server.SimpleHTTPRequestHandler
+          H.extensions_map.update({".ps1": "text/plain; charset=utf-8", ".sh": "text/plain; charset=utf-8"})
+          http.server.test(HandlerClass=H, port=8765, bind="127.0.0.1")
+          PY
+          nohup python3 "$RUNNER_TEMP/serve.py" > "$RUNNER_TEMP/http.log" 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8765/agents/cn1-create.properties && break; sleep 1; done
+
+      - name: Create projects (bash, no JDK on PATH)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          CN1_AGENT_SITE: http://127.0.0.1:8765/agents
+          CN1_AGENT_HOME: ${{ runner.temp }}/agent-home
+        run: |
+          # Hide every JDK so the Temurin download branch runs. macOS runners
+          # also answer /usr/libexec/java_home, which the script asks only when
+          # a java is on PATH.
+          export PATH="$(echo "$PATH" | tr ':' '\n' | grep -v -i -E 'java|jdk|hostedtoolcache/Java' | paste -sd: -)"
+          unset JAVA_HOME
+          if [ "$RUNNER_OS" = macOS ]; then
+            # /usr/bin/java is a stub that is always on PATH, and /usr/libexec/java_home
+            # still lists the runner's JDKs; unregister them so it finds none.
+            sudo rm -rf /Library/Java/JavaVirtualMachines/* ~/Library/Java/JavaVirtualMachines/*
+            /usr/libexec/java_home >/dev/null 2>&1 && { echo "java_home still answers"; exit 1; }
+          elif command -v java >/dev/null; then
+            # A system JDK in /usr/bin (Ubuntu runners) cannot be taken off PATH without
+            # losing bash and curl; shadow it with a java that is no JDK, which the
+            # script skips, so the download branch runs as on a bare machine.
+            echo "java still on PATH: $(command -v java); shadowing it"
+            mkdir -p "$RUNNER_TEMP/nojava/bin"
+            printf '#!/bin/sh\nexit 1\n' > "$RUNNER_TEMP/nojava/bin/java"
+            chmod +x "$RUNNER_TEMP/nojava/bin/java"
+            export PATH="$RUNNER_TEMP/nojava/bin:$PATH"
+          fi
+          curl -fsSL "$CN1_AGENT_SITE/create-app.sh" | bash -s -- --list
+          cd "$RUNNER_TEMP"
+          curl -fsSL "$CN1_AGENT_SITE/create-app.sh" | bash -s -- --name HabitTracker --package com.example.habits | tee create.log
+          curl -fsSL "$CN1_AGENT_SITE/create-app.sh" | bash -s -- --name PulseTry --package com.example.pulsetry --template PULSE
+          grep '^JAVA_HOME=' create.log | tail -1 >> "$GITHUB_ENV"
+          test -d "$CN1_AGENT_HOME/jdk" || { echo "the JDK download branch did not run"; exit 1; }
+
+      - name: Create projects (PowerShell, no JDK on PATH)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CN1_AGENT_SITE: http://127.0.0.1:8765/agents
+          CN1_AGENT_HOME: ${{ runner.temp }}\agent-home
+        run: |
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'java|jdk' }) -join ';'
+          Remove-Item Env:JAVA_HOME -ErrorAction SilentlyContinue
+          Get-ChildItem Env: | Where-Object { $_.Name -like 'JAVA_HOME*' } | ForEach-Object { Remove-Item "Env:$($_.Name)" }
+          # The documented command: irm, as an agent on Windows runs it.
+          $create = irm "$env:CN1_AGENT_SITE/create-app.ps1"
+          & ([scriptblock]::Create($create)) --list
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Set-Location $env:RUNNER_TEMP
+          $out = & ([scriptblock]::Create($create)) --name HabitTracker --package com.example.habits
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $out
+          & ([scriptblock]::Create($create)) --name PulseTry --package com.example.pulsetry --template PULSE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ($out | Select-String '^JAVA_HOME=' | Select-Object -Last 1).Line | Add-Content $env:GITHUB_ENV
+          if (-not (Test-Path (Join-Path $env:CN1_AGENT_HOME 'jdk'))) { throw 'the JDK download branch did not run' }
+
+      - name: Build the project with its own wrapper
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/HabitTracker"
+          if [ "$RUNNER_OS" = Windows ]; then
+            cmd //c "mvnw.cmd -B -q package -DskipTests -Dmaven.repo.local=$RUNNER_TEMP\\m2"
+          else
+            ./mvnw -B -q package -DskipTests "-Dmaven.repo.local=$RUNNER_TEMP/m2"
+          fi
+
+      - name: Make an icon (from the jars create-app downloaded)
+        shell: bash
+        env:
+          CN1_AGENT_HOME: ${{ runner.temp }}/agent-home
+        run: |
+          cd "$RUNNER_TEMP/HabitTracker"
+          "$JAVA_HOME/bin/java" -Djava.awt.headless=true .agent-skills/codename-one/tools/MakeIcon.java \
+              --glyph check_circle --bg 1f5eff --out common/icon.png
+          test -s common/icon.png

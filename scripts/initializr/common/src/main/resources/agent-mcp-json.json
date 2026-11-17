@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codenameone-cloud": {
+      "type": "http",
+      "url": "https://cloud.codenameone.com/api/v1/mcp"
+    }
+  }
+}

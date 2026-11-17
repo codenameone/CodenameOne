@@ -105,18 +105,38 @@ public final class ProjectBinding {
             String key = trimmed.substring(0, eq).trim();
             String val = trimmed.substring(eq + 1).trim();
             switch (key) {
-                case "projectDir" -> b.projectDir = val;
-                case "settings" -> b.settings = val;
-                case "outputDir" -> b.outputDir = val;
-                case "user" -> b.user = val;
-                case "token" -> b.token = val;
-                case "baseUrl" -> b.baseUrl = val;
-                case "buildSystem" -> b.buildSystem = val;
-                case "kind" -> b.kind = val;
-                case "rootDir" -> b.rootDir = val;
-                case "dependencyFile" -> b.dependencyFile = val;
-                default -> {
-                }
+                case "projectDir":
+                    b.projectDir = val;
+                    break;
+                case "settings":
+                    b.settings = val;
+                    break;
+                case "outputDir":
+                    b.outputDir = val;
+                    break;
+                case "user":
+                    b.user = val;
+                    break;
+                case "token":
+                    b.token = val;
+                    break;
+                case "baseUrl":
+                    b.baseUrl = val;
+                    break;
+                case "buildSystem":
+                    b.buildSystem = val;
+                    break;
+                case "kind":
+                    b.kind = val;
+                    break;
+                case "rootDir":
+                    b.rootDir = val;
+                    break;
+                case "dependencyFile":
+                    b.dependencyFile = val;
+                    break;
+                default:
+                    break;
             }
         }
         return b;

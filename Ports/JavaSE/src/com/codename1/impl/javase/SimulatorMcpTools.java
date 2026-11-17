@@ -281,6 +281,31 @@ final class SimulatorMcpTools {
                     }
                 }));
 
+        server.addTool(new Tool("sim_fold",
+                "Folds a foldable skin (one whose skin.properties says foldable=true) to a posture "
+                        + "- flat, half or closed - or to a hinge angle in degrees (0 closed, 180 flat). "
+                        + "The device is drawn folding in 3D and the app receives the posture events "
+                        + "as the hinge crosses each threshold; closed moves the app to the cover "
+                        + "display. animateMs: transition length (default the simulator's, 0 = at once).",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"posture\":{\"type\":\"string\",\"enum\":[\"flat\",\"half\",\"closed\"]},"
+                        + "\"angle\":{\"type\":\"integer\"},\"animateMs\":{\"type\":\"integer\"}}}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        Map<String, Object> a = parse(argumentsJson);
+                        Object p = a.get("posture");
+                        int angle = a.get("angle") instanceof Number ? ((Number) a.get("angle")).intValue() : -1;
+                        if (!(p instanceof String) && angle < 0) {
+                            throw new IllegalArgumentException("Give a posture or an angle");
+                        }
+                        long ms = a.get("animateMs") instanceof Number ? ((Number) a.get("animateMs")).longValue() : -1;
+                        port.setFoldStateAndWait(p instanceof String ? (String) p : null, angle, ms);
+                        FoldableSkin f = port.getFoldableSkin();
+                        return ok("targetAngle", port.getFoldController().getTargetAngle(),
+                                "postures", f.getPostures().size());
+                    }
+                }));
+
         server.addTool(new Tool("sim_touch_indicators",
                 "Configures how touches are drawn. style: none, dot or ripple. live: also draw them "
                         + "in the simulator window (recordings always get them unless style is none). "
@@ -430,7 +455,12 @@ final class SimulatorMcpTools {
                         + "application plays - sound effects, game sounds, music), microphone, "
                         + "app_and_microphone (for narration) or none. maxSeconds stops a "
                         + "forgotten recording (default 600). path defaults to "
-                        + "~/CodenameOneRecordings. Needs ffmpeg; without it PNG frames are written.",
+                        + "~/CodenameOneRecordings. Needs ffmpeg; without it PNG frames are written. "
+                        + "script: timed steps played during the recording, "
+                        + "[{at: ms, posture: flat|half|closed | angle: degrees, animateMs | "
+                        + "orientation: portrait|landscape}] (postures and angles need a foldable skin). "
+                        + "A skin recording is staged: the device keeps one size on a 16:9 backdrop "
+                        + "through folds, the cover display and rotations.",
                 "{\"type\":\"object\",\"properties\":{"
                         + "\"path\":{\"type\":\"string\"},"
                         + "\"format\":{\"type\":\"string\",\"enum\":[\"mp4\",\"mov\",\"webm\",\"gif\"]},"
@@ -440,7 +470,11 @@ final class SimulatorMcpTools {
                         + "\"touchTrail\":{\"type\":\"boolean\"},\"touchColor\":{\"type\":\"string\"},"
                         + "\"touchRadius\":{\"type\":\"integer\"},\"tapSound\":{\"type\":\"boolean\"},"
                         + "\"audio\":{\"type\":\"string\",\"enum\":[\"app\",\"microphone\",\"app_and_microphone\",\"none\"]},"
-                        + "\"maxSeconds\":{\"type\":\"integer\"}}}",
+                        + "\"maxSeconds\":{\"type\":\"integer\"},"
+                        + "\"script\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{"
+                        + "\"at\":{\"type\":\"integer\"},\"posture\":{\"type\":\"string\"},"
+                        + "\"angle\":{\"type\":\"integer\"},\"animateMs\":{\"type\":\"integer\"},"
+                        + "\"orientation\":{\"type\":\"string\",\"enum\":[\"portrait\",\"landscape\"]}}}}}}",
                 new ToolHandler() {
                     public String invoke(String argumentsJson) throws Exception {
                         RecordingOptions o = new RecordingOptions();
@@ -450,10 +484,23 @@ final class SimulatorMcpTools {
                         t.setShowTrail(o.isTouchTrail());
                         t.setColor(o.getTouchColor());
                         t.setRadius(o.getTouchRadius());
+                        Map<String, Object> args = parse(argumentsJson);
+                        FoldScript script = null;
+                        if (args.get("script") != null) {
+                            script = FoldScript.parse(args.get("script"));
+                            if (port.getFoldableSkin() == null && script.foldsTheDevice()) {
+                                throw new IllegalArgumentException("fold steps need a foldable skin");
+                            }
+                        }
+                        if (script != null) {
+                            // A scripted clip renders every frame for its moment.
+                            o.setLockstep(true);
+                        }
                         SimulatorRecorder rec = port.getSimulatorRecorder();
                         // Recordings paint the real menu bar; on macOS that needs it in the window.
                         port.setRecordingMenusInWindow(true);
                         rec.start(o);
+                        startFoldScript(script);
                         Map<String, Object> out = new LinkedHashMap<String, Object>();
                         out.put("recording", Boolean.TRUE);
                         out.put("path", rec.getOutput().getAbsolutePath());
@@ -473,7 +520,13 @@ final class SimulatorMcpTools {
                         SimulatorRecorder.Result r;
                         boolean auto = false;
                         if (rec.isRecording()) {
-                            r = rec.stop();
+                            // The script keeps playing while a lockstep video
+                            // catches up; it is cancelled only after that.
+                            try {
+                                r = rec.stopAtWallClock();
+                            } finally {
+                                startFoldScript(null);
+                            }
                         } else if (rec.getLastError() != null) {
                             // It already ended on its own, with an error.
                             throw rec.getLastError();
@@ -484,6 +537,7 @@ final class SimulatorMcpTools {
                         } else {
                             throw new IllegalStateException("Not recording");
                         }
+                        startFoldScript(null);
                         Map<String, Object> out = new LinkedHashMap<String, Object>();
                         if (auto) {
                             out.put("autoStopped", Boolean.TRUE);
@@ -731,6 +785,27 @@ final class SimulatorMcpTools {
         });
         if (err[0] != null) {
             throw err[0];
+        }
+    }
+
+    /// The fold script of the running recording, cancelled when it stops.
+    private FoldScript foldScript;
+
+    private synchronized void startFoldScript(FoldScript script) {
+        if (foldScript != null) {
+            foldScript.cancel();
+        }
+        foldScript = script;
+        if (script != null) {
+            script.start(new FoldScript.Target() {
+                public void fold(String posture, int angle, long animateMs) {
+                    port.setFoldStateAndWait(posture, angle, animateMs);
+                }
+
+                public void rotate(boolean portrait) {
+                    port.rotateSimulator(portrait);
+                }
+            });
         }
     }
 

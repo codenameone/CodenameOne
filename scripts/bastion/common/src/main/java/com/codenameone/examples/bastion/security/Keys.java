@@ -114,14 +114,9 @@ public final class Keys {
         if (storage != null) {
             return storage;
         }
-        SecureStorage platform = SecureStorage.getInstance();
-        // The strict binding is opt-in (installed apps keep their keys): on
-        // Android it binds the key on every API level and revokes it when a
-        // biometric is enrolled. Set before the first write creates the key:
-        // a key made before it (an update of an app that ran without it)
-        // stays unbound, and isStrictBiometricBinding() still answers true.
-        platform.setStrictBiometricBinding(true);
-        return platform;
+        // The key is bound to the enrolled biometrics and revoked by a new
+        // enrolment on every platform; nothing to opt in to.
+        return SecureStorage.getInstance();
     }
 
     /// The key while unlocked, else null. Callers must not keep it.

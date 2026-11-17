@@ -3379,6 +3379,40 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-15T01:01:06+00:00"
+      },
+      "devto": {
+        "id": 5042435,
+        "url": "https://dev.to/codenameone/pulse-heart-rate-zones-from-the-watch-to-the-trainers-screen-548b",
+        "syndicated_at": "2026-11-15T15:51:56+00:00"
+      }
+    },
+    "real-time-java-control-loops": {
+      "hashnode": {
+        "url": "https://debugagent.com/real-time-java-control-loops-the-garbage-collector-never-stops",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6afa559d8acf0fbf31b4c904",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-16T01:01:07+00:00"
+      },
+      "devto": {
+        "id": 5048669,
+        "url": "https://dev.to/codenameone/real-time-java-control-loops-the-garbage-collector-never-stops-4gop",
+        "syndicated_at": "2026-11-16T14:26:22+00:00"
+      }
+    },
+    "codename-one-on-xbox": {
+      "hashnode": {
+        "url": "https://debugagent.com/packaging-java-apps-for-xbox-developer-mode-and-why-consoles-need-help",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6afba71ee5adbff1a3e75ead",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-17T01:01:09+00:00"
       }
     }
   }

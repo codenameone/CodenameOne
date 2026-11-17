@@ -166,6 +166,10 @@ class JavaSEGLDevice extends GraphicsDevice {
         return createTexture(image.getWidth(), image.getHeight(), image.getRGB());
     }
 
+    /// Scratch space for texture uploads, reused across calls.
+    private int[] uploadInts;
+    private ByteBuffer uploadBuffer;
+
     public Texture createTexture(int w, int h, int[] argb) {
         Texture t = new Texture(w, h);
         int[] ids = new int[1];
@@ -173,17 +177,31 @@ class JavaSEGLDevice extends GraphicsDevice {
         int id = ids[0];
         gl.glBindTexture(GL2ES2.GL_TEXTURE_2D, id);
 
-        ByteBuffer pixels = ByteBuffer.allocateDirect(w * h * 4);
-        pixels.order(ByteOrder.nativeOrder());
+        // RGBA bytes, written a whole pixel at a time into a reused buffer:
+        // a byte at a time into a fresh direct buffer cost tens of
+        // milliseconds for a retina-sized texture uploaded every frame.
         int count = w * h;
+        if (uploadInts == null || uploadInts.length < count) {
+            uploadInts = new int[count];
+        }
+        int[] rgba = uploadInts;
+        boolean little = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN;
         for (int i = 0; i < count; i++) {
             int c = argb[i];
-            pixels.put((byte) ((c >> 16) & 0xff));
-            pixels.put((byte) ((c >> 8) & 0xff));
-            pixels.put((byte) (c & 0xff));
-            pixels.put((byte) ((c >>> 24) & 0xff));
+            int a = c >>> 24;
+            int r = (c >> 16) & 0xff;
+            int g = (c >> 8) & 0xff;
+            int b = c & 0xff;
+            rgba[i] = little ? (a << 24) | (b << 16) | (g << 8) | r : (r << 24) | (g << 16) | (b << 8) | a;
         }
+        if (uploadBuffer == null || uploadBuffer.capacity() < count * 4) {
+            uploadBuffer = ByteBuffer.allocateDirect(count * 4).order(ByteOrder.nativeOrder());
+        }
+        ByteBuffer pixels = uploadBuffer;
+        pixels.clear();
+        pixels.asIntBuffer().put(rgba, 0, count);
         pixels.position(0);
+        pixels.limit(count * 4);
         gl.glTexImage2D(GL2ES2.GL_TEXTURE_2D, 0, GL2ES2.GL_RGBA, w, h, 0,
                 GL2ES2.GL_RGBA, GL2ES2.GL_UNSIGNED_BYTE, pixels);
         // no mipmaps are uploaded, so the default mipmapped minification would

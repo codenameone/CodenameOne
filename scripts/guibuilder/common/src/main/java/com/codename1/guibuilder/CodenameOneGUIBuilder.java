@@ -492,20 +492,26 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             paletteFilter = search.getText().toLowerCase();
             rebuildPalette(palette);
         });
-        palette.putClientProperty("search", search);
-        rebuildPalette(palette);
-        return palette;
-    }
-
-    private void rebuildPalette(Container palette) {
-        TextField search = (TextField) palette.getClientProperty("search");
-        palette.removeAll();
+        // The heading, and the search field in it, are built once and never rebuilt: only the
+        // items below are. Rebuilding the heading on each keystroke re-added the search field to a
+        // new container while the discarded one still held it, which threw "Component is already
+        // contained in Container" on the first character typed -- and tearing the field down while
+        // it is being edited also orphans the browser's native text input on the JavaScript port.
         Container heading = new Container(BoxLayout.y());
         heading.add(sectionTitle("COMPONENTS"));
         heading.add(search);
         palette.add(BorderLayout.NORTH, heading);
         Container items = new Container(new GridLayout(5, 2));
         items.setScrollableY(true);
+        palette.add(BorderLayout.CENTER, items);
+        palette.putClientProperty("items", items);
+        rebuildPalette(palette);
+        return palette;
+    }
+
+    private void rebuildPalette(Container palette) {
+        Container items = (Container) palette.getClientProperty("items");
+        items.removeAll();
         String[] types = {"Button", "Label", "SpanLabel", "TextField", "TextArea", "CheckBox", "RadioButton", "Slider", "Container", "Tabs"};
         char[] icons = {FontImage.MATERIAL_SMART_BUTTON, FontImage.MATERIAL_TEXT_FIELDS, FontImage.MATERIAL_SUBJECT,
                 FontImage.MATERIAL_EDIT, FontImage.MATERIAL_NOTES, FontImage.MATERIAL_CHECK_BOX,
@@ -530,7 +536,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     () -> suppressAction[0] = true));
             items.add(item);
         }
-        palette.add(BorderLayout.CENTER, items);
         palette.revalidate();
     }
 
@@ -9748,7 +9753,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             + "NumericProperty|Paint|Painter|PeerComponent|PickerComponent|PreferencesObject|Property|"
             + "PropertyBase|PropertyBusinessObject|PropertyChangeListener|PropertyIndex|RGBImage|"
             + "RadialGradient|RadioButton|ReleasableComponent|RichTextArea|RichTextClipboardData|"
-            + "RichTextComponent|RichTextFormat|SQLMap|SelectableIconHolder|SetProperty|Sheet|SideMenuBar|"
+            + "RichTextComponent|RichTextFormat|SQLMap|ScrollSurface|SelectableIconHolder|SetProperty|Sheet|SideMenuBar|"
             + "Slider|SpanLabel|Stroke|SwipeableContainer|TableLayout|Tabs|TextArea|TextComponent|"
             + "TextComponentPassword|TextField|TextHolder|TextInputClient|TextInputConfig|TextInputGeometry|"
             + "TextInputState|TextModeLayout|TextSelection|Toolbar|TooltipManager|TopLevelContainer|Transform|"

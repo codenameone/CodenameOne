@@ -302,6 +302,7 @@ final class BackendSupport {
             // The generated contexts embed application.properties and the profile's
             // file, so a change to either alone must recompile and regenerate them.
             backendSettingsInputs(project, compile, layout);
+            mainOutputInputs(compile, main);
             compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
                     main.getOutput().getClassesDirs(), compile.getDestinationDirectory().getAsFile(),
                     stubs, layout.projectDir(), roots, AppSupport.javaEncoding(project, main),
@@ -311,6 +312,7 @@ final class BackendSupport {
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileTestKotlin").configure(compile -> {
                     backendSettingsInputs(project, compile, layout);
+                    mainOutputInputs(compile, main);
                     Provider<File> kotlinOut = AppSupport.kotlinDestinationProvider(compile, layout);
                     kotlinTestClasses.from(kotlinOut);
                     compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
@@ -322,6 +324,19 @@ final class BackendSupport {
             t.useJUnitPlatform();
             t.setForkEvery(1L);
         });
+    }
+
+    /// The application's compiled classes and resources, whole, as an input of a
+    /// test compile. The compile itself fingerprints its class path by ABI, which
+    /// leaves out annotation values and the wiring record -- exactly what the
+    /// generated test contexts are made of -- so changing only an attribute of an
+    /// application annotation left the task up to date and the contexts stale
+    /// (#6240).
+    private static void mainOutputInputs(org.gradle.api.Task compile, org.gradle.api.tasks.SourceSet main) {
+        compile.getInputs().files(main.getOutput())
+                .withPropertyName("cn1MainOutput")
+                .withNormalizer(org.gradle.api.tasks.ClasspathNormalizer.class)
+                .optional();
     }
 
     /// The backend's application.properties and profile files as inputs of

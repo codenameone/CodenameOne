@@ -114,7 +114,8 @@ public final class BackendTests {
             throw new BuildExecutionException("Could not scan the compiled classes: "
                     + err.getMessage(), err);
         }
-        if (!compiled && !mentionsAny(tests, BackendTestGenerator.TEST_ANNOTATIONS)) {
+        boolean standalone = referencesStandalone(testClasses);
+        if (!compiled && !standalone && !mentionsAny(tests, BackendTestGenerator.TEST_ANNOTATIONS)) {
             return 0;
         }
         Map<String, AnnotatedClass> index = new LinkedHashMap<String, AnnotatedClass>(main);
@@ -123,6 +124,9 @@ public final class BackendTests {
         mainNames.removeAll(tests.keySet());
         ProcessorContext ctx = new ProcessorContext(testClasses, stubs, index, log, projectDir,
                 new Properties(), null, sourceRoots, encoding, classpath);
+        if (standalone) {
+            ctx.setAttribute(BackendTestGenerator.STANDALONE_ATTRIBUTE, Boolean.TRUE);
+        }
         int count;
         try {
             count = BackendTestGenerator.generate(ctx, mainNames, tests.keySet(), mainClasses,
@@ -138,6 +142,49 @@ public final class BackendTests {
             throw new BuildFailureException(sb.toString());
         }
         return count;
+    }
+
+    /// Whether a compiled test names `MockMvcBuilders`, whose `standaloneSetup`
+    /// needs the generated router registry: a byte search of the class files,
+    /// since a class reference is a constant pool string.
+    private static boolean referencesStandalone(File dir) {
+        byte[] needle = "com/codename1/backend/test/MockMvcBuilders".getBytes(
+                java.nio.charset.StandardCharsets.US_ASCII);
+        java.util.ArrayDeque<File> pending = new java.util.ArrayDeque<File>();
+        pending.add(dir);
+        while (!pending.isEmpty()) {
+            File[] children = pending.poll().listFiles();
+            if (children == null) {
+                continue;
+            }
+            for (File f : children) {
+                if (f.isDirectory()) {
+                    pending.add(f);
+                } else if (f.getName().endsWith(".class")) {
+                    try {
+                        if (contains(java.nio.file.Files.readAllBytes(f.toPath()), needle)) {
+                            return true;
+                        }
+                    } catch (java.io.IOException ignored) {
+                        // Unreadable: the scan above would have failed on it already.
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean contains(byte[] hay, byte[] needle) {
+        outer:
+        for (int i = 0; i + needle.length <= hay.length; i++) {
+            for (int j = 0; j < needle.length; j++) {
+                if (hay[i + j] != needle[j]) {
+                    continue outer;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     private static boolean mentionsAny(Map<String, AnnotatedClass> classes, String[] descriptors) {

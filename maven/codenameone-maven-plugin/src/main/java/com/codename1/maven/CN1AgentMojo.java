@@ -52,6 +52,16 @@ public class CN1AgentMojo extends CN1RunMojo {
     @Parameter(property = "cn1.mcp.port", defaultValue = "8765")
     private int mcpPort;
 
+    /**
+     * Runs the simulator with no window at all: it lays out and renders as
+     * usual, so screenshots, recordings and every MCP tool work, but nothing
+     * appears on screen. For an agent making a demo video or screenshots
+     * while the developer keeps working. {@code CN1_SIMULATOR_HIDDEN=1} in
+     * the environment does the same.
+     */
+    @Parameter(property = "cn1.agent.hidden", defaultValue = "false")
+    private boolean hidden;
+
     /** Read by the shutdown hook as well as this thread. */
     private final AtomicReference<Process> xvfbRef = new AtomicReference<>();
 
@@ -110,6 +120,9 @@ public class CN1AgentMojo extends CN1RunMojo {
         writePortFile();
         request.addShellEnvironment("CN1_MCP_PORT", String.valueOf(mcpPort));
         request.addShellEnvironment("CN1_AGENT_BACKGROUND", "1");
+        if (hidden) {
+            request.addShellEnvironment("CN1_SIMULATOR_HIDDEN", "1");
+        }
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         boolean linux = os.contains("linux");
         String display = System.getenv("DISPLAY");

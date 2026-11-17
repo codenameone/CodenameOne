@@ -357,7 +357,29 @@ class JavaSESoftwareDevice extends GraphicsDevice {
 
         for (int y = minY; y < maxY; y++) {
             float py = y + 0.5f;
-            for (int x = minX; x < maxX; x++) {
+            // Only the run of this row inside the triangle is visited: a
+            // thin or diagonal triangle's bounding box is mostly outside it,
+            // and testing every pixel of it dominated whole frames. The run
+            // is widened a pixel each side; the per-pixel test stays exact.
+            float lo = minX;
+            float hi = maxX;
+            for (int e = 0; e < 3; e++) {
+                int ea = e == 0 ? 1 : (e == 1 ? 2 : 0);
+                int eb = e == 0 ? 2 : (e == 1 ? 0 : 1);
+                // weight(px) = c + k px, kept where >= 0
+                float k = -(sy[eb] - sy[ea]) * invArea;
+                float c = ((sx[eb] - sx[ea]) * (py - sy[ea]) + (sy[eb] - sy[ea]) * sx[ea]) * invArea;
+                if (k > 1e-9f) {
+                    lo = Math.max(lo, -c / k - 1.5f);
+                } else if (k < -1e-9f) {
+                    hi = Math.min(hi, -c / k + 1.5f);
+                } else if (c < 0) {
+                    hi = lo - 1;
+                }
+            }
+            int xStart = Math.max(minX, (int) Math.floor(lo));
+            int xEnd = Math.min(maxX, (int) Math.ceil(hi));
+            for (int x = xStart; x < xEnd; x++) {
                 float px = x + 0.5f;
                 float w0 = edge(sx[1], sy[1], sx[2], sy[2], px, py) * invArea;
                 float w1 = edge(sx[2], sy[2], sx[0], sy[0], px, py) * invArea;
@@ -760,10 +782,27 @@ class JavaSESoftwareDevice extends GraphicsDevice {
                     | clamp255((int) (db + sb * sa + 0.5f));
         }
         float ia = 1.0f - sa;
-        int rr = clamp255((int) (sr * sa + dr * ia + 0.5f));
-        int rg = clamp255((int) (sg * sa + dg * ia + 0.5f));
-        int rb = clamp255((int) (sb * sa + db * ia + 0.5f));
-        return (0xff << 24) | (rr << 16) | (rg << 8) | rb;
+        int dai = dst >>> 24;
+        if (dai == 0xff) {
+            int rr = clamp255((int) (sr * sa + dr * ia + 0.5f));
+            int rg = clamp255((int) (sg * sa + dg * ia + 0.5f));
+            int rb = clamp255((int) (sb * sa + db * ia + 0.5f));
+            return (0xff << 24) | (rr << 16) | (rg << 8) | rb;
+        }
+        // Source over a destination that is itself translucent (a frame
+        // cleared to transparent, rendered for compositing elsewhere): the
+        // coverage adds up instead of turning opaque, or every soft edge
+        // and transparent texel became a dark fringe over the backdrop.
+        float da = dai / 255.0f * ia;
+        float oa = sa + da;
+        if (oa <= 0.0f) {
+            return 0;
+        }
+        float inv = 1.0f / oa;
+        int rr = clamp255((int) ((sr * sa + dr * da) * inv + 0.5f));
+        int rg = clamp255((int) ((sg * sa + dg * da) * inv + 0.5f));
+        int rb = clamp255((int) ((sb * sa + db * da) * inv + 0.5f));
+        return (clamp255((int) (oa * 255.0f + 0.5f)) << 24) | (rr << 16) | (rg << 8) | rb;
     }
 
     private static float channel(int argb, int shift) {

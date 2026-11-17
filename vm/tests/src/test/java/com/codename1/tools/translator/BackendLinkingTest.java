@@ -50,9 +50,9 @@ import static org.junit.jupiter.api.Assertions.fail;
  * every test stays green.
  *
  * So this builds six whole servers, vm/backend/demo/linknone, linkjwt, linkform,
- * linkoauthlogin, linkauthserver and linkwebauthn -- no security, a JWT resource server only,
- * a form login only, a sign-in through another provider only, an authorization server only,
- * passkeys only -- runs each to prove it works, and reads the symbols of each binary. A class that is linked has a static
+ * linkoauthlogin, linkauthserver, linkwebauthn and linksaml -- no security, a JWT resource
+ * server only, a form login only, a sign-in through another provider only, an authorization
+ * server only, passkeys only, SAML sign-in only -- runs each to prove it works, and reads the symbols of each binary. A class that is linked has a static
  * initializer symbol; the classes of what a server did not declare must have none.
  *
  * The same goes for the natives. They are compiled whole, and what leaves an uncalled one out
@@ -138,6 +138,18 @@ class BackendLinkingTest {
     private static final String[] NO_WEBAUTHN = {"WebAuthnConfigurer",
         "WebAuthnAuthenticationFilter", "WebAuthnRegistrationFilter",
         "WebAuthnAuthenticationCodec", "webauthn_"};
+    /** SAML sign-in: the configurer, its filters, and the XML signature check under it. */
+    private static final String[] SAML = {"Saml2LoginConfigurer",
+        "Saml2WebSsoAuthenticationFilter", "Saml2WebSsoAuthenticationRequestFilter",
+        "Saml2AuthenticationCodec", "saml2_Saml2ResponseValidator", "saml2_Xml",
+        "saml2_ExcC14n", "saml2_XmlSignature", "saml2_RelyingPartyRegistration",
+        "saml2_Saml2AuthenticationRequest", "saml2_XmlEncryption",
+        "Saml2LogoutConfigurer", "Saml2LogoutFilter", "saml2_Saml2Logout"};
+    /** Every class of SAML and of LDAP, by prefix: what a server that declares neither holds none of. */
+    private static final String[] NO_SAML_LDAP = {"Saml2LoginConfigurer",
+        "Saml2WebSsoAuthenticationFilter", "Saml2WebSsoAuthenticationRequestFilter",
+        "Saml2AuthenticationCodec", "Saml2Addresses", "Saml2Logout", "saml2_", "ldap_"};
+
     /** The natives only a server that signs, verifies or encrypts calls. */
     private static final String[] SIGNING_NATIVES = {"Crypto_signImpl", "Crypto_verifyImpl",
         "Crypto_aesGcmImpl", "Crypto_generateRsaKeyImpl"};
@@ -168,6 +180,10 @@ class BackendLinkingTest {
         Set<String> issuer = build(work, "LinkAuthServer", "demo/linkauthserver", jdk8,
                 "LINKCHECK authserver open=200 metadata=200 jwks=200 token=200 signed=true "
                         + "wrong=401 device=200 authorize=401 elsewhere=403");
+        Set<String> saml = build(work, "LinkSaml", "demo/linksaml", jdk8,
+                "LINKCHECK saml open=200 redirect=302 to=/saml2/authenticate/corp asked=true "
+                        + "metadata=200 verified=alice@corp.example forged=invalid_signature "
+                        + "refused=/login?error");
         Set<String> passkeys = build(work, "LinkWebAuthn", "demo/linkwebauthn", jdk8,
                 "LINKCHECK webauthn open=200 options=200 rp=true refused=401 register=403 "
                         + "home=403 registered=true verified=ada forged=signature_invalid");
@@ -260,6 +276,24 @@ class BackendLinkingTest {
         absent("LinkForm", form, NO_WEBAUTHN);
         absent("LinkOAuthLogin", login, NO_WEBAUTHN);
         absent("LinkAuthServer", issuer, NO_WEBAUTHN);
+        // SAML holds its own and nothing it did not declare; nobody else holds
+        // a class of SAML or LDAP -- saml2Login() on HttpSecurity must not
+        // drag the XML signature check into every server.
+        present("LinkSaml", saml, SAML);
+        present("LinkSaml", saml, "SessionSignIn", "LogoutFilter", "HttpSessionRequestCache");
+        absent("LinkSaml", saml, FORM_ONLY);
+        absent("LinkSaml", saml, PASSWORDS);
+        absent("LinkSaml", saml, NEVER);
+        absent("LinkSaml", saml, OAUTH_LOGIN);
+        absent("LinkSaml", saml, AUTH_SERVER);
+        absent("LinkSaml", saml, NO_WEBAUTHN);
+        absent("LinkSaml", saml, "ldap_", "oauth2_client_", "oauth2_server_");
+        absent("LinkNone", none, NO_SAML_LDAP);
+        absent("LinkJwt", jwt, NO_SAML_LDAP);
+        absent("LinkForm", form, NO_SAML_LDAP);
+        absent("LinkOAuthLogin", login, NO_SAML_LDAP);
+        absent("LinkAuthServer", issuer, NO_SAML_LDAP);
+        absent("LinkWebAuthn", passkeys, NO_SAML_LDAP);
         present("LinkOAuthLogin", login, "OAuth2AuthenticationCodec");
         absent("LinkJwt", jwt, "OAuth2AuthenticationCodec");
         absent("LinkForm", form, "OAuth2AuthenticationCodec");
@@ -293,6 +327,15 @@ class BackendLinkingTest {
             assertTrue(!NATIVES.get("LinkWebAuthn").contains("com_codename1_backend_" + symbol),
                     "LinkWebAuthn signs nothing, makes no keys and encrypts nothing, and its "
                             + "binary holds the native " + symbol);
+        }
+        // RSA-OAEP decryption is reached only through a SAML registration
+        // that decrypts assertions.
+        assertTrue(NATIVES.get("LinkSaml").contains("com_codename1_backend_Crypto_rsaOaepDecryptImpl"),
+                "LinkSaml decrypts assertions, and its binary holds no native for it");
+        for (String main : new String[] {"LinkNone", "LinkForm", "LinkOAuthLogin",
+            "LinkWebAuthn", "LinkAuthServer"}) {
+            assertTrue(!NATIVES.get(main).contains("com_codename1_backend_Crypto_rsaOaepDecryptImpl"),
+                    main + " decrypts no SAML assertion, and its binary holds the RSA-OAEP native");
         }
         for (String symbol : new String[] {"Crypto_signImpl", "Crypto_generateRsaKeyImpl",
             "Crypto_aesGcmImpl"}) {

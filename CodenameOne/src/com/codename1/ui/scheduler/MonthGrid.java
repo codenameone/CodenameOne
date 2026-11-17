@@ -24,6 +24,8 @@ package com.codename1.ui.scheduler;
 
 import com.codename1.scheduling.ScheduleItem;
 import com.codename1.scheduling.TimeMath;
+import com.codename1.ui.ScrollSurface;
+import com.codename1.ui.ScrollSurface.EditTrigger;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.plaf.Style;
@@ -112,7 +114,7 @@ final class MonthGrid extends ScrollSurface {
 
     @Override
     @SuppressWarnings("unchecked")
-    void prepare(int width, int height) {
+    protected void layoutSurface(int width, int height) {
         int gen = UIManager.getThemeGeneration();
         if (!dirty && width == laidW && height == laidH && gen == laidGen) {
             return;
@@ -122,11 +124,11 @@ final class MonthGrid extends ScrollSurface {
         laidGen = gen;
         Style header = Look.style("SchedulerHeader");
         Font nf = Look.style("SchedulerMonthDay").getFont();
-        headerW = 0;
-        headerH = header.getFont().getHeight() + Look.mm(2);
+        setHeaderSize(0, getHeaderHeight());
+        setHeaderSize(getHeaderWidth(), header.getFont().getHeight() + Look.mm(2));
         numberH = nf.getHeight() + Look.mm(1.6f);
         chipH = Look.style("SchedulerItem").getFont().getHeight() + Look.mm(0.8f);
-        int cellH = Math.max(1, (height - headerH) / weeks);
+        int cellH = Math.max(1, (height - getHeaderHeight()) / weeks);
         capacity = Math.max(0, (cellH - numberH) / chipH);
         if (dirty) {
             dirty = false;
@@ -158,26 +160,26 @@ final class MonthGrid extends ScrollSurface {
     }
 
     @Override
-    int contentWidth() {
-        return bodyWidth();
+    protected int getContentWidth() {
+        return getBodyWidth();
     }
 
     @Override
-    int contentHeight() {
-        return bodyHeight();
+    protected int getContentHeight() {
+        return getBodyHeight();
     }
 
     private int colX(int col) {
-        return col * bodyWidth() / 7;
+        return col * getBodyWidth() / 7;
     }
 
     private int rowY(int row) {
-        return row * bodyHeight() / weeks;
+        return row * getBodyHeight() / weeks;
     }
 
     private int cellAt(int px, int py) {
-        int col = Math.max(0, Math.min(6, px * 7 / Math.max(1, bodyWidth())));
-        int row = Math.max(0, Math.min(weeks - 1, (py - headerH) * weeks / Math.max(1, bodyHeight())));
+        int col = Math.max(0, Math.min(6, px * 7 / Math.max(1, getBodyWidth())));
+        int row = Math.max(0, Math.min(weeks - 1, (py - getHeaderHeight()) * weeks / Math.max(1, getBodyHeight())));
         return row * 7 + col;
     }
 
@@ -188,11 +190,11 @@ final class MonthGrid extends ScrollSurface {
     }
 
     private ScheduleItem itemAt(int px, int py) {
-        if (py < headerH || cells == null) {
+        if (py < getHeaderHeight() || cells == null) {
             return null;
         }
         int cell = cellAt(px, py);
-        int top = headerH + rowY(cell / 7) + numberH;
+        int top = getHeaderHeight() + rowY(cell / 7) + numberH;
         if (py < top) {
             return null;
         }
@@ -201,15 +203,15 @@ final class MonthGrid extends ScrollSurface {
     }
 
     @Override
-    void paintBody(Graphics g, int x, int y) {
+    protected void paintContent(Graphics g, int x, int y) {
         Style grid = Look.style("SchedulerGrid");
         Style dayStyle = Look.style("SchedulerMonthDay");
         Style other = Look.style("SchedulerMonthOther");
         Style todaySt = Look.style("SchedulerHeaderToday");
         Style sel = Look.style("SchedulerSelection");
         Font nf = dayStyle.getFont();
-        int bw = bodyWidth();
-        int bh = bodyHeight();
+        int bw = getBodyWidth();
+        int bh = getBodyHeight();
         Look.fill(g, grid, x, y, bw, bh);
         ZoneId zone = owner.getZone();
         long today = TimeMath.epochDay(owner.now(), zone);
@@ -218,9 +220,9 @@ final class MonthGrid extends ScrollSurface {
         int line = Look.line(grid, 255);
         int lo = Math.min(anchorCell, editCell);
         int hi = Math.max(anchorCell, editCell);
-        Object over = hovered();
-        Object left = fading();
-        float lift = mode == MOVE ? liftLevel() : 0;
+        Object over = getHoverTarget();
+        Object left = getFadingHoverTarget();
+        float lift = mode == MOVE ? getLiftLevel() : 0;
         int alpha = g.getAlpha();
         for (int cell = 0; cell < weeks * 7; cell++) {
             long day = firstDay + cell;
@@ -236,9 +238,9 @@ final class MonthGrid extends ScrollSurface {
                 Look.fill(g, sel, x0, y0, x1 - x0, y1 - y0);
             }
             if (over instanceof Integer && ((Integer) over).intValue() == cell) {
-                Look.wash(g, grid.getFgColor(), x0, y0, x1 - x0, y1 - y0, hoverLevel(over));
+                Look.wash(g, grid.getFgColor(), x0, y0, x1 - x0, y1 - y0, getHoverLevel(over));
             } else if (left instanceof Integer && ((Integer) left).intValue() == cell) {
-                Look.wash(g, grid.getFgColor(), x0, y0, x1 - x0, y1 - y0, hoverLevel(left));
+                Look.wash(g, grid.getFgColor(), x0, y0, x1 - x0, y1 - y0, getHoverLevel(left));
             }
             String num = String.valueOf(Dates.dayOfMonth(day));
             int nw = nf.stringWidth(num);
@@ -272,7 +274,7 @@ final class MonthGrid extends ScrollSurface {
                 if (TimeMath.epochDay(Math.max(item.getStart(), item.getEnd() - 1), zone) > day) {
                     state |= ScheduleItemRenderer.ENDS_AFTER;
                 }
-                float lit = over != null || left != null ? hoverLevel(item.getId()) : 0;
+                float lit = over != null || left != null ? getHoverLevel(item.getId()) : 0;
                 if (lit > 0) {
                     state |= ScheduleItemRenderer.HOVERED;
                 }
@@ -319,41 +321,42 @@ final class MonthGrid extends ScrollSurface {
     }
 
     @Override
-    void hoverAt(int x, int y) {
-        if (y < headerH || cells == null || x < 0 || x >= getWidth() || y >= getHeight()) {
-            hover(null, DEFAULT_CURSOR);
+    protected void hoverAt(int x, int y) {
+        if (y < getHeaderHeight() || cells == null || x < 0 || x >= getWidth() || y >= getHeight()) {
+            setHoverTarget(null, DEFAULT_CURSOR);
             return;
         }
         ScheduleItem item = itemAt(x, y);
         if (item != null) {
-            hover(item.getId(), owner.isEditable() && isDragEdits() && item.isMovable() ? MOVE_CURSOR : HAND_CURSOR);
-            tip(item.getTitle());
+            setHoverTarget(item.getId(), owner.isEditable() && isDragEdits() && item.isMovable() ? MOVE_CURSOR : HAND_CURSOR);
+            setHoverTooltip(item.getTitle());
         } else {
             // The day a click opens and a drag starts a range from.
-            hover(Integer.valueOf(cellAt(x, y)), HAND_CURSOR);
-            tip(null);
+            setHoverTarget(Integer.valueOf(cellAt(x, y)), HAND_CURSOR);
+            setHoverTooltip(null);
         }
     }
 
     @Override
-    void paintTopHeader(Graphics g, int x, int y) {
+    protected void paintTopHeader(Graphics g, int x, int y) {
         Style header = Look.style("SchedulerHeader");
         Font f = header.getFont();
-        Look.fill(g, header, x, y, bodyWidth(), headerH);
+        Look.fill(g, header, x, y, getBodyWidth(), getHeaderHeight());
         g.setFont(f);
         g.setColor(header.getFgColor());
         for (int c = 0; c < 7; c++) {
             int w = colX(c + 1) - colX(c);
             String s = Look.fit(Dates.weekdayShort(TimeMath.dayOfWeek(firstDay + c)), f, w);
-            g.drawString(s, x + colX(c) + (w - f.stringWidth(s)) / 2, y + (headerH - f.getHeight()) / 2);
+            g.drawString(s, x + colX(c) + (w - f.stringWidth(s)) / 2, y + (getHeaderHeight() - f.getHeight()) / 2);
         }
         g.setColor(Look.mix(header.getBgColor(), header.getFgColor(), 50));
-        g.drawLine(x, y + headerH - 1, x + bodyWidth(), y + headerH - 1);
+        g.drawLine(x, y + getHeaderHeight() - 1, x + getBodyWidth(), y + getHeaderHeight() - 1);
     }
 
     @Override
-    boolean beginEdit(int x, int y, boolean handlesOnly) {
-        if (handlesOnly || !owner.isEditable() || y < headerH || cells == null) {
+    protected boolean editStarted(int x, int y, EditTrigger trigger) {
+        boolean handlesOnly = trigger == EditTrigger.HANDLE_DRAG;
+        if (handlesOnly || !owner.isEditable() || y < getHeaderHeight() || cells == null) {
             return false;
         }
         ScheduleItem item = itemAt(x, y);
@@ -376,14 +379,14 @@ final class MonthGrid extends ScrollSurface {
     }
 
     @Override
-    void editDragged(int x, int y) {
+    protected void editMoved(int x, int y) {
         if (mode != 0) {
-            editCell = cellAt(Math.max(0, Math.min(getWidth() - 1, x)), Math.max(headerH, Math.min(getHeight() - 1, y)));
+            editCell = cellAt(Math.max(0, Math.min(getWidth() - 1, x)), Math.max(getHeaderHeight(), Math.min(getHeight() - 1, y)));
         }
     }
 
     @Override
-    void endEdit(boolean commit) {
+    protected void editEnded(boolean commit) {
         int m = mode;
         ScheduleItem item = editItem;
         mode = 0;
@@ -410,8 +413,8 @@ final class MonthGrid extends ScrollSurface {
     }
 
     @Override
-    void tapped(int x, int y, boolean doubleTap) {
-        if (y < headerH || cells == null) {
+    protected void tapped(int x, int y, boolean doubleTap) {
+        if (y < getHeaderHeight() || cells == null) {
             return;
         }
         ScheduleItem item = itemAt(x, y);

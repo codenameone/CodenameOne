@@ -117,32 +117,4 @@ public final class Terrain {
         m.setColorUniform(ROCK, 0x8a8178).setUniform(SCALE, 0.8f);
         return m;
     }
-
-    /// Turf for a flat grass part: the part's own colour broken into
-    /// lighter and darker patches, a few sun-dried spots, and the fine bumps
-    /// of blades under a low sun. It reads as a lawn at any distance, where
-    /// a flat colour reads as felt. The tint comes from the instance colour,
-    /// so a creator's grass colour is kept.
-    ///
-    /// #### Returns
-    ///
-    /// a new shader material
-    public static ShaderMaterial turf() {
-        ShaderMaterial m = new ShaderMaterial().declareUniform(SCALE, ShaderType.FLOAT);
-        ShaderNode uv = Shading.worldUv(1f).mul(uniform(SCALE, ShaderType.FLOAT));
-        ShaderNode patches = Noise.fbm(uv.mul(0.18f), 3);
-        ShaderNode clumps = Noise.fbm(uv.mul(1.7f), 2);
-        ShaderNode dry = smoothstep(0.68f, 0.85f, Noise.fbm(uv.mul(0.09f).add(vec2(11.3f, 4.1f)), 3));
-        ShaderNode base = instanceColor().rgb();
-        ShaderNode tone = base.mul(patches.mul(0.7f).add(clumps.mul(0.35f)).add(0.42f));
-        ShaderNode straw = vec3(0.62f, 0.56f, 0.30f).mul(clumps.mul(0.3f).add(0.7f));
-        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(mix(tone, straw, dry.mul(0.55f)), f(1f)));
-        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.92f));
-        m.set(ShaderMaterial.Hook.METALLIC, f(0f));
-        // Blade bumps fade out with distance, where they would only shimmer.
-        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(mix(vec3(0f, 0f, 1f), Noise.bumpNormal(uv.mul(6f), 2, 0.6f),
-                Shading.distanceFade(15f, 60f))));
-        m.setUniform(SCALE, 1f);
-        return m;
-    }
 }

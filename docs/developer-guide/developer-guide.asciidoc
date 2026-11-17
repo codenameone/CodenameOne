@@ -71,6 +71,8 @@ include::Rich-Text-And-Code-Editing.asciidoc[]
 
 include::Scheduling-And-Gantt.asciidoc[]
 
+include::Node-Graphs.asciidoc[]
+
 include::Accessibility-Semantics.asciidoc[]
 
 include::Animations.asciidoc[]
@@ -189,6 +191,10 @@ include::Pulse-Implementors-Guide.asciidoc[]
 include::Slate-Users-Guide.asciidoc[]
 
 include::Slate-Implementors-Guide.asciidoc[]
+
+include::Fieldline-Users-Guide.asciidoc[]
+
+include::Fieldline-Implementors-Guide.asciidoc[]
 
 = Device and platform services
 

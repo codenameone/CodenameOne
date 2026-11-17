@@ -161,6 +161,19 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 && testClass instanceof DualAppearanceBaseTest) {
             return TEST_TIMEOUT_MS_NATIVE * 2;
         }
+        // The frame-gated GPU scenes wait for real frames before capturing,
+        // and the browser leg renders through a software GPU: one frame of the
+        // depth post chain takes seconds there and holds the main thread, so
+        // three of them never fit the 10s HTML5 default (GpuPostDepth timed
+        // out with no capture). They get the native budget, which
+        // BaseTest.maxPolls() is sized inside.
+        if (testClass instanceof GpuPostDepthScreenshotTest
+                || testClass instanceof GpuRenderTargetScreenshotTest
+                || testClass instanceof GpuShaderGalleryScreenshotTest
+                || testClass instanceof GpuShaderHarbourScreenshotTest
+                || testClass instanceof GpuSkinningScreenshotTest) {
+            return TEST_TIMEOUT_MS_NATIVE;
+        }
         if (testClass instanceof BackendClientTest) {
             // A backend client test fails a step that hears nothing after
             // BackendClientTest.STEP_TIMEOUT_MILLIS, naming the request. That only
@@ -457,6 +470,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SchedulerMonthThemeScreenshotTest(),
             new SchedulerResourceThemeScreenshotTest(),
             new GanttThemeScreenshotTest(),
+            new NodeGraphThemeScreenshotTest(),
             new ToolbarThemeScreenshotTest(),
             new TabsThemeScreenshotTest(),
             new MultiButtonThemeScreenshotTest(),

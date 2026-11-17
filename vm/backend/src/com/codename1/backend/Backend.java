@@ -919,6 +919,11 @@ public final class Backend {
         private final HttpServer.Handler[] own;
         /// The application's routers, and static files last.
         private final HttpServer.Handler[] chain;
+
+        /// The global exception resolvers, asked with a NoHandlerFoundException
+        /// for a path nothing served; null when the application has none, which
+        /// costs the chain nothing.
+        com.codename1.backend.web.ControllerHooks notFound;
         /// The security layer between the two, or null when the build linked none.
         private final RequestSecurity security;
         private final Sessions sessions;
@@ -985,6 +990,19 @@ public final class Backend {
             HttpServer.Response response = null;
             for (int i = 0 ; response == null && i < chain.length ; i++) {
                 response = chain[i].handle(request);
+                if (response != null && notFound != null && response.getStatus() == 404
+                        && chain[i] instanceof StaticFiles) {
+                    // A file that is not there is a path nothing serves, and the
+                    // application's NoHandlerFoundException handler answers it --
+                    // not the directory's plain-text 404 (issue 6240).
+                    HttpServer.Response own = notFound.notFound(request);
+                    if (own != null) {
+                        response = own;
+                    }
+                }
+            }
+            if (response == null && notFound != null) {
+                response = notFound.notFound(request);
             }
             return response;
         }
@@ -2044,6 +2062,7 @@ public final class Backend {
             runMigrations(pool);
             EntityManager manager = openEntityManager(pool);
             List routers = new ArrayList();
+            com.codename1.backend.web.ControllerHooks notFoundHooks = null;
             HttpServer.Handler relay = active != null ? active.relay() : null;
             if (relay != null) {
                 // FIRST: it answers one exact path, and a catch-all handler
@@ -2148,7 +2167,12 @@ public final class Backend {
                 HttpServer.Handler[] built = factory.create(pool, manager);
                 if (built != null) {
                     for (HttpServer.Handler handler : built) {
-                        if (handler != null) {
+                        if (handler instanceof com.codename1.backend.web.ControllerHooks) {
+                            // Not a router: the wiring hands its global exception
+                            // resolvers over for the paths nothing serves, which
+                            // are asked only after every router and file.
+                            notFoundHooks = (com.codename1.backend.web.ControllerHooks) handler;
+                        } else if (handler != null) {
                             routers.add(handler);
                         }
                     }
@@ -2342,6 +2366,7 @@ public final class Backend {
                         track, active != null ? active : Tracing.NONE, inFlight,
                         cors, Compression.fromConfig(config));
                 serving.forwarded = ForwardedHeaders.fromConfig(config);
+                serving.notFound = notFoundHooks;
                 server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
                         serving, context, routes, active != null ? active : Tracing.NONE);
                 bound = true;

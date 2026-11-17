@@ -1,0 +1,77 @@
+name: Golden plan
+
+# The first job of every hellocodenameone screenshot workflow. It reads the
+# suite's source (scripts/ci/cn1ss-golden-plan.py) and answers `run`:
+#
+#   false  (and this job fails) this is a pull request where some screenshot
+#          test has no golden in a directory whose port runs it, or deleted
+#          one the base has. Every job of the calling workflow is
+#          gated on `run` and skips; golden-capture.yml runs the suite in
+#          capture mode instead and pushes the goldens, which starts CI again.
+#   true   anything else: the goldens are complete, or this IS the capture run
+#          (`capture` set), or not a pull request.
+#
+# Only names are read (git ls-tree on a blobless, sparse checkout), so this
+# costs a few seconds and never downloads an image.
+
+on:
+  workflow_call:
+    inputs:
+      capture:
+        description: The calling run's cn1ss_capture input.
+        type: string
+        default: ''
+    outputs:
+      run:
+        description: "'true' when the calling workflow should run its jobs."
+        value: ${{ jobs.plan.outputs.run }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          # A pull request checks out its merge commit; its first parent is
+          # the base, which --base needs to see a deleted golden.
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout: |
+            scripts/ci
+            scripts/hellocodenameone/common/src/main
+            docs/website/data
+      - id: plan
+        env:
+          CAPTURE: ${{ inputs.capture }}
+          EVENT: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          base=()
+          if [ "$EVENT" = pull_request ]; then base=(--base=HEAD^1); fi
+          missing="$(python3 scripts/ci/cn1ss-golden-plan.py --verbose --from-git "${base[@]}")"
+          run=true
+          # A fork cannot be captured into (no branch here, no token): its
+          # suite runs, and the golden gate fails it on the missing images,
+          # which the run uploads (cn1ss-capture-<leg>) for a maintainer.
+          if [ -n "$missing" ] && [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" != "$REPO" ]; then
+            echo "::warning::No goldens yet for $missing. A fork cannot be captured into: a maintainer pushes this PR to a branch of $REPO and opens a PR from it, and Golden capture commits them there (or takes the cn1ss-capture-* artifacts of this run)."
+          fi
+          if [ -n "$missing" ] && [ -z "$CAPTURE" ] && [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" = "$REPO" ]; then
+            run=false
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" = false ]; then
+            # Red, not skipped: a skipped required check counts as passing, and
+            # this PR has not passed anything. The goldens push re-runs it.
+            echo "::error::No goldens yet for $missing. The Golden capture workflow records them and pushes them to this branch; if that run failed, re-run it."
+            exit 1
+          fi

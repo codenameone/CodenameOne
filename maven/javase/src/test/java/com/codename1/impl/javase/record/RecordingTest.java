@@ -258,10 +258,10 @@ class RecordingTest {
         Graphics2D g = frame.createGraphics();
         SimulatorRecorder.drawFitted(g, portrait, 400, 200);
         g.dispose();
-        assertEquals(0xff000000, frame.getRGB(10, 100), "left bar");
-        assertEquals(0xff000000, frame.getRGB(390, 100), "right bar");
+        assertEquals(0, frame.getRGB(10, 100), "left bar left alone");
+        assertEquals(0, frame.getRGB(390, 100), "right bar left alone");
         assertEquals(0xffffffff, frame.getRGB(200, 100), "content");
         assertEquals(0xffffffff, frame.getRGB(152, 100), "content keeps its width");
-        assertEquals(0xff000000, frame.getRGB(148, 100), "outside the content");
+        assertEquals(0, frame.getRGB(148, 100), "outside the content");
     }
 }

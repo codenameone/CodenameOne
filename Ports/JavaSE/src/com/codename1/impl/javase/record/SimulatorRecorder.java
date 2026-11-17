@@ -73,6 +73,16 @@ public final class SimulatorRecorder {
         BufferedImage captureFrame(RecordingOptions.Frame frame);
     }
 
+    /// A source that can move its animations to a given moment, for
+    /// lockstep recordings. `advanceTo` is called before each capture with
+    /// the frame's time on the wall clock's scale; `release` once the
+    /// recording ends, to hand the animations back to the wall clock.
+    public interface Timeline {
+        void advanceTo(long epochMs);
+
+        void release();
+    }
+
     /// What a stopped recording produced.
     public static final class Result {
         public final File file;
@@ -304,6 +314,10 @@ public final class SimulatorRecorder {
     }
 
     private void captureLoop() {
+        if (options.isLockstep() && source instanceof Timeline) {
+            lockstepLoop((Timeline) source);
+            return;
+        }
         long frameMs = 1000L / options.getFps();
         long maxMs = options.getMaxSeconds() * 1000L;
         try {
@@ -337,6 +351,71 @@ public final class SimulatorRecorder {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    /// A lockstep recording renders slower than real time, so a stop asked
+    /// for now still has video to make: it covers as long as the wall clock
+    /// has run since the start, the same as a live recording would.
+    private void finishTimeline() {
+        long target;
+        int fps;
+        synchronized (this) {
+            if (!running || !options.isLockstep() || Thread.currentThread() == thread) {
+                return;
+            }
+            target = System.currentTimeMillis() - startTime;
+            fps = options.getFps();
+        }
+        try {
+            while (true) {
+                synchronized (this) {
+                    if (!running || (long) frameCount * 1000L / fps >= target) {
+                        return;
+                    }
+                }
+                Thread.sleep(20);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /// One frame per interval of the timeline, each rendered for its own
+    /// moment: never a repeat, never a skip. When rendering is faster than
+    /// real time it waits for the wall clock, so the app keeps its pace.
+    private void lockstepLoop(Timeline timeline) {
+        int fps = options.getFps();
+        long maxMs = options.getMaxSeconds() * 1000L;
+        try {
+            while (isRecording()) {
+                int index;
+                synchronized (this) {
+                    index = frameCount;
+                }
+                long at = (long) index * 1000L / fps;
+                if (at >= maxMs) {
+                    autoStop();
+                    return;
+                }
+                long ahead = at - (System.currentTimeMillis() - startTime);
+                if (ahead > 0) {
+                    Thread.sleep(ahead);
+                }
+                timeline.advanceTo(startTime + at);
+                BufferedImage img = source.captureFrame(options.getFrame());
+                if (img != null) {
+                    compose(img, at);
+                }
+                synchronized (this) {
+                    frameCount++;
+                }
+                queue.put(new Frame(pixels(), index));
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            timeline.release();
         }
     }
 
@@ -440,9 +519,37 @@ public final class SimulatorRecorder {
         }, "SimulatorRecorderAutoStop").start();
     }
 
+    /// The light studio backdrop a recording shows around the device.
+    /// Draws a screen frame into the fixed-size video frame, over whatever is
+    /// there. A frame whose shape changed since the first (a foldable skin
+    /// moving to its cover display, a rotation) is letterboxed, never
+    /// stretched: a video stream keeps the size it started with.
+    static void drawFitted(Graphics2D g, BufferedImage img, int width, int height) {
+        if (img.getWidth() * height == img.getHeight() * width) {
+            g.drawImage(img, 0, 0, width, height, null);
+            return;
+        }
+        double s = Math.min(width / (double) img.getWidth(), height / (double) img.getHeight());
+        int dw = (int) Math.round(img.getWidth() * s);
+        int dh = (int) Math.round(img.getHeight() * s);
+        g.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh, null);
+    }
+
+    public static void paintBackdrop(Graphics2D g, int w, int h) {
+        g.setPaint(new java.awt.GradientPaint(0, 0, new java.awt.Color(0xf5f5f7), 0, h,
+                new java.awt.Color(0xdedee3)));
+        g.fillRect(0, 0, w, h);
+        g.setPaint(null);
+    }
+
     private void compose(BufferedImage img, long now) {
         Graphics2D g = scaled.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        // Every frame starts from the backdrop: a skin frame is transparent
+        // around the device, and drawn straight over the last frame its
+        // corners kept whatever was there (black, or a smear of the device
+        // as it moved).
+        paintBackdrop(g, width, height);
         drawFitted(g, img, width, height);
         Caption[] active;
         synchronized (this) {
@@ -454,26 +561,6 @@ public final class SimulatorRecorder {
             }
         }
         g.dispose();
-    }
-
-    /// Draws a screen frame into the fixed-size video frame. A video cannot
-    /// change size mid-stream, but the screen can: rotating the device turns
-    /// a portrait capture landscape. Stretching it to the frame distorted
-    /// every frame after the rotation, so a frame of another shape is fitted
-    /// at its own aspect ratio and centred on black instead.
-    static void drawFitted(Graphics2D g, BufferedImage img, int w, int h) {
-        int iw = img.getWidth();
-        int ih = img.getHeight();
-        if ((long) iw * h == (long) ih * w) {
-            g.drawImage(img, 0, 0, w, h, null);
-            return;
-        }
-        g.setColor(java.awt.Color.BLACK);
-        g.fillRect(0, 0, w, h);
-        double s = Math.min(w / (double) iw, h / (double) ih);
-        int dw = (int) Math.round(iw * s);
-        int dh = (int) Math.round(ih * s);
-        g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh, null);
     }
 
     static void paintCaption(Graphics2D g, String text, int w, int h) {
@@ -569,8 +656,39 @@ public final class SimulatorRecorder {
         }
     }
 
+    /// As `stop`, but a lockstep recording first renders on until its video
+    /// is as long as the wall clock has run since the start: that recording
+    /// renders slower than real time, and a caller timing the stop by the
+    /// wall clock expects the video to cover that span. A recording ended
+    /// by a script on the animation clock calls `stop` instead.
+    public Result stopAtWallClock() throws IOException {
+        finishTimeline();
+        return stop();
+    }
+
     /// Stops recording and finishes the file. Throws when encoding failed at any
     /// point during the recording.
+    private static void joinWhileDispatching(final Thread t) {
+        final java.awt.SecondaryLoop loop = java.awt.Toolkit.getDefaultToolkit()
+                .getSystemEventQueue().createSecondaryLoop();
+        Thread waiter = new Thread(new Runnable() {
+            public void run() {
+                while (t.isAlive()) {
+                    try {
+                        t.join();
+                    } catch (InterruptedException e) {
+                        // keep waiting; the loop must be exited
+                    }
+                }
+                loop.exit();
+            }
+        }, "RecorderStopJoin");
+        waiter.setDaemon(true);
+        waiter.start();
+        // Returns at once if exit() already ran (the thread had ended).
+        loop.enter();
+    }
+
     public Result stop() throws IOException {
         synchronized (stopLock) {
             Thread t;
@@ -588,6 +706,13 @@ public final class SimulatorRecorder {
             try {
                 // No timeout: the writer below must never be closed while the
                 // capture thread may still be writing a frame into it.
+                if (t != null && t != Thread.currentThread() && java.awt.EventQueue.isDispatchThread()) {
+                    // A lockstep capture thread renders each frame on the EDT
+                    // (invokeAndWait), so a plain join here would deadlock.
+                    // A secondary loop keeps dispatching events until the
+                    // capture thread has ended.
+                    joinWhileDispatching(t);
+                }
                 if (t != null && t != Thread.currentThread()) {
                     boolean interrupted = false;
                     while (t.isAlive()) {
