@@ -41,8 +41,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   check:
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    needs: golden-plan
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -84,7 +93,8 @@ jobs:
           exit $status
 
   fold:
-    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
+    needs: golden-plan
+    if: ${{ needs.golden-plan.outputs.run == 'true' && ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master') }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write

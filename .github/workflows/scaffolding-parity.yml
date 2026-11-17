@@ -51,7 +51,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   scaffolding-integrity:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     # 10 rather than 5, for the reason identity-stack's sample-secrets job
     # carries: checking out a repository this size can take three minutes on its

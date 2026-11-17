@@ -34,12 +34,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   # --------------------------------------------------------------------------- #
   # PR gate — fails only on net-new findings in changed posts.
   # --------------------------------------------------------------------------- #
   gate:
+    needs: golden-plan
     name: Blog prose gate
-    if: github.event_name == 'pull_request'
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'pull_request') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
@@ -233,7 +242,8 @@ jobs:
   # Weekly / on-demand whole-corpus backlog report. NEVER fails the build.
   # --------------------------------------------------------------------------- #
   report:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: golden-plan
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository

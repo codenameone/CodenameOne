@@ -54,7 +54,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   android-kernels:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -63,6 +73,8 @@ jobs:
         run: scripts/check-android-crypto-kernels.sh
 
   gpu:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -83,6 +95,8 @@ jobs:
         run: scripts/crypto-gpu/batch-check.sh 2048 --require-gpu | tee -a "$GITHUB_STEP_SUMMARY"
 
   jvm:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -98,6 +112,8 @@ jobs:
         run: scripts/crypto-bench/gate.py jvm "$RUNNER_TEMP/jvm.txt" | tee -a "$GITHUB_STEP_SUMMARY"
 
   native:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

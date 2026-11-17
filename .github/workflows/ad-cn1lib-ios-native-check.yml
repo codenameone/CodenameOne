@@ -37,7 +37,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   select:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     outputs:
       libraries: ${{ steps.plan.outputs.ios_ads }}
@@ -53,8 +63,8 @@ jobs:
   native-checks:
     # One runner, one checkout/tool installation, and one pod resolution per
     # library. Keep both ARC modes and both AdMob link destinations.
-    needs: select
-    if: ${{ needs.select.outputs.libraries != '' || needs.select.outputs.link == 'true' }}
+    needs: [golden-plan, select]
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.libraries != '' || needs.select.outputs.link == 'true') }}
     runs-on: macos-15
     timeout-minutes: 120
     steps:

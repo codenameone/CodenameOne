@@ -65,6 +65,14 @@ permissions:
   packages: read
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   # The framework is built ONCE, here, and the platform jobs consume the
   # artifacts. Two reasons it cannot be built per platform:
   #
@@ -79,6 +87,8 @@ jobs:
   # The container is the same one pr.yml uses, which bakes JDK 8 and a
   # cn1-binaries snapshot.
   framework:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: framework
     runs-on: ubuntu-latest
     container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
@@ -152,6 +162,8 @@ jobs:
   # read by nothing, so asking to re-run one platform launched all six -- several
   # of them two-hour native builds.
   plan:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: plan
     runs-on: ubuntu-latest
     outputs:
@@ -194,8 +206,9 @@ jobs:
               out.write("include=" + json.dumps(chosen) + "\n")
 
   measure:
+    if: needs.golden-plan.outputs.run == 'true'
     name: ${{ matrix.platform }}
-    needs: [framework, plan]
+    needs: [golden-plan, framework, plan]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     env:
@@ -404,11 +417,11 @@ jobs:
 
   publish:
     name: Publish
-    needs: measure
+    needs: [golden-plan, measure]
     # always(), so a platform that regressed still gets its numbers in front of
     # a reviewer. The `measure` jobs already carry the red status; hiding the
     # comment as well would leave the failure with no explanation attached.
-    if: always()
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (always()) }}
     runs-on: ubuntu-latest
     # Read-only contents: on a pull request this job runs the pull request's own
     # files (run_bench.py, publish-quality-comment.js with an authenticated
@@ -461,15 +474,10 @@ jobs:
   # executes is master's, not a contributor's.
   publish-status:
     name: Publish port status
-    needs: measure
+    needs: [golden-plan, measure]
     # Only a run of every platform: port status shows all of them, and a dispatch
     # for a subset would publish a table missing the rest.
-    if: >-
-      always() &&
-      github.event_name != 'pull_request' &&
-      github.ref == 'refs/heads/master' &&
-      (github.event_name == 'schedule' ||
-       (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'all' || inputs.platforms == '')))
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'all' || inputs.platforms == '')))) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
