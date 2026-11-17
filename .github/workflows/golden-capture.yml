@@ -130,8 +130,19 @@ jobs:
             const {cancelForCapture} = require('./scripts/ci/cancel-stale-pr-runs.js');
             core.setOutput('ids', (await cancelForCapture({github, context, core, keepRunId: context.runId})).join(' '));
 
+      # Failed or cancelled (a new push replaced this job mid-dispatch):
+      # nothing else stops the captures it did start.
+      - name: Cancel the captures that did start
+        if: failure() || cancelled()
+        run: |
+          [ -f "$RUNS" ] || exit 0
+          while read -r wf id; do
+            gh run cancel "$id" --repo "$GITHUB_REPOSITORY" || true
+          done < "$RUNS"
+
       # A capture that never got going would leave the PR's other checks
-      # cancelled for good; start them again, and the captures it did start.
+      # cancelled for good; start them again. Not when cancelled: the push
+      # that replaced this job started them.
       - name: Re-run what was cancelled
         if: failure()
         env:
@@ -140,7 +151,3 @@ jobs:
           for id in $IDS; do
             gh run rerun "$id" --repo "$GITHUB_REPOSITORY" || echo "could not re-run $id"
           done
-          [ -f "$RUNS" ] || exit 0
-          while read -r wf id; do
-            gh run cancel "$id" --repo "$GITHUB_REPOSITORY" || true
-          done < "$RUNS"

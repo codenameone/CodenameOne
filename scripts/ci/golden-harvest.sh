@@ -28,13 +28,26 @@ runs_at() {
 }
 
 list() {
-  local sha="$1" runs_file="$2" wf line runs pending=0
+  local sha="$1" runs_file="$2" wf line runs pending=0 capture=0 all
   [ "${#WORKFLOWS[@]}" -gt 0 ] || { log "no workflows read from golden-capture.sh"; return 1; }
   : > "$runs_file"
+  # A capture (golden-capture.yml) dispatches the workflows one after another
+  # over a few minutes. Once any of them has a capture run here, a workflow
+  # without one is still to come, not finished: harvesting then would take
+  # the legs that are done and leave the rest to a branch that has moved.
+  all="$(for wf in "${WORKFLOWS[@]}"; do runs_at "$wf" "$sha" | jq -c --arg wf "$wf" '{wf: $wf, runs: .}'; done)"
+  if jq -e -s 'any(.[].runs[]; .event == "workflow_dispatch")' <<<"$all" >/dev/null; then
+    capture=1
+  fi
   for wf in "${WORKFLOWS[@]}"; do
+    runs="$(jq -c -s --arg wf "$wf" '.[] | select(.wf == $wf) | .runs' <<<"$all")"
+    if [ "$capture" = 1 ] && ! jq -e 'any(.[]; .event == "workflow_dispatch")' <<<"$runs" >/dev/null; then
+      log "$wf has no capture run at $sha yet"
+      pending=1
+      continue
+    fi
     # A workflow whose every run here was cancelled has nothing to harvest;
     # say so, since its suite never reported.
-    runs="$(runs_at "$wf" "$sha")"
     if [ "$(jq '(length > 0 and all(.conclusion == "cancelled"))' <<<"$runs")" = true ]; then
       echo "::warning::every $wf run at $sha was cancelled; nothing of it is harvested"
     fi
@@ -48,11 +61,13 @@ list() {
       printf '%s %s\n' "$wf" "$1" >> "$runs_file"
     done < <(jq -r '[.[] | select(.conclusion != "cancelled")] | sort_by(.id) | last // empty | "\(.id) \(.status)"' <<<"$runs")
   done
+  echo "capture=$capture" >> "${GITHUB_OUTPUT:-/dev/null}"
   if [ "$pending" = 0 ] && [ -s "$runs_file" ]; then
     echo "ready=1" >> "${GITHUB_OUTPUT:-/dev/null}"
   else
     log "not every screenshot run at $sha has completed; the last one harvests"
     echo "ready=0" >> "${GITHUB_OUTPUT:-/dev/null}"
+    [ -z "${HARVEST_REQUIRE_READY:-}" ] || return 3
   fi
 }
 
@@ -79,17 +94,19 @@ count() {
   echo "$total"
 }
 
-# A capture cancelled the PR's own runs; when it brings nothing back, run them
-# again, so golden-plan names the open gap on the PR instead of leaving its
-# checks cancelled.
+# A capture cancelled the PR's own runs, screenshot workflows and the rest
+# (cancel-stale-pr-runs.js, cancelForCapture); when it brings nothing back,
+# run them again, so golden-plan names the open gap on the PR instead of
+# leaving its checks cancelled: the newest pull_request run of each workflow
+# at SHA, when that run was cancelled.
 rerun() {
-  local sha="$1" wf id
-  for wf in "${WORKFLOWS[@]}"; do
-    id="$(runs_at "$wf" "$sha" | jq -r '[.[] | select(.event == "pull_request")] | sort_by(.id) | last // empty
-            | select(.conclusion == "cancelled") | .id')"
-    [ -n "$id" ] || continue
-    log "re-running $wf run $id"
-    gh run rerun "$id" --repo "$GITHUB_REPOSITORY" || echo "::warning::could not re-run $wf run $id"
+  local sha="$1" id
+  for id in $(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$sha&event=pull_request&per_page=100" \
+                --jq '.workflow_runs[] | [.workflow_id, .id, .conclusion] | @tsv' \
+              | sort -k1,1n -k2,2n | awk -F'\t' '{last[$1] = $2 "\t" $3} END {for (w in last) print last[w]}' \
+              | awk -F'\t' '$2 == "cancelled" {print $1}'); do
+    log "re-running run $id"
+    gh run rerun "$id" --repo "$GITHUB_REPOSITORY" || echo "::warning::could not re-run run $id"
   done
 }
 
