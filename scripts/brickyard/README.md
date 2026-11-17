@@ -101,7 +101,7 @@ with the server and client in one process.
 ```bash
 # From the repository root, JDK 8 for the framework (per-checkout repository):
 cd maven
-mvn -pl core,backend,backend-test,codenameone-maven-plugin,luau-runtime,rbx-compat -am install \
+mvn -pl core,backend,backend-test,codenameone-maven-plugin,luau-runtime,rbx-compat,rbx-view -am install \
   -DskipTests -Plocal-dev-javase -Dmaven.repo.local=$PWD/../.m2-repo
 
 # JDK 17 for the project:

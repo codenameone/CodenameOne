@@ -20,6 +20,7 @@ package com.codenameone.examples.brickyard.ui;
 
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.CN;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.brickyard.api.ExperienceDto;
 import com.codenameone.examples.brickyard.api.PlayingDto;
@@ -43,6 +44,11 @@ public final class HomeForm {
         final Container content = Ui.content(f);
         content.add(Ui.bricks());
         content.add(Ui.label("Loading...", "Muted"));
+        capWidth(content);
+        f.addSizeChangedListener(e -> {
+            capWidth(content);
+            f.revalidate();
+        });
         f.show();
         // Live player counts first, so the tiles can say how many are in each
         // game; a failed count only loses the "playing" line.
@@ -154,6 +160,24 @@ public final class HomeForm {
         }, (status, message) -> { }));
     }
 
+    static final int NEW_VISITS = 10;
+
+    /// The widest the home column grows. On a tablet or desktop the phone
+    /// column stretched edge to edge; the rest becomes side margin.
+    static final int MAX_COLUMN_MM = 150;
+
+    /// Centres `content` in a column at most MAX_COLUMN_MM wide.
+    static void capWidth(Container content) {
+        int max = CN.convertToPixels(MAX_COLUMN_MM);
+        if (!CN.isTablet() && !CN.isDesktop()) {
+            return;
+        }
+        int side = Math.max(CN.convertToPixels(2), (CN.getDisplayWidth() - max) / 2);
+        com.codename1.ui.plaf.Style s = content.getAllStyles();
+        s.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        s.setPadding(s.getPaddingTop(), s.getPaddingBottom(), side, side);
+    }
+
     static String titleOf(List<ExperienceDto> all, String id) {
         if (all != null) {
             for (ExperienceDto e : all) {
@@ -172,10 +196,15 @@ public final class HomeForm {
             return;
         }
         row(content, "Continue", Experiences.recent(all));
-        row(content, "Featured", Experiences.featured(all));
-        row(content, "Trending", Experiences.trending(all));
+        // Featured is the top few; Trending leaves those out, and a genre
+        // with one game gets no row, so a game is not listed three times.
+        List<ExperienceDto> featured = Experiences.featured(all);
+        row(content, "Featured", featured);
+        row(content, "Trending", Experiences.without(Experiences.trending(all), featured));
         for (Map.Entry<String, List<ExperienceDto>> genre : Experiences.genres(all).entrySet()) {
-            row(content, genre.getKey(), genre.getValue());
+            if (genre.getValue().size() >= 2) {
+                row(content, genre.getKey(), genre.getValue());
+            }
         }
     }
 
@@ -217,6 +246,11 @@ public final class HomeForm {
         Long now = PLAYING.get(e.id());
         String reach = now != null && now.longValue() > 0 ? now + " playing"
                 : ExperienceForm.count(e.visits(), "visit");
-        return (rating < 0 ? "New" : rating + "% liked") + "  -  " + reach;
+        if (rating >= 0) {
+            return rating + "% liked  -  " + reach;
+        }
+        // No publish date reaches the client, so "New" means barely played;
+        // an unrated game with real traffic shows its reach alone.
+        return e.visits() < NEW_VISITS ? "New  -  " + reach : reach;
     }
 }

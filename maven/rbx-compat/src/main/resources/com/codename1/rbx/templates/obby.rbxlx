@@ -103,7 +103,26 @@
 <Item class="Part" referent="RBX108"><Properties><string name="Name">Confetti</string><bool name="Anchored">true</bool><bool name="CanCollide">false</bool><CoordinateFrame name="CFrame"><X>6</X><Y>40.7</Y><Z>-193</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>1</X><Y>1</Y><Z>1</Z></Vector3><Color3uint8 name="Color3uint8">4294967295</Color3uint8><token name="Material">288</token><token name="shape">1</token><float name="Transparency">1</float></Properties><Item class="ParticleEmitter" referent="RBX107"><Properties><string name="Name">Particles</string><float name="Rate">14</float><NumberRange name="Speed">3 6 </NumberRange><NumberRange name="Lifetime">1.5 2.5 </NumberRange><ColorSequence name="Color">0 1 0.25098 0.505882 0 1 0.25098 0.768627 1 0 </ColorSequence><NumberSequence name="Size">0 0.5 0 1 0.5 0 </NumberSequence><Vector3 name="Acceleration"><X>0</X><Y>-6</Y><Z>0</Z></Vector3></Properties></Item></Item>
 </Item>
 <Item class="Lighting" referent="RBX113"><Properties><string name="Name">Lighting</string><float name="ClockTime">17.8</float><float name="Brightness">2.6</float></Properties><Item class="BloomEffect" referent="RBX109"><Properties><string name="Name">Bloom</string><float name="Intensity">0.9</float><float name="Threshold">0.95</float></Properties></Item><Item class="Atmosphere" referent="RBX110"><Properties><string name="Name">Atmosphere</string><float name="Density">0.25</float><Color3 name="Color"><R>0.94902</R><G>0.701961</G><B>0.541176</B></Color3></Properties></Item><Item class="ColorCorrectionEffect" referent="RBX111"><Properties><string name="Name">Grade</string><float name="Saturation">0.12</float><float name="Contrast">0.12</float></Properties></Item><Item class="SunRaysEffect" referent="RBX112"><Properties><string name="Name">SunRays</string><float name="Intensity">0.2</float></Properties></Item></Item>
-<Item class="ServerScriptService" referent="RBX115"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="RBX114"><Properties><string name="Name">Obby</string><ProtectedString name="Source"><![CDATA[local function stats(player, fields)
+<Item class="ServerScriptService" referent="RBX115"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="RBX116"><Properties><string name="Name">Goal</string><ProtectedString name="Source"><![CDATA[-- The goal, on every new player's screen for a few seconds.
+local GOAL = "Reach the trophy at the top. Every checkpoint saves your stage."
+game:GetService("Players").PlayerAdded:Connect(function(player)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "GoalHint"
+    gui.ResetOnSpawn = false
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.8, 0, 0, 56)
+    label.Position = UDim2.new(0.1, 0, 0, 60)
+    label.BackgroundColor3 = Color3.fromRGB(22, 27, 46)
+    label.BackgroundTransparency = 0.2
+    label.TextColor3 = Color3.fromRGB(255, 196, 60)
+    label.TextWrapped = true
+    label.TextSize = 20
+    label.Text = GOAL
+    label.Parent = gui
+    gui.Parent = player:WaitForChild("PlayerGui")
+    task.delay(8, function() gui:Destroy() end)
+end)
+]]></ProtectedString></Properties></Item><Item class="Script" referent="RBX114"><Properties><string name="Name">Obby</string><ProtectedString name="Source"><![CDATA[local function stats(player, fields)
     local ls = Instance.new("Folder")
     ls.Name = "leaderstats"
     for _, f in ipairs(fields) do

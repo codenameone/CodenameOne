@@ -92,7 +92,26 @@
 <Item class="Part" referent="RBX104"><Properties><string name="Name">Hill</string><bool name="Anchored">true</bool><bool name="CanCollide">true</bool><CoordinateFrame name="CFrame"><X>-82.4443</X><Y>-7.45</Y><Z>194.227</Z><R00>0.920505</R00><R01>0</R01><R02>-0.390731</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0.390731</R20><R21>0</R21><R22>0.920505</R22></CoordinateFrame><Vector3 name="size"><X>147</X><Y>43</Y><Z>117.6</Z></Vector3><Color3uint8 name="Color3uint8">4291339370</Color3uint8><token name="Material">1296</token><token name="shape">0</token><BinaryString name="Tags">U2NlbmVyeQ==</BinaryString></Properties></Item>
 </Item>
 <Item class="Lighting" referent="RBX109"><Properties><string name="Name">Lighting</string><float name="ClockTime">16.9</float><float name="Brightness">2.8</float></Properties><Item class="BloomEffect" referent="RBX105"><Properties><string name="Name">Bloom</string><float name="Intensity">0.8</float><float name="Threshold">1</float></Properties></Item><Item class="Atmosphere" referent="RBX106"><Properties><string name="Name">Atmosphere</string><float name="Density">0.1</float><Color3 name="Color"><R>1</R><G>0.85098</G><B>0.627451</B></Color3></Properties></Item><Item class="ColorCorrectionEffect" referent="RBX107"><Properties><string name="Name">Grade</string><float name="Saturation">0.1</float><float name="Contrast">0.12</float></Properties></Item><Item class="SunRaysEffect" referent="RBX108"><Properties><string name="Name">SunRays</string><float name="Intensity">0.16</float></Properties></Item></Item>
-<Item class="ServerScriptService" referent="RBX111"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="RBX110"><Properties><string name="Name">Simulator</string><ProtectedString name="Source"><![CDATA[local function stats(player, fields)
+<Item class="ServerScriptService" referent="RBX111"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="RBX112"><Properties><string name="Name">Goal</string><ProtectedString name="Source"><![CDATA[-- The goal, on every new player's screen for a few seconds.
+local GOAL = "Mine crystals for gems, sell them for coins, buy more power."
+game:GetService("Players").PlayerAdded:Connect(function(player)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "GoalHint"
+    gui.ResetOnSpawn = false
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.8, 0, 0, 56)
+    label.Position = UDim2.new(0.1, 0, 0, 60)
+    label.BackgroundColor3 = Color3.fromRGB(22, 27, 46)
+    label.BackgroundTransparency = 0.2
+    label.TextColor3 = Color3.fromRGB(255, 196, 60)
+    label.TextWrapped = true
+    label.TextSize = 20
+    label.Text = GOAL
+    label.Parent = gui
+    gui.Parent = player:WaitForChild("PlayerGui")
+    task.delay(8, function() gui:Destroy() end)
+end)
+]]></ProtectedString></Properties></Item><Item class="Script" referent="RBX110"><Properties><string name="Name">Simulator</string><ProtectedString name="Source"><![CDATA[local function stats(player, fields)
     local ls = Instance.new("Folder")
     ls.Name = "leaderstats"
     for _, f in ipairs(fields) do

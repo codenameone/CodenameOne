@@ -1252,8 +1252,56 @@ def baseplate():
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "main", "resources", "com", "codename1",
                    "rbx", "templates")
+# What each game asks of a new player, shown when they join and gone after a
+# few seconds. Survival has its round status line instead, and the baseplate
+# is an empty world with no goal of its own.
+GOALS = {
+    "obby": "Reach the trophy at the top. Every checkpoint saves your stage.",
+    "rainbow": "Climb six colour stages to the rainbow. Checkpoints save your stage.",
+    "tycoon": "Collect the cash your factory makes, then buy droppers and upgrades.",
+    "arena": "Knock rivals off the platform. Points for every KO.",
+    "simulator": "Mine crystals for gems, sell them for coins, buy more power.",
+    "racing": "Three laps around the bay. Beat your best time.",
+    "town": "Take a job on the pad and earn cash around town.",
+}
+
+GOAL_SCRIPT = """
+-- The goal, on every new player's screen for a few seconds.
+local GOAL = %s
+game:GetService("Players").PlayerAdded:Connect(function(player)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "GoalHint"
+    gui.ResetOnSpawn = false
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.8, 0, 0, 56)
+    label.Position = UDim2.new(0.1, 0, 0, 60)
+    label.BackgroundColor3 = Color3.fromRGB(22, 27, 46)
+    label.BackgroundTransparency = 0.2
+    label.TextColor3 = Color3.fromRGB(255, 196, 60)
+    label.TextWrapped = true
+    label.TextSize = 20
+    label.Text = GOAL
+    label.Parent = gui
+    gui.Parent = player:WaitForChild("PlayerGui")
+    task.delay(8, function() gui:Destroy() end)
+end)
+"""
+
+def with_goal(name, xml):
+    """Adds the goal script to a template's ServerScriptService."""
+    if name not in GOALS:
+        return xml
+    import re
+    ref = "RBX%d" % (max(int(n) for n in re.findall(r'referent="RBX(\d+)"', xml)) + 1)
+    lua = GOAL_SCRIPT % ('"' + GOALS[name] + '"')
+    item = ('<Item class="Script" referent="%s"><Properties><string name="Name">Goal</string>'
+            '<ProtectedString name="Source"><![CDATA[%s]]></ProtectedString></Properties></Item>'
+            % (ref, lua.strip() + "\n"))
+    m = re.search(r'(<Item class="ServerScriptService" referent="RBX\d+"><Properties>.*?</Properties>)', xml)
+    return xml[:m.end()] + item + xml[m.end():]
+
 for name, fn in (("baseplate", baseplate), ("obby", obby), ("rainbow", rainbow), ("tycoon", tycoon), ("arena", arena), ("simulator", simulator),
                  ("racing", racing), ("survival", survival), ("town", town)):
     with open(os.path.join(OUT, name + ".rbxlx"), "w") as f:
-        f.write(fn())
+        f.write(with_goal(name, fn()))
 print("wrote", OUT)

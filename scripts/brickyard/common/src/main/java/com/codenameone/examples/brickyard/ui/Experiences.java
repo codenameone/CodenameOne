@@ -53,12 +53,25 @@ public final class Experiences {
                 return Long.compare(score(b), score(a));
             }
         });
-        return head(out);
+        return out.size() <= FEATURED ? out : new ArrayList<>(out.subList(0, FEATURED));
     }
 
     static long score(ExperienceDto e) {
         // Up votes minus down votes, plus a little for favourites.
         return e.upVotes() - e.downVotes() + e.favourites() / 4;
+    }
+
+    static final int FEATURED = 6;
+
+    /// `list` without the experiences in `drop`, in order.
+    public static List<ExperienceDto> without(List<ExperienceDto> list, List<ExperienceDto> drop) {
+        List<ExperienceDto> out = new ArrayList<>();
+        for (ExperienceDto e : list) {
+            if (!drop.contains(e)) {
+                out.add(e);
+            }
+        }
+        return out;
     }
 
     /// Most visited first.

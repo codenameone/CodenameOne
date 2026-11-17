@@ -87,13 +87,18 @@ public final class ProgressViews {
         long shown = Math.min(q.progress(), q.target());
         String reward = "+" + q.rewardXp() + " XP" + (q.rewardBricks() > 0 ? "  +" + q.rewardBricks() + " Bricks" : "");
         Label cadence = Ui.label("WEEKLY".equals(q.cadence()) ? "WEEKLY" : "DAILY", "QuestCadence");
-        Container text = BoxLayout.encloseY(BoxLayout.encloseX(cadence, Ui.label(q.title(), "CardTitle")),
+        // The title wraps: on a phone a long one beside Claim was cut to
+        // "Try a new experier".
+        Container titleRow = new Container(new BorderLayout());
+        titleRow.add(BorderLayout.WEST, cadence);
+        titleRow.add(BorderLayout.CENTER, Ui.text(q.title(), "CardTitle"));
+        Container text = BoxLayout.encloseY(titleRow,
                 new Meter((double) shown / Math.max(1, q.target()), done ? GREEN : YELLOW),
                 Ui.label(shown + " / " + q.target() + "    " + reward, "CardMeta"));
         Container row = new Container(new BorderLayout());
         row.setUIID("Panel");
         row.add(BorderLayout.CENTER, text);
-        Component action;
+        Component action = null;
         if (q.claimed() != 0) {
             Label l = Ui.label("Claimed", "Muted");
             FontImage.setMaterialIcon(l, FontImage.MATERIAL_CHECK_CIRCLE, 3.5f);
@@ -105,10 +110,10 @@ public final class ProgressViews {
                         Store.refresh();
                         after.run();
                     }, Ui::failed)));
-        } else {
-            action = Ui.label("", "Muted");
         }
-        row.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(action));
+        if (action != null) {
+            row.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(action));
+        }
         row.setName("quest-" + q.id());
         return row;
     }
@@ -123,12 +128,12 @@ public final class ProgressViews {
         box.setName("seasonPass");
         String name = s == null || s.name() == null ? "Season" : s.name();
         long left = s == null ? 0 : Math.max(0, (s.endsAt() - System.currentTimeMillis()) / 86400000L);
-        Container head = new Container(new BorderLayout());
-        head.add(BorderLayout.CENTER, Ui.label(name, "SeasonTitle"));
+        // Days left on a line of its own: beside the title the two ran
+        // together ("High Tide29 days left") and clipped on a phone.
+        box.add(Ui.text(name, "SeasonTitle"));
         if (left > 0) {
-            head.add(BorderLayout.EAST, Ui.label(left + " days left", "CardMeta"));
+            box.add(Ui.label(left + " days left", "CardMeta"));
         }
-        box.add(head);
         long into = p.seasonXp() % XP_PER_TIER;
         boolean maxed = p.seasonTier() >= (tiers == null ? 0 : tiers.size());
         box.add(new Meter(maxed ? 1 : (double) into / XP_PER_TIER, PURPLE));
@@ -145,7 +150,7 @@ public final class ProgressViews {
         }
         box.add(strip);
         if (p.premium() == 0) {
-            box.add(Ui.button("Unlock the Plus track - 400 Bricks", "PremiumButton", "buyPremium",
+            box.add(Ui.button("Unlock Plus - 400 Bricks", "PremiumButton", "buyPremium",
                     e -> Api.progression().buyPremium(Net.to(done -> {
                         Ui.toast("Plus track unlocked");
                         Store.refresh();

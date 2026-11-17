@@ -96,7 +96,8 @@ public final class AvatarForm {
         final AvatarPreview preview = new AvatarPreview(current[0].body());
         preview.setName("avatarPreview");
         preview.setPreferredH(CN.convertToPixels(CN.isTablet() ? 70 : 52));
-        Container chips = new Container(new GridLayout(1, Avatar.BODIES.length));
+        Container chips = new Container(new GridLayout(2, (Avatar.BODIES.length + 1) / 2));
+        // Two rows: four across cut "Barbarian" to "Barbar" on a phone.
         final Button[] bodyButtons = new Button[Avatar.BODIES.length];
         for (int i = 0; i < Avatar.BODIES.length; i++) {
             final String body = Avatar.BODIES[i];

@@ -212,8 +212,21 @@ public final class Ui {
         return l;
     }
 
+    private static ToastBar.Status toast;
+
+    /// Shows one message at a time: a new one replaces the one on screen
+    /// rather than stacking above it. ToastBar sits at the bottom of the
+    /// form's layered pane, above the content but not over the section bar,
+    /// which is part of the form's south.
     public static void toast(String text) {
-        ToastBar.showInfoMessage(text);
+        if (toast != null) {
+            toast.clear();
+        }
+        ToastBar.Status s = ToastBar.getInstance().createStatus();
+        s.setMessage(text);
+        s.setExpires(3000);
+        s.show();
+        toast = s;
     }
 
     public static void failed(int status, String message) {
