@@ -71,7 +71,6 @@ public class DataGridThemeScreenshotTest extends DualAppearanceBaseTest {
     @Override
     protected void populate(Form form, String suffix) {
         DataGrid grid = new DataGrid(people());
-        grid.getColumn(0).setWidthMM(18);
         grid.getColumn(2).setKind(GridColumn.Kind.NUMBER).setAggregate(GridAggregate.SUM);
         grid.getColumn(4).setFlex(1);
         grid.setFrozenColumns(1);

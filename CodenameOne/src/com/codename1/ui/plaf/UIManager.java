@@ -2168,7 +2168,8 @@ public class UIManager {
                 if (followsDevice && key.startsWith("$Dark")) {
                     dark = true;
                 }
-                if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")) {
+                if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")
+                        || key.startsWith("DataGrid")) {
                     // A default from the last pass is not the theme's: it
                     // was the light palette if that pass was light, and a
                     // refresh into dark mode has to be able to replace it.
@@ -2367,7 +2368,8 @@ public class UIManager {
         schedulingDefaults.clear();
         for (Map.Entry<String, Object> e : themeProps.entrySet()) {
             String key = e.getKey();
-            if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")) {
+            if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")
+                        || key.startsWith("DataGrid")) {
                 schedulingDefaults.put(key, e.getValue());
             }
         }
