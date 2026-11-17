@@ -180,6 +180,6 @@ jobs:
       # a push that lost a race, an API error) would leave the capture's
       # status pending for good.
       - name: Settle a capture that could not be harvested
-        if: failure() && steps.list.outputs.capture == '1' && steps.collect.outputs.settled != '1'
+        if: (failure() || cancelled()) && steps.list.outputs.capture == '1' && steps.collect.outputs.settled != '1'
         run: |
           trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" error "The harvest failed; see the run, then re-run Golden capture"
