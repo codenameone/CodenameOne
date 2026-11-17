@@ -5,14 +5,13 @@
 #                                           ready=1 in GITHUB_OUTPUT when all completed
 #   golden-harvest.sh count SHA             how many screenshot runs exist at SHA
 #   golden-harvest.sh collect RUNS_FILE DEST   take their unowned-golden images into DEST
-#   golden-harvest.sh rerun SHA             re-run the newest cancelled pull_request run of each
-#                                           screenshot workflow at SHA (a capture that committed nothing)
+#   golden-harvest.sh status SHA STATE DESC set the "Golden capture" commit status on SHA
 #
 # A run is a pull_request run (a normal PR run, harvest mode) or a
 # workflow_dispatch run (golden-capture.yml's capture mode); both are listed,
 # and the newest uncancelled one of each workflow is the one that counts.
 #
-# Needs GH_TOKEN (actions: read; write for rerun) and GITHUB_REPOSITORY.
+# Needs GH_TOKEN (actions: read; statuses: write for status) and GITHUB_REPOSITORY.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -36,12 +35,12 @@ list() {
   # workflow without one is still to come, not finished: harvesting then would
   # take the legs that are done and leave the rest to a branch that has moved.
   # Cancelled capture runs do not count: a capture that failed part way
-  # cancels the ones it started and re-runs the PR's runs, which then harvest
-  # as usual. (A screenshot workflow dispatched by hand at a PR head counts as
+  # cancels the ones it started, and the PR's own runs then harvest as
+  # usual. (A screenshot workflow dispatched by hand at a PR head counts as
   # a capture too; nothing else dispatches them.) A capture that failed after
   # one of its legs had already completed leaves that run live and the head
-  # never harvests; the PR's re-run golden-plan still names the gap, and the
-  # next push captures again. Legs run far longer than dispatching takes.
+  # never harvests; the PR's golden-plan still names the gap, and the next
+  # push captures again. Legs run far longer than dispatching takes.
   all=""
   for wf in "${WORKFLOWS[@]}"; do
     # One assignment per workflow, so a failed API call stops the listing
@@ -107,26 +106,20 @@ count() {
   echo "$total"
 }
 
-# A capture cancelled the PR's own runs, screenshot workflows and the rest
-# (cancel-stale-pr-runs.js, cancelForCapture); when it brings nothing back,
-# run them again, so golden-plan names the open gap on the PR instead of
-# leaving its checks cancelled: the newest pull_request run of each workflow
-# at SHA, when that run was cancelled.
-rerun() {
-  local sha="$1" id
-  for id in $(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$sha&event=pull_request&per_page=100" \
-                --jq '.workflow_runs[] | [.workflow_id, .id, .conclusion] | @tsv' \
-              | sort -k1,1n -k2,2n | awk -F'\t' '{last[$1] = $2 "\t" $3} END {for (w in last) print last[w]}' \
-              | awk -F'\t' '$2 == "cancelled" {print $1}'); do
-    log "re-running run $id"
-    gh run rerun "$id" --repo "$GITHUB_REPOSITORY" || echo "::warning::could not re-run run $id"
-  done
+# The "Golden capture" commit status golden-capture.yml left pending on SHA:
+# the PR's one view of a capture, whose runs (workflow_dispatch) GitHub does
+# not show on the PR.
+status() {
+  local sha="$1" state="$2" desc="$3"
+  gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state="$state" -f context="Golden capture" \
+    -f description="${desc:0:140}" -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null \
+    || echo "::warning::could not set the Golden capture status on $sha"
 }
 
 case "${1:-}" in
   count) count "$2" ;;
   list) list "$2" "$3" ;;
   collect) collect "$2" "$3" ;;
-  rerun) rerun "$2" ;;
-  *) echo "usage: $0 list|count|collect|rerun ..." >&2; exit 2 ;;
+  status) status "$2" "$3" "$4" ;;
+  *) echo "usage: $0 list|count|collect|status ..." >&2; exit 2 ;;
 esac
