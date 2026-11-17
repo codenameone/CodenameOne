@@ -25,6 +25,8 @@ package android.app;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
@@ -34,6 +36,7 @@ import com.codename1.ui.Display;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /// A message taller than the screen scrolls, and the buttons stay on screen.
@@ -105,5 +108,56 @@ public class AlertDialogTallMessageTest {
         assertTrue("the positive button is below the screen: " + where, bounds[1] <= bounds[4]);
         assertTrue("the negative button is below the screen: " + where, bounds[2] <= bounds[4]);
         assertTrue("the dialog starts above the screen: " + where, bounds[3] >= 0);
+    }
+
+    /// A dialog that fits lays every panel out at its own height. Equal
+    /// weights split the space instead, so a one-line message beside a tall
+    /// custom view took half the dialog and clipped the view.
+    @Test
+    public void panelsThatFitKeepTheirOwnHeights() {
+        final Context app = AndroidTestSupport.context().getApplicationContext();
+        final int[] h = new int[3];
+        final Throwable[] failure = new Throwable[1];
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Intent intent = new Intent(app, AndroidTestSupport.TestActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    app.startActivity(intent);
+                    Activity activity = ActivityThread.getTopActivity();
+                    View custom = new View(activity);
+                    custom.setLayoutParams(new ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, 400));
+                    AlertDialog dialog = new AlertDialog.Builder(activity)
+                            .setMessage("One line.")
+                            .setView(custom)
+                            .setPositiveButton("OK", (DialogInterface.OnClickListener) null)
+                            .create();
+                    dialog.show();
+                    dialog.host().revalidate();
+                    ViewGroup root = (ViewGroup) dialog.getButton(DialogInterface.BUTTON_POSITIVE)
+                            .getParent().getParent();
+                    ViewGroup messagePanel = (ViewGroup) root.getChildAt(0);
+                    h[0] = messagePanel.getHeight();
+                    h[1] = messagePanel.getChildAt(0).getHeight();
+                    h[2] = custom.getHeight();
+                    dialog.dismiss();
+                } catch (Throwable t) {
+                    failure[0] = t;
+                } finally {
+                    ActivityThread.finishAllActivities();
+                }
+            }
+        });
+        if (failure[0] instanceof Error) {
+            throw (Error) failure[0];
+        }
+        if (failure[0] != null) {
+            throw new RuntimeException(failure[0]);
+        }
+        assertTrue("the message has no height", h[1] > 0);
+        assertEquals("the message panel is not the message's own height", h[1], h[0]);
+        assertEquals("the custom view was not given its own height", 400, h[2]);
     }
 }

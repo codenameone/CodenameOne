@@ -66,10 +66,12 @@ public class AlertDialog extends Dialog implements DialogInterface {
 
     protected AlertDialog(Context context) {
         super(context, 0);
+        capHeightToScreen();
     }
 
     protected AlertDialog(Context context, int themeResId) {
         super(context, themeResId);
+        capHeightToScreen();
     }
 
     public void setMessage(CharSequence message) {
@@ -129,7 +131,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
         }
         mBuilt = true;
         Context c = getContext();
-        LinearLayout root = new LinearLayout(c);
+        LinearLayout root = new PanelLayout(c);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(0, dp(24), 0, dp(8));
         int textPrimary = themeColor(android.R.attr.textColorPrimary, 0xde000000);
@@ -161,13 +163,13 @@ public class AlertDialog extends Dialog implements DialogInterface {
             titleRow.addView(t);
             root.addView(titleRow);
         }
-        // The message, the list and the custom view each take a share of
-        // the height the title and the button bar leave, as the panels of
-        // Android's alert_dialog layout do: content taller than the screen
-        // must not push the buttons out of reach (discussion #6259). The
-        // message and the list scroll in panels of their own; a custom view
-        // is given its share and scrolls itself, as on Android -- wrapping it
-        // in a ScrollView would measure a ListView inside it one row high.
+        // The message, the list and the custom view are panels: each keeps
+        // its natural height while the dialog fits the screen, and they give
+        // up the overflow in proportion to their heights when it does not,
+        // so the title and the button bar stay visible (discussion #6259).
+        // The message and the list scroll in panels of their own; a custom
+        // view scrolls itself, as on Android -- inside a ScrollView a
+        // ListView is measured one row high.
         if (mMessage != null) {
             TextView m = new TextView(c);
             m.setText(mMessage);
@@ -254,10 +256,81 @@ public class AlertDialog extends Dialog implements DialogInterface {
         setContentView(root);
     }
 
-    /// A panel that gets what the title and the button bar leave: measured
-    /// at its own height while that fits, and shrunk when it does not.
+    /// A panel's layout parameters: marked by its weight for `PanelLayout`,
+    /// and measured at its own height.
     private static LinearLayout.LayoutParams weighted() {
-        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+    }
+
+    /// The dialog's column. Equal weights would split the space equally, so
+    /// a one-line message beside a tall custom view took half the dialog. A
+    /// panel (a child with a weight) is instead measured at its own height,
+    /// and only when the column is taller than it may be are the panels cut
+    /// down, each by its share of the overflow, as Android's
+    /// AlertDialogLayout does.
+    static final class PanelLayout extends LinearLayout {
+        PanelLayout(Context c) {
+            super(c);
+            setOrientation(VERTICAL);
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            int mode = MeasureSpec.getMode(heightMeasureSpec);
+            if (mode == MeasureSpec.UNSPECIFIED) {
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+                return;
+            }
+            int limit = MeasureSpec.getSize(heightMeasureSpec);
+            // Each child against the whole height, not against what the
+            // children above it left: a panel's own height, capped by the
+            // screen. AT_MOST and not UNSPECIFIED, which measures a ListView
+            // one row high.
+            int bound = MeasureSpec.makeMeasureSpec(limit, MeasureSpec.AT_MOST);
+            int total = getPaddingTop() + getPaddingBottom();
+            int flexible = 0;
+            for (int i = 0; i < getChildCount(); i++) {
+                View child = getChildAt(i);
+                if (child.getVisibility() == GONE) {
+                    continue;
+                }
+                measureChildWithMargins(child, widthMeasureSpec, 0, bound, 0);
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) child.getLayoutParams();
+                total += child.getMeasuredHeight() + lp.topMargin + lp.bottomMargin;
+                if (isPanel(child)) {
+                    flexible += child.getMeasuredHeight();
+                }
+            }
+            int left = Math.max(0, Math.min(total - limit, flexible));
+            int remainingFlexible = flexible;
+            for (int i = 0; i < getChildCount(); i++) {
+                View child = getChildAt(i);
+                if (!isPanel(child)) {
+                    continue;
+                }
+                int h = child.getMeasuredHeight();
+                int share = remainingFlexible <= 0 ? 0 : (int) ((long) left * h / remainingFlexible);
+                left -= share;
+                remainingFlexible -= h;
+                ((LinearLayout.LayoutParams) child.getLayoutParams()).height = Math.max(0, h - share);
+            }
+            try {
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+            } finally {
+                for (int i = 0; i < getChildCount(); i++) {
+                    View child = getChildAt(i);
+                    if (isPanel(child)) {
+                        child.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                    }
+                }
+            }
+        }
+
+        private static boolean isPanel(View child) {
+            return child.getVisibility() != GONE && child.getLayoutParams() instanceof LinearLayout.LayoutParams
+                    && ((LinearLayout.LayoutParams) child.getLayoutParams()).weight > 0;
+        }
     }
 
     private void onItemClicked(int which) {

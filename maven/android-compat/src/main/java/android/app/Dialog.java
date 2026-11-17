@@ -295,6 +295,11 @@ public class Dialog implements DialogInterface, Window.Callback {
         dismiss();
     }
 
+    /// Holds the dialog to the screen's height; `AlertDialog` asks for it.
+    void capHeightToScreen() {
+        mDecor.capHeight = true;
+    }
+
     /// The Codename One dialog showing this one, for tests.
     com.codename1.ui.Dialog host() {
         return mHost;
@@ -337,6 +342,11 @@ public class Dialog implements DialogInterface, Window.Callback {
     /// with nothing to scroll (discussion #6259). Capped, `AlertDialog`'s
     /// scrolling body gives up the space and its button bar stays visible.
     static final class DialogFrame extends FrameLayout {
+        /// Only an alert dialog is held to the screen's height: any other
+        /// dialog keeps the height its own layout asks for, a full-screen
+        /// one included.
+        boolean capHeight;
+
         DialogFrame(Context c) {
             super(c);
         }
@@ -353,7 +363,7 @@ public class Dialog implements DialogInterface, Window.Callback {
             int maxH = maxHeight(density);
             int h = MeasureSpec.getSize(heightMeasureSpec);
             int hMode = MeasureSpec.getMode(heightMeasureSpec);
-            if (hMode == MeasureSpec.UNSPECIFIED || h > maxH) {
+            if (capHeight && (hMode == MeasureSpec.UNSPECIFIED || h > maxH)) {
                 heightMeasureSpec = MeasureSpec.makeMeasureSpec(maxH,
                         hMode == MeasureSpec.EXACTLY ? MeasureSpec.EXACTLY : MeasureSpec.AT_MOST);
             }
