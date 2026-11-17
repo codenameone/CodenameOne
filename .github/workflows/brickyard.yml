@@ -279,10 +279,12 @@ jobs:
           JAVA_HOME: ${{ env.JDK_8_HOME }}
           RETRY_ONLY_MATCHING: transient
 
-      - name: Compile the client and its tests
+      - name: Test the client
+        # The javase profile is the one that runs JUnit; without it the
+        # client's tests only compiled.
         working-directory: scripts/brickyard
         run: |
-          mvn -B -pl common -am test-compile -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+          mvn -B -Dcodename1.platform=javase -pl common -am test -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
         env:
           JAVA_HOME: ${{ env.JDK_17_HOME }}
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
