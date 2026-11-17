@@ -53,7 +53,7 @@ wins. The server writes them and the leaderboards read them, so no client can aw
 itself a win.
 
 image::img/brickyard-beams.png["Climbing the floating stages, with the stage counter in the top bar",scaledwidth=30%]
-image::img/brickyard-win.png["The last stage under the rainbow",scaledwidth=30%]
+image::img/brickyard-win.png["The finish under the rainbow: Wins 1 on the counter",scaledwidth=30%]
 
 Players move with the touch stick and the jump button on a phone, the keyboard on a
 desktop, or a gamepad.
@@ -102,7 +102,7 @@ The *Create* tab starts a new experience from a template. The studio then shows 
 viewport over tabs for the explorer, the properties editor, the script editor and the
 output. Move, Insert, Play and Publish sit along the bottom.
 
-image::img/brickyard-templates.png["Starting something new: pick a template and name the experience",scaledwidth=30%]
+image::img/brickyard-templates.png["Starting something new: every template is a working game to change",scaledwidth=30%]
 image::img/brickyard-studio-phone.png["The phone studio: the viewport above the explorer",scaledwidth=30%]
 image::img/brickyard-insert-scripts.png["The Insert sheet: parts, models, scripts and effects",scaledwidth=30%]
 

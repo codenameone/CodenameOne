@@ -67,7 +67,7 @@ The application source is licensed under [MIT-0](https://github.com/codenameone/
 
 ![The home screen with friends playing](/developer-guide/img/brickyard-home-friends.png)
 ![A chat race in Rainbow Sky Obby](/developer-guide/img/brickyard-race.png)
-![The last stage of the obby](/developer-guide/img/brickyard-win.png)
+![The finish of the obby, one win on the counter](/developer-guide/img/brickyard-win.png)
 ![Daily and weekly quests](/developer-guide/img/brickyard-quests.png)
 ![The avatar shop](/developer-guide/img/brickyard-shop-owned.png)
 ![Disaster Island](/developer-guide/img/brickyard-disaster-island.png)
