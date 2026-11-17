@@ -112,6 +112,61 @@ class CodeScannerTest extends UITestBase {
     }
 
     @Test
+    void strictModeWaitsForTwoFramesThatAgree() {
+        new Form("Caller").show();
+        flushSerialCalls();
+        Recorder recorder = new Recorder(CodeScanner.scan(
+                new CodeScannerOptions().strict(true)));
+        flushSerialCalls();
+
+        vision.result = new Barcode[] {pdf("HRVHUB30 misread", new byte[] {1})};
+        camera.deliver(new byte[] {1});
+        flushSerialCalls();
+        assertTrue(recorder.values.isEmpty(), "one read is not enough");
+
+        vision.result = new Barcode[] {pdf("HRVHUB30", new byte[] {2})};
+        camera.deliver(new byte[] {2});
+        flushSerialCalls();
+        assertTrue(recorder.values.isEmpty(),
+                "a read that disagrees replaces the pending one");
+
+        vision.result = new Barcode[0];
+        camera.deliver(new byte[] {3});
+        flushSerialCalls();
+        assertTrue(recorder.values.isEmpty());
+
+        vision.result = new Barcode[] {pdf("HRVHUB30", new byte[] {2})};
+        camera.deliver(new byte[] {4});
+        flushSerialCalls();
+        assertEquals(1, recorder.values.size(),
+                "an empty frame between two matching reads keeps the pending read");
+        assertEquals("HRVHUB30", recorder.values.get(0).getValue());
+    }
+
+    @Test
+    void strictModeComparesRawBytesWhenBothReadsHaveThem() {
+        new Form("Caller").show();
+        flushSerialCalls();
+        Recorder recorder = new Recorder(CodeScanner.scan(
+                new CodeScannerOptions().strict(true)));
+        flushSerialCalls();
+
+        vision.result = new Barcode[] {pdf("same text", new byte[] {1, 2})};
+        camera.deliver(new byte[] {1});
+        flushSerialCalls();
+        vision.result = new Barcode[] {pdf("same text", new byte[] {1, 3})};
+        camera.deliver(new byte[] {2});
+        flushSerialCalls();
+        assertTrue(recorder.values.isEmpty(),
+                "different payload bytes are different reads");
+    }
+
+    private static Barcode pdf(String value, byte[] raw) {
+        return new Barcode(value, BarcodeFormat.PDF417, raw,
+                VisionRect.EMPTY, null);
+    }
+
+    @Test
     void aCodeInAnUnwantedFormatDoesNotEndTheScan() {
         new Form("Caller").show();
         flushSerialCalls();

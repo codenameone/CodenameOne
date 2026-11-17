@@ -47,6 +47,7 @@ public final class CodeScannerOptions {
     private String[] formats = new String[0];
     private CameraFacing facing = CameraFacing.BACK;
     private boolean torchButton = true;
+    private boolean strict;
     private VisionOptions visionOptions;
 
     /// Sets the scanner form's title.
@@ -109,6 +110,28 @@ public final class CodeScannerOptions {
         return this;
     }
 
+    /// Accepts a code only when two frames read it identically. Off by
+    /// default, where the first decoded code ends the scan.
+    ///
+    /// Turn this on for codes printed with little or no error correction. A
+    /// PDF417 at error correction level 0 carries two check codewords, which
+    /// can detect some misreads but correct none, so a blurred or tilted
+    /// frame can decode to a value with a few wrong characters and still be
+    /// reported as a valid code. Two frames rarely misread the same way, so
+    /// requiring them to agree filters those reads out, at the cost of one
+    /// more frame before the scan completes.
+    ///
+    /// The two frames need not be adjacent: a frame in which no accepted code
+    /// is found keeps the pending read, and a frame with a different value
+    /// replaces it.
+    ///
+    /// @param value whether two matching reads are required
+    /// @return this options object
+    public CodeScannerOptions strict(boolean value) {
+        strict = value;
+        return this;
+    }
+
     /// Passes analyzer options through to the underlying
     /// {@link BarcodeScanner}, which is how an iOS build selects
     /// {@link VisionBackends#mlKitBarcodeScanning()} instead of Apple Vision.
@@ -145,6 +168,12 @@ public final class CodeScannerOptions {
     /// @return whether a torch toggle may be shown
     public boolean isTorchButton() {
         return torchButton;
+    }
+
+    /// @return whether a code must be read identically twice before it is
+    ///         accepted
+    public boolean isStrict() {
+        return strict;
     }
 
     /// @return the analyzer configuration, or {@code null} for the defaults

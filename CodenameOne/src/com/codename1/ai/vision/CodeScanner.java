@@ -161,6 +161,8 @@ public final class CodeScanner {
         private boolean finished;
         private UITimer focusTimer;
         private int focusTicks;
+        /// In strict mode, the read waiting for a second frame to agree.
+        private Barcode pending;
 
         Session(CodeScannerOptions options) {
             this.options = options;
@@ -306,10 +308,49 @@ public final class CodeScanner {
             for (Barcode code : codes) {
                 if (code != null && code.getValue() != null
                         && BarcodeFormat.matches(code, formats)) {
-                    finish(code, null);
+                    accept(code);
                     return;
                 }
             }
+        }
+
+        /// Ends the scan with {@code code}, or in strict mode only once a
+        /// second frame has read the same code. A frame with no accepted code
+        /// never reaches here, so it keeps the pending read.
+        private void accept(Barcode code) {
+            if (!options.isStrict()) {
+                finish(code, null);
+                return;
+            }
+            if (pending != null && sameRead(pending, code)) {
+                finish(code, null);
+                return;
+            }
+            pending = code;
+        }
+
+        /// Whether two reads carry the same payload. The raw bytes are
+        /// compared when both have them, since two different byte sequences
+        /// can decode to one string in a lossy charset.
+        private static boolean sameRead(Barcode a, Barcode b) {
+            if (!a.getValue().equals(b.getValue())
+                    || !String.valueOf(a.getFormat()).equals(String.valueOf(b.getFormat()))) {
+                return false;
+            }
+            byte[] ra = a.getRawBytes();
+            byte[] rb = b.getRawBytes();
+            if (ra == null || rb == null) {
+                return true;
+            }
+            if (ra.length != rb.length) {
+                return false;
+            }
+            for (int i = 0; i < ra.length; i++) {
+                if (ra[i] != rb[i]) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
