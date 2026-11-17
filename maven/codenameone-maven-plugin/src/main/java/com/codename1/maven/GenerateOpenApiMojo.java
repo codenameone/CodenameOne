@@ -735,6 +735,33 @@ public class GenerateOpenApiMojo extends AbstractMojo {
                             .append(p.javaName).append(";\n");
                 }
                 sb.append("    public ").append(info.javaName).append("() {}\n");
+                // The record form's canonical constructor and accessors too, so code written
+                // against one form compiles against the other: a project that lowers its Java
+                // target below 17 (the Certificate Wizard went from 17 to 11) keeps compiling.
+                // The one difference: no accessor for a property named like an Object method.
+                if (!info.props.isEmpty()) {
+                    sb.append("\n    public ").append(info.javaName).append("(");
+                    for (int i = 0; i < info.props.size(); i++) {
+                        PropInfo p = info.props.get(i);
+                        if (i > 0) sb.append(", ");
+                        sb.append(boxIfPrimitive(p.javaType)).append(' ').append(p.javaName);
+                    }
+                    sb.append(") {\n");
+                    for (PropInfo p : info.props) {
+                        sb.append("        this.").append(p.javaName).append(" = ")
+                                .append(p.javaName).append(";\n");
+                    }
+                    sb.append("    }\n");
+                    for (PropInfo p : info.props) {
+                        if (OBJECT_METHOD_NAMES.contains(p.javaName)) {
+                            // getClass(), hashCode() and the rest are Object's; an accessor of
+                            // that name does not compile. The public field still carries it.
+                            continue;
+                        }
+                        sb.append("\n    public ").append(boxIfPrimitive(p.javaType)).append(' ').append(p.javaName)
+                                .append("() {\n        return ").append(p.javaName).append(";\n    }\n");
+                    }
+                }
                 sb.append("}\n");
             }
             writeFile(f, sb.toString());
@@ -838,6 +865,11 @@ public class GenerateOpenApiMojo extends AbstractMojo {
         // ----------------------------------------------------------------
         // Helpers shared with the old codegen
         // ----------------------------------------------------------------
+
+        /// No-argument methods of `Object`, which a generated accessor must not redeclare.
+        private static final Set<String> OBJECT_METHOD_NAMES = new java.util.HashSet<String>(
+                java.util.Arrays.asList("getClass", "hashCode", "toString", "clone", "finalize",
+                        "notify", "notifyAll", "wait"));
 
         private static String boxIfPrimitive(String type) {
             if (type == null) return "Object";

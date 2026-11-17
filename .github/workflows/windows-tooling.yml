@@ -26,6 +26,9 @@ on:
       - 'maven/javase/**'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/OpenSettingsMojo.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/OpenCertificateWizardMojo.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/AbstractCN1Mojo.java'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/DesktopTool.java'
+      - 'maven/cn1app-archetype/**'
   push:
     branches: [ master ]
     paths:
@@ -41,6 +44,9 @@ on:
       - 'maven/javase/**'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/OpenSettingsMojo.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/OpenCertificateWizardMojo.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/AbstractCN1Mojo.java'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/DesktopTool.java'
+      - 'maven/cn1app-archetype/**'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
