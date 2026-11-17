@@ -203,7 +203,14 @@ final class PdfSecurity {
         if (wrapped.length < 32) {
             return null;
         }
-        return Aes.cbcDecrypt(k, new byte[16], sub(wrapped, 0, 32));
+        // ISO 32000-2 unwraps with a zero IV. Chaining from the first block
+        // instead and XORing it back out of the first plaintext block gives
+        // the same bytes without handing a constant IV to the platform cipher.
+        byte[] out = Aes.cbcDecrypt(k, sub(wrapped, 0, 16), sub(wrapped, 0, 32));
+        for (int i = 0; i < 16; i++) {
+            out[i] ^= wrapped[i];
+        }
+        return out;
     }
 
     /// Algorithm 2.A/2.B: SHA-256 for revision 5, the iterated hash for 6.
