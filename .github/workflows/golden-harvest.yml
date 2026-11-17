@@ -10,6 +10,12 @@ name: Golden harvest
 # completed, this commits those images to the branch with CN1SS_GH_TOKEN, and
 # the push starts CI again on a head that has them.
 #
+# It is also the second half of golden-capture.yml: that dispatches the
+# screenshot workflows in capture mode (workflow_dispatch runs on the PR
+# branch) and exits, and this collects them the same way once the last one has
+# completed. When a capture brings back nothing, the PR's runs it cancelled are
+# re-run, so golden-plan names the gap on the PR.
+#
 # workflow_run always runs the default branch's copy of this file, so the
 # harvest does nothing for any PR until it is on master, including the PR
 # that adds it.
@@ -49,13 +55,15 @@ concurrency:
 jobs:
   harvest:
     if: >-
-      github.event.workflow_run.event == 'pull_request' &&
+      (github.event.workflow_run.event == 'pull_request' ||
+       github.event.workflow_run.event == 'workflow_dispatch') &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
-      actions: read
+      # write: re-running the PR's cancelled runs after an empty capture.
+      actions: write
       pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
@@ -104,6 +112,10 @@ jobs:
           path: pr
       - name: Collect, commit and push the goldens
         if: steps.list.outputs.ready == '1'
+        env:
+          # The runs at this head are a capture's (golden-capture.yml), not
+          # only the PR's own: whichever run completed last started this.
+          CAPTURE: ${{ steps.list.outputs.capture }}
         run: |
           set -euo pipefail
           cd pr
@@ -125,7 +137,15 @@ jobs:
           fi
           # Again at collect time: a leg that completed after the listing
           # step queued a harvest this group may have replaced.
-          ../trusted/scripts/ci/golden-harvest.sh list "$HEAD_SHA" ../runs.txt
+          # A leg restarted since the first listing is not done: the
+          # harvest its completion starts takes over.
+          rc=0
+          HARVEST_REQUIRE_READY=1 ../trusted/scripts/ci/golden-harvest.sh list "$HEAD_SHA" ../runs.txt || rc=$?
+          if [ "$rc" = 3 ]; then
+            exit 0
+          elif [ "$rc" != 0 ]; then
+            exit "$rc"
+          fi
           ok=1
           ../trusted/scripts/ci/golden-harvest.sh collect ../runs.txt "$PWD" || ok=0
           git add -A -- scripts
@@ -135,5 +155,10 @@ jobs:
             git commit -m "Harvest goldens rendered at ${HEAD_SHA:0:12}" \
               -m "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             git push origin "HEAD:$HEAD_REF"
+          elif [ "$CAPTURE" = 1 ]; then
+            # A capture that brought nothing back: its runs replaced the PR's,
+            # which golden-capture.yml cancelled. Without this the PR's checks
+            # would stay cancelled and nothing would name the gap.
+            ../trusted/scripts/ci/golden-harvest.sh rerun "$HEAD_SHA"
           fi
           [ "$ok" = 1 ]
