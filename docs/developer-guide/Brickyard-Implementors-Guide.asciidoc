@@ -21,7 +21,7 @@ needs:
 Brickyard does all this in Java, from one codebase, on Codename One's own APIs: `gpu`
 for the renderer, `payment` and `paywall` for the store, `analytics.invite` for
 referrals, `gaming.GameServices` for presence and achievements, `ads` for rewarded
-currency and the built-in MCP server for agentic creation. The server is a Codename One
+currency and the built-in MCP server, so an AI agent can build alongside the creator. The server is a Codename One
 Backend.
 
 Everything here is original and written clean room: the interpreter, the engine API,
@@ -65,7 +65,7 @@ Every play session feeds progression. Players earn XP and level up, keep a daily
 streak, and climb a season pass with a free track and a Brickyard Plus track. Quests
 are daily and weekly, and each pays XP and Bricks, the app's currency. Bricks buy
 hats, faces and shirts for the player's block avatar in the shop, and they can be
-bought as packs or come with the Plus subscription. Friends who accept an invite earn
+bought as packs or come with the Plus subscription. Friends who accept an invitation earn
 Bricks on both sides.
 
 image::img/brickyard-season-pass.png["The profile tab: level, daily streak and the season pass with its free and Plus tracks",scaledwidth=30%]
@@ -83,12 +83,12 @@ filter that shows only friends.
 
 The templates cover the kinds of games such a platform is known for, and the seeded
 experiences are built from them: two obbies (Rainbow Sky Obby and Sunset Islands Obby),
-a survival game, a roleplay town, a tycoon, a simulator, a racer and a fighting arena.
+a survival game, a role-play town, a tycoon, a simulator, a racer and a fighting arena.
 Each one is a place file with Luau scripts, which a creator can open in the studio and
 change.
 
 image::img/brickyard-disaster-island.png["Disaster Island: survive the meteor shower",scaledwidth=30%]
-image::img/brickyard-brick-town.png["Brick Town: a roleplay town with houses and roads",scaledwidth=30%]
+image::img/brickyard-brick-town.png["Brick Town: a role-play town with houses and roads",scaledwidth=30%]
 image::img/brickyard-tycoon.png["Brick Factory Tycoon: cash grows as the factory builds out",scaledwidth=30%]
 
 image::img/brickyard-miner.png["Crystal Miner Sim: gems, coins and power",scaledwidth=30%]
@@ -98,7 +98,7 @@ image::img/brickyard-arena.png["Block Arena: points and knockouts",scaledwidth=3
 [[brickyard-studio]]
 === The studio on a phone
 
-The *Create* tab starts a new experience from a template. The studio then shows the
+The studio tab, *Create*, starts a new experience from a template. The studio then shows the
 viewport over tabs for the explorer, the properties editor, the script editor and the
 output. Move, Insert, Play and Publish sit along the bottom.
 
@@ -190,7 +190,7 @@ studio exports `.rbxlx`, so a creator can take a place back out.
 ==== Multiplayer
 
 An experience runs on an authoritative server. Server scripts never leave it, and
-neither does anything in `ServerScriptService` or `ServerStorage`. Each client receives a
+nothing in `ServerScriptService` or `ServerStorage` does either. Each client receives a
 snapshot of the replicated services, followed by property deltas, remote events and
 remote function calls (`ReplicaServer` and `ReplicaClient`). Each client drives its own
 character, and the server accepts a move only if the humanoid could make it at its own
@@ -207,7 +207,7 @@ referral fraud checks write fraud flags. Moderation keeps an audit log, and anal
 stored per experience.
 
 Creators get a dashboard with visits, retention, revenue by product and error reports
-grouped by version. From it they roll back versions, sell game passes and products, and
+grouped by version. From it, they roll back versions, sell game passes and products, and
 request payouts. Admins, moderators and support share a console with the report queue,
 sanctions and appeals, fraud flags, payout approval, home-row curation, currency grants,
 payout jobs and an audit log of every staff action.
