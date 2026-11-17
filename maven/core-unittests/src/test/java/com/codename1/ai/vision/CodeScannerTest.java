@@ -161,6 +161,43 @@ class CodeScannerTest extends UITestBase {
                 "different payload bytes are different reads");
     }
 
+    @Test
+    void strictModeConfirmsWhenTwoCodesInViewSwapOrder() {
+        new Form("Caller").show();
+        flushSerialCalls();
+        Recorder recorder = new Recorder(CodeScanner.scan(
+                new CodeScannerOptions().strict(true)));
+        flushSerialCalls();
+        Barcode qr = new Barcode("qr", BarcodeFormat.QR_CODE, null,
+                VisionRect.EMPTY, null);
+        Barcode slip = pdf("slip", new byte[] {7});
+
+        vision.result = new Barcode[] {slip, qr};
+        camera.deliver(new byte[] {1});
+        flushSerialCalls();
+        assertTrue(recorder.values.isEmpty());
+
+        vision.result = new Barcode[] {qr, pdf("slip", new byte[] {7})};
+        camera.deliver(new byte[] {2});
+        flushSerialCalls();
+        assertEquals(1, recorder.values.size(),
+                "the pending read is confirmed by any code in the frame");
+        assertEquals("slip", recorder.values.get(0).getValue());
+    }
+
+    @Test
+    void withoutStrictModeTheFirstReadEndsTheScan() {
+        new Form("Caller").show();
+        flushSerialCalls();
+        Recorder recorder = new Recorder(CodeScanner.scan(
+                new CodeScannerOptions()));
+        flushSerialCalls();
+        vision.result = new Barcode[] {pdf("once", new byte[] {1})};
+        camera.deliver(new byte[] {1});
+        flushSerialCalls();
+        assertEquals(1, recorder.values.size());
+    }
+
     private static Barcode pdf(String value, byte[] raw) {
         return new Barcode(value, BarcodeFormat.PDF417, raw,
                 VisionRect.EMPTY, null);

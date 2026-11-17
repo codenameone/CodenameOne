@@ -122,8 +122,10 @@ public final class CodeScannerOptions {
     /// more frame before the scan completes.
     ///
     /// The two frames need not be adjacent: a frame in which no accepted code
-    /// is found keeps the pending read, and a frame with a different value
-    /// replaces it.
+    /// is found keeps the pending read. Every accepted code in a frame is
+    /// checked against the pending read, so several codes in view still
+    /// confirm; only when none of them matches does the frame's first
+    /// accepted code become the pending read.
     ///
     /// @param value whether two matching reads are required
     /// @return this options object

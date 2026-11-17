@@ -40,6 +40,8 @@ import com.codename1.ui.util.UITimer;
 import com.codename1.components.SpanLabel;
 import com.codename1.util.AsyncResource;
 
+import java.util.Arrays;
+
 /// A ready-made full-screen barcode and QR scanner.
 ///
 /// This is the one-call entry point that {@link BarcodeScanner} deliberately
@@ -305,28 +307,28 @@ public final class CodeScanner {
             if (codes == null) {
                 return;
             }
+            Barcode first = null;
             for (Barcode code : codes) {
-                if (code != null && code.getValue() != null
-                        && BarcodeFormat.matches(code, formats)) {
-                    accept(code);
+                if (code == null || code.getValue() == null
+                        || !BarcodeFormat.matches(code, formats)) {
+                    continue;
+                }
+                if (!options.isStrict()
+                        || (pending != null && sameRead(pending, code))) {
+                    finish(code, null);
                     return;
                 }
+                if (first == null) {
+                    first = code;
+                }
             }
-        }
-
-        /// Ends the scan with {@code code}, or in strict mode only once a
-        /// second frame has read the same code. A frame with no accepted code
-        /// never reaches here, so it keeps the pending read.
-        private void accept(Barcode code) {
-            if (!options.isStrict()) {
-                finish(code, null);
-                return;
+            // Strict mode: no code in this frame confirms the pending read.
+            // Every accepted code was checked against it first, so two codes
+            // in view whose order changes between frames still confirm; only
+            // a frame with no accepted code at all keeps the pending read.
+            if (first != null) {
+                pending = first;
             }
-            if (pending != null && sameRead(pending, code)) {
-                finish(code, null);
-                return;
-            }
-            pending = code;
         }
 
         /// Whether two reads carry the same payload. The raw bytes are
@@ -339,18 +341,7 @@ public final class CodeScanner {
             }
             byte[] ra = a.getRawBytes();
             byte[] rb = b.getRawBytes();
-            if (ra == null || rb == null) {
-                return true;
-            }
-            if (ra.length != rb.length) {
-                return false;
-            }
-            for (int i = 0; i < ra.length; i++) {
-                if (ra[i] != rb[i]) {
-                    return false;
-                }
-            }
-            return true;
+            return ra == null || rb == null || Arrays.equals(ra, rb);
         }
 
         @Override
