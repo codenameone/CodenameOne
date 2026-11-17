@@ -38,7 +38,10 @@ list() {
   # Cancelled capture runs do not count: a capture that failed part way
   # cancels the ones it started and re-runs the PR's runs, which then harvest
   # as usual. (A screenshot workflow dispatched by hand at a PR head counts as
-  # a capture too; nothing else dispatches them.)
+  # a capture too; nothing else dispatches them.) A capture that failed after
+  # one of its legs had already completed leaves that run live and the head
+  # never harvests; the PR's re-run golden-plan still names the gap, and the
+  # next push captures again. Legs run far longer than dispatching takes.
   all=""
   for wf in "${WORKFLOWS[@]}"; do
     # One assignment per workflow, so a failed API call stops the listing
