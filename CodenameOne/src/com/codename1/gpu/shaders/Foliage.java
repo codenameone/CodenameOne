@@ -93,6 +93,39 @@ public final class Foliage {
         return m;
     }
 
+    /// A tree crown modelled as one solid shape (a ball or a block of
+    /// leaves): leaf clusters from cellular noise, each cluster lit as a
+    /// bump of its own, crevices between clusters darkened, the underside in
+    /// shade, sunlight glowing through the rim seen against the sun, and a
+    /// gentle sway. The instance colour is the foliage tint, so a creator's
+    /// green, autumn orange or blossom pink is kept.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial canopy() {
+        ShaderMaterial m = wind();
+        m.setUniform(STRENGTH, 0.012f);
+        ShaderNode p = worldPos().mul(0.9f);
+        ShaderNode clusters = Noise.cellular(p.xz().add(p.y().mul(0.7f)));
+        ShaderNode fine = Noise.fbm(p.xy().add(p.xz()).mul(3.1f), 2);
+        // 0 inside a cluster's heart, 1 in the gap between clusters
+        ShaderNode gap = smoothstep(0.25f, 0.75f, clusters);
+        ShaderNode up = saturate(worldNormal().y().mul(0.5f).add(0.5f));
+        ShaderNode base = instanceColor().rgb();
+        ShaderNode shade = gap.mul(-0.45f).add(1f).mul(up.mul(0.45f).add(0.55f)).mul(fine.mul(0.3f).add(0.82f));
+        // hue shift: sunlit tops yellow a touch, shaded hollows go blue-green
+        ShaderNode warm = mix(base.mul(vec3(0.75f, 0.9f, 1.05f)), base.mul(vec3(1.12f, 1.05f, 0.75f)), up);
+        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(warm.mul(shade), f(1f)));
+        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.85f));
+        m.set(ShaderMaterial.Hook.METALLIC, f(0f));
+        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(Noise.bumpNormal(p.xz().add(p.y()).mul(1.4f), 2, 0.45f)));
+        ShaderNode through = pow(saturate(dot(viewDir().negate(), sunDir())), 4f);
+        ShaderNode rim = pow(f(1f).sub(saturate(dot(viewDir(), worldNormal()))), 2f);
+        m.set(ShaderMaterial.Hook.EMISSIVE, base.mul(sunColor()).mul(through.mul(rim).mul(0.6f)));
+        return m;
+    }
+
     /// Grass blades: a root to tip gradient along the texture's v (0 at the
     /// root), wind, and a sheen toward the sun. Pair with instancing or a
     /// field of crossed quads.
