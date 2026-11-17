@@ -59,7 +59,7 @@ dispatch() {
     # run github.token started, and golden-harvest.yml is a workflow_run.
     if ! { [ -n "${DISPATCH_TOKEN:-}" ] &&
            GH_TOKEN="$DISPATCH_TOKEN" gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"; }; then
-      echo "::warning::could not dispatch $wf with CN1SS_GH_TOKEN (it needs Actions: write); dispatching with github.token, so the harvest will not start by itself: run Golden harvest by hand with head_ref=$ref once the capture completes"
+      echo "::warning::could not dispatch $wf with CN1SS_GH_TOKEN (unset, lacking Actions: write, or a transient error); dispatching with github.token, so the harvest will not start by itself: run Golden harvest by hand with head_ref=$ref once the capture completes"
       gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"
     fi
     # The dispatch API answers without a run id; find the run it created.

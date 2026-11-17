@@ -98,7 +98,10 @@ jobs:
           # A PR's last runs often complete after it merged or closed, and
           # the branch is usually deleted by then: there is nothing to push
           # to, and goldens must never land on a merged branch either.
-          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD_REF" --state open --json number --jq length)"
+          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD_REF" --state open --json isCrossRepository,baseRefName --jq "[.[] | select(.isCrossRepository | not) | select(.baseRefName != \"$HEAD_REF\")] | length")"
+          # Same-repo PRs only, and never a base branch: a hand dispatch names
+          # the branch freely, and a fork PR can share a branch name.
+          [ "$HEAD_REF" != "${{ github.event.repository.default_branch }}" ] || open=0
           if [ "$open" = 0 ]; then
             echo "No open pull request for $HEAD_REF (merged, closed or deleted); nothing to harvest."
             echo "ready=0" >> "$GITHUB_OUTPUT"
