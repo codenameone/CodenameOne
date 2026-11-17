@@ -27,6 +27,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.CancellationSignal;
 import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyInfo;
 import android.security.keystore.KeyPermanentlyInvalidatedException;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
@@ -42,6 +43,7 @@ import java.io.IOException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyStore;
+import javax.crypto.SecretKeyFactory;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -71,8 +73,16 @@ import com.codename1.security.vault.ProtectionReport;
  * <p>Carries forward two non-obvious workarounds from the original cn1lib that
  * must NOT be reverted without re-testing:</p>
  * <ul>
- *   <li>On API 33+ the {@code setUserAuthenticationRequired} call is skipped
- *   to side-step <a href="https://github.com/codenameone/FingerprintScanner/issues/8">FingerprintScanner #8</a>.
+ *   <li>The key is bound on EVERY API level. FingerprintScanner #8 (a bound key
+ *   failing with "Key user not authenticated" on API 33) was once side-stepped by
+ *   dropping the binding on 33+. That left a key which decrypts without any
+ *   authentication and is never invalidated by a new enrolment, so a fingerprint
+ *   added by whoever knows the device PIN unlocked every entry -- the prompt looked
+ *   like protection and was not. #8's cause was never established (the cn1lib
+ *   already passed the cipher as the CryptoObject); the prompt here cancels its
+ *   signal only after the cipher work, the likeliest suspect. A key left unbound by
+ *   that era is deleted on first use and its entries report
+ *   {@link BiometricError#KEY_REVOKED}.
  *   <li>On Samsung devices running 8.0.0 the cipher init can succeed but
  *   final decryption then fails with a key-invalidated error; we delete the
  *   key and recreate it on first failure to recover.
@@ -90,6 +100,12 @@ public final class AndroidSecureStorage extends SecureStorage {
 
     private static final String KEY_ID = "BiometricsKey";
     private static final String PREFS = "CN1BiometricSecureStorage";
+
+    /**
+     * Marks an account whose entry was dropped because the key under it was revoked,
+     * so a later get() answers KEY_REVOKED rather than "no entry".
+     */
+    private static final String REVOKED_PREFIX = "r_";
     private static final String ANDROID_KEY_STORE = "AndroidKeyStore";
 
     /**
@@ -111,7 +127,6 @@ public final class AndroidSecureStorage extends SecureStorage {
 
     private KeyStore keyStore;
     private KeyGenerator keyGenerator;
-    private boolean keyRevoked;
     private CancellationSignal cancellationSignal;
 
     AndroidSecureStorage() {
@@ -138,6 +153,8 @@ public final class AndroidSecureStorage extends SecureStorage {
     private static final class EncryptCipherWork implements CipherWork<Boolean> {
         private final String account;
         private final String value;
+        /** The key generation the cipher belongs to; set before the prompt. */
+        long generation;
         EncryptCipherWork(String account, String value) {
             this.account = account;
             this.value = value;
@@ -152,10 +169,19 @@ public final class AndroidSecureStorage extends SecureStorage {
             // pair of entries is also all-or-nothing that way: apply() could persist a
             // ciphertext whose IV had not landed, which decrypts to nothing on the next
             // launch and looks to the caller like a value it successfully stored.
-            return Boolean.valueOf(sp.edit()
+            synchronized (BIO_KEY_LOCK) {
+                // Under the lock, and only while the key this was encrypted under is still
+                // the current one: committed after a replacement, the entry would sit under
+                // a dead key and fail with a padding error rather than as revoked.
+                if (sp.getLong(KEY_GENERATION, 0L) != generation) {
+                    throw new IllegalStateException("The biometric key was replaced during this write");
+                }
+                return Boolean.valueOf(sp.edit()
                     .putString("v_" + account, Base64.encodeToString(enc, Base64.DEFAULT))
                     .putString("iv_" + account, Base64.encodeToString(c.getIV(), Base64.DEFAULT))
+                    .remove(REVOKED_PREFIX + account)
                     .commit());
+            }
         }
     }
 
@@ -171,6 +197,13 @@ public final class AndroidSecureStorage extends SecureStorage {
                 .getApplicationContext()
                 .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         if (sp.getString("iv_" + account, null) == null) {
+            if (sp.contains(REVOKED_PREFIX + account)) {
+                // Its key was invalidated (or was an unbound legacy key) and the entry
+                // was dropped with it; see revokeAllEntries.
+                result.error(new BiometricException(BiometricError.KEY_REVOKED,
+                        "Key has been invalidated"));
+                return result;
+            }
             result.error(new BiometricException(BiometricError.UNKNOWN,
                     "No secure storage entry for account: " + account));
             return result;
@@ -204,8 +237,12 @@ public final class AndroidSecureStorage extends SecureStorage {
         // clears; reporting it gone while the removal sits in memory means it comes back
         // if the process is killed before the write lands, which on Android is how a
         // process usually ends.
-        result.complete(Boolean.valueOf(
-                sp.edit().remove("v_" + account).remove("iv_" + account).commit()));
+        boolean removed = sp.edit().remove("v_" + account).remove("iv_" + account)
+                .remove(REVOKED_PREFIX + account).commit();
+        if (removed) {
+            deleteKeyIfUnused();
+        }
+        result.complete(Boolean.valueOf(removed));
         return result;
     }
 
@@ -1362,47 +1399,81 @@ public final class AndroidSecureStorage extends SecureStorage {
     private <V> void runAuthenticatedCipher(final String reason, final String account,
                                             final int mode, final AsyncResource<V> result,
                                             final CipherWork<V> work) {
-        SecretKey secret = getSecretKey();
-        if (secret == null) {
-            if (mode == Cipher.ENCRYPT_MODE) {
-                if (!createKey()) {
-                    failResult(result, BiometricError.UNKNOWN, "Failed to create keystore key");
-                    return;
-                }
-            } else {
-                if (keyRevoked) {
-                    failResult(result, BiometricError.KEY_REVOKED, "Key has been invalidated");
-                } else {
-                    failResult(result, BiometricError.UNKNOWN, "No keystore key for account");
-                }
+        if (mode == Cipher.ENCRYPT_MODE) {
+            // Before anything can replace the key: with no biometric enrolled a bound key
+            // cannot be created, and replacing one first would drop every entry for a
+            // write that was never going to happen.
+            BiometricBackend backend = AndroidBiometrics.backend();
+            if (backend == null) {
+                failResult(result, BiometricError.NOT_AVAILABLE, "No biometric hardware");
+                return;
+            }
+            if (!backend.canAuthenticate(AndroidNativeUtil.getActivity())) {
+                failResult(result, BiometricError.NOT_ENROLLED, "No biometric is enrolled");
                 return;
             }
         }
-        Cipher operationCipher = initCipher(mode, account);
-        if (operationCipher == null) {
+        KeyLookup key = lookupKey();
+        if (key.state == KEY_UNVERIFIED) {
+            failResult(result, BiometricError.UNKNOWN,
+                    "Cannot confirm the keystore key is bound to the enrolled biometrics");
+            return;
+        }
+        if (key.state == KEY_ERROR) {
+            failResult(result, BiometricError.UNKNOWN, "The keystore is not available");
+            return;
+        }
+        if (key.state == KEY_UNRECOVERABLE) {
             if (mode == Cipher.ENCRYPT_MODE) {
-                if (createKey()) {
-                    operationCipher = initCipher(mode, account);
-                }
-                if (operationCipher == null) {
-                    failResult(result, BiometricError.UNKNOWN, "Failed to initialise cipher");
-                    return;
-                }
+                failResult(result, BiometricError.UNKNOWN, "The biometric key cannot be read; "
+                        + "remove() every entry to reset the secure storage");
             } else {
+                failResult(result, BiometricError.KEY_REVOKED, "The biometric key cannot be read");
+            }
+            return;
+        }
+        if (key.key == null) {
+            if (mode != Cipher.ENCRYPT_MODE) {
+                // A stored entry with no key under it. Reported, never wiped here: on
+                // API 23-30 getKey also answers null when the keystore daemon cannot be
+                // reached, and the key may be back on the next call.
+                failResult(result, BiometricError.KEY_REVOKED, "Key has been invalidated");
+                return;
+            }
+            key = replaceKey();
+            if (key.key == null) {
+                failResult(result, BiometricError.UNKNOWN, "Failed to create keystore key");
+                return;
+            }
+        }
+        Cipher operationCipher = initCipher(mode, account, key);
+        if (operationCipher == null) {
+            if (mode != Cipher.ENCRYPT_MODE) {
                 failResult(result, BiometricError.KEY_REVOKED,
                         "Failed to initialise cipher; key must have been revoked");
+                return;
+            }
+            key = replaceKey();
+            if (key.key != null) {
+                operationCipher = initCipher(mode, account, key);
+            }
+            if (operationCipher == null) {
+                failResult(result, BiometricError.UNKNOWN, "Failed to initialise cipher");
                 return;
             }
         }
         // Carried as a parameter from here on. It belongs to this operation and to no
         // other, which is what stops a concurrent call from handing its cipher to this
         // prompt.
-        promptBiometric(reason, mode, account, result, work, operationCipher);
+        if (work instanceof EncryptCipherWork) {
+            ((EncryptCipherWork) work).generation = key.generation;
+        }
+        promptBiometric(reason, mode, account, result, work, operationCipher, key.generation);
     }
 
     private <V> void promptBiometric(final String reason, final int mode, final String account,
                                      final AsyncResource<V> result, final CipherWork<V> work,
-                                     final Cipher operationCipher) {
+                                     final Cipher operationCipher, final long generation) {
         final BiometricBackend backend = AndroidBiometrics.backend();
         if (backend == null) {
             failResult(result, BiometricError.NOT_AVAILABLE, "No biometric hardware");
@@ -1422,8 +1493,12 @@ public final class AndroidSecureStorage extends SecureStorage {
                         operationCipher, cs, new BiometricBackend.Callback() {
                             @Override
                             public void onSuccess(Cipher authedCipher) {
-                                cs.cancel();
+                                // The signal is cancelled AFTER the cipher work, not before:
+                                // cancelling first may tear the keystore operation down
+                                // under the doFinal that the authentication unlocked
+                                // (the suspected cause of FingerprintScanner #8).
                                 if (authedCipher == null) {
+                                    cs.cancel();
                                     // The OS reported success without handing
                                     // back the CryptoObject we passed in, so
                                     // nothing proves a real unlock happened.
@@ -1432,7 +1507,12 @@ public final class AndroidSecureStorage extends SecureStorage {
                                                     + "biometric success may have been spoofed");
                                     return;
                                 }
-                                runCipherWork(authedCipher, work, result, mode, account);
+                                try {
+                                    runCipherWork(authedCipher, work, result, mode, account,
+                                            generation);
+                                } finally {
+                                    cs.cancel();
+                                }
                             }
 
                             @Override
@@ -1450,7 +1530,8 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     private <V> void runCipherWork(Cipher authedCipher, CipherWork<V> work,
-                                   final AsyncResource<V> result, int mode, String account) {
+                                   final AsyncResource<V> result, int mode, String account,
+                                   long generation) {
         try {
             V v = work.run(authedCipher);
             succeedResult(result, v);
@@ -1465,7 +1546,7 @@ public final class AndroidSecureStorage extends SecureStorage {
             // that initialises and then fails inside doFinal with a keystore error
             // underneath is that case, and isKeyInvalidation recognises it.
             if (isKeyInvalidation(t)) {
-                removePermanentlyInvalidatedKey();
+                deleteKeyAndEntries(generation);
                 failResult(result, BiometricError.KEY_REVOKED,
                         "Cipher operation failed; key invalidated: " + t.getMessage());
             } else {
@@ -1543,68 +1624,147 @@ public final class AndroidSecureStorage extends SecureStorage {
                     KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
                     .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
                     .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7);
-            // Skip setUserAuthenticationRequired on API 33+ per
-            // FingerprintScanner #8; the BiometricPrompt still authenticates
-            // the user, but the keystore no longer ties the key lifetime to
-            // biometric enrolment (which caused recovery failures). That stays
-            // the default so installed apps keep working on update. An app
-            // that opts in with setStrictBiometricBinding gets a key bound on
-            // every level and revoked by a new enrolment (API 24+); the prompt
-            // carries the cipher as its CryptoObject, which a per-use bound key
-            // needs. Only a key created here is affected: an existing key is
-            // never deleted for being unbound, which would wipe its entries.
-            if (isStrictBiometricBinding()) {
-                b.setUserAuthenticationRequired(true);
-                if (Build.VERSION.SDK_INT >= 24) {
-                    b.setInvalidatedByBiometricEnrollment(true);
-                }
-            } else if (Build.VERSION.SDK_INT < 33) {
-                b.setUserAuthenticationRequired(true);
+            // Bound on every level and revoked by a new enrolment. Never skip this:
+            // see the class comment. The prompt carries the cipher as its CryptoObject,
+            // which is what a per-use bound key needs.
+            b.setUserAuthenticationRequired(true);
+            if (Build.VERSION.SDK_INT >= 24) {
+                b.setInvalidatedByBiometricEnrollment(true);
             }
             keyGenerator.init(b.build());
             keyGenerator.generateKey();
             return true;
-        } catch (NoSuchAlgorithmException e) {
-            Log.e(e);
-        } catch (InvalidAlgorithmParameterException e) {
-            Log.e(e);
-        } catch (CertificateException e) {
-            Log.e(e);
-        } catch (IOException e) {
+        } catch (Exception e) {
+            // Unchecked too (ProviderException, IllegalStateException): escaping here
+            // would leave the caller's AsyncResource never completed.
             Log.e(e);
         }
         return false;
     }
 
-    private SecretKey getSecretKey() {
-        keyRevoked = false;
-        try {
-            keyStore().load(null);
-            SecretKey k = (SecretKey) keyStore.getKey(KEY_ID, null);
-            if (k == null) {
-                // Android deletes a biometric-bound key outright when the user removes
-                // EVERY enrolled biometric (and on some devices when the set changes),
-                // rather than leaving it to fail with KeyPermanentlyInvalidatedException.
-                // The only caller that reads this flag is the decrypt path, and get()
-                // returns before reaching it when no entry is stored -- so an absent key
-                // there always means an entry whose key was taken away: revoked. Reporting
-                // it as a generic failure made apps treat a re-enrolment as an error
-                // instead of asking the user to set biometric login up again.
-                keyRevoked = true;
-            }
-            return k;
-        } catch (UnrecoverableKeyException e) {
-            keyRevoked = true;
-        } catch (KeyStoreException e) {
-            Log.e(e);
-        } catch (NoSuchAlgorithmException e) {
-            Log.e(e);
-        } catch (CertificateException e) {
-            Log.e(e);
-        } catch (IOException e) {
-            Log.e(e);
+    private static final int KEY_PRESENT = 0;
+    /** No key: absent, removed by Android, or a legacy unbound key just deleted. */
+    private static final int KEY_GONE = 1;
+    /** A key whose binding could not be read on a level where unbound keys exist. */
+    private static final int KEY_UNVERIFIED = 2;
+    private static final int KEY_ERROR = 3;
+    /**
+     * A key that exists but cannot be read (UnrecoverableKeyException). Its entries
+     * report KEY_REVOKED; it is never replaced on a guess, since API 31+ also raises this
+     * for transient errors. remove() on the entries lets deleteKeyIfUnused clear it.
+     */
+    private static final int KEY_UNRECOVERABLE = 4;
+
+    /**
+     * Serializes every look-up, creation and deletion of the biometric key, and the
+     * entries under it, as PLAIN_KEY_LOCK does for the other tier. Without it one
+     * operation could delete a key another had just created, and with it the entries
+     * that operation had just written.
+     */
+    private static final Object BIO_KEY_LOCK = new Object();
+
+    /**
+     * Counts the keys this storage has had. An operation remembers the generation it
+     * started under, and a failure deletes the key only while that generation is still
+     * current -- a late failure of an operation on a key since replaced must not take
+     * the new key and its entries with it.
+     */
+    private static final String KEY_GENERATION = "keygen";
+
+    /** The key, what state it is in, and the generation it belongs to. */
+    private static final class KeyLookup {
+        final SecretKey key;
+        final int state;
+        final long generation;
+        KeyLookup(SecretKey key, int state, long generation) {
+            this.key = key;
+            this.state = state;
+            this.generation = generation;
         }
-        return null;
+    }
+
+    private SharedPreferences bioPrefs() {
+        return AndroidNativeUtil.getActivity().getApplicationContext()
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    private KeyLookup lookupKey() {
+        synchronized (BIO_KEY_LOCK) {
+            long generation = bioPrefs().getLong(KEY_GENERATION, 0L);
+            try {
+                keyStore().load(null);
+                SecretKey k = (SecretKey) keyStore.getKey(KEY_ID, null);
+                if (k == null) {
+                    // Android deletes a biometric-bound key outright when the user removes
+                    // EVERY enrolled biometric, rather than failing with
+                    // KeyPermanentlyInvalidatedException. Reported as gone; the entries are
+                    // dropped only when a new key replaces it (replaceKey), because a null
+                    // here can also be a keystore that is briefly unreachable.
+                    return new KeyLookup(null, KEY_GONE, generation);
+                }
+                int binding = bindingOf(k);
+                if (binding == BINDING_NONE) {
+                    // Created unbound on API 33+ by an earlier release. It decrypts with no
+                    // authentication and survives any re-enrolment, so it cannot be trusted
+                    // with what it holds: delete it, and report its entries as revoked so
+                    // the app asks the user to set biometric login up again.
+                    deleteKeyAndEntries(generation);
+                    return new KeyLookup(null, KEY_GONE, bioPrefs().getLong(KEY_GENERATION, 0L));
+                }
+                if (binding == BINDING_UNKNOWN && Build.VERSION.SDK_INT >= 33) {
+                    // Only 33+ ever had unbound keys. There, a key whose binding cannot be
+                    // confirmed is neither used (it might be one) nor deleted (on a guess).
+                    return new KeyLookup(null, KEY_UNVERIFIED, generation);
+                }
+                return new KeyLookup(k, KEY_PRESENT, generation);
+            } catch (UnrecoverableKeyException e) {
+                return new KeyLookup(null, KEY_UNRECOVERABLE, generation);
+            } catch (KeyStoreException e) {
+                Log.e(e);
+            } catch (NoSuchAlgorithmException e) {
+                Log.e(e);
+            } catch (CertificateException e) {
+                Log.e(e);
+            } catch (IOException e) {
+                Log.e(e);
+            }
+            return new KeyLookup(null, KEY_ERROR, generation);
+        }
+    }
+
+    /**
+     * Makes a new key when there is none, and drops every entry encrypted under the
+     * one that is gone, which nothing can read any more.
+     *
+     * <p>Never replaces a key that exists. A key that is present but could not be used
+     * (a keystore hiccup, an UnrecoverableKeyException that API 31+ also raises for
+     * transient errors) fails the operation instead: replacing it would destroy every
+     * entry on a guess. A key proven invalidated is removed by deleteKeyAndEntries
+     * before this runs, so by then the alias is absent.</p>
+     */
+    private KeyLookup replaceKey() {
+        synchronized (BIO_KEY_LOCK) {
+            KeyLookup current = lookupKey();
+            if (current.state != KEY_GONE) {
+                return current;
+            }
+            SharedPreferences sp = bioPrefs();
+            try {
+                keyStore().load(null);
+                if (keyStore.containsAlias(KEY_ID)) {
+                    return new KeyLookup(null, KEY_ERROR, current.generation);
+                }
+            } catch (Exception e) {
+                Log.e(e);
+                return new KeyLookup(null, KEY_ERROR, current.generation);
+            }
+            if (!createKey()) {
+                return new KeyLookup(null, KEY_ERROR, current.generation);
+            }
+            revokeAllEntries();
+            sp.edit().putLong(KEY_GENERATION, current.generation + 1).commit();
+            return lookupKey();
+        }
     }
 
     /**
@@ -1630,9 +1790,9 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     /** The initialised cipher for this one operation, or null if it could not be made. */
-    private Cipher initCipher(int mode, String account) {
+    private Cipher initCipher(int mode, String account, KeyLookup lookup) {
         try {
-            SecretKey key = getSecretKey();
+            SecretKey key = lookup.key;
             if (key == null) {
                 return null;
             }
@@ -1648,7 +1808,7 @@ public final class AndroidSecureStorage extends SecureStorage {
             }
             return c;
         } catch (KeyPermanentlyInvalidatedException e) {
-            removePermanentlyInvalidatedKey();
+            deleteKeyAndEntries(lookup.generation);
             return null;
         } catch (InvalidKeyException e) {
             Log.e(e);
@@ -1659,12 +1819,106 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
     }
 
-    private void removePermanentlyInvalidatedKey() {
-        try {
-            keyStore().deleteEntry(KEY_ID);
-        } catch (KeyStoreException e) {
-            Log.e(e);
+    /**
+     * The way out for a key that can never be used -- one whose binding cannot be
+     * confirmed on API 33+, or one that cannot be read: once the app removes every entry,
+     * the key goes and the next write creates a fresh, bound one.
+     *
+     * <p>A usable key is kept even with no entries: a set() may be holding a prompt over
+     * it with nothing committed yet, and deleting it would fail that write.</p>
+     */
+    private void deleteKeyIfUnused() {
+        synchronized (BIO_KEY_LOCK) {
+            SharedPreferences sp = bioPrefs();
+            for (String k : sp.getAll().keySet()) {
+                if (k.startsWith("iv_")) {
+                    return;
+                }
+            }
+            KeyLookup key = lookupKey();
+            if (key.state == KEY_UNVERIFIED || key.state == KEY_UNRECOVERABLE) {
+                deleteKeyAndEntries(key.generation);
+            }
         }
+    }
+
+    /**
+     * Deletes the key of {@code generation} and drops the entries under it.
+     *
+     * <p>Nothing happens if the key has been replaced since (a late failure on an old
+     * key), and the entries are dropped only once the key is confirmed gone: if the
+     * delete fails, they are still readable.</p>
+     */
+    private void deleteKeyAndEntries(long generation) {
+        synchronized (BIO_KEY_LOCK) {
+            SharedPreferences sp = bioPrefs();
+            if (sp.getLong(KEY_GENERATION, 0L) != generation) {
+                return;
+            }
+            try {
+                keyStore().load(null);
+                keyStore.deleteEntry(KEY_ID);
+                if (keyStore.containsAlias(KEY_ID)) {
+                    Log.p("SecureStorage: the biometric key could not be deleted");
+                    return;
+                }
+            } catch (Exception e) {
+                Log.e(e);
+                return;
+            }
+            revokeAllEntries();
+            sp.edit().putLong(KEY_GENERATION, generation + 1).commit();
+        }
+    }
+
+    /**
+     * Drops every entry encrypted under the biometric key, leaving a revoked marker.
+     *
+     * <p>Called whenever that key is gone. Every entry shares it, so none of them can be
+     * decrypted again -- and left in place, the next set() creates a new key and every
+     * OTHER account's old entry then fails to decrypt under it with a padding error,
+     * which reads as a generic failure instead of a revocation.</p>
+     */
+    private void revokeAllEntries() {
+        SharedPreferences sp = bioPrefs();
+        SharedPreferences.Editor e = null;
+        for (String k : sp.getAll().keySet()) {
+            if (k.startsWith("iv_")) {
+                String account = k.substring(3);
+                if (e == null) {
+                    e = sp.edit();
+                }
+                e.remove(k).remove("v_" + account).putBoolean(REVOKED_PREFIX + account, true);
+            }
+        }
+        if (e != null) {
+            e.commit();
+        }
+    }
+
+    private static final int BINDING_BOUND = 0;
+    private static final int BINDING_NONE = 1;
+    private static final int BINDING_UNKNOWN = 2;
+
+    /** Whether the keystore enforces user authentication for this key, if it can say. */
+    private static int bindingOf(SecretKey k) {
+        try {
+            SecretKeyFactory f = SecretKeyFactory.getInstance(k.getAlgorithm(), ANDROID_KEY_STORE);
+            KeyInfo info = (KeyInfo) f.getKeySpec(k, KeyInfo.class);
+            return info.isUserAuthenticationRequired() ? BINDING_BOUND : BINDING_NONE;
+        } catch (Throwable t) {
+            Log.e(t);
+            return BINDING_UNKNOWN;
+        }
+    }
+
+    /**
+     * The keystore's own failure under doFinal. That is android.security.KeyStoreException
+     * (public only from API 33, hidden before) -- not java.security.KeyStoreException,
+     * which an instanceof against the imported name tested and so never matched.
+     */
+    private static boolean isKeystoreError(Throwable t) {
+        return t != null && t.getClass().getName().endsWith("KeyStoreException");
     }
 
     /**
@@ -1689,8 +1943,12 @@ public final class AndroidSecureStorage extends SecureStorage {
             if (c instanceof KeyPermanentlyInvalidatedException) {
                 return true;
             }
-            if (c instanceof IllegalBlockSizeException
-                    && c.getCause() instanceof KeyStoreException) {
+            // The Samsung 8.0.0 quirk, and only there. Elsewhere the same shape is also
+            // "user not authenticated" or a pruned operation handle -- one failed
+            // operation, which must not delete the key every entry shares.
+            if ((Build.VERSION.SDK_INT == 26 || Build.VERSION.SDK_INT == 27)
+                    && c instanceof IllegalBlockSizeException
+                    && isKeystoreError(c.getCause())) {
                 return true;
             }
             Throwable next = c.getCause();
