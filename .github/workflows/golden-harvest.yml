@@ -37,6 +37,17 @@ on:
       - Windows cross-build + run (Linux build -> Windows run)
       - Test macOS UI build scripts
     types: [completed]
+  # By hand, for a head whose capture completed without starting this (see
+  # DISPATCH_TOKEN in golden-capture.yml): runs this file from master, like
+  # workflow_run does.
+  workflow_dispatch:
+    inputs:
+      head_ref:
+        description: PR branch to harvest
+        required: true
+      head_sha:
+        description: "Commit the screenshot runs rendered (default: the branch head)"
+        required: false
 
 permissions:
   contents: read
@@ -49,12 +60,13 @@ permissions:
 # head branch. That is the commit the next run compares on as well, so the
 # golden matches what CI will render.
 concurrency:
-  group: golden-harvest-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  group: golden-harvest-${{ github.event.workflow_run.head_repository.full_name || github.repository }}-${{ github.event.workflow_run.head_branch || inputs.head_ref }}
   cancel-in-progress: false
 
 jobs:
   harvest:
     if: >-
+      github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.event == 'pull_request' ||
        github.event.workflow_run.event == 'workflow_dispatch') &&
       github.event.workflow_run.head_repository.full_name == github.repository
@@ -68,8 +80,8 @@ jobs:
       pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-      HEAD_REF: ${{ github.event.workflow_run.head_branch }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha || inputs.head_sha }}
+      HEAD_REF: ${{ github.event.workflow_run.head_branch || inputs.head_ref }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -79,10 +91,17 @@ jobs:
         id: list
         run: |
           set -euo pipefail
+          if [ -z "$HEAD_SHA" ]; then
+            HEAD_SHA="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_REF" --jq .sha)"
+            echo "HEAD_SHA=$HEAD_SHA" >> "$GITHUB_ENV"
+          fi
           # A PR's last runs often complete after it merged or closed, and
           # the branch is usually deleted by then: there is nothing to push
           # to, and goldens must never land on a merged branch either.
-          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD_REF" --state open --json number --jq length)"
+          open="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD_REF" --state open --json isCrossRepository,baseRefName --jq "[.[] | select(.isCrossRepository | not) | select(.baseRefName != \"$HEAD_REF\")] | length")"
+          # Same-repo PRs only, and never a base branch: a hand dispatch names
+          # the branch freely, and a fork PR can share a branch name.
+          [ "$HEAD_REF" != "${{ github.event.repository.default_branch }}" ] || open=0
           if [ "$open" = 0 ]; then
             echo "No open pull request for $HEAD_REF (merged, closed or deleted); nothing to harvest."
             echo "ready=0" >> "$GITHUB_OUTPUT"
@@ -120,7 +139,7 @@ jobs:
       - uses: actions/checkout@v6
         if: steps.list.outputs.ready == '1'
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.workflow_run.head_branch || inputs.head_ref }}
           token: ${{ secrets.CN1SS_GH_TOKEN }}
           path: pr
       - name: Collect, commit and push the goldens

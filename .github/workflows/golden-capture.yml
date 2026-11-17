@@ -126,7 +126,12 @@ jobs:
             const {cancelForCapture} = require('./scripts/ci/cancel-stale-pr-runs.js');
             await cancelForCapture({github, context, core, keepRunId: context.runId});
 
+      # Dispatched with the push token, not github.token: GitHub starts no
+      # workflow_run for a run github.token started, so the harvest would
+      # never see the capture complete.
       - name: Dispatch the screenshot workflows in capture mode
+        env:
+          DISPATCH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
         run: scripts/ci/golden-capture.sh dispatch "$HEAD_REF" "$TESTS" "$RUNS"
 
       # Workflows the triggering push started after the first pass.
