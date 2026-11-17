@@ -4,13 +4,13 @@
 Uploaded images, generated reports, and backups don't belong in a database. They
 belong in an object store: a bucket of named blobs, priced by the gigabyte, served
 straight to clients. Every cloud has one, and they don't agree on an API.
-`ObjectStorage` is one interface over all of them. The provider is chosen by a
+`ObjectStorage` is one interface over every one of them. The provider is chosen by a
 property, so the same code moves from Amazon to Google to Azure, or onto a local
 emulator, by changing one line.
 
 Each provider is implemented over the backend's own HTTP client, with no cloud
 SDK. The build links only the provider the configuration names. The scheme
-decides: `r2://${CF_ACCOUNT_ID}` links R2 alone. When the URL is not in the
+decides: `r2://${CF_ACCOUNT_ID}` links R2 alone. When the URL isn't in the
 application's properties at all, because the deployment supplies it, the build
 links every provider; `cn1.storage.providers=gs` names the set instead.
 
@@ -49,23 +49,7 @@ usually needs no secret at all.
 
 [source,properties]
 ----
-# Amazon S3: explicit keys, else the standard AWS chain (environment,
-# web identity, ECS, EC2 instance role)
-cn1.storage.url=s3://eu-west-1
-
-# Cloudflare R2: an R2 API token's S3 keys
-cn1.storage.url=r2://${CF_ACCOUNT_ID}
-cn1.storage.r2.access-key-id=${R2_KEY_ID}
-cn1.storage.r2.secret-access-key=${R2_SECRET}
-
-# Google Cloud Storage: a service account key file
-# (GOOGLE_APPLICATION_CREDENTIALS), else the metadata server on GCE,
-# Cloud Run and GKE
-cn1.storage.url=gs://my-project
-
-# Azure: a connection string or an account key, else the managed identity
-cn1.storage.url=azblob://myaccount
-cn1.storage.azure.account-key=${AZURE_STORAGE_KEY}
+include::../demos/common/src/main/snippets/developer-guide/backend-storage.properties[tag=backend-storage-properties-001,indent=0]
 ----
 
 [cols="1,2"]
@@ -110,7 +94,7 @@ Service Account Token Creator role on itself to sign URLs.
 === Uploads straight from the app
 
 The object bytes of a mobile upload shouldn't pass through the server. The server
-hands the app a presigned URL, and the app sends the file to the provider
+hands the app a signed URL, and the app sends the file to the provider
 directly:
 
 [source,java,role=cn1-no-try]
@@ -132,7 +116,7 @@ How each provider signs:
   managed identity. The user delegation SAS costs one call a day to fetch the
   delegation key.
 
-The in-memory store refuses to presign, because no server would answer the URL.
+The in-memory store refuses to sign a URL, because no server would answer the URL.
 
 === The rest of the interface
 
@@ -152,15 +136,5 @@ configuration alone:
 
 [source,properties]
 ----
-# MinIO
-cn1.storage.url=s3://us-east-1
-cn1.storage.s3.endpoint=http://localhost:9000
-
-# fake-gcs-server
-cn1.storage.url=gs://demo
-cn1.storage.gcs.emulator-host=http://localhost:4443
-
-# Azurite
-cn1.storage.url=azblob://
-cn1.storage.azure.connection-string=UseDevelopmentStorage=true
+include::../demos/common/src/main/snippets/developer-guide/backend-storage.properties[tag=backend-storage-properties-002,indent=0]
 ----
