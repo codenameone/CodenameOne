@@ -32,16 +32,26 @@ list() {
   [ "${#WORKFLOWS[@]}" -gt 0 ] || { log "no workflows read from golden-capture.sh"; return 1; }
   : > "$runs_file"
   # A capture (golden-capture.yml) dispatches the workflows one after another
-  # over a few minutes. Once any of them has a capture run here, a workflow
-  # without one is still to come, not finished: harvesting then would take
-  # the legs that are done and leave the rest to a branch that has moved.
-  all="$(for wf in "${WORKFLOWS[@]}"; do runs_at "$wf" "$sha" | jq -c --arg wf "$wf" '{wf: $wf, runs: .}'; done)"
-  if jq -e -s 'any(.[].runs[]; .event == "workflow_dispatch")' <<<"$all" >/dev/null; then
+  # over a few minutes. Once any of them has a live capture run here, a
+  # workflow without one is still to come, not finished: harvesting then would
+  # take the legs that are done and leave the rest to a branch that has moved.
+  # Cancelled capture runs do not count: a capture that failed part way
+  # cancels the ones it started and re-runs the PR's runs, which then harvest
+  # as usual. (A screenshot workflow dispatched by hand at a PR head counts as
+  # a capture too; nothing else dispatches them.)
+  all=""
+  for wf in "${WORKFLOWS[@]}"; do
+    # One assignment per workflow, so a failed API call stops the listing
+    # under set -e instead of dropping that workflow from it.
+    runs="$(runs_at "$wf" "$sha")"
+    all+="$(jq -c --arg wf "$wf" '{wf: $wf, runs: .}' <<<"$runs")"$'\n'
+  done
+  if jq -e -s 'any(.[].runs[]; .event == "workflow_dispatch" and .conclusion != "cancelled")' <<<"$all" >/dev/null; then
     capture=1
   fi
   for wf in "${WORKFLOWS[@]}"; do
     runs="$(jq -c -s --arg wf "$wf" '.[] | select(.wf == $wf) | .runs' <<<"$all")"
-    if [ "$capture" = 1 ] && ! jq -e 'any(.[]; .event == "workflow_dispatch")' <<<"$runs" >/dev/null; then
+    if [ "$capture" = 1 ] && ! jq -e 'any(.[]; .event == "workflow_dispatch" and .conclusion != "cancelled")' <<<"$runs" >/dev/null; then
       log "$wf has no capture run at $sha yet"
       pending=1
       continue
