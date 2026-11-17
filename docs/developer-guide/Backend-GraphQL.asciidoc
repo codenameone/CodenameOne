@@ -35,7 +35,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/g
   field is read from.
 * `@BatchMapping` resolves a field for every element of a list in one call. It
   takes the `List` of parent objects and answers a `Map` from each one to its
-  value, or a `List` with one value per parent in the same order. That is how
+  value, or a `List` with one value per parent in the same order. That's how
   `books { author { name } }` costs one call for the authors, not one per book.
 
 A field with no resolver is read from its parent: a map's entry, or the
@@ -54,10 +54,10 @@ The parameters a resolver can take:
   source, the parent type and the path.
 * `HttpServer.Request` over HTTP, and `WebSocketSession` for a subscription.
   These take the place of Spring's `@ContextValue`.
-* The source object, in a `@SchemaMapping` of a type that is not a root type.
+* The source object, in a `@SchemaMapping` of a type that isn't a root type.
 
 A resolver returns the field's value, which can be null where the schema allows
-null. A subscription returns a `GraphQLStream`. It is opened when a client
+null. A subscription returns a `GraphQLStream`. It's opened when a client
 subscribes, and it sends an event with `emitter.next(value)` from any thread. Each event is resolved
 against the subscription's selection like any other value. The `Runnable` it
 returns runs when the client unsubscribes or disconnects.
@@ -69,7 +69,7 @@ Each of these is a build error that names the method:
 * A resolver for a type or field the schema doesn't declare, with the fields the
   type does have.
 * An `@Argument` the field doesn't take.
-* A primitive parameter for an argument the schema allows to be null, which
+* A primitive parameter for a nullable argument, which
   has no way to hold the null.
 * Two methods resolving the same field.
 * A resolver in a module with no schema, a subscription that doesn't return a
@@ -115,5 +115,5 @@ classification goes in `extensions.classification`:
 * Anything else is logged, and the client sees `INTERNAL_ERROR` with no detail
   of the exception.
 
-`@GraphQlExceptionHandler` is not supported. Throw a `GraphQLException` to
+`@GraphQlExceptionHandler` isn't supported. Throw a `GraphQLException` to
 choose what the client sees.
