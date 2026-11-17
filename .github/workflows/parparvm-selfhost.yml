@@ -59,12 +59,19 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   selfhost:
+    needs: golden-plan
     # On a pull_request only when the author asked for it; the schedule and
     # workflow_dispatch legs always run.
-    if: >-
-      github.event_name != 'pull_request' ||
-      contains(github.event.pull_request.labels.*.name, 'selfhost')
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'selfhost')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:

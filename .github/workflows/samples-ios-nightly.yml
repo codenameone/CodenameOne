@@ -37,12 +37,23 @@ permissions:
   contents: read
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   build-ios-port:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/_build-ios-port.yml
 
   ios:
+    if: needs.golden-plan.outputs.run == 'true'
     name: iOS builds (${{ matrix.shard }})
-    needs: build-ios-port
+    needs: [golden-plan, build-ios-port]
     runs-on: macos-15
     # Five steps at their 45-minute cap; a slow night must fail a step, not
     # kill the job and leave the rest of the shard unrun.

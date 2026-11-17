@@ -34,9 +34,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      run: ${{ steps.plan.outputs.run }}
+      run: ${{ steps.plan.outputs.run || steps.other.outputs.run }}
     steps:
+      # Only a pull request can be missing a golden it is about to add. Any
+      # other event answers at once, so a flaky checkout below can never
+      # skip a push, schedule or release run (every PR workflow needs this).
+      - id: other
+        if: github.event_name != 'pull_request'
+        run: echo "run=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v6
+        if: github.event_name == 'pull_request'
         with:
           persist-credentials: false
           # A pull request checks out its merge commit; its first parent is
@@ -48,6 +55,7 @@ jobs:
             scripts/hellocodenameone/common/src/main
             docs/website/data
       - id: plan
+        if: github.event_name == 'pull_request'
         env:
           CAPTURE: ${{ inputs.capture }}
           EVENT: ${{ github.event_name }}

@@ -119,7 +119,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   unity-compat:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -228,6 +238,8 @@ jobs:
   # archetype, not just the translator and the runtime -- so it is a job of its
   # own rather than a longer build in front of the samples.
   unity-compat-project:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -298,10 +310,13 @@ jobs:
   # project and they unpack what it made. This is that job, and below it the
   # only test of the handoff that does not cost a Mac.
   unity-gallery:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   unity-gallery-consumer:
-    needs: unity-gallery
+    if: needs.golden-plan.outputs.run == 'true'
+    needs: [golden-plan, unity-gallery]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:

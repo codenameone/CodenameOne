@@ -43,14 +43,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   build-port:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     # Reused by `ios` so the iOS port .jar / native sources are available in
     # the cache the build-ios-app step relies on. Same reusable workflow that
     # scripts-ios.yml depends on -- piggybacking on its cache key.
     uses: ./.github/workflows/_build-ios-port.yml
 
   ios:
-    needs: build-port
+    if: needs.golden-plan.outputs.run == 'true'
+    needs: [golden-plan, build-port]
     permissions:
       contents: read
     runs-on: macos-15

@@ -48,9 +48,19 @@ env:
   CPYTHON_VERSION: '3.13.9'
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   # JDK 8 for the core (the container bakes both JDKs and cn1-binaries, as
   # flutter-bench's framework job explains), JDK 17 for the runtime.
   framework:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: framework
     runs-on: ubuntu-latest
     container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
@@ -100,8 +110,9 @@ jobs:
           retention-days: 1
 
   measure:
+    if: needs.golden-plan.outputs.run == 'true'
     name: jvm
-    needs: framework
+    needs: [golden-plan, framework]
     # Pinned: setup-python has no CPYTHON_VERSION build for ubuntu-latest
     # (26.04), and the baselines are measured against that exact version.
     runs-on: ubuntu-24.04
@@ -147,8 +158,9 @@ jobs:
           path: python-bench.json
 
   parparvm:
+    if: needs.golden-plan.outputs.run == 'true'
     name: parparvm
-    needs: framework
+    needs: [golden-plan, framework]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
