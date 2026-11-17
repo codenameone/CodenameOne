@@ -195,7 +195,7 @@ jobs:
             # does not mean every leg came back.
             failed=""
             while read -r wf id; do
-              c="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq .conclusion)"
+              c="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq .conclusion)" || c=unknown
               [ "$c" = success ] || failed="$failed ${wf%.yml}"
             done < ../runs.txt
             [ -z "$failed" ] || ok=0
