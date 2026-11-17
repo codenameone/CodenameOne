@@ -20,10 +20,10 @@ package com.codenameone.examples.brickyard.play;
 
 import com.codename1.backend.Base64;
 import com.codename1.backend.ResponseStatusException;
-import com.codename1.rbx.Engine;
-import com.codename1.rbx.RigidBodies;
-import com.codename1.rbx.place.PlaceFile;
-import com.codename1.rbx.place.PlaceLoader;
+import com.codenameone.examples.brickyard.rbx.Engine;
+import com.codenameone.examples.brickyard.rbx.RigidBodies;
+import com.codenameone.examples.brickyard.rbx.place.PlaceFile;
+import com.codenameone.examples.brickyard.rbx.place.PlaceLoader;
 import com.codenameone.examples.brickyard.Clock;
 import com.codenameone.examples.brickyard.Ids;
 import com.codenameone.examples.brickyard.api.PlaceDto;

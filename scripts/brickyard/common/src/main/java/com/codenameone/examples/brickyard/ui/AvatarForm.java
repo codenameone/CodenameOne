@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.brickyard.ui;
 
-import com.codename1.rbx.AvatarPreview;
+import com.codenameone.examples.brickyard.rbx.AvatarPreview;
 
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;

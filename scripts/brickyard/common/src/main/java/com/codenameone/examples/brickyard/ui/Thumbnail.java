@@ -19,8 +19,8 @@
 package com.codenameone.examples.brickyard.ui;
 
 import com.codename1.io.Storage;
-import com.codename1.rbx.PlaceThumbnail;
-import com.codename1.rbx.place.PlaceFile;
+import com.codenameone.examples.brickyard.rbx.PlaceThumbnail;
+import com.codenameone.examples.brickyard.rbx.place.PlaceFile;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.EncodedImage;

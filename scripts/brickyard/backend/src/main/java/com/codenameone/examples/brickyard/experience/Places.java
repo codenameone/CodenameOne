@@ -20,10 +20,10 @@ package com.codenameone.examples.brickyard.experience;
 
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
-import com.codename1.rbx.Engine;
-import com.codename1.rbx.place.CompatReport;
-import com.codename1.rbx.place.PlaceFile;
-import com.codename1.rbx.place.PlaceLoader;
+import com.codenameone.examples.brickyard.rbx.Engine;
+import com.codenameone.examples.brickyard.rbx.place.CompatReport;
+import com.codenameone.examples.brickyard.rbx.place.PlaceFile;
+import com.codenameone.examples.brickyard.rbx.place.PlaceLoader;
 
 /// Checks an uploaded place file by doing what a game server will do with it:
 /// parse it, then load it into a server-side engine. Loading builds the

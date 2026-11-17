@@ -21,11 +21,11 @@ package com.codenameone.examples.brickyard.studio;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.codename1.rbx.Engine;
-import com.codename1.rbx.Instance;
-import com.codename1.rbx.Scheduler;
-import com.codename1.rbx.place.PlaceLoader;
-import com.codename1.rbx.place.PlaceSaver;
+import com.codenameone.examples.brickyard.rbx.Engine;
+import com.codenameone.examples.brickyard.rbx.Instance;
+import com.codenameone.examples.brickyard.rbx.Scheduler;
+import com.codenameone.examples.brickyard.rbx.place.PlaceLoader;
+import com.codenameone.examples.brickyard.rbx.place.PlaceSaver;
 import org.junit.jupiter.api.Test;
 
 /// The "Goal and win" snippet puts the objective on the player's screen and

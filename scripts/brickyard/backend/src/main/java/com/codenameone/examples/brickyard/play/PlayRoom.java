@@ -19,9 +19,9 @@
 package com.codenameone.examples.brickyard.play;
 
 import com.codename1.backend.log.Logger;
-import com.codename1.rbx.Engine;
-import com.codename1.rbx.Instance;
-import com.codename1.rbx.ReplicaServer;
+import com.codenameone.examples.brickyard.rbx.Engine;
+import com.codenameone.examples.brickyard.rbx.Instance;
+import com.codenameone.examples.brickyard.rbx.ReplicaServer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

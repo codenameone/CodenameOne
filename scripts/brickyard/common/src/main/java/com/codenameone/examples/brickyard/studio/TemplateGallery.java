@@ -18,9 +18,9 @@
  */
 package com.codenameone.examples.brickyard.studio;
 
-import com.codename1.rbx.PlaceThumbnail;
-import com.codename1.rbx.place.PlaceFile;
-import com.codename1.rbx.place.Templates;
+import com.codenameone.examples.brickyard.rbx.PlaceThumbnail;
+import com.codenameone.examples.brickyard.rbx.place.PlaceFile;
+import com.codenameone.examples.brickyard.rbx.place.Templates;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;

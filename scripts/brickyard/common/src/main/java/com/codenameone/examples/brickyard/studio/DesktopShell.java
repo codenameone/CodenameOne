@@ -195,7 +195,7 @@ final class DesktopShell {
     }
 
     /// The transform tools: each is a mode of the viewport's gizmo (see
-    /// `com.codename1.rbx.Gizmo`), in the same order.
+    /// `com.codenameone.examples.brickyard.rbx.Gizmo`), in the same order.
     private void rebuildTools() {
         toolButtons.removeAll();
         for (int i = 0; i < TOOLS.length; i++) {

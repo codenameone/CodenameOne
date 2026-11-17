@@ -26,22 +26,24 @@ rewarded currency and the built-in MCP server for agentic creation.
 
 ## What is in the box
 
-**The engine**, in two framework modules that any app can use:
+**The engine**, in `shared`, because the app and the server both run it:
 
-- `maven/luau-runtime` is a pure-Java Luau interpreter. It covers the full
+- The `luau` package is a pure-Java Luau interpreter. It covers the full
   syntax, coroutines as interpreter frames, and the standard libraries. Every
   script resume runs under an instruction budget, so an infinite loop in a
   creator's script is a reported error, never a hung app.
-- `maven/rbx-compat` is the engine API over Codename One: datatypes, the
+- The `rbx` package is the engine API over Codename One: datatypes, the
   instance tree, signals, services, GUI, tweens, pathfinding, data stores, the
   marketplace and badges. It also holds the place-file reader and writer, a
-  compatibility report, a GPU part renderer with materials, lighting and
-  effects, rigid-body physics, humanoid characters and multiplayer
+  compatibility report, rigid-body physics, humanoid characters and multiplayer
   replication. Nine starter templates are included: an empty baseplate,
   two obbies, tycoon, arena, simulator, racing, survival and a roleplay town.
 
 **The app** (`common`):
 
+- **The 3D view** (its `rbx` package): a GPU part renderer with materials,
+  lighting and effects, the camera, the play view, the studio's gizmo,
+  avatars, thumbnails and the agent's MCP tools.
 - **Players** browse home rows and experience pages, play in 3D with touch,
   keyboard or gamepad, and climb leaderboards. They level up, keep daily
   streaks and claim quests. They can edit a block avatar and buy Bricks or the
@@ -101,7 +103,7 @@ with the server and client in one process.
 ```bash
 # From the repository root, JDK 8 for the framework (per-checkout repository):
 cd maven
-mvn -pl core,backend,backend-test,cn1-app-kit/backend,codenameone-maven-plugin,luau-runtime,rbx-compat,rbx-view -am install \
+mvn -pl core,backend,backend-test,cn1-app-kit/backend,codenameone-maven-plugin -am install \
   -DskipTests -Plocal-dev-javase -Dmaven.repo.local=$PWD/../.m2-repo
 
 # JDK 17 for the project:
@@ -110,14 +112,12 @@ mvn -Dcodename1.platform=backend -pl shared,backend test -Dmaven.repo.local=$PWD
 mvn -Dcodename1.platform=javase -pl common -am test -Dmaven.repo.local=$PWD/../../.m2-repo
 ```
 
-`.github/workflows/brickyard.yml` runs the engine tests, the server tests on
-SQLite, PostgreSQL and MySQL, and the client compile.
+`.github/workflows/brickyard.yml` runs the server tests on the JVM and compiled by
+ParparVM, on SQLite, PostgreSQL and MySQL, and the engine's and the client's tests.
 
 ## Limits worth knowing
 
 - Store receipts are accepted only on the dev and test profiles until a store
   validator is configured; elsewhere the receipt endpoint answers 503.
-- The server runs on the JVM backend runtime; rbx-compat needs the client core,
-  so a ParparVM-compiled server is not supported yet.
 - Assets a place file references by URL are replaced by placeholders, and the
   compatibility report names them.

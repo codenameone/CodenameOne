@@ -24,20 +24,6 @@
             <artifactId>brickyard-shared</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- The engine places run on, and the Luau interpreter their scripts run in. -->
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-rbx-compat</artifactId>
-        </dependency>
-        <!-- The renderer, play view and studio agent tools over that engine. -->
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-rbx-view</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-luau-runtime</artifactId>
-        </dependency>
 
         <!--
           Test-scope deps needed if you add JUnit 5 tests under

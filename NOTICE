@@ -309,7 +309,7 @@ is released into the public domain.
 Kenney "Blocky Characters" and "Nature Kit" models (Brickyard 3D view)
 -------------------------------------------------------------------------------
 
-maven/rbx-view/src/main/resources/com/codename1/rbx/models/ bundles glTF models
+scripts/brickyard/common/src/main/resources/com/codenameone/examples/brickyard/rbx/models/ bundles glTF models
 by Kenney (www.kenney.nl), released under Creative Commons Zero (CC0 1.0,
 http://creativecommons.org/publicdomain/zero/1.0/). Each pack's licence file
 is kept verbatim beside the models.

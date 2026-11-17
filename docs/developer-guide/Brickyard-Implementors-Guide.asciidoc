@@ -156,18 +156,16 @@ live in the explorer.
 [[brickyard-modules]]
 === How it's built
 
-The engine is three framework modules that any Codename One app can use, and the
-application is an ordinary project with the usual module layout:
+Brickyard is one project with the usual module layout. The engine is part of it, in
+the module both halves share, because the app plays and edits places and the server
+checks and runs them:
 
 [cols="1,3",options="header"]
 |===
 |Module |What it holds
-|`maven/luau-runtime` |A pure-Java Luau interpreter (`com.codename1.luau`): lexer, parser, a compiler to its own instructions, the interpreter, coroutines and the standard libraries.
-|`maven/rbx-compat` |The engine API (`com.codename1.rbx`): datatypes, the instance tree, signals, services, GUI, tweens, pathfinding, data stores, the marketplace, badges, rigid-body physics, humanoid characters and replication. Its `place` package reads and writes place files and holds the templates.
-|`maven/rbx-view` |Drawing and playing: the GPU part renderer, the camera, the play view, the studio's gizmo, avatars, thumbnails and the agent's MCP tools.
-|`scripts/brickyard/common` |The app: home, experience pages, play, the studio, friends, shop, the dashboard and the admin console.
-|`scripts/brickyard/shared` |The API contracts the app and the server share.
-|`scripts/brickyard/backend` |The Codename One Backend server.
+|`shared` |The API contracts the app and the server share, and the engine: the Luau interpreter (`luau`), a lexer, parser, a compiler to its own instructions, coroutines and the standard libraries; and the engine API (`rbx`), datatypes, the instance tree, signals, services, GUI, tweens, pathfinding, data stores, the marketplace, badges, rigid-body physics, humanoid characters and replication. Its `place` package reads and writes place files and holds the templates.
+|`common` |The app: home, experience pages, play, the studio, friends, shop, the dashboard and the admin console. Its `rbx` package draws and plays: the GPU part renderer, the camera, the play view, the studio's gizmo, avatars, thumbnails and the agent's MCP tools.
+|`backend` |The Codename One Backend server. It runs the engine on the JVM in development and compiled natively by ParparVM in production.
 |===
 
 [[brickyard-luau]]
@@ -181,7 +179,7 @@ script becomes a reported error, never a hung app.
 [[brickyard-place]]
 ==== Place files and the compatibility report
 
-`com.codename1.rbx.place` reads and writes both the XML (`.rbxlx`) and binary (`.rbxl`)
+`com.codenameone.examples.brickyard.rbx.place` reads and writes both the XML (`.rbxlx`) and binary (`.rbxl`)
 place formats. Importing a place produces a compatibility report that lists the API its
 scripts use that the engine lacks and the assets it replaced with placeholders. The
 studio exports `.rbxlx`, so a creator can take a place back out.
@@ -226,7 +224,7 @@ tests on SQLite, PostgreSQL and MySQL, and the client tests.
 === Making it yours
 
 * *Templates*: each template is a place file in
-  `maven/rbx-compat/src/main/resources/com/codename1/rbx/templates`, with a thumbnail
+  `shared/src/main/resources/com/codenameone/examples/brickyard/rbx/templates`, with a thumbnail
   beside it. `TemplateGallery` in the app's `studio` package lists them for the Create
   tab. Add a place file and a thumbnail to offer a new kind of game.
 * *The economy*: the store product ids, the Plus subscription and the rewarded ad unit
@@ -245,8 +243,6 @@ tests on SQLite, PostgreSQL and MySQL, and the client tests.
 * Store receipts are accepted only on the development and test profiles until a store
   validator is configured; elsewhere the receipt endpoint answers 503. Configure your
   own products and validator.
-* The server runs on the JVM backend runtime. `rbx-compat` needs the client core, so a
-  ParparVM-compiled server isn't supported yet.
 * Assets a place file references by URL are replaced by placeholders, and the
   compatibility report names them. A live platform needs its own asset hosting.
 * Your own hosting, a database, a push key and ad units.

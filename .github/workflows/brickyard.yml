@@ -2,29 +2,22 @@ name: Brickyard (game platform sample)
 
 # scripts/brickyard is a user-generated-content game platform: players play
 # experiences built from Luau scripts and place files, creators build and
-# publish them in an in-app studio, admins moderate. Its engine is two
-# framework modules -- maven/luau-runtime (a pure-Java Luau interpreter) and
-# maven/rbx-compat (the engine API, place file I/O, 3D, physics and
-# multiplayer replication over it) -- and the project itself has a `shared`
-# module of transfer objects and @RestClient contracts, the Codename One
-# client (`common`) and a Codename One Backend.
+# publish them in an in-app studio, admins moderate. It is one Maven project:
+# `shared` holds the REST contract and the engine both halves run (the Luau
+# interpreter, the engine API, place file I/O, physics and replication),
+# `common` is the Codename One app (with the renderer, play view and studio)
+# and `backend` is the Codename One Backend.
 #
 # Checked here:
 #
-#   engine            both engine modules' tests: the Luau conformance
-#                     suite, the five starter templates played headless,
-#                     place round trips, replication between a server and
-#                     two clients
-#   backend           the server's tests on the JVM, on in-memory SQLite
+#   backend           the server's tests on the JVM and compiled by ParparVM,
+#                     on in-memory SQLite
 #   backend-database  the same tests on PostgreSQL and MySQL
-#   app               the client compiles and its unit tests compile
+#   app               the engine's tests (the Luau conformance suite, the
+#                     starter templates played headless, place round trips,
+#                     replication between a server and two clients) and the
+#                     client's
 #
-# The engine modules' static analysis (SpotBugs, PMD, Checkstyle) and the
-# cast-semantics check run in pr.yml with the rest of the framework.
-#
-# The engine (rbx-compat) names nothing of the client framework -- its
-# ServerSafeTest holds that -- so the server can run it compiled natively; the
-# renderer, play view and agent tools are rbx-view, which only the app uses.
 # Not here yet: a simulator or device leg, because the project has no javase
 # module.
 
@@ -34,9 +27,6 @@ on:
   pull_request:
     paths:
       - 'scripts/brickyard/**'
-      - 'maven/luau-runtime/**'
-      - 'maven/rbx-compat/**'
-      - 'maven/rbx-view/**'
       - '.github/workflows/brickyard.yml'
   workflow_dispatch:
   schedule:
@@ -50,58 +40,19 @@ permissions:
   contents: read
 
 jobs:
-  engine:
-    name: Engine tests (Luau runtime and engine API)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up JDK 8
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '8'
-          cache: 'maven'
-
-      - name: Starter templates match their generator
-        # The .rbxlx templates are checked in so the jar needs no Python, and
-        # generated so their scripts stay editable: a hand edit to either side
-        # is drift.
-        run: |
-          python3 maven/rbx-compat/tools/gen-templates.py
-          git diff --exit-code -- maven/rbx-compat/src/main/resources/com/codename1/rbx/templates
-
-      - name: Test both engine modules
-        working-directory: maven
-        run: |
-          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core -am install -DskipTests \
-            -Plocal-dev-javase -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
-            -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
-          mvn -B -pl luau-runtime,rbx-compat,rbx-view install \
-            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
-            -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
-        env:
-          RETRY_ONLY_MATCHING: transient
-
-      - name: Upload the test reports
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: brickyard-engine-tests
-          path: |
-            maven/luau-runtime/target/surefire-reports/**
-            maven/rbx-compat/target/surefire-reports/**
-            maven/rbx-view/target/surefire-reports/**
-          if-no-files-found: warn
-          retention-days: 14
-
   backend:
-    name: Server tests (JVM)
+    name: Server tests (JVM and compiled)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install native build tools
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          # A server binary links libcurl, OpenSSL and nghttp2; clang alone
+          # compiles the tests and then fails at the link.
+          sudo apt-get install -y clang zlib1g-dev libcurl4-openssl-dev libssl-dev libnghttp2-dev
 
       - name: Set up JDK 8
         uses: actions/setup-java@v5
@@ -120,11 +71,11 @@ jobs:
       - name: Save JDK 17 Path
         run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
-      - name: Install the framework, the engine, the backend runtime and the plugin
+      - name: Install the framework, the backend runtime and the plugin
         working-directory: maven
         run: |
           bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
-            -pl core,backend,backend-test,cn1-app-kit/backend,codenameone-maven-plugin,luau-runtime,rbx-compat \
+            -pl core,backend,backend-test,cn1-app-kit/backend,codenameone-maven-plugin \
             -am install -DskipTests -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true \
@@ -133,21 +84,28 @@ jobs:
           JAVA_HOME: ${{ env.JDK_8_HOME }}
           RETRY_ONLY_MATCHING: transient
 
-      - name: Run the server tests
+      - name: Run the server tests on the JVM and compiled
         working-directory: scripts/brickyard
         run: |
           mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+            -Dcn1.backend.compiledTests=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
         env:
           JAVA_HOME: ${{ env.JDK_17_HOME }}
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
 
-      - name: Check that the tests reported
+      # A goal that skipped leaves the job green, so the reports are what prove
+      # that both runners ran.
+      - name: Check that both runners reported
         working-directory: scripts/brickyard/backend/target/surefire-reports
         run: |
-          n=$(find . -maxdepth 1 -name 'TEST-*.xml' | wc -l)
-          echo "reports: $n"
-          [ "$n" -gt 0 ] || { echo "::error::the server tests produced no reports"; exit 1; }
+          jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+          compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+          echo "JVM reports: $jvm, compiled reports: $compiled"
+          if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+            echo "::error::a runner produced no test reports"
+            exit 1
+          fi
 
       - name: Upload the test reports
         if: ${{ !cancelled() }}
@@ -208,11 +166,11 @@ jobs:
       - name: Save JDK 17 Path
         run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
-      - name: Install the framework, the engine, the backend runtime and the plugin
+      - name: Install the framework, the backend runtime and the plugin
         working-directory: maven
         run: |
           bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
-            -pl core,backend,backend-test,cn1-app-kit/backend,codenameone-maven-plugin,luau-runtime,rbx-compat \
+            -pl core,backend,backend-test,cn1-app-kit/backend,codenameone-maven-plugin \
             -am install -DskipTests -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true \
@@ -243,7 +201,7 @@ jobs:
           retention-days: 14
 
   app:
-    name: Client compiles
+    name: Engine and client tests
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -266,11 +224,11 @@ jobs:
       - name: Save JDK 17 Path
         run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
-      - name: Install the framework, the engine and the plugin
+      - name: Install the framework and the plugin
         working-directory: maven
         run: |
           bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
-            -pl core,css-compiler,codenameone-maven-plugin,backend,luau-runtime,rbx-compat,rbx-view \
+            -pl core,css-compiler,codenameone-maven-plugin,backend \
             -am install -DskipTests -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true \
@@ -279,9 +237,18 @@ jobs:
           JAVA_HOME: ${{ env.JDK_8_HOME }}
           RETRY_ONLY_MATCHING: transient
 
-      - name: Test the client
+      - name: Starter templates match their generator
+        # The .rbxlx templates are checked in so the build needs no Python, and
+        # generated so their scripts stay editable: a hand edit to either side
+        # is drift.
+        run: |
+          python3 scripts/brickyard/tools/gen-templates.py
+          git diff --exit-code -- scripts/brickyard/shared/src/main/resources/com/codenameone/examples/brickyard/rbx/templates
+
+      - name: Test the engine and the client
         # The javase profile is the one that runs JUnit; without it the
-        # client's tests only compiled.
+        # client's tests only compiled. -am brings in shared, whose tests are
+        # the engine's.
         working-directory: scripts/brickyard
         run: |
           mvn -B -Dcodename1.platform=javase -pl common -am test -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"

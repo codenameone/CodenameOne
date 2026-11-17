@@ -64,33 +64,6 @@
             <version>${project.version}</version>
         </dependency>
         <!--
-             The engine, so that a place is checked where it is stored: publishing
-             parses the uploaded file and loads it into a server-side engine, and
-             keeps the compatibility report beside the version.
-        -->
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-rbx-compat</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-luau-runtime</artifactId>
-        </dependency>
-        <!--
-             The place readers decode binary properties with
-             com.codename1.util.Base64, a core class the backend runtime does not
-             carry. On this JVM the core jar supplies it at run time only, so
-             nothing here can compile against the UI. It is listed after
-             codenameone-backend, whose classes therefore win where both jars
-             have one. A native backend build cannot take the core this way; it
-             needs that class shared with the backend instead.
-        -->
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-core</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <!--
              The SQLite driver for `cn1:backend`, the local JVM run. It is optional in
              codenameone-backend, so Maven does not pass it down here, and without it
              Database.open(":memory:") fails with "No suitable driver" in the loop the

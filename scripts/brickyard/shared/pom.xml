@@ -28,6 +28,12 @@
     and the client's callback types, so the core is here at provided scope: the
     app brings its own, and the server must not receive it at all.
 
+    The engine lives here too, for the same reason: the Luau interpreter
+    (`luau`) and the engine API with its place file readers (`rbx`) run in the
+    app, where places are played and edited, and on the server, which checks a
+    place when it is published and runs the authoritative copy of a
+    multiplayer session. Drawing and playing over it (`rbx` in common) are the
+    app's alone.
     Keep it to what both sides can run. No UI classes, and no JDK API the
     devices lack. The language is Java 17, the app's level, so that the
     transfer objects are records: both the app's generated mappers and the
@@ -44,6 +50,13 @@
       <groupId>com.codenameone</groupId>
       <artifactId>codenameone-core</artifactId>
       <scope>provided</scope>
+    </dependency>
+    <!-- The engine's tests: the Luau conformance suite, the engine API and place I/O. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.9.3</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

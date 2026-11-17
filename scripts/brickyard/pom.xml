@@ -77,21 +77,6 @@
         <scope>system</scope>
         <systemPath>${user.home}/.codenameone/CodeNameOneBuildClient.jar</systemPath>
       </dependency>
-      <dependency>
-        <groupId>com.codenameone</groupId>
-        <artifactId>codenameone-luau-runtime</artifactId>
-        <version>${cn1.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.codenameone</groupId>
-        <artifactId>codenameone-rbx-compat</artifactId>
-        <version>${cn1.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.codenameone</groupId>
-        <artifactId>codenameone-rbx-view</artifactId>
-        <version>${cn1.version}</version>
-      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>

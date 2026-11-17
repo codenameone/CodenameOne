@@ -22,9 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.codename1.rbx.AgentTools;
-import com.codename1.rbx.Engine;
-import com.codename1.rbx.Instance;
+import com.codenameone.examples.brickyard.rbx.AgentTools;
+import com.codenameone.examples.brickyard.rbx.Engine;
+import com.codenameone.examples.brickyard.rbx.Instance;
 import org.junit.jupiter.api.Test;
 
 /// Every toolbox model and every snippet runs as written: a lesson that
