@@ -161,16 +161,28 @@ public class AlertDialog extends Dialog implements DialogInterface {
             titleRow.addView(t);
             root.addView(titleRow);
         }
+        // The message, the list and the custom view each take a share of
+        // the height the title and the button bar leave, as the panels of
+        // Android's alert_dialog layout do: content taller than the screen
+        // must not push the buttons out of reach (discussion #6259). The
+        // message and the list scroll in panels of their own; a custom view
+        // is given its share and scrolls itself, as on Android -- wrapping it
+        // in a ScrollView would measure a ListView inside it one row high.
         if (mMessage != null) {
             TextView m = new TextView(c);
             m.setText(mMessage);
             m.setTextSize(16);
             m.setTextColor(textSecondary);
             m.setPadding(dp(24), 0, dp(24), dp(16));
-            root.addView(m);
+            android.widget.ScrollView scroll = new android.widget.ScrollView(c);
+            scroll.addView(m, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            root.addView(scroll, weighted());
             mMessageView = m;
         }
         if (mItems != null) {
+            LinearLayout list = new LinearLayout(c);
+            list.setOrientation(LinearLayout.VERTICAL);
             for (int i = 0; i < mItems.length; i++) {
                 final int which = i;
                 TextView item = new TextView(c);
@@ -187,9 +199,13 @@ public class AlertDialog extends Dialog implements DialogInterface {
                     }
                 });
                 mItemViews.add(item);
-                root.addView(item, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                list.addView(item, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT));
             }
+            android.widget.ScrollView scroll = new android.widget.ScrollView(c);
+            scroll.addView(list, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            root.addView(scroll, weighted());
             refreshItems();
         }
         if (mView != null) {
@@ -198,8 +214,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
                 ((ViewGroup) mView.getParent()).removeView(mView);
             }
             custom.addView(mView);
-            root.addView(custom, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            root.addView(custom, weighted());
         }
         if (mButtonText[0] != null || mButtonText[1] != null || mButtonText[2] != null) {
             LinearLayout bar = new LinearLayout(c);
@@ -237,6 +252,12 @@ public class AlertDialog extends Dialog implements DialogInterface {
                     ViewGroup.LayoutParams.WRAP_CONTENT));
         }
         setContentView(root);
+    }
+
+    /// A panel that gets what the title and the button bar leave: measured
+    /// at its own height while that fits, and shrunk when it does not.
+    private static LinearLayout.LayoutParams weighted() {
+        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
     }
 
     private void onItemClicked(int which) {

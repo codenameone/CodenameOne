@@ -73,6 +73,19 @@ public abstract class AndroidCompatScreenshotTest extends BaseTest {
     protected void prepare(Activity activity) {
     }
 
+    /// The form to capture, given the activity's own. A screen that `prepare`
+    /// covers with a dialog answers the dialog's form: it is a form of its
+    /// own, current while it shows, and the capture waits for its form to be
+    /// the current one.
+    protected Form captureForm(Form activityForm) {
+        return activityForm;
+    }
+
+    /// Runs once the capture is taken, before the activities finish: closes
+    /// anything `prepare` opened that must not reach the next capture.
+    protected void afterCapture() {
+    }
+
     @Override
     public boolean runTest() throws Exception {
         // Pin the light appearance. The runtime answers night mode from
@@ -107,7 +120,7 @@ public abstract class AndroidCompatScreenshotTest extends BaseTest {
         // The activity's own form, not Display.getCurrent(): while the show
         // transition runs (the Android theme slides) the current form is still
         // the one being left, and a timer bound to that one never fires.
-        final Form form = top.getWindow().getDecorView().getPeer().getComponentForm();
+        final Form form = captureForm(top.getWindow().getDecorView().getPeer().getComponentForm());
         // Showing the form focused its first text field, whose caret blinks.
         // Drop that focus now, well before the capture: on a device the
         // repaint it triggers reaches the screen a frame later, and a capture
@@ -119,6 +132,7 @@ public abstract class AndroidCompatScreenshotTest extends BaseTest {
                 captureWhenSettled(form, imageName, new Runnable() {
                     @Override
                     public void run() {
+                        afterCapture();
                         ActivityThread.finishAllActivities();
                         Display.getInstance().setDarkMode(null);
                         done();
