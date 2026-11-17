@@ -89,6 +89,18 @@ jobs:
             exit 0
           fi
           trusted/scripts/ci/golden-harvest.sh list "$HEAD_SHA" runs.txt
+      # A capture leg cancelled after it started (a timeout, by hand) stops
+      # counting as a capture run, so the listing above waits for it, and if
+      # it was the last to complete nothing else would ever settle the status.
+      # (A newer push cancelling an older capture lands on that older head.)
+      - name: Settle a capture whose leg was cancelled
+        if: >-
+          github.event.workflow_run.event == 'workflow_dispatch' &&
+          github.event.workflow_run.conclusion == 'cancelled'
+        env:
+          WF: ${{ github.event.workflow_run.name }}
+        run: |
+          trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" failure "$WF capture was cancelled; re-run Golden capture"
       - name: Check the push token
         if: steps.list.outputs.ready == '1'
         env:
@@ -180,6 +192,8 @@ jobs:
       # a push that lost a race, an API error) would leave the capture's
       # status pending for good.
       - name: Settle a capture that could not be harvested
-        if: (failure() || cancelled()) && steps.list.outputs.capture == '1' && steps.collect.outputs.settled != '1'
+        if: >-
+          (failure() || cancelled()) && steps.collect.outputs.settled != '1' &&
+          (steps.list.outputs.capture == '1' || github.event.workflow_run.event == 'workflow_dispatch')
         run: |
           trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" error "The harvest failed; see the run, then re-run Golden capture"
