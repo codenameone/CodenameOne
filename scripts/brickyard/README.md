@@ -101,13 +101,13 @@ with the server and client in one process.
 ```bash
 # From the repository root, JDK 8 for the framework (per-checkout repository):
 cd maven
-mvn -pl core,backend,backend-test,codenameone-maven-plugin,luau-runtime,rbx-compat,rbx-view -am install \
+mvn -pl core,backend,backend-test,cn1-app-kit/backend,codenameone-maven-plugin,luau-runtime,rbx-compat,rbx-view -am install \
   -DskipTests -Plocal-dev-javase -Dmaven.repo.local=$PWD/../.m2-repo
 
 # JDK 17 for the project:
 cd ../scripts/brickyard
 mvn -Dcodename1.platform=backend -pl shared,backend test -Dmaven.repo.local=$PWD/../../.m2-repo
-mvn -pl common -am compile -Dmaven.repo.local=$PWD/../../.m2-repo
+mvn -Dcodename1.platform=javase -pl common -am test -Dmaven.repo.local=$PWD/../../.m2-repo
 ```
 
 `.github/workflows/brickyard.yml` runs the engine tests, the server tests on

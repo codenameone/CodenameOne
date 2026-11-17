@@ -215,23 +215,12 @@ payout jobs and an audit log of every staff action.
 [[brickyard-launch]]
 === Running it
 
-The project is in `scripts/brickyard`. Install the framework, the engine and the
-backend runtime from the repository root with JDK 8, then test the server and compile
-the app with JDK 17:
-
-[source,bash]
-----
-cd maven
-mvn -pl core,backend,backend-test,codenameone-maven-plugin,luau-runtime,rbx-compat -am install \
-  -DskipTests -Plocal-dev-javase -Dmaven.repo.local=$PWD/../.m2-repo
-
-cd ../scripts/brickyard
-mvn -Dcodename1.platform=backend -pl shared,backend test -Dmaven.repo.local=$PWD/../../.m2-repo
-mvn -pl common -am compile -Dmaven.repo.local=$PWD/../../.m2-repo
-----
-
-`.github/workflows/brickyard.yml` runs the engine tests, the server tests on SQLite,
-PostgreSQL and MySQL, and the client compile.
+The project is in `scripts/brickyard`. Its README has the exact commands: install the
+framework, the engine and the backend runtime from the repository root with JDK 8,
+then run `mvn -Dcodename1.platform=backend -pl shared,backend test` for the server and
+`mvn -Dcodename1.platform=javase -pl common -am test` for the client, both with JDK 17.
+`.github/workflows/brickyard.yml` runs the same steps: the engine tests, the server
+tests on SQLite, PostgreSQL and MySQL, and the client tests.
 
 [[brickyard-reskin]]
 === Making it yours
