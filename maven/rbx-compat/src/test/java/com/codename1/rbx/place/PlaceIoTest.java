@@ -143,4 +143,31 @@ class PlaceIoTest {
         byte[] block = {0x35, 'a', 'b', 'c', 3, 0, 0x10, 'z'};
         assertEquals("abcabcabcabcz", new String(Lz4.decompress(block, 0, block.length, 13)));
     }
+
+    @Test
+    public void forgedChunkSizeIsRejectedBeforeAllocating() {
+        // A tiny LZ4 chunk claiming ~2 GB once decompressed must fail as a
+        // format error, not exhaust the heap on new byte[ulen].
+        byte[] block = {0x10, 'a'};
+        try {
+            RbxlReader.checkChunkSizes(block.length, block.length, 0x7FFFFFF0, block, 0);
+            org.junit.jupiter.api.Assertions.fail("accepted a 2 GB chunk");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("chunk"));
+        }
+        try {
+            RbxlReader.checkChunkSizes(block.length, block.length, 1 << 20, block, 0);
+            org.junit.jupiter.api.Assertions.fail("accepted an impossible LZ4 ratio");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("ratio"));
+        }
+        // Uncompressed chunk longer than the file.
+        try {
+            RbxlReader.checkChunkSizes(10, 0, 11, block, 0);
+            org.junit.jupiter.api.Assertions.fail("accepted an overrunning raw chunk");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("overruns"));
+        }
+        RbxlReader.checkChunkSizes(block.length, block.length, 1, block, 0);
+    }
 }

@@ -209,6 +209,10 @@ public final class Wire {
     }
 
     static Object value(DataInputStream in, Engine e, Ids ids) throws IOException {
+        return value(in, e, ids, 0);
+    }
+
+    private static Object value(DataInputStream in, Engine e, Ids ids, int depth) throws IOException {
         int t = in.readByte();
         switch (t) {
             case T_NIL:
@@ -247,14 +251,26 @@ public final class Wire {
             case T_REF:
                 return ref(in, e, ids);
             case T_TABLE: {
+                // Decoding recurses per level, and a StackOverflowError is not
+                // an IOException: it escaped every catch and silently
+                // cancelled the room's tick task. Same cap the writer keeps.
+                if (depth >= MAX_DEPTH) {
+                    throw new IOException("Table nested deeper than " + MAX_DEPTH);
+                }
                 LuaTable tab = new LuaTable();
                 int n = in.readInt();
+                if (n < 0) {
+                    throw new IOException("Bad table size " + n);
+                }
                 for (int i = 0; i < n; i++) {
-                    Object k = value(in, e, ids);
-                    Object v = value(in, e, ids);
-                    if (k != null) {
-                        tab.rawset(k, v);
+                    Object k = value(in, e, ids, depth + 1);
+                    Object v = value(in, e, ids, depth + 1);
+                    // A nil or NaN key is an error in Lua; rawset would throw
+                    // a LuaError, which is not the IOException callers guard.
+                    if (k == null || k instanceof Double && ((Double) k).isNaN()) {
+                        throw new IOException("Bad table key");
                     }
+                    tab.rawset(k, v);
                 }
                 return tab;
             }

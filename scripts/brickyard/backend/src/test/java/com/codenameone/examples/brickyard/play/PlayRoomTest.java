@@ -144,6 +144,21 @@ class PlayRoomTest {
     }
 
     @Test
+    void aLinkThatFloodsItsInboxIsDroppedAndTheRoomLives() {
+        PlayRoom room = new PlayRoom("t2", "x", 4, true, place());
+        Queue flood = new Queue();
+        Queue calm = new Queue();
+        room.connect(flood, 1, "Alice", "Alice");
+        room.connect(calm, 2, "Bob", "Bob");
+        room.frame(System.currentTimeMillis());
+        for (int i = 0; i < PlayRoom.MAX_QUEUED_FRAMES * 4; i++) {
+            room.receive(flood, new byte[] {0});
+        }
+        room.frame(System.currentTimeMillis());
+        assertEquals(1, room.getServer().getPlayerCount(), "the flooding link lost its seat, the other kept it");
+    }
+
+    @Test
     void aRemoteEventRoundTripsThroughTheRoom() {
         PlayRoom room = new PlayRoom("t1", "x", 4, true, place());
         List<Player> players = new ArrayList<Player>();

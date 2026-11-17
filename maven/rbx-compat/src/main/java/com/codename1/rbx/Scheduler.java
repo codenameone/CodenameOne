@@ -27,6 +27,7 @@ import com.codename1.luau.Coroutine;
 import com.codename1.luau.Interp;
 import com.codename1.luau.LuaError;
 import com.codename1.luau.LuaFunction;
+import com.codename1.luau.Utf8;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -76,7 +77,26 @@ public final class Scheduler {
     public Scheduler(Interp in) {
         this.in = in;
         in.setBudget(budget);
+        // The interpreter's own print falls back to System.out when no
+        // printer is installed. Scripts here are untrusted (a creator's place
+        // on a shared server), so every print path must end in this
+        // scheduler's Output sink, which drops output when none is set,
+        // never on the backend's stdout. Lines are capped so one call cannot
+        // hand the sink an unbounded string.
+        in.setPrinter(new Interp.Printer() {
+            @Override
+            public void print(String line) {
+                String text = Utf8.toJava(line);
+                if (text.length() > MAX_PRINT_CHARS) {
+                    text = text.substring(0, MAX_PRINT_CHARS) + "...";
+                }
+                Scheduler.this.print("output", text);
+            }
+        });
     }
+
+    /// Longest line the interpreter's fallback print forwards.
+    static final int MAX_PRINT_CHARS = 8192;
 
     public Interp getInterp() {
         return in;

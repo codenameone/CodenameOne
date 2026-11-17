@@ -99,6 +99,11 @@ public final class Zstd {
     private int rep2;
     private int rep3;
 
+    /// Absolute output ceiling for one decompress call.
+    private static final int MAX_UNKNOWN_OUTPUT = 64 * 1024 * 1024;
+
+    private int limit = MAX_UNKNOWN_OUTPUT;
+
     private Zstd(byte[] src, int capacity) {
         this.src = src;
         this.out = new byte[capacity];
@@ -121,6 +126,11 @@ public final class Zstd {
             capacity = len;
         }
         Zstd z = new Zstd(src, capacity);
+        // The declared size is only a sizing hint (callers and tests pass
+        // short ones), so growth is held to an absolute ceiling instead: a
+        // forged frame of RLE blocks expands a few bytes to 128 KB each and
+        // must not grow the output until the heap is gone.
+        z.limit = MAX_UNKNOWN_OUTPUT;
         z.ip = off;
         int end = off + len;
         while (z.ip < end) {
@@ -182,7 +192,7 @@ public final class Zstd {
 
     private void ensure(int n) {
         int required = outPos + n;
-        if (required < 0) {
+        if (required < 0 || required > limit) {
             throw new IllegalArgumentException("zstd: output too large");
         }
         if (required > out.length) {

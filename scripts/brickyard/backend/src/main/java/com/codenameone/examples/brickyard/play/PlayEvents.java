@@ -19,6 +19,7 @@
 package com.codenameone.examples.brickyard.play;
 
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.log.Logger;
 import com.codenameone.examples.brickyard.analytics.Analytics;
 import com.codenameone.examples.brickyard.leaderboard.Leaderboards;
 import com.codenameone.examples.brickyard.social.Social;
@@ -28,6 +29,8 @@ import com.codenameone.examples.brickyard.social.Social;
 /// leaves. A failure here is logged and never reaches the room's thread.
 @Component
 public class PlayEvents implements PlayServers.Events {
+    private static final Logger LOG = Logger.getLogger(PlayEvents.class);
+
     private final Social social;
     private final Analytics analytics;
     private final Leaderboards leaderboards;
@@ -46,7 +49,7 @@ public class PlayEvents implements PlayServers.Events {
         try {
             leaderboards.record(room.getExperienceId(), stat, username, delta);
         } catch (Exception err) {
-            System.out.println("Leaderboard write refused: " + err.getMessage());
+            LOG.warn("Leaderboard write refused: {}", err.getMessage());
         }
     }
 
@@ -64,7 +67,7 @@ public class PlayEvents implements PlayServers.Events {
                 analytics.record(room.getExperienceId(), username, "SESSION", millis / 1000);
             }
         } catch (Exception err) {
-            err.printStackTrace();
+            LOG.error("Recording {} leaving room {} failed", username, room.getId(), err);
         }
     }
 }

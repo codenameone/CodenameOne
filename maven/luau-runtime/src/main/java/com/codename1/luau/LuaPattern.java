@@ -37,14 +37,40 @@ final class LuaPattern {
     final int[] capStart = new int[MAX_CAPTURES];
     final int[] capLen = new int[MAX_CAPTURES];
     private int depth;
+    private final Interp interp;
+    private int pending;
+
+    /// Hard cap on matcher steps per pattern operation when no interpreter
+    /// budget applies. Depth alone does not bound backtracking: a pattern of
+    /// thirty `a*` against forty `a`s stays shallow and is exponential.
+    static final long MAX_MATCH_STEPS = 10000000L;
+    private long matchSteps;
 
     LuaPattern(String src, String pat) {
+        this(null, src, pat);
+    }
+
+    LuaPattern(Interp interp, String src, String pat) {
+        this.interp = interp;
         this.src = src;
         this.pat = pat;
     }
 
+    /// Counts one matcher step, charging the interpreter budget in batches
+    /// of 256 so the per-step cost stays a counter increment.
+    private void step() {
+        if (++matchSteps > MAX_MATCH_STEPS) { // NOPMD AssignmentInOperand - step counter
+            throw LuaError.rt("pattern too complex");
+        }
+        if (interp != null && ++pending >= 256) { // NOPMD AssignmentInOperand - batched charge
+            interp.charge(pending);
+            pending = 0;
+        }
+    }
+
     /// Tries to match at `s`; returns the end index or -1.
     int match(int s, int p) {
+        step();
         if (++depth > MAX_DEPTH) { // NOPMD AssignmentInOperand - depth counter and scan loop
             throw LuaError.rt("pattern too complex");
         }

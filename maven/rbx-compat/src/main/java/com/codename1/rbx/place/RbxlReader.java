@@ -89,6 +89,7 @@ public final class RbxlReader {
             int clen = le32(d, p + 4);
             int ulen = le32(d, p + 8);
             p += 16;
+            checkChunkSizes(d.length - p, clen, ulen, d, p);
             byte[] body;
             if (clen == 0) {
                 body = new byte[ulen];
@@ -117,6 +118,40 @@ public final class RbxlReader {
             ((PlaceNode) f[0]).put((String) f[1], "Ref", r.nodes.get((Integer) f[2]));
         }
         return r.out;
+    }
+
+    /// The largest chunk a place file may declare once decompressed. Real
+    /// places stay far below this; the cap exists because `ulen` comes from
+    /// untrusted bytes and sizes an allocation before anything is decoded.
+    static final int MAX_CHUNK_BYTES = 64 * 1024 * 1024;
+
+    /// LZ4 emits at most 255 output bytes per input byte of a match length
+    /// extension, so a block can never expand past this ratio (plus slack).
+    private static final int LZ4_MAX_RATIO = 255;
+
+    /// Rejects a chunk header whose sizes cannot be honest, before any of
+    /// them sizes an array: a tiny file claiming a 2 GB chunk would otherwise
+    /// exhaust the server's heap on `new byte[ulen]`.
+    static void checkChunkSizes(int remaining, int clen, int ulen, byte[] d, int p) {
+        if (clen < 0 || ulen < 0 || clen > remaining || ulen > MAX_CHUNK_BYTES) {
+            throw new IllegalArgumentException("Corrupt binary place file: bad chunk size");
+        }
+        if (clen == 0) {
+            if (ulen > remaining) {
+                throw new IllegalArgumentException("Corrupt binary place file: chunk overruns file");
+            }
+            return;
+        }
+        if (!isZstd(d, p, clen) && (long) ulen > (long) clen * LZ4_MAX_RATIO + 16) {
+            // Zstandard has no small fixed ratio (an RLE block expands a few
+            // bytes to 128 KB), so it is held to the absolute cap only.
+            throw new IllegalArgumentException("Corrupt binary place file: impossible LZ4 ratio");
+        }
+    }
+
+    private static boolean isZstd(byte[] d, int off, int len) {
+        return len >= 4 && (d[off] & 0xff) == 0x28 && (d[off + 1] & 0xff) == 0xb5 && (d[off + 2] & 0xff) == 0x2f
+                && (d[off + 3] & 0xff) == 0xfd;
     }
 
     private static byte[] decompress(byte[] d, int off, int len, int ulen) {

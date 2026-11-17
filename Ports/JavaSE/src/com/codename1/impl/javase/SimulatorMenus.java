@@ -108,7 +108,9 @@ public final class SimulatorMenus {
         }
         String want = normalize(segment);
         for (JMenuItem i : items) {
-            if (want.equals(normalize(i.getText()))) {
+            // equalsIgnoreCase is locale independent; toLowerCase() folded the
+            // I of a menu title to a dotless i under a Turkish locale.
+            if (want.equalsIgnoreCase(normalize(i.getText()))) {
                 return i;
             }
         }
@@ -123,7 +125,7 @@ public final class SimulatorMenus {
         while (t.endsWith(".")) {
             t = t.substring(0, t.length() - 1);
         }
-        return t.trim().toLowerCase();
+        return t.trim();
     }
 
     private static String titles(List<JMenuItem> items) {

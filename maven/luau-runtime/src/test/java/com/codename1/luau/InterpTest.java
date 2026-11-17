@@ -124,4 +124,34 @@ class InterpTest {
         assertEquals("2.000", StringLib.formatFloat(2.0004, 'f', 3, ""));
         assertEquals("1.23e+05", StringLib.formatFloat(123456, 'e', 2, ""));
     }
+
+    @Test
+    void stringRepIsChargedAndBounded() {
+        Interp vm = new Interp();
+        vm.setBudget(100000);
+        // Empty string and separator: nothing to build, returns at once.
+        assertEquals("", run(vm, "return string.rep('', 2000000000, '')")[0]);
+        vm.resetSteps();
+        // A cheap call that would loop millions of times runs out of budget.
+        LuaError e = assertThrows(LuaError.class, () -> run(vm, "return string.rep('a', 1000000)"));
+        assertTrue(e.getMessage().contains("Script timeout"), e.getMessage());
+        vm.resetSteps();
+        vm.setBudget(0);
+        e = assertThrows(LuaError.class, () -> run(vm, "return string.rep('ab', 20000000)"));
+        assertTrue(e.getMessage().contains("overflow"), e.getMessage());
+    }
+
+    @Test
+    void backtrackingPatternIsChargedToTheBudget() {
+        Interp vm = new Interp();
+        vm.setBudget(1000000);
+        LuaError e = assertThrows(LuaError.class,
+                () -> run(vm, "return string.find(string.rep('a', 40), string.rep('a*', 30) .. 'b')"));
+        assertTrue(e.getMessage().contains("Script timeout"), e.getMessage());
+        // Without a budget, the per-match step cap stops it instead.
+        Interp free = new Interp();
+        e = assertThrows(LuaError.class,
+                () -> run(free, "return string.find(string.rep('a', 40), string.rep('a*', 30) .. 'b')"));
+        assertTrue(e.getMessage().contains("pattern too complex"), e.getMessage());
+    }
 }

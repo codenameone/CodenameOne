@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.brickyard.play;
 
+import com.codename1.backend.log.Logger;
 import com.codename1.rbx.Engine;
 import com.codename1.rbx.Instance;
 import com.codename1.rbx.ReplicaServer;
@@ -29,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /// One running server of an experience: an authoritative SERVER engine and
 /// the [ReplicaServer] that replicates it to every seated player.
@@ -65,6 +67,14 @@ public final class PlayRoom {
     /// How often leaderstats are read for the leaderboards.
     static final long SCORE_MILLIS = 2000;
 
+    private static final Logger LOG = Logger.getLogger(PlayRoom.class);
+    /// Frames one link may have waiting for the room thread. The socket
+    /// thread fills the inbox faster than a tick drains it if a client
+    /// floods; past this the link is dropped rather than queued without end.
+    static final int MAX_QUEUED_FRAMES = 256;
+    /// Bytes one link may have waiting, for the same reason.
+    static final int MAX_QUEUED_BYTES = 1 << 20;
+
     private final String id;
     private final String experienceId;
     private final int maxPlayers;
@@ -78,6 +88,8 @@ public final class PlayRoom {
     private final Map<Link, String> owners = new HashMap<Link, String>();
     /// Room thread only: when each connected username first connected.
     private final Map<String, Long> since = new HashMap<String, Long>();
+    /// Any thread: frames and bytes each link has queued and not yet applied.
+    private final Map<Link, AtomicInteger[]> backlog = new ConcurrentHashMap<Link, AtomicInteger[]>();
     private final AtomicBoolean closed = new AtomicBoolean();
     private ScheduledExecutorService thread;
     private Listener listener;
@@ -149,10 +161,11 @@ public final class PlayRoom {
             public void run() {
                 try {
                     frame(System.currentTimeMillis());
-                } catch (RuntimeException ex) {
-                    // A script error must not kill the room's thread; the
-                    // engine reports script errors through its own output.
-                    ex.printStackTrace();
+                } catch (Throwable ex) { // NOPMD AvoidCatchingThrowable - an escaped Error silently cancels the schedule
+                    // Anything thrown out of here makes scheduleAtFixedRate
+                    // cancel the room for good, without a word. A link's
+                    // input is already guarded in frame; this is the last line.
+                    LOG.error("Room {} frame failed", id, ex);
                 }
             }
         }, 0, 1000 / HZ, TimeUnit.MILLISECONDS);
@@ -189,12 +202,43 @@ public final class PlayRoom {
 
     /// Queues a message from `link`; any thread.
     public void receive(final Link link, final byte[] message) {
+        AtomicInteger[] b = backlog.get(link);
+        if (b == null) {
+            AtomicInteger[] fresh = {new AtomicInteger(), new AtomicInteger()};
+            b = backlog.putIfAbsent(link, fresh);
+            if (b == null) {
+                b = fresh;
+            }
+        }
+        final AtomicInteger[] counts = b;
+        int frames = counts[0].incrementAndGet();
+        int bytes = counts[1].addAndGet(message.length);
+        if (frames > MAX_QUEUED_FRAMES || bytes > MAX_QUEUED_BYTES) {
+            counts[0].decrementAndGet();
+            counts[1].addAndGet(-message.length);
+            if (backlog.remove(link, counts)) {
+                LOG.warn("Room {} dropped a link that flooded its inbox", id);
+                disconnect(link);
+            }
+            return;
+        }
         inbox.add(new Runnable() {
             @Override
             public void run() {
+                counts[0].decrementAndGet();
+                counts[1].addAndGet(-message.length);
                 Integer h = handles.get(link);
-                if (h != null) {
+                if (h == null) {
+                    return;
+                }
+                try {
                     server.receive(h.intValue(), message);
+                } catch (Throwable bad) { // NOPMD AvoidCatchingThrowable - one link's input must never end the room
+                    // A message that escapes ReplicaServer's own guards (an
+                    // Error such as a stack overflow) costs that link its
+                    // seat, never the room everyone else is in.
+                    LOG.warn("Room {} dropped a link whose message failed", id, bad);
+                    disconnect(link);
                 }
             }
         });
@@ -205,6 +249,7 @@ public final class PlayRoom {
         inbox.add(new Runnable() {
             @Override
             public void run() {
+                backlog.remove(link);
                 Integer h = handles.remove(link);
                 String who = owners.remove(link);
                 if (h != null) {

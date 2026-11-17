@@ -39,4 +39,10 @@
         </Or>
         <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
     </Match>
+    <!-- A snapshot's particle emitters are plain data the renderer in
+         rbx-view reads; nothing in this module reads them back. -->
+    <Match>
+        <Class name="com.codename1.rbx.SceneSnapshot$Emitter"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
 </FindBugsFilter>

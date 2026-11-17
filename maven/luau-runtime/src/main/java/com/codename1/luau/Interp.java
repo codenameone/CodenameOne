@@ -119,6 +119,16 @@ public final class Interp {
         budget = maxSteps <= 0 ? Long.MAX_VALUE : maxSteps;
     }
 
+    /// Charges `n` steps of library work (a long `string.rep`, a pattern
+    /// match that backtracks) to the same budget loops and calls draw on, so
+    /// one builtin call cannot run unbounded inside a single bytecode step.
+    void charge(long n) {
+        steps += n;
+        if (steps > budget || steps < 0) {
+            throw LuaError.fatal("Script timeout: exhausted allowed execution time");
+        }
+    }
+
     /// Steps run since the last [#resetSteps()].
     public long getSteps() {
         return steps;

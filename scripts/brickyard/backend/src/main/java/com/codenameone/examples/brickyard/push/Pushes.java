@@ -20,6 +20,7 @@ package com.codenameone.examples.brickyard.push;
 
 import com.codename1.appkit.server.push.PushSender;
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.log.Logger;
 import com.codename1.backend.push.PushNotification;
 import com.codename1.backend.push.PushTarget;
 import com.codenameone.examples.brickyard.domain.Follow;
@@ -31,6 +32,8 @@ import java.util.List;
 /// service's to report; it never fails the request that caused it.
 @Component
 public class Pushes {
+    private static final Logger LOG = Logger.getLogger(Pushes.class);
+
     private final PushDevices devices;
     private final PushSender sender;
     private final FollowRepository follows;
@@ -67,7 +70,7 @@ public class Pushes {
                 sender.send(targets, message.build(), null);
             }
         } catch (RuntimeException err) {
-            err.printStackTrace();
+            LOG.error("Push to {} failed", username, err);
         }
     }
 }

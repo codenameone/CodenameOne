@@ -66,7 +66,7 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
     private final List<Peer> peers = new ArrayList<Peer>();
     private final List<Object[]> ops = new ArrayList<Object[]>();
     private final Set<String> dirty = new HashSet<String>();
-    private final Map<Integer, Coroutine> calls = new HashMap<Integer, Coroutine>();
+    private final Map<Integer, PendingCall> calls = new HashMap<Integer, PendingCall>();
     private int nextId = 1;
     private int nextCall = 1;
     private long seq;
@@ -78,11 +78,33 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
         final Instance player;
         long lastMoveFrame;
         boolean correct;
+        // Movement allowance, refilled once per server frame from the time
+        // that passed and spent by every MOVE in it. A fresh allowance per
+        // op let 500 MOVEs in one frame add up to a teleport.
+        double walkBudget;
+        double riseBudget;
+        double fallBudget;
 
         Peer(Link link, long joined, Instance player) {
             this.link = link;
             this.joined = joined;
             this.player = player;
+            this.walkBudget = 1;
+            this.riseBudget = 1;
+            this.fallBudget = 1;
+        }
+    }
+
+    /// An InvokeClient waiting on its answer, and the one peer allowed to
+    /// give it: call ids are a server-wide counter, so any other client
+    /// could otherwise answer (or forge) a call meant for someone else.
+    private static final class PendingCall {
+        final Coroutine co;
+        final Peer peer;
+
+        PendingCall(Coroutine co, Peer peer) {
+            this.co = co;
+            this.peer = peer;
         }
     }
 
@@ -111,7 +133,15 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
 
     /// Players connected now.
     public int getPlayerCount() {
-        return peers.size();
+        // A disconnect nulls its slot rather than shifting the handles, so
+        // the list's size counted everyone who ever joined.
+        int n = 0;
+        for (Peer p : peers) {
+            if (p != null) {
+                n++;
+            }
+        }
+        return n;
     }
 
     /// Admits a player: sends the snapshot over `link`, then adds the player,
@@ -159,6 +189,22 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
             return;
         }
         peers.set(handle, null);
+        // Calls waiting on this player would stay parked forever. Roblox
+        // raises an error in the caller when the player leaves; the
+        // interpreter cannot resume a thread with an error from outside, so
+        // the caller gets nil back and the leave is reported.
+        List<Coroutine> orphaned = new ArrayList<Coroutine>();
+        for (java.util.Iterator<PendingCall> it = calls.values().iterator(); it.hasNext();) {
+            PendingCall c = it.next();
+            if (c.peer == p) { // NOPMD CompareObjectsWithEquals - peer identity
+                orphaned.add(c.co);
+                it.remove();
+            }
+        }
+        for (Coroutine co : orphaned) {
+            engine.getScheduler().error(co.getOwner(), "InvokeClient: player " + p.player.getName() + " left");
+            engine.getScheduler().resume(co, new Object[0]);
+        }
         Instance ch = p.player.ref("Character");
         if (ch != null) {
             ch.destroy();
@@ -210,9 +256,11 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
                     case Wire.RESULT: {
                         int call = in.readInt();
                         Object[] r = Wire.values(in, engine, this);
-                        Coroutine co = calls.remove(Integer.valueOf(call));
-                        if (co != null) {
-                            engine.getScheduler().resume(co, r);
+                        Integer key = Integer.valueOf(call);
+                        PendingCall pc = calls.get(key);
+                        if (pc != null && pc.peer == p) { // NOPMD CompareObjectsWithEquals - peer identity
+                            calls.remove(key);
+                            engine.getScheduler().resume(pc.co, r);
                         }
                         break;
                     }
@@ -255,29 +303,76 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
         if (root == null || hum == null || cf == null) {
             return;
         }
-        long frames = Math.max(1, engine.getFrames() - p.lastMoveFrame);
-        p.lastMoveFrame = engine.getFrames();
-        double dt = Math.min(1, frames * FRAME);
+        double speed = hum.num("WalkSpeed") * 1.5 + 2;
+        double gravity = engine.getWorkspace().num("Gravity");
+        double rise = Math.max(hum.num("JumpPower"), 50) + gravity;
+        // Nothing stops a fall but the ground, so the bound is a generous
+        // terminal velocity: three seconds of free fall.
+        double fall = Math.max(gravity, 0) * 3 + 50;
+        long now = engine.getFrames();
+        if (now != p.lastMoveFrame) {
+            double dt = Math.min(1, Math.max(1, now - p.lastMoveFrame) * FRAME);
+            p.lastMoveFrame = now;
+            // Refill by the time that passed, capped at one second's worth
+            // so idling does not bank a teleport.
+            p.walkBudget = Math.min(p.walkBudget + speed * dt + 1, speed + 1);
+            p.riseBudget = Math.min(p.riseBudget + rise * dt + 1, rise + 1);
+            p.fallBudget = Math.min(p.fallBudget + fall * dt + 1, fall + 1);
+        }
         CFrame at = (CFrame) root.prop("CFrame");
         double dx = cf.x - at.x;
         double dy = cf.y - at.y;
         double dz = cf.z - at.z;
         double horizontal = Math.sqrt(dx * dx + dz * dz);
-        double speed = hum.num("WalkSpeed") * 1.5 + 2;
-        double vertical = Math.max(hum.num("JumpPower"), 50) + engine.getWorkspace().num("Gravity") * dt;
-        if (horizontal > speed * dt + 1 || dy > vertical * dt + 1) {
+        // NaN and Infinity fail every comparison, so they are tested first,
+        // and the rotation has to be one: a skewed or scaled matrix would
+        // replicate to every client.
+        if (!validFrame(cf) || horizontal > p.walkBudget || dy > p.riseBudget || -dy > p.fallBudget) {
             rejectedMoves++;
             p.correct = true;
             touch(root, "CFrame");
             return;
         }
+        p.walkBudget -= horizontal;
+        if (dy > 0) {
+            p.riseBudget -= dy;
+        } else {
+            p.fallBudget += dy;
+        }
+        boolean dirOk = dir != null && isFinite(dir.x) && isFinite(dir.y) && isFinite(dir.z);
         root.put("CFrame", cf);
-        if (dir != null) {
+        if (dirOk) {
             hum.put("MoveDirection", dir);
         }
         if (jump) {
             hum.put("Jump", Boolean.TRUE);
         }
+    }
+
+    private static boolean isFinite(double d) {
+        return !Double.isNaN(d) && !Double.isInfinite(d);
+    }
+
+    /// True when every component is finite and the rotation is orthonormal
+    /// with determinant +1, within what float drift on a client produces.
+    static boolean validFrame(CFrame c) {
+        double[] m = {c.x, c.y, c.z, c.r00, c.r01, c.r02, c.r10, c.r11, c.r12, c.r20, c.r21, c.r22};
+        for (double d : m) {
+            if (!isFinite(d)) {
+                return false;
+            }
+        }
+        double eps = 1e-3;
+        double n0 = c.r00 * c.r00 + c.r01 * c.r01 + c.r02 * c.r02;
+        double n1 = c.r10 * c.r10 + c.r11 * c.r11 + c.r12 * c.r12;
+        double n2 = c.r20 * c.r20 + c.r21 * c.r21 + c.r22 * c.r22;
+        double d01 = c.r00 * c.r10 + c.r01 * c.r11 + c.r02 * c.r12;
+        double d02 = c.r00 * c.r20 + c.r01 * c.r21 + c.r02 * c.r22;
+        double d12 = c.r10 * c.r20 + c.r11 * c.r21 + c.r12 * c.r22;
+        double det = c.r00 * (c.r11 * c.r22 - c.r12 * c.r21) - c.r01 * (c.r10 * c.r22 - c.r12 * c.r20)
+                + c.r02 * (c.r10 * c.r21 - c.r11 * c.r20);
+        return Math.abs(n0 - 1) < eps && Math.abs(n1 - 1) < eps && Math.abs(n2 - 1) < eps
+                && Math.abs(d01) < eps && Math.abs(d02) < eps && Math.abs(d12) < eps && Math.abs(det - 1) < eps;
     }
 
     /// Sends every op queued since the last flush. Call it after each
@@ -634,8 +729,18 @@ public final class ReplicaServer implements Network.Transport, Engine.EngineList
         if (co == null || player == null) {
             throw LuaError.rt("InvokeClient must be called from a script thread, with a player");
         }
+        Peer target = null;
+        for (Peer p : peers) {
+            if (p != null && p.player == player) { // NOPMD CompareObjectsWithEquals - instance identity
+                target = p;
+                break;
+            }
+        }
+        if (target == null) {
+            throw LuaError.rt("InvokeClient: player is not connected");
+        }
         Integer call = Integer.valueOf(nextCall++);
-        calls.put(call, co);
+        calls.put(call, new PendingCall(co, target));
         queue(Wire.INVOKE, remote, call, player, args);
         return engine.getInterp().yield(new Object[0]);
     }

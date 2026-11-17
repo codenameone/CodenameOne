@@ -34,6 +34,7 @@ import com.codenameone.examples.brickyard.repository.DataStoreEntryRepository;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /// An experience's data stores: named stores, each split into scopes, each a
 /// map of keys to JSON values. The game server's `Engine.Host` reaches these
@@ -43,6 +44,13 @@ import java.util.List;
 public class DataStores {
     /// The largest value a key may hold, in UTF-8 bytes.
     public static final int MAX_VALUE_BYTES = 4 * 1024 * 1024;
+
+    /// One monitor per key. Read-modify-write (increment, the revision bump,
+    /// the first insert) was unguarded, so two servers incrementing one key
+    /// lost an update or inserted the key twice. This serializes writers in
+    /// this process; the transaction commits after the monitor is released,
+    /// so a write racing that commit still re-reads inside its own lock.
+    private static final ConcurrentHashMap<String, Object> LOCKS = new ConcurrentHashMap<String, Object>();
 
     private final DataStoreEntryRepository entries;
     private final Experiences experiences;
@@ -67,7 +75,9 @@ public class DataStores {
             throws IOException {
         guard(experienceId);
         check(json);
-        return write(experienceId, store, scope, key, json);
+        synchronized (lock(experienceId, store, scope, key)) {
+            return write(experienceId, store, scope, key, json);
+        }
     }
 
     /// Adds `delta` to a numeric value, starting from 0 for a key never written.
@@ -75,16 +85,41 @@ public class DataStores {
     public DataValueDto increment(String experienceId, String store, String scope, String key, long delta)
             throws IOException {
         guard(experienceId);
-        DataStoreEntry d = find(experienceId, store, scope, key);
-        long current = 0;
-        if (d != null) {
-            Object value = Json.parse(d.getJsonValue());
-            if (!(value instanceof Number)) {
-                throw new ResponseStatusException(409, "That key does not hold a number");
+        synchronized (lock(experienceId, store, scope, key)) {
+            DataStoreEntry d = find(experienceId, store, scope, key);
+            long current = 0;
+            if (d != null) {
+                Object value = Json.parse(d.getJsonValue());
+                // IncrementAsync works on integers only, as Roblox's does;
+                // longValue() silently truncated 1.5 and wrapped huge doubles.
+                if (!(value instanceof Number) || !isInteger((Number) value)) {
+                    throw new ResponseStatusException(409, "That key does not hold an integer");
+                }
+                current = ((Number) value).longValue();
             }
-            current = ((Number) value).longValue();
+            long next;
+            try {
+                next = Math.addExact(current, delta);
+            } catch (ArithmeticException overflow) {
+                throw new ResponseStatusException(400, "The increment overflows");
+            }
+            return write(experienceId, store, scope, key, Long.toString(next));
         }
-        return write(experienceId, store, scope, key, Long.toString(current + delta));
+    }
+
+    static boolean isInteger(Number n) {
+        if (n instanceof Double || n instanceof Float) {
+            double v = n.doubleValue();
+            return v == Math.rint(v) && Math.abs(v) <= 9007199254740992.0; // 2^53, exact in a double
+        }
+        return true;
+    }
+
+    private static Object lock(String experienceId, String store, String scope, String key) {
+        String k = experienceId + '\u0000' + store + '\u0000' + scope + '\u0000' + key;
+        Object fresh = new Object();
+        Object had = LOCKS.putIfAbsent(k, fresh);
+        return had == null ? fresh : had;
     }
 
     @Transactional(readOnly = true)

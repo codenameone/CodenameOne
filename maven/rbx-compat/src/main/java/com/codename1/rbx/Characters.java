@@ -1097,8 +1097,7 @@ final class Characters {
     }
 
     private static boolean blocks(Instance p, double x, double z, double[] probes) {
-        for (int k = 0; k < probes.length; k++) {
-            double py = probes[k];
+        for (double py : probes) {
             if (inside(p, x, py, z, 0.5) && (!p.isA("WedgePart") || underSlope(p, x, py, z, 0.5))) {
                 return true;
             }

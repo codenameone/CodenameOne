@@ -34,6 +34,11 @@ final class StringLib {
 
     private static final Object[] NONE = new Object[0];
 
+    /// Longest string `string.rep` may build: 16 M characters. Scripts run
+    /// sandboxed on a shared server, where 100 M (up to 200 MB of chars) per
+    /// call was enough for a few calls to exhaust the heap.
+    static final long MAX_STRING = 16L * 1024 * 1024;
+
     private static Object[] ret(Object v) {
         return new Object[] {v};
     }
@@ -118,13 +123,18 @@ final class StringLib {
                 String x = str(a, 0, "rep");
                 int n = Stdlib.integer(a, 1, "rep");
                 String sep = a.length > 2 && a[2] != null ? str(a, 2, "rep") : "";
-                if (n <= 0) {
+                long total = n <= 0 ? 0 : (long) x.length() * n + (long) sep.length() * (n - 1);
+                if (total == 0) {
+                    // Also covers "" with "" for any n: nothing to build, so
+                    // never spin through n empty appends.
                     return ret("");
                 }
-                long total = (long) x.length() * n + (long) sep.length() * (n - 1);
-                if (total > 100000000L) {
+                if (total > MAX_STRING) {
                     throw LuaError.rt("string length overflow");
                 }
+                // One step per 64 characters produced, so a repeat costs the
+                // budget what the equivalent Lua loop would.
+                i.charge(n + total / 64);
                 StringBuilder b = new StringBuilder((int) total);
                 for (int k = 0; k < n; k++) {
                     if (k > 0) {
@@ -189,13 +199,13 @@ final class StringLib {
         Stdlib.reg(s, new JavaFunction("string.find") {
             @Override
             public Object[] call(Interp i, Object[] a) {
-                return find(a, true);
+                return find(i, a, true);
             }
         });
         Stdlib.reg(s, new JavaFunction("string.match") {
             @Override
             public Object[] call(Interp i, Object[] a) {
-                return find(a, false);
+                return find(i, a, false);
             }
         });
         Stdlib.reg(s, new JavaFunction("string.gmatch") {
@@ -211,7 +221,7 @@ final class StringLib {
                         boolean anchor = p.startsWith("^");
                         int pi = anchor ? 1 : 0;
                         while (pos[0] <= x.length()) {
-                            LuaPattern m = new LuaPattern(x, p);
+                            LuaPattern m = new LuaPattern(i2, x, p);
                             int e = m.match(pos[0], pi);
                             if (e >= 0 && e != lastEnd[0]) {
                                 int st = pos[0];
@@ -272,7 +282,7 @@ final class StringLib {
         return true;
     }
 
-    static Object[] find(Object[] a, boolean find) {
+    static Object[] find(Interp in, Object[] a, boolean find) {
         String fn = find ? "find" : "match";
         String x = str(a, 0, fn);
         String p = str(a, 1, fn);
@@ -292,7 +302,7 @@ final class StringLib {
         int pi = anchor ? 1 : 0;
         int st = init;
         do {
-            LuaPattern m = new LuaPattern(x, p);
+            LuaPattern m = new LuaPattern(in, x, p);
             int e = m.match(st, pi);
             if (e >= 0) {
                 if (find) {
@@ -324,7 +334,7 @@ final class StringLib {
         int s = 0;
         int n = 0;
         while (n < max) {
-            LuaPattern m = new LuaPattern(x, p);
+            LuaPattern m = new LuaPattern(in, x, p);
             int e = m.match(s, pi);
             if (e >= 0) {
                 n++;
