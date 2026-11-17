@@ -43,7 +43,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   cross-compile:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: cross-compile (x64 PE on Linux)
     runs-on: ubuntu-24.04
     # A ceiling, because there was not one: this job hung in apt and ran for six
@@ -242,8 +252,9 @@ jobs:
   # swap chain) on a Windows runner. The app writes a marker into its package
   # LocalState once its first form has painted; no marker fails the job.
   uwp-run:
+    if: needs.golden-plan.outputs.run == 'true'
     name: install + launch the UWP package (Windows x64)
-    needs: cross-compile
+    needs: [golden-plan, cross-compile]
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -338,8 +349,9 @@ jobs:
   # kiosk hook blocks. Shell Launcher itself needs IoT Enterprise, which no
   # runner has; the deploy script is unit-tested in build-engine instead.
   kiosk-run:
+    if: needs.golden-plan.outputs.run == 'true'
     name: launch the kiosk build (Windows x64)
-    needs: cross-compile
+    needs: [golden-plan, cross-compile]
     runs-on: windows-latest
     timeout-minutes: 15
     steps:

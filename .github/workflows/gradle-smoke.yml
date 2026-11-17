@@ -54,7 +54,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   gradle-smoke:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 80
     name: gradle-smoke (JDK ${{ matrix.gradle-jdk }}, Gradle ${{ matrix.gradle-version || 'wrapper' }})
@@ -181,10 +191,11 @@ jobs:
   # for its version) but never compiles anything, so it stays cheap. The same
   # script's upload-jar and android-source comparisons run again here for free.
   gradle-maven-parity-macos:
+    needs: golden-plan
     # The Xcode half of the parity check runs nightly only: hosted macOS runners
     # are the scarce pool, and the Linux job above already holds every other
     # target to Maven/Gradle parity on the pull request.
-    if: github.event_name != 'pull_request'
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name != 'pull_request') }}
     runs-on: macos-15
     timeout-minutes: 60
     env:

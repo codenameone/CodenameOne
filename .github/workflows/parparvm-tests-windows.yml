@@ -704,7 +704,9 @@ jobs:
           retention-days: 14
 
       - name: Fail on a ParparVM performance regression (x64)
-        if: success() || failure()
+        # Not in a capture (cn1ss_capture): that run exists to render goldens,
+        # and a timing gate failing it only marks the capture red.
+        if: ${{ (success() || failure()) && inputs.cn1ss_capture == '' }}
         shell: bash
         run: vm/selfhost/ci-perf-gate.sh verdict artifacts/windows-port/raw/perf
 
@@ -937,7 +939,9 @@ jobs:
           retention-days: 14
 
       - name: Fail on a ParparVM performance regression (arm64)
-        if: success() || failure()
+        # Not in a capture (cn1ss_capture): that run exists to render goldens,
+        # and a timing gate failing it only marks the capture red.
+        if: ${{ (success() || failure()) && inputs.cn1ss_capture == '' }}
         shell: bash
         run: vm/selfhost/ci-perf-gate.sh verdict artifacts/windows-port/raw/perf
 

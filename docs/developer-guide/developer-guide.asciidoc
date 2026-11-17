@@ -149,6 +149,8 @@ include::Backend-Messaging.asciidoc[]
 
 include::Backend-Mail.asciidoc[]
 
+include::Backend-Storage.asciidoc[]
+
 include::Backend-Observability.asciidoc[]
 
 include::Backend-MCP.asciidoc[]

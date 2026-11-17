@@ -55,7 +55,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   linux-tests:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Core tests, plugin & Android compile, sample javac
     runs-on: ubuntu-24.04
     # Same container the main PR workflow uses; it ships JDK 8/17/21 and
@@ -180,6 +190,8 @@ jobs:
           test -f target/sample-check/com/codename1/samples/UniversalSignInDemo.class
 
   sample-secrets:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Scan demo sample for accidental credentials
     runs-on: ubuntu-24.04
     # 10 rather than 3. The scan itself is one grep over ten paths and takes
@@ -246,6 +258,8 @@ jobs:
           echo "No credential leaks detected."
 
   macos-clang:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Clang syntax check for iOS native sources
     runs-on: macos-15
     timeout-minutes: 10

@@ -228,6 +228,14 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   # EVERY DOCUMENTED RUNTIME CONFIGURATION MUST STILL COMPILE.
   #
   # ParparVM's runtime carries ~40 compile-time arms: QA instruments, and ablations
@@ -246,6 +254,8 @@ jobs:
   # a compile-and-link sweep, not a behaviour suite, and what each arm DOES is its own
   # gate's business.
   ablation-arms:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -281,6 +291,8 @@ jobs:
           if-no-files-found: warn
 
   vm-tests:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     # The full suite and serial GC benchmarks took 69 and 47 minutes in run
     # 38355108612. Both passed, but setup plus reporting exceeded two hours.
@@ -666,6 +678,8 @@ jobs:
   # has to match the committed manifest so the suite cannot quietly shrink to the
   # cases it happens to pass.
   backend-compiled-tests:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     # The backend test framework's two runners over one test source: surefire on
     # the JVM, then the same classes translated by ParparVM into a native test
     # binary (cn1:backend-test), the way an application's own tests run when it
@@ -745,6 +759,8 @@ jobs:
           retention-days: 14
 
   python-backend-native:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     # The Flask and FastAPI samples built NATIVELY (ParparVM, clang) and
     # driven over sockets by the same client as the JVM run. The only place
     # Python handlers run on the backend's virtual threads, so the only run
@@ -809,6 +825,8 @@ jobs:
           JAVA17_HOME: ${{ env.JDK_17_HOME }}
 
   backend-websocket-conformance:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: WebSocket conformance (Autobahn)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -854,7 +872,8 @@ jobs:
 
 
   release-jars:
-    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    needs: golden-plan
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'release' && github.event.action == 'published') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:

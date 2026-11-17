@@ -235,12 +235,28 @@ class ValuesTest {
                         + " cells and there are " + COLUMNS.length + " conversions");
         for (int iter = 0; iter < CONVERSIONS.length; iter++) {
             String actual;
+            Object result = null;
             try {
-                actual = render(CONVERSIONS[iter].apply(encoding));
+                result = CONVERSIONS[iter].apply(encoding);
+                actual = render(result);
             } catch (Exception refused) {
                 actual = "!";
             }
-            assertEquals(cells[iter], actual, describe(encoding) + " -> " + COLUMNS[iter]);
+            // Float.toString and Double.toString are not one spelling across
+            // JDKs: JDK 19 (JDK-4511638) prints the shortest digits that round
+            // trip, so 2^31 as a float is 2.14748365E9 on JDK 8 and 2.1474836E9
+            // on JDK 19 and later. The cell is the value, not its spelling, so a
+            // floating result is compared by parsing the cell. The test used to
+            // pass or fail depending on which JDK surefire forked.
+            if (result instanceof Float && !"!".equals(cells[iter])) {
+                assertEquals(Float.valueOf(cells[iter]), result,
+                        describe(encoding) + " -> " + COLUMNS[iter]);
+            } else if (result instanceof Double && !"!".equals(cells[iter])) {
+                assertEquals(Double.valueOf(cells[iter]), result,
+                        describe(encoding) + " -> " + COLUMNS[iter]);
+            } else {
+                assertEquals(cells[iter], actual, describe(encoding) + " -> " + COLUMNS[iter]);
+            }
         }
     }
 
