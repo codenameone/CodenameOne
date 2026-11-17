@@ -177,7 +177,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   build-test:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
 
     runs-on: ubuntu-24.04
     # Java 8 also runs the full quality reports and packaging checks.
@@ -957,8 +967,8 @@ jobs:
     # "failed to resolve source metadata for docker.io/library/alpine:latest"
     # after three retries. A job-level condition skips setup entirely, so on a
     # pull request the image is never fetched.
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-    needs: build-test
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/master') }}
+    needs: [golden-plan, build-test]
     runs-on: ubuntu-24.04
     steps:
       - name: Download the distribution bundle

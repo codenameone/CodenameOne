@@ -7,7 +7,8 @@
 # Nothing here waits for the runs: golden-harvest.yml collects them when the
 # last one completes, so no runner sits idle for the hours a slow leg takes.
 #
-# Needs GH_TOKEN (actions: write) and GITHUB_REPOSITORY. Each dispatch is a run
+# Needs GH_TOKEN (actions: write), DISPATCH_TOKEN (CN1SS_GH_TOKEN) and
+# GITHUB_REPOSITORY. Each dispatch is a run
 # of its own, so the workflows' concurrency groups and fixed artifact names
 # (the Unity gallery, the port bundles) cannot collide as they would if they
 # were called inside one run.
@@ -54,7 +55,13 @@ dispatch() {
     since="$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)"
     seen="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
               --event workflow_dispatch --limit 20 --json databaseId --jq '[.[].databaseId] | join(",")')"
-    gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"
+    # DISPATCH_TOKEN (the push token): GitHub starts no workflow_run for a
+    # run github.token started, and golden-harvest.yml is a workflow_run.
+    if ! { [ -n "${DISPATCH_TOKEN:-}" ] &&
+           GH_TOKEN="$DISPATCH_TOKEN" gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"; }; then
+      echo "::warning::could not dispatch $wf with CN1SS_GH_TOKEN (unset, lacking Actions: write, or a transient error); dispatching with github.token, so the harvest will not start by itself: run Golden harvest by hand with head_ref=$ref once the capture completes"
+      gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"
+    fi
     # The dispatch API answers without a run id; find the run it created.
     id=""
     for tries in $(seq 1 30); do

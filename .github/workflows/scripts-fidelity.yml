@@ -108,7 +108,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   fidelity-android:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Fidelity (Android, Material 3)
     permissions:
       contents: read
@@ -210,6 +220,8 @@ jobs:
           retention-days: 14
 
   fidelity-ios-metal:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Fidelity (iOS Modern, Metal)
     permissions:
       contents: read
@@ -330,6 +342,8 @@ jobs:
   # golden set, the simulator runtime and the artifact/baseline names --
   # scripts/check-duplicated-ci-legs.py holds it to that.
   fidelity-ios-metal-27:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Fidelity (iOS Modern 27, Metal)
     # A real gate, like the iOS 26 row: the committed ios-27-metal baseline is
     # its ratchet. It was the last row to get one because iOS 27's dark glass
