@@ -65,18 +65,26 @@ public class AndroidCompatTallDialogScreenshotTest extends AndroidCompatScreensh
                     .append(": the guided tour moves the map to a training area so that nothing you try"
                             + " changes your real data.\n\n");
         }
-        dialog = new AlertDialog.Builder(activity)
-                .setTitle("Use a training area?")
-                .setMessage(message.toString())
-                .setPositiveButton("Continue", (DialogInterface.OnClickListener) null)
-                .setNegativeButton("Cancel", (DialogInterface.OnClickListener) null)
-                .show();
+        try {
+            dialog = new AlertDialog.Builder(activity)
+                    .setTitle("Use a training area?")
+                    .setMessage(message.toString())
+                    .setPositiveButton("Continue", (DialogInterface.OnClickListener) null)
+                    .setNegativeButton("Cancel", (DialogInterface.OnClickListener) null)
+                    .show();
+        } catch (RuntimeException e) {
+            // Never leave the static default changed for the tests after this one.
+            com.codename1.ui.Dialog.setDefaultNativeWindowMode(nativeWindowMode);
+            throw e;
+        }
     }
 
     @Override
     protected com.codename1.ui.Form captureForm(com.codename1.ui.Form activityForm) {
-        com.codename1.ui.Form host = dialog == null ? null
-                : dialog.getButton(DialogInterface.BUTTON_POSITIVE).getPeer().getComponentForm();
+        android.widget.Button positive = dialog == null ? null
+                : dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+        com.codename1.ui.Form host = positive == null || positive.getPeer() == null ? null
+                : positive.getPeer().getComponentForm();
         return host != null ? host : activityForm;
     }
 
