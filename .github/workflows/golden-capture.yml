@@ -11,14 +11,16 @@ name: Golden capture
 # in the test (`// cn1ss-skip: <ports>`) and held to the tree both ways, so
 # the tree's goldens are complete and a gap is the whole signal: no marker, no
 # diff. When there is any gap, it:
-#   1. cancels every other run of this PR. The screenshot workflows already
-#      skip every job (their first job, golden-plan.yml, runs the same
-#      detector); the rest would only spend runners on a head about to move;
+#   1. cancels every other run of this PR: it is known to fail, and the point
+#      of the feature is that it spends no runners until its goldens exist;
 #   2. dispatches each screenshot workflow on the PR branch with
 #      `cn1ss_capture`: the FULL suite runs (tests leak, so a subset could
 #      render differently), non-screenshot jobs skip, and every image without
 #      a golden is uploaded instead of gated (.github/actions/cn1ss-capture);
-#   3. exits. It does not wait: the slowest leg takes hours, often more while
+#   3. sets a pending "Golden capture" status on the PR's head: the PR shows
+#      its runs cancelled, and GitHub does not show workflow_dispatch runs on
+#      a PR, so this is where it says what is going on;
+#   4. exits. It does not wait: the slowest leg takes hours, often more while
 #      macOS runners are queued, and a job that polled for that long held a
 #      runner the whole time and lost everything that had arrived when it hit
 #      its deadline. Each capture run's completion starts golden-harvest.yml,
@@ -29,8 +31,9 @@ name: Golden capture
 # A gap still open after that push is golden-plan's to report: its leg failed,
 # or the test captures nothing there and needs a cn1ss-skip declaration. What
 # did arrive is still committed, so the next push captures only what is left.
-# When nothing arrives at all, the harvest re-runs the PR's cancelled runs, and
-# their golden-plan job fails naming the gap.
+# The harvest settles the status: success with the commit (whose push starts
+# the PR's runs again), or failure when a leg failed or nothing arrived. The
+# PR's runs stay cancelled then: they are still known to fail.
 #
 # Pull requests from forks are skipped: the dispatches need the branch in this
 # repository and the push needs a token a fork run does not get. Review the
@@ -76,13 +79,13 @@ jobs:
     if: needs.detect.outputs.tests != ''
     runs-on: ubuntu-24.04
     # Dispatching only; golden-harvest.yml collects. golden-capture.sh waits
-    # up to five minutes for each of seven runs to appear, and a timeout
-    # would skip the re-run below.
+    # up to five minutes for each of seven runs to appear.
     timeout-minutes: 45
     permissions:
       contents: read
       actions: write
       pull-requests: read
+      statuses: write
     env:
       GH_TOKEN: ${{ github.token }}
       TESTS: ${{ needs.detect.outputs.tests }}
@@ -100,7 +103,7 @@ jobs:
             exit 1
           fi
           # Set is not enough: an expired or narrowed token would pass the check
-          # above and fail only at the push, after the PR's runs were cancelled.
+          # above and fail only at the push, hours of runners later.
           push="$(GH_TOKEN="$CN1SS_GH_TOKEN" gh api "repos/$GITHUB_REPOSITORY" --jq .permissions.push 2>/dev/null || true)"
           if [ "$push" != true ]; then
             echo "::error::secrets.CN1SS_GH_TOKEN cannot push to $GITHUB_REPOSITORY (expired, revoked or lacking Contents: write); golden capture cannot push. Regenerate it (see the note in scripts-android.yml)."
@@ -112,44 +115,54 @@ jobs:
         with:
           persist-credentials: false
 
+      # The point of all this: a PR missing a golden is known to fail, so
+      # none of its runs may spend runners. They stay cancelled; the push
+      # that commits the goldens starts them all again, and the status below
+      # says on the PR why they were cancelled.
       - name: Cancel the PR's other runs
-        id: cancel1
         uses: actions/github-script@v8
         with:
           script: |
             const {cancelForCapture} = require('./scripts/ci/cancel-stale-pr-runs.js');
-            core.setOutput('ids', (await cancelForCapture({github, context, core, keepRunId: context.runId})).join(' '));
+            await cancelForCapture({github, context, core, keepRunId: context.runId});
 
       - name: Dispatch the screenshot workflows in capture mode
         run: scripts/ci/golden-capture.sh dispatch "$HEAD_REF" "$TESTS" "$RUNS"
 
       # Workflows the triggering push started after the first pass.
       - name: Cancel the PR's other runs again
-        id: cancel2
         uses: actions/github-script@v8
         with:
           script: |
             const {cancelForCapture} = require('./scripts/ci/cancel-stale-pr-runs.js');
-            core.setOutput('ids', (await cancelForCapture({github, context, core, keepRunId: context.runId})).join(' '));
+            await cancelForCapture({github, context, core, keepRunId: context.runId});
+
+      # The capture's runs are workflow_dispatch runs, which GitHub does not
+      # show on the PR; this status is the PR's view of them, and
+      # golden-harvest.yml settles it once they have all completed.
+      - name: Show the capture on the PR
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          n="$(wc -l < "$RUNS")"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f state=pending -f context="Golden capture" \
+            -f description="Goldens missing: other checks cancelled; capturing on $n screenshot workflows" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null \
+            || echo "::warning::could not set the Golden capture status; the capture runs anyway"
 
       # Failed or cancelled (a new push replaced this job mid-dispatch):
-      # nothing else stops the captures it did start.
+      # nothing else stops the captures it did start, and a part capture
+      # would never harvest.
       - name: Cancel the captures that did start
         if: failure() || cancelled()
-        run: |
-          [ -f "$RUNS" ] || exit 0
-          while read -r wf id; do
-            gh run cancel "$id" --repo "$GITHUB_REPOSITORY" || true
-          done < "$RUNS"
-
-      # A capture that never got going would leave the PR's other checks
-      # cancelled for good; start them again. Not when cancelled: the push
-      # that replaced this job started them.
-      - name: Re-run what was cancelled
-        if: failure()
         env:
-          IDS: ${{ steps.cancel1.outputs.ids }} ${{ steps.cancel2.outputs.ids }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          for id in $IDS; do
-            gh run rerun "$id" --repo "$GITHUB_REPOSITORY" || echo "could not re-run $id"
-          done
+          if [ -f "$RUNS" ]; then
+            while read -r wf id; do
+              gh run cancel "$id" --repo "$GITHUB_REPOSITORY" || true
+            done < "$RUNS"
+          fi
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f state=error -f context="Golden capture" \
+            -f description="The capture did not start; re-run Golden capture" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null || true
