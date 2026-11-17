@@ -32,14 +32,33 @@ import com.example.droid.MainActivity;
 /// (discussion #6259, where the buttons fell off the bottom and the title went
 /// under the status bar).
 public class AndroidCompatTallDialogScreenshotTest extends AndroidCompatScreenshotTest {
+    // cn1ss-skip: watchos -- captures nothing on these ports (the guard below);
+    // a phone dialog on a watch face is not what this test is about, as in
+    // CenteredDialogTitleScreenshotTest.
+
     public AndroidCompatTallDialogScreenshotTest() {
         super(MainActivity.class, "AndroidCompatTallDialog");
     }
 
     private AlertDialog dialog;
+    private boolean nativeWindowMode;
+
+    @Override
+    public boolean runTest() throws Exception {
+        if (com.codename1.ui.CN.isWatch()) {
+            System.out.println("CN1SS:INFO:test=AndroidCompatTallDialog status=SKIPPED reason=phone-dialog-on-watch");
+            done();
+            return true;
+        }
+        return super.runTest();
+    }
 
     @Override
     protected void prepare(Activity activity) {
+        // A desktop port opens a dialog in a native window of its own, which
+        // a capture of the form never sees; keep it on the form for the shot.
+        nativeWindowMode = com.codename1.ui.Dialog.isDefaultNativeWindowMode();
+        com.codename1.ui.Dialog.setDefaultNativeWindowMode(false);
         StringBuilder message = new StringBuilder();
         for (int i = 1; i <= 30; i++) {
             message.append("Paragraph ").append(i)
@@ -63,6 +82,7 @@ public class AndroidCompatTallDialogScreenshotTest extends AndroidCompatScreensh
 
     @Override
     protected void afterCapture() {
+        com.codename1.ui.Dialog.setDefaultNativeWindowMode(nativeWindowMode);
         if (dialog != null) {
             dialog.dismiss();
             dialog = null;
