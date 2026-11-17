@@ -1,0 +1,263 @@
+[[brickyard-implementors-guide]]
+== Brickyard: A game platform where players make the games
+
+Brickyard is a complete user-generated-content game platform. Players browse a home
+screen of experiences, play them in 3D with their friends and chat while they race.
+Creators build those experiences in a 3D studio inside the same app, on a phone, a
+tablet or a desktop, then publish them and earn from them. Admins keep the place safe
+from a console. The experiences are Luau scripts in a 3D world of parts, and the
+platform is compatible with Luau and Roblox place files: a creator can bring an
+`.rbxlx` or `.rbxl` export, and it runs.
+
+A game platform tests a cross-platform framework harder than any other kind of app. It
+needs:
+
+* A scripting VM that runs code written by strangers and still cannot freeze the device.
+* 3D rendering and physics at frame rate, on every platform.
+* An authoritative multiplayer server, so a client cannot cheat its way up a leaderboard.
+* An economy with store purchases, a subscription and creator payouts.
+* Social features with child-safety rules, moderation and analytics.
+
+Brickyard does all of it in Java, from one codebase, on Codename One's own APIs: `gpu`
+for the renderer, `payment` and `paywall` for the store, `analytics.invite` for
+referrals, `gaming.GameServices` for presence and achievements, `ads` for rewarded
+currency and the built-in MCP server for agentic creation. The server is a Codename One
+Backend.
+
+Everything in it is original and written clean room: the interpreter, the engine API,
+the file readers, the renderer and the templates. Brickyard is its own name and art.
+Nothing is fetched from Roblox; a place's assets come from the file or are replaced by
+placeholders, which the compatibility report lists.
+
+Videos of every part of this tour are on https://www.codenameone.com/brickyard/[the
+Brickyard page].
+
+[[brickyard-tour]]
+=== Playing with friends
+
+The home screen opens with the friends who are playing right now, each with a *Join*
+button, then the experiences to continue and the featured rows. Every card shows a live
+count of the people playing it.
+
+image::img/brickyard-home-friends.png["The home screen: friends playing with Join buttons, then Continue and Featured rows",scaledwidth=30%]
+
+Joining a friend drops the player into the same server. The chat button at the top of
+the play view opens a text field, and every message shows in the chat log and as a
+bubble over the sender's character, so a race can start with a dare.
+
+image::img/brickyard-chat.png["Typing a chat message in Rainbow Sky Obby",scaledwidth=30%]
+image::img/brickyard-race.png["The race starts: the chat log and bubbles over the other players",scaledwidth=30%]
+
+Rainbow Sky Obby is an obstacle course. The leaderstats in the top bar count stages and
+wins. The server writes them and the leaderboards read them, so no client can award
+itself a win.
+
+image::img/brickyard-beams.png["Climbing the floating stages, with the stage counter in the top bar",scaledwidth=30%]
+image::img/brickyard-win.png["The last stage under the rainbow",scaledwidth=30%]
+
+Players move with the touch stick and the jump button on a phone, the keyboard on a
+desktop, or a gamepad.
+
+[[brickyard-engagement]]
+=== Coming back tomorrow
+
+Every play session feeds progression. Players earn XP and level up, keep a daily
+streak, and climb a season pass with a free track and a Brickyard Plus track. Quests
+are daily and weekly, and each pays XP and Bricks, the app's currency. Bricks buy
+hats, faces and shirts for the player's block avatar in the shop, and they can be
+bought as packs or come with the Plus subscription. Friends who accept an invite earn
+Bricks on both sides.
+
+image::img/brickyard-season-pass.png["The Me tab: level, daily streak and the season pass with its free and Plus tracks",scaledwidth=30%]
+image::img/brickyard-avatar.png["The Me tab: the player's character and its four looks",scaledwidth=30%]
+image::img/brickyard-quests.png["Daily and weekly quests with their XP and Bricks rewards, two ready to claim",scaledwidth=30%]
+
+image::img/brickyard-shop-owned.png["The avatar shop: hats, faces and shirts priced in Bricks, one already owned",scaledwidth=30%]
+image::img/brickyard-leaderboard.png["An experience's leaderboard by stage for today, with a friends-only filter",scaledwidth=30%]
+
+Each experience has leaderboards by stat, for today, this week and all time, with a
+filter that shows only friends.
+
+[[brickyard-game-types]]
+=== Game types
+
+The templates cover the kinds of games such a platform is known for, and the seeded
+experiences are built from them: two obbies (Rainbow Sky Obby and Sunset Islands Obby),
+a survival game, a roleplay town, a tycoon, a simulator, a racer and a fighting arena.
+Each one is a place file with Luau scripts, which a creator can open in the studio and
+change.
+
+image::img/brickyard-disaster-island.png["Disaster Island: survive the meteor shower",scaledwidth=30%]
+image::img/brickyard-brick-town.png["Brick Town: a roleplay town with houses and roads",scaledwidth=30%]
+image::img/brickyard-tycoon.png["Brick Factory Tycoon: cash grows as the factory builds out",scaledwidth=30%]
+
+image::img/brickyard-miner.png["Crystal Miner Sim: gems, coins and power",scaledwidth=30%]
+image::img/brickyard-kart.png["Kart Loop: laps and the best time",scaledwidth=30%]
+image::img/brickyard-arena.png["Block Arena: points and knockouts",scaledwidth=30%]
+
+[[brickyard-studio]]
+=== The studio on a phone
+
+The *Create* tab starts a new experience from a template. The studio then shows the
+viewport over tabs for the explorer, the properties editor, the script editor and the
+output. Move, Insert, Play and Publish sit along the bottom.
+
+image::img/brickyard-templates.png["Starting something new: pick a template and name the experience",scaledwidth=30%]
+image::img/brickyard-studio-phone.png["The phone studio: the viewport above the explorer",scaledwidth=30%]
+image::img/brickyard-insert-scripts.png["The Insert sheet: parts, models, scripts and effects",scaledwidth=30%]
+
+The Insert sheet adds parts, ready-made models, scripts and effects. A script is
+Luau, and the editor colors it, checks its syntax and completes names as the creator
+types. *Play* runs a test copy of the place on the spot.
+
+image::img/brickyard-script-editor.png["The script editor with a Luau goal script and Save script",scaledwidth=30%]
+image::img/brickyard-playtest.png["Play testing: the goal script puts the objective on screen",scaledwidth=30%]
+
+[[brickyard-studio-tablet]]
+=== The studio on a tablet
+
+On a tablet the explorer, the viewport and the properties panel share the screen,
+with the output and script panes below the viewport. The Insert sheet adds ready-made
+models, such as a lamp post with its own light, and the Lighting tab switches the
+whole place between noon, dusk and night.
+
+image::img/brickyard-studio-tablet.png["The tablet studio: explorer, viewport and properties side by side",scaledwidth=90%]
+image::img/brickyard-insert-models.png["A lamp post model inserted and selected, its toolbox script in the output",scaledwidth=90%]
+image::img/brickyard-lighting.png["The Lighting presets: noon, dusk and night",scaledwidth=90%]
+image::img/brickyard-tablet-play.png["Play testing the place on a tablet",scaledwidth=90%]
+
+[[brickyard-desktop]]
+=== On a desktop
+
+The desktop build lays out the same home screen across the window and plays with the
+keyboard. The studio gets a menu bar and a toolbar over the explorer, the viewport and
+the properties panel.
+
+image::img/brickyard-desktop-home.png["The home screen on a desktop: Continue, Featured and the level card",scaledwidth=90%]
+image::img/brickyard-desktop-play.png["Rainbow Sky Obby on a desktop, played with the keyboard",scaledwidth=90%]
+image::img/brickyard-desktop-studio.png["The desktop studio with a coin part selected",scaledwidth=90%]
+image::img/brickyard-desktop-code.png["Typing a coin rain script with completion",scaledwidth=90%]
+image::img/brickyard-desktop-coin-rain.png["Play testing the coin rain",scaledwidth=90%]
+
+[[brickyard-agent]]
+==== Building with an AI agent
+
+Open an experience in the studio and choose *AI agent mode*. The studio's tools are
+then registered with the app's built-in MCP server under the `brickyard_` prefix, and an
+agent connected to the device or simulator can build the experience itself. It can read
+and edit the instance tree, write scripts and get the syntax check back, run a Luau
+snippet against the place, apply templates, add effects and lighting, import and export
+place files, take a screenshot, and publish. Its `playtest` tool plays a saved copy
+with a number of players for a number of seconds and answers with the output, the
+errors, the leaderstats and any unsupported API. Every button in the studio goes
+through the same tools, so an agent can do whatever a creator can, and its edits appear
+live in the explorer.
+
+[[brickyard-modules]]
+=== How it is built
+
+The engine is three framework modules that any Codename One app can use, and the
+application is an ordinary project with the usual module layout:
+
+[cols="1,3",options="header"]
+|===
+|Module |What it holds
+|`maven/luau-runtime` |A pure-Java Luau interpreter (`com.codename1.luau`): lexer, parser, a compiler to its own instructions, the interpreter, coroutines and the standard libraries.
+|`maven/rbx-compat` |The engine API (`com.codename1.rbx`): datatypes, the instance tree, signals, services, GUI, tweens, pathfinding, data stores, the marketplace, badges, rigid-body physics, humanoid characters and replication. Its `place` package reads and writes place files and holds the templates.
+|`maven/rbx-view` |Drawing and playing: the GPU part renderer, the camera, the play view, the studio's gizmo, avatars, thumbnails and the agent's MCP tools.
+|`scripts/brickyard/common` |The app: home, experience pages, play, the studio, friends, shop, the dashboard and the admin console.
+|`scripts/brickyard/shared` |The API contracts the app and the server share.
+|`scripts/brickyard/backend` |The Codename One Backend server.
+|===
+
+[[brickyard-luau]]
+==== The Luau runtime
+
+The interpreter covers the full Luau syntax and the standard libraries. Coroutines are
+interpreter frames, not threads, so a script that waits does not hold a thread. Every
+script resume runs under an instruction budget, so an infinite loop in a creator's
+script becomes a reported error, never a hung app.
+
+[[brickyard-place]]
+==== Place files and the compatibility report
+
+`com.codename1.rbx.place` reads and writes both the XML (`.rbxlx`) and binary (`.rbxl`)
+place formats. Importing a place produces a compatibility report that lists the API its
+scripts use that the engine lacks and the assets it replaced with placeholders. The
+studio exports `.rbxlx`, so a creator can take a place back out.
+
+[[brickyard-replication]]
+==== Multiplayer
+
+An experience runs on an authoritative server. Server scripts never leave it, and
+neither does anything in `ServerScriptService` or `ServerStorage`. Each client receives a
+snapshot of the replicated services, followed by property deltas, remote events and
+remote function calls (`ReplicaServer` and `ReplicaClient`). Each client drives its own
+character, and the server accepts a move only if the humanoid could make it at its own
+speed, correcting the client when it could not. Offline, the same place runs with the
+server and the client in one process.
+
+[[brickyard-backend]]
+==== The server
+
+The backend covers accounts, experiences with draft, publish and rollback, data stores,
+leaderboards written only by the engine, a ledger-based economy, progression with the
+season pass, and the social graph. Chat filtering depends on the reader's age, and
+referral fraud checks write fraud flags. Moderation keeps an audit log, and analytics is
+stored per experience.
+
+Creators get a dashboard with visits, retention, revenue by product and error reports
+grouped by version. From it they roll back versions, sell game passes and products, and
+request payouts. Admins, moderators and support share a console with the report queue,
+sanctions and appeals, fraud flags, payout approval, home-row curation, currency grants,
+payout jobs and an audit log of every staff action.
+
+[[brickyard-launch]]
+=== Running it
+
+The project is in `scripts/brickyard`. Install the framework, the engine and the
+backend runtime from the repository root with JDK 8, then test the server and compile
+the app with JDK 17:
+
+[source,bash]
+----
+cd maven
+mvn -pl core,backend,backend-test,codenameone-maven-plugin,luau-runtime,rbx-compat -am install \
+  -DskipTests -Plocal-dev-javase -Dmaven.repo.local=$PWD/../.m2-repo
+
+cd ../scripts/brickyard
+mvn -Dcodename1.platform=backend -pl shared,backend test -Dmaven.repo.local=$PWD/../../.m2-repo
+mvn -pl common -am compile -Dmaven.repo.local=$PWD/../../.m2-repo
+----
+
+`.github/workflows/brickyard.yml` runs the engine tests, the server tests on SQLite,
+PostgreSQL and MySQL, and the client compile.
+
+[[brickyard-reskin]]
+=== Making it yours
+
+* *Templates*: each template is a place file in
+  `maven/rbx-compat/src/main/resources/com/codename1/rbx/templates`, with a thumbnail
+  beside it. `TemplateGallery` in the app's `studio` package lists them for the Create
+  tab. Add a place file and a thumbnail to offer a new kind of game.
+* *The economy*: the store product ids, the Plus subscription and the rewarded ad unit
+  are in `AppConfig`. On the server, quests, levels and the season pass are in the
+  `progress` package, and the wallet and the store receipt validators in `economy`.
+* *The look*: every color is a constant at the top of
+  `common/src/main/css/theme.css`: charcoal surfaces, a green Play, a blue primary
+  action and yellow kept for Bricks and badges. Every screen is built from ordinary
+  widgets that these rules dress, so changing the palette re-skins the app.
+* *The name*: the application source is MIT-0 (`scripts/brickyard/LICENSE`), so rename
+  it, change it and ship it without royalties.
+
+[[brickyard-live]]
+=== What a live deployment still needs
+
+* Store receipts are accepted only on the development and test profiles until a store
+  validator is configured; elsewhere the receipt endpoint answers 503. Configure your
+  own products and validator.
+* The server runs on the JVM backend runtime. `rbx-compat` needs the client core, so a
+  ParparVM-compiled server is not supported yet.
+* Assets a place file references by URL are replaced by placeholders, and the
+  compatibility report names them. A live platform needs its own asset hosting.
+* Your own hosting, a database, a push key and ad units.

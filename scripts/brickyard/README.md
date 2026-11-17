@@ -37,8 +37,8 @@ rewarded currency and the built-in MCP server for agentic creation.
   marketplace and badges. It also holds the place-file reader and writer, a
   compatibility report, a GPU part renderer with materials, lighting and
   effects, rigid-body physics, humanoid characters and multiplayer
-  replication. Five starter templates are included: obby, tycoon, arena,
-  simulator and racing.
+  replication. Nine starter templates are included: an empty baseplate,
+  two obbies, tycoon, arena, simulator, racing, survival and a roleplay town.
 
 **The app** (`common`):
 
