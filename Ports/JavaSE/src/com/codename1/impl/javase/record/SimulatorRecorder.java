@@ -520,6 +520,21 @@ public final class SimulatorRecorder {
     }
 
     /// The light studio backdrop a recording shows around the device.
+    /// Draws a screen frame into the fixed-size video frame, over whatever is
+    /// there. A frame whose shape changed since the first (a foldable skin
+    /// moving to its cover display, a rotation) is letterboxed, never
+    /// stretched: a video stream keeps the size it started with.
+    static void drawFitted(Graphics2D g, BufferedImage img, int width, int height) {
+        if (img.getWidth() * height == img.getHeight() * width) {
+            g.drawImage(img, 0, 0, width, height, null);
+            return;
+        }
+        double s = Math.min(width / (double) img.getWidth(), height / (double) img.getHeight());
+        int dw = (int) Math.round(img.getWidth() * s);
+        int dh = (int) Math.round(img.getHeight() * s);
+        g.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh, null);
+    }
+
     public static void paintBackdrop(Graphics2D g, int w, int h) {
         g.setPaint(new java.awt.GradientPaint(0, 0, new java.awt.Color(0xf5f5f7), 0, h,
                 new java.awt.Color(0xdedee3)));
@@ -535,17 +550,7 @@ public final class SimulatorRecorder {
         // corners kept whatever was there (black, or a smear of the device
         // as it moved).
         paintBackdrop(g, width, height);
-        if (img.getWidth() * height == img.getHeight() * width) {
-            g.drawImage(img, 0, 0, width, height, null);
-        } else {
-            // A frame whose shape changed since the first (a foldable skin
-            // moving to its cover display, a rotation) is letterboxed, never
-            // stretched: a video stream keeps the size it started with.
-            double s = Math.min(width / (double) img.getWidth(), height / (double) img.getHeight());
-            int dw = (int) Math.round(img.getWidth() * s);
-            int dh = (int) Math.round(img.getHeight() * s);
-            g.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh, null);
-        }
+        drawFitted(g, img, width, height);
         Caption[] active;
         synchronized (this) {
             active = captions.toArray(new Caption[captions.size()]);

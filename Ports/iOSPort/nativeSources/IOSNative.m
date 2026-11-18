@@ -12341,8 +12341,6 @@ void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_M
 #endif // CN1_USE_APPREVIEW
 }
 
-extern BOOL cn1KeyboardTrackingSuspended;
-
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
 // Not implemented on the native macOS port: the body below is UIKit -- a
@@ -12378,15 +12376,32 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             
             [picker setBody:smsBody];
             
-            // The composer brings its own keyboard; keep our keyboard handlers out
-            // of it until the delegate dismisses the sheet (issue #6211). Not when
-            // something is already presented: UIKit then refuses this presentation,
-            // the delegate that clears the flag never runs, and the keyboard of
-            // whatever is up would go unhandled until that is dismissed.
-            if (cn1PresentingController().presentedViewController == nil) {
-                cn1KeyboardTrackingSuspended = YES;
+            // Issue #6211: the composer intermittently comes up with its entry
+            // field and send button behind the keyboard, with nothing of the
+            // application being edited. The composer is a remote view controller:
+            // its text view and its keyboard avoidance run in Apple's process, and
+            // the port's keyboard handlers were ruled out (suspending them for the
+            // composer's lifetime changed nothing on a device). What is still ours
+            // is how it is presented, so this presents it the way least likely to
+            // disturb that inset:
+            //  - Full screen, not the default page sheet, so the remote view's
+            //    frame is not still settling while it computes the inset.
+            //  - The GL view, which viewDidAppear makes first responder for
+            //    hardware keys, gives it up while the composer opens. Only the GL
+            //    view: endEditing: on the window would also resign an active
+            //    Codename One editor behind the Java side's back.
+            //  - presentViewController:animated:completion:, not the
+            //    presentModalViewController: deprecated since iOS 6.
+            // Full screen sends the GL controller through viewWillDisappear /
+            // viewDidAppear, as the camera and video presentations already do;
+            // viewDidAppear restores first responder and repaints on dismissal.
+            // Not reproducible in the simulator, where canSendText is NO.
+            UIViewController* presenter = cn1PresentingController();
+            if ([presenter.view isFirstResponder]) {
+                [presenter.view resignFirstResponder];
             }
-            [cn1PresentingController() presentModalViewController:picker animated:YES];
+            picker.modalPresentationStyle = UIModalPresentationFullScreen;
+            [presenter presentViewController:picker animated:YES completion:nil];
             
 #ifndef CN1_USE_ARC
             [picker release];

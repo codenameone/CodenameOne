@@ -611,7 +611,13 @@ public final class Web {
                     }
                 }
             }
-            if (body != null && body.length > 0) {
+            // An empty body under an explicit verb other than GET is still a
+            // body: the packaged arm (cn1_backend_web.c) sends it with
+            // Content-Length: 0, and HttpURLConnection sends no length at all
+            // unless output is enabled. Azure answers a PUT without one with
+            // 411 Length Required, so the two arms must agree here.
+            if (body != null && (body.length > 0
+                    || !"GET".equals(verb) && !"HEAD".equals(verb))) {
                 if ("GET".equals(verb)) {
                     // SILENTLY REWRITTEN OTHERWISE. HttpURLConnection turns a GET
                     // into a POST the moment anything is written to it -- the JDK

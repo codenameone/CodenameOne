@@ -22,6 +22,10 @@
  */
 package com.codename1.backend.aws;
 
+import com.codename1.backend.Config;
+import com.codename1.backend.storage.ObjectStorage;
+import com.codename1.backend.storage.ObjectStorages;
+import com.codename1.impl.backend.FlatXml;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -43,7 +47,7 @@ import com.codename1.backend.Web;
 /// The presigned URL is the method to reach for from a mobile app: it lets the
 /// device upload or download directly and keeps the object bytes out of the
 /// server, which is most of the reason to use object storage from an app.
-public final class S3 {
+public final class S3 implements ObjectStorage {
     /// How long before expiry to fetch again. Long enough that a request signed now
     /// is still valid when it arrives, short enough not to refresh constantly.
     private static final long CREDENTIAL_REFRESH_MARGIN = 5 * 60 * 1000L;
@@ -120,6 +124,14 @@ public final class S3 {
     /// Lambda and ECS set and hard-coding it is how a service ends up deployable in
     /// exactly one place.
     public static S3 forRegion(String region) throws IOException {
+        String resolved = regionOrEnvironment(region);
+        return new S3(Credentials.resolve(), resolved, endpointFor(resolved),
+                false, true, true);
+    }
+
+    /// `region`, or the environment's when it is empty, checked to be a region
+    /// this class can build an endpoint for.
+    private static String regionOrEnvironment(String region) throws IOException {
         String resolved = region != null && region.length() > 0
                 ? region : System.getenv("AWS_REGION");
         if (resolved == null || resolved.length() == 0) {
@@ -130,8 +142,7 @@ public final class S3 {
         }
         requireRegionName(resolved);
         requireSupportedPartition(resolved);
-        return new S3(Credentials.resolve(), resolved, endpointFor(resolved),
-                false, true, true);
+        return resolved;
     }
 
     /// Refuses a region whose partition this cannot build an endpoint for.
@@ -253,11 +264,85 @@ public final class S3 {
                 false);
     }
 
+    /// Opens `s3://` and `r2://` storage URLs for
+    /// [com.codename1.backend.storage.ObjectStorages]; the generated wiring
+    /// registers it under whichever of the two the configuration names.
+    ///
+    /// - `s3://region` (or `s3://`, which reads `AWS_REGION`) is AWS. With
+    ///   `cn1.storage.s3.endpoint` set it is that S3-compatible endpoint instead,
+    ///   addressed path-style.
+    /// - `r2://<account id>` is Cloudflare R2, at
+    ///   `<account id>.r2.cloudflarestorage.com`, or the jurisdiction
+    ///   `cn1.storage.r2.jurisdiction` names (`eu`, `fedramp`).
+    ///
+    /// Keys come from `cn1.storage.<s3|r2>.access-key-id` and
+    /// `.secret-access-key`. Without them AWS resolves its usual chain
+    /// (environment, container, instance role) and R2 reads the
+    /// `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` environment, which is
+    /// where R2's own documentation puts its S3 keys.
+    public static final class Factory implements ObjectStorages.Factory {
+        @Override
+        public ObjectStorage open(String url, Config config) throws IOException {
+            String authority = ObjectStorages.authority(url);
+            boolean r2 = url.regionMatches(true, 0, "r2:", 0, 3);
+            String prefix = r2 ? "cn1.storage.r2." : "cn1.storage.s3.";
+            String keyId = ObjectStorages.setting(config, prefix + "access-key-id", null);
+            String secret = ObjectStorages.setting(config, prefix + "secret-access-key", null);
+            Credentials explicit = keyId != null && secret != null
+                    ? new Credentials(keyId, secret, null) : null;
+            if (r2) {
+                requireAccountId(authority);
+                String jurisdiction = ObjectStorages.setting(config,
+                        "cn1.storage.r2.jurisdiction", null);
+                if (jurisdiction != null) {
+                    requireAccountId(jurisdiction);
+                }
+                return forEndpoint(explicit != null ? explicit : Credentials.fromEnvironment(),
+                        "auto", "https://" + authority
+                        + (jurisdiction == null ? "" : "." + jurisdiction)
+                        + ".r2.cloudflarestorage.com");
+            }
+            String endpoint = ObjectStorages.setting(config, "cn1.storage.s3.endpoint", null);
+            if (endpoint != null) {
+                return forEndpoint(explicit != null ? explicit : Credentials.resolve(),
+                        authority.length() == 0 ? null : authority, endpoint);
+            }
+            if (explicit == null) {
+                return forRegion(authority);
+            }
+            String region = regionOrEnvironment(authority);
+            return new S3(explicit, region, endpointFor(region), false, true, false);
+        }
+
+        /// An R2 account id or jurisdiction becomes a hostname label, so it is
+        /// held to one: letters and digits only. Anything else could move the
+        /// request -- and the signed key id -- to a different host.
+        private static void requireAccountId(String value) throws IOException {
+            boolean ok = value.length() > 0 && value.length() <= 63;
+            for (int iter = 0 ; ok && iter < value.length() ; iter++) {
+                char c = value.charAt(iter);
+                ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+            }
+            if (!ok) {
+                throw new IOException("Not an R2 account id or jurisdiction: \"" + value
+                        + "\". It becomes part of the host name, so it is letters and "
+                        + "digits only");
+            }
+        }
+    }
+
+    /// `s3` for AWS and for every S3-compatible endpoint, R2 included.
+    @Override
+    public String getName() {
+        return "s3";
+    }
+
     /// Creates a bucket, and says nothing when it already exists.
     ///
     /// Usually infrastructure's job rather than the application's, but a first run
     /// against a fresh MinIO or a test fixture needs it, and the alternative is a
     /// shell script that speaks a protocol this class already speaks.
+    @Override
     public void createBucket(String bucket) throws IOException {
         Web.Result result = send("PUT", bucket, "", null, null, createBucketBody());
         if (result.isSuccess()) {
@@ -276,6 +361,7 @@ public final class S3 {
     }
 
     /// Uploads an object. Returns its ETag, which is the server's receipt.
+    @Override
     public String putObject(String bucket, String key, byte[] content, String contentType)
             throws IOException {
         Map headers = new LinkedHashMap();
@@ -289,6 +375,7 @@ public final class S3 {
     }
 
     /// Downloads an object. Throws when it is missing, rather than returning null.
+    @Override
     public byte[] getObject(String bucket, String key) throws IOException {
         Web.Result result = send("GET", bucket, key, null, null, null);
         requireSuccess(result, "GET", bucket, key);
@@ -296,22 +383,21 @@ public final class S3 {
     }
 
     /// The object's metadata, or null when it does not exist.
+    @Override
     public ObjectInfo headObject(String bucket, String key) throws IOException {
         Web.Result result = send("HEAD", bucket, key, null, null, null);
         if (result.getStatus() == 404) {
             return null;
         }
         requireSuccess(result, "HEAD", bucket, key);
-        ObjectInfo info = new ObjectInfo();
-        info.key = key;
-        info.size = parseLong(result.getHeader("content-length"));
-        info.contentType = result.getHeader("content-type");
         String etag = result.getHeader("etag");
-        info.etag = etag == null ? null : etag.replace("\"", "");
-        info.lastModified = result.getHeader("last-modified");
-        return info;
+        return new ObjectInfo(key, parseLong(result.getHeader("content-length")),
+                result.getHeader("content-type"),
+                etag == null ? null : etag.replace("\"", ""),
+                result.getHeader("last-modified"));
     }
 
+    @Override
     public void deleteObject(String bucket, String key) throws IOException {
         Web.Result result = send("DELETE", bucket, key, null, null, null);
         // S3 answers 204 for a delete, and also for a key that was not there.
@@ -326,7 +412,9 @@ public final class S3 {
     /// for, and a caller that ignores the continuation token silently sees only the
     /// first page. This follows the token until the listing is complete or `max` is
     /// reached.
-    public List listObjects(String bucket, String prefix, int max) throws IOException {
+    @Override
+    public List<String> listObjects(String bucket, String prefix, int max)
+            throws IOException {
         // UP TO MAX MEANS UP TO MAX. The loop below stops at the limit only while
         // it is positive, so zero and below meant "follow every continuation token
         // to the end of the bucket" -- the opposite of what was asked, and on a
@@ -334,13 +422,13 @@ public final class S3 {
         // of everything in the heap. There is no documented unlimited mode to
         // preserve: the contract above is "lists up to max objects".
         if (max == 0) {
-            return new ArrayList();
+            return new ArrayList<String>();
         }
         if (max < 0) {
             throw new IllegalArgumentException("listObjects max must not be negative: "
                     + max);
         }
-        List keys = new ArrayList();
+        List<String> keys = new ArrayList<String>();
         String token = null;
         while (true) {
             Map query = new LinkedHashMap();
@@ -356,7 +444,7 @@ public final class S3 {
             String body = result.getBodyAsString();
             List page = elements(body, "Key");
             for (Object key : page) {
-                keys.add(key);
+                keys.add((String) key);
                 // max is positive here: zero and negative were answered above.
                 if (keys.size() >= max) {
                     return keys;
@@ -374,44 +462,26 @@ public final class S3 {
     ///
     /// Nothing is sent here: a presigned URL is a computation, so this costs no
     /// round trip and can be handed straight to a client.
+    @Override
     public String presignGet(String bucket, String key, int seconds) throws IOException {
         return Aws.presign(credentials(), region, "s3", "GET", hostFor(bucket),
                 pathFor(bucket, key), null, seconds, null, secure);
     }
 
     /// The upload counterpart: a URL a client can PUT to, for `seconds`.
+    @Override
     public String presignPut(String bucket, String key, int seconds) throws IOException {
         return Aws.presign(credentials(), region, "s3", "PUT", hostFor(bucket),
                 pathFor(bucket, key), null, seconds, null, secure);
     }
 
-    /// What [#headObject] reports.
-    public static final class ObjectInfo {
-        String key;
-        long size;
-        String contentType;
-        String etag;
-        String lastModified;
-
-        public String getKey() {
-            return key;
-        }
-
-        public long getSize() {
-            return size;
-        }
-
-        public String getContentType() {
-            return contentType;
-        }
-
-        public String getEtag() {
-            return etag;
-        }
-
-        /// The raw HTTP date the service sent, not a parsed one.
-        public String getLastModified() {
-            return lastModified;
+    /// What [#headObject] reports; the provider-neutral
+    /// [com.codename1.backend.storage.ObjectInfo] under the name this class has
+    /// always returned.
+    public static final class ObjectInfo extends com.codename1.backend.storage.ObjectInfo {
+        ObjectInfo(String key, long size, String contentType, String etag,
+                   String lastModified) {
+            super(key, size, contentType, etag, lastModified);
         }
     }
 
@@ -536,131 +606,10 @@ public final class S3 {
                 + (message.isEmpty() ? "" : ": " + message.get(0)));
     }
 
-    /// The text of every `<name>` element, in order.
-    ///
-    /// A deliberate non-parser: S3's list and error responses are flat, the element
-    /// names wanted are known, and a real XML parser is a dependency this runtime
-    /// does not have. It decodes the five predefined entities, which is what S3
-    /// escapes in a key.
+    /// The text of every `<name>` element, in order; see
+    /// [com.codename1.impl.backend.FlatXml#elements].
     static List elements(String xml, String name) {
-        List out = new ArrayList();
-        if (xml == null) {
-            return out;
-        }
-        String open = "<" + name + ">";
-        String close = "</" + name + ">";
-        int at = 0;
-        while (true) {
-            int start = xml.indexOf(open, at);
-            if (start < 0) {
-                return out;
-            }
-            int end = xml.indexOf(close, start + open.length());
-            if (end < 0) {
-                return out;
-            }
-            out.add(unescape(xml.substring(start + open.length(), end)));
-            at = end + close.length();
-        }
-    }
-
-    /// A numeric XML entity's code point, or -1 for anything that is not one.
-    ///
-    /// Deliberately not Integer.parseInt: it accepts a leading sign and any Unicode
-    /// digit Character.digit knows, so "&#x+41;" and "&#+65;" both decoded to "A" --
-    /// two more spellings of a character, in a decoder whose output becomes object
-    /// keys. com.codename1.backend.Hex is the same rule for HTTP and URI input; it
-    /// is package-private there, and this is a different package, so rather than
-    /// widen an internal utility to public for one caller the rule is stated once
-    /// more here, next to the only other place that needs it.
-    private static int entityCodePoint(String text, int from, int radix) {
-        if (from >= text.length()) {
-            return -1;
-        }
-        long value = 0;
-        for (int iter = from ; iter < text.length() ; iter++) {
-            char c = text.charAt(iter);
-            int digit;
-            if (c >= '0' && c <= '9') {
-                digit = c - '0';
-            } else if (radix == 16 && c >= 'a' && c <= 'f') {
-                digit = c - 'a' + 10;
-            } else if (radix == 16 && c >= 'A' && c <= 'F') {
-                digit = c - 'A' + 10;
-            } else {
-                return -1;
-            }
-            value = value * radix + digit;
-            if (value > 0x10FFFF) {
-                return -1;
-            }
-        }
-        return (int) value;
-    }
-
-    static String unescape(String value) {
-        if (value.indexOf('&') < 0) {
-            return value;
-        }
-        StringBuilder out = new StringBuilder(value.length());
-        int at = 0;
-        while (at < value.length()) {
-            char c = value.charAt(at);
-            if (c != '&') {
-                out.append(c);
-                at++;
-                continue;
-            }
-            int semi = value.indexOf(';', at);
-            if (semi < 0) {
-                out.append(c);
-                at++;
-                continue;
-            }
-            String entity = value.substring(at + 1, semi);
-            if ("amp".equals(entity)) {
-                out.append('&');
-            } else if ("lt".equals(entity)) {
-                out.append('<');
-            } else if ("gt".equals(entity)) {
-                out.append('>');
-            } else if ("quot".equals(entity)) {
-                out.append('"');
-            } else if ("apos".equals(entity)) {
-                out.append('\'');
-            } else if (entity.length() > 1 && entity.charAt(0) == '#') {
-                // appendCodePoint, not a cast. A cast to char keeps the low 16
-                // bits, so the perfectly legal &#x1F600; became U+F600 -- a
-                // private-use character -- and an object key or a continuation
-                // token carrying an emoji came back corrupted. A truncated token
-                // pages from the wrong place, which is a wrong ANSWER rather than
-                // an error.
-                //
-                boolean hexEntity = entity.charAt(1) == 'x' || entity.charAt(1) == 'X';
-                int code = hexEntity ? entityCodePoint(entity, 2, 16)
-                                     : entityCodePoint(entity, 1, 10);
-                if (code >= 0 && code <= 0x10FFFF) {
-                    // The surrogate pair BY HAND. StringBuilder.appendCodePoint
-                    // does not exist in vm/JavaAPI, so it compiles against the JDK
-                    // for the Java SE arm and fails the translated build -- which
-                    // is the rule that core code may only call what the VM
-                    // actually defines.
-                    if (code > 0xFFFF) {
-                        int astral = code - 0x10000;
-                        out.append((char) (0xD800 + (astral >> 10)));
-                        out.append((char) (0xDC00 + (astral & 0x3FF)));
-                    } else {
-                        out.append((char) code);
-                    }
-                } else {
-                    out.append('&').append(entity).append(';');
-                }
-            } else {
-                out.append('&').append(entity).append(';');
-            }
-            at = semi + 1;
-        }
-        return out.toString();
+        return FlatXml.elements(xml, name);
     }
 
     private static long parseLong(String value) {

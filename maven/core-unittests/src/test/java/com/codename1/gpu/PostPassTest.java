@@ -24,6 +24,7 @@ package com.codename1.gpu;
 
 import com.codename1.gpu.shader.ShaderMaterial;
 import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Image;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,7 +32,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class PostPassTest {
+// UITestBase: a dropped pass is logged, and logging needs an implementation.
+class PostPassTest extends UITestBase {
     // Records the order of what GraphicsDevice asks of a device in a frame.
     private static class Recorder extends GraphicsDevice {
         final List<String> log = new ArrayList<String>();

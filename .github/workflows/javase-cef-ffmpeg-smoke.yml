@@ -33,7 +33,17 @@ on:
   workflow_dispatch:
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   javase-smoke:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: ${{ matrix.os }}
     strategy:
       fail-fast: false

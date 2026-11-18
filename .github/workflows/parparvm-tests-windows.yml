@@ -704,7 +704,9 @@ jobs:
           retention-days: 14
 
       - name: Fail on a ParparVM performance regression (x64)
-        if: success() || failure()
+        # Not in a capture (cn1ss_capture): that run exists to render goldens,
+        # and a timing gate failing it only marks the capture red.
+        if: ${{ (success() || failure()) && inputs.cn1ss_capture == '' }}
         shell: bash
         run: vm/selfhost/ci-perf-gate.sh verdict artifacts/windows-port/raw/perf
 
@@ -937,7 +939,9 @@ jobs:
           retention-days: 14
 
       - name: Fail on a ParparVM performance regression (arm64)
-        if: success() || failure()
+        # Not in a capture (cn1ss_capture): that run exists to render goldens,
+        # and a timing gate failing it only marks the capture red.
+        if: ${{ (success() || failure()) && inputs.cn1ss_capture == '' }}
         shell: bash
         run: vm/selfhost/ci-perf-gate.sh verdict artifacts/windows-port/raw/perf
 
@@ -1052,7 +1056,9 @@ jobs:
         with:
           name: windows-native-x64-diagnostics
           path: artifacts/windows-port/port-status-windows-x64.json
-          if-no-files-found: error
+          # A capture (cn1ss_capture) renders goldens and writes no port
+          # status; requiring the file failed every capture's comment job.
+          if-no-files-found: ${{ inputs.cn1ss_capture != '' && 'ignore' || 'error' }}
           retention-days: 14
 
       - name: Upload golden capture
@@ -1165,7 +1171,9 @@ jobs:
         with:
           name: port-status-windows-arm64
           path: artifacts/windows-port/port-status-windows-arm64.json
-          if-no-files-found: error
+          # A capture (cn1ss_capture) renders goldens and writes no port
+          # status; requiring the file failed every capture's comment job.
+          if-no-files-found: ${{ inputs.cn1ss_capture != '' && 'ignore' || 'error' }}
           retention-days: 14
 
       - name: Upload golden capture

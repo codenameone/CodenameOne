@@ -26,14 +26,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   car-android:
-    needs: unity-gallery
+    if: needs.golden-plan.outputs.run == 'true'
+    needs: [golden-plan, unity-gallery]
     name: Car Android Auto
     permissions:
       contents: read

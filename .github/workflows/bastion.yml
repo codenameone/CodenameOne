@@ -54,7 +54,17 @@ permissions:
   packages: read
 
 jobs:
+  # The gate every PR workflow waits on: a PR missing a golden is known to
+  # fail as a whole, so nothing here runs until Golden capture
+  # (golden-capture.yml) has committed them.
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
   template-sync:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Initializr template matches the sample
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -67,6 +77,8 @@ jobs:
         run: python3 scripts/sync-initializr-template.py bastion
 
   backend:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Server tests (JVM and compiled)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -144,6 +156,8 @@ jobs:
           retention-days: 14
 
   chain:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Ether on a development chain
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -198,6 +212,8 @@ jobs:
           fi
 
   backend-database:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Server tests on ${{ matrix.database }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -290,6 +306,8 @@ jobs:
           retention-days: 14
 
   client-e2e:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: The app's tests, and the server driven over HTTP (JVM and compiled)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -372,6 +390,8 @@ jobs:
           retention-days: 14
 
   web:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Web app hosted by the server (headless browser)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -452,6 +472,8 @@ jobs:
           retention-days: 14
 
   android:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
     name: Android build
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -498,16 +520,17 @@ jobs:
           ./scripts/build-android-app.sh -q -DskipTests
 
   build-ios-port:
+    needs: golden-plan
     # The nightly iOS build is samples-ios-nightly.yml's: one port build and
     # shared warm runners for every sample, instead of two macOS jobs per sample.
-    if: github.event_name != 'schedule'
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name != 'schedule') }}
     # The reusable workflow scripts-ios.yml depends on; sharing it shares its cache.
     uses: ./.github/workflows/_build-ios-port.yml
 
   ios:
     name: iOS build (simulator)
-    if: github.event_name != 'schedule'
-    needs: build-ios-port
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name != 'schedule') }}
+    needs: [golden-plan, build-ios-port]
     runs-on: macos-15
     timeout-minutes: 50
     env:
