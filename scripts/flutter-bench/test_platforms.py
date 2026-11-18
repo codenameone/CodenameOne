@@ -304,14 +304,17 @@ class AndroidInstall(unittest.TestCase):
         self.result = os.path.join(self.bin, "install_result")
         with open(self.result, "w") as handle:
             handle.write("Success")
+        self.logcat = os.path.join(self.bin, "logcat")
+        self._logcat("I System.out: BENCH:FIRSTFRAME after=81ms edtPasses=1")
         adb = os.path.join(self.bin, "adb")
         with open(adb, "w") as handle:
             handle.write("#!/bin/sh\n"
                          "echo \"$*\" >> '%s'\n"
                          "case \"$*\" in *\\ install\\ *|install\\ *) cat '%s';; "
                          "*'package compile'*) echo Success;; "
+                         "*'logcat -d'*) cat '%s';; "
                          "*'am start'*) echo 'TotalTime: 123';; esac\n"
-                         % (self.log, self.result))
+                         % (self.log, self.result, self.logcat))
         os.chmod(adb, 0o755)
         self._path = os.environ["PATH"]
         os.environ["PATH"] = self.bin + os.pathsep + self._path
@@ -331,6 +334,34 @@ class AndroidInstall(unittest.TestCase):
     def _calls(self):
         with open(self.log) as handle:
             return [line.strip() for line in handle]
+
+    def _logcat(self, *lines):
+        with open(self.logcat, "w") as handle:
+            handle.write("\n".join(lines) + "\n")
+
+    def test_a_launch_that_drew_without_its_marker_is_not_a_measurement(self):
+        # `am start -W` answers for a gallery that died in its first layout
+        # too, faster than for a working one: the 2026-11-18 nightly published
+        # that as an improvement.
+        self._logcat("I ActivityManager: Displayed com.example.bench/.Main",
+                     "I System.out: java.lang.ExceptionInInitializerError",
+                     "I System.out: BENCH:FIRSTFRAME-INVALID after=3ms edtPasses=1")
+        saved = platforms.Adapter._unmarked_reported
+        platforms.Adapter._unmarked_reported = collections.Counter()
+        err = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err):
+                measured = self.adapter.launch_and_time("codenameone")
+        finally:
+            platforms.Adapter._unmarked_reported = saved
+        self.assertEqual((None, None, None), measured)
+        self.assertIn("| I System.out: java.lang.ExceptionInInitializerError", err.getvalue())
+        self.assertNotIn("ActivityManager", err.getvalue())
+        self.assertFalse([c for c in self._calls() if "meminfo" in c],
+                         "no memory figure for a launch that does not count")
+
+    def test_a_marked_launch_is_timed_by_the_platform(self):
+        self.assertEqual(123.0, self.adapter.launch_and_time("codenameone")[0])
 
     def test_uninstalls_then_installs_before_the_first_launch_only(self):
         cold, _, _ = self.adapter.launch_and_time("codenameone")

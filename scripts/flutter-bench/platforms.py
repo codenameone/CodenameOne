@@ -91,6 +91,9 @@ SETTLE_S = float(os.environ.get("BENCH_SETTLE", "12"))
 # stack trace out of a tail. Enough for a Java trace with its "Caused by".
 UNMARKED_HEAD_LINES = 80
 UNMARKED_TAIL_LINES = 80
+# The logcat lines that are an application talking: both sides print through
+# these tags, and a crash is the runtime's.
+ANDROID_APP_LOG = re.compile(r"System\.out|System\.err|flutter|AndroidRuntime|BENCH:")
 # How many unmarked launches are explained per side. More than one, because an
 # intermittent failure need not look like the first; not all of them, because
 # nine rounds of one broken application say the same thing nine times.
@@ -292,10 +295,9 @@ class Adapter(object):
         exception that had killed its first frame; finding it took a local
         build.
 
-        Only the adapters that time against a marker come through here: the
-        desktop ones, and iOS where it is measured at all. Android takes its figure from `am start -W` and
-        reads no marker, so a gallery that dies in its first layout is still
-        timed there, as a fast launch.
+        Every adapter comes through here: the desktop ones and iOS time
+        against the marker, and Android, whose figure is `am start -W`,
+        requires it in logcat before it believes that figure.
         """
         key = (self.id, side)
         if Adapter._unmarked_reported[key] >= UNMARKED_REPORTS:
@@ -904,7 +906,10 @@ class AndroidAdapter(Adapter):
         self._install(side)
         package = self.packages[side]
         self._adb("shell", "am", "force-stop", package)
-        self._adb("shell", "logcat", "-c")
+        # Room for one launch of either application with the emulator's own
+        # chatter, so the marker cannot have been rotated out when it is read.
+        self._adb("logcat", "-G", "8M")
+        self._adb("logcat", "-c")
         out = self._adb("shell", "am", "start", "-W", "-n",
                         "%s/%s" % (package, self.activities[side]))
         cold = None
@@ -915,6 +920,22 @@ class AndroidAdapter(Adapter):
                 except ValueError:
                     cold = None
         time.sleep(SETTLE_S)
+        # `am start -W` says the activity drew, not that the application
+        # started: a gallery that dies in its first layout draws a window too,
+        # sooner than a working one and holding less memory. That is what the
+        # 2026-11-18 nightly timed here -- 450 ms and 35 MB, "improved" past
+        # the baseline -- while the desktop legs, which wait for the marker,
+        # measured nothing. So the marker is required here as well, read back
+        # from logcat: it does not time the launch, it says the launch counts.
+        log = self._adb("logcat", "-d").stdout.splitlines()
+        if not any(MARKERS[side].search(line) for line in log):
+            self._adb("shell", "am", "force-stop", package)
+            said = [line for line in log if ANDROID_APP_LOG.search(line)]
+            head = said[:UNMARKED_HEAD_LINES]
+            rest = said[UNMARKED_HEAD_LINES:]
+            tail = rest[-UNMARKED_TAIL_LINES:]
+            self._report_unmarked(side, head, tail, len(rest) - len(tail))
+            return None, None, None
         memory = self._memory(package)
         self._adb("shell", "am", "force-stop", package)
         # `am start -W` reports one number, so there is no bracket here.
