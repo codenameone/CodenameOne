@@ -257,7 +257,7 @@ public class ChartDataModelTest extends UITestBase {
         s.setWidth(100);
         s.setHeight(30);
         s.paint(Image.createImage(100, 30).getGraphics());
-        assertEquals(2, s.lastSegments);
+        assertEquals(2, s.getLastSegments());
     }
 
     @FormTest

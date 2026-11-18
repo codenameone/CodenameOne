@@ -30,11 +30,11 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.animations.AnimationTime;
-import com.codename1.ui.chart.series.XYSeries;
 import com.codename1.ui.chart.axis.Axis;
 import com.codename1.ui.chart.axis.CategoryAxis;
 import com.codename1.ui.chart.axis.NumberAxis;
 import com.codename1.ui.chart.layout.LabelLayout;
+import com.codename1.ui.chart.series.XYSeries;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
@@ -1426,7 +1426,7 @@ public class Chart extends Component {
             if (yb != null) {
                 // an x/y series is summarized from its numbers; formatting every point of a long
                 // series on each accessibility query would be wasted work
-                sb.append(((com.codename1.ui.chart.series.XYSeries) s).size()).append(" values from ").append(s.formatValue(null, yb[0]))
+                sb.append(((XYSeries) s).size()).append(" values from ").append(s.formatValue(null, yb[0]))
                         .append(" to ").append(s.formatValue(null, yb[1]));
             } else {
                 ArrayList<String[]> rows = new ArrayList<String[]>();
@@ -1449,10 +1449,10 @@ public class Chart extends Component {
 
     // the smallest and largest data values, without the baseline a bar or area adds to its bounds
     private static double[] valueRange(Series s) {
-        if (!(s instanceof com.codename1.ui.chart.series.XYSeries)) {
+        if (!(s instanceof XYSeries)) {
             return null;
         }
-        com.codename1.ui.chart.series.XYSeries xy = (com.codename1.ui.chart.series.XYSeries) s;
+        XYSeries xy = (XYSeries) s;
         double min = Double.MAX_VALUE;
         double max = -Double.MAX_VALUE;
         for (int i = 0; i < xy.size(); i++) {

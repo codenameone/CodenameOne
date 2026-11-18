@@ -312,7 +312,7 @@ public class BoxPlotSeries extends XYSeries {
             line(g, rot, c - half / 2, pMax, c + half / 2, pMax);
             rect(g, rot, c - half, pMed - 1, half * 2, Math.max(2, ctx.mm(0.4f)));
             if (t >= 1) {
-                int d = Math.max(3, Math.round(ctx.mm(1)));
+                int d = Math.max(3, ctx.mm(1));
                 for (double o : getOutliers(i)) {
                     float po = pos(ctx, i, o, rot);
                     int cx = Math.round(rot ? po : c);

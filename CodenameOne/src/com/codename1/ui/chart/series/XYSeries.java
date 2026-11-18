@@ -455,6 +455,9 @@ public abstract class XYSeries extends Series {
     // its own old value instead of taking its neighbour's; a new x starts from the old point just
     // before it, so an appended point grows out of the previous last point instead of snapping in.
     private int fromSlot(int i) {
+        if (fromY == null) {
+            return -1;
+        }
         if (fromX == null || !isAscending()) {
             return i < fromY.length ? i : -1;
         }

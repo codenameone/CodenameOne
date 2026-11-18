@@ -52,7 +52,12 @@ public class Sparkline extends Component {
     private boolean showExtremes;
     private ChartTheme theme;
     // the number of separate line runs the last line or area paint drew, for tests
-    int lastSegments;
+    private int lastSegments;
+
+    // the line pieces drawn by the last paint; a gap starts a new one
+    int getLastSegments() {
+        return lastSegments;
+    }
 
     /// Creates a sparkline.
     ///
