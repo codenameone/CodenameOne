@@ -42,6 +42,7 @@ public class ChartTheme {
     private int axisColor;
     private int tooltipBackground;
     private int tooltipText;
+    private Integer legendTextColor;
     private int positiveColor = 0x26A69A;
     private int negativeColor = 0xEF5350;
 
@@ -70,6 +71,64 @@ public class ChartTheme {
         ChartTheme t = new ChartTheme(lightText);
         t.textColor = fg;
         return t;
+    }
+
+    /// Applies colours a theme sets on the chart's part UIIDs: the foreground of `ChartAxis`
+    /// colours axis labels and lines, `ChartGrid` the grid lines, `ChartLegend` the legend text, and
+    /// the background and foreground of `ChartTooltip` the tooltip. A UIID the theme leaves out
+    /// keeps the palette's colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ui`: the UI manager to read the styles from
+    ///
+    /// #### Returns
+    ///
+    /// this theme
+    public ChartTheme applyUIIDs(com.codename1.ui.plaf.UIManager ui) {
+        // an undefined UIID resolves to the default style, so only differences from it are applied
+        com.codename1.ui.plaf.Style none = ui.getComponentStyle("ChartUndefinedPart");
+        com.codename1.ui.plaf.Style axis = ui.getComponentStyle("ChartAxis");
+        if (axis.getFgColor() != none.getFgColor()) {
+            secondaryTextColor = axis.getFgColor();
+            axisColor = axis.getFgColor();
+        }
+        com.codename1.ui.plaf.Style grid = ui.getComponentStyle("ChartGrid");
+        if (grid.getFgColor() != none.getFgColor()) {
+            gridColor = grid.getFgColor();
+        }
+        com.codename1.ui.plaf.Style legend = ui.getComponentStyle("ChartLegend");
+        if (legend.getFgColor() != none.getFgColor()) {
+            legendTextColor = Integer.valueOf(legend.getFgColor());
+        }
+        com.codename1.ui.plaf.Style tip = ui.getComponentStyle("ChartTooltip");
+        if (tip.getBgColor() != none.getBgColor()) {
+            tooltipBackground = tip.getBgColor();
+        }
+        if (tip.getFgColor() != none.getFgColor()) {
+            tooltipText = tip.getFgColor();
+        }
+        return this;
+    }
+
+    /// The legend text colour; the secondary text colour unless `ChartLegend` or
+    /// `setLegendTextColor` sets one.
+    public int getLegendTextColor() {
+        return legendTextColor != null ? legendTextColor.intValue() : secondaryTextColor;
+    }
+
+    /// Sets the legend text colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: an RGB colour
+    ///
+    /// #### Returns
+    ///
+    /// this theme
+    public ChartTheme setLegendTextColor(int c) {
+        legendTextColor = Integer.valueOf(c);
+        return this;
     }
 
     private final boolean dark;

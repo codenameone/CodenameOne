@@ -84,6 +84,11 @@ public class Chart extends Component {
     private final List<Series> series = new ArrayList<Series>();
     private final List<Annotation> annotations = new ArrayList<Annotation>();
     private final List<SelectionListener> selectionListeners = new ArrayList<SelectionListener>();
+    private final List<RangeListener> rangeListeners = new ArrayList<RangeListener>();
+    private boolean brushEnabled;
+    private boolean brushZooms = true;
+    private int brushFrom = -1;
+    private int brushTo = -1;
     private Axis xAxis = new NumberAxis(Axis.BOTTOM);
     private Axis yAxis = new NumberAxis(Axis.LEFT);
     private Axis secondaryYAxis;
@@ -96,6 +101,7 @@ public class Chart extends Component {
     private boolean zoomEnabled = true;
     private int animationDuration = 450;
     private String emptyText = "No data";
+    private String loadingText;
     private TooltipRenderer tooltipRenderer;
 
     // transition state
@@ -122,6 +128,7 @@ public class Chart extends Component {
     private static final int DRAG_PAN = 1;
     private static final int DRAG_SCRUB = 2;
     private static final int DRAG_PASS = 3;
+    private static final int DRAG_BRUSH = 4;
     private int dragMode;
     private boolean pinching;
     private List<Chart> syncGroup = new ArrayList<Chart>();
@@ -271,7 +278,7 @@ public class Chart extends Component {
     /// The colour theme.
     public ChartTheme getTheme() {
         if (theme == null) {
-            theme = ChartTheme.fromStyle(getStyle());
+            theme = ChartTheme.fromStyle(getStyle()).applyUIIDs(getUIManager());
         }
         return theme;
     }
@@ -338,6 +345,67 @@ public class Chart extends Component {
     public Chart setAnimationDuration(int ms) {
         animationDuration = Math.max(0, ms);
         return this;
+    }
+
+    /// Shows that data is on its way: with no data yet the text replaces the empty state, and over
+    /// existing data the chart is dimmed under it until the new data arrives.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to show, or null to stop showing it
+    ///
+    /// #### Returns
+    ///
+    /// this chart
+    public Chart setLoading(String text) {
+        loadingText = text;
+        repaint();
+        return this;
+    }
+
+    /// Whether `setLoading` is showing a loading state.
+    public boolean isLoading() {
+        return loadingText != null;
+    }
+
+    /// Makes a drag inside the plot select a range of x values instead of scrubbing or panning;
+    /// pinch, the wheel and the keyboard still zoom and pan. The selection is reported to
+    /// `addRangeListener` and, unless `setBrushZooms(false)`, the chart zooms to it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: true to brush
+    ///
+    /// #### Returns
+    ///
+    /// this chart
+    public Chart setBrushEnabled(boolean enabled) {
+        brushEnabled = enabled;
+        return this;
+    }
+
+    /// Whether a brush selection also zooms the chart to it; true by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zooms`: false to only report the selection
+    ///
+    /// #### Returns
+    ///
+    /// this chart
+    public Chart setBrushZooms(boolean zooms) {
+        brushZooms = zooms;
+        return this;
+    }
+
+    /// Adds a listener for brush selections.
+    public void addRangeListener(RangeListener l) {
+        rangeListeners.add(l);
+    }
+
+    /// Removes a brush selection listener.
+    public void removeRangeListener(RangeListener l) {
+        rangeListeners.remove(l);
     }
 
     /// Text shown when there is nothing to plot.
@@ -476,7 +544,7 @@ public class Chart extends Component {
         super.initComponent();
         if (!themeSet) {
             // follow the style: the theme may have changed since the last time we showed
-            theme = ChartTheme.fromStyle(getStyle());
+            theme = ChartTheme.fromStyle(getStyle()).applyUIIDs(getUIManager());
         }
         Form f = getComponentForm();
         if (f != null) {
@@ -648,8 +716,9 @@ public class Chart extends Component {
         }
 
         if (!hasData()) {
+            String msg = loadingText != null ? loadingText : emptyText;
             g.setColor(getTheme().getSecondaryTextColor());
-            g.drawString(emptyText, x + (w - font.stringWidth(emptyText)) / 2, y + (h - fh) / 2);
+            g.drawString(msg, x + (w - font.stringWidth(msg)) / 2, y + (h - fh) / 2);
             lastContext = ctx;
             g.setAntiAliased(aa);
             return;
@@ -770,8 +839,24 @@ public class Chart extends Component {
         if (cartesian && xl != null) {
             paintAxes(g, ctx, xl, yl, y2l, font, gap);
         }
+        if (brushFrom >= 0 && brushTo >= 0) {
+            paintBrush(g, ctx);
+        }
         paintTooltip(g, ctx, font);
+        if (loadingText != null) {
+            paintLoading(g, font, x, y, w, h);
+        }
         g.setAntiAliased(aa);
+    }
+
+    private void paintLoading(Graphics g, Font font, int x, int y, int w, int h) {
+        int alpha = g.getAlpha();
+        g.setAlpha(alpha * 160 / 255);
+        g.setColor(getStyle().getBgColor());
+        g.fillRect(x, y, w, h);
+        g.setAlpha(alpha);
+        g.setColor(getTheme().getTextColor());
+        g.drawString(loadingText, x + (w - font.stringWidth(loadingText)) / 2, y + (h - font.getHeight()) / 2);
     }
 
     private void applyAxisTransition(float p) {
@@ -811,6 +896,7 @@ public class Chart extends Component {
         int itemGap = mm(3);
         int rowGap = mm(1);
         boolean vertical = pos == LEGEND_RIGHT;
+        boolean rtl = isRTL();
         int maxItemW = vertical ? Math.min(fullWidth / 3, mm(35)) : w;
         int cx = x;
         int cy = y;
@@ -840,11 +926,15 @@ public class Chart extends Component {
                     if (!on) {
                         g.setAlpha(alpha * 2 / 5);
                     }
-                    s.paintLegendEntrySymbol(g, i, cx, cy + (rowH - sw) / 2, sw);
-                    g.setColor(getTheme().getSecondaryTextColor());
-                    g.drawString(name, cx + sw + mm(1), cy + (rowH - fh) / 2);
+                    // right to left: entries run from the right and each symbol follows its text
+                    int ix = rtl ? (vertical ? x + w - iw : 2 * x + w - cx - iw) : cx;
+                    int symX = rtl ? ix + iw - sw : ix;
+                    int textX = rtl ? ix : ix + sw + mm(1);
+                    s.paintLegendEntrySymbol(g, i, symX, cy + (rowH - sw) / 2, sw);
+                    g.setColor(getTheme().getLegendTextColor());
+                    g.drawString(name, textX, cy + (rowH - fh) / 2);
                     g.setAlpha(alpha);
-                    legendHits.add(new int[]{cx - getX(), cy - getY(), iw, rowH, indexOf(s), i});
+                    legendHits.add(new int[]{ix - getX(), cy - getY(), iw, rowH, indexOf(s), i});
                 }
                 usedW = Math.max(usedW, vertical ? iw : cx + iw - x);
                 if (vertical) {
@@ -1207,20 +1297,25 @@ public class Chart extends Component {
         if (title != null) {
             sb.append(title).append(". ");
         }
+        if (loadingText != null) {
+            sb.append(loadingText).append(". ");
+        }
         if (series.isEmpty()) {
             sb.append(emptyText == null ? "No data." : emptyText);
             return sb.toString();
         }
         for (int i = 0; i < series.size(); i++) {
             Series s = series.get(i);
-            ArrayList<String[]> rows = new ArrayList<String[]>();
-            s.collectTableRows(rows);
             sb.append(s.getName() == null ? "Series " + (i + 1) : s.getName()).append(": ");
             double[] yb = valueRange(s);
             if (yb != null) {
-                sb.append(rows.size()).append(" values from ").append(s.formatValue(null, yb[0]))
+                // an x/y series is summarized from its numbers; formatting every point of a long
+                // series on each accessibility query would be wasted work
+                sb.append(((com.codename1.ui.chart.series.XYSeries) s).size()).append(" values from ").append(s.formatValue(null, yb[0]))
                         .append(" to ").append(s.formatValue(null, yb[1]));
             } else {
+                ArrayList<String[]> rows = new ArrayList<String[]>();
+                s.collectTableRows(rows);
                 int shown = Math.min(rows.size(), 6);
                 for (int k = 0; k < shown; k++) {
                     if (k > 0) {
@@ -1429,7 +1524,10 @@ public class Chart extends Component {
             // decided once per gesture and latched, so a scroll stays a scroll
             boolean zoomed = horizontalAxis().isZoomed() || verticalAxis().isZoomed();
             boolean horizontalIntent = Math.abs(px - pressX) > Math.abs(py - pressY);
-            if (zoomEnabled && zoomed && hasCartesian()) {
+            if (brushEnabled && hasCartesian() && insidePlot(pressX, pressY)) {
+                dragMode = DRAG_BRUSH;
+                brushFrom = rotated ? pressY : pressX;
+            } else if (zoomEnabled && zoomed && hasCartesian()) {
                 dragMode = DRAG_PAN;
             } else if (horizontalIntent && hasCartesian() && tooltipMode != TOOLTIP_NONE && insidePlot(pressX, pressY)) {
                 dragMode = DRAG_SCRUB;
@@ -1441,7 +1539,10 @@ public class Chart extends Component {
             super.pointerDragged(x, y);
             return;
         }
-        if (dragMode == DRAG_PAN) {
+        if (dragMode == DRAG_BRUSH) {
+            brushTo = rotated ? py : px;
+            repaint();
+        } else if (dragMode == DRAG_PAN) {
             long now = System.currentTimeMillis();
             int dx = px - lastX;
             int dy = py - lastY;
@@ -1591,6 +1692,11 @@ public class Chart extends Component {
             super.pointerReleased(x, y);
             return;
         }
+        if (mode == DRAG_BRUSH) {
+            finishBrush();
+            super.pointerReleased(x, y);
+            return;
+        }
         if (mode == DRAG_SCRUB || mode == DRAG_PASS) {
             if (tooltipMode != TOOLTIP_SHARED) {
                 hover = null;
@@ -1717,6 +1823,57 @@ public class Chart extends Component {
             target[i * 3 + 1] = axes[i].getDataMax();
         }
         animateViewport(target);
+    }
+
+    // the x value under a screen position along the brushed (x) axis
+    private double brushValue(int pos) {
+        ChartContext ctx = lastContext;
+        double n = rotated ? (pos - ctx.plotY) / (double) ctx.plotH : (pos - ctx.plotX) / (double) ctx.plotW;
+        return xAxis.fromNormalized(Math.max(0, Math.min(1, n)));
+    }
+
+    private void finishBrush() {
+        int from = brushFrom;
+        int to = brushTo;
+        brushFrom = -1;
+        brushTo = -1;
+        repaint();
+        if (from < 0 || to < 0 || lastContext == null || Math.abs(to - from) < mm(2)) {
+            return;
+        }
+        double a = brushValue(from);
+        double b = brushValue(to);
+        double lo = Math.min(a, b);
+        double hi = Math.max(a, b);
+        for (RangeListener l : new ArrayList<RangeListener>(rangeListeners)) {
+            l.rangeSelected(this, lo, hi);
+        }
+        if (brushZooms && zoomEnabled) {
+            Axis[] axes = allAxes();
+            double[] target = snapshot(axes);
+            target[0] = lo;
+            target[1] = hi;
+            target[2] = 1;
+            animateViewport(target);
+        }
+    }
+
+    private void paintBrush(Graphics g, ChartContext ctx) {
+        int a = Math.min(brushFrom, brushTo);
+        int b = Math.max(brushFrom, brushTo);
+        int alpha = g.getAlpha();
+        g.setColor(getTheme().getSeriesColor(0));
+        g.setAlpha(alpha * 50 / 255);
+        if (rotated) {
+            a = Math.max(a, ctx.plotY);
+            b = Math.min(b, ctx.plotY + ctx.plotH);
+            g.fillRect(ctx.plotX, a, ctx.plotW, b - a);
+        } else {
+            a = Math.max(a, ctx.plotX);
+            b = Math.min(b, ctx.plotX + ctx.plotW);
+            g.fillRect(a, ctx.plotY, b - a, ctx.plotH);
+        }
+        g.setAlpha(alpha);
     }
 
     private void animateViewport(double[] target) {

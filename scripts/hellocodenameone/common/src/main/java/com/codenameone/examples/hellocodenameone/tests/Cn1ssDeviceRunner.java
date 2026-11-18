@@ -123,7 +123,21 @@ import com.codenameone.examples.hellocodenameone.tests.charts.ChartScatterScreen
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartStackedBarScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartTimeChartScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartTransformScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2MixedScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2DenseLabelsScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2CandlesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2WaterfallScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2BoxplotScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2HeatmapScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2PieScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2DoughnutScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2GaugeScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2RadarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2TreemapScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2SunburstScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2SankeyScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2FunnelScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2SparklinesScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
 
@@ -428,21 +442,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new ChartCombinedXYScreenshotTest(),
             new ChartTransformScreenshotTest(),
             new ChartRotatedScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2MixedScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2DenseLabelsScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2CandlesScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2WaterfallScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2BoxplotScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2HeatmapScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2PieScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2DoughnutScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2GaugeScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2RadarScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2TreemapScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2SunburstScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2SankeyScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2FunnelScreenshotTest(),
-            new ModernChartScreenshotTest.Chart2SparklinesScreenshotTest(),
+            new Chart2MixedScreenshotTest(),
+            new Chart2DenseLabelsScreenshotTest(),
+            new Chart2CandlesScreenshotTest(),
+            new Chart2WaterfallScreenshotTest(),
+            new Chart2BoxplotScreenshotTest(),
+            new Chart2HeatmapScreenshotTest(),
+            new Chart2PieScreenshotTest(),
+            new Chart2DoughnutScreenshotTest(),
+            new Chart2GaugeScreenshotTest(),
+            new Chart2RadarScreenshotTest(),
+            new Chart2TreemapScreenshotTest(),
+            new Chart2SunburstScreenshotTest(),
+            new Chart2SankeyScreenshotTest(),
+            new Chart2FunnelScreenshotTest(),
+            new Chart2SparklinesScreenshotTest(),
             new BrowserComponentScreenshotTest(),
             new RichTextAreaScreenshotTest(),
             new CodeEditorScreenshotTest(),

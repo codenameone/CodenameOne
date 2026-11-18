@@ -82,6 +82,20 @@ public final class LabelLayout {
         return count;
     }
 
+    /// The bounds of the `i`th placed or reserved box, as `{x, y, w, h}`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: an index below `size()`
+    ///
+    /// #### Returns
+    ///
+    /// a new array holding the box
+    public int[] getRect(int i) {
+        int o = i * 4;
+        return new int[]{rects[o], rects[o + 1], rects[o + 2], rects[o + 3]};
+    }
+
     /// Reserves an area (a legend, a marker) that labels must avoid.
     public void reserve(int x, int y, int w, int h) {
         add(x, y, w, h);

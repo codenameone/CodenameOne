@@ -374,6 +374,29 @@
       ]
     },
     {
+      "id": "charts-interactive",
+      "category": "Data visualization",
+      "name": "Interactive charts",
+      "description": "Renders the animated chart package: mixed bar and line, dense labels, candlesticks, waterfall, box plot, heatmap, pie, doughnut, gauge, radar, treemap, sunburst, sankey, funnel and sparklines.",
+      "tests": [
+        "Chart2BoxplotScreenshotTest",
+        "Chart2CandlesScreenshotTest",
+        "Chart2DenseLabelsScreenshotTest",
+        "Chart2DoughnutScreenshotTest",
+        "Chart2FunnelScreenshotTest",
+        "Chart2GaugeScreenshotTest",
+        "Chart2HeatmapScreenshotTest",
+        "Chart2MixedScreenshotTest",
+        "Chart2PieScreenshotTest",
+        "Chart2RadarScreenshotTest",
+        "Chart2SankeyScreenshotTest",
+        "Chart2SparklinesScreenshotTest",
+        "Chart2SunburstScreenshotTest",
+        "Chart2TreemapScreenshotTest",
+        "Chart2WaterfallScreenshotTest"
+      ]
+    },
+    {
       "id": "embedded-web-content",
       "category": "Rich components",
       "name": "Embedded browser content",
@@ -1362,6 +1385,66 @@
     {
       "pattern": "chart-rotated-pie",
       "test": "ChartRotatedScreenshotTest"
+    },
+    {
+      "pattern": "chart2-mixed",
+      "test": "Chart2MixedScreenshotTest"
+    },
+    {
+      "pattern": "chart2-dense-labels",
+      "test": "Chart2DenseLabelsScreenshotTest"
+    },
+    {
+      "pattern": "chart2-candles",
+      "test": "Chart2CandlesScreenshotTest"
+    },
+    {
+      "pattern": "chart2-waterfall",
+      "test": "Chart2WaterfallScreenshotTest"
+    },
+    {
+      "pattern": "chart2-boxplot",
+      "test": "Chart2BoxplotScreenshotTest"
+    },
+    {
+      "pattern": "chart2-heatmap",
+      "test": "Chart2HeatmapScreenshotTest"
+    },
+    {
+      "pattern": "chart2-pie",
+      "test": "Chart2PieScreenshotTest"
+    },
+    {
+      "pattern": "chart2-doughnut",
+      "test": "Chart2DoughnutScreenshotTest"
+    },
+    {
+      "pattern": "chart2-gauge",
+      "test": "Chart2GaugeScreenshotTest"
+    },
+    {
+      "pattern": "chart2-radar",
+      "test": "Chart2RadarScreenshotTest"
+    },
+    {
+      "pattern": "chart2-treemap",
+      "test": "Chart2TreemapScreenshotTest"
+    },
+    {
+      "pattern": "chart2-sunburst",
+      "test": "Chart2SunburstScreenshotTest"
+    },
+    {
+      "pattern": "chart2-sankey",
+      "test": "Chart2SankeyScreenshotTest"
+    },
+    {
+      "pattern": "chart2-funnel",
+      "test": "Chart2FunnelScreenshotTest"
+    },
+    {
+      "pattern": "chart2-sparklines",
+      "test": "Chart2SparklinesScreenshotTest"
     },
     {
       "pattern": "BrowserComponent",
