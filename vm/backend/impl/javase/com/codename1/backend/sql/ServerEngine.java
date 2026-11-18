@@ -46,10 +46,12 @@ public final class ServerEngine {
 
     private final Postgres postgres;
     private final MySql mysql;
+    private final SqlServer sqlServer;
 
-    private ServerEngine(Postgres postgres, MySql mysql) {
+    private ServerEngine(Postgres postgres, MySql mysql, SqlServer sqlServer) {
         this.postgres = postgres;
         this.mysql = mysql;
+        this.sqlServer = sqlServer;
     }
 
     /// The engine the build declared, as [Engines] names it, or null when it
@@ -85,11 +87,15 @@ public final class ServerEngine {
                                        int socketTimeoutMillis) throws IOException {
         if (Engines.POSTGRES.equals(engine)) {
             return new ServerEngine(Postgres.connect(host, port, database, user, password,
-                    sslMode, caFile, timeoutMillis, socketTimeoutMillis), null);
+                    sslMode, caFile, timeoutMillis, socketTimeoutMillis), null, null);
         }
         if (Engines.MYSQL.equals(engine)) {
             return new ServerEngine(null, MySql.connect(host, port, database, user, password,
-                    sslMode, caFile, timeoutMillis, socketTimeoutMillis));
+                    sslMode, caFile, timeoutMillis, socketTimeoutMillis), null);
+        }
+        if (Engines.SQLSERVER.equals(engine)) {
+            return new ServerEngine(null, null, SqlServer.connect(host, port, database, user,
+                    password, sslMode, caFile, timeoutMillis, socketTimeoutMillis));
         }
         throw new IOException("No client for " + engine);
     }
@@ -98,19 +104,30 @@ public final class ServerEngine {
         if (postgres != null) {
             return Dialect.POSTGRES;
         }
+        if (sqlServer != null) {
+            return Dialect.SQLSERVER;
+        }
         return mysql.isMariaDb() ? Dialect.MARIADB : Dialect.MYSQL;
     }
 
     public int execute(String sql, Object[] params) throws IOException {
+        if (sqlServer != null) {
+            return sqlServer.execute(sql, params);
+        }
         return postgres != null ? postgres.execute(sql, params) : mysql.execute(sql, params);
     }
 
     public List query(String sql, Object[] params) throws IOException {
+        if (sqlServer != null) {
+            return sqlServer.query(sql, params);
+        }
         return postgres != null ? postgres.query(sql, params) : mysql.query(sql, params);
     }
 
     public void close() {
-        if (postgres != null) {
+        if (sqlServer != null) {
+            sqlServer.close();
+        } else if (postgres != null) {
             postgres.close();
         } else {
             mysql.close();
@@ -118,6 +135,9 @@ public final class ServerEngine {
     }
 
     public boolean isClosed() {
+        if (sqlServer != null) {
+            return sqlServer.isClosed();
+        }
         return postgres != null ? postgres.isClosed() : mysql.isClosed();
     }
 
@@ -128,7 +148,9 @@ public final class ServerEngine {
     }
 
     public void begin() throws IOException {
-        if (postgres != null) {
+        if (sqlServer != null) {
+            sqlServer.begin();
+        } else if (postgres != null) {
             postgres.begin();
         } else {
             mysql.begin();
@@ -136,7 +158,9 @@ public final class ServerEngine {
     }
 
     public void beginReadOnly() throws IOException {
-        if (postgres != null) {
+        if (sqlServer != null) {
+            sqlServer.beginReadOnly();
+        } else if (postgres != null) {
             postgres.beginReadOnly();
         } else {
             mysql.beginReadOnly();
@@ -144,7 +168,9 @@ public final class ServerEngine {
     }
 
     public void begin(boolean readOnly, Isolation isolation) throws IOException {
-        if (postgres != null) {
+        if (sqlServer != null) {
+            sqlServer.begin(readOnly, isolation);
+        } else if (postgres != null) {
             postgres.begin(readOnly, isolation);
         } else {
             mysql.begin(readOnly, isolation);
@@ -152,7 +178,9 @@ public final class ServerEngine {
     }
 
     public void commit() throws IOException {
-        if (postgres != null) {
+        if (sqlServer != null) {
+            sqlServer.commit();
+        } else if (postgres != null) {
             postgres.commit();
         } else {
             mysql.commit();
@@ -160,7 +188,9 @@ public final class ServerEngine {
     }
 
     public void rollback() throws IOException {
-        if (postgres != null) {
+        if (sqlServer != null) {
+            sqlServer.rollback();
+        } else if (postgres != null) {
             postgres.rollback();
         } else {
             mysql.rollback();
@@ -168,7 +198,9 @@ public final class ServerEngine {
     }
 
     public void savepoint(String verb, String name) throws IOException {
-        if (postgres != null) {
+        if (sqlServer != null) {
+            sqlServer.savepoint(verb, name);
+        } else if (postgres != null) {
             postgres.savepoint(verb, name);
         } else {
             mysql.savepoint(verb, name);
@@ -176,6 +208,9 @@ public final class ServerEngine {
     }
 
     public long lastInsertId() {
+        if (sqlServer != null) {
+            return sqlServer.lastInsertId();
+        }
         return postgres != null ? 0 : mysql.lastInsertId();
     }
 }

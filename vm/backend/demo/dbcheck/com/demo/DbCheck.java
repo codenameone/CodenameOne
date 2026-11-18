@@ -142,14 +142,16 @@ public class DbCheck {
     private static void run(Database db, String url) throws Exception {
         boolean postgres = url.startsWith("postgres");
         boolean mysql = url.startsWith("mysql") || url.startsWith("mariadb");
+        boolean sqlServer = url.startsWith("sqlserver") || url.startsWith("mssql");
         // Each engine spells "auto-incrementing primary key" and "binary blob"
         // differently. Everything BELOW this line is identical for all three,
         // which is the part being tested.
         String key = postgres ? "id SERIAL PRIMARY KEY"
                 : (mysql ? "id BIGINT AUTO_INCREMENT PRIMARY KEY"
-                         : "id INTEGER PRIMARY KEY AUTOINCREMENT");
-        String blob = postgres ? "BYTEA" : (mysql ? "BLOB" : "BLOB");
-        String real = postgres ? "DOUBLE PRECISION" : "DOUBLE";
+                : (sqlServer ? "id BIGINT IDENTITY PRIMARY KEY"
+                         : "id INTEGER PRIMARY KEY AUTOINCREMENT"));
+        String blob = postgres ? "BYTEA" : (sqlServer ? "VARBINARY(MAX)" : "BLOB");
+        String real = postgres ? "DOUBLE PRECISION" : (sqlServer ? "FLOAT(53)" : "DOUBLE");
 
         db.execute("DROP TABLE IF EXISTS cn1_check", null);
         db.execute("CREATE TABLE cn1_check (" + key + ", name VARCHAR(64), size " + real
@@ -190,10 +192,13 @@ public class DbCheck {
         // have it, the column exists precisely because a double would not hold
         // the value -- so it has to come back exact and it has to come back as
         // a number the caller can read, not as a BLOB that JSON base64s.
-        if(postgres || mysql) {
-            String exact = "123456789012345678901234567890.12345";
+        if(postgres || mysql || sqlServer) {
+            // SQL Server's DECIMAL stops at 38 digits, where the other two go on.
+            String exact = sqlServer ? "123456789012345678901234567890123.12345"
+                    : "123456789012345678901234567890.12345";
             db.execute("DROP TABLE IF EXISTS cn1_check_decimal", null);
-            db.execute("CREATE TABLE cn1_check_decimal (amount DECIMAL(65,5))", null);
+            db.execute("CREATE TABLE cn1_check_decimal (amount DECIMAL("
+                    + (sqlServer ? 38 : 65) + ",5))", null);
             db.execute("INSERT INTO cn1_check_decimal (amount) VALUES (" + exact + ")", null);
             List decimals = db.query("SELECT amount FROM cn1_check_decimal", null);
             Object amount = ((Map)decimals.get(0)).get("amount");
@@ -424,7 +429,8 @@ public class DbCheck {
             note("oversize-message check skipped: set CN1_DB_MAX_MESSAGE_MB to 1..4");
             return;
         }
-        if(!postgres && !mysql) {
+        boolean sqlServer = url.startsWith("sqlserver") || url.startsWith("mssql");
+        if(!postgres && !mysql && !sqlServer) {
             note("oversize-message check skipped: it needs a network engine");
             return;
         }
@@ -434,7 +440,8 @@ public class DbCheck {
         int bytes = mysql ? 20 * 1024 * 1024 : (limitMb * 1024 * 1024) + (1024 * 1024);
         String sql = postgres
                 ? "SELECT repeat('x', " + bytes + ") AS big"
-                : "SELECT REPEAT('x', " + bytes + ") AS big";
+                : (sqlServer ? "SELECT REPLICATE(CAST('x' AS VARCHAR(MAX)), " + bytes + ") AS big"
+                : "SELECT REPEAT('x', " + bytes + ") AS big");
         // ITS OWN CONNECTION, because refusing the oversized message CLOSES the
         // one it arrives on -- that is the point of the last assertion here -- and
         // a check that used the shared Database would leave every check after it
@@ -447,7 +454,8 @@ public class DbCheck {
         // asked of it afterwards, and a check that tried would be testing the
         // close instead of the bound.
         List small = db.query(postgres ? "SELECT repeat('y', 1024) AS small"
-                                       : "SELECT REPEAT('y', 1024) AS small", null);
+                : (sqlServer ? "SELECT REPLICATE('y', 1024) AS small"
+                                       : "SELECT REPEAT('y', 1024) AS small"), null);
         check("a message inside the bound still arrives", "1024",
                 small.isEmpty() ? "<none>"
                         : String.valueOf(String.valueOf(
@@ -657,11 +665,13 @@ public class DbCheck {
      */
     private static void aQueryParksItsVirtualThread(final String url) throws Exception {
         final boolean postgres = url.startsWith("postgres");
-        if(!postgres && !url.startsWith("mysql") && !url.startsWith("mariadb")) {
+        final boolean sqlServer = url.startsWith("sqlserver") || url.startsWith("mssql");
+        if(!postgres && !sqlServer && !url.startsWith("mysql") && !url.startsWith("mariadb")) {
             note("the parked-query check needs a server engine; SQLite blocks its host by design");
             return;
         }
-        final String sleep = postgres ? "SELECT pg_sleep(2)" : "SELECT SLEEP(2)";
+        final String sleep = postgres ? "SELECT pg_sleep(2)"
+                : (sqlServer ? "WAITFOR DELAY '00:00:02'" : "SELECT SLEEP(2)");
         final String[] onVirtual = new String[1];
         HttpServer server = HttpServer.start("127.0.0.1", 0, 16,
                 VirtualThread.supported() ? 1 : 2, new HttpServer.Handler() {
@@ -722,11 +732,13 @@ public class DbCheck {
      */
     private static void concurrentPoolOpensDoNotWedgeTheHost(final String url) throws Exception {
         final boolean postgres = url.startsWith("postgres");
-        if(!postgres && !url.startsWith("mysql") && !url.startsWith("mariadb")) {
+        final boolean sqlServer = url.startsWith("sqlserver") || url.startsWith("mssql");
+        if(!postgres && !sqlServer && !url.startsWith("mysql") && !url.startsWith("mariadb")) {
             note("the concurrent-open check needs a server engine");
             return;
         }
-        final String sleep = postgres ? "SELECT pg_sleep(0.5)" : "SELECT SLEEP(0.5)";
+        final String sleep = postgres ? "SELECT pg_sleep(0.5)"
+                : (sqlServer ? "WAITFOR DELAY '00:00:00.500'" : "SELECT SLEEP(0.5)");
         final DataSource pool = DataSource.open(url, 4, 5000, 10000);
         final int requests = 4;
         HttpServer server = HttpServer.start("127.0.0.1", 0, 16,

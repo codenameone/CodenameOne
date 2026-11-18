@@ -63,7 +63,7 @@ public final class BackendEngines {
     /// Every engine a build can name. Keep in step with the runtime's
     /// `com.codename1.backend.sql.Engines`.
     private static final List<String> ENGINES = Collections.unmodifiableList(
-            Arrays.asList(SQLITE, "postgres", "mysql"));
+            Arrays.asList(SQLITE, "postgres", "mysql", "sqlserver"));
 
     private BackendEngines() {
     }
@@ -105,6 +105,9 @@ public final class BackendEngines {
         }
         if (name.equalsIgnoreCase("mysql") || name.equalsIgnoreCase("mariadb")) {
             return "mysql";
+        }
+        if (name.equalsIgnoreCase("sqlserver") || name.equalsIgnoreCase("mssql")) {
+            return "sqlserver";
         }
         return null;
     }

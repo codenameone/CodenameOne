@@ -63,6 +63,8 @@ class BackendEnginesTest {
         assertEquals("postgres", BackendEngines.require(" PostgreSQL ", true));
         assertEquals("mysql", BackendEngines.require("mysql", true));
         assertEquals("mysql", BackendEngines.require("MariaDB", true));
+        assertEquals("sqlserver", BackendEngines.require("sqlserver", true));
+        assertEquals("sqlserver", BackendEngines.require("MSSQL", true));
     }
 
     @Test void sqliteAloneWithSqliteOffIsNoDatabaseAtAll() throws Exception {
@@ -84,7 +86,7 @@ class BackendEnginesTest {
     }
 
     private static void assertSelected(Path sources, String engine, String directory) throws Exception {
-        for (String each : new String[] {"none", "postgres", "mysql"}) {
+        for (String each : new String[] {"none", "postgres", "mysql", "sqlserver"}) {
             write(sources.resolve(BackendEngines.ENGINES_DIR).resolve(each).resolve(ENGINE_FILE), each);
         }
         write(sources.resolve(BackendEngines.ENGINES_DIR).resolve("postgres")
