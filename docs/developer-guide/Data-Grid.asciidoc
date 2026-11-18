@@ -403,6 +403,145 @@ image::img/generated/datagrid-dark.png["The sorted orders grid on a dark backgro
 .The grid in the iOS theme
 image::img/generated/datagrid-ios.png["The sorted orders grid with the colors of the iOS theme",scaledwidth=70%]
 
+=== Spreadsheet files
+
+A grid reads and writes spreadsheets through the `com.codename1.spreadsheet` package.
+A `Workbook` is an Excel `.xlsx` file, an OpenDocument `.ods` file or separated text
+such as CSV, and each of its `Sheet` objects is a `TableModel`:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-open,indent=0]
+----
+
+`setHeaderRow(true)` takes the column names from the first row of the sheet.
+`createColumns()` then builds a `GridColumn` for each column: its kind comes from
+the values the column holds, and its formatter from the number format of its
+cells, so a price shows as `1,234.50` and a date the way the file formats it.
+
+Cells keep their types. A number is a `Double`, a date is a `java.util.Date`, a
+logical value is a `Boolean` and an error such as `#DIV/0!` is a `CellError`.
+`Sheet.getCellText` answers the text a spreadsheet would show for a cell.
+
+`Workbook.Format.detect` picks the format from a file name and the first bytes
+of the file, for a file the user chose.
+
+==== Formulas
+
+Formulas are live. A formula reads other cells by their address in the sheet, so
+sorting or filtering the grid never changes what `B2` means. When a cell changes,
+every formula that reads that cell is calculated again and the grid repaints
+the cells that changed:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-formula,indent=0]
+----
+
+Text given to `setValueAt` is read the way a spreadsheet reads what's typed into
+a cell, which is what the grid's editor does: `=B2*C2` is a formula, `25%` is the
+number 0.25, `2024-02-29` is a date and `'=B2` is the text `=B2`. Give it a
+`Double`, a `Date` or a `Boolean` to store a value unchanged.
+
+Formulas are written the way Excel writes them, in English and with commas
+between arguments, whichever format the file is in. They can use ranges, whole
+rows and columns, other sheets, defined names and array constants. A formula
+that refers to itself, directly or through other cells, shows a `CellError` for
+a circular reference instead of looping.
+
+The following functions are available. `Workbook.getSupportedFunctions()` returns
+the same list.
+
+[cols="1,4",options="header"]
+|===
+|Category |Functions
+
+|Math and trigonometry
+|`ABS`, `ACOS`, `ACOSH`, `ACOT`, `ACOTH`, `ARABIC`, `ASIN`, `ASINH`, `ATAN`, `ATAN2`, `ATANH`, `BASE`, `CEILING`, `CEILING.MATH`, `CEILING.PRECISE`, `COMBIN`, `COMBINA`, `COS`, `COSH`, `COT`, `COTH`, `CSC`, `CSCH`, `DECIMAL`, `DEGREES`, `EVEN`, `EXP`, `FACT`, `FACTDOUBLE`, `FLOOR`, `FLOOR.MATH`, `FLOOR.PRECISE`, `GCD`, `INT`, `ISO.CEILING`, `LCM`, `LN`, `LOG`, `LOG10`, `MDETERM`, `MINVERSE`, `MMULT`, `MOD`, `MROUND`, `MULTINOMIAL`, `MUNIT`, `ODD`, `PERMUT`, `PERMUTATIONA`, `PI`, `POWER`, `PRODUCT`, `QUOTIENT`, `RADIANS`, `RAND`, `RANDBETWEEN`, `ROMAN`, `ROUND`, `ROUNDDOWN`, `ROUNDUP`, `SEC`, `SECH`, `SERIESSUM`, `SIGN`, `SIN`, `SINH`, `SQRT`, `SQRTPI`, `SUM`, `SUMIF`, `SUMIFS`, `SUMPRODUCT`, `SUMSQ`, `SUMX2MY2`, `SUMX2PY2`, `SUMXMY2`, `TAN`, `TANH`, `TRUNC`
+
+|Statistics
+|`AGGREGATE`, `AVEDEV`, `AVERAGE`, `AVERAGEA`, `AVERAGEIF`, `AVERAGEIFS`, `BETA.DIST`, `BETA.INV`, `BETADIST`, `BETAINV`, `BINOM.DIST`, `BINOM.DIST.RANGE`, `BINOM.INV`, `BINOMDIST`, `CHIDIST`, `CHIINV`, `CHISQ.DIST`, `CHISQ.DIST.RT`, `CHISQ.INV`, `CHISQ.INV.RT`, `CHISQ.TEST`, `CHITEST`, `CONFIDENCE`, `CONFIDENCE.NORM`, `CONFIDENCE.T`, `CORREL`, `COUNT`, `COUNTA`, `COUNTBLANK`, `COUNTIF`, `COUNTIFS`, `COVAR`, `COVARIANCE.P`, `COVARIANCE.S`, `CRITBINOM`, `DEVSQ`, `EXPON.DIST`, `EXPONDIST`, `F.DIST`, `F.DIST.RT`, `F.INV`, `F.INV.RT`, `F.TEST`, `FDIST`, `FINV`, `FISHER`, `FISHERINV`, `FORECAST`, `FORECAST.LINEAR`, `FREQUENCY`, `FTEST`, `GAMMA`, `GAMMA.DIST`, `GAMMA.INV`, `GAMMADIST`, `GAMMAINV`, `GAMMALN`, `GAMMALN.PRECISE`, `GAUSS`, `GEOMEAN`, `HARMEAN`, `HYPGEOM.DIST`, `HYPGEOMDIST`, `INTERCEPT`, `KURT`, `LARGE`, `LOGINV`, `LOGNORM.DIST`, `LOGNORM.INV`, `LOGNORMDIST`, `MAX`, `MAXA`, `MAXIFS`, `MEDIAN`, `MIN`, `MINA`, `MINIFS`, `MODE`, `MODE.MULT`, `MODE.SNGL`, `NEGBINOM.DIST`, `NEGBINOMDIST`, `NORM.DIST`, `NORM.INV`, `NORM.S.DIST`, `NORM.S.INV`, `NORMDIST`, `NORMINV`, `NORMSDIST`, `NORMSINV`, `PEARSON`, `PERCENTILE`, `PERCENTILE.EXC`, `PERCENTILE.INC`, `PERCENTRANK`, `PERCENTRANK.EXC`, `PERCENTRANK.INC`, `PHI`, `POISSON`, `POISSON.DIST`, `QUARTILE`, `QUARTILE.EXC`, `QUARTILE.INC`, `RANK`, `RANK.AVG`, `RANK.EQ`, `RSQ`, `SKEW`, `SKEW.P`, `SLOPE`, `SMALL`, `STANDARDIZE`, `STDEV`, `STDEV.P`, `STDEV.S`, `STDEVA`, `STDEVP`, `STDEVPA`, `STEYX`, `SUBTOTAL`, `T.DIST`, `T.DIST.2T`, `T.DIST.RT`, `T.INV`, `T.INV.2T`, `T.TEST`, `TDIST`, `TINV`, `TRIMMEAN`, `TTEST`, `VAR`, `VAR.P`, `VAR.S`, `VARA`, `VARP`, `VARPA`, `WEIBULL`, `WEIBULL.DIST`, `Z.TEST`, `ZTEST`
+
+|Logic and information
+|`AND`, `CHOOSE`, `COLUMN`, `ERROR.TYPE`, `FALSE`, `FORMULATEXT`, `IF`, `IFERROR`, `IFNA`, `IFS`, `INDIRECT`, `ISBLANK`, `ISERR`, `ISERROR`, `ISEVEN`, `ISFORMULA`, `ISLOGICAL`, `ISNA`, `ISNONTEXT`, `ISNUMBER`, `ISODD`, `ISREF`, `ISTEXT`, `LET`, `N`, `NA`, `NOT`, `NOW`, `OFFSET`, `OR`, `RAND`, `RANDARRAY`, `RANDBETWEEN`, `ROW`, `SWITCH`, `T`, `TODAY`, `TRUE`, `TYPE`, `XOR`
+
+|Text
+|`CHAR`, `CLEAN`, `CODE`, `CONCAT`, `CONCATENATE`, `DOLLAR`, `EXACT`, `FIND`, `FIXED`, `LEFT`, `LEN`, `LOWER`, `MID`, `NUMBERVALUE`, `PROPER`, `REPLACE`, `REPT`, `RIGHT`, `SEARCH`, `SUBSTITUTE`, `TEXT`, `TEXTAFTER`, `TEXTBEFORE`, `TEXTJOIN`, `TRIM`, `UNICHAR`, `UNICODE`, `UPPER`, `VALUE`
+
+|Date and time
+|`DATE`, `DATEDIF`, `DATEVALUE`, `DAY`, `DAYS`, `DAYS360`, `EDATE`, `EOMONTH`, `HOUR`, `ISOWEEKNUM`, `MINUTE`, `MONTH`, `NETWORKDAYS`, `NETWORKDAYS.INTL`, `NOW`, `SECOND`, `TIME`, `TIMEVALUE`, `TODAY`, `WEEKDAY`, `WEEKNUM`, `WORKDAY`, `WORKDAY.INTL`, `YEAR`, `YEARFRAC`
+
+|Lookup and reference
+|`ADDRESS`, `AREAS`, `COLUMNS`, `HLOOKUP`, `INDEX`, `INDIRECT`, `LOOKUP`, `MATCH`, `OFFSET`, `ROWS`, `SHEET`, `SHEETS`, `TRANSPOSE`, `VLOOKUP`, `XLOOKUP`, `XMATCH`
+
+|Financial
+|`CUMIPMT`, `CUMPRINC`, `DB`, `DDB`, `DOLLARDE`, `DOLLARFR`, `EFFECT`, `FV`, `FVSCHEDULE`, `IPMT`, `IRR`, `ISPMT`, `MIRR`, `NOMINAL`, `NPER`, `NPV`, `PDURATION`, `PMT`, `PPMT`, `PV`, `RATE`, `RRI`, `SLN`, `SYD`, `VDB`, `XIRR`, `XNPV`
+
+|Engineering
+|`BIN2DEC`, `BIN2HEX`, `BIN2OCT`, `BITAND`, `BITLSHIFT`, `BITOR`, `BITRSHIFT`, `BITXOR`, `CONVERT`, `DEC2BIN`, `DEC2HEX`, `DEC2OCT`, `DELTA`, `ERF`, `ERF.PRECISE`, `ERFC`, `ERFC.PRECISE`, `GESTEP`, `HEX2BIN`, `HEX2DEC`, `HEX2OCT`, `OCT2BIN`, `OCT2DEC`, `OCT2HEX`
+
+|Database
+|`DAVERAGE`, `DCOUNT`, `DCOUNTA`, `DGET`, `DMAX`, `DMIN`, `DPRODUCT`, `DSTDEV`, `DSTDEVP`, `DSUM`, `DVAR`, `DVARP`
+
+|Arrays
+|`CHOOSECOLS`, `CHOOSEROWS`, `DROP`, `EXPAND`, `FILTER`, `HSTACK`, `RANDARRAY`, `SEQUENCE`, `SORT`, `SORTBY`, `TAKE`, `TOCOL`, `TOROW`, `UNIQUE`, `VSTACK`, `WRAPCOLS`, `WRAPROWS`
+|===
+
+A formula that uses anything else isn't lost. Its text is kept and written back
+to the file, and its cell shows the value the file stored for it. The cell shows
+`#NAME?` once a cell it reads has changed, because the stored value is stale by
+then.
+
+Three things work differently from Excel:
+
+* A formula that returns an array keeps the whole array for the formulas that
+  read it, but the cell shows its first value. Results don't spill into the
+  neighboring cells.
+* Functions of complex numbers, such as `IMSUM`, and the regression functions
+  that return an array, such as `LINEST` and `TREND`, aren't included.
+* Formulas use `A1` references. The `R1C1` style isn't read.
+
+==== Saving a grid
+
+`Workbook.fromGrid` copies what a grid shows: its rows in the order they're
+sorted and filtered to, and its visible columns in the order they're arranged in.
+Values keep their types, so a number is a number in the file and never the text
+the grid formatted it to:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-save,indent=0]
+----
+
+The depth of a row in a tree grid becomes its outline level, and the grid's
+frozen columns stay frozen. `Workbook.fromModel` copies a `TableModel` without a
+grid.
+
+A workbook also keeps number formats, column widths, frozen panes, merged cells,
+outline levels and defined names between reading and writing. It doesn't keep
+charts, images, fonts, colors or conditional formatting, and it doesn't read the
+older binary `.xls` format or a file protected with a password.
+
+==== Separated text
+
+Text has no types, so reading CSV guesses them: a cell that reads as a number, a
+date or a logical value becomes one. The guess is made for a whole column,
+because a column of postal codes or part numbers would otherwise lose the zeros
+at the start of `00420`. Where any cell of a column would lose digits as a
+number, the whole column stays text. The separator is detected from the first
+lines when the file uses a semicolon, a tab or a bar instead of a comma.
+
+A cell that starts with `=` stays text when it's read from CSV. A file from
+somewhere else doesn't get to run a formula.
+
+`CSVParser` and `CSVWriter` in `com.codename1.io` read and write the text itself,
+without a workbook:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-csv,indent=0]
+----
+
 === The row engine
 
 The sort and the tree flattening are public, for a view of your own that needs

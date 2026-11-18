@@ -1,0 +1,64 @@
+name: Spreadsheet interop
+
+# Opens the xlsx and ods files Codename One writes with LibreOffice and
+# openpyxl, in a container (scripts/check-spreadsheet-interop.sh). The unit
+# tests in pr.yml read back what our own writers wrote, which proves the reader
+# and the writer agree with each other and nothing about whether a spreadsheet
+# accepts the file.
+#
+# Runs only when the spreadsheet code, its tests or this check change: nothing
+# else can alter a byte of what the writers produce.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'CodenameOne/src/com/codename1/spreadsheet/**'
+      - 'CodenameOne/src/com/codename1/io/CSV*.java'
+      - 'CodenameOne/src/com/codename1/io/zip/**'
+      - 'maven/core-unittests/src/test/java/com/codename1/spreadsheet/**'
+      - 'maven/core-unittests/src/test/resources/spreadsheet-fixtures/**'
+      - 'scripts/spreadsheet-interop/**'
+      - 'scripts/check-spreadsheet-interop.sh'
+      - '.github/workflows/spreadsheet-interop.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  interop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      # Not pr.yml's container: this job needs the runner's docker to start one of its own.
+      - name: Set up Java 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '8'
+      - name: Cache Maven dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2
+      - name: Compile core and its test classes
+        env:
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh mvn -B test-compile -DunitTests=true -pl core-unittests -am \
+            -Dmaven.javadoc.skip=true -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true -Djacoco.skip=true
+      - name: Open our workbooks with LibreOffice and openpyxl
+        env:
+          CONTAINER_ENGINE: docker
+        run: scripts/check-spreadsheet-interop.sh
