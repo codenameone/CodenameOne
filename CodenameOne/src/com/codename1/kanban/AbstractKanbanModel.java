@@ -38,8 +38,8 @@ public abstract class AbstractKanbanModel implements KanbanModel {
             return getCards(column, null).size();
         }
         int n = 0;
-        for (int i = 0; i < lanes.size(); i++) {
-            n += getCards(column, lanes.get(i)).size();
+        for (KanbanLane ln : lanes) {
+            n += getCards(column, ln).size();
         }
         return n;
     }
@@ -51,12 +51,12 @@ public abstract class AbstractKanbanModel implements KanbanModel {
         }
         List<KanbanColumn> columns = getColumns();
         List<KanbanLane> lanes = getLanes();
-        for (int c = 0; c < columns.size(); c++) {
+        for (KanbanColumn col : columns) {
             for (int l = 0; l < Math.max(1, lanes.size()); l++) {
-                List<KanbanCard> cards = getCards(columns.get(c), lanes.isEmpty() ? null : lanes.get(l));
-                for (int i = 0; i < cards.size(); i++) {
-                    if (id.equals(cards.get(i).getId())) {
-                        return cards.get(i);
+                List<KanbanCard> cards = getCards(col, lanes.isEmpty() ? null : lanes.get(l));
+                for (KanbanCard kc : cards) {
+                    if (id.equals(kc.getId())) {
+                        return kc;
                     }
                 }
             }
@@ -67,9 +67,9 @@ public abstract class AbstractKanbanModel implements KanbanModel {
     @Override
     public KanbanColumn getColumn(String id) {
         List<KanbanColumn> columns = getColumns();
-        for (int i = 0; i < columns.size(); i++) {
-            if (columns.get(i).getId().equals(id)) {
-                return columns.get(i);
+        for (KanbanColumn col : columns) {
+            if (col.getId().equals(id)) {
+                return col;
             }
         }
         return null;
@@ -78,9 +78,9 @@ public abstract class AbstractKanbanModel implements KanbanModel {
     @Override
     public KanbanLane getLane(String id) {
         List<KanbanLane> lanes = getLanes();
-        for (int i = 0; i < lanes.size(); i++) {
-            if (lanes.get(i).getId().equals(id)) {
-                return lanes.get(i);
+        for (KanbanLane ln : lanes) {
+            if (ln.getId().equals(id)) {
+                return ln;
             }
         }
         return null;
@@ -142,8 +142,8 @@ public abstract class AbstractKanbanModel implements KanbanModel {
     protected void fireChanged() {
         // a listener may remove itself while it is told
         List<KanbanChangeListener> copy = new ArrayList<KanbanChangeListener>(listeners);
-        for (int i = 0; i < copy.size(); i++) {
-            copy.get(i).boardChanged(this);
+        for (KanbanChangeListener each : copy) {
+            each.boardChanged(this);
         }
     }
 }

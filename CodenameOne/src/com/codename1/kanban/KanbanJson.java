@@ -74,8 +74,7 @@ public final class KanbanJson {
         Map<String, Object> root = new LinkedHashMap<String, Object>();
         List<KanbanLane> lanes = model.getLanes();
         List<Object> laneList = new ArrayList<Object>();
-        for (int i = 0; i < lanes.size(); i++) {
-            KanbanLane l = lanes.get(i);
+        for (KanbanLane l : lanes) {
             Map<String, Object> m = new LinkedHashMap<String, Object>();
             m.put("id", l.getId());
             m.put("title", l.getTitle());
@@ -89,8 +88,7 @@ public final class KanbanJson {
         }
         List<Object> columnList = new ArrayList<Object>();
         List<KanbanColumn> columns = model.getColumns();
-        for (int i = 0; i < columns.size(); i++) {
-            KanbanColumn c = columns.get(i);
+        for (KanbanColumn c : columns) {
             Map<String, Object> m = new LinkedHashMap<String, Object>();
             m.put("id", c.getId());
             m.put("title", c.getTitle());
@@ -105,8 +103,8 @@ public final class KanbanJson {
             for (int l = 0; l < Math.max(1, lanes.size()); l++) {
                 KanbanLane lane = lanes.isEmpty() ? null : lanes.get(l);
                 List<KanbanCard> cards = model.getCards(c, lane);
-                for (int k = 0; k < cards.size(); k++) {
-                    cardList.add(cardToMap(cards.get(k), lane == null ? cards.get(k).getLaneId() : lane.getId(),
+                for (KanbanCard kc : cards) {
+                    cardList.add(cardToMap(kc, lane == null ? kc.getLaneId() : lane.getId(),
                             codec));
                 }
             }
@@ -171,14 +169,14 @@ public final class KanbanJson {
             throw new IOException("Not a board document");
         }
         List<Object> lanes = list(root.get("lanes"));
-        for (int i = 0; i < lanes.size(); i++) {
-            Map<String, Object> m = map(lanes.get(i));
+        for (Object raw : lanes) {
+            Map<String, Object> m = map(raw);
             into.addLane(new KanbanLane(required(m, "id"), string(m, "title"))
                     .setCollapsed(bool(m.get("collapsed"))));
         }
         List<Object> columns = list(root.get("columns"));
-        for (int i = 0; i < columns.size(); i++) {
-            Map<String, Object> m = map(columns.get(i));
+        for (Object raw : columns) {
+            Map<String, Object> m = map(raw);
             KanbanColumn c = new KanbanColumn(required(m, "id"), string(m, "title"));
             Object limit = m.get("limit");
             if (limit instanceof Number) {
@@ -188,8 +186,8 @@ public final class KanbanJson {
             c.setStyleKey(string(m, "style"));
             into.addColumn(c);
             List<KanbanCard> cards = readCards(m, codec);
-            for (int k = 0; k < cards.size(); k++) {
-                into.addCard(c.getId(), cards.get(k));
+            for (KanbanCard kc : cards) {
+                into.addCard(c.getId(), kc);
             }
         }
     }
@@ -203,14 +201,14 @@ public final class KanbanJson {
     public static List<KanbanCard> readCards(Map<String, Object> holder, UserDataCodec codec) throws IOException {
         List<KanbanCard> out = new ArrayList<KanbanCard>();
         List<Object> cards = list(holder.get("cards"));
-        for (int i = 0; i < cards.size(); i++) {
-            Map<String, Object> m = map(cards.get(i));
+        for (Object raw : cards) {
+            Map<String, Object> m = map(raw);
             KanbanCard c = new KanbanCard(required(m, "id"), string(m, "title"));
             c.setDescription(string(m, "description"));
             List<Object> tags = list(m.get("tags"));
-            for (int t = 0; t < tags.size(); t++) {
-                if (tags.get(t) instanceof String) {
-                    c.addTag((String) tags.get(t));
+            for (Object tag : tags) {
+                if (tag instanceof String) {
+                    c.addTag((String) tag);
                 }
             }
             c.setBadge(string(m, "badge"));

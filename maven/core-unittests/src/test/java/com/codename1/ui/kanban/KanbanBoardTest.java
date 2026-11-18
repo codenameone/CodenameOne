@@ -205,10 +205,10 @@ class KanbanBoardTest extends UITestBase {
     void cardsAreAddedRenamedAndRemovedWithUndo() {
         KanbanBoard b = show(false);
         b.startAddCard(model.getColumn("done"), null);
-        assertTrue(b.isEditing());
+        assertTrue(b.isTitleEditing());
         b.editor().setText("Shipped");
         b.finishEditing();
-        assertFalse(b.isEditing());
+        assertFalse(b.isTitleEditing());
         assertEquals(1, model.getCardCount(model.getColumn("done")));
         KanbanCard added = model.getCards(model.getColumn("done"), null).get(0);
         assertEquals("Shipped", added.getTitle());

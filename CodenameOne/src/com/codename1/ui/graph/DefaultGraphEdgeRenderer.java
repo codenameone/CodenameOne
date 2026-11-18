@@ -173,8 +173,7 @@ public class DefaultGraphEdgeRenderer implements GraphEdgeRenderer {
             }
             at += period;
         }
-        double rest = (phase + len) % period;
-        return rest;
+        return (phase + len) % period;
     }
 
     // Paints the mark at one end of an edge; the unit vector points at the tip.

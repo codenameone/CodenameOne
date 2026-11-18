@@ -33,7 +33,7 @@ import java.util.List;
 
 /// The steps a `NodeGraph` records in an `UndoHistory`. Each replays through
 /// the model, the way the user's own edit went, so a listening view repaints.
-final class GraphEdits {
+final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - a holder of the edit classes
     private GraphEdits() {
     }
 

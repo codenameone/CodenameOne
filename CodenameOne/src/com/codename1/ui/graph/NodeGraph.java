@@ -929,9 +929,9 @@ public class NodeGraph extends Container {
         List<GraphEdge> edges = new ArrayList<GraphEdge>(model.getEdges());
         List<double[]> routesFrom = new ArrayList<double[]>();
         List<double[]> routesTo = new ArrayList<double[]>();
-        for (int i = 0; i < edges.size(); i++) {
-            routesFrom.add(edges.get(i).getRoute());
-            routesTo.add(r.getRoute(edges.get(i).getId()));
+        for (GraphEdge ge : edges) {
+            routesFrom.add(ge.getRoute());
+            routesTo.add(r.getRoute(ge.getId()));
         }
         record(new GraphEdits.Arrange(model, nodes, from, to, edges, routesFrom, routesTo));
     }
@@ -964,7 +964,7 @@ public class NodeGraph extends Container {
         }
         int reach = GraphLook.mm(1.8f);
         for (int c = 0; c < 4; c++) {
-            int cx = worldToScreenX(n.getX() + (c % 2 == 1 ? n.getWidth() : 0));
+            int cx = worldToScreenX(n.getX() + ((c & 1) != 0 ? n.getWidth() : 0));
             int cy = worldToScreenY(n.getY() + (c >= 2 ? n.getHeight() : 0));
             if (Math.abs(cx - sx) <= reach && Math.abs(cy - sy) <= reach) {
                 return c;
@@ -977,7 +977,7 @@ public class NodeGraph extends Container {
         int r = Math.max(3, GraphLook.mm(0.8f));
         int bg = GraphLook.bg(GraphLook.style("NodeGraphHandle"), 0xffffff);
         for (int c = 0; c < 4; c++) {
-            int cx = worldToScreenX(n.getX() + (c % 2 == 1 ? n.getWidth() : 0));
+            int cx = worldToScreenX(n.getX() + ((c & 1) != 0 ? n.getWidth() : 0));
             int cy = worldToScreenY(n.getY() + (c >= 2 ? n.getHeight() : 0));
             g.setColor(bg);
             g.fillRect(cx - r, cy - r, r * 2, r * 2);
@@ -1243,8 +1243,7 @@ public class NodeGraph extends Container {
     private List<GraphNode> addNodes(List<GraphNode> nodes, List<GraphEdge> edges, String name) {
         List<GraphNode> in = new ArrayList<GraphNode>();
         Set<String> ids = new HashSet<String>();
-        for (int i = 0; i < nodes.size(); i++) {
-            GraphNode n = nodes.get(i);
+        for (GraphNode n : nodes) {
             boolean ok = true;
             for (int l = 0; l < listeners.size() && ok; l++) {
                 ok = listeners.get(l).nodeCreating(this, n);
@@ -1255,8 +1254,7 @@ public class NodeGraph extends Container {
             }
         }
         List<GraphEdge> inEdges = new ArrayList<GraphEdge>();
-        for (int i = 0; i < edges.size(); i++) {
-            GraphEdge e = edges.get(i);
+        for (GraphEdge e : edges) {
             if (ids.contains(e.getSourceId()) && ids.contains(e.getTargetId()) && model.insertEdge(e)) {
                 inEdges.add(e);
             }
@@ -1265,9 +1263,9 @@ public class NodeGraph extends Container {
             return in;
         }
         record(new GraphEdits.Presence(model, in, inEdges, false, name));
-        for (int i = 0; i < in.size(); i++) {
+        for (GraphNode created : in) {
             for (int l = 0; l < listeners.size(); l++) { // NOPMD ForLoopCanBeForeach - indexed, as the rest of the class
-                listeners.get(l).nodeCreated(this, in.get(i));
+                listeners.get(l).nodeCreated(this, created);
             }
         }
         selection.clear();
@@ -1284,8 +1282,7 @@ public class NodeGraph extends Container {
         Map<String, String> ids = new HashMap<String, String>();
         Set<String> taken = new HashSet<String>();
         List<GraphNode> nodes = new ArrayList<GraphNode>();
-        for (int i = 0; i < srcNodes.size(); i++) {
-            GraphNode n = srcNodes.get(i);
+        for (GraphNode n : srcNodes) {
             String id = freeNodeId("n", taken);
             taken.add(id);
             ids.put(n.getId(), id);
@@ -1301,8 +1298,7 @@ public class NodeGraph extends Container {
             edgeIds.add(e.getId());
         }
         List<GraphEdge> edges = new ArrayList<GraphEdge>();
-        for (int i = 0; i < srcEdges.size(); i++) {
-            GraphEdge e = srcEdges.get(i);
+        for (GraphEdge e : srcEdges) {
             String s = ids.get(e.getSourceId());
             String t = ids.get(e.getTargetId());
             if (s == null || t == null) {

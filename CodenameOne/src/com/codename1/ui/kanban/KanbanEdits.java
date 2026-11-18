@@ -30,7 +30,7 @@ import com.codename1.util.UndoableEdit;
 
 /// The steps a `KanbanBoard` records in an `UndoHistory`. Each replays
 /// through the model, so a listening board repaints.
-final class KanbanEdits {
+final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - a holder of the edit classes
     private KanbanEdits() {
     }
 

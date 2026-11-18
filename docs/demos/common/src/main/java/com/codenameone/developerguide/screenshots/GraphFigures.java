@@ -95,6 +95,7 @@ public final class GraphFigures {
         v.add(landscape("graph-force", GraphFigures::force));
         v.add(landscape("graph-editor", GraphFigures::editor));
         v.add(landscape("graph-components", GraphFigures::embedded));
+        v.add(landscape("graph-flowchart", () -> new com.codenameone.developerguide.graph.GraphSnippets().flowChart()));
         Fig dark = new Fig("graph-services-appearance", () -> laid(services(), new LayeredArrangement()));
         v.add(new FigureVariant(dark, FigureDevice.ANDROID, true, true, "graph-services-dark.png"));
         v.add(new FigureVariant(dark, FigureDevice.IOS, false, true, "graph-services-ios.png"));

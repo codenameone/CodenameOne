@@ -120,7 +120,7 @@ public final class GraphJson {
             List<GraphGroup> groups = model.getGroups();
             count = groups.size();
             for (int i = 0; i < count; i++) {
-                groupList.add(groupMap(groups.get(i), codec));
+                groupList.add(groupMap(groups.get(i)));
             }
             if (!groupList.isEmpty()) {
                 root.put("groups", groupList);
@@ -205,8 +205,8 @@ public final class GraphJson {
         double[] route = e.getRoute();
         if (route != null && route.length > 0) {
             List<Object> r = new ArrayList<Object>();
-            for (int i = 0; i < route.length; i++) {
-                r.add(Double.valueOf(route[i]));
+            for (double coordinate : route) {
+                r.add(Double.valueOf(coordinate));
             }
             m.put("route", r);
         }
@@ -214,7 +214,7 @@ public final class GraphJson {
         return m;
     }
 
-    private static Map<String, Object> groupMap(GraphGroup g, UserDataCodec codec) {
+    private static Map<String, Object> groupMap(GraphGroup g) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("id", g.getId());
         m.put("label", g.getLabel());
@@ -277,8 +277,8 @@ public final class GraphJson {
     public static void readMap(Map<String, Object> root, DefaultGraphModel into, UserDataCodec codec)
             throws IOException {
         List<Object> groups = list(root.get("groups"));
-        for (int i = 0; i < groups.size(); i++) {
-            Map<String, Object> m = map(groups.get(i));
+        for (Object raw : groups) {
+            Map<String, Object> m = map(raw);
             GraphGroup g = new GraphGroup(required(m, "id"), string(m, "label"));
             g.setStyleKey(string(m, "style"));
             g.setCollapsed(bool(m.get("collapsed"), false));
@@ -290,8 +290,8 @@ public final class GraphJson {
             into.addGroup(g);
         }
         List<Object> nodes = list(root.get("nodes"));
-        for (int i = 0; i < nodes.size(); i++) {
-            Map<String, Object> m = map(nodes.get(i));
+        for (Object raw : nodes) {
+            Map<String, Object> m = map(raw);
             GraphNode n = new GraphNode(required(m, "id"), string(m, "label"),
                     number(m, "x", 0), number(m, "y", 0), number(m, "w", 160), number(m, "h", 64));
             n.setDescription(string(m, "description"));
@@ -307,8 +307,8 @@ public final class GraphJson {
             into.addNode(n);
         }
         List<Object> edges = list(root.get("edges"));
-        for (int i = 0; i < edges.size(); i++) {
-            Map<String, Object> m = map(edges.get(i));
+        for (Object raw : edges) {
+            Map<String, Object> m = map(raw);
             GraphEdge e = new GraphEdge(required(m, "id"), required(m, "from"), string(m, "fromPort"),
                     required(m, "to"), string(m, "toPort"));
             e.setLabel(string(m, "label"));
@@ -334,8 +334,8 @@ public final class GraphJson {
     }
 
     private static void readPorts(GraphNode n, List<Object> ports, int direction) throws IOException {
-        for (int i = 0; i < ports.size(); i++) {
-            Map<String, Object> m = map(ports.get(i));
+        for (Object raw : ports) {
+            Map<String, Object> m = map(raw);
             GraphPort p = new GraphPort(required(m, "id"), direction, string(m, "label"), string(m, "type"));
             p.setMaxConnections((int) number(m, "max", -1));
             p.setValue(m.get("value"));

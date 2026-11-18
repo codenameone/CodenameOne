@@ -691,8 +691,8 @@ public class KanbanBoard extends Container {
         KanbanLane lane = at == null ? model.getLanes().isEmpty() ? null : model.getLanes().get(0) : at.lane;
         int index = at == null ? Integer.MAX_VALUE : at.index + 1;
         boolean any = false;
-        for (int i = 0; i < read.size(); i++) {
-            KanbanCard c = read.get(i).copy(freeCardId());
+        for (KanbanCard source : read) {
+            KanbanCard c = source.copy(freeCardId());
             if (insert(c, column, lane, index, "Paste card")) {
                 any = true;
                 if (index != Integer.MAX_VALUE) {
@@ -728,7 +728,7 @@ public class KanbanBoard extends Container {
     // ---------------------------------------------------------- typing titles
 
     /// True while a title is being typed in place.
-    public boolean isEditing() {
+    public boolean isTitleEditing() {
         return editor != null;
     }
 
@@ -905,11 +905,10 @@ public class KanbanBoard extends Container {
         List<String> gone = new ArrayList<String>(components.keySet());
         List<KanbanColumn> columns = model.getColumns();
         List<KanbanLane> ls = model.getLanes();
-        for (int c = 0; c < columns.size(); c++) {
+        for (KanbanColumn col : columns) {
             for (int l = 0; l < Math.max(1, ls.size()); l++) {
-                List<KanbanCard> cards = model.getCards(columns.get(c), ls.isEmpty() ? null : ls.get(l));
-                for (int i = 0; i < cards.size(); i++) {
-                    KanbanCard card = cards.get(i);
+                List<KanbanCard> cards = model.getCards(col, ls.isEmpty() ? null : ls.get(l));
+                for (KanbanCard card : cards) {
                     gone.remove(card.getId());
                     if (!components.containsKey(card.getId())) {
                         Component cmp = cardFactory.createComponent(this, card);
@@ -922,8 +921,8 @@ public class KanbanBoard extends Container {
                 }
             }
         }
-        for (int i = 0; i < gone.size(); i++) {
-            Component cmp = components.remove(gone.get(i));
+        for (String goneId : gone) {
+            Component cmp = components.remove(goneId);
             if (cmp != null && cmp.getParent() != null) {
                 layer.removeComponent(cmp);
             }
@@ -1407,7 +1406,7 @@ public class KanbanBoard extends Container {
             index++;
         }
         if (addH > 0 && !(editor != null && editCard == null && cols.get(c) == editColumn // NOPMD CompareObjectsWithEquals - the cell being typed in
-                && (lanes.isEmpty() || lanes.get(l) == editLane))) {
+                && (lanes.isEmpty() || lanes.get(l) == editLane))) { // NOPMD CompareObjectsWithEquals - the lane being typed in
             Style as = KanbanLook.style("KanbanAddCard");
             Font f = as.getFont();
             g.setFont(f);

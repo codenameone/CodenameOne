@@ -474,6 +474,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new DataGridThemeScreenshotTest(),
             new TreeGridThemeScreenshotTest(),
             new NodeGraphThemeScreenshotTest(),
+            new FlowChartThemeScreenshotTest(),
+            new KanbanBoardThemeScreenshotTest(),
             new PdfViewerScreenshotTest(),
             new ToolbarThemeScreenshotTest(),
             new TabsThemeScreenshotTest(),

@@ -99,6 +99,34 @@
       ]
     },
     {
+      "test": "FlowChartThemeScreenshotTest",
+      "reason": "The flow chart baseline is eight shapes in two swimlanes. A watch face has no room for it, so the capture there would only record how the diagram fails to fit.",
+      "platform_support": "The NodeGraph component and its flow chart shapes compile and run on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "flow-chart-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "KanbanBoardThemeScreenshotTest",
+      "reason": "The Kanban baseline is three columns in two swimlanes. A watch face shows a strip of one column, which checks nothing of the board.",
+      "platform_support": "The KanbanBoard component compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "kanban-board-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "GanttThemeScreenshotTest",
       "reason": "The Gantt chart baseline is a task table beside a timeline of bars and dependency arrows. A watch face has no room for either, so the capture there would only record how the chart fails to fit.",
       "platform_support": "The Gantt component compiles and runs on watchOS; it is a planning view for phones, tablets and desktops, and only this baseline does not apply to the watch form factor.",

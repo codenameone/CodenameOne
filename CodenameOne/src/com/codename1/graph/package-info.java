@@ -33,6 +33,10 @@
 ///   editor, where edges join an output to an input of the same type; leave
 ///   it without for a diagram, where edges join nodes.
 /// - A `GraphGroup` is a box drawn around its members, and can collapse.
+/// - A node's shape is a name from `GraphShapes`, and a group made with
+///   `GraphGroup.lane` is a swimlane with bounds of its own.
+/// - A `GraphNodeTemplate` makes nodes of one kind, for a palette.
+/// - `GraphJson` writes a model as JSON text and reads it back.
 /// - `com.codename1.graph.arrange` places the nodes automatically.
 ///
 /// The classes are not thread safe: use a model from one thread, which for a

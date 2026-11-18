@@ -183,9 +183,9 @@ public class DefaultKanbanModel extends AbstractKanbanModel {
             return all;
         }
         List<KanbanCard> out = new ArrayList<KanbanCard>();
-        for (int i = 0; i < all.size(); i++) {
-            if (inLane(all.get(i), lane)) {
-                out.add(all.get(i));
+        for (KanbanCard kc : all) {
+            if (inLane(kc, lane)) {
+                out.add(kc);
             }
         }
         return out;

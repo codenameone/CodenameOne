@@ -470,6 +470,24 @@
       ]
     },
     {
+      "id": "flow-chart",
+      "category": "Rich components",
+      "name": "Flow chart",
+      "description": "Checks the node graph as a flow chart: the flow chart outlines in two swimlanes, dashed and plain lines, open and circle arrow ends and a selected decision, in light and dark themes.",
+      "tests": [
+        "FlowChartThemeScreenshotTest"
+      ]
+    },
+    {
+      "id": "kanban-board",
+      "category": "Rich components",
+      "name": "Kanban board",
+      "description": "Checks the Kanban board with two swimlanes, a column over its limit, a folded column, tagged and badged cards and a selected card, in light and dark themes.",
+      "tests": [
+        "KanbanBoardThemeScreenshotTest"
+      ]
+    },
+    {
       "id": "pdf-viewer",
       "category": "Rich components",
       "name": "PDF viewer",
@@ -1494,6 +1512,14 @@
     {
       "pattern": "NodeGraphTheme*",
       "test": "NodeGraphThemeScreenshotTest"
+    },
+    {
+      "pattern": "FlowChartTheme*",
+      "test": "FlowChartThemeScreenshotTest"
+    },
+    {
+      "pattern": "KanbanBoardTheme*",
+      "test": "KanbanBoardThemeScreenshotTest"
     },
     {
       "pattern": "PdfViewer*",
