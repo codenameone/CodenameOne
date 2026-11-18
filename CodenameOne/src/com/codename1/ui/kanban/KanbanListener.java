@@ -63,8 +63,14 @@ public interface KanbanListener {
     /// keep the old one.
     boolean cardRenaming(KanbanBoard board, KanbanCard card, String title);
 
+    /// A card has the title the user typed.
+    void cardRenamed(KanbanBoard board, KanbanCard card);
+
     /// A card is about to be removed. Return false to keep it.
     boolean cardRemoving(KanbanBoard board, KanbanCard card);
+
+    /// A card was removed.
+    void cardRemoved(KanbanBoard board, KanbanCard card);
 
     /// A column was folded or unfolded.
     void columnToggled(KanbanBoard board, KanbanColumn column);

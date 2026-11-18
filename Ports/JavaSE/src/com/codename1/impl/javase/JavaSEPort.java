@@ -5873,8 +5873,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // A component that asked for shortcut keys (the "cn1$shortcutKeys" client
                 // property: NodeGraph, KanbanBoard) gets the plain letter of a Ctrl or Cmd
                 // combination as a press, and reads the modifier from Display. The key
-                // character is not used: with Ctrl held it is a control character. The
-                // release stays blocked, as it is for every other combination.
+                // character is not used: with Ctrl held it is a control character.
                 int vk = e.getKeyCode();
                 if ((e.isControlDown() || e.isMetaDown()) && !e.isAltDown() && !e.isAltGraphDown()
                         && vk >= KeyEvent.VK_A && vk <= KeyEvent.VK_Z && isShortcutKeysFocused()) {
@@ -5883,6 +5882,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         testRecorder.eventKeyPressed(letter);
                     }
                     JavaSEPort.this.windowKeyPressed(windowId, letter);
+                    // released at once: the real release is blocked, and a press with
+                    // no release leaves Display repeating the key for as long as
+                    // nothing else is typed
+                    JavaSEPort.this.windowKeyReleased(windowId, letter);
                 }
                 return;
             }

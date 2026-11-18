@@ -105,7 +105,8 @@ there.
 === Undo and saving
 
 The board records its edits in an `UndoHistory`, the same class `NodeGraph`
-uses, and one history can serve both. `KanbanJson` writes a model as JSON text
+uses, and one history can serve both. Showing another model with `setModel`
+clears the history. `KanbanJson` writes a model as JSON text
 and reads it back.
 
 [source,java]

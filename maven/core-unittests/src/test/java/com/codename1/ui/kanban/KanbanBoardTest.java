@@ -368,6 +368,25 @@ class KanbanBoardTest extends UITestBase {
         assertEquals("todo", a.getColumnId());
         assertNull(a.getLaneId());
         assertEquals("abc", ids("todo", "x"));
+        // and so does putting back one that was removed
+        final StringBuilder heard = new StringBuilder();
+        b.addKanbanListener(new KanbanAdapter() {
+            @Override
+            public void cardRemoved(KanbanBoard board, KanbanCard card) {
+                heard.append("removed ").append(card.getId());
+            }
+
+            @Override
+            public void cardRenamed(KanbanBoard board, KanbanCard card) {
+                heard.append("renamed ").append(card.getTitle()).append(' ');
+            }
+        });
+        assertTrue(b.renameCard(a, "Again"));
+        assertTrue(b.removeCard(a));
+        assertEquals("renamed Again removed a", heard.toString());
+        assertTrue(b.undo());
+        assertNull(a.getLaneId());
+        assertEquals("abc", ids("todo", "x"));
     }
 
     @FormTest

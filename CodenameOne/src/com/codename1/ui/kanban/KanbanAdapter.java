@@ -74,6 +74,14 @@ public class KanbanAdapter implements KanbanListener {
     }
 
     @Override
+    public void cardRenamed(KanbanBoard board, KanbanCard card) {
+    }
+
+    @Override
+    public void cardRemoved(KanbanBoard board, KanbanCard card) {
+    }
+
+    @Override
     public void columnToggled(KanbanBoard board, KanbanColumn column) {
     }
 

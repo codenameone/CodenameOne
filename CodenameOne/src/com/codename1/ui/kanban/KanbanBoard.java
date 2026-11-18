@@ -208,7 +208,8 @@ public class KanbanBoard extends ScrollSurface {
     }
 
     /// Shows another model. An edit under way ends, and the undo history is
-    /// cleared: its steps belong to the model that was shown.
+    /// cleared: its steps belong to the model that was shown. That is the
+    /// whole history, the steps of another component sharing it included.
     public void setModel(KanbanModel model) {
         if (model == null) {
             throw new IllegalArgumentException("model is null");
@@ -244,7 +245,8 @@ public class KanbanBoard extends ScrollSurface {
         }
         // what is held may be gone, or its column
         if (dragCard != null && model.getCard(dragCard.getId()) != dragCard // NOPMD CompareObjectsWithEquals - the card of the model itself
-                || dragColumn != null && !model.getColumns().contains(dragColumn)) {
+                || dragColumn != null && (model.getColumns().indexOf(dragColumn) != dragColumnFrom
+                || model.getColumns().size() != cols.size())) {
             dropDrag();
         }
         repaint();
@@ -300,6 +302,9 @@ public class KanbanBoard extends ScrollSurface {
     /// The height, in pixels, the component of a card takes at the bottom of
     /// it; 0 for a card without one.
     public int getCardComponentHeight(KanbanCard card) {
+        if (dirty) {
+            syncComponents();
+        }
         Component c = components.get(card.getId());
         return c == null ? 0 : c.getPreferredH() + KanbanLook.mm(1.5f);
     }
@@ -579,7 +584,11 @@ public class KanbanBoard extends ScrollSurface {
         if (!model.moveCard(card, column, lane, index)) {
             return false;
         }
-        record(new KanbanEdits.Move(model, card, from, placeOf(card), fromLaneId));
+        KanbanEdits.Place to = placeOf(card);
+        // a model of your own may have put it where the board cannot find it
+        if (to != null) {
+            record(new KanbanEdits.Move(model, card, from, to, fromLaneId));
+        }
         for (int i = 0; i < listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself
             listeners.get(i).cardMoved(this, card);
         }
@@ -675,6 +684,9 @@ public class KanbanBoard extends ScrollSurface {
             return false;
         }
         record(new KanbanEdits.Rename(model, card, old, title));
+        for (int i = 0; i < listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself
+            listeners.get(i).cardRenamed(this, card);
+        }
         return true;
     }
 
@@ -697,6 +709,9 @@ public class KanbanBoard extends ScrollSurface {
             return false;
         }
         record(new KanbanEdits.Presence(model, card, at, true, "Remove card"));
+        for (int i = 0; i < listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself
+            listeners.get(i).cardRemoved(this, card);
+        }
         return true;
     }
 
@@ -1164,6 +1179,8 @@ public class KanbanBoard extends ScrollSurface {
             return false;
         }
         endEdit(true);
+        // the title just taken may have added a card
+        ensureLayout();
         int cx = x + getOffsetX();
         if (y < headerH) {
             int c = columnAt(cx);

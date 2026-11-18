@@ -91,10 +91,12 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
         private final Place at;
         private final boolean removal;
         private final String name;
+        private final String laneId;
 
         Presence(KanbanModel model, KanbanCard card, Place at, boolean removal, String name) {
             this.model = model;
             this.card = card;
+            this.laneId = card.getLaneId();
             this.at = at;
             this.removal = removal;
             this.name = name;
@@ -103,9 +105,18 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
         @Override
         public void undo() {
             if (removal) {
-                model.insertCard(card, at.column, at.lane, at.index);
+                put();
             } else {
                 model.removeCard(card);
+            }
+        }
+
+        // a card naming no lane is shown in the first one; put back there it
+        // names none again, as before
+        private void put() {
+            if (model.insertCard(card, at.column, at.lane, at.index)
+                    && (laneId == null || model.getLane(laneId) == null)) {
+                card.setLaneId(laneId);
             }
         }
 
@@ -114,7 +125,7 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
             if (removal) {
                 model.removeCard(card);
             } else {
-                model.insertCard(card, at.column, at.lane, at.index);
+                put();
             }
         }
 

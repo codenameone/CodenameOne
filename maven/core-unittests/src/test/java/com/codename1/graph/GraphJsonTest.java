@@ -157,6 +157,7 @@ class GraphJsonTest {
     void textThatIsNotAGraphIsRefused() {
         assertThrows(IOException.class, () -> GraphJson.fromJson("[1, 2]"));
         assertThrows(IOException.class, () -> GraphJson.fromJson("not json at all {"));
+        assertThrows(IOException.class, () -> GraphJson.fromJson("{\"nodes\":5}"));
     }
 
     @Test

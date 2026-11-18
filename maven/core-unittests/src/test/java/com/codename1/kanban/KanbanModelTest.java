@@ -164,6 +164,12 @@ class KanbanModelTest {
                 KanbanJson.fromJson("{\"nodes\":[]}");
             }
         });
+        assertThrows(IOException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() throws Throwable {
+                KanbanJson.fromJson("{\"columns\":\"x\"}");
+            }
+        });
     }
 
     @Test

@@ -112,7 +112,7 @@ public class DefaultGraphEdgeRenderer implements GraphEdgeRenderer {
             double y1 = ys[i];
             double x2 = xs[i + 1];
             double y2 = ys[i + 1];
-            if (i == 0 && tailCut > 0 && tlen > size) {
+            if (i == 0 && tailCut > 0 && tlen > tailCut && (count > 2 || tlen > tailCut + headCut)) {
                 x1 = sx - tdx / tlen * tailCut;
                 y1 = sy - tdy / tlen * tailCut;
             }

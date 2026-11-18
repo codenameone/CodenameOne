@@ -883,6 +883,8 @@ public class NodeGraph extends Container {
         if (undoHistory == null) {
             return false;
         }
+        // what is held would be let go from where it no longer is
+        cancelGesture();
         finishAnimation();
         endLabelEdit();
         return undoHistory.undo();
@@ -897,6 +899,8 @@ public class NodeGraph extends Container {
         if (undoHistory == null) {
             return false;
         }
+        // what is held would be let go from where it no longer is
+        cancelGesture();
         finishAnimation();
         endLabelEdit();
         return undoHistory.redo();
@@ -1523,10 +1527,12 @@ public class NodeGraph extends Container {
                 String key = n.getId() + "\n" + p.getId();
                 Component c = portEditors.get(key);
                 if (onScreen && !isPortConnected(n, p)) {
-                    if (c == null && !portEditors.containsKey(key)) {
+                    if (c == null) {
+                        // a factory that had no editor for a port is asked again:
+                        // its answer may depend on the value
                         c = portEditorFactory.createEditor(this, n, p);
-                        portEditors.put(key, c);
                         if (c != null) {
+                            portEditors.put(key, c);
                             c.putClientProperty("cn1$graphNode", n.getId());
                             c.putClientProperty("cn1$graphPort", p.getId());
                         }
@@ -2836,6 +2842,19 @@ public class NodeGraph extends Container {
 
     private void finishMove() {
         beginStep("Move");
+        // a listener that throws must not leave the step open: every later
+        // edit would go into it and nothing could be undone again
+        try {
+            finishMoveStep();
+        } finally {
+            endStep();
+            moving.clear();
+            groupsDirty = true;
+        }
+        syncComponents();
+    }
+
+    private void finishMoveStep() {
         boolean moved = false;
         GraphGroup lane = movingLane;
         movingLane = null;
@@ -2886,10 +2905,6 @@ public class NodeGraph extends Container {
         }
         unrouted.clear();
         unroutedRoutes.clear();
-        endStep();
-        moving.clear();
-        groupsDirty = true;
-        syncComponents();
     }
 
     private void finishConnect() {
@@ -2921,8 +2936,11 @@ public class NodeGraph extends Container {
         } else {
             beginStep("Connect");
         }
-        connectTo(n, p, valid, cn, cp, rev);
-        endStep();
+        try {
+            connectTo(n, p, valid, cn, cp, rev);
+        } finally {
+            endStep();
+        }
     }
 
     private static List<GraphEdge> single(GraphEdge e) {

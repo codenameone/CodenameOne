@@ -386,9 +386,12 @@ public final class GraphJson {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Object> list(Object o) {
+    private static List<Object> list(Object o) throws IOException {
         if (o instanceof List) {
             return (List<Object>) o;
+        }
+        if (o != null) {
+            throw new IOException("Not a graph: a list was expected");
         }
         return new ArrayList<Object>();
     }
