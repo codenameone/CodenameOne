@@ -816,6 +816,9 @@ public class Chart extends Component {
     @Override
     protected void deinitialize() {
         stopAnimating();
+        // the release of a drag in progress will not come back to this chart
+        brushing = false;
+        brushMoved = false;
         super.deinitialize();
     }
 
@@ -1824,6 +1827,9 @@ public class Chart extends Component {
         flinging = false;
         // a touch takes over from a running zoom animation, keeping the range shown right now
         viewportTo = null;
+        // a brush whose release never arrived (the chart left its form mid-drag) is abandoned
+        brushing = false;
+        brushMoved = false;
         pressX = toPaintX(x);
         pressY = toPaintY(y);
         lastX = pressX;

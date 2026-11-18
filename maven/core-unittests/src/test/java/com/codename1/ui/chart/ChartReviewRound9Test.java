@@ -220,4 +220,45 @@ public class ChartReviewRound9Test extends UITestBase {
             implementation.setRecordDrawCalls(false);
         }
     }
+
+    private List<String> calls(Chart c) {
+        implementation.setRecordDrawCalls(true);
+        try {
+            paint(c);
+            List<String> out = new ArrayList<String>();
+            for (Object[] call : implementation.getDrawCalls()) {
+                StringBuilder sb = new StringBuilder();
+                for (Object o : call) {
+                    sb.append(o).append(',');
+                }
+                out.add(sb.toString());
+            }
+            return out;
+        } finally {
+            implementation.setRecordDrawCalls(false);
+        }
+    }
+
+    @FormTest
+    public void anAbandonedBrushIsClearedByTheNextTouch() {
+        Chart fresh = new Chart().setBrushEnabled(true);
+        fresh.addSeries(line("a"));
+        ChartContext ctx = paint(fresh);
+        List<String> clean = calls(fresh);
+
+        Chart c = new Chart().setBrushEnabled(true);
+        c.addSeries(line("a"));
+        paint(c);
+        int y = ctx.getPlotY() + ctx.getPlotHeight() / 2;
+        int from = ctx.getPlotX() + ctx.getPlotWidth() / 4;
+        int to = ctx.getPlotX() + ctx.getPlotWidth() * 3 / 4;
+        c.pointerPressed(from, y);
+        c.pointerDragged(new int[]{(from + to) / 2}, new int[]{y});
+        c.pointerDragged(new int[]{to}, new int[]{y});
+        // positive control: the band is drawn mid-drag
+        assertFalse(clean.equals(calls(c)), "the brush band should paint while dragging");
+        // the release never arrives; the chart leaves its form
+        c.deinitialize();
+        assertEquals(clean, calls(c), "a brush whose release was lost must not stay on screen");
+    }
 }
