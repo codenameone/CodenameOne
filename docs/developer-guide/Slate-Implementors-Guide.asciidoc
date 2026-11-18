@@ -132,7 +132,11 @@ include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slat
 
 The app's slot picker shows the server's starts and adds the one thing the server
 can't know: with the calendar check on, a start that clashes with the client's
-own phone calendar is marked, though it can still be booked:
+own phone calendar is marked, though it can still be booked. The day is a pill
+on a strip or, for a day the strip doesn't have, a date on the Material
+calendar. That calendar is bounded at today and nowhere else. The horizon is a
+rule of the slot engine, which answers a day past it like any other refused
+day, with no starts and the reason:
 
 [source,java,role=cn1-no-try]
 ----
@@ -183,6 +187,28 @@ include::../../scripts/slate/backend/src/main/java/com/codenameone/examples/slat
 [source,java,role=cn1-no-try]
 ----
 include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/provider/HoursForm.java[tag=slate-hours-form,indent=0]
+----
+
+Every date and time in the app is a `Picker`, and one theme constant,
+`pickerStyle: material`, makes each of them open the Material 3 calendar or clock
+face in a dialog on every platform. The field keeps the picker's contract: the
+minute step, the first date, and a *Cancel* that puts the value back. The clock
+face also takes a typed time, which the step doesn't bind, so the field rounds
+what it's given:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/slate/common/src/main/java/com/codenameone/examples/slate/provider/HoursForm.java[tag=slate-time-picker,indent=0]
+----
+
+The dialogs wear the brand through a few `PickerMaterial` styles. A style the
+theme names is the theme's whole style for it, so each rule states its font and
+padding as well as its colors, and the parts left unnamed keep the platform's
+look:
+
+[source,css]
+----
+include::../../scripts/slate/common/src/main/css/theme.css[tag=slate-picker-css,indent=0]
 ----
 
 The provider's day, week and agenda are one schedule read over a range, drawn as
