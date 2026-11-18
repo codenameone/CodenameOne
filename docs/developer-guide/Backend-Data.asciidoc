@@ -238,18 +238,14 @@ The current tenant lives in `TenantContext`, one value per thread. `TenantFilter
 
 [source,java,role=cn1-no-try]
 ----
-// Tenant from the first label of the host name: acme.example.com is "acme".
-new TenantFilter(TenantFilter.subdomain("example.com"), true);
-// Or from a header that a gateway in front of the server sets.
-new TenantFilter(TenantFilter.header("X-Tenant-ID"), true);
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TenancySnippets.java[tag=backend-tenancy-filter,indent=0]
 ----
 
 A header or a host name is whatever the client sent. A user signed in to one tenant who sends another tenant's name reads that tenant's data, and nothing in the ORM can tell. Only trust one that a gateway strips and sets after authenticating the caller. Otherwise, derive the tenant from the authenticated principal, with the filter installed after authentication:
 
 [source,java,role=cn1-no-try]
 ----
-// accounts.tenantOf is your own lookup, from a user table or a token claim.
-new TenantFilter(TenantFilter.authenticated(auth -> accounts.tenantOf(auth.getName())), true);
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TenancySnippets.java[tag=backend-tenancy-principal,indent=0]
 ----
 
 Any other rule is a `TenantResolver`. A tenant identifier is 1 to 64 characters of letters, digits, `_`, `.` and `-`; anything else is refused with a 400.
@@ -260,12 +256,7 @@ Mark a `String` field with `@TenantId`:
 
 [source,java,role=cn1-no-try]
 ----
-@Entity
-public class Invoice {
-    @Id @GeneratedValue long id;
-    @TenantId String tenant;
-    String customer;
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Invoice.java[tag=backend-tenancy-entity,indent=0]
 ----
 
 From then on the session:
@@ -287,10 +278,7 @@ Native SQL is never rewritten. Instead of letting one quietly read every tenant'
 
 [source,java,role=cn1-no-try]
 ----
-Long open = (Long) TenantContext.allowNativeSql(() -> session
-        .createNativeQuery("SELECT COUNT(*) FROM invoice WHERE tenant_id = :t", Long.class)
-        .setParameter("t", TenantContext.get())
-        .first());
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TenancySnippets.java[tag=backend-tenancy-native,indent=0]
 ----
 
 Statements run straight through a `DataSource` don't pass through the session and aren't checked.
@@ -305,19 +293,12 @@ On the client there's no current tenant, and `@TenantId` is an ordinary column.
 
 [source,properties]
 ----
-# A database per tenant
-cn1.tenancy.datasource.url=postgres://app:secret@db/app_${tenant}
-# Or a schema per tenant, on the main database
-cn1.tenancy.datasource.init=SET search_path TO tenant_${tenant}
-cn1.tenancy.datasource.pool.size=4
-cn1.tenancy.datasource.maxPools=32
+include::../demos/common/src/main/snippets/developer-guide/backend-web.properties[tag=backend-tenancy-datasource-001,indent=0]
 ----
 
 [source,java,role=cn1-no-try]
 ----
-TenantDataSources tenants = TenantDataSources.fromConfig(config);
-tenants.migrateAll(Arrays.asList("acme", "globex"), config);
-EntityManager entities = EntityManager.open(tenants.current());
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TenancySnippets.java[tag=backend-tenancy-datasources,indent=0]
 ----
 
 `current()` throws `MissingTenantException` when no tenant is set. A template that names `${tenant}` in neither the URL nor the init statement is refused, since it would give every tenant the same database. So is a bare `${tenant}`: it must follow a letter, digit or underscore (`app_${tenant}`), or a tenant called `public` or `postgres` would open a pool on a shared schema. The init statement runs again on every borrow, so native SQL that changed a connection's schema can't carry over to the next request. You can also register a pool for a tenant with `register`; the cap never closes a registered pool.
@@ -328,7 +309,7 @@ A task submitted to an executor runs on another thread, which has no tenant. `Te
 
 [source,java,role=cn1-no-try]
 ----
-Tasks.executor("mail").setTaskDecorator(TenantContext.decorator());
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TenancySnippets.java[tag=backend-tenancy-decorator,indent=0]
 ----
 
 === Schema migrations
