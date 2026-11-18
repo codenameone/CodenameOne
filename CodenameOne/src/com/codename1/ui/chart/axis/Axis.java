@@ -179,6 +179,12 @@ public abstract class Axis {
         if (fixedMax != null) {
             max = fixedMax.doubleValue();
         }
+        if (fixedMin != null && fixedMax != null && min > max) {
+            // both ends given in the wrong order: take them as a range
+            double t = min;
+            min = max;
+            max = t;
+        }
         if (!(max > min)) { //NOPMD LogicInversion - the negated comparison is also true for NaN
             // a fixed bound beyond the data keeps its side; only the free side moves
             double anchor = fixedMin != null ? min : max;

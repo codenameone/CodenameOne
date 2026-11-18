@@ -812,7 +812,11 @@ public class Chart extends Component {
         ctx.labels = new LabelLayout(plotX, plotY - fh / 2, ctx.plotW, ctx.plotH + fh / 2);
         lastContext = ctx;
         if (ctx.plotW <= 0 || ctx.plotH <= 0) {
-            // the title and legend took the whole component: there is no plot to draw into
+            // the title and legend took the whole component: there is no plot to draw into,
+            // but a loading state must still show
+            if (loadingText != null) {
+                paintLoading(g, font, x, y, w, h);
+            }
             g.setAntiAliased(aa);
             return;
         }
@@ -1420,7 +1424,8 @@ public class Chart extends Component {
         if (s == null) {
             return -1;
         }
-        if (!rotated && s instanceof com.codename1.ui.chart.series.XYSeries && ctx.plotW > 0) {
+        if (!rotated && s instanceof com.codename1.ui.chart.series.XYSeries && ctx.plotW > 0
+                && ((com.codename1.ui.chart.series.XYSeries) s).isAscending()) {
             // scrubbing runs on every move: search the sorted x values instead of every point
             double n = (relX + getX() - ctx.plotX) / (double) ctx.plotW;
             return ((com.codename1.ui.chart.series.XYSeries) s).nearestIndexOfX(xAxis.fromNormalized(n));

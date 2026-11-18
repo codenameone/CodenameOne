@@ -302,7 +302,32 @@ public abstract class XYSeries extends Series {
         return sum;
     }
 
-    /// The index whose x is closest to `x`, by binary search over the ascending x values.
+    // 0 unknown, 1 ascending, 2 not; reset by every change to the data
+    private int orderState;
+
+    @Override
+    protected void dataChanged() {
+        orderState = 0;
+        super.dataChanged();
+    }
+
+    /// True when the x values never decrease, as a time series' do; a scatter filled in any
+    /// order is not. Checked once per change to the data.
+    public boolean isAscending() {
+        if (orderState == 0) {
+            orderState = 1;
+            for (int i = 1; i < count; i++) {
+                if (xs[i] < xs[i - 1]) {
+                    orderState = 2;
+                    break;
+                }
+            }
+        }
+        return orderState == 1;
+    }
+
+    /// The index whose x is closest to `x` among the points that have a y value, by binary
+    /// search; only meaningful when `isAscending()`.
     ///
     /// #### Parameters
     ///
@@ -325,7 +350,30 @@ public abstract class XYSeries extends Series {
                 hi = mid;
             }
         }
-        return Math.abs(xs[lo] - x) <= Math.abs(xs[hi] - x) ? lo : hi;
+        int best = Math.abs(xs[lo] - x) <= Math.abs(xs[hi] - x) ? lo : hi;
+        if (ys[best] == ys[best]) {
+            return best;
+        }
+        // a gap: the nearest neighbour on either side that has a value
+        for (int d = 1; d < count; d++) {
+            int a = best - d;
+            int b = best + d;
+            boolean aok = a >= 0 && ys[a] == ys[a];
+            boolean bok = b < count && ys[b] == ys[b];
+            if (aok && bok) {
+                return Math.abs(xs[a] - x) <= Math.abs(xs[b] - x) ? a : b;
+            }
+            if (aok) {
+                return a;
+            }
+            if (bok) {
+                return b;
+            }
+            if (a < 0 && b >= count) {
+                break;
+            }
+        }
+        return -1;
     }
 
     int indexOfX(double x) {

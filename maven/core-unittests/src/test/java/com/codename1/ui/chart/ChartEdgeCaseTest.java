@@ -199,4 +199,25 @@ public class ChartEdgeCaseTest extends UITestBase {
         assertEquals(2, s.nearestIndexOfX(16));
         assertEquals(3, s.nearestIndexOfX(99));
     }
+
+    @FormTest
+    public void unsortedOrGappySeriesStillFindTheirPoints() {
+        XYSeries scatter = new LineSeries("s").setData(new double[]{5, 1, 9, 3}, new double[]{1, 2, 3, 4});
+        assertFalse(scatter.isAscending());
+        XYSeries gaps = new LineSeries("g").setData(new double[]{0, 1, 2, 3}, new double[]{1, Double.NaN, Double.NaN, 4});
+        assertTrue(gaps.isAscending());
+        assertEquals(0, gaps.nearestIndexOfX(1.2));
+        assertEquals(3, gaps.nearestIndexOfX(2.2));
+        gaps.add(-1, 0);
+        assertFalse(gaps.isAscending());
+    }
+
+    @FormTest
+    public void bothFixedBoundsReversedAreTakenAsARange() {
+        NumberAxis a = new NumberAxis(Axis.LEFT);
+        a.setRange(Double.valueOf(10), Double.valueOf(5));
+        a.setDataBounds(0, 50);
+        assertEquals(5, a.getDataMin(), 0);
+        assertEquals(10, a.getDataMax(), 0);
+    }
 }
