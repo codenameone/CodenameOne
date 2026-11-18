@@ -549,7 +549,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public boolean isFullScreenSupported() {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false);
+        // The preference is the simulator's, and the bundle is found from the working
+        // directory: a desktop tool started in a project must not pick up its bundle (#6255).
+        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false)
+                && isSimulator();
         if (autoUpdateDefaultResourceBundle) {
             enableAutoLocalizationBundle();
         } else {
@@ -12707,7 +12710,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         }*/
                 
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false);
+        // The preference is the simulator's, and the bundle is found from the working
+        // directory: a desktop tool started in a project must not pick up its bundle (#6255).
+        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false)
+                && isSimulator();
         if (autoUpdateDefaultResourceBundle) {
             enableAutoLocalizationBundle();
         } else {
@@ -21467,7 +21473,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(resource.startsWith("raw")) {
             throw new RuntimeException("Files starting with 'raw' are reserved file names and can't be used in getResource()!");
         }
-        if ("/theme.res".equals(resource)) {
+        // The source tree's theme.res is the simulator's live copy, read in preference to the
+        // class path. Only the simulator may do that: the desktop tools (Certificate Wizard,
+        // Settings, GUI Builder) run on this port with the developer's project as their
+        // working directory, so a project with a theme.res under src/main/resources replaced
+        // the tool's own theme and drew it unstyled (issue #6255).
+        if ("/theme.res".equals(resource) && isSimulator()) {
             File srcThemeRes = new File(getSourceResourcesDir(),  "theme.res");
             if (srcThemeRes.exists()) {
                 try {
