@@ -25,6 +25,10 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation.AffineCall;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+import java.util.List;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
@@ -370,6 +374,153 @@ class InfiniteProgressTest extends UITestBase {
         DisplayTest.flushEdt();
         assertNull(f.getClientProperty("cn1$infiniteProgressDepth"),
                 "and disposing the one that did attach gives the host back");
+    }
+
+    /// Issue #6269: the first spin of a spinner rendered a rotated copy of its image
+    /// for every new angle, in the middle of a paint, which flickered the first
+    /// pull-to-refresh after each launch on iOS. With an affine transform available
+    /// the original image is drawn under a rotation instead, so a whole turn creates
+    /// no image at all.
+    @FormTest
+    void testAffinePaintRotatesTheOriginalImageInsteadOfCopies() {
+        implementation.setAffineSupported(true);
+        InfiniteProgress progress = spinner(30);
+        Image animation = progress.getAnimation();
+        Graphics g = Image.createImage(200, 200).getGraphics();
+        List<AffineCall> log = implementation.startAffineCallLog();
+
+        for (int frame = 0; frame < 12; frame++) {
+            progress.animate(true);
+            progress.paint(g);
+        }
+
+        int draws = 0;
+        for (AffineCall call : log) {
+            if (call.kind == AffineCall.DRAW_IMAGE) {
+                draws++;
+                assertSame(animation.getImage(), call.image,
+                        "every frame draws the original image, never a rotated copy");
+            }
+        }
+        assertEquals(12, draws);
+    }
+
+    /// The pivot is the image's own center, in the coordinates the image is drawn
+    /// in. The branch was once disabled because it pivoted on absolute coordinates
+    /// while drawing on relative ones; here the component is not in a form and the
+    /// graphics is translated, as when the look and feel paints the pull-to-refresh
+    /// header, so absolute and drawn coordinates differ. With no transform on the
+    /// context beforehand it is reset afterwards, which is exact, rather than
+    /// rotated back, which leaves float residue.
+    @FormTest
+    void testAffinePaintPivotsOnTheImageCenterAndResetsAnIdentityContext() {
+        implementation.setAffineSupported(true);
+        InfiniteProgress progress = paddedSpinner();
+        Graphics g = Image.createImage(200, 200).getGraphics();
+        g.translate(17, 23);
+        List<AffineCall> log = implementation.startAffineCallLog();
+
+        progress.animate(true);
+        progress.paint(g);
+
+        AffineCall[] calls = spinnerCalls(log, progress);
+        assertPivot(calls[0]);
+        assertNotNull(calls[2], "the context is put back after the draw");
+        assertEquals(AffineCall.RESET, calls[2].kind, "an identity context is reset exactly");
+    }
+
+    /// A transform a parent set must survive the spinner, so it is rotated back
+    /// rather than reset.
+    @FormTest
+    void testAffinePaintKeepsAParentTransform() {
+        implementation.setAffineSupported(true);
+        InfiniteProgress progress = paddedSpinner();
+        Graphics g = Image.createImage(200, 200).getGraphics();
+        g.translate(17, 23);
+        g.scale(2f, 2f);
+        List<AffineCall> log = implementation.startAffineCallLog();
+
+        progress.animate(true);
+        progress.paint(g);
+
+        AffineCall[] calls = spinnerCalls(log, progress);
+        AffineCall rotate = assertPivot(calls[0]);
+        AffineCall restore = calls[2];
+        assertNotNull(restore, "the rotation is undone after the draw");
+        assertEquals(AffineCall.ROTATE, restore.kind, "a parent transform is never reset");
+        assertEquals(-rotate.angle, restore.angle, 1e-6f);
+        assertEquals(rotate.x, restore.x);
+        assertEquals(rotate.y, restore.y);
+    }
+
+    private static InfiniteProgress paddedSpinner() {
+        InfiniteProgress progress = spinner(90);
+        progress.setX(5);
+        progress.setY(7);
+        Style s = progress.getStyle();
+        s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        s.setPadding(3, 0, 2, 0);
+        return progress;
+    }
+
+    /// The rotation before the spinner's draw, the draw, and the call after it.
+    private static AffineCall[] spinnerCalls(List<AffineCall> log, InfiniteProgress progress) {
+        AffineCall[] out = new AffineCall[3];
+        for (AffineCall call : log) {
+            boolean spinnerDraw = call.kind == AffineCall.DRAW_IMAGE
+                    && call.image == progress.getAnimation().getImage();
+            if (spinnerDraw) {
+                out[1] = call;
+            } else if (out[1] == null && call.kind == AffineCall.ROTATE) {
+                out[0] = call;
+            } else if (out[1] != null && out[2] == null && call.kind != AffineCall.DRAW_IMAGE) {
+                out[2] = call;
+            }
+        }
+        AffineCall draw = out[1];
+        assertNotNull(draw, "the spinner image is drawn");
+        assertEquals(5 + 2 + 17, draw.x);
+        assertEquals(7 + 3 + 23, draw.y);
+        return out;
+    }
+
+    private static AffineCall assertPivot(AffineCall rotate) {
+        assertNotNull(rotate, "the draw is rotated");
+        assertEquals(AffineCall.ROTATE, rotate.kind);
+        assertEquals((float) Math.toRadians(90), rotate.angle, 1e-5f);
+        assertEquals(5 + 2 + 17 + 10, rotate.x, "pivot is the image center, translated, not the component's");
+        assertEquals(7 + 3 + 23 + 5, rotate.y);
+        return rotate;
+    }
+
+    /// A port without an affine transform keeps the cached rotated images.
+    @FormTest
+    void testPaintWithoutAffineDrawsRotatedCopies() {
+        implementation.setAffineSupported(false);
+        InfiniteProgress progress = spinner(30);
+        Graphics g = Image.createImage(200, 200).getGraphics();
+        List<AffineCall> log = implementation.startAffineCallLog();
+
+        progress.animate(true);
+        progress.paint(g);
+
+        boolean drewCopy = false;
+        for (AffineCall call : log) {
+            assertNotEquals(AffineCall.ROTATE, call.kind, "no transform is used");
+            if (call.kind == AffineCall.DRAW_IMAGE && call.image != progress.getAnimation().getImage()) {
+                drewCopy = true;
+            }
+        }
+        assertTrue(drewCopy, "a rotated copy is drawn");
+    }
+
+    private static InfiniteProgress spinner(int angleIncrease) {
+        InfiniteProgress progress = new InfiniteProgress();
+        progress.setMaterialDesignMode(false);
+        progress.setAnimation(Image.createImage(20, 10, 0xFFFF0000));
+        progress.setTickCount(1);
+        progress.setAngleIncrease(angleIncrease);
+        return progress;
     }
 
 }

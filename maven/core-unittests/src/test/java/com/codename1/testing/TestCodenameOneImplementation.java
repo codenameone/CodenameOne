@@ -1565,6 +1565,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         colorMatrixRegionSupported = false;
         colorMatrixCalls.clear();
         lensCalls.clear();
+        affineSupported = false;
+        affineCallLog = null;
         minimized = false;
         usesInvokeAndBlockForEditString = false;
         windowManager = null;
@@ -1963,6 +1965,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void resetAffine(Object nativeGraphics) {
+        if (affineCallLog != null) {
+            affineCallLog.add(new AffineCall(AffineCall.RESET, null, 0f, 0, 0));
+        }
         if (nativeGraphics instanceof TestGraphics) {
             ((TestGraphics) nativeGraphics).transform.setIdentity();
         }
@@ -1996,6 +2001,51 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void rotate(Object nativeGraphics, float angle, int pivotX, int pivotY) {
+        if (affineCallLog != null) {
+            affineCallLog.add(new AffineCall(AffineCall.ROTATE, null, angle, pivotX, pivotY));
+        }
+    }
+
+    private boolean affineSupported;
+    private java.util.List<AffineCall> affineCallLog;
+
+    /// Makes `isAffineSupported()` answer true, as every GPU-backed port does. Off by
+    /// default and reset between tests.
+    public void setAffineSupported(boolean affineSupported) {
+        this.affineSupported = affineSupported;
+    }
+
+    @Override
+    public boolean isAffineSupported() {
+        return affineSupported;
+    }
+
+    /// Starts recording rotations and image draws, in call order, into a fresh list
+    /// that is returned. Recording stops on `reset()`.
+    public java.util.List<AffineCall> startAffineCallLog() {
+        affineCallLog = new java.util.ArrayList<AffineCall>();
+        return affineCallLog;
+    }
+
+    /// One recorded rotation or image draw. Coordinates are the ones the port
+    /// receives, after the Graphics translation was applied.
+    public static final class AffineCall {
+        public static final int ROTATE = 0;
+        public static final int DRAW_IMAGE = 1;
+        public static final int RESET = 2;
+        public final int kind;
+        public final Object image;
+        public final float angle;
+        public final int x;
+        public final int y;
+
+        AffineCall(int kind, Object image, float angle, int x, int y) {
+            this.kind = kind;
+            this.image = image;
+            this.angle = angle;
+            this.x = x;
+            this.y = y;
+        }
     }
 
     @Override
@@ -3070,6 +3120,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y) {
+        if (affineCallLog != null) {
+            affineCallLog.add(new AffineCall(AffineCall.DRAW_IMAGE, img, 0f, x, y));
+        }
     }
 
     /**
