@@ -71,7 +71,7 @@ import java.util.Map;
 ///
 /// Everywhere but Android the test self-skips (CN1SS SKIPPED log, no screenshot, no golden).
 public class SurfacesRemoteViewsScreenshotTest extends BaseTest {
-    // cn1ss-skip: ios-metal, mac-catalyst, macos, javascript, linux-x64, linux-arm64, windows-x64, windows-arm64, tvos, watchos -- captures nothing on these ports (the guard below);
+    // cn1ss-skip: ios-metal, macos, javascript, linux-x64, linux-arm64, windows-x64, windows-arm64, tvos, watchos -- captures nothing on these ports (the guard below);
     // scripts/ci/cn1ss-golden-plan.py expects a golden everywhere else.
     private static final String NAME = "SurfacesRemoteViews";
     /// Same pinned clock as SurfacesRasterizerScreenshotTest: 2025-06-15T15:06:40Z.

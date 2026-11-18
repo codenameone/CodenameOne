@@ -6,27 +6,6 @@ The `build-macos` job in
 compares `scripts/hellocodenameone` output against these PNGs via
 [`scripts/run-macos-ui-tests.sh`](../../run-macos-ui-tests.sh).
 
-The legacy Mac Catalyst baseline is
-[`../../mac-catalyst/screenshots`](../../mac-catalyst/screenshots).
-
-## Scope
-
-This is a different port from Catalyst, not a newer build of it, and the images
-differ accordingly. Expect:
-
-- A real `NSWindow` title bar, with real traffic lights, rather than the frame
-  Catalyst puts around a `UIWindowScene`.
-- AppKit text rasterization and sub-pixel positioning.
-- A backing scale that comes from `NSScreen`, so frame dimensions can differ
-  from the Catalyst set outright.
-- Scrollbar chrome drawn by AppKit conventions.
-
-The `Window-*` family differs in kind rather than degree. A Catalyst window
-renders into an off-screen raster that is handed to the scene's view; here every
-window owns its own `CAMetalLayer` and is a real second GPU surface. That is the
-point of the port, and it is why the two baselines are separate rather than one
-set with a loose tolerance.
-
 ## Adopting the first baseline
 
 1. Run the `build-macos` job and download the `macos-ui-tests` artifact.
@@ -38,7 +17,7 @@ set with a loose tolerance.
 
 ## Review rules
 
-Open each new golden beside its counterpart in `../../mac-catalyst/screenshots/`
+Open each new golden beside its counterpart in `../../ios/screenshots-metal/`
 as a **review aid, never as a source**. Then:
 
 - **Layout differences are bugs.** A widget that is shifted, clipped, wrapped
@@ -67,7 +46,7 @@ as a **review aid, never as a source**. Then:
 
 Start with none, and add one only when a test is shown to be nondeterministic
 between two runs of the same binary. "AppKit rasterizes text differently from
-Catalyst" is deterministic and permanent: the answer is this baseline, which is
+iOS" is deterministic and permanent: the answer is this baseline, which is
 what this directory is for.
 
 ## Window layout progress references

@@ -101,8 +101,7 @@ mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=f
 # is rendered + compiled the same way as the iOS one). Cloud-built.
 mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native
 
-# Local Xcode project for the Mac slice. Open the project in Xcode and
-# select the Mac Catalyst destination to run.
+# Local Xcode project for the Mac app. Open the project in Xcode and run it.
 mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-source -Dopen=false
 
 # Native Android APK/AAB. Cloud-built by default.

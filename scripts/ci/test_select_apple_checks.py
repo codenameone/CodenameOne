@@ -8,10 +8,10 @@ apple = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(apple)
 
 class AppleSelectionTest(unittest.TestCase):
-    def test_catalyst_only_does_not_expand_to_all_suites(self):
+    def test_packaging_only_does_not_expand_to_all_suites(self):
         for event in ['push', 'pull_request']:
-            result = apple.select(['scripts/run-mac-catalyst-ui-tests.sh'], event)
-            self.assertEqual({'ios':'false', 'native':'false', 'packaging':'false', 'catalyst':'true', 'any':'true'}, result)
+            result = apple.select(['.github/workflows/ios-packaging.yml'], event)
+            self.assertEqual({'ios':'false', 'native':'false', 'packaging':'true', 'any':'true'}, result)
 
     def test_no_native_runner_for_independent_cn1lib_or_core_unit_test(self):
         for event in ['push', 'pull_request']:
@@ -32,7 +32,7 @@ class AppleSelectionTest(unittest.TestCase):
         self.assertEqual('false', apple.select([])['any'])
 
     def test_workflow_specific_changes_are_selected(self):
-        for key, name in [('native', 'scripts-ios-native.yml'), ('packaging', 'ios-packaging.yml'), ('catalyst','scripts-mac-catalyst.yml')]:
+        for key, name in [('native', 'scripts-ios-native.yml'), ('packaging', 'ios-packaging.yml')]:
             self.assertEqual('true', apple.select(['.github/workflows/' + name])[key])
 
     def test_packaging_ignores_baselines_its_smoke_never_reads(self):

@@ -1180,8 +1180,8 @@ Traps:
   JavaScript build script read it; a list of class directories per workflow
   is how the Unity runtime was missing from three of them.
 - **The artifact name is fixed, so the workflow is called once per run.** A
-  workflow that is itself called (`scripts-ios-native.yml`, `ios-packaging.yml`,
-  `scripts-mac-catalyst.yml`) takes `unity_prepared` and skips its own call
+  workflow that is itself called (`scripts-ios-native.yml`, `ios-packaging.yml`)
+  takes `unity_prepared` and skips its own call
   when `scripts-ios.yml` already made one.
 - **Anything new that determines the archive goes into the cache key** in the
   reusable workflow. A stale cached archive is not refused downstream -- it is
@@ -1441,6 +1441,55 @@ Traps that have already cost a fix:
 target's upload (`.github/workflows/kmp-compat.yml`). `scripts/kmp-bench` runs
 the same Compose source against Compose Multiplatform on an iOS simulator; see
 its README for the numbers and what they do not show.
+
+### Screenshot goldens: capture, harvest, and how to watch them
+
+A PR that adds or changes a hellocodenameone screenshot test needs a golden per
+platform directory. Nobody renders those by hand; CI does, in two halves:
+
+- **Golden capture** (`golden-capture.yml`) runs on every PR push. When
+  `scripts/ci/cn1ss-golden-plan.py` finds a missing golden it cancels the
+  PR's other checks, dispatches only the screenshot workflows that own the
+  missing directories (and, on iOS, only the legs whose directory has a gap),
+  sets a pending **"Golden capture"** commit status and posts a
+  github-actions comment on the PR.
+- **Golden harvest** (`golden-harvest.yml`, always master's copy) runs when the
+  last capture run completes, commits the rendered images to the branch and
+  settles the status. The commit restarts CI, which runs normally once nothing
+  is missing.
+
+Watching a PR through this, which is how "it's stuck" gets answered:
+
+1. **Read the "Golden capture" status on the PR head first**
+   (`gh api repos/<repo>/commits/<sha>/statuses`) and the capture runs at that
+   head (`gh run list --commit <sha>`, event `workflow_dispatch`). The PR's own
+   checks are cancelled on purpose while a capture runs; a wall of cancelled
+   checks is not the failure.
+2. **Go to the job level before calling anything stuck.** A run that is
+   `queued` with jobs queued is waiting for a runner -- macOS runners are the
+   scarce ones, and an iOS capture can wait an hour. Say so with the job
+   names and times; do not re-dispatch, which only queues more.
+3. **A job failed with "not acquired by Runner of type hosted"** was dropped
+   by GitHub for capacity. The harvest re-runs those itself (twice,
+   `golden-harvest.sh redo-dropped`) and keeps the status pending; do nothing.
+4. **The harvest's log is the answer to "why didn't it commit X"**: the
+   "Collect, commit and push" step prints every image it added and every one
+   it refused. Read it before guessing. Two legs sharing a directory (the
+   Windows legs) that differ only by anti-aliasing are committed with a
+   generated `.tolerance` sidecar; any larger difference is refused, and that
+   is a real rendering difference to fix in the PR.
+5. **A capture runs the PR branch's own copy of the screenshot workflows.** A
+   capture fix on master reaches a PR only after the branch merges master;
+   the harvest, which runs master's copy, does not need that.
+6. **Runs started with the job token start no `workflow_run`**, so no harvest.
+   Dispatch and re-run captures with `CN1SS_GH_TOKEN`; a hand re-run with your
+   own `gh` login is fine.
+7. **Do not push to the PR while a capture is in flight.** A new head
+   supersedes the capture and its images may be dropped as stale; batch the
+   push until the status settles.
+8. **Watch from a background shell**, never by polling in the conversation:
+   snapshot the head SHA and the "Golden capture" status every few minutes and
+   exit on a change.
 
 ### Nightly CI: what runs on a pull request and what does not
 

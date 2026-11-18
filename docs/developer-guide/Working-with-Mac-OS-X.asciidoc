@@ -117,8 +117,6 @@ This target is a good fit when:
 
 Java source is shared with your other targets; no Mac-specific code is required.
 
-NOTE: This target replaced a Mac Catalyst build, which produced a UIKit application running in macOS's iOS compatibility layer. Existing projects keep building without an edit and simply get the AppKit app instead. If you depend on the previous behavior, see <<_working_with_mac_catalyst>>.
-
 [NOTE]
 ====
 A few device capabilities have no macOS counterpart and are inert rather than
@@ -209,7 +207,3 @@ The native macOS build emits a `<MainClass>.entitlements` plist (or `<MainClass>
 | App Store      | Sandboxed, hardened runtime off. Signed with _Apple Distribution_; uploaded via App Store Connect.
 | Developer ID   | Hardened runtime on, sandbox off. Signed with _Developer ID Application_; notarized before distribution.
 |===
-
-=== If You Need the Previous Mac Behavior
-
-Projects that depend on the Mac Catalyst build this target replaced can still build it: set `macNative.enabled=true` and build the iOS target, which is what Catalyst has always been. See <<_working_with_mac_catalyst>>.

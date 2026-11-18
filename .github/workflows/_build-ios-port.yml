@@ -1,7 +1,7 @@
 name: _Build iOS port (reusable)
 
 # The iOS coordinator calls this once and shares its artifact with UI,
-# notification, packaging and Catalyst consumers in the SAME run. Standalone
+# notification and packaging consumers in the SAME run. Standalone
 # diagnostic dispatches can still call it themselves. Caches only accelerate
 # later runs; an exact artifact remains the required handoff, even on a cold
 # cache or when entries are evicted while consumers wait for a runner.

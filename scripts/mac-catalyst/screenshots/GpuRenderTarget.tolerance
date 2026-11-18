@@ -1,4 +1,0 @@
-# GPU 3D render: software rasterizers (swiftshader/Metal sim) vary ~1%
-# between CI runners; widen tolerance so noise does not fail the build.
-maxChannelDelta=8
-maxMismatchPercent=3.0

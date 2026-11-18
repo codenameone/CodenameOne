@@ -533,9 +533,8 @@ eSigner
 # model used in the model test, and "JOGL" is the OpenGL binding the desktop
 # simulator renders through. "Direct3D" and "HLSL" are the native Windows GPU
 # backend and its shader language, "AppKit" is the macOS UI framework the native
-# macOS port is built on, "Catalyst" is Apple's Mac Catalyst target (the port
-# that preceded it, and which the macOS and desktop-windows chapters still
-# document), and "texels" are texture pixels (the standard graphics term).
+# macOS port is built on, and "texels" are texture pixels (the standard
+# graphics term).
 [Pp]hong
 Khronos
 BoomBox
@@ -543,7 +542,6 @@ JOGL
 Direct3D
 HLSL
 AppKit
-Catalyst
 texels
 billboarded
 Bezier
