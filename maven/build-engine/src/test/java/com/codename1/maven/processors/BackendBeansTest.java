@@ -4091,6 +4091,174 @@ public class BackendBeansTest {
         return withApplication(Backend.builder(Config.of(settings, "dev")).quiet(), app).start();
     }
 
+    private static final String GRAPHQL_SCHEMA = "type Query {\n"
+            + "  book(id: ID!): Book\n  books(limit: Int): [Book!]!\n}\n"
+            + "type Mutation { addBook(input: BookInput!): Book! }\n"
+            + "input BookInput { title: String! year: Int }\n"
+            + "type Book { id: ID! title: String! year: Int author: Author shout: String! }\n"
+            + "type Author { name: String! }\n";
+
+    private static Map<String, String> graphQLSample() {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Book", PKG + "public class Book {\n"
+                + "    public String id; public String title; public Integer year;\n"
+                + "    public Book() {}\n"
+                + "    public Book(String id, String title, Integer year) {\n"
+                + "        this.id = id; this.title = title; this.year = year;\n    }\n}\n");
+        s.put("com.example.BookInput", PKG + "public class BookInput {\n"
+                + "    public String title; public Integer year;\n}\n");
+        s.put("com.example.Author", PKG + "public class Author {\n"
+                + "    public String name;\n"
+                + "    public Author() {}\n"
+                + "    public Author(String name) { this.name = name; }\n}\n");
+        s.put("com.example.Books", PKG + "@Controller public class Books {\n"
+                + "    final List<Book> all = new ArrayList<Book>();\n"
+                + "    public static final AtomicInteger AUTHOR_CALLS = new AtomicInteger();\n"
+                + "    public Books() {\n"
+                + "        all.add(new Book(\"1\", \"Dune\", 1965));\n"
+                + "        all.add(new Book(\"2\", \"Emma\", null));\n    }\n"
+                + "    @QueryMapping public Book book(@Argument(\"id\") String id) {\n"
+                + "        for (Book b : all) { if (b.id.equals(id)) { return b; } }\n"
+                + "        return null;\n    }\n"
+                + "    @QueryMapping List<Book> books(@Argument(\"limit\") Integer limit) {\n"
+                + "        return limit == null ? all : all.subList(0, limit);\n    }\n"
+                + "    @MutationMapping public Book addBook(@Argument(\"input\") BookInput in) {\n"
+                + "        Book b = new Book(String.valueOf(all.size() + 1), in.title, in.year);\n"
+                + "        all.add(b);\n        return b;\n    }\n"
+                + "    @SchemaMapping public String shout(Book b) { return b.title + \"!\"; }\n"
+                + "    @BatchMapping public Map<Book, Author> author(List<Book> books) {\n"
+                + "        AUTHOR_CALLS.incrementAndGet();\n"
+                + "        Map<Book, Author> m = new HashMap<Book, Author>();\n"
+                + "        for (Book b : books) { m.put(b, new Author(\"A\" + b.id)); }\n"
+                + "        return m;\n    }\n}\n");
+        return s;
+    }
+
+    @Test
+    public void graphQLControllersAreWiredToTheEndpoint() throws Exception {
+        File classes = compile(graphQLSample());
+        File schemaDir = new File(classes, "graphql");
+        assertTrue(schemaDir.mkdirs());
+        writeProperties(schemaDir, "schema.graphqls", GRAPHQL_SCHEMA);
+        ProcessorContext ctx = process(classes);
+        assertNoErrors(ctx);
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        BackendApplication app = (BackendApplication) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        // What the generated main installs before it starts the server.
+        com.codename1.impl.backend.JsonCodec.install((com.codename1.impl.backend.JsonCodec.Registry)
+                loader.loadClass("cn1app.JsonCodecs").newInstance());
+        Backend backend = withApplication(Backend.builder(Config.of(settings, "dev")).quiet(), app)
+                .start();
+        try {
+            String one = post(port, "/graphql",
+                    "{\"query\":\"{ book(id: \\\"1\\\") { title year shout } }\"}");
+            assertTrue(one, one.contains("\"title\":\"Dune\"") && one.contains("\"year\":1965")
+                    && one.contains("\"shout\":\"Dune!\""));
+            String list = post(port, "/graphql",
+                    "{\"query\":\"{ books { id author { name } } }\"}");
+            assertTrue(list, list.contains("\"name\":\"A1\"") && list.contains("\"name\":\"A2\""));
+            assertEquals("the batch mapping was called once per list", "1",
+                    String.valueOf(loader.loadClass("com.example.Books").getField("AUTHOR_CALLS")
+                            .get(null)));
+            String added = post(port, "/graphql", "{\"query\":\"mutation($in: BookInput!) "
+                    + "{ addBook(input: $in) { id title year } }\",\"variables\":"
+                    + "{\"in\":{\"title\":\"Ulysses\",\"year\":1922}}}");
+            assertTrue(added, added.contains("\"id\":\"3\"") && added.contains("\"year\":1922"));
+            String limited = post(port, "/graphql", "{\"query\":\"{ books(limit: 1) { id } }\"}");
+            assertTrue(limited, limited.contains("\"books\":[{\"id\":\"1\"}]"));
+        } finally {
+            backend.stop();
+            com.codename1.impl.backend.JsonCodec.install(null);
+        }
+    }
+
+    @Test
+    public void graphQLMappingsTheSchemaLacksFailTheBuild() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Book", PKG + "public class Book { public String id; }\n");
+        s.put("com.example.Bad", PKG + "@Controller public class Bad {\n"
+                + "    @QueryMapping public Book missing() { return null; }\n"
+                + "    @QueryMapping public Book book(@Argument(\"isbn\") String isbn) { return null; }\n"
+                + "    @QueryMapping public List<Book> books(@Argument(\"limit\") int limit) {\n"
+                + "        return null;\n    }\n"
+                + "    @SchemaMapping(typeName = \"Book\", field = \"title\")\n"
+                + "    public String t1(Book b) { return null; }\n"
+                + "    @SchemaMapping(typeName = \"Book\", field = \"title\")\n"
+                + "    public String t2(Book b) { return null; }\n"
+                + "}\n");
+        File classes = compile(s);
+        File schemaDir = new File(classes, "graphql");
+        assertTrue(schemaDir.mkdirs());
+        writeProperties(schemaDir, "schema.graphqls", GRAPHQL_SCHEMA);
+        String errors = String.valueOf(process(classes).getErrors());
+        assertTrue(errors, errors.contains("Query.missing, which the schema does not have"));
+        assertTrue(errors, errors.contains("binds @Argument(\"isbn\"), but Query.book has no "
+                + "such argument"));
+        assertTrue(errors, errors.contains("binds the nullable argument \"limit\" to a primitive"));
+        assertTrue(errors, errors.contains("both resolve Book.title"));
+    }
+
+    @Test
+    public void graphQLBatchArgumentsInterfacesAndDuplicateTypesFailTheBuild() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Book", PKG + "public class Book { public String id; }\n");
+        s.put("com.example.Bad", PKG + "@Controller public class Bad {\n"
+                + "    @BatchMapping(typeName = \"Book\", field = \"title\")\n"
+                + "    public List<String> titles(List<Book> books, @Argument(\"x\") Integer x) {\n"
+                + "        return null;\n    }\n"
+                + "    @SchemaMapping(typeName = \"Node\", field = \"id\")\n"
+                + "    public String id(Book b) { return null; }\n"
+                + "}\n");
+        File classes = compile(s);
+        File schemaDir = new File(classes, "graphql");
+        assertTrue(schemaDir.mkdirs());
+        // Read in name order: the extension comes before the type it extends.
+        writeProperties(schemaDir, "a.graphqls", "extend type Query { more: String }\n");
+        writeProperties(schemaDir, "schema.graphqls", "type Query { book: Book }\n"
+                + "interface Node { id: ID! }\n"
+                + "type Book implements Node { id: ID! title(x: Int): String }\n");
+        String errors = String.valueOf(process(classes).getErrors());
+        assertTrue(errors, errors.contains("which a @BatchMapping cannot"));
+
+        // Collection errors stop the schema checks, so the rest runs without it.
+        s.put("com.example.Bad", PKG + "@Controller public class Bad {\n"
+                + "    @SchemaMapping(typeName = \"Node\", field = \"id\")\n"
+                + "    public String id(Book b) { return null; }\n"
+                + "}\n");
+        classes = compile(s);
+        schemaDir = new File(classes, "graphql");
+        assertTrue(schemaDir.mkdirs());
+        writeProperties(schemaDir, "a.graphqls", "extend type Query { more: String }\n");
+        writeProperties(schemaDir, "schema.graphqls", "type Query { book: Book }\n"
+                + "interface Node { id: ID! }\n"
+                + "type Book implements Node { id: ID! title(x: Int): String }\n");
+        errors = String.valueOf(process(classes).getErrors());
+        assertTrue(errors, errors.contains("which is an interface"));
+        assertFalse(errors, errors.contains("does not parse"));
+
+        writeProperties(schemaDir, "b.graphqls", "type Book { other: String }\n");
+        errors = String.valueOf(process(classes).getErrors());
+        assertTrue(errors, errors.contains("there can be only one type named Book"));
+    }
+
+    @Test
+    public void graphQLMappingsWithNoSchemaFailTheBuild() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Api", PKG + "@Controller public class Api {\n"
+                + "    @QueryMapping public String hello() { return \"hi\"; }\n}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("the module has no schema"));
+        s.put("com.example.Api", PKG + "@Controller public class Api {\n"
+                + "    @SubscriptionMapping public String ticks() { return null; }\n}\n");
+        errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("must return a GraphQLStream"));
+    }
+
     private File compile(Map<String, String> sources) throws Exception {
         File classes = tmp.newFolder();
         JavaSourceCompiler.compile(sources, classes, backendClasspath());

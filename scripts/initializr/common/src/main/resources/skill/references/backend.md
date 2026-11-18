@@ -347,6 +347,38 @@ endpoint off with `cn1.mcp.enabled=false`. A packaged binary contains the MCP
 endpoint only when it has an `@McpTool` method, or `cn1.mcp.enabled=true`
 (or `cn1.mcp.path`/`cn1.mcp.allowedOrigins`) in a properties file; the dev tools are only in the dev run.
 
+## GraphQL (Spring for GraphQL model)
+
+Schema first: put `.graphqls` files under `src/main/resources/graphql`. Resolve
+fields with methods of a `@Controller` bean:
+
+```java
+@Controller
+public class Books {
+    @QueryMapping public Book book(@Argument("id") String id) { ... }
+    @MutationMapping public Book addBook(@Argument("input") BookInput input) { ... }
+    @SchemaMapping public String shout(Book book) { ... }            // Book.shout
+    @BatchMapping public Map<Book, Author> author(List<Book> books) { ... } // one call per list
+    @SubscriptionMapping public GraphQLStream bookAdded() {
+        return emitter -> { listeners.add(emitter); return () -> listeners.remove(emitter); };
+    }
+}
+```
+
+- `@Argument` needs the name written out; `@Arguments` takes them all as a `Map` or a class.
+  `DataFetchingEnvironment`, `HttpServer.Request` and `WebSocketSession` parameters are filled too
+  (there is no `@ContextValue`).
+- A field with no resolver is read from the parent's map entry or property; returned classes go
+  through the generated JSON codecs, like REST bodies.
+- The build fails on a field, type or argument the schema lacks, a primitive bound to a nullable
+  argument, two resolvers for one field, or resolvers with no schema.
+- Served at `/graphql` (POST, GET for queries); subscriptions over `graphql-transport-ws` on the
+  same path. Settings: `spring.graphql.path`, `spring.graphql.websocket.path`,
+  `spring.graphql.graphiql.enabled`, `spring.graphql.schema.introspection.enabled`,
+  `cn1.graphql.maxDepth`.
+- Throw `GraphQLException` to control the error a client sees; other exceptions become
+  `INTERNAL_ERROR` without detail. `@GraphQlExceptionHandler` is not supported.
+
 ## Testing
 
 Tests are JUnit 5 in `backend/src/test/java`, written against Spring Boot's test

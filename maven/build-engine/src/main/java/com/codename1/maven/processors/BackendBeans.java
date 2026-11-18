@@ -119,6 +119,13 @@ final class BackendBeans {
     static final String[] CACHING_SHOWN = {"@Cacheable", "@CachePut", "@CacheEvict"};
     static final String MCP_TOOL = PKG + "McpTool;";
     static final String MCP_PARAM = PKG + "McpParam;";
+    static final String QUERY_MAPPING = PKG + "QueryMapping;";
+    static final String MUTATION_MAPPING = PKG + "MutationMapping;";
+    static final String SUBSCRIPTION_MAPPING = PKG + "SubscriptionMapping;";
+    static final String SCHEMA_MAPPING = PKG + "SchemaMapping;";
+    static final String BATCH_MAPPING = PKG + "BatchMapping;";
+    static final String GQL_ARGUMENT = PKG + "Argument;";
+    static final String GQL_ARGUMENTS = PKG + "Arguments;";
     static final String MVC_CONTROLLER = PKG + "Controller;";
     static final String REST_CONTROLLER = PKG + "RestController;";
     static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
@@ -148,7 +155,8 @@ final class BackendBeans {
                     POST_CONSTRUCT, PRE_DESTROY, TRANSACTIONAL, ASYNC, SCHEDULED,
                     MANAGED_RESOURCE, MANAGED_ATTRIBUTE, MANAGED_OPERATION, TIMED, COUNTED,
                     CACHEABLE, CACHE_PUT, CACHE_EVICT, ENABLE_CACHING, MESSAGE_LISTENER, KAFKA_LISTENER,
-                    RABBIT_LISTENER, JMS_LISTENER, MCP_TOOL, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
+                    RABBIT_LISTENER, JMS_LISTENER, MCP_TOOL, QUERY_MAPPING, MUTATION_MAPPING,
+                    SUBSCRIPTION_MAPPING, SCHEMA_MAPPING, BATCH_MAPPING, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
                     ROLES_ALLOWED, PERMIT_ALL, DENY_ALL,
                     BackendExceptionHandlers.CONTROLLER_ADVICE,
                     BackendExceptionHandlers.REST_CONTROLLER_ADVICE)));
@@ -393,6 +401,9 @@ final class BackendBeans {
         /// `@EventListener` methods, each taking the ready event or nothing.
         final List<MethodInfo> readyListeners = new ArrayList<MethodInfo>();
         final List<Tool> tools = new ArrayList<Tool>();
+        /// Its GraphQL resolvers, and the adapter class registering them.
+        final List<BackendGraphQL.Mapping> graphql = new ArrayList<BackendGraphQL.Mapping>();
+        String graphqlAdapter;
         Managed managed;
         /// Request, session and lazy beans: the number the build gives each.
         int slot = -1;
@@ -740,6 +751,7 @@ final class BackendBeans {
 
     /// The adapter class names the wiring registers, as the main build named them.
     private void nameAdapters() {
+        BackendGraphQL.name(this);
         for (Bean b : beans) {
             String pkg = RestClientAnnotationProcessor.packageOf(b.type.replace('/', '.'));
             for (int i = 0; i < b.tools.size(); i++) {
@@ -879,6 +891,14 @@ final class BackendBeans {
 
     static boolean isSecurityChain(Bean b) {
         return b.types.contains(SECURITY_CHAIN_TYPE);
+    }
+
+    /// The module's GraphQL schema, every `.graphqls` file joined; null when it
+    /// has none and serves no GraphQL.
+    String graphQLSchema;
+
+    boolean hasGraphQL() {
+        return graphQLSchema != null;
     }
 
     boolean hasTools() {
@@ -1037,6 +1057,7 @@ final class BackendBeans {
         }
         collectJobs(bean);
         collectTools(bean);
+        BackendGraphQL.collect(this, bean);
         collectManaged(bean);
         return bean;
     }
@@ -1402,6 +1423,7 @@ final class BackendBeans {
             // because @Bean rather than a stereotype created it.
             collectJobs(bean);
             collectTools(bean);
+            BackendGraphQL.collect(this, bean);
             collectManaged(bean);
         }
         AnnotationValues props = m.getAnnotation(CONFIG_PROPERTIES);
@@ -1739,7 +1761,7 @@ final class BackendBeans {
         return false;
     }
 
-    private List<MethodInfo> inheritedMembers(AnnotatedClass cls) {
+    List<MethodInfo> inheritedMembers(AnnotatedClass cls) {
         List<MethodInfo> out = new ArrayList<MethodInfo>();
         Set<String> seen = new HashSet<String>();
         AnnotatedClass c = cls;
@@ -1782,7 +1804,7 @@ final class BackendBeans {
     /// collectAspects() weaves -- a class-level annotation reaches only that
     /// class's own methods, so an inherited method stays synchronous under a
     /// subclass's @Async, and reporting it as asynchronous refused a valid bean.
-    private boolean wovenAsync(AnnotatedClass cls, MethodInfo m) {
+    boolean wovenAsync(AnnotatedClass cls, MethodInfo m) {
         if (m.getAnnotation(ASYNC) != null) {
             return true;
         }
@@ -2545,7 +2567,7 @@ final class BackendBeans {
             "com/codename1/impl/backend/AsyncTask"));
 
     /// Whether `m` returns a Future: declared as one, or a type implementing it.
-    private boolean returnsFuture(MethodInfo m) {
+    boolean returnsFuture(MethodInfo m) {
         Type ret = Type.getReturnType(m.getDescriptor());
         return ret.getSort() == Type.OBJECT
                 && isFutureType(ret.getInternalName(), new HashSet<String>());
@@ -4019,6 +4041,7 @@ final class BackendBeans {
         return m.getAnnotation(AUTOWIRED) != null || m.getAnnotation(POST_CONSTRUCT) != null
                 || m.getAnnotation(PRE_DESTROY) != null || m.getAnnotation(BEAN) != null
                 || m.getAnnotation(SCHEDULED) != null || m.getAnnotation(MCP_TOOL) != null
+                || BackendGraphQL.isMapping(m)
                 || m.getAnnotation(MANAGED_ATTRIBUTE) != null
                 || m.getAnnotation(MANAGED_OPERATION) != null;
     }
@@ -4045,6 +4068,10 @@ final class BackendBeans {
                     + err.getMessage(), err);
         }
         BackendSources writer = new BackendSources(this);
+        BackendGraphQL.emit(this, sources);
+        if (ctx.hasErrors()) {
+            return;
+        }
         for (Aspects a : aspects.values()) {
             writer.aspects(a, sources);
         }
@@ -4069,6 +4096,8 @@ final class BackendBeans {
         // own routes, over these.
         boolean toolCodecs = false;
         for (Bean b : beans) {
+            // A GraphQL adapter reads arguments and sources with them.
+            toolCodecs |= b.graphqlAdapter != null;
             for (Tool t : b.tools) {
                 toolCodecs |= t.returnType != null || t.paramTypes.size()
                         > Collections.frequency(t.paramTypes, null);

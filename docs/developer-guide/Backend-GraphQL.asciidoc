@@ -1,0 +1,119 @@
+[[backend-graphql]]
+== Backend GraphQL
+
+A backend serves GraphQL the way Spring for GraphQL does: the schema is written
+first, in `.graphqls` files, and the methods of `@Controller` beans resolve its
+fields. The build connects the two. A resolver for a field the schema doesn't
+have, or an argument the field doesn't take, is a build error rather than a
+warning in a startup log, and nothing is looked up by reflection at run time.
+
+=== The schema
+
+Every `.graphqls` file under `src/main/resources/graphql`, in any folder below
+it, is part of the schema. Files are joined, so a type can be split across
+files, and `extend type` adds fields to one declared elsewhere:
+
+[source,graphql]
+----
+include::../demos/backend/src/main/resources/graphql/schema.graphqls[tag=backend-graphql-schema,indent=0]
+----
+
+=== Resolvers
+
+A controller's methods resolve fields. The annotation says which:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/graphql/BookController.java[tag=backend-graphql-controller,indent=0]
+----
+
+* `@QueryMapping`, `@MutationMapping` and `@SubscriptionMapping` resolve a field
+  of the root type. The field is the method's name unless the annotation names one.
+* `@SchemaMapping` resolves a field of any type. The type is `typeName`, or the
+  `typeName` of a `@SchemaMapping` on the class, or the simple name of the
+  class of the method's source parameter. The source is the parent object the
+  field is read from.
+* `@BatchMapping` resolves a field for every element of a list in one call. It
+  takes the `List` of parent objects and answers a `Map` from each one to its
+  value, or a `List` with one value per parent in the same order. That's how
+  `books { author { name } }` costs one call for the authors, not one per book.
+
+A field with no resolver is read from its parent: a map's entry, or the
+property of the same name in an object of the application's own. Classes are
+read through the JSON codecs the build writes, so a class a resolver returns
+follows the same rules as one a REST controller returns.
+
+The parameters a resolver can take:
+
+* `@Argument("name")`, one argument. The name is required, because a Java
+  parameter's name doesn't survive compilation. A class of the application's own,
+  such as an input type, is read with its JSON codec.
+* `@Arguments`, all the arguments, as a `Map` or as one class whose
+  properties are the argument names.
+* `DataFetchingEnvironment`, which has the arguments, the variables, the
+  source, the parent type and the path.
+* `HttpServer.Request` over HTTP, and `WebSocketSession` for a subscription.
+  These take the place of Spring's `@ContextValue`.
+* The source object, in a `@SchemaMapping` of a type that isn't a root type.
+
+A resolver returns the field's value, which can be null where the schema allows
+null. A subscription returns a `GraphQLStream`. It's opened when a client
+subscribes, and it sends an event with `emitter.next(value)` from any thread. Each event is resolved
+against the subscription's selection like any other value. The `Runnable` it
+returns runs when the client unsubscribes or disconnects.
+
+=== What the build checks
+
+Each of these is a build error that names the method:
+
+* A resolver for a type or field the schema doesn't declare, with the fields the
+  type does have.
+* An `@Argument` the field doesn't take.
+* A primitive parameter for a nullable argument, which
+  has no way to hold the null.
+* Two methods resolving the same field.
+* A resolver in a module with no schema, a subscription that doesn't return a
+  `GraphQLStream`, and a resolver returning a `Future` or marked `@Async`.
+
+=== The endpoint
+
+The endpoint is `/graphql`. It takes a `POST` of
+`{"query": ..., "variables": ..., "operationName": ...}` and a `GET` with the
+same values as query parameters. A mutation over `GET` is refused with 405. The
+answer is `application/graphql-response+json`, or `application/json` when the
+client accepts only that.
+
+A subscription is served over a WebSocket, using the `graphql-transport-ws`
+protocol that the client's `GraphQLSubscription` uses. The WebSocket is at the same path unless one is
+set.
+
+[cols="1,1,2",options="header"]
+|===
+|Setting |Default |Meaning
+|`spring.graphql.path` |`/graphql` |Where queries and mutations are served
+|`spring.graphql.websocket.path` |the HTTP path |Where subscriptions are served; `none` turns them off
+|`spring.graphql.schema.introspection.enabled` |`true` |Whether `__schema` and `__type` answer
+|`spring.graphql.graphiql.enabled` |`false` |Serves the GraphiQL page for trying queries in a browser
+|`spring.graphql.graphiql.path` |`/graphiql` |Where that page is
+|`cn1.graphql.maxDepth` |`15` |The deepest selection a query may nest
+|===
+
+The client generator, `cn1:generate-graphql`, reads `.graphqls` files too, so a
+client module can be generated from the backend's own schema.
+
+=== Errors
+
+A resolver that throws nulls its field and adds an entry to `errors`, with the
+path and the location in the query, as the specification asks. The
+classification goes in `extensions.classification`:
+
+* A `GraphQLException` keeps its message and its extensions.
+* `AccessDeniedException` is `FORBIDDEN`, and `AuthenticationException` is
+  `UNAUTHORIZED`.
+* A `ResponseStatusException` is `NOT_FOUND`, `BAD_REQUEST`, `UNAUTHORIZED` or
+  `FORBIDDEN` by its status.
+* Anything else is logged, and the client sees `INTERNAL_ERROR` with no detail
+  of the exception.
+
+`@GraphQlExceptionHandler` isn't supported. Throw a `GraphQLException` to
+choose what the client sees.
