@@ -157,7 +157,10 @@ public class L10NManager {
         try {
             return extractMonthName(fmt);
         } catch (ParseException ex) {
-            int v = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) - java.util.Calendar.JANUARY;
+            // the month of the date asked about, not of today
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            c.setTime(date);
+            int v = c.get(java.util.Calendar.MONTH) - java.util.Calendar.JANUARY;
 
             return getSymbols().getMonths()[v];
         }
@@ -170,13 +173,28 @@ public class L10NManager {
         return s;
     }
 
+    private boolean isWeekdayName(String part) {
+        DateFormatSymbols sym = getSymbols();
+        return contains(sym.getShortWeekdays(), part) || contains(sym.getWeekdays(), part);
+    }
+
+    private static boolean contains(String[] names, String part) {
+        for (String n : names) {
+            if (n != null && n.length() > 0 && part.equalsIgnoreCase(n)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private String extractMonthName(String dateStr) throws ParseException {
         String[] parts = Util.split(dateStr, " ");
         for (String part : parts) {
             if (part.length() == 0) {
                 continue;
             }
-            if ("de".equalsIgnoreCase(part)) {
+            if ("de".equalsIgnoreCase(part) || isWeekdayName(part)) {
+                // the default long style is Date.toString(), which opens with the weekday
                 continue;
             }
             String firstChar = part.substring(0, 1);

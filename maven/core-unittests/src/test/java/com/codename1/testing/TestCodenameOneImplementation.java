@@ -3040,8 +3040,25 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void drawArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
     }
 
+    private java.util.List<Object[]> drawnStrings;
+
+    /// Starts (true) or stops recording every drawString as `{String, x, y, Object font}`, with
+    /// the coordinates translated.
+    public void setRecordDrawnStrings(boolean record) {
+        drawnStrings = record ? new java.util.ArrayList<Object[]>() : null;
+    }
+
+    /// The strings recorded since `setRecordDrawnStrings(true)`, or null when not recording.
+    public java.util.List<Object[]> getDrawnStrings() {
+        return drawnStrings;
+    }
+
     @Override
     public void drawString(Object graphics, String str, int x, int y) {
+        if (drawnStrings != null && graphics instanceof TestGraphics) {
+            TestGraphics g = (TestGraphics) graphics;
+            drawnStrings.add(new Object[]{str, Integer.valueOf(x + g.translateX), Integer.valueOf(y + g.translateY), g.font});
+        }
     }
 
     @Override

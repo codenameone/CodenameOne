@@ -90,6 +90,10 @@ public class ChartTheme {
         com.codename1.ui.plaf.Style none = ui.getComponentStyle("ChartUndefinedPart");
         com.codename1.ui.plaf.Style axis = ui.getComponentStyle("ChartAxis");
         if (axis.getFgColor() != none.getFgColor()) {
+            if (legendTextColor == null) {
+                // the legend shares the secondary text colour; an axis colour must not reach it
+                legendTextColor = Integer.valueOf(secondaryTextColor);
+            }
             secondaryTextColor = axis.getFgColor();
             axisColor = axis.getFgColor();
         }

@@ -348,7 +348,8 @@ public class Chart extends Component {
     }
 
     /// Shows that data is on its way: with no data yet the text replaces the empty state, and over
-    /// existing data the chart is dimmed under it until the new data arrives.
+    /// existing data the chart is dimmed under it. It stays until `setLoading(null)`, so a caller
+    /// that loads in steps decides when the data is complete.
     ///
     /// #### Parameters
     ///
