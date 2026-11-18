@@ -1213,11 +1213,13 @@ public class Chart extends Component {
         int bottom = getY() + getHeight() - getStyle().getPaddingBottom();
         boxW = Math.min(boxW, right - left);
         int off = mm(3);
-        int bx = anchorX + off;
-        if (bx + boxW > right) {
-            bx = anchorX - off - boxW;
+        boolean rtl = isRTL();
+        // right to left: the box opens toward the start (left) of the point, rows are right aligned
+        int bx = rtl ? anchorX - off - boxW : anchorX + off;
+        if (rtl ? bx < left : bx + boxW > right) {
+            bx = rtl ? anchorX + off : anchorX - off - boxW;
         }
-        bx = Math.max(left, bx);
+        bx = Math.max(left, Math.min(bx, right - boxW));
         int by = anchorY - boxH - off;
         if (by < top) {
             by = anchorY + off;
@@ -1231,16 +1233,18 @@ public class Chart extends Component {
         g.setColor(getTheme().getTooltipText());
         int ty = by + pad;
         if (header != null) {
-            g.drawString(LabelLayout.ellipsize(f, header, boxW - pad * 2), bx + pad, ty);
+            String h = LabelLayout.ellipsize(f, header, boxW - pad * 2);
+            g.drawString(h, rtl ? bx + boxW - pad - f.stringWidth(h) : bx + pad, ty);
             ty += fh;
         }
         for (int i = 0; i < lines.length; i++) {
             g.setColor(rows.get(i).getSeries().getColor());
             if (rows.get(i).getLabel() == null || rows.size() > 1 || !(rows.get(i).getSeries().getLegendEntryCount() > 1)) { //NOPMD LogicInversion - the negated comparison is also true for NaN
-                g.fillRoundRect(bx + pad, ty + (fh - sw) / 2, sw, sw, sw / 2, sw / 2);
+                g.fillRoundRect(rtl ? bx + boxW - pad - sw : bx + pad, ty + (fh - sw) / 2, sw, sw, sw / 2, sw / 2);
             }
             g.setColor(getTheme().getTooltipText());
-            g.drawString(LabelLayout.ellipsize(f, lines[i], boxW - pad * 3 - sw), bx + pad * 2 + sw, ty);
+            String line = LabelLayout.ellipsize(f, lines[i], boxW - pad * 3 - sw);
+            g.drawString(line, rtl ? bx + boxW - pad * 2 - sw - f.stringWidth(line) : bx + pad * 2 + sw, ty);
             ty += fh;
         }
     }
