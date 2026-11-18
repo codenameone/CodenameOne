@@ -44,7 +44,9 @@ public class Chart2CandlesScreenshotTest extends AbstractChart2ScreenshotTest {
         double p = 100;
         for (int i = 0; i < n; i++) {
             // two trading weeks per row of ten, weekends skipped by the axis
-            t[i] = 1735776000000L + (i / 5 * 7 + i % 5) * 86400000L;
+            // noon UTC: every timezone from UTC-11 to UTC+11 sees the same calendar day, so the
+            // labels and tick placement do not depend on the device's zone
+            t[i] = 1735776000000L + 12 * 3600000L + (i / 5 * 7 + i % 5) * 86400000L;
             double d = ((i * 37) % 11 - 5) * 0.6;
             o[i] = p;
             cl[i] = p + d;

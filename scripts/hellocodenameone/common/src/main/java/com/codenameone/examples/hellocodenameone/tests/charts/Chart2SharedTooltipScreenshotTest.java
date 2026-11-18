@@ -25,6 +25,7 @@ package com.codenameone.examples.hellocodenameone.tests.charts;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
 import com.codename1.ui.chart.Chart;
+import com.codename1.ui.chart.ChartContext;
 
 /// The shared tooltip and crosshair: a pointer hovering inside the plot shows one tooltip listing
 /// every series at the hovered x.
@@ -42,9 +43,12 @@ public class Chart2SharedTooltipScreenshotTest extends AbstractChart2ScreenshotT
             @Override
             public void run() {
                 // the chart has painted by now, so its plot is laid out
-                Component c = getBuiltComponent();
-                int x = c.getAbsoluteX() + c.getWidth() * 3 / 5;
-                int y = c.getAbsoluteY() + c.getHeight() / 2;
+                // aimed at the plot itself, so a change to the title, legend or axis gutters
+                // cannot move the pointer outside it
+                Chart c = (Chart) getBuiltComponent();
+                ChartContext ctx = c.getLastContext();
+                int x = c.getAbsoluteX() - c.getX() + ctx.getPlotX() + ctx.getPlotWidth() * 3 / 5;
+                int y = c.getAbsoluteY() - c.getY() + ctx.getPlotY() + ctx.getPlotHeight() / 2;
                 c.pointerHover(new int[]{x}, new int[]{y});
                 c.repaint();
                 run.run();

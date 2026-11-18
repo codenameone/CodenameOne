@@ -25,6 +25,7 @@ package com.codenameone.examples.hellocodenameone.tests.charts;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
 import com.codename1.ui.chart.Chart;
+import com.codename1.ui.chart.ChartContext;
 
 /// A brush selection mid-drag: the pointer is pressed at 30% of the chart and dragged to 70%
 /// without being released, so the selected band is drawn over the plot.
@@ -42,10 +43,15 @@ public class Chart2BrushScreenshotTest extends AbstractChart2ScreenshotTest {
             @Override
             public void run() {
                 // the chart has painted by now, so its plot is laid out
-                Component c = getBuiltComponent();
-                int y = c.getAbsoluteY() + c.getHeight() / 2;
-                int from = c.getAbsoluteX() + c.getWidth() * 3 / 10;
-                int to = c.getAbsoluteX() + c.getWidth() * 7 / 10;
+                // aimed at the plot itself, so a change to the title, legend or axis gutters
+                // cannot move the press outside it (the brush is refused there). The pointer is
+                // deliberately never released: the capture is the selection mid-drag.
+                Chart c = (Chart) getBuiltComponent();
+                ChartContext ctx = c.getLastContext();
+                int ox = c.getAbsoluteX() - c.getX() + ctx.getPlotX();
+                int y = c.getAbsoluteY() - c.getY() + ctx.getPlotY() + ctx.getPlotHeight() / 2;
+                int from = ox + ctx.getPlotWidth() * 3 / 10;
+                int to = ox + ctx.getPlotWidth() * 7 / 10;
                 c.pointerPressed(from, y);
                 c.pointerDragged(new int[]{(from + to) / 2}, new int[]{y});
                 c.pointerDragged(new int[]{to}, new int[]{y});
