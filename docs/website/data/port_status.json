@@ -599,6 +599,17 @@
       ]
     },
     {
+      "id": "rive",
+      "category": "Media and graphics",
+      "name": "Rive",
+      "description": "Checks Rive animations, state machines, text, layouts, data binding and GPU meshes.",
+      "tests": [
+        "RiveAnimatedScreenshotTest",
+        "RiveFeaturesScreenshotTest",
+        "RiveGpuScreenshotTest"
+      ]
+    },
+    {
       "id": "audio-media-playback",
       "category": "Media and graphics",
       "name": "Audio and media playback",
@@ -1594,6 +1605,18 @@
     {
       "pattern": "LottieAnimatedScreenshotTest",
       "test": "LottieAnimatedScreenshotTest"
+    },
+    {
+      "pattern": "RiveAnimatedScreenshotTest",
+      "test": "RiveAnimatedScreenshotTest"
+    },
+    {
+      "pattern": "RiveFeatures",
+      "test": "RiveFeaturesScreenshotTest"
+    },
+    {
+      "pattern": "RiveGpu",
+      "test": "RiveGpuScreenshotTest"
     },
     {
       "pattern": "Gpu3DCube",
