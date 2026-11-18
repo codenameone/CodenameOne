@@ -3430,6 +3430,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-18T01:01:07+00:00"
+      },
+      "devto": {
+        "id": 5065768,
+        "url": "https://dev.to/codenameone/port-your-spring-code-with-fewer-edits-and-libraries-that-bring-their-own-server-207p",
+        "syndicated_at": "2026-11-18T14:29:49+00:00"
       }
     }
   }
