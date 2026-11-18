@@ -194,6 +194,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/graph/Grap
 .A flow chart in two swimlanes
 image::img/generated/graph-flowchart.png["Six flow chart symbols in two bands titled Shop and Warehouse: a rounded start, a decision diamond with yes and no branches, a database cylinder joined to a step by a dashed line",scaledwidth=70%]
 
+`LayeredArrangement.setRespectLanes(true)` arranges a chart without taking a
+node out of its lane. The layers run along the lanes, and each node stays in
+the band of its own.
+
 With `setResizable(true)` a selected node shows a handle on each corner, and
 dragging one resizes it. The edges of a lane are dragged the same way. To draw
 an outline that isn't in the list, implement `GraphShape` and give it a name

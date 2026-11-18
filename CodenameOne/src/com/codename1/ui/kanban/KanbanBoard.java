@@ -38,6 +38,8 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.ScrollSurface;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TopLevelContainer;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.FocusListener;
@@ -79,6 +81,10 @@ import java.util.Map;
 /// (`DefaultKanbanModel.setEnforceWipLimits`) shows the refusal while the
 /// card is still held over the column.
 ///
+/// On a narrow screen `setColumnSnap` brings scrolling to rest on a column.
+/// A `KanbanCardFactory` puts a component in each card; it is drawn with the
+/// card, and a tap on it reaches it.
+///
 /// The row under the cards of a column adds a card, typed in place, and a
 /// double tap renames one. Every edit is offered to the `KanbanListener`s
 /// and then to the model, and with `setUndoHistory` can be undone. With a
@@ -93,10 +99,8 @@ import java.util.Map;
 /// `KanbanCardTag`, `KanbanLane`, `KanbanAddCard` and `KanbanDropSlot`. A
 /// theme that defines none of them gets defaults that follow its light or
 /// dark mode.
-public class KanbanBoard extends Container {
+public class KanbanBoard extends ScrollSurface {
     private KanbanModel model;
-    private final Surface surface = new Surface();
-    private final Container layer = new Container(new CellLayout());
     private final List<KanbanListener> listeners = new ArrayList<KanbanListener>();
     private final KanbanChangeListener modelListener = new KanbanChangeListener() {
         @Override
@@ -114,6 +118,11 @@ public class KanbanBoard extends Container {
     private boolean columnReorder = true;
     private boolean inlineAdd = true;
     private boolean inlineEditing = true;
+    private boolean columnSnap;
+    // scrolling coming to rest on a column
+    private boolean snapPending;
+    private int snapLastX;
+    private Motion snapMotion;
     private float columnWidth = 42;
     private String addCardText = "+ Add card";
     private int idCounter;
@@ -158,11 +167,13 @@ public class KanbanBoard extends Container {
 
     // the field a title is typed in
     private TextField editor;
+    private Container editorHolder;
     private KanbanCard editCard;
     private KanbanColumn editColumn;
     private KanbanLane editLane;
 
     private final int[] rectBuf = new int[4];
+    private final int[] cmpBuf = new int[4];
 
     /// The cards of one column in one lane, and where each is.
     private static final class Cell {
@@ -181,13 +192,8 @@ public class KanbanBoard extends Container {
 
     /// A board showing `model`.
     public KanbanBoard(KanbanModel model) {
-        super(new com.codename1.ui.layouts.LayeredLayout());
         setUIID("KanbanBoard");
-        setScrollable(false);
-        layer.setUIID("Container");
-        layer.getAllStyles().setBgTransparency(0);
-        add(surface);
-        add(layer);
+        setFocusable(true);
         setModel(model);
     }
 
@@ -210,11 +216,6 @@ public class KanbanBoard extends Container {
         this.model = model;
         model.addChangeListener(modelListener);
         selected = null;
-        for (Component c : components.values()) {
-            if (c != null && c.getParent() != null) {
-                layer.removeComponent(c);
-            }
-        }
         components.clear();
         modelChanged();
     }
@@ -229,7 +230,7 @@ public class KanbanBoard extends Container {
             fireSelection();
         }
         syncComponents();
-        surface.refreshLayout();
+        refreshLayout();
         repaint();
     }
 
@@ -255,11 +256,6 @@ public class KanbanBoard extends Container {
     /// Puts a real component inside each card; null, the default, for cards
     /// that are only painted.
     public void setCardFactory(KanbanCardFactory cardFactory) {
-        for (Component c : components.values()) {
-            if (c != null && c.getParent() != null) {
-                layer.removeComponent(c);
-            }
-        }
         components.clear();
         this.cardFactory = cardFactory;
         modelChanged();
@@ -338,16 +334,66 @@ public class KanbanBoard extends Container {
         this.inlineEditing = inlineEditing;
     }
 
-    /// True when a plain drag moves a card.
-    public boolean isDragEdits() {
-        return surface.isDragEdits();
+    /// True when scrolling comes to rest on a column.
+    public boolean isColumnSnap() {
+        return columnSnap;
     }
 
-    /// Makes a plain drag move the card or the column title under it, as it
-    /// does with a mouse, or scroll the board and leave moving to a long
-    /// press, as it does with a finger. The default follows the device.
-    public void setDragEdits(boolean dragEdits) {
-        surface.setDragEdits(dragEdits);
+    /// Makes scrolling across the board come to rest with a column at its
+    /// leading edge, so a narrow screen shows one whole column at a time
+    /// and not the halves of two. Off by default.
+    public void setColumnSnap(boolean columnSnap) {
+        this.columnSnap = columnSnap;
+        if (!columnSnap) {
+            snapPending = false;
+            snapMotion = null;
+        }
+    }
+
+    /// Where scrolling across the board rests nearest to `x`: the start of a
+    /// column, or the end of the board.
+    private int snapTarget(int x) {
+        int max = getMaxOffsetX();
+        int best = Math.max(0, Math.min(x, max));
+        int dist = Integer.MAX_VALUE;
+        for (int c = 0; c <= colX.length; c++) {
+            int at = c == colX.length ? max : Math.max(0, Math.min(colX[c] - gap, max));
+            if (Math.abs(at - x) < dist) {
+                dist = Math.abs(at - x);
+                best = at;
+            }
+        }
+        return best;
+    }
+
+    // Called every frame after a release: waits for the fling to stop, then
+    // eases to the column.
+    private boolean animateSnap() {
+        if (!snapPending) {
+            return false;
+        }
+        if (snapMotion == null) {
+            int x = getOffsetX();
+            if (x != snapLastX) {
+                snapLastX = x;
+                return true;
+            }
+            int to = snapTarget(x);
+            if (to == x) {
+                snapPending = false;
+                return false;
+            }
+            snapMotion = Motion.createEaseInOutMotion(x, to, 180);
+            snapMotion.start();
+            return true;
+        }
+        scrollTo(snapMotion.getValue(), getOffsetY());
+        if (snapMotion.isFinished()) {
+            snapMotion = null;
+            snapPending = false;
+            return false;
+        }
+        return true;
     }
 
     /// The text of the row that adds a card.
@@ -402,7 +448,7 @@ public class KanbanBoard extends Container {
         ensureLayout();
         int c = cols.indexOf(column);
         if (c >= 0) {
-            surface.scrollTo(colX[c] - gap, surface.getOffsetY());
+            scrollTo(colX[c] - gap, getOffsetY());
         }
     }
 
@@ -413,10 +459,10 @@ public class KanbanBoard extends Container {
         if (at == null || !cardRect(at[0], at[1], at[2], rectBuf)) {
             return;
         }
-        int ox = surface.getOffsetX();
-        int oy = surface.getOffsetY();
-        int bw = surface.getBodyWidth();
-        int bh = surface.getBodyHeight();
+        int ox = getOffsetX();
+        int oy = getOffsetY();
+        int bw = getBodyWidth();
+        int bh = getBodyHeight();
         if (rectBuf[0] < ox) {
             ox = rectBuf[0] - gap;
         } else if (rectBuf[0] + rectBuf[2] > ox + bw) {
@@ -427,7 +473,7 @@ public class KanbanBoard extends Container {
         } else if (rectBuf[1] + rectBuf[3] > oy + bh) {
             oy = rectBuf[1] + rectBuf[3] + gap - bh;
         }
-        surface.scrollTo(ox, oy);
+        scrollTo(ox, oy);
     }
 
     // ------------------------------------------------------------------ edits
@@ -728,7 +774,8 @@ public class KanbanBoard extends Container {
     // ---------------------------------------------------------- typing titles
 
     /// True while a title is being typed in place.
-    public boolean isTitleEditing() {
+    @Override
+    public boolean isEditing() {
         return editor != null;
     }
 
@@ -767,6 +814,16 @@ public class KanbanBoard extends Container {
     }
 
     private void showEditor(String text) {
+        TopLevelContainer top = getTopLevelContainer();
+        if (top == null) {
+            // not on a form: there is nowhere to type
+            editCard = null;
+            editColumn = null;
+            editLane = null;
+            return;
+        }
+        ensureLayout();
+        stopFling();
         final TextField tf = new TextField(text == null ? "" : text);
         editor = tf;
         ActionListener<ActionEvent> done = new ActionListener<ActionEvent>() {
@@ -791,8 +848,30 @@ public class KanbanBoard extends Container {
                 }
             }
         });
-        layer.add(tf);
-        layer.layoutContainer();
+        // over the board, in the form's layered pane: the board has no children
+        Container pane = top.getFormLayeredPane(KanbanBoard.class, true);
+        editorHolder = new EditorLayer(new Layout() {
+            @Override
+            public void layoutContainer(Container parent) {
+                if (editorRect(rectBuf)) {
+                    tf.setX(getAbsoluteX() + rectBuf[0] - parent.getAbsoluteX());
+                    tf.setY(getAbsoluteY() + rectBuf[1] - parent.getAbsoluteY());
+                    tf.setWidth(rectBuf[2]);
+                    tf.setHeight(rectBuf[3]);
+                } else {
+                    tf.setWidth(0);
+                    tf.setHeight(0);
+                }
+            }
+
+            @Override
+            public Dimension getPreferredSize(Container parent) {
+                return new Dimension(0, 0);
+            }
+        }, tf);
+        editorHolder.add(tf);
+        pane.add(editorHolder);
+        pane.revalidate();
         repaint();
         tf.startEditingAsync();
     }
@@ -810,8 +889,17 @@ public class KanbanBoard extends Container {
         editColumn = null;
         editLane = null;
         String text = tf.getText();
-        if (tf.getParent() != null) {
-            layer.removeComponent(tf);
+        Container holder = editorHolder;
+        editorHolder = null;
+        if (tf.isEditing()) {
+            tf.stopEditing(null);
+        }
+        if (holder != null) {
+            Container pane = holder.getParent();
+            holder.remove();
+            if (pane != null) {
+                pane.revalidate();
+            }
         }
         text = text == null ? "" : text.trim();
         if (apply && text.length() > 0) {
@@ -831,8 +919,8 @@ public class KanbanBoard extends Container {
     private void ensureLayout() {
         // the width a column takes follows the board's: an answer laid out
         // for another width is not one
-        if (dirty || surface.getWidth() != laidWidth) {
-            surface.refreshLayout();
+        if (dirty || getWidth() != laidWidth) {
+            refreshLayout();
         }
     }
 
@@ -895,7 +983,7 @@ public class KanbanBoard extends Container {
             y += laneBodyH[l];
         }
         contentH = y + gap;
-        layer.layoutContainer();
+        placeEditor();
     }
 
     private void syncComponents() {
@@ -913,19 +1001,12 @@ public class KanbanBoard extends Container {
                     if (!components.containsKey(card.getId())) {
                         Component cmp = cardFactory.createComponent(this, card);
                         components.put(card.getId(), cmp);
-                        if (cmp != null) {
-                            cmp.putClientProperty("cn1$kanbanCard", card.getId());
-                            layer.add(cmp);
-                        }
                     }
                 }
             }
         }
         for (String goneId : gone) {
-            Component cmp = components.remove(goneId);
-            if (cmp != null && cmp.getParent() != null) {
-                layer.removeComponent(cmp);
-            }
+            components.remove(goneId);
         }
     }
 
@@ -970,8 +1051,8 @@ public class KanbanBoard extends Container {
         if (at == null || !cardRect(at[0], at[1], at[2], r)) {
             return null;
         }
-        r[0] -= surface.getOffsetX();
-        r[1] += headerH - surface.getOffsetY();
+        r[0] -= getOffsetX();
+        r[1] += headerH - getOffsetY();
         return r;
     }
 
@@ -980,7 +1061,7 @@ public class KanbanBoard extends Container {
     public int[] getColumnHeaderBounds(KanbanColumn column) {
         ensureLayout();
         int c = cols.indexOf(column);
-        return c < 0 ? null : new int[]{colX[c] - surface.getOffsetX(), 0, colW[c], headerH};
+        return c < 0 ? null : new int[]{colX[c] - getOffsetX(), 0, colW[c], headerH};
     }
 
     private int columnAt(int cx) {
@@ -1044,7 +1125,7 @@ public class KanbanBoard extends Container {
             return false;
         }
         endEdit(true);
-        int cx = x + surface.getOffsetX();
+        int cx = x + getOffsetX();
         if (y < headerH) {
             int c = columnAt(cx);
             if (c < 0 || !columnReorder || !editable || cols.size() < 2) {
@@ -1060,7 +1141,7 @@ public class KanbanBoard extends Container {
         if (!editable) {
             return false;
         }
-        int cy = y - headerH + surface.getOffsetY();
+        int cy = y - headerH + getOffsetY();
         KanbanCard card = cardAt(cx, cy);
         int[] at = card == null ? null : locate(card);
         if (at == null || !cardRect(at[0], at[1], at[2], rectBuf)) {
@@ -1079,14 +1160,14 @@ public class KanbanBoard extends Container {
         // the gap is where the card was: nothing has to open
         slotSince = 0;
         select(card);
-        layer.layoutContainer();
+        placeEditor();
         return true;
     }
 
     private void dragTo(int x, int y) {
         dragX = x;
         dragY = y;
-        int cx = x + surface.getOffsetX();
+        int cx = x + getOffsetX();
         if (dragColumn != null) {
             int to = 0;
             for (int c = 0; c < cols.size(); c++) {
@@ -1100,7 +1181,7 @@ public class KanbanBoard extends Container {
         if (dragCard == null) {
             return;
         }
-        int cy = y - headerH + surface.getOffsetY();
+        int cy = y - headerH + getOffsetY();
         int midX = cx - grabX + dragW / 2;
         int midY = cy - grabY + dragH / 2;
         int c = nearestColumn(midX);
@@ -1125,8 +1206,8 @@ public class KanbanBoard extends Container {
             dropCol = c;
             dropLane = l;
             dropIndex = index;
-            slotSince = surface.now();
-            surface.animateNow();
+            slotSince = currentTime();
+            requestAnimation();
         }
         KanbanLane lane = lanes.isEmpty() ? null : lanes.get(l);
         dropAllowed = (lane == null || !lane.isCollapsed()) && model.canMoveCard(dragCard, cols.get(c), lane);
@@ -1149,8 +1230,8 @@ public class KanbanBoard extends Container {
         dragCard = null;
         int[] from = dragFrom;
         dragFrom = null;
-        int gx = dragX + surface.getOffsetX() - grabX;
-        int gy = dragY - headerH + surface.getOffsetY() - grabY;
+        int gx = dragX + getOffsetX() - grabX;
+        int gy = dragY - headerH + getOffsetY() - grabY;
         boolean elsewhere = dropCol != from[1] || dropLane != from[0] || dropIndex != from[2];
         if (committed && dropAllowed && elsewhere && dropCol >= 0) {
             moveCard(card, cols.get(dropCol), lanes.isEmpty() ? null : lanes.get(dropLane), dropIndex);
@@ -1159,15 +1240,15 @@ public class KanbanBoard extends Container {
         dropLane = -1;
         dropIndex = -1;
         // from where it was let go, the card glides to where it now belongs
-        surface.settle(card.getId(), gx, gy, dragW, dragH);
+        startSettle(card.getId(), gx, gy, dragW, dragH);
         dirty = true;
-        surface.refreshLayout();
-        layer.layoutContainer();
+        refreshLayout();
+        placeEditor();
         repaint();
     }
 
     private void tap(int x, int y, boolean twice) {
-        int cx = x + surface.getOffsetX();
+        int cx = x + getOffsetX();
         if (y < headerH) {
             int c = columnAt(cx);
             if (c >= 0 && (cols.get(c).isCollapsed() || cx >= colX[c] + colW[c] - KanbanLook.mm(7))) {
@@ -1175,7 +1256,7 @@ public class KanbanBoard extends Container {
             }
             return;
         }
-        int cy = y - headerH + surface.getOffsetY();
+        int cy = y - headerH + getOffsetY();
         if (cy < 0 || cy >= contentH || cells.length == 0) {
             select(null);
             return;
@@ -1193,6 +1274,9 @@ public class KanbanBoard extends Container {
         KanbanCard card = cardAt(cx, cy);
         if (card != null) {
             select(card);
+            if (tapComponent(card, x, y)) {
+                return;
+            }
             if (twice) {
                 if (inlineEditing && editable) {
                     startCardEdit(card);
@@ -1371,7 +1455,7 @@ public class KanbanBoard extends Container {
         boolean dropHere = dragCard != null && l == dropLane && c == dropCol;
         int slot = 0;
         if (dropHere) {
-            long t = slotSince == 0 ? 120 : surface.now() - slotSince;
+            long t = slotSince == 0 ? 120 : currentTime() - slotSince;
             float level = t >= 120 ? 1f : Math.max(0f, t / 120f);
             slot = Math.round((dragH + gap) * level);
         }
@@ -1400,12 +1484,13 @@ public class KanbanBoard extends Container {
             int oy = top - bandH - laneTop[l];
             rectBuf[0] -= ox;
             rectBuf[1] -= oy;
-            surface.applySettle(card.getId(), rectBuf);
+            applySettle(card.getId(), rectBuf);
             rectBuf[0] += ox;
             rectBuf[1] += oy;
             if (rectBuf[1] < clipBottom && rectBuf[1] + rectBuf[3] > clipTop) {
                 renderer.paintCard(g, this, card, rectBuf[0], rectBuf[1], rectBuf[2], rectBuf[3],
                         card == selected, 0f); // NOPMD CompareObjectsWithEquals - the selected card itself
+                paintCardComponent(g, card, rectBuf[0], rectBuf[1], rectBuf[2], rectBuf[3]);
             }
             ry += h + gap;
             index++;
@@ -1503,7 +1588,8 @@ public class KanbanBoard extends Container {
         g.setAntiAliased(true);
         if (dragCard != null) {
             renderer.paintCard(g, this, dragCard, x + dragX - grabX, y + dragY - grabY, dragW, dragH, true,
-                    surface.getLiftLevel());
+                    getLiftLevel());
+            paintCardComponent(g, dragCard, x + dragX - grabX, y + dragY - grabY, dragW, dragH);
         } else if (dragColumn != null) {
             Style cs = KanbanLook.style("KanbanColumn");
             Style hs = KanbanLook.style("KanbanColumnHeader");
@@ -1534,7 +1620,7 @@ public class KanbanBoard extends Container {
             }
             g.setColor(KanbanLook.style("KanbanCardSelected").getFgColor());
             int lw = Math.max(2, KanbanLook.mm(0.5f));
-            g.fillRect(x + lineX - surface.getOffsetX() - lw / 2, y, lw, surface.getHeight());
+            g.fillRect(x + lineX - getOffsetX() - lw / 2, y, lw, getHeight());
         }
         g.setAntiAliased(aa);
     }
@@ -1563,194 +1649,228 @@ public class KanbanBoard extends Container {
         return img.scaled(Math.max(1, Math.round(w * ratio)), Math.max(1, Math.round(h * ratio)));
     }
 
-    // The surface, for tests to press and drag on.
-    Component surface() {
-        return surface;
-    }
-
-    /// Lays the components of the cards, and the field a title is typed in,
-    /// over the painted board.
-    private final class CellLayout extends Layout {
-        @Override
-        public void layoutContainer(Container parent) {
-            if (dirty) {
-                // the board lays this out again when it has its own layout
-                return;
-            }
-            int ox = surface.getOffsetX();
-            int oy = surface.getOffsetY() - headerH;
-            int count = parent.getComponentCount();
-            for (int k = 0; k < count; k++) {
-                Component cmp = parent.getComponentAt(k);
-                boolean shown = false;
-                if (cmp == editor) { // NOPMD CompareObjectsWithEquals - the field itself
-                    shown = placeEditor(cmp, ox, oy);
-                } else {
-                    String id = (String) cmp.getClientProperty("cn1$kanbanCard");
-                    KanbanCard card = id == null ? null : model.getCard(id);
-                    int[] at = card == null || card == dragCard ? null : locate(card); // NOPMD CompareObjectsWithEquals - the dragged card itself
-                    if (at != null && cardRect(at[0], at[1], at[2], rectBuf)) {
-                        int ph = cmp.getPreferredH();
-                        int top = rectBuf[1] + rectBuf[3] - ph - pad - oy;
-                        // a component cannot be clipped by the pinned titles: under them it hides
-                        if (top >= headerH && top < parent.getHeight()) {
-                            cmp.setX(rectBuf[0] + pad - ox);
-                            cmp.setY(top);
-                            cmp.setWidth(Math.max(0, rectBuf[2] - pad * 2));
-                            cmp.setHeight(ph);
-                            shown = true;
-                        }
-                    }
-                }
-                if (!shown) {
-                    cmp.setWidth(0);
-                    cmp.setHeight(0);
-                } else if (cmp instanceof Container) {
-                    ((Container) cmp).layoutContainer();
-                }
-            }
+    /// Where the field a title is typed in goes, in the board's own
+    /// coordinates; false while its card or its cell is not shown.
+    private boolean editorRect(int[] out) {
+        if (editor == null) {
+            return false;
         }
-
-        private boolean placeEditor(Component cmp, int ox, int oy) {
-            int ph = cmp.getPreferredH();
-            if (editCard != null) {
-                int[] at = locate(editCard);
-                if (at == null || !cardRect(at[0], at[1], at[2], rectBuf)) {
-                    return false;
-                }
-                cmp.setX(rectBuf[0] - ox);
-                cmp.setY(rectBuf[1] - oy);
-                cmp.setWidth(rectBuf[2]);
-                cmp.setHeight(Math.max(ph, Math.min(rectBuf[3], ph * 2)));
-                return true;
+        int ph = editor.getPreferredH();
+        int ox = getOffsetX();
+        int oy = getOffsetY() - headerH;
+        if (editCard != null) {
+            int[] at = locate(editCard);
+            if (at == null || !cardRect(at[0], at[1], at[2], out)) {
+                return false;
             }
+            out[0] -= ox;
+            out[1] -= oy;
+            out[3] = Math.max(ph, Math.min(out[3], ph * 2));
+        } else {
             int c = cols.indexOf(editColumn);
             int l = editLane == null ? 0 : lanes.indexOf(editLane);
             if (c < 0 || l < 0 || l >= cells.length || !cellShown(l, c)) {
                 return false;
             }
-            cmp.setX(colX[c] + pad - ox);
-            cmp.setY(laneTop[l] + bandH + cells[l][c].addY - oy);
-            cmp.setWidth(colW[c] - pad * 2);
-            cmp.setHeight(ph);
-            return true;
+            out[0] = colX[c] + pad - ox;
+            out[1] = laneTop[l] + bandH + cells[l][c].addY - oy;
+            out[2] = colW[c] - pad * 2;
+            out[3] = ph;
         }
+        // the pinned titles cannot clip a field: under them it hides
+        return out[1] >= headerH && out[1] < getHeight();
+    }
 
-        @Override
-        public Dimension getPreferredSize(Container parent) {
-            return new Dimension(0, 0);
-        }
-
-        @Override
-        public boolean isOverlapSupported() {
-            return true;
+    private void placeEditor() {
+        if (editorHolder != null) {
+            editorHolder.revalidate();
         }
     }
 
-    private final class Surface extends ScrollSurface {
-        Surface() {
-            setUIID("Container");
-            setFocusable(true);
-            getAllStyles().setBgTransparency(0);
+    /// Where the component of a card is drawn, given the card's rectangle:
+    /// along its bottom edge.
+    private boolean componentRect(Component cmp, int cardX, int cardY, int cardW, int cardH, int[] out) {
+        int ph = cmp.getPreferredH();
+        out[0] = cardX + pad;
+        out[1] = cardY + cardH - ph - pad;
+        out[2] = Math.max(0, cardW - pad * 2);
+        out[3] = ph;
+        return out[2] > 0 && ph > 0;
+    }
+
+    /// Draws the component of a card. It is never added to the form: like a
+    /// renderer's, it is given its bounds and painted.
+    private void paintCardComponent(Graphics g, KanbanCard card, int cardX, int cardY, int cardW, int cardH) {
+        Component cmp = components.get(card.getId());
+        if (cmp == null || !componentRect(cmp, cardX, cardY, cardW, cardH, cmpBuf)) {
+            return;
+        }
+        place(cmp, cmpBuf[0], cmpBuf[1], cmpBuf[2], cmpBuf[3]);
+        cmp.paintComponent(g);
+    }
+
+    private static void place(Component cmp, int x, int y, int w, int h) {
+        cmp.setX(x);
+        cmp.setY(y);
+        cmp.setWidth(w);
+        cmp.setHeight(h);
+        if (cmp instanceof Container) {
+            ((Container) cmp).layoutContainer();
+        }
+    }
+
+    /// Hands a tap to the component of a card when it lands on it: the
+    /// component is only drawn, so the board delivers the press and the
+    /// release itself.
+    private boolean tapComponent(KanbanCard card, int x, int y) {
+        Component cmp = components.get(card.getId());
+        int[] r = cmp == null ? null : getCardBounds(card);
+        if (r == null || !componentRect(cmp, r[0], r[1], r[2], r[3], cmpBuf)) {
+            return false;
+        }
+        if (x < cmpBuf[0] || x >= cmpBuf[0] + cmpBuf[2] || y < cmpBuf[1] || y >= cmpBuf[1] + cmpBuf[3]) {
+            return false;
+        }
+        int ax = getAbsoluteX() + x;
+        int ay = getAbsoluteY() + y;
+        place(cmp, getAbsoluteX() + cmpBuf[0], getAbsoluteY() + cmpBuf[1], cmpBuf[2], cmpBuf[3]);
+        Component target = cmp;
+        if (cmp instanceof Container) {
+            target = ((Container) cmp).getComponentAt(ax, ay);
+        }
+        if (target == null || !target.isEnabled()) {
+            return false;
+        }
+        target.pointerPressed(ax, ay);
+        target.pointerReleased(ax, ay);
+        repaint();
+        return true;
+    }
+
+    // The layer the title field is laid in. It covers the form, so only the
+    // field itself takes the pointer: a tap anywhere else reaches what is
+    // under it.
+    private static final class EditorLayer extends Container {
+        private final Component field;
+
+        EditorLayer(Layout layout, Component field) {
+            super(layout);
+            this.field = field;
         }
 
-        long now() {
-            return currentTime();
+        @Override
+        public boolean contains(int x, int y) {
+            return field.contains(x, y);
         }
+    }
 
-        void animateNow() {
+    // ---------------------------------------------------------- the surface
+
+    @Override
+    protected void layoutSurface(int width, int height) {
+        if (dirty || width != laidWidth) {
+            relayout(width);
+        }
+        setHeaderSize(0, headerH);
+    }
+
+    @Override
+    protected int getContentWidth() {
+        return contentW;
+    }
+
+    @Override
+    protected int getContentHeight() {
+        return contentH;
+    }
+
+    @Override
+    protected void paintContent(Graphics g, int x, int y) {
+        paintBoard(g, x, y);
+    }
+
+    @Override
+    protected void paintTopHeader(Graphics g, int x, int y) {
+        paintHeader(g, x, y);
+    }
+
+    @Override
+    protected void paintOverlay(Graphics g, int x, int y) {
+        if (dragCard != null || dragColumn != null) {
+            paintDrag(g, x, y);
+        }
+    }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+        return new Dimension(KanbanLook.mm(60), KanbanLook.mm(60));
+    }
+
+    @Override
+    protected void scrollChanged() {
+        placeEditor();
+    }
+
+    @Override
+    public void pointerReleased(int x, int y) {
+        boolean edit = isEditInProgress();
+        super.pointerReleased(x, y);
+        if (columnSnap && !edit && getMaxOffsetX() > 0) {
+            snapPending = true;
+            snapMotion = null;
+            // one frame off, so the first frame only watches the fling
+            snapLastX = getOffsetX() - 1;
             requestAnimation();
         }
+    }
 
-        void settle(Object key, int x, int y, int w, int h) {
-            startSettle(key, x, y, w, h);
+    @Override
+    protected void pressStarted(int x, int y) {
+        snapPending = false;
+        snapMotion = null;
+        if (!hasFocus() && getComponentForm() != null) {
+            // keys: Delete, and copy, paste and undo with Ctrl or Cmd
+            requestFocus();
         }
+    }
 
-        @Override
-        protected void layoutSurface(int width, int height) {
-            if (dirty || width != laidWidth) {
-                relayout(width);
-            }
-            setHeaderSize(0, headerH);
-        }
+    @Override
+    protected boolean editStarted(int x, int y, EditTrigger trigger) {
+        return beginDrag(x, y, trigger);
+    }
 
-        @Override
-        protected int getContentWidth() {
-            return contentW;
-        }
+    @Override
+    protected void editMoved(int x, int y) {
+        dragTo(x, y);
+    }
 
-        @Override
-        protected int getContentHeight() {
-            return contentH;
-        }
+    @Override
+    protected void editEnded(boolean committed) {
+        endDrag(committed);
+    }
 
-        @Override
-        protected void paintContent(Graphics g, int x, int y) {
-            paintBoard(g, x, y);
-        }
+    @Override
+    protected void tapped(int x, int y, boolean doubleTap) {
+        tap(x, y, doubleTap);
+    }
 
-        @Override
-        protected void paintTopHeader(Graphics g, int x, int y) {
-            paintHeader(g, x, y);
-        }
+    @Override
+    protected boolean animateSurface() {
+        boolean snapping = animateSnap();
+        // the gap a held card opens
+        return snapping || dragCard != null && slotSince != 0 && currentTime() - slotSince < 120;
+    }
 
-        @Override
-        protected void paintOverlay(Graphics g, int x, int y) {
-            if (dragCard != null || dragColumn != null) {
-                paintDrag(g, x, y);
-            }
-        }
+    @Override
+    protected void deinitialize() {
+        endEdit(true);
+        super.deinitialize();
+    }
 
-        @Override
-        protected Dimension calcPreferredSize() {
-            return new Dimension(KanbanLook.mm(60), KanbanLook.mm(60));
-        }
-
-        @Override
-        protected void scrollChanged() {
-            layer.layoutContainer();
-            layer.repaint();
-        }
-
-        @Override
-        protected void pressStarted(int x, int y) {
-            if (!hasFocus() && getComponentForm() != null) {
-                // keys: Delete, and copy, paste and undo with Ctrl or Cmd
-                requestFocus();
-            }
-        }
-
-        @Override
-        protected boolean editStarted(int x, int y, EditTrigger trigger) {
-            return beginDrag(x, y, trigger);
-        }
-
-        @Override
-        protected void editMoved(int x, int y) {
-            dragTo(x, y);
-        }
-
-        @Override
-        protected void editEnded(boolean committed) {
-            endDrag(committed);
-        }
-
-        @Override
-        protected void tapped(int x, int y, boolean doubleTap) {
-            tap(x, y, doubleTap);
-        }
-
-        @Override
-        protected boolean animateSurface() {
-            // the gap a held card opens
-            return dragCard != null && slotSince != 0 && currentTime() - slotSince < 120;
-        }
-
-        @Override
-        public void keyPressed(int keyCode) {
-            if (!keyTyped(keyCode)) {
-                super.keyPressed(keyCode);
-            }
+    @Override
+    public void keyPressed(int keyCode) {
+        if (!keyTyped(keyCode)) {
+            super.keyPressed(keyCode);
         }
     }
 }

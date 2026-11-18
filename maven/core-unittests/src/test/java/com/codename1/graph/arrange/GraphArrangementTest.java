@@ -24,6 +24,7 @@ package com.codename1.graph.arrange;
 
 import com.codename1.graph.DefaultGraphModel;
 import com.codename1.graph.GraphEdge;
+import com.codename1.graph.GraphGroup;
 import com.codename1.graph.GraphNode;
 import org.junit.jupiter.api.Test;
 
@@ -201,6 +202,47 @@ class GraphArrangementTest {
         m.addNode(new GraphNode("only", "Only"));
         for (GraphArrangement l : arrangements) {
             assertNotNull(l.arrange(m).getPosition("only"));
+        }
+    }
+
+    @Test
+    void layeredKeepsNodesInTheirLanesWhenAsked() {
+        DefaultGraphModel m = new DefaultGraphModel();
+        m.addGroup(GraphGroup.lane("top", "Top", true, 100, 50, 900, 200));
+        m.addGroup(GraphGroup.lane("low", "Low", true, 100, 250, 900, 200));
+        String[] ids = {"a", "b", "c", "d", "e", "f"};
+        for (int i = 0; i < ids.length; i++) {
+            GraphNode n = new GraphNode(ids[i], ids[i], 0, 0, 100, 40);
+            n.setGroupId(i % 2 == 0 ? "top" : "low");
+            m.addNode(n);
+        }
+        m.addEdge("a", "b");
+        m.addEdge("a", "c");
+        m.addEdge("a", "e");
+        m.addEdge("b", "d");
+        m.addEdge("c", "f");
+        LayeredArrangement lay = new LayeredArrangement();
+        lay.setDirection(LayeredArrangement.LEFT_TO_RIGHT);
+        lay.setRespectLanes(true);
+        assertTrue(lay.isRespectLanes());
+        ArrangementResult r = lay.arrange(m);
+        assertNoOverlap(m, r);
+        for (int i = 0; i < ids.length; i++) {
+            double[] p = r.getPosition(ids[i]);
+            double top = i % 2 == 0 ? 50 : 250;
+            assertTrue(p[1] >= top && p[1] + 40 <= top + 200, ids[i] + " is at " + p[1] + ", outside its lane");
+            assertTrue(p[0] >= 100, ids[i] + " starts before the lanes do");
+        }
+        // an edge still points along the lanes
+        assertTrue(r.getPosition("a")[0] < r.getPosition("b")[0]);
+        // lanes lying the other way leave the arrangement as it was
+        lay.setDirection(LayeredArrangement.TOP_TO_BOTTOM);
+        ArrangementResult across = lay.arrange(m);
+        lay.setRespectLanes(false);
+        ArrangementResult plain = lay.arrange(m);
+        for (String id : ids) {
+            assertEquals(plain.getPosition(id)[0], across.getPosition(id)[0], 0.001);
+            assertEquals(plain.getPosition(id)[1], across.getPosition(id)[1], 0.001);
         }
     }
 }

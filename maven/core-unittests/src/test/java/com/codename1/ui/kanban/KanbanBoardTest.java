@@ -28,10 +28,13 @@ import com.codename1.kanban.DefaultKanbanModel;
 import com.codename1.kanban.KanbanCard;
 import com.codename1.kanban.KanbanColumn;
 import com.codename1.kanban.KanbanLane;
+import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.util.UndoHistory;
 
@@ -89,7 +92,7 @@ class KanbanBoardTest extends UITestBase {
     }
 
     private static void drag(KanbanBoard b, int[] from, int[] to) {
-        Component c = b.surface();
+        Component c = b;
         int ax = c.getAbsoluteX();
         int ay = c.getAbsoluteY();
         c.pointerPressed(ax + from[0], ay + from[1]);
@@ -99,7 +102,7 @@ class KanbanBoardTest extends UITestBase {
     }
 
     private static void tap(KanbanBoard b, int x, int y) {
-        Component c = b.surface();
+        Component c = b;
         c.pointerPressed(c.getAbsoluteX() + x, c.getAbsoluteY() + y);
         c.pointerReleased(c.getAbsoluteX() + x, c.getAbsoluteY() + y);
     }
@@ -205,10 +208,10 @@ class KanbanBoardTest extends UITestBase {
     void cardsAreAddedRenamedAndRemovedWithUndo() {
         KanbanBoard b = show(false);
         b.startAddCard(model.getColumn("done"), null);
-        assertTrue(b.isTitleEditing());
+        assertTrue(b.isEditing());
         b.editor().setText("Shipped");
         b.finishEditing();
-        assertFalse(b.isTitleEditing());
+        assertFalse(b.isEditing());
         assertEquals(1, model.getCardCount(model.getColumn("done")));
         KanbanCard added = model.getCards(model.getColumn("done"), null).get(0);
         assertEquals("Shipped", added.getTitle());
@@ -281,5 +284,73 @@ class KanbanBoardTest extends UITestBase {
         assertTrue(b.getCardBounds(model.getCard("a"))[3] > plain);
         Image img = b.toImage(300, 300);
         assertTrue(img.getWidth() <= 300 && img.getHeight() <= 300);
+    }
+
+    @FormTest
+    void aTapOnACardsComponentReachesItThoughItIsOnlyDrawn() {
+        KanbanBoard b = show(false);
+        final int[] pressed = new int[1];
+        final Button done = new Button("Done");
+        done.addActionListener(new ActionListener<ActionEvent>() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                pressed[0]++;
+            }
+        });
+        b.setCardFactory(new KanbanCardFactory() {
+            @Override
+            public Component createComponent(KanbanBoard board, KanbanCard card) {
+                return "a".equals(card.getId()) ? done : null;
+            }
+        });
+        // the board has no children: the component is a stamp
+        assertNull(done.getParent());
+        int[] r = b.getCardBounds(model.getCard("a"));
+        // the top of the card is the card's own
+        tap(b, r[0] + r[2] / 2, r[1] + 2);
+        assertEquals(0, pressed[0]);
+        tap(b, r[0] + r[2] / 2, r[1] + r[3] - done.getPreferredH() / 2 - 2);
+        assertEquals(1, pressed[0]);
+        assertSame(model.getCard("a"), b.getSelectedCard());
+    }
+
+    @FormTest
+    void theTitleFieldIsOverTheBoardAndGoesWhenTheBoardDoes() {
+        KanbanBoard b = show(false);
+        b.startCardEdit(model.getCard("a"));
+        assertTrue(b.isEditing());
+        assertNotNull(b.editor().getParent());
+        int[] r = b.getCardBounds(model.getCard("a"));
+        assertEquals(b.getAbsoluteX() + r[0], b.editor().getAbsoluteX());
+        assertEquals(b.getAbsoluteY() + r[1], b.editor().getAbsoluteY());
+        b.editor().setText("Renamed");
+        b.remove();
+        assertFalse(b.isEditing());
+        assertEquals("Renamed", model.getCard("a").getTitle());
+    }
+
+    @FormTest
+    void scrollingRestsOnAColumnWhenItSnaps() throws InterruptedException {
+        KanbanBoard b = show(false);
+        for (int i = 0; i < 12; i++) {
+            model.addColumn(new KanbanColumn("x" + i, "X" + i));
+        }
+        b.setDragEdits(false);
+        b.setColumnSnap(true);
+        b.setColumnWidth(200);
+        b.getComponentForm().revalidate();
+        assertTrue(b.getMaxOffsetX() > 0, "the board is " + b.getWidth() + " wide");
+        int[] first = b.getColumnHeaderBounds(model.getColumn("todo"));
+        int[] second = b.getColumnHeaderBounds(model.getColumn("doing"));
+        int step = second[0] - first[0];
+        int y = b.getHeight() / 2;
+        // a third of a column: nearer where it started
+        int from = b.getWidth() - 5;
+        drag(b, new int[]{from, y}, new int[]{from - step / 3, y});
+        for (int i = 0; i < 200 && b.animate(); i++) {
+            Thread.sleep(5);
+        }
+        int rest = b.getOffsetX();
+        assertEquals(0, rest % step, "rests on a column, at " + rest + " with columns every " + step);
     }
 }

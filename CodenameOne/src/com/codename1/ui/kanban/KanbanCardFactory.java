@@ -31,6 +31,13 @@ import com.codename1.ui.Component;
 /// The component is laid along the bottom of the card at its preferred
 /// height, and the card is made that much taller. It is asked for once per
 /// card and kept.
+///
+/// It is drawn with the card and never added to the form, the way a list
+/// draws what its renderer returns, so a board of a thousand cards has no
+/// component tree to lay out. A tap that lands on it is handed to it, or to
+/// the component under the tap when it is a container, as a press and a
+/// release: a button in a card fires. It gets no drag, focus or hover of its
+/// own, and after changing what it shows, repaint the board.
 public interface KanbanCardFactory {
     /// The component for a card, or null for a card that is only painted.
     Component createComponent(KanbanBoard board, KanbanCard card);

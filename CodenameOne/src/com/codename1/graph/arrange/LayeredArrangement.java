@@ -23,6 +23,7 @@
 package com.codename1.graph.arrange;
 
 import com.codename1.graph.GraphEdge;
+import com.codename1.graph.GraphGroup;
 import com.codename1.graph.GraphModel;
 import com.codename1.graph.GraphNode;
 
@@ -55,6 +56,7 @@ public class LayeredArrangement implements GraphArrangement {
     private double layerGap = 80;
     private double nodeGap = 40;
     private int sweeps = 12;
+    private boolean respectLanes;
 
     /// `TOP_TO_BOTTOM`, the default, or `LEFT_TO_RIGHT`.
     public int getDirection() {
@@ -84,6 +86,89 @@ public class LayeredArrangement implements GraphArrangement {
     /// Sets the space between nodes on one layer.
     public void setNodeGap(double nodeGap) {
         this.nodeGap = nodeGap;
+    }
+
+    /// True when a node stays inside the band of its lane.
+    public boolean isRespectLanes() {
+        return respectLanes;
+    }
+
+    /// Keeps each node inside the band of the lane it belongs to. The layers
+    /// still say how far along the lanes a node goes; across them, the nodes
+    /// of one lane on one layer are spread over that lane's band in the order
+    /// the arrangement gave them, and the picture starts where the lanes do.
+    ///
+    /// It applies to lanes that run along the direction: horizontal lanes
+    /// with `LEFT_TO_RIGHT`, vertical ones with `TOP_TO_BOTTOM`. A lane lying
+    /// the other way, and a node in no lane, are arranged as without it. An
+    /// edge gets no route through hidden points then, since a node moved
+    /// into its band is no longer where the route went around it. Off by
+    /// default.
+    public void setRespectLanes(boolean respectLanes) {
+        this.respectLanes = respectLanes;
+    }
+
+    // Moves the nodes of each lane into its band. `along` and `center` are
+    // the layer axis and the cross axis of each node; true when a lane took
+    // part.
+    private boolean intoLanes(GraphModel model, Graphs g, int[] layer, double[] along, double[] center,
+                              double[] breadth) {
+        boolean tb = direction == TOP_TO_BOTTOM;
+        int n = g.size();
+        GraphGroup[] laneOf = new GraphGroup[n];
+        double start = 0;
+        boolean any = false;
+        for (int i = 0; i < n; i++) {
+            String gid = g.nodes[i].getGroupId();
+            GraphGroup lane = gid == null ? null : model.getGroup(gid);
+            // a horizontal lane is a band across the screen: layers must run across too
+            if (lane != null && lane.isLane() && lane.isHorizontal() != tb) {
+                laneOf[i] = lane;
+                double s = tb ? lane.getY() : lane.getX();
+                start = any ? Math.min(start, s) : s;
+                any = true;
+            }
+        }
+        if (!any) {
+            return false;
+        }
+        for (int i = 0; i < n; i++) {
+            along[i] += start + nodeGap;
+        }
+        boolean[] done = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            if (laneOf[i] == null || done[i]) {
+                continue;
+            }
+            // the nodes of this lane on this layer, in the order they were given
+            List<Integer> row = new ArrayList<Integer>();
+            for (int j = i; j < n; j++) {
+                if (!done[j] && laneOf[j] == laneOf[i] && layer[j] == layer[i]) { // NOPMD CompareObjectsWithEquals - the lane itself
+                    int at = 0;
+                    while (at < row.size() && center[row.get(at).intValue()] <= center[j]) {
+                        at++;
+                    }
+                    row.add(at, Integer.valueOf(j));
+                    done[j] = true;
+                }
+            }
+            GraphGroup lane = laneOf[i];
+            double bandStart = tb ? lane.getX() : lane.getY();
+            double bandSize = tb ? lane.getWidth() : lane.getHeight();
+            double total = 0;
+            for (int k = 0; k < row.size(); k++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass
+                total += breadth[row.get(k).intValue()];
+            }
+            // the gap shrinks before a row leaves its band, and never below nothing
+            double gap = row.size() < 2 ? 0 : Math.max(0, Math.min(nodeGap, (bandSize - total) / (row.size() - 1)));
+            double at = bandStart + Math.max(0, (bandSize - total - gap * (row.size() - 1)) / 2);
+            for (int k = 0; k < row.size(); k++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass
+                int v = row.get(k).intValue();
+                center[v] = at + breadth[v] / 2;
+                at += breadth[v] + gap;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -176,16 +261,24 @@ public class LayeredArrangement implements GraphArrangement {
             layerStart[l] = at;
             at += depth[l] + layerGap;
         }
+        double[] alongOf = new double[n];
         for (int i = 0; i < n; i++) {
             GraphNode node = g.nodes[i];
-            int l = layer[i];
+            alongOf[i] = layerStart[layer[i]] + (depth[layer[i]] - (tb ? node.getHeight() : node.getWidth())) / 2;
+        }
+        boolean inLanes = respectLanes && intoLanes(model, g, layer, alongOf, center, breadth);
+        for (int i = 0; i < n; i++) {
+            GraphNode node = g.nodes[i];
             double c = center[i];
-            double along = layerStart[l] + (depth[l] - (tb ? node.getHeight() : node.getWidth())) / 2;
+            double along = alongOf[i];
             if (tb) {
                 result.setPosition(node.getId(), c - node.getWidth() / 2, along);
             } else {
                 result.setPosition(node.getId(), along, c - node.getHeight() / 2);
             }
+        }
+        if (inLanes) {
+            return result;
         }
         Map<String, Integer> index = new HashMap<String, Integer>();
         for (int i = 0; i < n; i++) {

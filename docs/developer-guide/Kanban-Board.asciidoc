@@ -37,6 +37,9 @@ board and a long press picks the card up, so the two gestures don't compete.
 `setDragEdits` chooses one behavior for both. While a card is held, the other
 cards of the column under it make room where it would land.
 
+On a phone, where one column fills most of the screen, `setColumnSnap(true)`
+brings scrolling to rest with a column at the leading edge.
+
 A column title is dragged the same way to move the column. The mark at the
 end of a title folds the column to a strip that shows only its count, and a tap
 on the strip opens it again.
@@ -118,7 +121,9 @@ width and paints it.
 
 A card can carry a real component as well, such as a progress bar or a
 button. A `KanbanCardFactory` is asked for one per card, and the component is
-placed along the bottom of the card.
+drawn along the bottom of the card. It's drawn with the card and isn't added to
+the form, so a board of many cards stays cheap. A tap on it reaches it, which
+is enough for a button. After changing what it shows, repaint the board.
 
 [source,java]
 ----
