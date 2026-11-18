@@ -182,7 +182,10 @@ public class RadarSeries extends Series {
                 continue;
             }
             for (int i = 0; i < r.values.length; i++) {
-                max = Math.max(max, r.values[i]);
+                double rv = r.values[i];
+                if (rv == rv) {
+                    max = Math.max(max, rv);
+                }
             }
         }
         for (String label : sp) {
@@ -257,7 +260,7 @@ public class RadarSeries extends Series {
         GeneralPath poly = new GeneralPath();
         for (int i = 0; i < n; i++) {
             double v = i < values.length ? shown(ctx, i) : 0;
-            float rr = (float) (r * Math.max(0, v) / top);
+            float rr = (float) (r * pos(v) / top);
             double a = 360.0 * i / n;
             if (i == 0) {
                 poly.moveTo(Shapes.px(cx, rr, a), Shapes.py(cy, rr, a));
@@ -288,7 +291,7 @@ public class RadarSeries extends Series {
         }
         int n = Math.max(spokes().length, values.length);
         double a = 360.0 * i / n;
-        float rr = (float) (lastR * Math.max(0, values[i]) / lastMax);
+        float rr = (float) (lastR * pos(values[i]) / lastMax);
         String[] sp = spokes();
         return new ChartPoint(this, i, i, values[i], Math.round(Shapes.px(lastCx, rr, a)) - ctx.getOriginX(),
                 Math.round(Shapes.py(lastCy, rr, a)) - ctx.getOriginY(), i < sp.length ? sp[i] : null);
@@ -322,5 +325,10 @@ public class RadarSeries extends Series {
         for (int i = 0; i < values.length; i++) {
             rows.add(new String[]{getName(), i < sp.length && sp[i] != null ? sp[i] : String.valueOf(i + 1), formatValue(null, values[i])});
         }
+    }
+
+    // NaN and negative values count as nothing; Math.max(0, NaN) is NaN and would poison the sums
+    private static double pos(double v) {
+        return !(v > 0) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
     }
 }

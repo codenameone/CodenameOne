@@ -31,7 +31,7 @@ import java.util.List;
 /// charts, wrap the instance in a `com.codename1.charts.ChartComponent` to
 /// place it on a form.
 ///
-/// @deprecated Use the `com.codename1.ui.chart` package instead.
+/// @deprecated Use `com.codename1.ui.chart.series.ScatterSeries` in a `Chart`; the `com.codename1.ui.chart` package replaces this one.
 @Deprecated
 public class ScatterChart extends XYChart {
     /// The constant to identify this chart type.

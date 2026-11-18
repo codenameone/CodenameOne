@@ -30,8 +30,13 @@ import com.codename1.ui.chart.axis.CategoryAxis;
 import com.codename1.ui.chart.axis.LogAxis;
 import com.codename1.ui.chart.axis.TimeAxis;
 import com.codename1.ui.chart.series.BarSeries;
+import com.codename1.ui.chart.series.FunnelSeries;
+import com.codename1.ui.chart.series.HeatmapSeries;
 import com.codename1.ui.chart.series.LineSeries;
 import com.codename1.ui.chart.series.PieSeries;
+import com.codename1.ui.chart.series.SankeySeries;
+import com.codename1.ui.chart.series.SunburstSeries;
+import com.codename1.ui.chart.series.TreemapSeries;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -280,5 +285,70 @@ public class ChartFeatureTest extends UITestBase {
         c.pointerReleased(ax + 2, ay + 2);
         assertFalse(alpha.isLegendEntryVisible(0));
         assertTrue(beta.isLegendEntryVisible(0));
+    }
+
+    @FormTest
+    public void manySliceDoughnutLabelsNeverOverlap() {
+        String[] names = new String[14];
+        double[] v = new double[14];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = "Category number " + (i + 1);
+            v[i] = i < 3 ? 30 - i * 5 : 1 + i % 3;
+        }
+        assertDrawnTextLegible(new Chart().addSeries(new PieSeries("p").setInnerRadius(0.5f).setData(names, v)));
+    }
+
+    @FormTest
+    public void treemapAndSunburstLabelsNeverOverlap() {
+        TreeNode root = new TreeNode("All");
+        for (int g = 0; g < 4; g++) {
+            TreeNode group = root.add(new TreeNode("Group with a long name " + g));
+            for (int k = 0; k < 6; k++) {
+                group.add(new TreeNode("Leaf " + g + "." + k, 1 + (g * 7 + k * 3) % 11));
+            }
+        }
+        assertDrawnTextLegible(new Chart().addSeries(new TreemapSeries("t", root)));
+        assertDrawnTextLegible(new Chart().addSeries(new SunburstSeries("s", root)));
+    }
+
+    @FormTest
+    public void sankeyAndFunnelLabelsNeverOverlap() {
+        SankeySeries s = new SankeySeries("e");
+        String[] src = {"Solar power", "Wind power", "Natural gas", "Coal", "Nuclear", "Hydro"};
+        for (int i = 0; i < src.length; i++) {
+            s.addLink(src[i], "Grid", 10 + i * 3);
+        }
+        s.addLink("Grid", "Homes", 40).addLink("Grid", "Industry", 30).addLink("Grid", "Losses", 3).addLink("Grid", "Exports", 2);
+        assertDrawnTextLegible(new Chart().addSeries(s));
+        assertDrawnTextLegible(new Chart().addSeries(new FunnelSeries("f").setData(
+                new String[]{"Visited the site", "Viewed pricing", "Started a trial", "Invited a teammate", "Paid"},
+                new double[]{12000, 4200, 900, 400, 210})));
+    }
+
+    @FormTest
+    public void heatmapValuesAndAWrappingLegendNeverOverlap() {
+        double[][] m = new double[6][12];
+        for (int r = 0; r < m.length; r++) {
+            for (int k = 0; k < m[r].length; k++) {
+                m[r][k] = (r * 13 + k * 7) % 40 + 5;
+            }
+        }
+        assertDrawnTextLegible(new Chart().addSeries(new HeatmapSeries("h").setMatrix(m).setShowValues(true)));
+        Chart lines = new Chart();
+        for (int i = 0; i < 9; i++) {
+            lines.addSeries(new LineSeries("A series with a long legend name " + i).setData(null, new double[]{i, i + 1, i * 2}));
+        }
+        assertDrawnTextLegible(lines);
+    }
+
+    @FormTest
+    public void aTooltipAtThePlotEdgeStaysInside() {
+        Chart c = new Chart().setTooltipMode(Chart.TOOLTIP_SHARED);
+        c.addSeries(new LineSeries("A rather long series name").setData(null, new double[]{1, 5, 2, 8, 3}));
+        c.addSeries(new LineSeries("Another long series name").setData(null, new double[]{2, 3, 4, 5, 6}));
+        ChartContext ctx = paint(c);
+        int py = ctx.getPlotY() + ctx.getPlotHeight() / 2;
+        c.pointerHover(new int[]{ctx.getPlotX() + ctx.getPlotWidth() - 1}, new int[]{py});
+        assertDrawnTextLegible(c);
     }
 }

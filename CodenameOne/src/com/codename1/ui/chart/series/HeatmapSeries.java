@@ -136,6 +136,32 @@ public class HeatmapSeries extends Series {
         return scale != null ? scale : ColorScale.sequential(getColor());
     }
 
+    /// The range of values the colour scale spans: the fixed range when one is set, otherwise the
+    /// smallest and largest value present. A matrix with no values at all answers `{0, 1}`.
+    ///
+    /// #### Returns
+    ///
+    /// a new `{min, max}` array
+    public double[] getValueRange() {
+        return extent();
+    }
+
+    /// The hit point id of a cell, `row * getColumns() + column`, which never aliases however wide
+    /// the matrix is.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row
+    ///
+    /// - `column`: the column
+    ///
+    /// #### Returns
+    ///
+    /// the id `hitTest` gives that cell's point
+    public int cellId(int row, int column) {
+        return row * Math.max(1, getColumns()) + column;
+    }
+
     private double[] extent() {
         double min = Double.MAX_VALUE;
         double max = -Double.MAX_VALUE;
@@ -146,6 +172,11 @@ public class HeatmapSeries extends Series {
                     max = Math.max(max, v);
                 }
             }
+        }
+        if (min > max) {
+            // no value at all: an empty but sane range rather than {MAX_VALUE, -MAX_VALUE}
+            min = 0;
+            max = 1;
         }
         if (fixedMin != null) {
             min = fixedMin.doubleValue();
@@ -271,7 +302,7 @@ public class HeatmapSeries extends Series {
             for (int c = 0; c < matrix[r].length; c++) {
                 float[] b = cell(ctx, r, c);
                 if (ax >= b[0] && ax <= b[0] + b[2] && ay >= b[1] && ay <= b[1] + b[3] && matrix[r][c] == matrix[r][c]) {
-                    return new ChartPoint(this, r * 65536 + c, c, matrix[r][c], Math.round(b[0] + b[2] / 2) - ctx.getOriginX(),
+                    return new ChartPoint(this, cellId(r, c), c, matrix[r][c], Math.round(b[0] + b[2] / 2) - ctx.getOriginX(),
                             Math.round(b[1] + b[3] / 2) - ctx.getOriginY(), null);
                 }
             }
@@ -290,8 +321,9 @@ public class HeatmapSeries extends Series {
 
     @Override
     public String formatTooltip(ChartContext ctx, ChartPoint p) {
-        int r = p.getIndex() / 65536;
-        int c = p.getIndex() % 65536;
+        int stride = Math.max(1, getColumns());
+        int r = p.getIndex() / stride;
+        int c = p.getIndex() % stride;
         String col = ctx.getXAxis().format(c, 0);
         String row = ctx.getValueAxis(this).format(r, 0);
         return row + ", " + col + ": " + formatValue(ctx, p.getY());

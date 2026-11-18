@@ -32,7 +32,7 @@ import java.util.List;
 /// `XYSeries` instances where consecutive entries form the minimum/maximum
 /// pair for a category.
 ///
-/// @deprecated Use the `com.codename1.ui.chart` package instead.
+/// @deprecated Use `com.codename1.ui.chart.series.RangeBarSeries` in a `Chart`; the `com.codename1.ui.chart` package replaces this one.
 @Deprecated
 public class RangeBarChart extends BarChart {
     /// The chart type.

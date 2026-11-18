@@ -123,21 +123,26 @@ import com.codenameone.examples.hellocodenameone.tests.charts.ChartScatterScreen
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartStackedBarScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartTimeChartScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartTransformScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2MixedScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2DenseLabelsScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2CandlesScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2WaterfallScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2BoxplotScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2HeatmapScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2PieScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2DoughnutScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2GaugeScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2RadarScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2TreemapScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2SunburstScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2SankeyScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2FunnelScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest.Chart2SparklinesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2MixedScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DenseLabelsScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2CandlesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2WaterfallScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BoxplotScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2HeatmapScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PieScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DoughnutScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2GaugeScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2RadarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2TreemapScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SunburstScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SankeyScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FunnelScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SparklinesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SharedTooltipScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BrushScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2GrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DataChangeAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2ZoomAnimationScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
 
@@ -457,6 +462,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Chart2SankeyScreenshotTest(),
             new Chart2FunnelScreenshotTest(),
             new Chart2SparklinesScreenshotTest(),
+            new Chart2SharedTooltipScreenshotTest(),
+            new Chart2BrushScreenshotTest(),
+            new Chart2GrowInAnimationScreenshotTest(),
+            new Chart2DataChangeAnimationScreenshotTest(),
+            new Chart2ZoomAnimationScreenshotTest(),
             new BrowserComponentScreenshotTest(),
             new RichTextAreaScreenshotTest(),
             new CodeEditorScreenshotTest(),

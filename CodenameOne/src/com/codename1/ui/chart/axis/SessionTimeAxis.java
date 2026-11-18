@@ -34,6 +34,12 @@ import java.util.Date;
 /// slot wide no matter how much time separates it from the previous one, so a Monday candle sits
 /// right next to Friday's.
 ///
+/// **Live data.** A streaming series appends with `XYSeries.add(y)`, which gives each new bar the
+/// next index, and with `setMaxPoints(n)` drops its oldest bar, so its first index climbs past 0.
+/// Follow it by calling `addTime(long)` with each bar's timestamp, and `setMaxTimes(n)` with the
+/// same `n`: the axis then remembers the index of its first stored timestamp
+/// (`getFirstIndex()`) and labels the climbing indices with the times that belong to them.
+///
 /// ```java
 /// SessionTimeAxis axis = new SessionTimeAxis(Axis.BOTTOM, timestamps);
 /// chart.setXAxis(axis);
@@ -41,6 +47,9 @@ import java.util.Date;
 /// ```
 public class SessionTimeAxis extends Axis {
     private long[] times;
+    private int count;
+    private int firstIndex;
+    private int maxTimes;
     private int lastField = Calendar.DAY_OF_MONTH;
 
     /// Creates the axis.
@@ -66,11 +75,69 @@ public class SessionTimeAxis extends Axis {
     /// this axis
     public SessionTimeAxis setTimes(long[] times) {
         int n = times == null ? 0 : times.length;
-        this.times = new long[n];
+        this.times = new long[Math.max(16, n)];
         if (n > 0) {
             System.arraycopy(times, 0, this.times, 0, n);
         }
+        count = n;
+        firstIndex = 0;
+        trim();
         return this;
+    }
+
+    /// Appends the timestamp of the next bar, for a series that grows with `XYSeries.add(y)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `time`: the new bar's timestamp in milliseconds, not before the previous one
+    ///
+    /// #### Returns
+    ///
+    /// this axis
+    public SessionTimeAxis addTime(long time) {
+        if (count == times.length) {
+            long[] n = new long[times.length * 2];
+            System.arraycopy(times, 0, n, 0, count);
+            times = n;
+        }
+        times[count++] = time;
+        trim();
+        return this;
+    }
+
+    /// Keeps only the newest `n` timestamps, dropping the oldest as `addTime` appends, the way
+    /// `XYSeries.setMaxPoints(n)` drops the oldest bar. Each dropped timestamp moves
+    /// `getFirstIndex()` up by one, so the remaining bars keep their indices.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: the maximum number of timestamps, or 0 for no limit
+    ///
+    /// #### Returns
+    ///
+    /// this axis
+    public SessionTimeAxis setMaxTimes(int n) {
+        maxTimes = n;
+        trim();
+        return this;
+    }
+
+    /// The bar index of the oldest stored timestamp: 0 until `setMaxTimes` drops one.
+    ///
+    /// #### Returns
+    ///
+    /// the index of the first timestamp
+    public int getFirstIndex() {
+        return firstIndex;
+    }
+
+    private void trim() {
+        if (maxTimes > 0 && count > maxTimes) {
+            int drop = count - maxTimes;
+            System.arraycopy(times, drop, times, 0, maxTimes);
+            count = maxTimes;
+            firstIndex += drop;
+        }
     }
 
     /// The timestamp of bar `index`, extrapolated past either end.
@@ -83,11 +150,11 @@ public class SessionTimeAxis extends Axis {
     ///
     /// milliseconds since the epoch
     public long timeAt(double index) {
-        int n = times.length;
+        int n = count;
         if (n == 0) {
             return 0;
         }
-        int i = (int) Math.rint(index);
+        int i = (int) Math.rint(index) - firstIndex;
         if (i < 0) {
             return times[0];
         }
@@ -100,7 +167,7 @@ public class SessionTimeAxis extends Axis {
     @Override
     public void setDataBounds(double min, double max) {
         // bars are padded by half a slot; keep the full set of indices visible
-        super.setDataBounds(Math.min(min, -0.5), Math.max(max, times.length - 0.5));
+        super.setDataBounds(Math.min(min, firstIndex - 0.5), Math.max(max, firstIndex + count - 0.5));
     }
 
     @Override
@@ -110,12 +177,12 @@ public class SessionTimeAxis extends Axis {
 
     @Override
     public double[] ticks(int maxCount) {
-        int n = times.length;
+        int n = count;
         if (n == 0) {
             return new double[0];
         }
-        int lo = Math.max(0, (int) Math.ceil(getVisibleMin()));
-        int hi = Math.min(n - 1, (int) Math.floor(getVisibleMax()));
+        int lo = Math.max(0, (int) Math.ceil(getVisibleMin()) - firstIndex);
+        int hi = Math.min(n - 1, (int) Math.floor(getVisibleMax()) - firstIndex);
         if (hi < lo) {
             return new double[0];
         }
@@ -124,7 +191,7 @@ public class SessionTimeAxis extends Axis {
         double[] t = TimeAxis.timeTicks(times[lo], times[hi], maxCount + 2, field);
         lastField = field[0];
         double[] tmp = new double[t.length + 1];
-        int count = 0;
+        int found = 0;
         int last = -1;
         int minGap = Math.max(1, (hi - lo + 1) / Math.max(1, maxCount + 1));
         for (double tick : t) {
@@ -132,11 +199,11 @@ public class SessionTimeAxis extends Axis {
             if (idx < 0 || idx == last || last >= 0 && idx - last < minGap) {
                 continue;
             }
-            tmp[count++] = idx;
+            tmp[found++] = idx + firstIndex;
             last = idx;
         }
-        double[] out = new double[count];
-        System.arraycopy(tmp, 0, out, 0, count);
+        double[] out = new double[found];
+        System.arraycopy(tmp, 0, out, 0, found);
         return out;
     }
 

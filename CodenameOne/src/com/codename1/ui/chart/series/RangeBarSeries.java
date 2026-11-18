@@ -41,6 +41,12 @@ public class RangeBarSeries extends BarSeries {
         super(name, 1);
     }
 
+    /// A range added by `add(x, y)` or `setData` starts at zero, so its bar spans `0..y`.
+    @Override
+    protected double auxDefault(int channel, double y) {
+        return 0;
+    }
+
     /// Replaces all ranges.
     ///
     /// #### Parameters

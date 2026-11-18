@@ -2580,8 +2580,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/charts/Mod
 
 * **Labels never cover each other.** Axis ticks use round steps chosen from the measured label width, so a long label means fewer ticks rather than overlapping text. Labels that still don't fit are dropped or shortened with an ellipsis, pie labels are spread into columns with leader lines, and the plot area shrinks to make room for the axes and legend. There are no margins to set by hand.
 * **Changes animate.** A chart grows in when it first appears, and every later change to the data -- new values, an added or removed series, a series hidden from the legend -- moves from the old picture to the new one. `setAnimationDuration(0)` turns this off.
-* **Common gestures work.** Drag to pan, pinch or use the mouse wheel to zoom, double tap to zoom in, and use the arrow keys and `+`/`-` on a desktop. Tap or hover shows a tooltip that snaps to the nearest point, and tapping a legend entry hides or shows its series. `setZoomEnabled(false)` makes a chart static.
-* **Styling comes from the theme.** The `Chart` UIID sets the background, font and colors, and `ChartTheme` holds the series palette, which defaults to colors that color-blind readers can tell apart and follows dark mode. The foreground colors of the `ChartAxis`, `ChartGrid` and `ChartLegend` UIIDs, and the background and foreground of `ChartTooltip`, override the palette's colors for those parts.
+* **Common gestures work.** Drag to pan, pinch or use the mouse wheel to zoom, double tap to zoom in, and use `+`/`-` on a desktop. A category or time chart zooms along x only, so its values keep their scale; `setZoomMode` chooses x only or both axes for any chart. Tap or hover shows a tooltip that snaps to the nearest point, and tapping a legend entry hides or shows its series. `setZoomEnabled(false)` makes a chart static.
+* **The keyboard reaches every point.** With the chart focused, the arrow keys step through the points of a series and move between series, a zoomed chart pans to keep the point in view, and each point is announced to the screen reader.
+* **Styling comes from the theme.** The `Chart` UIID sets the background, font and colors, and `ChartTheme` holds the series palette, which defaults to colors that color-blind readers can tell apart. The palette is derived from the `Chart` style, so a dark theme, or a theme that switches with the device's dark mode, gets the dark palette, and the chart picks up a theme change while it's showing. The foreground colors of the `ChartAxis`, `ChartGrid` and `ChartLegend` UIIDs, and the background and foreground of `ChartTooltip`, override the palette's colors for those parts.
 * **Text reads right to left in RTL locales.** The legend runs from the right, with each symbol after its text, and tooltips open toward the start of the line with their rows aligned right. The data axes keep their direction, because time and value still increase from left to right.
 
 ==== Series types
@@ -2591,7 +2592,7 @@ Several series can share one chart and its axes, and a series can use a secondar
 [cols="1,3",options="header"]
 |===
 |Family |Series
-|Cartesian |`LineSeries` (straight, monotone spline that never overshoots, or step; optionally filled and stacked), `BarSeries` (grouped, stacked or horizontal with `setRotated(true)`), `ScatterSeries` (also bubbles), `RangeBarSeries`, `ErrorBarSeries`, `BoxPlotSeries`, `HistogramSeries`, `WaterfallSeries`, `HeatmapSeries`
+|Cartesian |`LineSeries` (straight, monotone spline that never overshoots, or step; optionally filled and stacked), `BarSeries` (grouped, stacked, or horizontal with `Chart.setRotated(true)`), `ScatterSeries` (also bubbles), `RangeBarSeries`, `ErrorBarSeries`, `BoxPlotSeries`, `HistogramSeries`, `WaterfallSeries`, `HeatmapSeries`
 |Financial |`CandlestickSeries` (candles, OHLC bars or Heikin-Ashi), `VolumeSeries`, and the indicators in `Indicators`: SMA, EMA, Bollinger bands, RSI and MACD
 |Parts of a whole |`PieSeries` (and doughnut through `setInnerRadius`), `FunnelSeries`, `TreemapSeries`, `SunburstSeries`
 |Flows and others |`SankeySeries`, `GaugeSeries`, `RadarSeries`

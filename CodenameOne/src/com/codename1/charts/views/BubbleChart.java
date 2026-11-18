@@ -34,7 +34,7 @@ import java.util.List;
 /// wrapped in a `com.codename1.charts.ChartComponent` to embed it inside a
 /// Codename One UI.
 ///
-/// @deprecated Use the `com.codename1.ui.chart` package instead.
+/// @deprecated Use `ScatterSeries` with bubble sizes, in the `com.codename1.ui.chart` package; the `com.codename1.ui.chart` package replaces this one.
 @Deprecated
 public class BubbleChart extends XYChart {
     /// The constant to identify this chart type.

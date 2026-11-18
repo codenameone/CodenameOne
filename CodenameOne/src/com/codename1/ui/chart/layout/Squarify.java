@@ -51,7 +51,7 @@ public final class Squarify {
         float[][] out = new float[n][4];
         double total = 0;
         for (int i = 0; i < n; i++) {
-            total += Math.max(0, values[i]);
+            total += pos(values[i]);
         }
         if (total <= 0 || w <= 0 || h <= 0) {
             for (int i = 0; i < n; i++) {
@@ -74,7 +74,7 @@ public final class Squarify {
         double scale = (double) w * h / total;
         double[] area = new double[n];
         for (int i = 0; i < n; i++) {
-            area[i] = Math.max(0, values[order[i]]) * scale;
+            area[i] = pos(values[order[i]]) * scale;
         }
         double rx = x;
         double ry = y;
@@ -139,5 +139,10 @@ public final class Squarify {
         double s2 = sum * sum;
         double side2 = side * side;
         return Math.max(side2 * max / s2, s2 / (side2 * min));
+    }
+
+    // NaN and negative values count as nothing; Math.max(0, NaN) is NaN and would poison the sums
+    private static double pos(double v) {
+        return !(v > 0) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
     }
 }

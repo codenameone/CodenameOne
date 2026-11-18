@@ -326,7 +326,15 @@ def plan(root=ROOT, sources_dir=SOURCES, runner=RUNNER, dir_ports=DIR_PORTS,
         lost_out.update(lost)
     gaps, problems = [], []
     for t in suite:
-        if t not in classes or opted_out(t, classes):
+        if t not in classes:
+            # A suite entry with no indexed source cannot be planned, and skipping it hid
+            # fifteen nested test classes whose goldens were never captured. index_sources()
+            # reads one top-level class per file, named like the file: a test must be one.
+            problems.append("%s is in the suite but no top-level class of that name was found in a "
+                            "file named %s.java or %s.kt; a test class must be top level in its own file"
+                            % (t, t, t))
+            continue
+        if opted_out(t, classes):
             continue
         if not (t in mapped or takes_screenshots(t, classes)):
             continue

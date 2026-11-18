@@ -48,7 +48,10 @@ public class VolumeSeries extends BarSeries {
         super(name);
         this.prices = prices;
         double[] x = null;
-        if (prices != null && prices.size() == volume.length) {
+        if (prices != null && prices.size() != volume.length) {
+            throw new IllegalArgumentException("Expected " + prices.size() + " volumes, one per candle, got " + volume.length);
+        }
+        if (prices != null) {
             x = new double[volume.length];
             for (int i = 0; i < x.length; i++) {
                 x[i] = prices.getX(i);
@@ -61,10 +64,12 @@ public class VolumeSeries extends BarSeries {
 
     @Override
     protected int colorAt(ChartContext ctx, int i) {
-        if (prices == null || i >= prices.size()) {
+        // matched by x, not position: either series may have slid or grown since they were paired
+        int j = prices == null ? -1 : prices.indexOfX(getX(i));
+        if (j < 0) {
             return getColor();
         }
-        int c = prices.getClose(i) >= prices.getOpen(i) ? ctx.getTheme().getPositiveColor() : ctx.getTheme().getNegativeColor();
+        int c = prices.getClose(j) >= prices.getOpen(j) ? ctx.getTheme().getPositiveColor() : ctx.getTheme().getNegativeColor();
         // volume reads as context, not as the subject: tone it down towards the background
         return blend(c, ctx.getTheme().getGridColor(), 0.35f);
     }

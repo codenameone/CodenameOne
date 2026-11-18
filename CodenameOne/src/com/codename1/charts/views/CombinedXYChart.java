@@ -34,7 +34,7 @@ import java.util.List;
 /// should render each data series. The combined chart can then be wrapped in a
 /// `com.codename1.charts.ChartComponent` for display.
 ///
-/// @deprecated Use the `com.codename1.ui.chart` package instead.
+/// @deprecated Use one `com.codename1.ui.chart.Chart` holding several series of different types; the `com.codename1.ui.chart` package replaces this one.
 @Deprecated
 public class CombinedXYChart extends XYChart {
 

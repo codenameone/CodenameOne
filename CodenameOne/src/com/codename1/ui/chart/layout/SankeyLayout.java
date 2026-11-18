@@ -37,6 +37,7 @@ public final class SankeyLayout {
     private float[] linkTy;
     private float[] linkW;
     private int columns;
+    private boolean[] back;
 
     /// Computes a layout.
     ///
@@ -65,12 +66,20 @@ public final class SankeyLayout {
             float nodeWidth, float nodePad) {
         int n = nodeCount;
         int m = src.length;
+        for (int l = 0; l < m; l++) {
+            if (src[l] < 0 || src[l] >= n || dst[l] < 0 || dst[l] >= n) {
+                throw new IllegalArgumentException("Link " + l + " joins nodes " + src[l] + " and " + dst[l]
+                        + " but there are only " + n + " nodes");
+            }
+        }
         column = new int[n];
-        // longest path from a source; the iteration bound also stops cycles
+        back = findBackLinks(n, src, dst);
+        // longest path from a source over the forward links; back links close a cycle and would
+        // otherwise push its nodes right until the pass bound
         for (int pass = 0; pass < n; pass++) {
             boolean changed = false;
             for (int l = 0; l < m; l++) {
-                if (src[l] != dst[l] && column[dst[l]] < column[src[l]] + 1 && column[src[l]] + 1 < n) {
+                if (!back[l] && src[l] != dst[l] && column[dst[l]] < column[src[l]] + 1 && column[src[l]] + 1 < n) {
                     column[dst[l]] = column[src[l]] + 1;
                     changed = true;
                 }
@@ -85,7 +94,9 @@ public final class SankeyLayout {
         }
         boolean[] hasOut = new boolean[n];
         for (int l = 0; l < m; l++) {
-            hasOut[src[l]] = true;
+            if (!back[l]) {
+                hasOut[src[l]] = true;
+            }
         }
         for (int i = 0; i < n; i++) {
             if (!hasOut[i]) {
@@ -96,8 +107,8 @@ public final class SankeyLayout {
         double[] in = new double[n];
         double[] out = new double[n];
         for (int l = 0; l < m; l++) {
-            out[src[l]] += Math.max(0, value[l]);
-            in[dst[l]] += Math.max(0, value[l]);
+            out[src[l]] += pos(value[l]);
+            in[dst[l]] += pos(value[l]);
         }
         double[] nv = new double[n];
         for (int i = 0; i < n; i++) {
@@ -147,7 +158,7 @@ public final class SankeyLayout {
         linkTy = new float[m];
         linkW = new float[m];
         for (int l = 0; l < m; l++) {
-            linkW[l] = (float) (Math.max(0, value[l]) * ky);
+            linkW[l] = (float) (pos(value[l]) * ky);
         }
         // order links by the far end's position so ribbons do not cross at their ends
         float[] outOff = new float[n];
@@ -168,6 +179,60 @@ public final class SankeyLayout {
             linkTy[l] = nodeY[dst[l]] + inOff[dst[l]];
             inOff[dst[l]] += linkW[l];
         }
+    }
+
+    /// True when link `l` closes a cycle (or is a self loop): it points back to a node at or
+    /// left of its source, so it does not take part in assigning columns and runs right to left.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the link
+    ///
+    /// #### Returns
+    ///
+    /// true for a back link
+    public boolean isBackLink(int l) {
+        return back[l];
+    }
+
+    // depth first search from every node in order; a link to a node still on the stack is a back link
+    private static boolean[] findBackLinks(int n, int[] src, int[] dst) {
+        int m = src.length;
+        boolean[] back = new boolean[m];
+        int[] state = new int[n];
+        int[] stack = new int[n];
+        int[] next = new int[n];
+        for (int root = 0; root < n; root++) {
+            if (state[root] != 0) {
+                continue;
+            }
+            int top = 0;
+            stack[0] = root;
+            next[root] = 0;
+            state[root] = 1;
+            while (top >= 0) {
+                int u = stack[top];
+                int l = next[u];
+                while (l < m && src[l] != u) {
+                    l++;
+                }
+                if (l >= m) {
+                    state[u] = 2;
+                    top--;
+                    continue;
+                }
+                next[u] = l + 1;
+                int v = dst[l];
+                if (state[v] == 1) {
+                    back[l] = true;
+                } else if (state[v] == 0) {
+                    state[v] = 1;
+                    next[v] = 0;
+                    stack[++top] = v;
+                }
+            }
+        }
+        return back;
     }
 
     /// The number of columns.
@@ -230,7 +295,7 @@ public final class SankeyLayout {
                 if (me != i || other == i) {
                     continue;
                 }
-                double v = Math.max(0, value[l]);
+                double v = pos(value[l]);
                 sum += (nodeY[other] + nodeH[other] / 2) * v;
                 wsum += v;
             }
@@ -274,5 +339,10 @@ public final class SankeyLayout {
                 bottom = nodeY[i] - pad;
             }
         }
+    }
+
+    // NaN and negative values count as nothing; Math.max(0, NaN) is NaN and would poison the sums
+    private static double pos(double v) {
+        return !(v > 0) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
     }
 }

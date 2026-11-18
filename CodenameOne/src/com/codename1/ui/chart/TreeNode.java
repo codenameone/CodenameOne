@@ -87,7 +87,7 @@ public class TreeNode {
     /// The leaf value, or the sum of the children's values for a branch.
     public double getValue() {
         if (children.isEmpty()) {
-            return Math.max(0, value);
+            return !(value > 0) ? 0 : value; //NOPMD LogicInversion - the negated comparison is also true for NaN
         }
         double s = 0;
         for (TreeNode c : children) {

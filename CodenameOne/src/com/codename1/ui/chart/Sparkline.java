@@ -51,6 +51,8 @@ public class Sparkline extends Component {
     private boolean showLast = true;
     private boolean showExtremes;
     private ChartTheme theme;
+    // the number of separate line runs the last line or area paint drew, for tests
+    int lastSegments;
 
     /// Creates a sparkline.
     ///
@@ -224,9 +226,17 @@ public class Sparkline extends Component {
             boolean started = false;
             float firstX = 0;
             float lastX = 0;
+            int segments = 0;
             for (int i = 0; i < n; i++) {
                 double v = values[i];
                 if (v != v) {
+                    // a gap breaks the line and its area, as in LineSeries; never bridge across it
+                    if (started) {
+                        area.lineTo(lastX, y + h);
+                        area.lineTo(firstX, y + h);
+                        area.closePath();
+                        started = false;
+                    }
                     continue;
                 }
                 float px = x + (n == 1 ? w / 2f : i * w / (float) (n - 1));
@@ -237,16 +247,20 @@ public class Sparkline extends Component {
                     area.lineTo(px, py);
                     firstX = px;
                     started = true;
+                    segments++;
                 } else {
                     line.lineTo(px, py);
                     area.lineTo(px, py);
                 }
                 lastX = px;
             }
+            lastSegments = segments;
             if (type == AREA) {
-                area.lineTo(lastX, y + h);
-                area.lineTo(firstX, y + h);
-                area.closePath();
+                if (started) {
+                    area.lineTo(lastX, y + h);
+                    area.lineTo(firstX, y + h);
+                    area.closePath();
+                }
                 g.setAlpha(alpha * 50 / 255);
                 g.fillShape(area);
                 g.setAlpha(alpha);

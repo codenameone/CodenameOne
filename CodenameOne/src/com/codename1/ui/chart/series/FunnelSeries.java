@@ -60,11 +60,11 @@ public class FunnelSeries extends CategoricalSeries {
         int shown = 0;
         double max = 0;
         for (int i = 0; i < n; i++) {
-            double v = displayValue(ctx, i);
+            // only stages on screen set the scale; a hidden giant must not shrink the rest
             if (isShown(i)) {
                 shown++;
+                max = Math.max(max, clean(displayValue(ctx, i)));
             }
-            max = Math.max(max, v);
         }
         lastTop = new float[n];
         lastH = new float[n];
@@ -87,11 +87,11 @@ public class FunnelSeries extends CategoricalSeries {
                 lastTop[i] = y;
                 continue;
             }
-            double v = displayValue(ctx, i) * t;
+            double v = clean(displayValue(ctx, i)) * t;
             double next = v;
             for (int j = i + 1; j < n; j++) {
                 if (isShown(j)) {
-                    next = displayValue(ctx, j) * t;
+                    next = clean(displayValue(ctx, j)) * t;
                     break;
                 }
             }
@@ -107,12 +107,14 @@ public class FunnelSeries extends CategoricalSeries {
             g.fillShape(p);
             lastTop[i] = y;
             lastH[i] = bandH;
+            // labels and percentages use the value as drawn: a NaN or negative stage reads as 0
+            double shownValue = clean(values[i]);
             if (first < 0) {
-                first = values[i];
+                first = shownValue;
             }
             if (t >= 1 && bandH >= fh) {
-                String pct = first > 0 ? "  " + Axis.formatNumber(values[i] * 100 / first, 0) + "%" : "";
-                String text = LabelLayout.ellipsize(f, labels[i] + "  " + formatValue(ctx, values[i]) + pct, (int) maxW);
+                String pct = first > 0 ? "  " + Axis.formatNumber(shownValue * 100 / first, 0) + "%" : "";
+                String text = LabelLayout.ellipsize(f, labels[i] + "  " + formatValue(ctx, shownValue) + pct, (int) maxW);
                 int tw = f.stringWidth(text);
                 int tx = Math.round(cx - tw / 2f);
                 int ty = Math.round(y + (bandH - fh) / 2);
@@ -135,7 +137,7 @@ public class FunnelSeries extends CategoricalSeries {
         int n = Math.min(lastTop.length, values.length);
         for (int i = 0; i < n; i++) {
             if (lastH[i] > 0 && ay >= lastTop[i] && ay <= lastTop[i] + lastH[i]
-                    && Math.abs(ax - lastCx) <= Math.max(displayValue(ctx, i) * lastScale / 2, radius)) {
+                    && Math.abs(ax - lastCx) <= Math.max(clean(displayValue(ctx, i)) * lastScale / 2, radius)) {
                 return getPoint(ctx, i);
             }
         }
@@ -148,5 +150,9 @@ public class FunnelSeries extends CategoricalSeries {
             return null;
         }
         return point(ctx, i, lastCx, lastTop[i] + lastH[i] / 2);
+    }
+
+    private static double clean(double v) {
+        return !(v > 0) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
     }
 }

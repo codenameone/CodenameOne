@@ -62,20 +62,34 @@ public class WaterfallSeries extends BarSeries {
         totals = new boolean[n];
         double[] y = new double[n];
         double[] base = new double[n];
-        double run = 0;
         for (int i = 0; i < n; i++) {
             totals[i] = isTotal != null && i < isTotal.length && isTotal[i];
-            if (totals[i]) {
-                base[i] = 0;
-                y[i] = run;
-            } else {
-                base[i] = run;
-                y[i] = deltas[i];
-                run += deltas[i];
-            }
+            y[i] = deltas[i];
         }
+        // the bases and totals are filled in by dataChanged, which every change goes through
         setRows(null, y, new double[][]{base});
         return this;
+    }
+
+    /// Recomputes every base and total from the deltas, so `set`, `add` and a slide keep the bridge
+    /// joined. A NaN delta is a gap: its bar is not drawn and the running total carries past it.
+    @Override
+    protected void dataChanged() {
+        double run = 0;
+        double[] base = aux[0];
+        for (int i = 0; i < count; i++) {
+            if (isTotal(i)) {
+                base[i] = 0;
+                ys[i] = run;
+            } else {
+                base[i] = run;
+                double d = ys[i];
+                if (d == d) {
+                    run += d;
+                }
+            }
+        }
+        super.dataChanged();
     }
 
     /// Shows or hides the thin lines joining each bar's end to the next bar's start.
@@ -108,8 +122,12 @@ public class WaterfallSeries extends BarSeries {
         double min = 0;
         double max = 0;
         for (int i = 0; i < size(); i++) {
+            double v = getY(i);
+            if (v != v) {
+                continue;
+            }
             double a = getBase(i);
-            double b = a + getY(i);
+            double b = a + v;
             min = Math.min(min, Math.min(a, b));
             max = Math.max(max, Math.max(a, b));
         }
@@ -130,7 +148,8 @@ public class WaterfallSeries extends BarSeries {
             Graphics g = ctx.getGraphics();
             g.setColor(ctx.getTheme().getAxisColor());
             for (int i = 0; i + 1 < size(); i++) {
-                double end = getBase(i) + getY(i);
+                double d = getY(i);
+                double end = getBase(i) + (d == d ? d : 0);
                 float x0 = ctx.screenX(this, getX(i), end);
                 float y0 = ctx.screenY(this, getX(i), end);
                 float x1 = ctx.screenX(this, getX(i + 1), end);

@@ -36,7 +36,7 @@ import java.util.TimeZone;
 /// using `#setDateFormat(String)` or let the chart choose an appropriate
 /// format automatically.
 ///
-/// @deprecated Use the `com.codename1.ui.chart` package instead.
+/// @deprecated Use `LineSeries` on a `com.codename1.ui.chart.axis.TimeAxis`; the `com.codename1.ui.chart` package replaces this one.
 @Deprecated
 public class TimeChart extends LineChart {
     /// /** The constant to identify this chart type.

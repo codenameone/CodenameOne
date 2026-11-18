@@ -33,7 +33,7 @@ import java.util.List;
 /// `DefaultRenderer` and wrap the instance in a
 /// `com.codename1.charts.ChartComponent` to present it inside your UI.
 ///
-/// @deprecated Use the `com.codename1.ui.chart` package instead.
+/// @deprecated Use `com.codename1.ui.chart.series.RadarSeries` in a `Chart`; the `com.codename1.ui.chart` package replaces this one.
 @Deprecated
 public class RadarChart extends RoundChart {
 

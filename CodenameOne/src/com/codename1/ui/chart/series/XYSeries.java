@@ -39,6 +39,8 @@ public abstract class XYSeries extends Series {
     double[] ys = new double[16];
     int count;
     private double[] fromY;
+    // the x of each fromY slot, so a transition matches old values to new ones by x; null matches by index
+    private double[] fromX;
     private double[] fromBase;
     private String stackGroup;
     private int maxPoints;
@@ -127,6 +129,23 @@ public abstract class XYSeries extends Series {
     /// #### Returns
     ///
     /// the stored value
+    /// The value an extra channel takes for a point added without one, by `add(x, y)` or
+    /// `setData`. The default is the point's own value, which collapses an open/high/low, a box or an
+    /// error bar onto the point itself; a subclass whose channel means something else overrides it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channel`: the extra channel
+    ///
+    /// - `y`: the point's value
+    ///
+    /// #### Returns
+    ///
+    /// the channel's value for that point
+    protected double auxDefault(int channel, double y) {
+        return y;
+    }
+
     protected double getAux(int channel, int i) {
         return aux[channel][i];
     }
@@ -138,8 +157,12 @@ public abstract class XYSeries extends Series {
             if (aux != null) {
                 for (double[] channel : aux) {
                     System.arraycopy(channel, 1, channel, 0, count - 1);
+                    channel[count - 1] = 0;
                 }
             }
+            // clear the vacated slot so nothing of the dropped point can leak into the next one
+            xs[count - 1] = 0;
+            ys[count - 1] = 0;
             count--;
         }
     }
@@ -164,7 +187,7 @@ public abstract class XYSeries extends Series {
             for (int k = 0; k < aux.length; k++) {
                 double[] na = new double[xs.length];
                 for (int i = 0; i < count; i++) {
-                    na[i] = y[i];
+                    na[i] = auxDefault(k, y[i]);
                 }
                 aux[k] = na;
             }
@@ -190,6 +213,11 @@ public abstract class XYSeries extends Series {
         ensure(count + 1);
         xs[count] = x;
         ys[count] = y;
+        if (aux != null) {
+            for (int k = 0; k < aux.length; k++) {
+                aux[k][count] = auxDefault(k, y);
+            }
+        }
         count++;
         dataChanged();
         return this;
@@ -197,6 +225,9 @@ public abstract class XYSeries extends Series {
 
     /// Changes the value at `index`.
     public XYSeries set(int index, double y) {
+        if (index < 0 || index >= count) {
+            throw new IndexOutOfBoundsException("Index " + index + " of a series of " + count + " points");
+        }
         begin();
         ys[index] = y;
         dataChanged();
@@ -214,6 +245,20 @@ public abstract class XYSeries extends Series {
     /// Keeps at most `n` points, dropping the oldest as new ones arrive; 0 keeps all.
     public XYSeries setMaxPoints(int n) {
         maxPoints = n;
+        if (n > 0 && count > n) {
+            // trim now rather than on the next add, so the limit holds from the moment it is set
+            begin();
+            int drop = count - n;
+            System.arraycopy(xs, drop, xs, 0, n);
+            System.arraycopy(ys, drop, ys, 0, n);
+            if (aux != null) {
+                for (double[] channel : aux) {
+                    System.arraycopy(channel, drop, channel, 0, n);
+                }
+            }
+            count = n;
+            dataChanged();
+        }
         return this;
     }
 
@@ -398,20 +443,51 @@ public abstract class XYSeries extends Series {
     public double animatedY(ChartContext ctx, int i) {
         double t = ctx == null ? 1 : ctx.getProgress();
         double target = ys[i];
-        if (fromY == null || i >= fromY.length || t >= 1) {
+        if (fromY == null || t >= 1) {
             return target;
         }
-        return lerp(fromY[i], target, t);
+        int j = fromSlot(i);
+        return j < 0 ? target : lerp(fromY[j], target, t);
+    }
+
+    // the slot of fromY/fromBase that point i animates from, or -1 for none. Matched by x when the
+    // old and new data are both ascending, so a point that slid one place left (setMaxPoints) keeps
+    // its own old value instead of taking its neighbour's; a new x starts from the old point just
+    // before it, so an appended point grows out of the previous last point instead of snapping in.
+    private int fromSlot(int i) {
+        if (fromX == null || !isAscending()) {
+            return i < fromY.length ? i : -1;
+        }
+        int n = fromX.length;
+        if (n == 0) {
+            return -1;
+        }
+        double x = xs[i];
+        int lo = 0;
+        int hi = n;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (fromX[mid] < x) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        if (lo < n && fromX[lo] == x) {
+            return lo;
+        }
+        return lo > 0 ? lo - 1 : 0;
     }
 
     /// The stacked base shown at `i` in the current frame.
     public double animatedBase(ChartContext ctx, int i) {
         double target = getBase(i);
         double t = ctx == null ? 1 : ctx.getProgress();
-        if (fromBase == null || i >= fromBase.length || t >= 1) {
+        if (fromBase == null || fromY == null || t >= 1) {
             return target;
         }
-        return lerp(fromBase[i], target, t);
+        int j = fromSlot(i);
+        return j < 0 || j >= fromBase.length ? target : lerp(fromBase[j], target, t);
     }
 
     @Override
@@ -423,13 +499,20 @@ public abstract class XYSeries extends Series {
             fy[i] = animatedY(ctx, i);
             fb[i] = animatedBase(ctx, i);
         }
+        double[] fx = null;
+        if (isAscending()) {
+            fx = new double[count];
+            System.arraycopy(xs, 0, fx, 0, count);
+        }
         fromY = fy;
         fromBase = fb;
+        fromX = fx;
     }
 
     @Override
     protected void captureEntryStart() {
         fromY = new double[count];
+        fromX = null;
         fromBase = new double[count];
         for (int i = 0; i < count; i++) {
             fromBase[i] = getBase(i);

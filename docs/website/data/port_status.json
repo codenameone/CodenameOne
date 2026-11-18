@@ -377,23 +377,28 @@
       "id": "charts-interactive",
       "category": "Data visualization",
       "name": "Interactive charts",
-      "description": "Renders the animated chart package: mixed bar and line, dense labels, candlesticks, waterfall, box plot, heatmap, pie, doughnut, gauge, radar, treemap, sunburst, sankey, funnel and sparklines.",
+      "description": "Renders the animated chart package: mixed bar and line, dense labels, candlesticks, waterfall, box plot, heatmap, pie, doughnut, gauge, radar, treemap, sunburst, sankey, funnel and sparklines, plus frame grids of the grow-in, data-change and zoom animations and still captures of the shared tooltip and a brush selection.",
       "tests": [
         "Chart2BoxplotScreenshotTest",
+        "Chart2BrushScreenshotTest",
         "Chart2CandlesScreenshotTest",
+        "Chart2DataChangeAnimationScreenshotTest",
         "Chart2DenseLabelsScreenshotTest",
         "Chart2DoughnutScreenshotTest",
         "Chart2FunnelScreenshotTest",
         "Chart2GaugeScreenshotTest",
+        "Chart2GrowInAnimationScreenshotTest",
         "Chart2HeatmapScreenshotTest",
         "Chart2MixedScreenshotTest",
         "Chart2PieScreenshotTest",
         "Chart2RadarScreenshotTest",
         "Chart2SankeyScreenshotTest",
+        "Chart2SharedTooltipScreenshotTest",
         "Chart2SparklinesScreenshotTest",
         "Chart2SunburstScreenshotTest",
         "Chart2TreemapScreenshotTest",
-        "Chart2WaterfallScreenshotTest"
+        "Chart2WaterfallScreenshotTest",
+        "Chart2ZoomAnimationScreenshotTest"
       ]
     },
     {
@@ -1445,6 +1450,26 @@
     {
       "pattern": "chart2-sparklines",
       "test": "Chart2SparklinesScreenshotTest"
+    },
+    {
+      "pattern": "chart2-shared-tooltip",
+      "test": "Chart2SharedTooltipScreenshotTest"
+    },
+    {
+      "pattern": "chart2-brush",
+      "test": "Chart2BrushScreenshotTest"
+    },
+    {
+      "pattern": "Chart2GrowInAnimationScreenshotTest",
+      "test": "Chart2GrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2DataChangeAnimationScreenshotTest",
+      "test": "Chart2DataChangeAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2ZoomAnimationScreenshotTest",
+      "test": "Chart2ZoomAnimationScreenshotTest"
     },
     {
       "pattern": "BrowserComponent",

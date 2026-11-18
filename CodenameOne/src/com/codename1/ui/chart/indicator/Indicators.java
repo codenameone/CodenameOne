@@ -53,14 +53,28 @@ public final class Indicators {
     ///
     /// the average of each window, `NaN` for the first `period - 1` values
     public static double[] sma(double[] v, int period) {
+        checkPeriod(period);
         double[] out = new double[v.length];
         double sum = 0;
+        // NaN values in the window; while there is one the average is NaN, and it recovers once the
+        // gap leaves the window because the gap was never added to the sum
+        int gaps = 0;
         for (int i = 0; i < v.length; i++) {
-            sum += v[i];
-            if (i >= period) {
-                sum -= v[i - period];
+            double x = v[i];
+            if (x == x) {
+                sum += x;
+            } else {
+                gaps++;
             }
-            out[i] = i >= period - 1 ? sum / period : Double.NaN;
+            if (i >= period) {
+                double old = v[i - period];
+                if (old == old) {
+                    sum -= old;
+                } else {
+                    gaps--;
+                }
+            }
+            out[i] = i >= period - 1 && gaps == 0 ? sum / period : Double.NaN;
         }
         return out;
     }
@@ -77,6 +91,7 @@ public final class Indicators {
     ///
     /// the average, `NaN` for the first `period - 1` values
     public static double[] ema(double[] v, int period) {
+        checkPeriod(period);
         double[] out = new double[v.length];
         double k = 2.0 / (period + 1);
         double prev = Double.NaN;
@@ -85,7 +100,8 @@ public final class Indicators {
         for (int i = 0; i < v.length; i++) {
             double x = v[i];
             if (x != x) {
-                out[i] = prev;
+                // a gap is NaN like every other indicator's; the average resumes from where it was
+                out[i] = Double.NaN;
                 continue;
             }
             if (seen < period) {
@@ -117,6 +133,7 @@ public final class Indicators {
     ///
     /// `{middle, upper, lower}`
     public static double[][] bollinger(double[] v, int period, double deviations) {
+        checkPeriod(period);
         double[] mid = sma(v, period);
         double[] up = new double[v.length];
         double[] lo = new double[v.length];
@@ -150,21 +167,29 @@ public final class Indicators {
     ///
     /// the index, `NaN` for the first `period` values
     public static double[] rsi(double[] v, int period) {
+        checkPeriod(period);
         double[] out = new double[v.length];
         double gain = 0;
         double loss = 0;
+        // consecutive valid changes since the start or the last gap; a gap restarts the seeding, so
+        // the output is NaN until `period` changes past it are known, never a blend across it
+        int valid = 0;
         for (int i = 0; i < v.length; i++) {
-            if (i == 0) {
+            double ch = i == 0 ? Double.NaN : v[i] - v[i - 1];
+            if (ch != ch) {
                 out[i] = Double.NaN;
+                valid = 0;
+                gain = 0;
+                loss = 0;
                 continue;
             }
-            double ch = v[i] - v[i - 1];
             double g = ch > 0 ? ch : 0;
             double l = ch < 0 ? -ch : 0;
-            if (i <= period) {
+            valid++;
+            if (valid <= period) {
                 gain += g;
                 loss += l;
-                if (i < period) {
+                if (valid < period) {
                     out[i] = Double.NaN;
                     continue;
                 }
@@ -174,7 +199,12 @@ public final class Indicators {
                 gain = (gain * (period - 1) + g) / period;
                 loss = (loss * (period - 1) + l) / period;
             }
-            out[i] = loss == 0 ? 100 : 100 - 100 / (1 + gain / loss);
+            if (loss == 0) {
+                // a flat market has neither strength nor weakness: the neutral midpoint, not 100
+                out[i] = gain == 0 ? 50 : 100;
+            } else {
+                out[i] = 100 - 100 / (1 + gain / loss);
+            }
         }
         return out;
     }
@@ -195,6 +225,9 @@ public final class Indicators {
     ///
     /// `{macd, signal, histogram}`
     public static double[][] macd(double[] v, int fast, int slow, int signal) {
+        checkPeriod(fast);
+        checkPeriod(slow);
+        checkPeriod(signal);
         double[] f = ema(v, fast);
         double[] s = ema(v, slow);
         double[] m = new double[v.length];
@@ -260,5 +293,11 @@ public final class Indicators {
         LineSeries s = new LineSeries(name);
         s.setData(x, values);
         return s;
+    }
+
+    private static void checkPeriod(int period) {
+        if (period < 1) {
+            throw new IllegalArgumentException("An indicator period must be at least 1, got " + period);
+        }
     }
 }

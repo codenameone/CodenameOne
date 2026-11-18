@@ -102,6 +102,19 @@ public final class Annotation {
         return this;
     }
 
+    private boolean secondaryAxis;
+
+    /// Measures a value line or band against the chart's secondary y axis, for a threshold
+    /// that belongs to a series drawn on that axis.
+    public Annotation setSecondaryAxis(boolean secondary) {
+        this.secondaryAxis = secondary;
+        return this;
+    }
+
+    boolean isSecondaryAxis() {
+        return secondaryAxis;
+    }
+
     boolean isBehindSeries() {
         return behind;
     }
@@ -126,7 +139,11 @@ public final class Annotation {
     private int[] extent(ChartContext ctx) {
         boolean valueKind = kind == VALUE_LINE || kind == VALUE_BAND;
         boolean horizontalLine = valueKind != ctx.isRotated();
-        com.codename1.ui.chart.axis.Axis axis = valueKind ? ctx.getChart().getYAxis() : ctx.getXAxis();
+        com.codename1.ui.chart.axis.Axis axis = ctx.getXAxis();
+        if (valueKind) {
+            com.codename1.ui.chart.axis.Axis second = ctx.getChart().getSecondaryYAxis();
+            axis = secondaryAxis && second != null ? second : ctx.getChart().getYAxis();
+        }
         double n0 = axis.toNormalized(from);
         double n1 = axis.toNormalized(to);
         if (n1 < 0 || n0 > 1) {

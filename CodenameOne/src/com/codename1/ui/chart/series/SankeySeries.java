@@ -198,6 +198,9 @@ public class SankeySeries extends Series {
             float xe = x0 + (x1 - x0) * t;
             float ye = lay.getLinkSourceY(l) + (lay.getLinkTargetY(l) - lay.getLinkSourceY(l)) * t;
             g.setColor(colorOf(ctx, src[l]));
+            // a back link closes a cycle and runs right to left across the others: draw it faint
+            // so the forward flow stays readable
+            g.setAlpha((int) (alpha * vis * linkAlpha * (lay.isBackLink(l) ? 0.35f : 1f)));
             g.fillShape(Shapes.ribbon(x0, lay.getLinkSourceY(l), lay.getLinkSourceY(l) + lw, xe, ye, ye + lw));
         }
         g.setAlpha((int) (alpha * vis));

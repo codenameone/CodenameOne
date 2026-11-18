@@ -34,7 +34,7 @@ import java.util.List;
 /// wrapped in a `com.codename1.charts.ChartComponent` before being added
 /// to a Codename One form.
 ///
-/// @deprecated Use the `com.codename1.ui.chart` package instead.
+/// @deprecated Use `com.codename1.ui.chart.series.LineSeries` in a `Chart`; the `com.codename1.ui.chart` package replaces this one.
 @Deprecated
 public class LineChart extends XYChart {
     /// The constant to identify this chart type.

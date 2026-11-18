@@ -238,6 +238,14 @@ public class CandlestickSeries extends XYSeries {
     // one buffer refilled per call: paint and hit testing read a row and are done with it
     private final double[] rowBuf = new double[4];
 
+    /// Drops the cached Heikin-Ashi values: they depend on every candle, so any change to the data
+    /// (an add, a slide, a `set`, an `updateLast`) makes them stale, not only a change of length.
+    @Override
+    protected void dataChanged() {
+        ha = null;
+        super.dataChanged();
+    }
+
     private double[] row(int i) {
         double[] r = rowBuf;
         if (style == HEIKIN_ASHI) {

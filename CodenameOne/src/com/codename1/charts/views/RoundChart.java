@@ -30,7 +30,7 @@ import com.codename1.ui.Component;
 /// layout. Developers typically work with concrete subclasses such as
 /// `PieChart` or `DoughnutChart` directly.
 ///
-/// @deprecated Use the `com.codename1.ui.chart` package instead.
+/// @deprecated Use `PieSeries` or `GaugeSeries` in the `com.codename1.ui.chart` package; the `com.codename1.ui.chart` package replaces this one.
 @Deprecated
 public abstract class RoundChart extends AbstractChart {
     /// The legend shape width.

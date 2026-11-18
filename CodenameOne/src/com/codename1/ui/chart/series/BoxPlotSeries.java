@@ -41,6 +41,9 @@ public class BoxPlotSeries extends XYSeries {
     private static final int Q3 = 2;
     private static final int MAX = 3;
     private float boxFraction = 0.5f;
+    // outliers of boxes built from samples, as {x, outlier...} rows; keyed by x so a slide cannot
+    // pair a box with another box's outliers
+    private final java.util.ArrayList<double[]> outliers = new java.util.ArrayList<double[]>();
 
     /// Creates an empty series.
     ///
@@ -71,11 +74,14 @@ public class BoxPlotSeries extends XYSeries {
     ///
     /// this series
     public BoxPlotSeries addBox(double x, double min, double q1, double median, double q3, double max) {
+        removeOutliers(x);
         addRow(x, median, new double[]{min, q1, q3, max});
         return this;
     }
 
-    /// Appends a box computed from raw samples, with whiskers at the extremes.
+    /// Appends a box computed from raw samples. The whiskers reach the furthest samples within
+    /// 1.5 times the interquartile range of the box (Tukey's rule) and every sample beyond them is
+    /// an outlier, drawn as a dot and returned by `getOutliers(int)`.
     ///
     /// #### Parameters
     ///
@@ -105,7 +111,104 @@ public class BoxPlotSeries extends XYSeries {
         if (s.length == 0) {
             return this;
         }
-        return addBox(x, s[0], quantile(s, 0.25), quantile(s, 0.5), quantile(s, 0.75), s[s.length - 1]);
+        double q1 = quantile(s, 0.25);
+        double q3 = quantile(s, 0.75);
+        double fence = 1.5 * (q3 - q1);
+        double lo = q1 - fence;
+        double hi = q3 + fence;
+        double wMin = q1;
+        double wMax = q3;
+        int out = 0;
+        for (double v : s) {
+            if (v < lo || v > hi) {
+                out++;
+            } else {
+                wMin = Math.min(wMin, v);
+                wMax = Math.max(wMax, v);
+            }
+        }
+        removeOutliers(x);
+        if (out > 0) {
+            double[] row = new double[out + 1];
+            row[0] = x;
+            int k = 1;
+            for (double v : s) {
+                if (v < lo || v > hi) {
+                    row[k++] = v;
+                }
+            }
+            outliers.add(row);
+        }
+        addRow(x, quantile(s, 0.5), new double[]{wMin, q1, q3, wMax});
+        return this;
+    }
+
+    /// The outliers of box `i`: the samples `addSamples` placed beyond the whiskers. A box given
+    /// by `addBox` has none.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the box index
+    ///
+    /// #### Returns
+    ///
+    /// a new array, empty when there are none
+    public double[] getOutliers(int i) {
+        double x = getX(i);
+        for (int k = 0; k < outliers.size(); k++) {
+            double[] row = outliers.get(k);
+            if (row[0] == x) {
+                double[] o = new double[row.length - 1];
+                System.arraycopy(row, 1, o, 0, o.length);
+                return o;
+            }
+        }
+        return new double[0];
+    }
+
+    /// The lower whisker of box `i`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the box index
+    ///
+    /// #### Returns
+    ///
+    /// the lower whisker's value
+    public double getMin(int i) {
+        return getAux(MIN, i);
+    }
+
+    /// The upper whisker of box `i`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the box index
+    ///
+    /// #### Returns
+    ///
+    /// the upper whisker's value
+    public double getMax(int i) {
+        return getAux(MAX, i);
+    }
+
+    private void removeOutliers(double x) {
+        for (int k = outliers.size() - 1; k >= 0; k--) {
+            if (outliers.get(k)[0] == x) {
+                outliers.remove(k);
+            }
+        }
+    }
+
+    /// Forgets the outliers of boxes that are no longer in the series, such as one a slide dropped.
+    @Override
+    protected void dataChanged() {
+        for (int k = outliers.size() - 1; k >= 0; k--) {
+            if (indexOfX(outliers.get(k)[0]) < 0) {
+                outliers.remove(k);
+            }
+        }
+        super.dataChanged();
     }
 
     /// Linear interpolated quantile of sorted data.
@@ -157,6 +260,10 @@ public class BoxPlotSeries extends XYSeries {
         for (int i = 0; i < size(); i++) {
             min = Math.min(min, getAux(MIN, i));
             max = Math.max(max, getAux(MAX, i));
+            for (double o : getOutliers(i)) {
+                min = Math.min(min, o);
+                max = Math.max(max, o);
+            }
         }
         return min > max ? null : new double[]{min, max};
     }
@@ -204,6 +311,15 @@ public class BoxPlotSeries extends XYSeries {
             line(g, rot, c - half / 2, pMin, c + half / 2, pMin);
             line(g, rot, c - half / 2, pMax, c + half / 2, pMax);
             rect(g, rot, c - half, pMed - 1, half * 2, Math.max(2, ctx.mm(0.4f)));
+            if (t >= 1) {
+                int d = Math.max(3, Math.round(ctx.mm(1)));
+                for (double o : getOutliers(i)) {
+                    float po = pos(ctx, i, o, rot);
+                    int cx = Math.round(rot ? po : c);
+                    int cy = Math.round(rot ? c : po);
+                    g.drawArc(cx - d / 2, cy - d / 2, d, d, 0, 360);
+                }
+            }
         }
         g.setAlpha(alpha);
     }

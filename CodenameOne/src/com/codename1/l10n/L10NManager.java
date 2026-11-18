@@ -187,9 +187,19 @@ public class L10NManager {
         return false;
     }
 
+    private static String trimPunctuation(String s) {
+        int end = s.length();
+        while (end > 0 && ",.;".indexOf(s.charAt(end - 1)) >= 0) {
+            end--;
+        }
+        return s.substring(0, end);
+    }
+
     private String extractMonthName(String dateStr) throws ParseException {
         String[] parts = Util.split(dateStr, " ");
-        for (String part : parts) {
+        for (String raw : parts) {
+            // long styles punctuate their words ("lundi," "Montag,"): compare the bare word
+            String part = trimPunctuation(raw);
             if (part.length() == 0) {
                 continue;
             }

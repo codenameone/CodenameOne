@@ -289,6 +289,24 @@ public class Chart extends Component {
         return theme;
     }
 
+    @Override
+    protected void refreshTheme(String id, boolean merge) {
+        super.refreshTheme(id, merge);
+        // a theme switch (light to dark, or a new theme) re-derives the palette from the style
+        if (!themeSet) {
+            theme = null;
+            repaint();
+        }
+    }
+
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+        super.styleChanged(propertyName, source);
+        if (!themeSet && Style.FG_COLOR.equals(propertyName)) {
+            theme = null;
+        }
+    }
+
     /// Replaces the colour theme.
     public Chart setTheme(ChartTheme theme) {
         this.theme = theme;
@@ -559,6 +577,9 @@ public class Chart extends Component {
         }
         transitionStart = AnimationTime.now();
         transitionLength = animationDuration;
+        if (transitionLength > 0) {
+            startAnimating();
+        }
         repaint();
     }
 
@@ -590,10 +611,6 @@ public class Chart extends Component {
             // follow the style: the theme may have changed since the last time we showed
             theme = ChartTheme.fromStyle(getStyle()).applyUIIDs(getUIManager());
         }
-        Form f = getComponentForm();
-        if (f != null) {
-            f.registerAnimated(this);
-        }
         if (entryPending) {
             entryPending = false;
             for (Series s : series) {
@@ -604,14 +621,36 @@ public class Chart extends Component {
             transitionStart = AnimationTime.now();
             transitionLength = animationDuration > 0 ? (int) (animationDuration * 1.6f) : 0;
         }
+        if (transitionLength > 0 || viewportTo != null || flinging) {
+            startAnimating();
+        }
+    }
+
+    // the form the chart is registered with while something moves; an idle chart (a list of
+    // sparkline-sized charts) costs the animation loop nothing
+    private Form animationHost;
+
+    private void startAnimating() {
+        Form f = getComponentForm();
+        if (f != null && animationHost != f) { //NOPMD CompareObjectsWithEquals - identity of the form is intended
+            if (animationHost != null) {
+                animationHost.deregisterAnimated(this);
+            }
+            f.registerAnimated(this);
+            animationHost = f;
+        }
+    }
+
+    private void stopAnimating() {
+        if (animationHost != null) {
+            animationHost.deregisterAnimated(this);
+            animationHost = null;
+        }
     }
 
     @Override
     protected void deinitialize() {
-        Form f = getComponentForm();
-        if (f != null) {
-            f.deregisterAnimated(this);
-        }
+        stopAnimating();
         super.deinitialize();
     }
 
@@ -631,6 +670,9 @@ public class Chart extends Component {
         if (flinging) {
             stepFling();
             changed = true;
+        }
+        if (transitionLength <= 0 && viewportTo == null && !flinging) {
+            stopAnimating();
         }
         return changed;
     }
@@ -691,8 +733,9 @@ public class Chart extends Component {
         for (Annotation a : annotations) {
             double v = a.getValueExtent();
             if (v == v && a.isOnValueAxis()) {
-                ymin[0] = Math.min(ymin[0], v);
-                ymax[0] = Math.max(ymax[0], a.getValueExtentMax());
+                int k = a.isSecondaryAxis() && secondaryYAxis != null ? 1 : 0;
+                ymin[k] = Math.min(ymin[k], Math.min(v, a.getValueExtentMax()));
+                ymax[k] = Math.max(ymax[k], Math.max(v, a.getValueExtentMax()));
             }
         }
         if (xmin > xmax) {
@@ -1835,6 +1878,7 @@ public class Chart extends Component {
                     && (Math.abs(velocityX) > 0.3f || Math.abs(velocityY) > 0.3f)) {
                 flinging = true;
                 flingLast = AnimationTime.now();
+                startAnimating();
             }
             super.pointerReleased(x, y);
             return;
@@ -2028,6 +2072,7 @@ public class Chart extends Component {
         viewportFrom = snapshot(allAxes());
         viewportTo = target;
         viewportStart = AnimationTime.now();
+        startAnimating();
         repaint();
     }
 
