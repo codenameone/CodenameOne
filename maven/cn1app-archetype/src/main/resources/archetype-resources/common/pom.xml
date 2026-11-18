@@ -460,7 +460,7 @@
         </profile>
         <profile>
             <!--
-                For sending Windows device builds use:
+                For sending native Windows builds (no JVM, free) use:
                 mvn cn:build -P win
             -->
             <id>win</id>
@@ -471,7 +471,8 @@
         </profile>
         <profile>
             <!--
-                For sending Windows desktop builds use:
+                For sending Windows desktop builds use (bundled JVM, a Pro feature;
+                the free native build is the win profile):
                 mvn cn:build -P windows
             -->
             <id>windows</id>
@@ -482,7 +483,8 @@
         </profile>
         <profile>
             <!--
-                For sending Mac Desktop builds use:
+                For sending Mac Desktop builds use (bundled JVM, a Pro feature; the free
+                native build is -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native):
                 mvn cn:build -P mac
             -->
             <id>mac</id>

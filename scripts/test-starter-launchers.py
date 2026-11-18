@@ -139,6 +139,10 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     for target, argument in [('javascript', '-Dcodename1.buildTarget=local-javascript'),
                              ('javascript_cloud', '-Dcodename1.buildTarget=javascript'),
                              ('windows_device', '-Dcodename1.buildTarget=windows-device'),
+                             # The same build under the name the IDE launchers show; on Windows
+                             # it is a label of its own, so the goto has to find it.
+                             ('windows_native', '-Dcodename1.buildTarget=windows-device'),
+                             ('mac_native', '-Dcodename1.buildTarget=mac-os-x-native'),
                              ('linux_device', '-Dcodename1.buildTarget=linux-device'),
                              ('ios_source', '-Dcodename1.buildTarget=ios-source')]:
         run('build', target, argument)

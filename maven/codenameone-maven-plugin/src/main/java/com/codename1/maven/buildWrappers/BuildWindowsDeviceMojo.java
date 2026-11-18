@@ -27,10 +27,13 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
 /**
- * Build wrapper for the native Windows (ParparVM -> clang-cl) target. Distinct
+ * Sends a native Windows build (a standalone exe, no JVM) to the build server. Free;
+ * {@code buildWindowsNative} is the same goal under a clearer name.
+ *
+ * <p>Build wrapper for the native Windows (ParparVM -> clang-cl) target. Distinct
  * from {@link BuildWindowsDesktopMojo}, which bundles the JVM/JavaSE app
  * ({@code windows-desktop}); this produces a native Win32 executable
- * ({@code windows-device}), the Windows analog of the iOS device build.
+ * ({@code windows-device}), the Windows analog of the iOS device build.</p>
  */
 @Mojo(name="buildWindowsDevice", requiresDependencyResolution = ResolutionScope.NONE,
         requiresDependencyCollection = ResolutionScope.NONE)
