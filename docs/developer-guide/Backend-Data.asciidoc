@@ -230,6 +230,107 @@ indistinguishable from a row that holds those. Declare the field as its boxed
 type -- `Integer` rather than `int` -- when the column can be empty.
 
 [[backend-schema-migrations]]
+=== Multi-tenancy
+
+A server that hosts many customers in one deployment has to keep each customer's rows away from the others. Adding `WHERE tenant_id = ?` by hand to every query works until one query forgets it. The backend does that filtering itself, in the managed session, so a forgotten clause can't leak data.
+
+The current tenant lives in `TenantContext`, one value per thread. `TenantFilter` sets it for each request and clears it afterwards:
+
+[source,java]
+----
+// Tenant from the first label of the host name: acme.example.com is "acme".
+new TenantFilter(TenantFilter.subdomain("example.com"), true);
+// Or from a header that a gateway in front of the server sets.
+new TenantFilter(TenantFilter.header("X-Tenant-ID"), true);
+----
+
+A header or a host name is whatever the client sent. A user signed in to one tenant who sends another tenant's name reads that tenant's data, and nothing in the ORM can tell. Only trust one that a gateway strips and sets after authenticating the caller. Otherwise, derive the tenant from the authenticated principal, with the filter installed after authentication:
+
+[source,java]
+----
+// accounts.tenantOf is your own lookup, from a user table or a token claim.
+new TenantFilter(TenantFilter.authenticated(auth -> accounts.tenantOf(auth.getName())), true);
+----
+
+Any other rule is a `TenantResolver`. A tenant identifier is 1 to 64 characters of letters, digits, `_`, `.` and `-`; anything else is refused with a 400.
+
+==== A shared table
+
+Mark a `String` field with `@TenantId`:
+
+[source,java]
+----
+@Entity
+public class Invoice {
+    @Id @GeneratedValue long id;
+    @TenantId String tenant;
+    String customer;
+}
+----
+
+From then on the session:
+
+* stamps the current tenant into the field on every insert, and refuses an entity that already names a different tenant (`TenantMismatchException`);
+* refuses to change the field afterwards, through a managed entity, a merge or a JPQL bulk update, so a row can't be moved into another tenant;
+* limits finds, criteria queries, JPQL queries, counts, bulk updates and deletes, and the update or delete of a single entity to the current tenant, so another tenant's row reads as missing;
+* throws `MissingTenantException` when there's no current tenant, instead of answering every tenant's rows.
+
+In an inheritance hierarchy the field belongs on the root entity. Add an index that leads with the tenant column, because every statement filters on it.
+
+A session also binds to the first tenant it serves. Its identity map answers repeated finds from memory, so switching to another tenant (or to unscoped work) on the same session throws `TenantMismatchException` until you call `clear()`. One session per request, as the server opens them, never notices.
+
+Entities with a `@TenantId` field need a managed session; the plain dao refuses them, because it would bypass the filter.
+
+==== Native SQL
+
+Native SQL is never rewritten. Instead of letting one quietly read every tenant's rows, a session that maps any `@TenantId` entity refuses to create or run a native query (`TenantNativeSqlException`). The check runs again when the query executes, so a query created inside the opt-in can't be run outside it. Add the tenant condition yourself and opt in for that call:
+
+[source,java]
+----
+Long open = (Long) TenantContext.allowNativeSql(() -> session
+        .createNativeQuery("SELECT COUNT(*) FROM invoice WHERE tenant_id = :t", Long.class)
+        .setParameter("t", TenantContext.get())
+        .first());
+----
+
+Statements run straight through a `DataSource` don't pass through the session and aren't checked.
+
+Migrations, reports across tenants and provisioning jobs run inside `TenantContext.runUnscoped(...)`, which turns filtering off for that call only. Nothing turns it off for longer.
+
+On the client there's no current tenant, and `@TenantId` is an ordinary column.
+
+==== A database or schema per tenant
+
+`TenantDataSources` keeps one pool per tenant. It opens each pool on first use and closes the least recently used one past a cap. `${tenant}` in the URL gives each tenant a database; `${tenant}` in the connection-init statement pins each tenant's pool to a schema:
+
+[source,properties]
+----
+# A database per tenant
+cn1.tenancy.datasource.url=postgres://app:secret@db/app_${tenant}
+# Or a schema per tenant, on the main database
+cn1.tenancy.datasource.init=SET search_path TO tenant_${tenant}
+cn1.tenancy.datasource.pool.size=4
+cn1.tenancy.datasource.maxPools=32
+----
+
+[source,java]
+----
+TenantDataSources tenants = TenantDataSources.fromConfig(config);
+tenants.migrateAll(Arrays.asList("acme", "globex"), config);
+EntityManager entities = EntityManager.open(tenants.current());
+----
+
+`current()` throws `MissingTenantException` when no tenant is set. A template that names `${tenant}` in neither the URL nor the init statement is refused, since it would give every tenant the same database. So is a bare `${tenant}`: it must follow a letter, digit or underscore (`app_${tenant}`), or a tenant called `public` or `postgres` would open a pool on a shared schema. The init statement runs again on every borrow, so native SQL that changed a connection's schema can't carry over to the next request. You can also register a pool for a tenant with `register`; the cap never closes a registered pool.
+
+==== Background work
+
+A task submitted to an executor runs on another thread, which has no tenant. `TenantContext.decorator()` carries the submitting thread's tenant into the task:
+
+[source,java]
+----
+Tasks.executor("mail").setTaskDecorator(TenantContext.decorator());
+----
+
 === Schema migrations
 
 A schema changes for as long as the application does, and every database the

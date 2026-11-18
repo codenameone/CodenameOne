@@ -507,6 +507,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             pf.fieldName = fieldPath.path;pf.declaringType=fieldPath.declaringType;
             pf.embeddedParent = fieldPath.prefix;
             pf.version = f.getAnnotation("Lcom/codename1/annotations/db/Version;") != null;
+            pf.tenant = f.getAnnotation("Lcom/codename1/annotations/db/TenantId;") != null;
             pf.sortKey = f.getAnnotation("Lcom/codename1/backend/annotations/SortKey;") != null;
             pf.searchField = f.getAnnotation("Lcom/codename1/backend/annotations/SearchField;") != null;
             pf.kind = PropertyTypeKind.of(f);
@@ -651,6 +652,23 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 ctx.error(cls,"Boolean mappings use numeric storage; native BOOL/BOOLEAN declarations are not supported: "+pf.fieldName);
             }
             pf.boxed = isBoxed(pf.kind);
+            if (pf.tenant) {
+                // The tenant is a String identifier: the session writes it into
+                // SQL as a validated literal and compares it with equals.
+                if (!"java.lang.String".equals(pf.javaType)) {
+                    ctx.error(cls, "@TenantId requires a String field: " + pf.fieldName);
+                }
+                if (f.getAnnotation(ID_DESC) != null || pf.version) {
+                    ctx.error(cls, "@TenantId cannot also be @Id or @Version: " + pf.fieldName);
+                }
+                if (pf.embeddedParent.length() > 0) {
+                    ctx.error(cls, "@TenantId cannot be declared inside an embeddable: " + pf.fieldName);
+                }
+                for (PersistedField previous : ec.fields) {
+                    if (previous.tenant) ctx.error(cls, "An entity can have only one @TenantId field");
+                }
+                pf.nullable = false;
+            }
             if (pf.version) {
                 if (pf.kind.kind != PropertyTypeKind.Kind.INT && pf.kind.kind != PropertyTypeKind.Kind.LONG) {
                     ctx.error(cls, "@Version requires an int or long field: " + pf.fieldName);
@@ -1625,17 +1643,17 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 member.discriminatorValue=tag==null?member.simpleName:tag.getStringOrDefault("value",member.simpleName);
                 if(!member.discriminatorValue.matches("[A-Za-z0-9_$]{1,63}") || !values.add(member.discriminatorValue)) ctx.error("Invalid or duplicate discriminator: "+member.discriminatorValue);
                 for(PersistedField field:member.fields) {
-                    if(member!=root && (field.isId || field.version)) {
+                    if(member!=root && (field.isId || field.version || field.tenant)) {
                         boolean inherited=false;
                         for(PersistedField rootField:root.fields) {
                             if(rootField.fieldName.equals(field.fieldName) && rootField.declaringType.equals(field.declaringType)
-                                    && rootField.isId==field.isId && rootField.version==field.version) inherited=true;
+                                    && rootField.isId==field.isId && rootField.version==field.version && rootField.tenant==field.tenant) inherited=true;
                         }
-                        if(!inherited) ctx.error("Identifier and version fields must be declared on or inherited by the hierarchy root: "+field.declaringType+"."+field.fieldName);
+                        if(!inherited) ctx.error("Identifier, version and tenant fields must be declared on or inherited by the hierarchy root: "+field.declaringType+"."+field.fieldName);
                     }
                     PersistedField prior=fields.get(field.fieldName);
                     if(prior==null) {
-                        if(member!=root && !field.isId && !field.version) field.nullable=true;
+                        if(member!=root && !field.isId && !field.version && !field.tenant) field.nullable=true;
                         fields.put(field.fieldName,field);
                     } else if(!prior.declaringType.equals(field.declaringType)) ctx.error("Hidden inherited persistent field: "+member.binaryName+"."+field.fieldName);
                 }
@@ -1985,6 +2003,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         for(int i=0;i<ec.fields.size();i++) {
             if(ec.fields.get(i).sortKey) sb.append("public int sortKeyIndex() { return ").append(i).append("; }\n");
+            if(ec.fields.get(i).tenant) sb.append("public int tenantIndex() { return ").append(i).append("; }\n");
         }
         if(ec.generation!=0) sb.append("public int generation() { return ").append(ec.generation)
           .append("; }\npublic String generator() { return ").append('"').append(escape(ec.generator)).append("\"; }\n");
@@ -3698,6 +3717,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         boolean isId;
         boolean autoIncrement;
         boolean version;
+        boolean tenant;
         /// @SortKey: the sort key of a two-column identifier in a document store.
         boolean sortKey;
         /// @SearchField: indexed in the search document.

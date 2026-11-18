@@ -165,6 +165,10 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
         if (mutation) {
             throw new IllegalStateException("Use executeUpdate for bulk mutations");
         }
+        // Again at execution: a query created inside allowNativeSql or
+        // runUnscoped and run after it would otherwise escape the check.
+        session.check();
+        session.checkNativeSql();
         Object[] args = arguments();
         session.autoFlush();
         List<T> result = new ArrayList<T>();
@@ -198,6 +202,8 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
         if (!mutation) {
             throw new IllegalStateException("Not a bulk mutation");
         }
+        session.check();
+        session.checkNativeSql();
         if (maximum >= 0 || skip > 0) {
             throw new IllegalArgumentException("Bulk mutation pagination is not supported");
         }

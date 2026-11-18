@@ -39,6 +39,11 @@ public abstract class EntityModel<T> {
     public int discriminatorIndex() {
         return -1;
     }
+    /// The index of the [com.codename1.annotations.db.TenantId] attribute, or
+    /// -1 when the entity is not partitioned by tenant.
+    public int tenantIndex() {
+        return -1;
+    }
     public String discriminatorValue() {
         return "";
     }
@@ -76,7 +81,7 @@ public abstract class EntityModel<T> {
     }
     public boolean requiresSession() {
         return relationships().length > 0 || versionIndex() >= 0 || generation() != 0 || idIndexes().length > 1 ||
-                indexes().length > 0 || discriminatorIndex() >= 0;
+                indexes().length > 0 || discriminatorIndex() >= 0 || tenantIndex() >= 0;
     }
     /// 0: assigned/identity, 1: UUID, 2: native sequence with table fallback, 3: table.
     public Index[] indexes() {

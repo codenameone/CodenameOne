@@ -454,6 +454,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (attribute.id || root.model.discriminatorIndex() == index) {
                         throw error("Bulk updates cannot change entity identifiers");
                     }
+                    if (index == root.model.tenantIndex()) {
+                        // The tenant filter limits which rows a bulk update hits,
+                        // not what they are set to; assigning the column would move
+                        // the current tenant's rows into another one.
+                        throw error("Bulk updates cannot change the tenant column");
+                    }
                     expect("=");
                     Expr value = rowExpression();
                     Expr target = new Expr(session.q(attribute.column), attribute.kind);

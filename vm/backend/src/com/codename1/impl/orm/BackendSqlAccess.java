@@ -36,7 +36,7 @@ import java.util.Map;
 /// Connection borrowing and transaction pinning for a single managed session.
 /// Internal connection adapter; not an application API.
 /// @hidden
-public final class BackendSqlAccess implements SqlAccess {
+public final class BackendSqlAccess implements SqlAccess, TenantSource {
     private final DataSource pool;
     private final Database supplied;
     private final Dialect dialect;
@@ -50,6 +50,23 @@ public final class BackendSqlAccess implements SqlAccess {
         this.pool = pool;
         this.supplied = supplied;
         this.dialect = dialect;
+    }
+
+    /// The tenant of the work on this thread; see
+    /// [com.codename1.backend.tenancy.TenantContext].
+    @Override
+    public String currentTenant() {
+        return com.codename1.backend.tenancy.TenantContext.get();
+    }
+
+    @Override
+    public boolean isUnscoped() {
+        return com.codename1.backend.tenancy.TenantContext.isUnscoped();
+    }
+
+    @Override
+    public boolean isNativeSqlAllowed() {
+        return com.codename1.backend.tenancy.TenantContext.isNativeSqlAllowed();
     }
 
     @Override

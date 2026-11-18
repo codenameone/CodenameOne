@@ -203,6 +203,57 @@ public class OrmAnnotationProcessorTest {
         }
     }
 
+    /// A generated @TenantId model on the backend: the session stamps the
+    /// current tenant, filters every read by it, and a dao is refused because
+    /// it would bypass the filter.
+    @Test
+    public void tenantIdEntitiesArePartitionedOnTheBackend() throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("tenanted.Invoice","package tenanted; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Invoice { @Id public long id; @TenantId public String tenant; public String customer; }");
+        sources.put("tenanted.Check","package tenanted; import com.codename1.orm.session.*; import com.codename1.backend.tenancy.TenantContext; public class Check { public static void run(Session s) throws Exception { "
+            + "s.createTables(); "
+            + "TenantContext.set(\"acme\"); s.beginTransaction(); Invoice a=new Invoice(); a.customer=\"x\"; s.persist(a); s.commitTransaction(); s.clear(); "
+            + "if(!\"acme\".equals(a.tenant)) throw new AssertionError(\"stamped \"+a.tenant); "
+            + "TenantContext.set(\"globex\"); "
+            + "if(s.find(Invoice.class,a.id)!=null) throw new AssertionError(\"foreign row by id\"); "
+            + "if(!s.query(Invoice.class).list().isEmpty()) throw new AssertionError(\"foreign rows by query\"); "
+            + "TenantContext.clear(); } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backendClasspath());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass("cn1app.BackendDaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:"));
+        com.codename1.orm.session.Session session=server.openSession();
+        try {
+            Class<?> invoice=loader.loadClass("tenanted.Invoice");
+            try { server.dao(invoice); fail("a dao bypasses the tenant filter"); } catch(IllegalStateException expected) { }
+            loader.loadClass("tenanted.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session);
+        } finally {
+            session.close();server.close();
+            // The registry is process wide; a tenant model left in it makes every
+            // later test's session refuse native SQL, as it would in an application.
+            com.codename1.impl.orm.Models.unregister(loader.loadClass("tenanted.Invoice"));
+            loader.close();
+        }
+    }
+
+    /// @TenantId must be a single String field, not a key, on the hierarchy root.
+    @Test
+    public void tenantIdMisuseFailsTheBuild() throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        String imports="import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        sources.put("badtenant.Numbered","package badtenant; "+imports+"@Entity public class Numbered { @Id public long id; @TenantId public long tenant; }");
+        sources.put("badtenant.Twice","package badtenant; "+imports+"@Entity public class Twice { @Id public long id; @TenantId public String a; @TenantId public String b; }");
+        sources.put("badtenant.Keyed","package badtenant; "+imports+"@Entity public class Keyed { @Id(autoIncrement=false) @TenantId public String tenant; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        String errors=runProcessor(classes,Collections.<String>emptyList()).getErrors().toString();
+        assertTrue(errors,errors.contains("@TenantId requires a String field: tenant"));
+        assertTrue(errors,errors.contains("An entity can have only one @TenantId field"));
+        assertTrue(errors,errors.contains("@TenantId cannot also be @Id or @Version: tenant"));
+    }
+
     /// A collation is spliced into DDL, so the processor refuses anything but a name.
     @Test
     public void collationMustBeAName() throws Exception {
