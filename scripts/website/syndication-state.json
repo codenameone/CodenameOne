@@ -3419,6 +3419,18 @@
         "url": "https://dev.to/codenameone/packaging-java-apps-for-xbox-developer-mode-and-why-consoles-need-help-4ob",
         "syndicated_at": "2026-11-17T14:15:41+00:00"
       }
+    },
+    "cn1libs-with-a-server-side": {
+      "hashnode": {
+        "url": "https://debugagent.com/port-your-spring-code-with-fewer-edits-and-libraries-that-bring-their-own-server",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6afcf89cb5a3d19801d5b9f2",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-18T01:01:07+00:00"
+      }
     }
   }
 }
