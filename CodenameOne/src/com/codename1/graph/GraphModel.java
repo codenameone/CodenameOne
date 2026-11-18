@@ -30,6 +30,10 @@ import java.util.List;
 /// so a model that refuses an edit (by returning false or null) keeps the
 /// graph as it was. `AbstractGraphModel` refuses all of them; extend
 /// `DefaultGraphModel` for an editable graph in memory.
+///
+/// Write a model of your own by extending `AbstractGraphModel`, not by
+/// implementing this interface: an edit a later component learns to make
+/// arrives there as one more method that refuses.
 public interface GraphModel {
     /// Every node, in painting order: later nodes are drawn over earlier ones.
     List<GraphNode> getNodes();
@@ -100,7 +104,14 @@ public interface GraphModel {
     /// #### Returns
     ///
     /// false when the model refuses, or already has a node with this id
-    boolean insertNode(GraphNode node);
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the node
+    /// - `index`: where in `getNodes` it goes, which is its painting order;
+    ///   negative, or past the end, for the end. Undoing a removal puts a
+    ///   node back where it was.
+    boolean insertNode(GraphNode node, int index);
 
     /// Adds an edge as it is, without the checks `connect` makes: pasting and
     /// undo put back edges that were valid when they were made.
@@ -109,7 +120,13 @@ public interface GraphModel {
     ///
     /// false when the model refuses, has an edge with this id, or lacks one of
     /// the nodes the edge names
-    boolean insertEdge(GraphEdge edge);
+    ///
+    /// #### Parameters
+    ///
+    /// - `edge`: the edge
+    /// - `index`: where in `getEdges` it goes; negative, or past the end, for
+    ///   the end
+    boolean insertEdge(GraphEdge edge, int index);
 
     /// Gives a node a new size, in world units.
     ///

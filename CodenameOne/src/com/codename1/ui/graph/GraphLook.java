@@ -183,12 +183,26 @@ final class GraphLook {
         return Math.max(1, Math.round(mm(mm) * Math.min(zoom, 1.5f)));
     }
 
-    /// Mixes two RGB colours: 0 is all `a`, 255 all `b`.
-    /// A stroke for the outline of a shape.
+    // the last two strokes asked for, newest first: a frame asks for the
+    // same two widths for every node it paints. Painting is the EDT's alone.
+    private static final Stroke[] STROKES = new Stroke[2];
+
+    /// A stroke for the outline of a shape. It is shared: do not change it.
     static Stroke stroke(float width) {
-        return new Stroke(width, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 4f);
+        Stroke s = STROKES[0];
+        if (s != null && s.getLineWidth() == width) {
+            return s;
+        }
+        s = STROKES[1];
+        if (s == null || s.getLineWidth() != width) {
+            s = new Stroke(width, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 4f);
+        }
+        STROKES[1] = STROKES[0];
+        STROKES[0] = s;
+        return s;
     }
 
+    /// Mixes two RGB colours: 0 is all `a`, 255 all `b`.
     static int mix(int a, int b, int amount) {
         int inv = 255 - amount;
         int r = (((a >> 16) & 0xff) * inv + ((b >> 16) & 0xff) * amount) / 255;

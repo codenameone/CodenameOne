@@ -5775,6 +5775,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         // are taking action when the key is released... so we need to track whether the
         // control key was down while a key was pressed.
         private HashSet<Integer> ignorePressedKeys = new HashSet<Integer>();
+        private boolean isShortcutKeysFocused() {
+            com.codename1.ui.TopLevelContainer f = canvasTopLevel();
+            com.codename1.ui.Component c = f == null ? null : f.getFocused();
+            return c != null && c.getClientProperty("cn1$shortcutKeys") != null;
+        }
+
         private boolean isPureEditorFocused() {
             com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             return f != null && (f.getFocused() instanceof com.codename1.ui.editor.EditorView);
@@ -5864,6 +5870,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             // wants the modifier combos (word / line navigation, clipboard shortcuts)
             if (!editorFocused && (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
                 ignorePressedKeys.add(e.getKeyCode());
+                // A component that asked for shortcut keys (the "cn1$shortcutKeys" client
+                // property: NodeGraph, KanbanBoard) gets the plain letter of a Ctrl or Cmd
+                // combination as a press, and reads the modifier from Display. The key
+                // character is not used: with Ctrl held it is a control character. The
+                // release stays blocked, as it is for every other combination.
+                int vk = e.getKeyCode();
+                if ((e.isControlDown() || e.isMetaDown()) && !e.isAltDown() && !e.isAltGraphDown()
+                        && vk >= KeyEvent.VK_A && vk <= KeyEvent.VK_Z && isShortcutKeysFocused()) {
+                    int letter = 'a' + (vk - KeyEvent.VK_A);
+                    if (testRecorder != null) {
+                        testRecorder.eventKeyPressed(letter);
+                    }
+                    JavaSEPort.this.windowKeyPressed(windowId, letter);
+                }
                 return;
             }
             // This press was not blocked, so any record left over from an earlier blocked press of

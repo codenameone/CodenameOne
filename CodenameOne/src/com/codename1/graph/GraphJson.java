@@ -27,6 +27,7 @@ import com.codename1.io.JSONParser;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -257,29 +258,43 @@ public final class GraphJson {
     ///
     /// #### Throws
     ///
-    /// - `IOException`: when the text is not a graph document, or a node or an
-    ///   edge in it has no id
+    /// - `IOException`: when the text is not well-formed JSON or not a graph
+    ///   document, or `readMap` refuses it; the model is then as it was
     public static void read(String json, DefaultGraphModel into, UserDataCodec codec) throws IOException {
-        Map<String, Object> root = json == null ? null : JSONParser.parseJSON(json);
-        // the parser answers an array, and text that is no JSON at all, with a
-        // map of its own making
-        if (root == null || !root.containsKey("nodes") && !root.containsKey("edges") && !root.containsKey("groups")) {
+        // the strict parser: what it answers does not depend on how the
+        // application configured the lenient one
+        Object parsed = JSONParser.parseStrict(json);
+        if (!(parsed instanceof Map)) {
+            throw new IOException("Not a graph document");
+        }
+        Map<String, Object> root = map(parsed);
+        if (!root.containsKey("nodes") && !root.containsKey("edges") && !root.containsKey("groups")) {
             throw new IOException("Not a graph document");
         }
         readMap(root, into, codec);
     }
 
-    /// Reads the tree `toMap` built, as a JSON parser returns it.
+    /// Reads the tree `toMap` built, as a JSON parser returns it. Nothing is
+    /// added to the model unless the whole tree can be.
     ///
     /// #### Throws
     ///
-    /// - `IOException`: when a node or an edge has no id
+    /// - `IOException`: when a node, an edge or a group has no id or one that
+    ///   is taken, or an edge names a node that is neither in the tree nor in
+    ///   the model
     public static void readMap(Map<String, Object> root, DefaultGraphModel into, UserDataCodec codec)
             throws IOException {
+        List<GraphGroup> newGroups = new ArrayList<GraphGroup>();
+        List<GraphNode> newNodes = new ArrayList<GraphNode>();
+        List<GraphEdge> newEdges = new ArrayList<GraphEdge>();
+        Map<String, Object> seen = new HashMap<String, Object>();
         List<Object> groups = list(root.get("groups"));
         for (Object raw : groups) {
             Map<String, Object> m = map(raw);
             GraphGroup g = new GraphGroup(required(m, "id"), string(m, "label"));
+            if (into.getGroup(g.getId()) != null || seen.put("g" + g.getId(), g) != null) {
+                throw new IOException("Graph document: duplicate group " + g.getId());
+            }
             g.setStyleKey(string(m, "style"));
             g.setCollapsed(bool(m.get("collapsed"), false));
             if (bool(m.get("lane"), false)) {
@@ -287,13 +302,16 @@ public final class GraphJson {
                 g.setHorizontal(bool(m.get("horizontal"), true));
                 g.setBounds(number(m, "x", 0), number(m, "y", 0), number(m, "w", 0), number(m, "h", 0));
             }
-            into.addGroup(g);
+            newGroups.add(g);
         }
         List<Object> nodes = list(root.get("nodes"));
         for (Object raw : nodes) {
             Map<String, Object> m = map(raw);
             GraphNode n = new GraphNode(required(m, "id"), string(m, "label"),
                     number(m, "x", 0), number(m, "y", 0), number(m, "w", 160), number(m, "h", 64));
+            if (into.getNode(n.getId()) != null || seen.put("n" + n.getId(), n) != null) {
+                throw new IOException("Graph document: duplicate node " + n.getId());
+            }
             n.setDescription(string(m, "description"));
             n.setShape(string(m, "shape"));
             n.setGroupId(string(m, "group"));
@@ -304,13 +322,20 @@ public final class GraphJson {
             if (codec != null && m.get("data") != null) {
                 n.setUserData(codec.decode(m.get("data")));
             }
-            into.addNode(n);
+            newNodes.add(n);
         }
         List<Object> edges = list(root.get("edges"));
         for (Object raw : edges) {
             Map<String, Object> m = map(raw);
             GraphEdge e = new GraphEdge(required(m, "id"), required(m, "from"), string(m, "fromPort"),
                     required(m, "to"), string(m, "toPort"));
+            if (into.getEdge(e.getId()) != null || seen.put("e" + e.getId(), e) != null) {
+                throw new IOException("Graph document: duplicate edge " + e.getId());
+            }
+            if (!seen.containsKey("n" + e.getSourceId()) && into.getNode(e.getSourceId()) == null
+                    || !seen.containsKey("n" + e.getTargetId()) && into.getNode(e.getTargetId()) == null) {
+                throw new IOException("Graph document: edge " + e.getId() + " names a node that is not there");
+            }
             e.setLabel(string(m, "label"));
             e.setStyleKey(string(m, "style"));
             e.setDirected(bool(m.get("directed"), true));
@@ -320,15 +345,24 @@ public final class GraphJson {
             List<Object> route = list(m.get("route"));
             if (!route.isEmpty()) {
                 double[] r = new double[route.size()];
-                for (int j = 0; j < r.length; j++) {
-                    Object v = route.get(j);
-                    r[j] = v instanceof Number ? ((Number) v).doubleValue() : 0;
+                for (int k = 0; k < r.length; k++) {
+                    Object v = route.get(k);
+                    r[k] = v instanceof Number ? ((Number) v).doubleValue() : 0;
                 }
                 e.setRoute(r);
             }
             if (codec != null && m.get("data") != null) {
                 e.setUserData(codec.decode(m.get("data")));
             }
+            newEdges.add(e);
+        }
+        for (GraphGroup g : newGroups) {
+            into.addGroup(g);
+        }
+        for (GraphNode n : newNodes) {
+            into.addNode(n);
+        }
+        for (GraphEdge e : newEdges) {
             into.addEdge(e);
         }
     }

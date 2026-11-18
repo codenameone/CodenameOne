@@ -202,21 +202,33 @@ public class DefaultGraphModel extends AbstractGraphModel {
     }
 
     @Override
-    public boolean insertNode(GraphNode node) {
+    public boolean insertNode(GraphNode node, int index) {
         if (node == null || nodeIndex.containsKey(node.getId())) {
             return false;
         }
-        addNode(node);
+        nodeIndex.put(node.getId(), node);
+        if (index < 0 || index >= nodes.size()) {
+            nodes.add(node);
+        } else {
+            nodes.add(index, node);
+        }
+        fireChanged();
         return true;
     }
 
     @Override
-    public boolean insertEdge(GraphEdge edge) {
+    public boolean insertEdge(GraphEdge edge, int index) {
         if (edge == null || edgeIndex.containsKey(edge.getId())
                 || !nodeIndex.containsKey(edge.getSourceId()) || !nodeIndex.containsKey(edge.getTargetId())) {
             return false;
         }
-        addEdge(edge);
+        edgeIndex.put(edge.getId(), edge);
+        if (index < 0 || index >= edges.size()) {
+            edges.add(edge);
+        } else {
+            edges.add(index, edge);
+        }
+        fireChanged();
         return true;
     }
 

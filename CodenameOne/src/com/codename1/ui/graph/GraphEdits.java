@@ -29,6 +29,7 @@ import com.codename1.graph.GraphNode;
 import com.codename1.graph.GraphPort;
 import com.codename1.util.UndoableEdit;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /// The steps a `NodeGraph` records in an `UndoHistory`. Each replays through
@@ -73,13 +74,13 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
 
     /// Edges lost the routes an arrangement gave them when a node moved.
     static final class Routes implements UndoableEdit {
-        private final GraphModel model;
+        private final NodeGraph graph;
         private final List<GraphEdge> edges;
         private final List<double[]> before;
         private final List<double[]> after;
 
-        Routes(GraphModel model, List<GraphEdge> edges, List<double[]> before, List<double[]> after) {
-            this.model = model;
+        Routes(NodeGraph graph, List<GraphEdge> edges, List<double[]> before, List<double[]> after) {
+            this.graph = graph;
             this.edges = edges;
             this.before = before;
             this.after = after;
@@ -90,13 +91,8 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
             for (int i = 0; i < n; i++) {
                 edges.get(i).setRoute(routes == null ? null : routes.get(i));
             }
-            // a route is not an edit of the model; moving a node nowhere tells
-            // its listeners to repaint
-            List<GraphNode> nodes = model.getNodes();
-            if (!nodes.isEmpty()) {
-                GraphNode first = nodes.get(0);
-                model.moveNode(first, first.getX(), first.getY());
-            }
+            // a route is not an edit of the model, so no listener hears of it
+            graph.repaint();
         }
 
         @Override
@@ -157,23 +153,58 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
         private final List<GraphEdge> edges;
         private final boolean removal;
         private final String name;
+        // where each was in the model before a removal, or null: at the end
+        private final int[] nodeAt;
+        private final int[] edgeAt;
 
         Presence(GraphModel model, List<GraphNode> nodes, List<GraphEdge> edges, boolean removal, String name) {
+            this(model, nodes, edges, removal, name, null, null);
+        }
+
+        /// A removal, with the model's nodes and edges as they were before
+        /// it: undo puts each back where it was, so what was drawn under
+        /// another node is under it again.
+        Presence(GraphModel model, List<GraphNode> nodes, List<GraphEdge> edges, boolean removal, String name,
+                 List<GraphNode> nodesBefore, List<GraphEdge> edgesBefore) {
             this.model = model;
-            this.nodes = nodes;
-            this.edges = edges;
             this.removal = removal;
             this.name = name;
+            if (nodesBefore == null) {
+                this.nodes = nodes;
+                this.edges = edges;
+                nodeAt = null;
+                edgeAt = null;
+                return;
+            }
+            // in the order they had, so that each index is right when it is used
+            this.nodes = new ArrayList<GraphNode>();
+            this.edges = new ArrayList<GraphEdge>();
+            nodeAt = new int[nodes.size()];
+            edgeAt = new int[edges.size()];
+            int k = 0;
+            for (int i = 0; i < nodesBefore.size() && k < nodeAt.length; i++) {
+                if (nodes.contains(nodesBefore.get(i))) {
+                    this.nodes.add(nodesBefore.get(i));
+                    nodeAt[k++] = i;
+                }
+            }
+            k = 0;
+            for (int i = 0; i < edgesBefore.size() && k < edgeAt.length; i++) {
+                if (edges.contains(edgesBefore.get(i))) {
+                    this.edges.add(edgesBefore.get(i));
+                    edgeAt[k++] = i;
+                }
+            }
         }
 
         private void put() {
             int n = nodes.size();
             for (int i = 0; i < n; i++) {
-                model.insertNode(nodes.get(i));
+                model.insertNode(nodes.get(i), nodeAt == null ? -1 : nodeAt[i]);
             }
             n = edges.size();
             for (int i = 0; i < n; i++) {
-                model.insertEdge(edges.get(i));
+                model.insertEdge(edges.get(i), edgeAt == null ? -1 : edgeAt[i]);
             }
         }
 

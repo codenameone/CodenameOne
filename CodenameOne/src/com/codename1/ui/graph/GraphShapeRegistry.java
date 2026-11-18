@@ -37,7 +37,7 @@ import java.util.Map;
 /// components that read it, it belongs to the event dispatch thread.
 public final class GraphShapeRegistry {
     private static final float KAPPA = 0.5523f;
-    private static final int KEPT_PER_SHAPE = 12;
+    private static final int KEPT_PER_SHAPE = 48;
     private static final Map<String, GraphShape> SHAPES = new HashMap<String, GraphShape>();
     // per shape name, the outlines built so far at the origin, each with its size
     private static final Map<String, List<Sized>> PATHS = new HashMap<String, List<Sized>>();

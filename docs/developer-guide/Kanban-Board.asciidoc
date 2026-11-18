@@ -74,7 +74,10 @@ card was opened instead, which is where an application shows its own details
 form.
 
 With a keyboard, Delete removes the selected card, Enter opens it, and with
-Control or Command, C, X, V and D copy, cut, paste and duplicate it.
+Control or Command, C, X, V and D copy, cut, paste and duplicate it. A phone
+has no such keys, so the same commands are methods of the board, ready for a
+menu or a toolbar: `copySelection`, `cutSelection`, `paste`,
+`duplicateSelection`, `undo` and `redo`.
 `setEditingEnabled(false)` makes the board read-only. Columns and lanes still
 fold.
 
@@ -94,10 +97,9 @@ The edits the user makes are also methods of the board: `moveCard`, `addCard`,
 and the undo history the way a gesture does, so a menu or a toolbar button
 behaves like the drag it stands for.
 
-A model of your own implements `KanbanModel`, or extends `AbstractKanbanModel`
-for the listener plumbing. Its `moveCard`, `insertCard` and the other edit
-methods return false to refuse a change, which makes a read-only model the
-default. A model backed by a server applies the change and tells the server
+A model of your own extends `AbstractKanbanModel`, which keeps the listeners
+and refuses every edit, so a model is read-only until it overrides `moveCard`,
+`insertCard` and the other edit methods. Each returns false to refuse a change. A model backed by a server applies the change and tells the server
 there.
 
 === Undo and saving

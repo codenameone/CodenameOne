@@ -272,10 +272,22 @@ public class NodeGraph extends Container {
         return model;
     }
 
-    /// Shows another model, and clears the selection.
+    /// Shows another model, and clears the selection. An edit under way ends,
+    /// and the undo history is cleared: its steps belong to the model that
+    /// was shown.
     public void setModel(GraphModel model) {
         if (this.model != null) {
+            // what was under way belongs to the model that is leaving
+            endLabelEdit();
+            cancelGesture();
             this.model.removeChangeListener(modelListener);
+        }
+        animTo = null;
+        animFrom = null;
+        pendingTemplate = null;
+        // its steps would edit a model that is no longer shown
+        if (undoHistory != null) {
+            undoHistory.clear();
         }
         this.model = model == null ? new DefaultGraphModel() : model;
         this.model.addChangeListener(modelListener);
@@ -669,6 +681,8 @@ public class NodeGraph extends Container {
         }
         List<GraphNode> goneNodes = new ArrayList<GraphNode>();
         List<GraphEdge> goneEdges = new ArrayList<GraphEdge>();
+        List<GraphNode> nodesBefore = new ArrayList<GraphNode>(model.getNodes());
+        List<GraphEdge> edgesBefore = new ArrayList<GraphEdge>(model.getEdges());
         if (selectedEdge != null) {
             GraphEdge e = selectedEdge;
             if (allowRemove(null, e) && model.removeEdge(e)) {
@@ -689,11 +703,16 @@ public class NodeGraph extends Container {
             }
             if (model.removeNode(n)) {
                 goneNodes.add(n);
-                goneEdges.addAll(touching);
+                for (GraphEdge e : touching) {
+                    // an edge between two removed nodes, or the selected one, once
+                    if (!goneEdges.contains(e)) {
+                        goneEdges.add(e);
+                    }
+                }
             }
         }
         if (!goneNodes.isEmpty() || !goneEdges.isEmpty()) {
-            record(new GraphEdits.Presence(model, goneNodes, goneEdges, true, "Delete"));
+            record(new GraphEdits.Presence(model, goneNodes, goneEdges, true, "Delete", nodesBefore, edgesBefore));
         }
         selection.clear();
         selectedEdge = null;
@@ -1248,14 +1267,14 @@ public class NodeGraph extends Container {
             for (int l = 0; l < listeners.size() && ok; l++) {
                 ok = listeners.get(l).nodeCreating(this, n);
             }
-            if (ok && model.insertNode(n)) {
+            if (ok && model.insertNode(n, -1)) {
                 in.add(n);
                 ids.add(n.getId());
             }
         }
         List<GraphEdge> inEdges = new ArrayList<GraphEdge>();
         for (GraphEdge e : edges) {
-            if (ids.contains(e.getSourceId()) && ids.contains(e.getTargetId()) && model.insertEdge(e)) {
+            if (ids.contains(e.getSourceId()) && ids.contains(e.getTargetId()) && model.insertEdge(e, -1)) {
                 inEdges.add(e);
             }
         }
@@ -2817,10 +2836,7 @@ public class NodeGraph extends Container {
 
     private void finishMove() {
         beginStep("Move");
-        if (!unrouted.isEmpty()) {
-            record(new GraphEdits.Routes(model, new ArrayList<GraphEdge>(unrouted),
-                    new ArrayList<double[]>(unroutedRoutes), null));
-        }
+        boolean moved = false;
         GraphGroup lane = movingLane;
         movingLane = null;
         if (lane != null) {
@@ -2828,6 +2844,7 @@ public class NodeGraph extends Container {
             lane.setBounds(laneFrom[0], laneFrom[1], laneFrom[2], laneFrom[3]);
             if ((to[0] != laneFrom[0] || to[1] != laneFrom[1]) && model.resizeGroup(lane, to[0], to[1], to[2], to[3])) {
                 record(new GraphEdits.LaneBounds(model, lane, laneFrom, to));
+                moved = true;
             }
         }
         for (int i = 0; i < moving.size(); i++) {
@@ -2846,6 +2863,7 @@ public class NodeGraph extends Container {
             }
             if (ok && model.moveNode(n, nx, ny)) {
                 n.setPosition(nx, ny);
+                moved = true;
                 record(new GraphEdits.Move(model, n, ox, oy, nx, ny));
                 if (lane == null) {
                     joinLane(n);
@@ -2853,6 +2871,17 @@ public class NodeGraph extends Container {
                 for (int l = 0; l < listeners.size(); l++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator
                     listeners.get(l).nodeMoved(this, n);
                 }
+            }
+        }
+        if (moved) {
+            if (!unrouted.isEmpty()) {
+                record(new GraphEdits.Routes(this, new ArrayList<GraphEdge>(unrouted),
+                        new ArrayList<double[]>(unroutedRoutes), null));
+            }
+        } else {
+            // refused, or put back where it was: the routes still fit
+            for (int i = 0; i < unrouted.size(); i++) {
+                unrouted.get(i).setRoute(unroutedRoutes.get(i));
             }
         }
         unrouted.clear();
@@ -2882,11 +2911,13 @@ public class NodeGraph extends Container {
                 // dropped back where it was
                 return;
             }
+            List<GraphEdge> edgesBefore = new ArrayList<GraphEdge>(model.getEdges());
             if (!allowRemove(null, d) || !model.removeEdge(d)) {
                 return;
             }
             beginStep(n == null || !valid ? "Disconnect" : "Reconnect");
-            record(new GraphEdits.Presence(model, new ArrayList<GraphNode>(), single(d), true, "Disconnect"));
+            record(new GraphEdits.Presence(model, new ArrayList<GraphNode>(), single(d), true, "Disconnect",
+                    new ArrayList<GraphNode>(), edgesBefore));
         } else {
             beginStep("Connect");
         }
@@ -3191,6 +3222,9 @@ public class NodeGraph extends Container {
         Canvas() {
             setUIID("Container");
             setFocusable(true);
+            // asks a desktop port for the letter of a Control or Command
+            // combination, which it otherwise keeps from a component
+            putClientProperty("cn1$shortcutKeys", Boolean.TRUE);
             getAllStyles().setBgTransparency(0);
             setBounded(false);
         }

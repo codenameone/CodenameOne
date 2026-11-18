@@ -53,17 +53,24 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
         private final KanbanCard card;
         private final Place from;
         private final Place to;
+        private final String fromLaneId;
 
-        Move(KanbanModel model, KanbanCard card, Place from, Place to) {
+        Move(KanbanModel model, KanbanCard card, Place from, Place to, String fromLaneId) {
             this.model = model;
             this.card = card;
             this.from = from;
             this.to = to;
+            this.fromLaneId = fromLaneId;
         }
 
         @Override
         public void undo() {
-            model.moveCard(card, from.column, from.lane, from.index);
+            // a card naming no lane is shown in the first one; moved back there
+            // it names none again, as before
+            if (model.moveCard(card, from.column, from.lane, from.index)
+                    && (fromLaneId == null || model.getLane(fromLaneId) == null)) {
+                card.setLaneId(fromLaneId);
+            }
         }
 
         @Override

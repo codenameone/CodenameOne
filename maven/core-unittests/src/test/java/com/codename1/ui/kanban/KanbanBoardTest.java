@@ -344,13 +344,67 @@ class KanbanBoardTest extends UITestBase {
         int[] second = b.getColumnHeaderBounds(model.getColumn("doing"));
         int step = second[0] - first[0];
         int y = b.getHeight() / 2;
-        // a third of a column: nearer where it started
+        // two thirds of a column: nearer the next one than where it started
         int from = b.getWidth() - 5;
-        drag(b, new int[]{from, y}, new int[]{from - step / 3, y});
-        for (int i = 0; i < 200 && b.animate(); i++) {
+        drag(b, new int[]{from, y}, new int[]{from - step * 2 / 3, y});
+        assertTrue(b.getOffsetX() > 0, "the drag scrolled");
+        // the fling and the snap run on the clock; ten seconds is a bound, not a wait
+        long until = System.currentTimeMillis() + 10000;
+        while (b.animate() && System.currentTimeMillis() < until) {
             Thread.sleep(5);
         }
         int rest = b.getOffsetX();
-        assertEquals(0, rest % step, "rests on a column, at " + rest + " with columns every " + step);
+        assertTrue(rest > 0 && rest % step == 0, "rests on a column, at " + rest + " with columns every " + step);
+    }
+
+    @FormTest
+    void undoingAMoveLeavesACardNamingNoLaneAsItWas() {
+        KanbanBoard b = show(true);
+        KanbanCard a = model.getCard("a");
+        assertNull(a.getLaneId());
+        assertTrue(b.moveCard(a, model.getColumn("doing"), model.getLane("y"), 0));
+        assertEquals("y", a.getLaneId());
+        assertTrue(b.undo());
+        assertEquals("todo", a.getColumnId());
+        assertNull(a.getLaneId());
+        assertEquals("abc", ids("todo", "x"));
+    }
+
+    @FormTest
+    void fillingAShownModelMeasuresOnceAndTheFireKeyOpensACard() {
+        KanbanBoard b = show(false);
+        final int[] measured = new int[1];
+        b.setCardRenderer(new DefaultKanbanCardRenderer() {
+            @Override
+            public int getCardHeight(KanbanBoard board, KanbanCard card, int width) {
+                measured[0]++;
+                return super.getCardHeight(board, card, width);
+            }
+        });
+        b.getCardBounds(model.getCard("a"));
+        measured[0] = 0;
+        for (int i = 0; i < 50; i++) {
+            model.addCard("done", new KanbanCard("n" + i, "N" + i));
+        }
+        assertEquals(0, measured[0]);
+        assertNotNull(b.getCardBounds(model.getCard("n49")));
+        assertEquals(54, measured[0]);
+        final String[] opened = new String[1];
+        b.addKanbanListener(new KanbanAdapter() {
+            @Override
+            public void cardOpened(KanbanBoard board, KanbanCard card) {
+                opened[0] = card.getId();
+            }
+        });
+        b.select(model.getCard("b"));
+        b.keyPressed(com.codename1.ui.Display.getInstance().getKeyCode(com.codename1.ui.Display.GAME_FIRE));
+        assertEquals("b", opened[0]);
+        // a column moved past the end is recorded where it went
+        assertTrue(b.moveColumn(model.getColumn("todo"), 99));
+        assertSame(model.getColumn("todo"), model.getColumns().get(2));
+        assertTrue(b.undo());
+        assertSame(model.getColumn("todo"), model.getColumns().get(0));
+        assertTrue(b.redo());
+        assertSame(model.getColumn("todo"), model.getColumns().get(2));
     }
 }

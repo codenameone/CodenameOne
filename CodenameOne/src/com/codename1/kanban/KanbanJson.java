@@ -27,6 +27,7 @@ import com.codename1.io.JSONParser;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,8 +105,9 @@ public final class KanbanJson {
                 KanbanLane lane = lanes.isEmpty() ? null : lanes.get(l);
                 List<KanbanCard> cards = model.getCards(c, lane);
                 for (KanbanCard kc : cards) {
-                    cardList.add(cardToMap(kc, lane == null ? kc.getLaneId() : lane.getId(),
-                            codec));
+                    // the card's own lane id, not the lane it is shown in: a
+                    // card naming no lane is shown in the first and still names none
+                    cardList.add(cardToMap(kc, kc.getLaneId(), codec));
                 }
             }
             m.put("cards", cardList);
@@ -160,36 +162,74 @@ public final class KanbanJson {
     /// #### Throws
     ///
     /// - `IOException`: when the text is not a board document, or a column,
-    ///   a lane or a card in it has no id
+    ///   a lane or a card in it has no id or one that is taken; the model is
+    ///   then as it was
     public static void read(String json, DefaultKanbanModel into, UserDataCodec codec) throws IOException {
-        Map<String, Object> root = json == null ? null : JSONParser.parseJSON(json);
-        // the parser answers an array, and text that is no JSON at all, with a
-        // map of its own making
-        if (root == null || !root.containsKey("columns")) {
+        Map<String, Object> root = parse(json);
+        if (!root.containsKey("columns")) {
             throw new IOException("Not a board document");
         }
+        // everything is read and checked before the model is touched
+        List<KanbanLane> newLanes = new ArrayList<KanbanLane>();
+        List<KanbanColumn> newColumns = new ArrayList<KanbanColumn>();
+        List<List<KanbanCard>> newCards = new ArrayList<List<KanbanCard>>();
+        Map<String, Object> seen = new HashMap<String, Object>();
         List<Object> lanes = list(root.get("lanes"));
         for (Object raw : lanes) {
             Map<String, Object> m = map(raw);
-            into.addLane(new KanbanLane(required(m, "id"), string(m, "title"))
-                    .setCollapsed(bool(m.get("collapsed"))));
+            KanbanLane lane = new KanbanLane(required(m, "id"), string(m, "title"))
+                    .setCollapsed(bool(m.get("collapsed")));
+            if (into.getLane(lane.getId()) != null || seen.put("l" + lane.getId(), lane) != null) {
+                throw new IOException("Board document: duplicate lane " + lane.getId());
+            }
+            newLanes.add(lane);
         }
         List<Object> columns = list(root.get("columns"));
         for (Object raw : columns) {
             Map<String, Object> m = map(raw);
             KanbanColumn c = new KanbanColumn(required(m, "id"), string(m, "title"));
+            if (into.getColumn(c.getId()) != null || seen.put("c" + c.getId(), c) != null) {
+                throw new IOException("Board document: duplicate column " + c.getId());
+            }
             Object limit = m.get("limit");
             if (limit instanceof Number) {
                 c.setWipLimit(((Number) limit).intValue());
             }
             c.setCollapsed(bool(m.get("collapsed")));
             c.setStyleKey(string(m, "style"));
-            into.addColumn(c);
             List<KanbanCard> cards = readCards(m, codec);
             for (KanbanCard kc : cards) {
+                if (into.getCard(kc.getId()) != null || seen.put("k" + kc.getId(), kc) != null) {
+                    throw new IOException("Board document: duplicate card " + kc.getId());
+                }
+            }
+            newColumns.add(c);
+            newCards.add(cards);
+        }
+        for (KanbanLane lane : newLanes) {
+            into.addLane(lane);
+        }
+        for (int i = 0; i < newColumns.size(); i++) {
+            KanbanColumn c = into.addColumn(newColumns.get(i));
+            for (KanbanCard kc : newCards.get(i)) {
                 into.addCard(c.getId(), kc);
             }
         }
+    }
+
+    /// Parses the text of a document `toJson` or a board's clipboard wrote.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the text is not a well-formed JSON object
+    public static Map<String, Object> parse(String json) throws IOException {
+        // the strict parser: what it answers does not depend on how the
+        // application configured the lenient one
+        Object parsed = JSONParser.parseStrict(json);
+        if (!(parsed instanceof Map)) {
+            throw new IOException("Not a board document");
+        }
+        return map(parsed);
     }
 
     /// Reads the cards of a map `cardsToMap` built, or of one column of a

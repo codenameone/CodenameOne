@@ -110,8 +110,10 @@ public class GraphPort {
     /// Sets the value. A model shown by a component is told through
     /// `GraphModel.setPortValue`.
     ///
-    /// `GraphJson` saves a value that is a string, a number or a boolean; a
-    /// number it reads back is a `Double`.
+    /// `GraphJson` saves a value that is a string, a number or a boolean, and
+    /// so does the clipboard. Read back, a whole number is a `Long` and any
+    /// other number a `Double`, whatever class it was: compare a value as a
+    /// `Number`, not as the class it was set with.
     public void setValue(Object value) {
         this.value = value;
     }

@@ -96,12 +96,12 @@ public abstract class AbstractGraphModel implements GraphModel {
     }
 
     @Override
-    public boolean insertNode(GraphNode node) {
+    public boolean insertNode(GraphNode node, int index) {
         return false;
     }
 
     @Override
-    public boolean insertEdge(GraphEdge edge) {
+    public boolean insertEdge(GraphEdge edge, int index) {
         return false;
     }
 

@@ -23,6 +23,7 @@
 package com.codename1.kanban;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -180,7 +181,9 @@ public class DefaultKanbanModel extends AbstractKanbanModel {
             return new ArrayList<KanbanCard>();
         }
         if (lane == null || lanes.isEmpty()) {
-            return all;
+            // a view of the model's own list: a caller changing it would change
+            // the board without an event
+            return Collections.unmodifiableList(all);
         }
         List<KanbanCard> out = new ArrayList<KanbanCard>();
         for (KanbanCard kc : all) {

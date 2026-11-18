@@ -260,7 +260,8 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/graph/Grap
 Copied nodes go to the clipboard as JSON together with the edges between
 them, and a paste gives them new ids. With a keyboard, Delete removes the
 selection, and with Control or Command, C, X, V and D copy, cut, paste and
-duplicate, Z undoes and Shift-Z redoes.
+duplicate, Z undoes and Shift-Z redoes. A phone has no such keys, so put the
+same methods behind a menu or a toolbar.
 
 === Finding your way
 

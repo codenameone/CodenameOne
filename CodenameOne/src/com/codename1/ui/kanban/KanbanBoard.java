@@ -194,6 +194,9 @@ public class KanbanBoard extends ScrollSurface {
     public KanbanBoard(KanbanModel model) {
         setUIID("KanbanBoard");
         setFocusable(true);
+        // asks a desktop port for the letter of a Control or Command
+        // combination, which it otherwise keeps from a component
+        putClientProperty("cn1$shortcutKeys", Boolean.TRUE);
         setModel(model);
     }
 
@@ -204,14 +207,20 @@ public class KanbanBoard extends ScrollSurface {
         return model;
     }
 
-    /// Shows another model.
+    /// Shows another model. An edit under way ends, and the undo history is
+    /// cleared: its steps belong to the model that was shown.
     public void setModel(KanbanModel model) {
         if (model == null) {
             throw new IllegalArgumentException("model is null");
         }
         endEdit(false);
+        dropDrag();
         if (this.model != null) {
             this.model.removeChangeListener(modelListener);
+        }
+        // its steps would edit a model that is no longer shown
+        if (undoHistory != null) {
+            undoHistory.clear();
         }
         this.model = model;
         model.addChangeListener(modelListener);
@@ -220,18 +229,39 @@ public class KanbanBoard extends ScrollSurface {
         modelChanged();
     }
 
-    /// The model changed: lay the board out again. Called by the model's
-    /// listener, and by an application that changed a card behind the
-    /// model's back, such as its tags.
+    /// The model changed: the board is laid out again before it is next
+    /// painted or asked where something is. Called by the model's listener,
+    /// and by an application that changed a card behind the model's back,
+    /// such as its tags.
+    ///
+    /// Nothing is measured here, so filling a model a card at a time while
+    /// a board shows it costs one layout and not one per card.
     public void modelChanged() {
         dirty = true;
         if (selected != null && model.getCard(selected.getId()) != selected) { // NOPMD CompareObjectsWithEquals - the card of the model itself
             selected = null;
             fireSelection();
         }
-        syncComponents();
-        refreshLayout();
+        // what is held may be gone, or its column
+        if (dragCard != null && model.getCard(dragCard.getId()) != dragCard // NOPMD CompareObjectsWithEquals - the card of the model itself
+                || dragColumn != null && !model.getColumns().contains(dragColumn)) {
+            dropDrag();
+        }
         repaint();
+    }
+
+    // Lets go of what is held without moving it.
+    private void dropDrag() {
+        if (dragCard != null || dragColumn != null) {
+            cancelEdit();
+            dragCard = null;
+            dragColumn = null;
+            dragFrom = null;
+            dropCol = -1;
+            dropLane = -1;
+            dropIndex = -1;
+            dirty = true;
+        }
     }
 
     /// Paints the cards. Never null.
@@ -263,6 +293,7 @@ public class KanbanBoard extends ScrollSurface {
 
     /// The component the factory made for a card, or null.
     public Component getCardComponent(KanbanCard card) {
+        ensureLayout();
         return components.get(card.getId());
     }
 
@@ -539,6 +570,7 @@ public class KanbanBoard extends ScrollSurface {
         if (from == null || column == null) {
             return false;
         }
+        String fromLaneId = card.getLaneId();
         for (int i = 0; i < listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself
             if (!listeners.get(i).cardMoving(this, card, column, lane, index)) {
                 return false;
@@ -547,7 +579,7 @@ public class KanbanBoard extends ScrollSurface {
         if (!model.moveCard(card, column, lane, index)) {
             return false;
         }
-        record(new KanbanEdits.Move(model, card, from, placeOf(card)));
+        record(new KanbanEdits.Move(model, card, from, placeOf(card), fromLaneId));
         for (int i = 0; i < listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself
             listeners.get(i).cardMoved(this, card);
         }
@@ -562,6 +594,8 @@ public class KanbanBoard extends ScrollSurface {
     /// false when a listener or the model refused
     public boolean moveColumn(KanbanColumn column, int index) {
         int from = model.getColumns().indexOf(column);
+        // the index it ends at, which is what undo and redo replay
+        index = Math.max(0, Math.min(index, model.getColumns().size() - 1));
         if (from < 0 || from == index) {
             return false;
         }
@@ -728,7 +762,7 @@ public class KanbanBoard extends ScrollSurface {
         }
         List<KanbanCard> read;
         try {
-            read = KanbanJson.readCards(JSONParser.parseJSON((String) o), userDataCodec);
+            read = KanbanJson.readCards(KanbanJson.parse((String) o), userDataCodec);
         } catch (IOException notCards) {
             return false;
         }
@@ -927,6 +961,7 @@ public class KanbanBoard extends ScrollSurface {
     private void relayout(int width) {
         dirty = false;
         laidWidth = width;
+        syncComponents();
         cols = new ArrayList<KanbanColumn>(model.getColumns());
         lanes = new ArrayList<KanbanLane>(model.getLanes());
         pad = KanbanLook.mm(1.5f);
@@ -976,6 +1011,11 @@ public class KanbanBoard extends ScrollSurface {
                 }
                 cell.addY = cy;
                 cell.height = cy + addH + pad;
+                // the gap a held card opens in another cell is part of that cell
+                if (dragCard != null && l == dropLane && c == dropCol && dragFrom != null
+                        && (dragFrom[0] != l || dragFrom[1] != c) && !foldedLane && !col.isCollapsed()) {
+                    cell.height += dragH + gap;
+                }
                 bodyH = Math.max(bodyH, cell.height);
                 cells[l][c] = cell;
             }
@@ -986,28 +1026,27 @@ public class KanbanBoard extends ScrollSurface {
         placeEditor();
     }
 
+    // One component per card that has one, made once and kept while the
+    // card is in the model.
     private void syncComponents() {
         if (cardFactory == null) {
             return;
         }
-        List<String> gone = new ArrayList<String>(components.keySet());
+        Map<String, Component> next = new HashMap<String, Component>();
         List<KanbanColumn> columns = model.getColumns();
         List<KanbanLane> ls = model.getLanes();
         for (KanbanColumn col : columns) {
             for (int l = 0; l < Math.max(1, ls.size()); l++) {
                 List<KanbanCard> cards = model.getCards(col, ls.isEmpty() ? null : ls.get(l));
                 for (KanbanCard card : cards) {
-                    gone.remove(card.getId());
-                    if (!components.containsKey(card.getId())) {
-                        Component cmp = cardFactory.createComponent(this, card);
-                        components.put(card.getId(), cmp);
-                    }
+                    String id = card.getId();
+                    next.put(id, components.containsKey(id) ? components.get(id)
+                            : cardFactory.createComponent(this, card));
                 }
             }
         }
-        for (String goneId : gone) {
-            components.remove(goneId);
-        }
+        components.clear();
+        components.putAll(next);
     }
 
     /// Where a card is in the layout: its lane, column and index, or null.
@@ -1178,7 +1217,7 @@ public class KanbanBoard extends ScrollSurface {
             dragColumnTo = to;
             return;
         }
-        if (dragCard == null) {
+        if (dragCard == null || cols.isEmpty()) {
             return;
         }
         int cy = y - headerH + getOffsetY();
@@ -1203,6 +1242,8 @@ public class KanbanBoard extends ScrollSurface {
             }
         }
         if (c != dropCol || l != dropLane || index != dropIndex) {
+            // the cell it leaves gives the gap back, the one it enters takes it
+            dirty = dirty || c != dropCol || l != dropLane;
             dropCol = c;
             dropLane = l;
             dropIndex = index;
@@ -1233,7 +1274,8 @@ public class KanbanBoard extends ScrollSurface {
         int gx = dragX + getOffsetX() - grabX;
         int gy = dragY - headerH + getOffsetY() - grabY;
         boolean elsewhere = dropCol != from[1] || dropLane != from[0] || dropIndex != from[2];
-        if (committed && dropAllowed && elsewhere && dropCol >= 0) {
+        if (committed && dropAllowed && elsewhere && dropCol >= 0 && dropCol < cols.size()
+                && dropLane < Math.max(1, lanes.size())) {
             moveCard(card, cols.get(dropCol), lanes.isEmpty() ? null : lanes.get(dropLane), dropIndex);
         }
         dropCol = -1;
@@ -1776,11 +1818,19 @@ public class KanbanBoard extends ScrollSurface {
 
     @Override
     protected int getContentWidth() {
+        // asked before the next paint laid out what the model changed
+        if (dirty) {
+            layoutSurface(getWidth(), getHeight());
+        }
         return contentW;
     }
 
     @Override
     protected int getContentHeight() {
+        // asked before the next paint laid out what the model changed
+        if (dirty) {
+            layoutSurface(getWidth(), getHeight());
+        }
         return contentH;
     }
 
@@ -1826,6 +1876,7 @@ public class KanbanBoard extends ScrollSurface {
 
     @Override
     protected void pressStarted(int x, int y) {
+        ensureLayout();
         snapPending = false;
         snapMotion = null;
         if (!hasFocus() && getComponentForm() != null) {
@@ -1836,6 +1887,7 @@ public class KanbanBoard extends ScrollSurface {
 
     @Override
     protected boolean editStarted(int x, int y, EditTrigger trigger) {
+        ensureLayout();
         return beginDrag(x, y, trigger);
     }
 
@@ -1851,6 +1903,7 @@ public class KanbanBoard extends ScrollSurface {
 
     @Override
     protected void tapped(int x, int y, boolean doubleTap) {
+        ensureLayout();
         tap(x, y, doubleTap);
     }
 
@@ -1869,7 +1922,10 @@ public class KanbanBoard extends ScrollSurface {
 
     @Override
     public void keyPressed(int keyCode) {
-        if (!keyTyped(keyCode)) {
+        // a port answers Enter as the fire key, not as a character
+        boolean fire = keyCode != 10 && keyCode != 13 && editor == null && selected != null
+                && Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE;
+        if (!keyTyped(fire ? 10 : keyCode)) {
             super.keyPressed(keyCode);
         }
     }

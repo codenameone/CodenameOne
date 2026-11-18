@@ -462,4 +462,61 @@ class NodeGraphEditingTest extends UITestBase {
         assertNull(editor.getParent());
         assertNotNull(g.getPortEditor(n, n.getPort("y")).getParent());
     }
+
+    @FormTest
+    void undoingADeletePutsANodeBackUnderTheOnesThatWereOverIt() {
+        DefaultGraphModel m = twoBoxes();
+        m.addNode(new GraphNode("c", "C", 400, 300, 100, 60));
+        NodeGraph g = show(m);
+        GraphNode a = m.getNode("a");
+        assertSame(a, m.getNodes().get(0));
+        g.select(a);
+        g.deleteSelection();
+        assertEquals(2, m.getNodes().size());
+        assertTrue(g.undo());
+        assertSame(a, m.getNodes().get(0));
+        assertEquals(3, m.getNodes().size());
+    }
+
+    @FormTest
+    void anotherModelEndsWhatWasUnderWay() {
+        DefaultGraphModel m = twoBoxes();
+        NodeGraph g = show(m);
+        GraphNode a = m.getNode("a");
+        g.select(a);
+        g.duplicateSelection();
+        assertTrue(history.canUndo());
+        g.startLabelEdit(a);
+        DefaultGraphModel other = twoBoxes();
+        String label = other.getNode("a").getLabel();
+        int nodes = m.getNodes().size();
+        g.setModel(other);
+        // the steps were the old model's, and so was the label being typed
+        assertFalse(history.canUndo());
+        assertFalse(g.undo());
+        assertEquals(nodes, m.getNodes().size());
+        assertEquals(label, other.getNode("a").getLabel());
+        assertEquals(2, other.getNodes().size());
+    }
+
+    @FormTest
+    void aRefusedMoveKeepsTheRoutesAndLeavesNoStep() {
+        DefaultGraphModel m = twoBoxes();
+        NodeGraph g = show(m);
+        GraphEdge e = m.getEdges().get(0);
+        double[] route = {1, 2, 3, 4};
+        e.setRoute(route);
+        g.addGraphListener(new GraphAdapter() {
+            @Override
+            public boolean nodeMoving(NodeGraph graph, GraphNode node, double x, double y) {
+                return false;
+            }
+        });
+        GraphNode a = m.getNode("a");
+        double x = a.getX();
+        drag(g, 60, 40, 160, 140);
+        assertEquals(x, a.getX(), 0);
+        assertSame(route, e.getRoute());
+        assertFalse(history.canUndo());
+    }
 }

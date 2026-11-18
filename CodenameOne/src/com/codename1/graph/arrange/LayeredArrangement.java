@@ -104,6 +104,11 @@ public class LayeredArrangement implements GraphArrangement {
     /// edge gets no route through hidden points then, since a node moved
     /// into its band is no longer where the route went around it. Off by
     /// default.
+    ///
+    /// The lanes are taken as they are, and none is resized: make a lane as
+    /// wide as the nodes it has to hold side by side, or they spill over its
+    /// edge. The first layer starts `getNodeGap` from the start of the
+    /// lanes, which is the room a lane's title needs.
     public void setRespectLanes(boolean respectLanes) {
         this.respectLanes = respectLanes;
     }

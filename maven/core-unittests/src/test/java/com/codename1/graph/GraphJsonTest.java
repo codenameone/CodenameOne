@@ -102,11 +102,8 @@ class GraphJsonTest {
         assertEquals(500, lane.getWidth(), 0);
         assertTrue(m.getGroup("g").isCollapsed());
         assertFalse(m.getGroup("g").isLane());
-        // and what was read writes the same text however often it goes round;
-        // only a whole number that was a port's value comes back as a double
-        String again = GraphJson.toJson(m);
-        assertEquals(again, GraphJson.toJson(GraphJson.fromJson(again)));
-        assertEquals(json.length() + 2, again.length());
+        // and what was read writes the same text
+        assertEquals(json, GraphJson.toJson(m));
     }
 
     @Test
@@ -160,5 +157,43 @@ class GraphJsonTest {
     void textThatIsNotAGraphIsRefused() {
         assertThrows(IOException.class, () -> GraphJson.fromJson("[1, 2]"));
         assertThrows(IOException.class, () -> GraphJson.fromJson("not json at all {"));
+    }
+
+    @Test
+    void aDocumentThatCannotBeAddedWholeAddsNothing() throws IOException {
+        final DefaultGraphModel m = sample();
+        final String json = GraphJson.toJson(m);
+        // every id is taken: nothing of it goes in
+        assertThrows(IOException.class, () -> GraphJson.read(json, m, null));
+        assertEquals(2, m.getNodes().size());
+        assertEquals(1, m.getEdges().size());
+        assertEquals(2, m.getGroups().size());
+        // a node twice in one document, and an edge to a node that is nowhere
+        final DefaultGraphModel empty = new DefaultGraphModel();
+        assertThrows(IOException.class, () -> GraphJson.read(
+                "{\"nodes\":[{\"id\":\"a\"},{\"id\":\"a\"}]}", empty, null));
+        assertThrows(IOException.class, () -> GraphJson.read(
+                "{\"nodes\":[{\"id\":\"a\"}],\"edges\":[{\"id\":\"e\",\"from\":\"a\",\"to\":\"zz\"}]}",
+                empty, null));
+        assertEquals(0, empty.getNodes().size());
+        // an edge may name a node the model already has
+        empty.addNode(new GraphNode("zz", "Z"));
+        GraphJson.read("{\"nodes\":[{\"id\":\"a\"}],\"edges\":[{\"id\":\"e\",\"from\":\"a\",\"to\":\"zz\"}]}",
+                empty, null);
+        assertEquals(1, empty.getEdges().size());
+    }
+
+    @Test
+    void aPortValueKeepsItsKindThroughJson() throws IOException {
+        DefaultGraphModel m = new DefaultGraphModel();
+        GraphNode n = m.addNode(new GraphNode("n", "N")
+                .addInput("on", "On", "bool").addInput("count", "Count", "num").addInput("ratio", "Ratio", "num"));
+        n.getPort("on").setValue(Boolean.TRUE);
+        n.getPort("count").setValue(Integer.valueOf(3));
+        n.getPort("ratio").setValue(Double.valueOf(0.5));
+        GraphNode back = GraphJson.fromJson(GraphJson.toJson(m)).getNode("n");
+        assertEquals(Boolean.TRUE, back.getPort("on").getValue());
+        assertEquals(Long.valueOf(3), back.getPort("count").getValue());
+        assertEquals(Double.valueOf(0.5), back.getPort("ratio").getValue());
     }
 }

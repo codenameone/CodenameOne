@@ -25,6 +25,7 @@ package com.codename1.kanban;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -161,6 +162,46 @@ class KanbanModelTest {
             @Override
             public void execute() throws Throwable {
                 KanbanJson.fromJson("{\"nodes\":[]}");
+            }
+        });
+    }
+
+    @Test
+    void aBoardThatCannotBeAddedWholeAddsNothing() {
+        final DefaultKanbanModel m = board();
+        final String json = KanbanJson.toJson(m);
+        final int cards = m.getCardCount(m.getColumn("todo"));
+        assertThrows(IOException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() throws Throwable {
+                KanbanJson.read(json, m, null);
+            }
+        });
+        assertEquals(3, m.getColumns().size());
+        assertEquals(cards, m.getCardCount(m.getColumn("todo")));
+        final DefaultKanbanModel empty = new DefaultKanbanModel();
+        assertThrows(IOException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() throws Throwable {
+                KanbanJson.read("{\"columns\":[{\"id\":\"c\",\"cards\":[{\"id\":\"k\"}]},"
+                        + "{\"id\":\"d\",\"cards\":[{\"id\":\"k\"}]}]}", empty, null);
+            }
+        });
+        assertEquals(0, empty.getColumns().size());
+    }
+
+    @Test
+    void aCardNamingNoLaneStillNamesNoneAfterJsonAndItsListIsReadOnly() throws IOException {
+        DefaultKanbanModel m = board();
+        m.addLane(new KanbanLane("x", "X"));
+        assertNull(m.getCard("a").getLaneId());
+        DefaultKanbanModel back = KanbanJson.fromJson(KanbanJson.toJson(m));
+        assertNull(back.getCard("a").getLaneId());
+        final List<KanbanCard> all = back.getCards(back.getColumn("todo"), null);
+        assertThrows(UnsupportedOperationException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                all.remove(0);
             }
         });
     }

@@ -116,7 +116,8 @@ public class DefaultGraphEdgeRenderer implements GraphEdgeRenderer {
                 x1 = sx - tdx / tlen * tailCut;
                 y1 = sy - tdy / tlen * tailCut;
             }
-            if (i == count - 2 && headCut > 0 && len > size) {
+            // a segment shorter than the cut would come out the other side of its start
+            if (i == count - 2 && headCut > 0 && len > headCut) {
                 x2 = ex - dx / len * headCut;
                 y2 = ey - dy / len * headCut;
             }
