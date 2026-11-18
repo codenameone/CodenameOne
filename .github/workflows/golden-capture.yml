@@ -85,9 +85,10 @@ jobs:
     needs: detect
     if: needs.detect.outputs.tests != ''
     runs-on: ubuntu-24.04
-    # Dispatching only; golden-harvest.yml collects. golden-capture.sh waits
-    # up to five minutes for each of seven runs to appear.
-    timeout-minutes: 45
+    # Dispatching only; golden-harvest.yml collects. golden-capture.sh
+    # dispatches every workflow, then waits up to 40 minutes in all for GitHub
+    # to list the runs it created.
+    timeout-minutes: 60
     permissions:
       contents: read
       actions: write

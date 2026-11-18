@@ -61,11 +61,12 @@ gh_retry() {
 }
 
 dispatch() {
-  local ref="$1" tests="$2" runs_file="$3" wf since seen id tries
+  local ref="$1" tests="$2" runs_file="$3" wf since seen id i deadline missing
   shift 3
   local targets=("$@")
   [ "${#targets[@]}" -gt 0 ] || targets=("${WORKFLOWS[@]}")
   : > "$runs_file"
+  local -a sinces=() seens=()
   for wf in "${targets[@]}"; do
     # A capture of an earlier head of this branch is rendering code that is
     # gone; its harvest would be skipped anyway (the branch moved).
@@ -87,21 +88,48 @@ dispatch() {
       echo "::warning::could not dispatch $wf with CN1SS_GH_TOKEN (unset, lacking Actions: write, or a transient error); dispatching with github.token, so the harvest will not start by itself: run Golden harvest by hand with head_ref=$ref once the capture completes"
       gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"
     fi
-    # The dispatch API answers without a run id; find the run it created.
-    id=""
-    for tries in $(seq 1 30); do
+    sinces+=("$since")
+    seens+=("$seen")
+  done
+  # The dispatch API answers without a run id, and GitHub can take many
+  # minutes to list a run it has already created (a run created at 18:20:05
+  # was still unlisted five minutes later and failed a whole capture). So every
+  # workflow is dispatched first, then all of them are looked up together
+  # against ONE generous deadline: a slow listing costs time, never the capture,
+  # and never holds up finding the others. CN1SS_FIND_RUN_MINUTES overrides it.
+  deadline=$(( $(date +%s) + ${CN1SS_FIND_RUN_MINUTES:-40} * 60 ))
+  local -a ids=()
+  while :; do
+    missing=0
+    for i in "${!targets[@]}"; do
+      [ -n "${ids[$i]:-}" ] && continue
+      wf="${targets[$i]}"
       id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
-              --event workflow_dispatch --limit 5 --json databaseId,createdAt \
-              --jq "[.[] | select(.createdAt >= \"$since\") | select(.databaseId | tostring | IN(\"$seen\" | split(\",\")[]) | not)] | .[0].databaseId // empty")"
-      [ -n "$id" ] && break
-      sleep 10
+              --event workflow_dispatch --limit 20 --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt >= \"${sinces[$i]}\") | select(.databaseId | tostring | IN(\"${seens[$i]}\" | split(\",\")[]) | not)] | .[0].databaseId // empty" \
+              2>/dev/null || true)"
+      if [ -n "$id" ]; then
+        ids[$i]="$id"
+        log "$wf -> run $id"
+      else
+        missing=$((missing + 1))
+      fi
     done
-    if [ -z "$id" ]; then
-      log "no run of $wf appeared after dispatch"
+    [ "$missing" -eq 0 ] && break
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      for i in "${!targets[@]}"; do
+        [ -n "${ids[$i]:-}" ] || log "no run of ${targets[$i]} appeared after dispatch"
+      done
+      # Record what did start, so the failure step cancels those runs.
+      for i in "${!targets[@]}"; do
+        [ -n "${ids[$i]:-}" ] && printf '%s %s\n' "${targets[$i]}" "${ids[$i]}" >> "$runs_file"
+      done
       return 1
     fi
-    log "$wf -> run $id"
-    printf '%s %s\n' "$wf" "$id" >> "$runs_file"
+    sleep 20
+  done
+  for i in "${!targets[@]}"; do
+    printf '%s %s\n' "${targets[$i]}" "${ids[$i]}" >> "$runs_file"
   done
 }
 
