@@ -205,6 +205,8 @@ public abstract class Axis {
             visibleMin = dataMin;
             visibleMax = dataMax;
         } else {
+            // new data bounds (a setMaxPoints window sliding) re-clamp a zoomed viewport here,
+            // so it cannot be left hanging past the data
             clampViewport();
         }
     }

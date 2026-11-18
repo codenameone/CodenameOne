@@ -169,6 +169,13 @@ public class Chart extends Component {
 
     /// Adds a series, animating it in when the chart is showing.
     public Chart addSeries(Series s) {
+        if (s.chart == this && series.contains(s)) { //NOPMD CompareObjectsWithEquals - identity of the owning chart is intended
+            return this;
+        }
+        if (s.chart != null) {
+            // a series paints into one chart; adding it here takes it from the other
+            s.chart.removeSeries(s);
+        }
         beginChange();
         s.chart = this;
         series.add(s);
@@ -187,6 +194,7 @@ public class Chart extends Component {
         beginChange();
         series.remove(s);
         s.chart = null;
+        dropPointsOf(s);
         if (!inBatch) {
             startTransition();
         }
@@ -199,6 +207,8 @@ public class Chart extends Component {
             s.chart = null;
         }
         series.clear();
+        selected = null;
+        hover = null;
         repaint();
         return this;
     }
@@ -432,7 +442,9 @@ public class Chart extends Component {
 
     /// Makes a drag inside the plot select a range of x values instead of scrubbing or panning;
     /// pinch, the wheel and the keyboard still zoom and pan. The selection is reported to
-    /// `addRangeListener` and, unless `setBrushZooms(false)`, the chart zooms to it.
+    /// `addRangeListener` and, unless `setBrushZooms(false)`, the chart zooms to it. While the
+    /// chart is zoomed a one finger drag pans instead, so a zoomed chart stays reachable by
+    /// touch; resetting the zoom brings the brush back.
     ///
     /// #### Parameters
     ///
@@ -555,7 +567,49 @@ public class Chart extends Component {
         }
     }
 
+    // a selection or hover on a removed series is a dead point; getSelection must not return it
+    private void dropPointsOf(Series s) {
+        if (selected != null && selected.getSeries() == s) { //NOPMD CompareObjectsWithEquals - identity of the same series is intended
+            selected = null;
+        }
+        if (hover != null && hover.getSeries() == s) { //NOPMD CompareObjectsWithEquals - identity of the same series is intended
+            hover = null;
+        }
+    }
+
+    // finds a remembered point in the current data and frame: its screen position and value
+    // move with every pan, zoom, transition and sliding window, so a stored one goes stale.
+    // An x series is matched by x value, anything else by index; null when the point is gone.
+    private ChartPoint resolve(ChartPoint p, ChartContext ctx) {
+        if (p == null) {
+            return null;
+        }
+        Series s = p.getSeries();
+        if (s.chart != this || !s.isVisible()) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+            return null;
+        }
+        int i = p.getIndex();
+        if (s instanceof XYSeries) {
+            XYSeries xs = (XYSeries) s;
+            if (i >= xs.size() || xs.getX(i) != p.getX()) {
+                i = indexAtX(xs, p.getX());
+            }
+            if (i < 0 || xs.getY(i) != xs.getY(i)) {
+                return null;
+            }
+        } else if (i >= s.getPointCount()) {
+            return null;
+        }
+        return ctx == null ? p : s.getPoint(ctx, i);
+    }
+
     void seriesDataChanged(Series s) {
+        if (selected != null && selected.getSeries() == s) { //NOPMD CompareObjectsWithEquals - identity of the same series is intended
+            selected = resolve(selected, null);
+        }
+        if (hover != null && hover.getSeries() == s) { //NOPMD CompareObjectsWithEquals - identity of the same series is intended
+            hover = resolve(hover, null);
+        }
         if (!inBatch) {
             startTransition();
         }
@@ -641,6 +695,21 @@ public class Chart extends Component {
         }
     }
 
+    private boolean stopPending;
+    private final Runnable stopIfIdle = new Runnable() {
+        @Override
+        public void run() {
+            stopPending = false;
+            if (isIdle()) {
+                stopAnimating();
+            }
+        }
+    };
+
+    private boolean isIdle() {
+        return transitionLength <= 0 && viewportTo == null && !flinging;
+    }
+
     private void stopAnimating() {
         if (animationHost != null) {
             animationHost.deregisterAnimated(this);
@@ -671,8 +740,11 @@ public class Chart extends Component {
             stepFling();
             changed = true;
         }
-        if (transitionLength <= 0 && viewportTo == null && !flinging) {
-            stopAnimating();
+        if (animationHost != null && !stopPending && isIdle()) {
+            // Form.loopAnimations walks its list by index, so leaving it from inside animate()
+            // would skip the animation after this one for a frame; leave once the loop is done
+            stopPending = true;
+            CN.callSerially(stopIfIdle);
         }
         return changed;
     }
@@ -1283,8 +1355,15 @@ public class Chart extends Component {
                 g.fillArc(cp.getScreenX() + getX() - d / 2, cp.getScreenY() + getY() - d / 2, d, d, 0, 360);
             }
         } else {
-            ChartPoint cp = hover != null ? hover : selected;
-            if (cp == null || cp.getSeries().chart != this || !cp.getSeries().isVisible()) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+            ChartPoint cp;
+            if (hover != null) {
+                hover = resolve(hover, ctx);
+                cp = hover;
+            } else {
+                selected = resolve(selected, ctx);
+                cp = selected;
+            }
+            if (cp == null) {
                 return;
             }
             rows.add(cp);
@@ -1517,35 +1596,18 @@ public class Chart extends Component {
                 continue;
             }
             XYSeries xs = (XYSeries) candidate;
-            int i = xs.isAscending() ? xs.nearestIndexOfX(target) : scanNearest(xs, ctx, relX, relY);
-            ChartPoint p = i < 0 ? null : xs.getPoint(ctx, i);
-            if (p == null) {
+            int pos = rotated ? relY : relX;
+            int i = xs.isAscending() ? xs.nearestIndexOfX(target) : xs.nearestScreenIndex(ctx, pos, rotated);
+            if (i < 0) {
                 continue;
             }
-            int d = rotated ? Math.abs(p.getScreenY() - relY) : Math.abs(p.getScreenX() - relX);
+            int d = Math.abs(xs.screenPosition(ctx, i, rotated) - pos);
             if (d < bestD) {
                 bestD = d;
                 bestX = xs.getX(i);
             }
         }
         return bestX;
-    }
-
-    private int scanNearest(XYSeries s, ChartContext ctx, int relX, int relY) {
-        int best = -1;
-        int bestD = Integer.MAX_VALUE;
-        for (int i = 0; i < s.getPointCount(); i++) {
-            ChartPoint p = s.getPoint(ctx, i);
-            if (p == null) {
-                continue;
-            }
-            int d = rotated ? Math.abs(p.getScreenY() - relY) : Math.abs(p.getScreenX() - relX);
-            if (d < bestD) {
-                bestD = d;
-                best = i;
-            }
-        }
-        return best;
     }
 
     /// The index of `s`'s point at exactly `x` (with a y value), or -1 when it has none there.
@@ -1690,7 +1752,9 @@ public class Chart extends Component {
             // decided once per gesture and latched, so a scroll stays a scroll
             boolean zoomed = horizontalAxis().isZoomed() || verticalAxis().isZoomed();
             boolean horizontalIntent = Math.abs(px - pressX) > Math.abs(py - pressY);
-            if (brushEnabled && hasCartesian() && insidePlot(pressX, pressY)) {
+            // a zoomed chart pans under one finger even with brushing on, or it could never
+            // be panned by touch; the brush selects again once the zoom is reset
+            if (brushEnabled && !(zoomEnabled && zoomed) && hasCartesian() && insidePlot(pressX, pressY)) {
                 dragMode = DRAG_BRUSH;
                 brushFrom = rotated ? pressY : pressX;
                 brushing = true;
@@ -1781,23 +1845,30 @@ public class Chart extends Component {
         return new Axis[]{xAxis};
     }
 
-    private void panBy(int dx, int dy) {
+    // true when some axis moved; a pan into the data edge is clamped and changes nothing
+    private boolean panBy(int dx, int dy) {
         ChartContext c = lastContext;
         if (c == null || c.plotW <= 0 || c.plotH <= 0) {
-            return;
+            return false;
         }
+        boolean moved = false;
         for (Axis h : horizontalAxes()) {
             if (h.isZoomed()) {
+                double before = h.getVisibleMin();
                 h.pan(-dx / (double) c.plotW);
+                moved |= h.getVisibleMin() != before;
             }
         }
         for (Axis v : verticalAxes()) {
             if (v.isZoomed()) {
+                double before = v.getVisibleMin();
                 v.pan((isTopDown(v) ? -dy : dy) / (double) c.plotH);
+                moved |= v.getVisibleMin() != before;
             }
         }
         fireViewportChanged();
         repaint();
+        return moved;
     }
 
     private void handlePinch(int x0, int y0, int x1, int y1) {
@@ -2092,13 +2163,21 @@ public class Chart extends Component {
             double hi = viewportFrom[i * 3 + 1] + (viewportTo[i * 3 + 1] - viewportFrom[i * 3 + 1]) * e;
             axes[i].setDisplayRange(lo, hi);
         }
+        // linked charts follow every frame, as they do a pan or pinch, not just the last one
+        fireViewportFrame();
     }
 
     private void stepFling() {
         long now = AnimationTime.now();
         long dt = Math.max(1, now - flingLast);
         flingLast = now;
-        panBy((int) (velocityX * dt), (int) (velocityY * dt));
+        int dx = (int) (velocityX * dt);
+        int dy = (int) (velocityY * dt);
+        if (!panBy(dx, dy) && (dx != 0 || dy != 0)) {
+            // the viewport hit the data edge: coasting on would only spin the animation
+            flinging = false;
+            return;
+        }
         float decay = (float) MathUtil.pow(0.995, dt);
         velocityX *= decay;
         velocityY *= decay;
@@ -2221,9 +2300,14 @@ public class Chart extends Component {
             }
         }
         ChartPoint next = null;
+        // a gap (a NaN y) is skipped, whether stepping along a series or onto another one
+        XYSeries gaps = s instanceof XYSeries ? (XYSeries) s : null;
         for (int i = index + dir; i >= 0 && i < s.getPointCount(); i += dir) {
+            if (gaps != null && gaps.getY(i) != gaps.getY(i)) {
+                continue;
+            }
             next = s.getPoint(lastContext, i);
-            if (next != null || !across) {
+            if (next != null) {
                 break;
             }
         }
@@ -2267,6 +2351,38 @@ public class Chart extends Component {
         }
         for (Chart c : merged) {
             c.syncGroup = merged;
+        }
+    }
+
+    /// Leaves the group joined with `syncWith`: this chart stops following the others and
+    /// they stop following it, while the rest of the group stays linked. Removing a chart
+    /// from its form does not unlink it, so a chart shown again keeps syncing; call this when
+    /// a linked chart is discarded.
+    public void unsync() {
+        if (syncGroup.size() <= 1) {
+            return;
+        }
+        List<Chart> rest = new ArrayList<Chart>(syncGroup);
+        rest.remove(this);
+        for (Chart c : rest) {
+            c.syncGroup = rest;
+        }
+        syncGroup = new ArrayList<Chart>();
+        syncGroup.add(this);
+    }
+
+    // one frame of an animated viewport change: the linked charts draw the same range
+    // without being marked zoomed, and fireViewportChanged settles them at the end
+    private void fireViewportFrame() {
+        if (syncing) {
+            return;
+        }
+        for (Chart c : syncGroup) {
+            if (c == this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+                continue;
+            }
+            c.xAxis.setDisplayRange(xAxis.getVisibleMin(), xAxis.getVisibleMax());
+            c.repaint();
         }
     }
 

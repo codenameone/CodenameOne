@@ -189,7 +189,8 @@ public class L10NManager {
 
     private static String trimPunctuation(String s) {
         int end = s.length();
-        while (end > 0 && ",.;".indexOf(s.charAt(end - 1)) >= 0) {
+        // only separators: an abbreviation's own period ("janv.", "Jan.") is part of the name
+        while (end > 0 && ",;".indexOf(s.charAt(end - 1)) >= 0) {
             end--;
         }
         return s.substring(0, end);
@@ -197,14 +198,19 @@ public class L10NManager {
 
     private String extractMonthName(String dateStr) throws ParseException {
         String[] parts = Util.split(dateStr, " ");
+        boolean first = true;
         for (String raw : parts) {
             // long styles punctuate their words ("lundi," "Montag,"): compare the bare word
             String part = trimPunctuation(raw);
             if (part.length() == 0) {
                 continue;
             }
-            if ("de".equalsIgnoreCase(part) || isWeekdayName(part)) {
-                // the default long style is Date.toString(), which opens with the weekday
+            boolean leading = first;
+            first = false;
+            // only a LEADING weekday is skipped (Date.toString() and "Monday, March 3" open with
+            // one); later words are never weekdays in a date, and a short weekday can equal a
+            // short month (Spanish "mar" is both martes and marzo)
+            if ("de".equalsIgnoreCase(part) || leading && isWeekdayName(part)) {
                 continue;
             }
             String firstChar = part.substring(0, 1);

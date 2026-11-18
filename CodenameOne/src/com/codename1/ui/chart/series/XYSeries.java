@@ -78,6 +78,15 @@ public abstract class XYSeries extends Series {
     ///
     /// - `channels`: one array per extra channel, each as long as `y`
     protected void setRows(double[] x, double[] y, double[][] channels) {
+        // validate before begin(), so a bad call leaves the series and its transition untouched
+        if (x != null && x.length < y.length) {
+            throw new IllegalArgumentException("x has " + x.length + " values for " + y.length + " y values");
+        }
+        for (int k = 0; k < aux.length; k++) {
+            if (channels == null || k >= channels.length || channels[k] == null || channels[k].length < y.length) {
+                throw new IllegalArgumentException("channel " + k + " is shorter than y");
+            }
+        }
         begin();
         count = y.length;
         int cap = Math.max(16, count);
@@ -175,6 +184,10 @@ public abstract class XYSeries extends Series {
     /// Replaces all data. `x` may be null, in which case points are numbered 0, 1, 2 ...
     /// (the positions of a category axis).
     public XYSeries setData(double[] x, double[] y) {
+        // validate before begin(), so a bad call leaves the series and its transition untouched
+        if (x != null && x.length < y.length) {
+            throw new IllegalArgumentException("x has " + x.length + " values for " + y.length + " y values");
+        }
         begin();
         count = y.length;
         xs = new double[Math.max(16, count)];
@@ -598,16 +611,74 @@ public abstract class XYSeries extends Series {
     }
 
     /// The index range `{from, to}` (inclusive) worth painting: the visible points plus one
-    /// neighbour each side so lines run to the plot edge. Assumes ascending x.
+    /// neighbour each side so lines run to the plot edge. Data whose x values are not
+    /// ascending (a scatter filled in any order) cannot be binary searched, so every point is
+    /// in range then.
     protected int[] visibleRange(ChartContext ctx) {
         if (count == 0) {
             return new int[]{0, -1};
+        }
+        if (!isAscending()) {
+            return new int[]{0, count - 1};
         }
         double lo = ctx.getXAxis().getVisibleMin();
         double hi = ctx.getXAxis().getVisibleMax();
         int a = Math.max(0, lowerBound(lo) - 1);
         int b = Math.min(count - 1, lowerBound(hi));
         return new int[]{a, b};
+    }
+
+    /// The screen position of point `i` along one direction, relative to the chart like
+    /// `ChartPoint.getScreenX()`, without allocating a point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ctx`: the frame
+    ///
+    /// - `i`: the point index
+    ///
+    /// - `vertical`: true for the y coordinate, false for x
+    ///
+    /// #### Returns
+    ///
+    /// the coordinate in pixels
+    public int screenPosition(ChartContext ctx, int i, boolean vertical) {
+        double top = getBase(i) + ys[i];
+        if (vertical) {
+            return (int) ctx.screenY(this, xs[i], top) - ctx.getOriginY();
+        }
+        return (int) ctx.screenX(this, xs[i], top) - ctx.getOriginX();
+    }
+
+    /// The index of the point with a y value whose screen position along one direction is
+    /// nearest `pos`, scanning every point; for data that is not ascending. Allocates nothing,
+    /// as it runs on every pointer move.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ctx`: the frame
+    ///
+    /// - `pos`: the pointer coordinate, relative to the chart
+    ///
+    /// - `vertical`: true to compare y coordinates, false for x
+    ///
+    /// #### Returns
+    ///
+    /// the index, or -1 when no point has a value
+    public int nearestScreenIndex(ChartContext ctx, int pos, boolean vertical) {
+        int best = -1;
+        int bestD = Integer.MAX_VALUE;
+        for (int i = 0; i < count; i++) {
+            if (ys[i] != ys[i]) {
+                continue;
+            }
+            int d = Math.abs(screenPosition(ctx, i, vertical) - pos);
+            if (d < bestD) {
+                bestD = d;
+                best = i;
+            }
+        }
+        return best;
     }
 
     @Override

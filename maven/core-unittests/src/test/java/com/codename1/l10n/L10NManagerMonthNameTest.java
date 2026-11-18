@@ -59,6 +59,13 @@ class L10NManagerMonthNameTest extends UITestBase {
     }
 
     @Test
+    void anAbbreviationKeepsItsPeriodAndOnlyALeadingWeekdayIsSkipped() {
+        assertEquals("Mar.", longStyle("3 Mar. 2025").getLongMonthName(march3()));
+        // a weekday-looking word after the first is the month, never skipped
+        assertEquals("Mon", longStyle("3 Mon 2025").getLongMonthName(march3()));
+    }
+
+    @Test
     void unparseableStyleFallsBackToTheDatesOwnMonth() {
         // the month table itself is read through the long style, so only the date asked about
         // is unparseable; every other month formats normally

@@ -129,7 +129,8 @@ public class LineSeries extends XYSeries {
         float[] pb = bufB;
         boolean[] gap = bufGap;
         int m = 0;
-        boolean dense = n > ctx.getPlotWidth() * 2 && !ctx.isRotated();
+        // M4 relies on points arriving column by column, which only ascending x guarantees
+        boolean dense = n > ctx.getPlotWidth() * 2 && !ctx.isRotated() && isAscending();
         boolean needBase = getStackGroup() != null || fill;
         // dense data keeps, per pixel column, the first, lowest, highest and last point in
         // their own order (M4), which draws the same pixels as every point would

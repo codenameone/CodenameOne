@@ -71,16 +71,40 @@ public class LogAxis extends Axis {
     @Override
     public double[] ticks(int maxCount) {
         double vmin = getVisibleMin() > 0 ? getVisibleMin() : getDataMin();
+        double vmax = getVisibleMax();
         double a = Math.floor(lg(vmin) - 1e-9);
-        double b = Math.ceil(lg(getVisibleMax()) + 1e-9);
+        double b = Math.ceil(lg(vmax) + 1e-9);
         int decades = (int) (b - a);
         int every = Math.max(1, (int) Math.ceil(decades / (double) Math.max(1, maxCount - 1)));
+        double[] out = decadeTicks(vmin, vmax, (int) a, (int) b, every, POWERS);
+        if (out.length < 2) {
+            // zoomed in to less than a decade or two: 1, 2 and 5 of each decade
+            out = decadeTicks(vmin, vmax, (int) a, (int) b, 1, ONE_TWO_FIVE);
+        }
+        if (out.length < 2 || out.length > Math.max(2, maxCount)) {
+            // under two decades the axis is close to linear, and round linear steps read
+            // better than one lone power of ten (or more 1-2-5 ticks than fit)
+            double[] lin = Ticks.linear(vmin, vmax, maxCount);
+            if (lin.length >= 2) {
+                out = lin;
+            }
+        }
+        return out;
+    }
+
+    private static final double[] POWERS = {1};
+    private static final double[] ONE_TWO_FIVE = {1, 2, 5};
+
+    private static double[] decadeTicks(double vmin, double vmax, int a, int b, int every, double[] mantissas) {
+        double[] tmp = new double[((b - a) / every + 1) * mantissas.length];
         int n = 0;
-        double[] tmp = new double[decades + 1];
-        for (int e = (int) a; e <= (int) b; e += every) {
-            double v = MathUtil.pow(10, e);
-            if (v >= vmin * 0.999999 && v <= getVisibleMax() * 1.000001) {
-                tmp[n++] = v;
+        for (int e = a; e <= b; e += every) {
+            double p = MathUtil.pow(10, e);
+            for (double m : mantissas) {
+                double v = m * p;
+                if (v >= vmin * 0.999999 && v <= vmax * 1.000001) {
+                    tmp[n++] = v;
+                }
             }
         }
         double[] out = new double[n];
