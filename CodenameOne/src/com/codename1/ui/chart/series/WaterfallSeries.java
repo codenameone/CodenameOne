@@ -157,7 +157,7 @@ public class WaterfallSeries extends BarSeries {
         double max = 0;
         for (int i = 0; i < size(); i++) {
             double v = getY(i);
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             double a = getBase(i);

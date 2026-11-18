@@ -98,14 +98,14 @@ public class BoxPlotSeries extends XYSeries {
         // NaN has no place in an order statistic, and sort does not order it on every platform
         int n = 0;
         for (double v : samples) {
-            if (v == v) {
+            if (!isGap(v)) {
                 n++;
             }
         }
         double[] s = new double[n];
         n = 0;
         for (double v : samples) {
-            if (v == v) {
+            if (!isGap(v)) {
                 s[n++] = v;
             }
         }
@@ -170,7 +170,7 @@ public class BoxPlotSeries extends XYSeries {
         }
         for (int k = 0; k < 4; k++) {
             double v = getAux(k, i);
-            if (v != v) {
+            if (isGap(v)) {
                 return true;
             }
         }
@@ -295,11 +295,19 @@ public class BoxPlotSeries extends XYSeries {
             if (isGap(i)) {
                 continue;
             }
-            min = Math.min(min, getAux(MIN, i));
-            max = Math.max(max, getAux(MAX, i));
+            double lo = getAux(MIN, i);
+            double hi = getAux(MAX, i);
+            if (!isGap(lo)) {
+                min = Math.min(min, lo);
+            }
+            if (!isGap(hi)) {
+                max = Math.max(max, hi);
+            }
             for (double o : getOutliers(i)) {
-                min = Math.min(min, o);
-                max = Math.max(max, o);
+                if (!isGap(o)) {
+                    min = Math.min(min, o);
+                    max = Math.max(max, o);
+                }
             }
         }
         return min > max ? null : new double[]{min, max};

@@ -244,7 +244,7 @@ public class BarSeries extends XYSeries {
         boolean top = getStackGroup() == null || isTopOfStack();
         for (int i = r[0]; i <= r[1]; i++) {
             double v = animatedY(ctx, i);
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             float[] b = barRect(ctx, i, animatedBase(ctx, i), v, slot, bandPx);
@@ -300,7 +300,7 @@ public class BarSeries extends XYSeries {
         int pad = ctx.mm(0.8f);
         for (int i = r[0]; i <= r[1]; i++) {
             double v = getY(i);
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             float[] b = barRect(ctx, i, animatedBase(ctx, i), animatedY(ctx, i), slot, bandPx);
@@ -359,7 +359,7 @@ public class BarSeries extends XYSeries {
         int ay = y + ctx.getOriginY();
         for (int i = r[0]; i <= r[1]; i++) {
             double v = getY(i);
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             float[] b = barRect(ctx, i, getBase(i), v, slot, bandPx);

@@ -184,7 +184,7 @@ public class ScatterSeries extends XYSeries {
                 continue;
             }
             double v = animatedY(ctx, i);
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             int d = (int) (diameter(ctx, i, ms) * Math.min(1, ctx.getProgress() * 1.5f + (bubbles ? 0 : 1)));
@@ -221,7 +221,7 @@ public class ScatterSeries extends XYSeries {
         double bestD = Double.MAX_VALUE;
         for (int i = 0; i < count; i++) {
             double v = getY(i);
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             int r = Math.max(radius, diameter(ctx, i, ms) / 2);

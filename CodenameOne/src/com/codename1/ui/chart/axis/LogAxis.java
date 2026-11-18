@@ -50,8 +50,10 @@ public class LogAxis extends Axis {
         if (!(min > 0) || min >= max) { //NOPMD LogicInversion - the negated comparison is also true for NaN
             min = max > 1 ? Math.min(1, max / 10) : max / 1000;
         }
-        double lo = MathUtil.pow(10, Math.floor(lg(min)));
-        double hi = MathUtil.pow(10, Math.ceil(lg(max)));
+        // an end pinned by setRange is kept as given (when a logarithm can show it); only a
+        // free end is rounded out to a whole decade
+        double lo = isMinFixed() ? min : MathUtil.pow(10, Math.floor(lg(min)));
+        double hi = isMaxFixed() ? max : MathUtil.pow(10, Math.ceil(lg(max)));
         if (hi <= lo) {
             hi = lo * 10;
         }

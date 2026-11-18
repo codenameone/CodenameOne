@@ -167,7 +167,7 @@ public class HeatmapSeries extends Series {
         double max = -Double.MAX_VALUE;
         for (double[] row : matrix) {
             for (double v : row) {
-                if (v == v) {
+                if (!isGap(v)) {
                     min = Math.min(min, v);
                     max = Math.max(max, v);
                 }
@@ -255,7 +255,7 @@ public class HeatmapSeries extends Series {
         for (int r = 0; r < matrix.length; r++) {
             for (int c = 0; c < matrix[r].length; c++) {
                 double v = shown(ctx, r, c);
-                if (v != v) {
+                if (isGap(v)) {
                     continue;
                 }
                 float[] b = cell(ctx, r, c);

@@ -40,6 +40,12 @@ public class ColorScale {
     ///
     /// - `colors`: the colour at each stop
     public ColorScale(double[] positions, int[] colors) {
+        if (positions == null || colors == null || positions.length == 0
+                || positions.length != colors.length) {
+            // interpolation pairs stops by index: a missing or unpaired stop fails here, not
+            // as an index error in the first paint
+            throw new IllegalArgumentException("positions and colors must be non-empty and of equal length");
+        }
         this.positions = new double[positions.length];
         this.colors = new int[colors.length];
         System.arraycopy(positions, 0, this.positions, 0, positions.length);

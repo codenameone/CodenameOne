@@ -96,7 +96,7 @@ public class ErrorBarSeries extends XYSeries {
         for (int i = 0; i < size(); i++) {
             double[] v = {getLow(i), getHigh(i), getY(i)};
             for (int k = 0; k < 3; k++) {
-                if (v[k] == v[k]) {
+                if (!isGap(v[k])) {
                     min = Math.min(min, v[k]);
                     max = Math.max(max, v[k]);
                 }
@@ -120,15 +120,15 @@ public class ErrorBarSeries extends XYSeries {
             // whiskers and marker move from where they were when the last transition started, so a
             // change elsewhere leaves this one still; only a first appearance grows out of the value
             double v = animatedY(ctx, i);
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             // a NaN end has no whisker: it would round to pixel 0, so that side collapses onto
             // the value and gets no cap
             double low = getLow(i);
             double high = getHigh(i);
-            boolean hasLo = low == low;
-            boolean hasHi = high == high;
+            boolean hasLo = !isGap(low);
+            boolean hasHi = !isGap(high);
             double lo = hasLo ? animatedAux(ctx, 0, i) : v;
             double hi = hasHi ? animatedAux(ctx, 1, i) : v;
             int x0 = Math.round(ctx.screenX(this, getX(i), lo));

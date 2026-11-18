@@ -133,6 +133,16 @@ public abstract class Axis {
         return this;
     }
 
+    /// True when `setRange` pinned the low end, so `adjustBounds` must keep it as given.
+    protected boolean isMinFixed() {
+        return fixedMin != null;
+    }
+
+    /// True when `setRange` pinned the high end, so `adjustBounds` must keep it as given.
+    protected boolean isMaxFixed() {
+        return fixedMax != null;
+    }
+
     /// Forces zero into the automatic range, as a bar chart's value axis needs.
     public Axis setIncludeZero(boolean includeZero) {
         this.includeZero = includeZero;
@@ -169,6 +179,21 @@ public abstract class Axis {
     ///
     /// - `max`: largest value of any visible series
     public void setDataBounds(double min, double max) {
+        // the last guard against a series or caller that hands over NaN or infinity: such an
+        // end carries no extent, so it collapses onto the other end (or 0..1 when neither is
+        // usable) and the empty-range padding below takes over
+        boolean minOk = min == min && !Double.isInfinite(min);
+        boolean maxOk = max == max && !Double.isInfinite(max);
+        if (!minOk || !maxOk) {
+            if (minOk) {
+                max = min;
+            } else if (maxOk) {
+                min = max;
+            } else {
+                min = 0;
+                max = 1;
+            }
+        }
         if (includeZero) {
             min = Math.min(min, 0);
             max = Math.max(max, 0);

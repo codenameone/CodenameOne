@@ -223,7 +223,7 @@ public class CandlestickSeries extends XYSeries {
             double h = getHigh(i);
             double l = getLow(i);
             double c = getClose(i);
-            if (o != o || h != h || l != l || c != c) {
+            if (isGap(o) || isGap(h) || isGap(l) || isGap(c)) {
                 // a candle with any price missing is a gap, and the next one starts the average over
                 out[0][i] = Double.NaN;
                 out[1][i] = Double.NaN;
@@ -281,10 +281,10 @@ public class CandlestickSeries extends XYSeries {
         for (int i = 0; i < n; i++) {
             double l = getLow(i);
             double h = getHigh(i);
-            if (l == l) {
+            if (!isGap(l)) {
                 min = Math.min(min, l);
             }
-            if (h == h) {
+            if (!isGap(h)) {
                 max = Math.max(max, h);
             }
         }

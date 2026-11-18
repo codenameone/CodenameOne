@@ -59,7 +59,7 @@ public class HistogramSeries extends BarSeries {
         double max = -Double.MAX_VALUE;
         int n = 0;
         for (double v : samples) {
-            if (v == v) {
+            if (!isGap(v)) {
                 min = Math.min(min, v);
                 max = Math.max(max, v);
                 n++;
@@ -81,7 +81,7 @@ public class HistogramSeries extends BarSeries {
             x[b] = min + width * (b + 0.5);
         }
         for (double v : samples) {
-            if (v == v) {
+            if (!isGap(v)) {
                 int b = (int) ((v - min) / width);
                 y[Math.min(bins - 1, Math.max(0, b))]++;
             }

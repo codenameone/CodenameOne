@@ -145,7 +145,7 @@ public class LineSeries extends XYSeries {
         for (int i = r[0]; i <= r[1] + 1; i++) {
             boolean end = i > r[1];
             double v = end ? Double.NaN : animatedY(ctx, i);
-            if (v != v) {
+            if (isGap(v)) {
                 if (dense && first >= 0) {
                     m = flushColumn(ctx, m, first, lo, hi, last, needBase);
                     first = -1;
@@ -414,7 +414,7 @@ public class LineSeries extends XYSeries {
         LabelLayout ll = ctx.getLabels();
         for (int i = r[0]; i <= r[1]; i++) {
             double v = ys[i];
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             // the same animated base the line is drawn on, so a label rides its point mid-transition

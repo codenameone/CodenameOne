@@ -622,9 +622,20 @@ public class Chart extends Component {
         // the export shows the chart as it will settle: a transition still running on
         // screen is drawn at its end, without being finished or restarted
         exporting = true;
+        // a viewport animation in flight is exported at its target, like any other transition;
+        // the on-screen tween resumes from the range it had
+        Axis[] axes = viewportTo != null ? allAxes() : null;
+        double[] keepViewport = null;
+        if (axes != null && viewportTo.length == axes.length * 3) {
+            keepViewport = snapshot(axes);
+            restore(axes, viewportTo);
+        }
         try {
             paintChart(g, 0, 0, width, height);
         } finally {
+            if (keepViewport != null) {
+                restore(axes, keepViewport);
+            }
             exporting = false;
             setX(ox);
             setY(oy);
@@ -895,6 +906,10 @@ public class Chart extends Component {
         return false;
     }
 
+    private static boolean finite(double v) {
+        return v == v && !Double.isInfinite(v);
+    }
+
     private void prepareAxes() {
         double xmin = Double.MAX_VALUE;
         double xmax = -Double.MAX_VALUE;
@@ -906,24 +921,34 @@ public class Chart extends Component {
             }
             double[] xb = s.getXBounds();
             double[] yb = s.getYBounds();
-            // A NaN bound would poison Math.min/max for every other series, so a
-            // series that reports one is left out of that axis rather than trusted.
-            if (xb != null && xb[0] == xb[0] && xb[1] == xb[1]) {
+            // A NaN or infinite bound would poison Math.min/max for every other series, so
+            // a series that reports one is left out of that axis rather than trusted.
+            if (xb != null && finite(xb[0]) && finite(xb[1])) {
                 xmin = Math.min(xmin, xb[0]);
                 xmax = Math.max(xmax, xb[1]);
             }
-            if (yb != null && yb[0] == yb[0] && yb[1] == yb[1]) {
+            if (yb != null && finite(yb[0]) && finite(yb[1])) {
                 int k = s.isSecondaryAxis() && secondaryYAxis != null ? 1 : 0;
                 ymin[k] = Math.min(ymin[k], yb[0]);
                 ymax[k] = Math.max(ymax[k], yb[1]);
             }
         }
         for (Annotation a : annotations) {
+            if (!a.isOnValueAxis()) {
+                continue;
+            }
+            int k = a.isSecondaryAxis() && secondaryYAxis != null ? 1 : 0;
+            // each end counts on its own: a band to infinity widens the axis to its finite end
+            // only, never to infinity
             double v = a.getValueExtent();
-            if (v == v && a.isOnValueAxis()) {
-                int k = a.isSecondaryAxis() && secondaryYAxis != null ? 1 : 0;
-                ymin[k] = Math.min(ymin[k], Math.min(v, a.getValueExtentMax()));
-                ymax[k] = Math.max(ymax[k], Math.max(v, a.getValueExtentMax()));
+            double v2 = a.getValueExtentMax();
+            if (finite(v)) {
+                ymin[k] = Math.min(ymin[k], v);
+                ymax[k] = Math.max(ymax[k], v);
+            }
+            if (finite(v2)) {
+                ymin[k] = Math.min(ymin[k], v2);
+                ymax[k] = Math.max(ymax[k], v2);
             }
         }
         if (xmin > xmax) {
@@ -2482,7 +2507,7 @@ public class Chart extends Component {
         // a gap (a NaN y) is skipped, whether stepping along a series or onto another one
         XYSeries gaps = s instanceof XYSeries ? (XYSeries) s : null;
         for (int i = index + dir; i >= 0 && i < s.getPointCount(); i += dir) {
-            if (gaps != null && gaps.getY(i) != gaps.getY(i)) {
+            if (gaps != null && Series.isGap(gaps.getY(i))) {
                 continue;
             }
             next = s.getPoint(lastContext, i);
@@ -2491,7 +2516,8 @@ public class Chart extends Component {
             }
         }
         if (next == null) {
-            return true;
+            // at the edge there is nothing to step to: let the arrow pan a zoomed chart instead
+            return false;
         }
         if (s.isCartesian()) {
             Axis h = xAxis;

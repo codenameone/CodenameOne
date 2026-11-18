@@ -317,6 +317,12 @@ public abstract class Series {
         return visibility;
     }
 
+    /// True for a value that cannot be plotted: NaN or either infinity. Such a point is a gap,
+    /// drawn as nothing and kept out of every axis bound.
+    protected static boolean isGap(double v) {
+        return v != v || Double.isInfinite(v);
+    }
+
     /// Interpolates for transitions; a NaN start means the value appears without a tween.
     protected static double lerp(double a, double b, double t) {
         if (a != a) {

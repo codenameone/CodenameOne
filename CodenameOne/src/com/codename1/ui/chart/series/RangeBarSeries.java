@@ -126,7 +126,7 @@ public class RangeBarSeries extends BarSeries {
         for (int i = 0; i < size(); i++) {
             double a = getStart(i);
             double b = getEnd(i);
-            if (a == a && b == b) {
+            if (!isGap(a) && !isGap(b)) {
                 min = Math.min(min, Math.min(a, b));
                 max = Math.max(max, Math.max(a, b));
             }

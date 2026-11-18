@@ -389,7 +389,7 @@ public abstract class XYSeries extends Series {
                     int j = i < xo.count && xo.xs[i] == x ? i : xo.indexOfX(x);
                     if (j >= 0) {
                         double v = xo.ys[j];
-                        if (v == v && (v < 0) == negative) {
+                        if (!isGap(v) && (v < 0) == negative) {
                             sum += v;
                         }
                     }
@@ -632,10 +632,15 @@ public abstract class XYSeries extends Series {
         double min = Double.MAX_VALUE;
         double max = -Double.MAX_VALUE;
         for (int i = 0; i < count; i++) {
-            min = Math.min(min, xs[i]);
-            max = Math.max(max, xs[i]);
+            double x = xs[i];
+            // one NaN x would turn the whole min/max into NaN and drop the series from the axis
+            if (isGap(x)) {
+                continue;
+            }
+            min = Math.min(min, x);
+            max = Math.max(max, x);
         }
-        return new double[]{min, max};
+        return min > max ? null : new double[]{min, max};
     }
 
     @Override
@@ -645,10 +650,13 @@ public abstract class XYSeries extends Series {
         boolean any = false;
         for (int i = 0; i < count; i++) {
             double v = ys[i];
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             double b = getBase(i);
+            if (isGap(b)) {
+                continue;
+            }
             min = Math.min(min, Math.min(b, b + v));
             max = Math.max(max, Math.max(b, b + v));
             any = true;
@@ -662,7 +670,7 @@ public abstract class XYSeries extends Series {
             max = -Double.MAX_VALUE;
             for (int i = 0; i < count; i++) {
                 double v = ys[i];
-                if (v == v) {
+                if (!isGap(v)) {
                     min = Math.min(min, v);
                     max = Math.max(max, v);
                 }
@@ -779,7 +787,7 @@ public abstract class XYSeries extends Series {
         int oy = ctx.getOriginY();
         for (int i = r[0]; i <= r[1]; i++) {
             double v = ys[i];
-            if (v != v) {
+            if (isGap(v)) {
                 continue;
             }
             double top = getBase(i) + v;

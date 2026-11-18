@@ -74,6 +74,16 @@ public class TreeNode {
     ///
     /// the child, for chaining further adds onto it
     public TreeNode add(TreeNode child) {
+        for (TreeNode p = this; p != null; p = p.parent) {
+            if (p == child) { //NOPMD CompareObjectsWithEquals - identity, a cycle is the same node
+                throw new IllegalArgumentException("a node cannot be added under itself or its own descendant");
+            }
+        }
+        if (child.parent != null) {
+            // a node lives in one place: moving it out of its old parent keeps that parent's
+            // sum and the hierarchy a tree
+            child.parent.children.remove(child);
+        }
         child.parent = this;
         children.add(child);
         return child;

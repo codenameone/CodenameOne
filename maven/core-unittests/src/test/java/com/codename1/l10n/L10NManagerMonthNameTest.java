@@ -91,4 +91,44 @@ class L10NManagerMonthNameTest extends UITestBase {
             implementation.setLocalizationManager(previous);
         }
     }
+
+    // a manager formatting like a device in another language: weekday and month come from its
+    // own tables, so no English name can be matched against them
+    private static L10NManager localized(final String[] weekdays, final String[] months, final boolean german) {
+        return new L10NManager("xx", "XX") {
+            @Override
+            public String formatDateLongStyle(Date d) {
+                Calendar c = Calendar.getInstance();
+                c.setTime(d);
+                String wd = weekdays[c.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY];
+                String m = months[c.get(Calendar.MONTH) - Calendar.JANUARY];
+                int day = c.get(Calendar.DAY_OF_MONTH);
+                int y = c.get(Calendar.YEAR);
+                return german ? wd + ", " + day + ". " + m + " " + y : wd + " " + day + " " + m + " " + y;
+            }
+        };
+    }
+
+    private static Date day(int y, int month, int d) {
+        Calendar c = Calendar.getInstance();
+        c.set(y, month, d, 12, 0, 0);
+        return c.getTime();
+    }
+
+    @Test
+    void weekdayOfAnotherLanguageIsSkipped() {
+        String[] frDays = {"dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"};
+        String[] frMonths = {"janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout",
+                "septembre", "octobre", "novembre", "decembre"};
+        String[] deDays = {"Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"};
+        String[] deMonths = {"Januar", "Februar", "Maerz", "April", "Mai", "Juni", "Juli", "August",
+                "September", "Oktober", "November", "Dezember"};
+        L10NManager fr = localized(frDays, frMonths, false);
+        L10NManager de = localized(deDays, deMonths, true);
+        assertEquals("mars", fr.getLongMonthName(day(2026, Calendar.MARCH, 3)));
+        assertEquals("Maerz", de.getLongMonthName(day(2026, Calendar.MARCH, 3)));
+        // the first and last day of a month compare against a neighbour inside that month
+        assertEquals("mars", fr.getLongMonthName(day(2026, Calendar.MARCH, 1)));
+        assertEquals("Dezember", de.getLongMonthName(day(2026, Calendar.DECEMBER, 31)));
+    }
 }
