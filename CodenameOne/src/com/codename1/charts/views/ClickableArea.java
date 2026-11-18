@@ -16,6 +16,7 @@ package com.codename1.charts.views;
 import com.codename1.ui.geom.Rectangle2D;
 
 
+@Deprecated
 public class ClickableArea {
     private final Rectangle2D rect;
     private final double x;

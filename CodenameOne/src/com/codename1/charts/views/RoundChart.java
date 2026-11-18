@@ -29,6 +29,9 @@ import com.codename1.ui.Component;
 /// functionality for drawing the chart title, legend entries and handling
 /// layout. Developers typically work with concrete subclasses such as
 /// `PieChart` or `DoughnutChart` directly.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public abstract class RoundChart extends AbstractChart {
     /// The legend shape width.
     protected static final int SHAPE_WIDTH = 10;

@@ -1,0 +1,511 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.chart.series;
+
+import com.codename1.ui.chart.Chart;
+import com.codename1.ui.chart.ChartContext;
+import com.codename1.ui.chart.ChartPoint;
+import com.codename1.ui.chart.Series;
+
+import java.util.List;
+
+/// A series of `(x, y)` points in primitive arrays. A `NaN` y is a gap: lines break there
+/// and bars are left out.
+///
+/// Series sharing a stack group are drawn on top of each other, each point resting on the
+/// sum of the earlier series at the same index.
+public abstract class XYSeries extends Series {
+    double[] xs = new double[16];
+    double[] ys = new double[16];
+    int count;
+    private double[] fromY;
+    private double[] fromBase;
+    private String stackGroup;
+    private int maxPoints;
+    /// Extra values per point (open/high/low, a range start, quartiles), parallel to `ys`.
+    double[][] aux;
+
+    /// Creates an empty series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the legend name
+    protected XYSeries(String name) {
+        super(name);
+    }
+
+    /// Creates a series that keeps `auxChannels` extra values beside each y.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the series name
+    ///
+    /// - `auxChannels`: number of extra values per point
+    protected XYSeries(String name, int auxChannels) {
+        super(name);
+        aux = new double[auxChannels][16];
+    }
+
+    /// Replaces all points, each with its extra values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x values, or null for 0, 1, 2...
+    ///
+    /// - `y`: the main values
+    ///
+    /// - `channels`: one array per extra channel, each as long as `y`
+    protected void setRows(double[] x, double[] y, double[][] channels) {
+        begin();
+        count = y.length;
+        int cap = Math.max(16, count);
+        xs = new double[cap];
+        ys = new double[cap];
+        for (int k = 0; k < aux.length; k++) {
+            aux[k] = new double[cap];
+        }
+        for (int i = 0; i < count; i++) {
+            xs[i] = x == null ? i : x[i];
+            ys[i] = y[i];
+            for (int k = 0; k < aux.length; k++) {
+                aux[k][i] = channels[k][i];
+            }
+        }
+        dataChanged();
+    }
+
+    /// Appends one point with its extra values, sliding the window when a maximum is set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x value
+    ///
+    /// - `y`: the main value
+    ///
+    /// - `values`: the extra values, one per channel
+    protected void addRow(double x, double y, double[] values) {
+        begin();
+        slide();
+        ensure(count + 1);
+        xs[count] = x;
+        ys[count] = y;
+        for (int k = 0; k < aux.length; k++) {
+            aux[k][count] = values[k];
+        }
+        count++;
+        dataChanged();
+    }
+
+    /// An extra value of point `i`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channel`: the channel index
+    ///
+    /// - `i`: the point index
+    ///
+    /// #### Returns
+    ///
+    /// the stored value
+    protected double getAux(int channel, int i) {
+        return aux[channel][i];
+    }
+
+    private void slide() {
+        if (maxPoints > 0 && count >= maxPoints) {
+            System.arraycopy(xs, 1, xs, 0, count - 1);
+            System.arraycopy(ys, 1, ys, 0, count - 1);
+            if (aux != null) {
+                for (double[] channel : aux) {
+                    System.arraycopy(channel, 1, channel, 0, count - 1);
+                }
+            }
+            count--;
+        }
+    }
+
+    @Override
+    public boolean isCartesian() {
+        return true;
+    }
+
+    /// Replaces all data. `x` may be null, in which case points are numbered 0, 1, 2 ...
+    /// (the positions of a category axis).
+    public XYSeries setData(double[] x, double[] y) {
+        begin();
+        count = y.length;
+        xs = new double[Math.max(16, count)];
+        ys = new double[Math.max(16, count)];
+        for (int i = 0; i < count; i++) {
+            xs[i] = x == null ? i : x[i];
+            ys[i] = y[i];
+        }
+        if (aux != null) {
+            for (int k = 0; k < aux.length; k++) {
+                double[] na = new double[xs.length];
+                for (int i = 0; i < count; i++) {
+                    na[i] = y[i];
+                }
+                aux[k] = na;
+            }
+        }
+        dataChanged();
+        return this;
+    }
+
+    /// Replaces all data with values at x = 0, 1, 2 ...
+    public XYSeries setValues(double... y) {
+        return setData(null, y);
+    }
+
+    /// Appends a point at the next index.
+    public XYSeries add(double y) {
+        return add(count == 0 ? 0 : xs[count - 1] + 1, y);
+    }
+
+    /// Appends a point. With `setMaxPoints` the oldest point drops off, for real time data.
+    public XYSeries add(double x, double y) {
+        begin();
+        slide();
+        ensure(count + 1);
+        xs[count] = x;
+        ys[count] = y;
+        count++;
+        dataChanged();
+        return this;
+    }
+
+    /// Changes the value at `index`.
+    public XYSeries set(int index, double y) {
+        begin();
+        ys[index] = y;
+        dataChanged();
+        return this;
+    }
+
+    /// Removes every point.
+    public XYSeries clear() {
+        begin();
+        count = 0;
+        dataChanged();
+        return this;
+    }
+
+    /// Keeps at most `n` points, dropping the oldest as new ones arrive; 0 keeps all.
+    public XYSeries setMaxPoints(int n) {
+        maxPoints = n;
+        return this;
+    }
+
+    /// Stacks this series on earlier ones sharing the same group name; null for none.
+    public XYSeries setStackGroup(String group) {
+        stackGroup = group;
+        dataChanged();
+        return this;
+    }
+
+    /// The stack group, or null.
+    public String getStackGroup() {
+        return stackGroup;
+    }
+
+    /// The number of points.
+    public int size() {
+        return count;
+    }
+
+    /// The x value at `i`.
+    public double getX(int i) {
+        return xs[i];
+    }
+
+    /// The y value at `i`.
+    public double getY(int i) {
+        return ys[i];
+    }
+
+    private void ensure(int n) {
+        if (n > xs.length) {
+            int cap = Math.max(n, xs.length * 2);
+            double[] nx = new double[cap];
+            double[] ny = new double[cap];
+            System.arraycopy(xs, 0, nx, 0, count);
+            System.arraycopy(ys, 0, ny, 0, count);
+            xs = nx;
+            ys = ny;
+            if (aux != null) {
+                for (int k = 0; k < aux.length; k++) {
+                    double[] na = new double[cap];
+                    System.arraycopy(aux[k], 0, na, 0, count);
+                    aux[k] = na;
+                }
+            }
+        }
+    }
+
+    private void begin() {
+        Chart c = getChart();
+        if (c != null) {
+            c.beginChange();
+        }
+    }
+
+    /// The base this series' point `i` rests on: 0, or the stacked sum of the earlier series
+    /// in its group.
+    public double getBase(int i) {
+        if (stackGroup == null || getChart() == null) {
+            return 0;
+        }
+        double sum = 0;
+        double x = xs[i];
+        List<Series> all = getChart().getSeries();
+        for (Series o : all) {
+            if (o == this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+                break;
+            }
+            if (o instanceof XYSeries && o.isVisible()) {
+                XYSeries xo = (XYSeries) o;
+                if (stackGroup.equals(xo.stackGroup) && xo.isSecondaryAxis() == isSecondaryAxis()) {
+                    int j = i < xo.count && xo.xs[i] == x ? i : xo.indexOfX(x);
+                    if (j >= 0) {
+                        double v = xo.ys[j];
+                        if (v == v) {
+                            sum += v;
+                        }
+                    }
+                }
+            }
+        }
+        return sum;
+    }
+
+    int indexOfX(double x) {
+        int lo = 0;
+        int hi = count - 1;
+        while (lo <= hi) {
+            int mid = (lo + hi) >>> 1;
+            double v = xs[mid];
+            if (v < x) {
+                lo = mid + 1;
+            } else if (v > x) {
+                hi = mid - 1;
+            } else {
+                return mid;
+            }
+        }
+        return -1;
+    }
+
+    /// The y shown at `i` in the current frame: the value interpolated from where the last
+    /// transition started.
+    public double animatedY(ChartContext ctx, int i) {
+        double t = ctx == null ? 1 : ctx.getProgress();
+        double target = ys[i];
+        if (fromY == null || i >= fromY.length || t >= 1) {
+            return target;
+        }
+        return lerp(fromY[i], target, t);
+    }
+
+    /// The stacked base shown at `i` in the current frame.
+    public double animatedBase(ChartContext ctx, int i) {
+        double target = getBase(i);
+        double t = ctx == null ? 1 : ctx.getProgress();
+        if (fromBase == null || i >= fromBase.length || t >= 1) {
+            return target;
+        }
+        return lerp(fromBase[i], target, t);
+    }
+
+    @Override
+    protected void captureTransitionStart() {
+        ChartContext ctx = getChart() == null ? null : getChart().getLastContext();
+        double[] fy = new double[count];
+        double[] fb = new double[count];
+        for (int i = 0; i < count; i++) {
+            fy[i] = animatedY(ctx, i);
+            fb[i] = animatedBase(ctx, i);
+        }
+        fromY = fy;
+        fromBase = fb;
+    }
+
+    @Override
+    protected void captureEntryStart() {
+        fromY = new double[count];
+        fromBase = new double[count];
+        for (int i = 0; i < count; i++) {
+            fromBase[i] = getBase(i);
+        }
+    }
+
+    @Override
+    public double[] getXBounds() {
+        if (count == 0) {
+            return null;
+        }
+        double min = Double.MAX_VALUE;
+        double max = -Double.MAX_VALUE;
+        for (int i = 0; i < count; i++) {
+            min = Math.min(min, xs[i]);
+            max = Math.max(max, xs[i]);
+        }
+        return new double[]{min, max};
+    }
+
+    @Override
+    public double[] getYBounds() {
+        double min = Double.MAX_VALUE;
+        double max = -Double.MAX_VALUE;
+        boolean any = false;
+        for (int i = 0; i < count; i++) {
+            double v = ys[i];
+            if (v != v) {
+                continue;
+            }
+            double b = getBase(i);
+            min = Math.min(min, Math.min(b, b + v));
+            max = Math.max(max, Math.max(b, b + v));
+            any = true;
+        }
+        if (!any) {
+            return null;
+        }
+        if (stackGroup == null) {
+            // a lone series should not drag the axis to 0 unless the chart asks for it
+            min = Double.MAX_VALUE;
+            max = -Double.MAX_VALUE;
+            for (int i = 0; i < count; i++) {
+                double v = ys[i];
+                if (v == v) {
+                    min = Math.min(min, v);
+                    max = Math.max(max, v);
+                }
+            }
+        }
+        return new double[]{min, max};
+    }
+
+    /// The smallest gap between neighbouring x values, the width of one bar or candle slot;
+    /// 1 when there are fewer than two points, which is a category band.
+    public double getMinXSpacing() {
+        double m = Double.MAX_VALUE;
+        for (int i = 1; i < count; i++) {
+            double d = xs[i] - xs[i - 1];
+            if (d > 0 && d < m) {
+                m = d;
+            }
+        }
+        return m == Double.MAX_VALUE ? 1 : m;
+    }
+
+    /// First index whose x is at or after `x`, for culling points outside the viewport.
+    protected int lowerBound(double x) {
+        int lo = 0;
+        int hi = count;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (xs[mid] < x) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        return lo;
+    }
+
+    /// The index range `{from, to}` (inclusive) worth painting: the visible points plus one
+    /// neighbour each side so lines run to the plot edge. Assumes ascending x.
+    protected int[] visibleRange(ChartContext ctx) {
+        if (count == 0) {
+            return new int[]{0, -1};
+        }
+        double lo = ctx.getXAxis().getVisibleMin();
+        double hi = ctx.getXAxis().getVisibleMax();
+        int a = Math.max(0, lowerBound(lo) - 1);
+        int b = Math.min(count - 1, lowerBound(hi));
+        return new int[]{a, b};
+    }
+
+    @Override
+    public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
+        int[] r = visibleRange(ctx);
+        int best = -1;
+        double bestD = (double) radius * radius;
+        int ox = ctx.getOriginX();
+        int oy = ctx.getOriginY();
+        for (int i = r[0]; i <= r[1]; i++) {
+            double v = ys[i];
+            if (v != v) {
+                continue;
+            }
+            double top = getBase(i) + v;
+            double dx = ctx.screenX(this, xs[i], top) - ox - x;
+            double dy = ctx.screenY(this, xs[i], top) - oy - y;
+            double d = dx * dx + dy * dy;
+            if (d <= bestD) {
+                bestD = d;
+                best = i;
+            }
+        }
+        return best < 0 ? null : getPoint(ctx, best);
+    }
+
+    @Override
+    public void collectTableRows(List<String[]> rows) {
+        Chart c = getChart();
+        for (int i = 0; i < count; i++) {
+            String item = c == null ? com.codename1.ui.chart.axis.Axis.formatNumber(xs[i], 2) : c.getXAxis().format(xs[i], 0);
+            rows.add(new String[]{getName(), item, tableValue(i)});
+        }
+    }
+
+    /// The text of point `i` in the accessible data table.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the point index
+    ///
+    /// #### Returns
+    ///
+    /// the formatted value
+    protected String tableValue(int i) {
+        return formatValue(null, ys[i]);
+    }
+
+    @Override
+    public int getPointCount() {
+        return count;
+    }
+
+    @Override
+    public ChartPoint getPoint(ChartContext ctx, int index) {
+        if (index < 0 || index >= count) {
+            return null;
+        }
+        double top = getBase(index) + ys[index];
+        int sx = (int) ctx.screenX(this, xs[index], top) - ctx.getOriginX();
+        int sy = (int) ctx.screenY(this, xs[index], top) - ctx.getOriginY();
+        return new ChartPoint(this, index, xs[index], ys[index], sx, sy, null);
+    }
+}

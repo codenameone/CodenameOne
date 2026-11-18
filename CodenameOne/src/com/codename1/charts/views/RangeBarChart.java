@@ -31,6 +31,9 @@ import java.util.List;
 /// Use this chart with an `XYMultipleSeriesDataset` containing
 /// `XYSeries` instances where consecutive entries form the minimum/maximum
 /// pair for a category.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class RangeBarChart extends BarChart {
     /// The chart type.
     public static final String TYPE = "RangeBar";

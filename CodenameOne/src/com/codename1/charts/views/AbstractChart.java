@@ -34,6 +34,9 @@ import java.util.List;
 
 
 /// An abstract class to be implemented by the chart rendering classes.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public abstract class AbstractChart {
     private static final char[] stopCharCandidates = "!@#$%^&*()?><,./+-qwertyuiop[zxcvbnm,./\\|}{".toCharArray();
 

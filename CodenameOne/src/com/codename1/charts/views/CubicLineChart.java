@@ -32,6 +32,9 @@ import java.util.List;
 /// `XYMultipleSeriesDataset` and `XYMultipleSeriesRenderer` as usual
 /// and pass an optional smoothness factor to control how tightly the curve
 /// follows the provided data points.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class CubicLineChart extends LineChart {
     /// The chart type.
     public static final String TYPE = "Cubic";

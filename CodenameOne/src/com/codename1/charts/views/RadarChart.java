@@ -32,6 +32,9 @@ import java.util.List;
 /// axis radiating from the centre. Configure colours and labelling through a
 /// `DefaultRenderer` and wrap the instance in a
 /// `com.codename1.charts.ChartComponent` to present it inside your UI.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class RadarChart extends RoundChart {
 
     /// The series dataset.

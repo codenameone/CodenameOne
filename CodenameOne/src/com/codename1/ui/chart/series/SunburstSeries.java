@@ -1,0 +1,163 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.chart.series;
+
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.chart.ChartContext;
+import com.codename1.ui.chart.TreeNode;
+import com.codename1.ui.chart.layout.LabelLayout;
+import com.codename1.ui.chart.layout.Shapes;
+
+/// A sunburst: the hierarchy as concentric rings, the root in the centre and each level one
+/// ring further out, every node's angle proportional to its value. Tap a branch to make it the
+/// centre; tap the centre to go back up.
+///
+/// ```java
+/// chart.addSeries(new SunburstSeries("Disk usage", root).setMaxDepth(3));
+/// ```
+public class SunburstSeries extends HierarchySeries {
+    private float cx;
+    private float cy;
+    private float hole;
+
+    /// Creates a sunburst.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the series name
+    ///
+    /// - `root`: the tree's root
+    public SunburstSeries(String name, TreeNode root) {
+        super(name, root);
+        setMaxDepth(3);
+    }
+
+    @Override
+    public void paint(ChartContext ctx) {
+        nodes.clear();
+        cells.clear();
+        crumb = null;
+        if (current == null) {
+            return;
+        }
+        Graphics g = ctx.getGraphics();
+        Font f = ctx.getFont();
+        float t = growth(ctx);
+        cx = ctx.getPlotX() + ctx.getPlotWidth() / 2f;
+        cy = ctx.getPlotY() + ctx.getPlotHeight() / 2f;
+        float r = Math.min(ctx.getPlotWidth(), ctx.getPlotHeight()) / 2f - ctx.mm(1);
+        int levels = Math.max(1, Math.min(getMaxDepth(), depthBelow(current)));
+        float ring = r / (levels + 0.6f);
+        hole = ring * 0.6f;
+        int alpha = g.getAlpha();
+        g.setAlpha((int) (alpha * getVisibilityFraction()));
+        paintRing(ctx, current, 0, 360 * t, 1, levels, ring, t >= 1);
+        String label = current.getLabel();
+        int fh = f.getHeight();
+        if (label != null && hole > fh) {
+            g.setColor(ctx.getTheme().getTextColor());
+            g.setFont(f);
+            String a = LabelLayout.ellipsize(f, label, (int) (hole * 1.8f));
+            g.drawString(a, Math.round(cx - f.stringWidth(a) / 2f), Math.round(cy - fh));
+            String b = LabelLayout.ellipsize(f, formatValue(ctx, current.getValue()), (int) (hole * 1.8f));
+            g.setColor(ctx.getTheme().getSecondaryTextColor());
+            g.drawString(b, Math.round(cx - f.stringWidth(b) / 2f), Math.round(cy));
+            if (current != root) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+                crumb = new int[]{Math.round(cx - hole), Math.round(cy - hole), Math.round(hole * 2), Math.round(hole * 2)};
+            }
+        }
+        g.setAlpha(alpha);
+    }
+
+    private static int depthBelow(TreeNode n) {
+        int d = 0;
+        for (int i = 0; i < n.getChildCount(); i++) {
+            d = Math.max(d, depthBelow(n.getChild(i)));
+        }
+        return n.getChildCount() == 0 ? 0 : d + 1;
+    }
+
+    private void paintRing(ChartContext ctx, TreeNode parent, double start, double sweep, int level, int levels, float ring, boolean labels) {
+        double total = parent.getValue();
+        if (total <= 0 || level > levels) {
+            return;
+        }
+        Graphics g = ctx.getGraphics();
+        Font f = ctx.getFont();
+        int fh = f.getHeight();
+        float inner = hole + ring * (level - 1);
+        float outer = inner + ring - Math.max(1, ctx.mm(0.3f));
+        double a = start;
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            TreeNode c = parent.getChild(i);
+            double s = sweep * c.getValue() / total;
+            if (s <= 0) {
+                continue;
+            }
+            int color = colorOf(ctx, c);
+            g.setColor(color);
+            double pad = s > 1 ? 0.4 : 0;
+            g.fillShape(Shapes.sector(cx, cy, outer, inner, a + pad, s - pad * 2));
+            record(c, new float[]{inner, outer, (float) a, (float) s});
+            if (labels) {
+                double mid = a + s / 2;
+                float mr = (inner + outer) / 2;
+                double arc = Math.toRadians(s) * mr;
+                String txt = LabelLayout.ellipsize(f, c.getLabel(), (int) Math.min(arc - ctx.mm(1), ring * 1.6f));
+                int w = f.stringWidth(txt);
+                if (txt.length() > 0 && !"...".equals(txt) && arc > w + ctx.mm(1) && ring > fh) {
+                    int x = Math.round(Shapes.px(cx, mr, mid) - w / 2f);
+                    int y = Math.round(Shapes.py(cy, mr, mid) - fh / 2f);
+                    if (ctx.getLabels().placeAt(x, y, w, fh)) {
+                        g.setColor(BarSeries.contrast(color));
+                        g.drawString(txt, x, y);
+                    }
+                }
+            }
+            paintRing(ctx, c, a, s, level + 1, levels, ring, labels);
+            a += s;
+        }
+    }
+
+    @Override
+    protected boolean contains(float[] geo, float x, float y) {
+        float dx = x - cx;
+        float dy = y - cy;
+        double d = Math.sqrt(dx * dx + dy * dy);
+        if (d < geo[0] || d > geo[1]) {
+            return false;
+        }
+        double deg = Math.toDegrees(com.codename1.util.MathUtil.atan2(dx, -dy));
+        double rel = deg - geo[2];
+        rel = rel - 360 * Math.floor(rel / 360);
+        return rel <= geo[3];
+    }
+
+    @Override
+    protected float[] anchor(float[] geo) {
+        double mid = geo[2] + geo[3] / 2;
+        float mr = (geo[0] + geo[1]) / 2;
+        return new float[]{Shapes.px(cx, mr, mid), Shapes.py(cy, mr, mid)};
+    }
+}

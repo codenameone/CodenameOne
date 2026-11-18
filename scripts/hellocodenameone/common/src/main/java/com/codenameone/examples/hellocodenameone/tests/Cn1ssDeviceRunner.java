@@ -123,6 +123,7 @@ import com.codenameone.examples.hellocodenameone.tests.charts.ChartScatterScreen
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartStackedBarScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartTimeChartScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartTransformScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.ModernChartScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
 
@@ -427,6 +428,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new ChartCombinedXYScreenshotTest(),
             new ChartTransformScreenshotTest(),
             new ChartRotatedScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2MixedScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2DenseLabelsScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2CandlesScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2WaterfallScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2BoxplotScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2HeatmapScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2PieScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2DoughnutScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2GaugeScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2RadarScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2TreemapScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2SunburstScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2SankeyScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2FunnelScreenshotTest(),
+            new ModernChartScreenshotTest.Chart2SparklinesScreenshotTest(),
             new BrowserComponentScreenshotTest(),
             new RichTextAreaScreenshotTest(),
             new CodeEditorScreenshotTest(),

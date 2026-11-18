@@ -20,6 +20,9 @@ import java.util.Arrays;
 import java.util.List;
 
 /// Dial chart renderer.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class DialRenderer extends DefaultRenderer {
     /// An array of the renderers types (default is NEEDLE).
     private final List<Type> mVisualTypes = new ArrayList<Type>();

@@ -19,6 +19,9 @@ import java.util.List;
 import java.util.Map;
 
 /// A series for the category charts like the radar ones.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class AreaSeries {
 
     /// The series data table.

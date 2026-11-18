@@ -172,6 +172,9 @@ import java.util.ArrayList;
 ///
 /// The charts package is derived work from the excellent
 /// [open source aChartEngine API.](http://www.achartengine.org/)
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class ChartComponent extends Component {
 
     /// Util object for rendering the chart.

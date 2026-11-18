@@ -26,6 +26,9 @@ import java.util.TreeMap;
 
 /// An XY series encapsulates values for XY charts like line, time, area,
 /// scatter... charts.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class XYSeries {
     /// A map to contain values for X and Y axes and index for each bundle
     private final IndexXYMap<Double, Double> mXY = new IndexXYMap<Double, Double>();

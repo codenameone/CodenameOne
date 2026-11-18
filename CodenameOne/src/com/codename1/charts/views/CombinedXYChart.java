@@ -33,6 +33,9 @@ import java.util.List;
 /// `XYCombinedChartDef` instances that describe which inner chart type
 /// should render each data series. The combined chart can then be wrapped in a
 /// `com.codename1.charts.ChartComponent` for display.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class CombinedXYChart extends XYChart {
 
     private final XYCombinedChartDef[] chartDefinitions;

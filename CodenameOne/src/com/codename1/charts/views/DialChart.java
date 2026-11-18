@@ -30,6 +30,9 @@ import com.codename1.ui.Component;
 /// dataset and renderer to the constructor. Dial charts are typically wrapped in
 /// a `com.codename1.charts.ChartComponent` so they can be placed inside
 /// regular Codename One layouts.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class DialChart extends RoundChart {
     /// The radius of the needle.
     private static final int NEEDLE_RADIUS = 10;

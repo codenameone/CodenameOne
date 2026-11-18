@@ -33,6 +33,9 @@ import java.util.List;
 /// `XYMultipleSeriesRenderer`. The resulting `BubbleChart` can be
 /// wrapped in a `com.codename1.charts.ChartComponent` to embed it inside a
 /// Codename One UI.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class BubbleChart extends XYChart {
     /// The constant to identify this chart type.
     public static final String TYPE = "Bubble";

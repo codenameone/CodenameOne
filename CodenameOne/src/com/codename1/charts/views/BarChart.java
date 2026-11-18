@@ -51,6 +51,9 @@ import java.util.List;
 ///
 /// The `Type` supplied to the constructor controls whether the bars are
 /// rendered in their default style, stacked or heaped.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class BarChart extends XYChart {
     /// The constant to identify this chart type.
     public static final String TYPE = "Bar";

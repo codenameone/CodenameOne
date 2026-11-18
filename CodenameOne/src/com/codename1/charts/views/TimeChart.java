@@ -35,6 +35,9 @@ import java.util.TimeZone;
 /// expressed as milliseconds since the epoch. Configure the desired date format
 /// using `#setDateFormat(String)` or let the chart choose an appropriate
 /// format automatically.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class TimeChart extends LineChart {
     /// /** The constant to identify this chart type.
     public static final String TYPE = "Time";
