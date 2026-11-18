@@ -103,6 +103,10 @@ public abstract class Dialect {
     /// this is the same wire protocol and the same SQL, and everything that
     /// branches on the engine name means that family.
     public static final Dialect MARIADB = new MariaDbDialect();
+    /// Microsoft SQL Server and Azure SQL.
+    public static final Dialect SQLSERVER = new SqlServerDialect();
+    /// Oracle Database.
+    public static final Dialect ORACLE = new OracleDialect();
 
     Dialect() {
     }
@@ -136,10 +140,16 @@ public abstract class Dialect {
         if (equalsIgnoreCaseAscii(engine, "mysql")) {
             return MYSQL;
         }
+        if (equalsIgnoreCaseAscii(engine, "sqlserver") || equalsIgnoreCaseAscii(engine, "mssql")) {
+            return SQLSERVER;
+        }
+        if (equalsIgnoreCaseAscii(engine, "oracle")) {
+            return ORACLE;
+        }
         return null;
     }
 
-    /// "sqlite", "postgresql" or "mysql".
+    /// "sqlite", "postgresql", "mysql", "sqlserver" or "oracle".
     public abstract String getName();
 
     /// `identifier` quoted so that its case is preserved and a reserved word
@@ -225,6 +235,34 @@ public abstract class Dialect {
         return out.toString();
     }
 
+    /// As [#limit(int, int)], told whether the statement it is appended to
+    /// already has an ORDER BY.
+    ///
+    /// It matters on SQL Server alone, where the paging clause is PART of ORDER
+    /// BY and a statement without one cannot be paged at all; there an unordered
+    /// statement is given an ordering that sorts nothing.
+    public String limit(int count, int offset, boolean ordered) {
+        return limit(count, offset);
+    }
+
+    /// The standard paging clause, which SQL Server and Oracle take in place of
+    /// LIMIT. `fetchNeedsOffset` is SQL Server's rule that FETCH cannot stand
+    /// without an OFFSET before it.
+    static String offsetFetch(int count, int offset, boolean fetchNeedsOffset) {
+        if (count < 0 && offset <= 0) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        if (offset > 0 || fetchNeedsOffset) {
+            out.append(" OFFSET ").append(offset > 0 ? offset : 0).append(" ROWS");
+        }
+        if (count >= 0) {
+            out.append(offset > 0 || fetchNeedsOffset ? " FETCH NEXT " : " FETCH FIRST ")
+                    .append(count).append(" ROWS ONLY");
+        }
+        return out.toString();
+    }
+
     /// The limit that means "all of them", for the offset-without-limit case.
     String unboundedLimit() {
         return "-1";
@@ -256,7 +294,7 @@ public abstract class Dialect {
         if (sql == null) {
             throw new IOException("No statement");
         }
-        return Placeholders.render(sql, paramCount, dollarPlaceholders(), nestedBlockComments(),
+        return Placeholders.render(sql, paramCount, parameterMarker(), nestedBlockComments(),
                 backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
                 dashCommentNeedsSpace(), bracketIdentifiers(),
                 executableComments());
@@ -557,6 +595,14 @@ public abstract class Dialect {
         return false;
     }
 
+    /// What a numbered parameter opens with, or null where parameters stay ?.
+    ///
+    /// Three engines number them and none agrees on the spelling: $1 on
+    /// PostgreSQL, @p1 on SQL Server, :1 on Oracle.
+    String parameterMarker() {
+        return dollarPlaceholders() ? "$" : null;
+    }
+
     /// Whether a backslash escapes the next character inside an ordinary string
     /// literal.
     ///
@@ -637,6 +683,186 @@ public abstract class Dialect {
     }
 
     /// The shared identifier quoting, parameterised on the quote character.
+    /// Microsoft SQL Server, 2017 and later, and Azure SQL.
+    private static final class SqlServerDialect extends Dialect {
+        /// The collation every text column is given.
+        ///
+        /// The server default is case and accent insensitive, so eq("name", "A")
+        /// would match a stored "a" here and nothing on the other engines; a
+        /// binary collation makes equality byte equality, as MySQL's columns are
+        /// given one for. BIN2 rather than a _UTF8 collation: those arrived in
+        /// SQL Server 2019 and the columns are NVARCHAR, which needs none.
+        ///
+        /// It does NOT make a trailing space significant. SQL Server pads the
+        /// shorter operand of = under every collation, so that difference is
+        /// answered where the comparison is written, not here.
+        private static final String TEXT_COLLATION = "Latin1_General_100_BIN2";
+
+        @Override
+        public String getName() {
+            return "sqlserver";
+        }
+
+        /// Brackets, with a closing bracket doubled. Double quotes would work
+        /// only while QUOTED_IDENTIFIER is on, which a session can turn off.
+        @Override
+        public String quote(String identifier) {
+            if (identifier == null || identifier.length() == 0) {
+                throw new IllegalArgumentException("An SQL identifier cannot be empty");
+            }
+            StringBuilder out = new StringBuilder(identifier.length() + 4);
+            out.append('[');
+            for (int iter = 0 ; iter < identifier.length() ; iter++) {
+                char c = identifier.charAt(iter);
+                if (c == 0) {
+                    throw new IllegalArgumentException("An SQL identifier cannot hold a NUL: '"
+                            + identifier + "'");
+                }
+                if (c == ']') {
+                    out.append(']');
+                }
+                out.append(c);
+            }
+            out.append(']');
+            return out.toString();
+        }
+
+        @Override
+        public String columnType(int kind) {
+            switch (kind) {
+                case INTEGER:
+                    return "INT";
+                case BIGINT:
+                case TIMESTAMP:
+                    return "BIGINT";
+                case BOOLEAN:
+                    // Not BIT, so that every engine stores 0/1 as a number and
+                    // every read decodes the same way.
+                    return "SMALLINT";
+                case REAL:
+                    return "FLOAT(53)";
+                case BLOB:
+                    return "VARBINARY(MAX)";
+                default:
+                    return "NVARCHAR(MAX) COLLATE " + TEXT_COLLATION;
+            }
+        }
+
+        @Override
+        public String generatedKeyColumn(int kind) {
+            return (kind == INTEGER ? "INT" : "BIGINT") + " IDENTITY(1,1) NOT NULL PRIMARY KEY";
+        }
+
+        /// A (MAX) column cannot be indexed, so a text key is bounded, at the
+        /// length MySQL's is.
+        @Override
+        public String assignedKeyColumn(int kind) {
+            if (kind == TEXT) {
+                return "NVARCHAR(255) COLLATE " + TEXT_COLLATION + " NOT NULL PRIMARY KEY";
+            }
+            return columnType(kind) + " NOT NULL PRIMARY KEY";
+        }
+
+        /// Appended to a statement the caller says nothing about, this takes it
+        /// to be ordered: an ORDER BY added to one that has its own is a syntax
+        /// error, which is the worse of the two mistakes.
+        @Override
+        public String limit(int count, int offset) {
+            return offsetFetch(count, offset, true);
+        }
+
+        @Override
+        public String limit(int count, int offset, boolean ordered) {
+            String paging = offsetFetch(count, offset, true);
+            if (ordered || paging.length() == 0) {
+                return paging;
+            }
+            return " ORDER BY (SELECT NULL)" + paging;
+        }
+
+        /// NULLS FIRST is a syntax error here and is not needed: SQL Server
+        /// already sorts a null below every value, so ascending puts the nulls
+        /// first and descending puts them last.
+        @Override
+        public String orderBy(String quotedColumn, boolean ascending, boolean text) {
+            return quotedColumn + (ascending ? " ASC" : " DESC");
+        }
+
+        @Override
+        String parameterMarker() {
+            return "@p";
+        }
+
+        @Override
+        boolean bracketIdentifiers() {
+            return true;
+        }
+    }
+
+    /// Oracle Database, 19c and later.
+    private static final class OracleDialect extends Dialect {
+        @Override
+        public String getName() {
+            return "oracle";
+        }
+
+        @Override
+        public String quote(String identifier) {
+            return quoteWith(identifier, '"');
+        }
+
+        @Override
+        public String columnType(int kind) {
+            switch (kind) {
+                case INTEGER:
+                    return "NUMBER(10)";
+                case BIGINT:
+                case TIMESTAMP:
+                    return "NUMBER(19)";
+                case BOOLEAN:
+                    return "NUMBER(1)";
+                case REAL:
+                    return "BINARY_DOUBLE";
+                case BLOB:
+                    return "BLOB";
+                default:
+                    // VARCHAR2 and not CLOB: a CLOB cannot stand in a
+                    // comparison, an ORDER BY, a GROUP BY or a DISTINCT, so eq()
+                    // on a string column would be refused outright. The price
+                    // is the bound -- 4000 bytes unless the database was created
+                    // with MAX_STRING_SIZE=EXTENDED -- where the other engines'
+                    // string columns have none.
+                    return "VARCHAR2(4000 CHAR)";
+            }
+        }
+
+        /// BY DEFAULT, as on PostgreSQL, so a caller that supplies its own key
+        /// inserts a value the column accepts.
+        @Override
+        public String generatedKeyColumn(int kind) {
+            return (kind == INTEGER ? "NUMBER(10)" : "NUMBER(19)")
+                    + " GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY";
+        }
+
+        @Override
+        public String assignedKeyColumn(int kind) {
+            if (kind == TEXT) {
+                return "VARCHAR2(255 CHAR) NOT NULL PRIMARY KEY";
+            }
+            return columnType(kind) + " NOT NULL PRIMARY KEY";
+        }
+
+        @Override
+        public String limit(int count, int offset) {
+            return offsetFetch(count, offset, false);
+        }
+
+        @Override
+        String parameterMarker() {
+            return ":";
+        }
+    }
+
     static String quoteWith(String identifier, char quote) {
         if (identifier == null || identifier.length() == 0) {
             throw new IllegalArgumentException("An SQL identifier cannot be empty");

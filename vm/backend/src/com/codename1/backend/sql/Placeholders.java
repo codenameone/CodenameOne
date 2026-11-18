@@ -44,8 +44,8 @@ final class Placeholders {
     /// `sql` with each parameter placeholder rendered for the target engine
     /// and each `??` escape collapsed to a single question mark.
     ///
-    /// @param dollars   true to render parameters as $1, $2 (PostgreSQL), false to
-    /// leave them as ?
+    /// @param marker    what a numbered parameter opens with -- "$" for $1, $2
+    /// (PostgreSQL), "@p" (SQL Server), ":" (Oracle) -- or null to leave them as ?
     /// @param nestedComments true where a block comment can contain another one
     /// @param backslashEscapes true where a backslash escapes the next character
     /// inside an ordinary string literal, which is MySQL in its
@@ -58,7 +58,7 @@ final class Placeholders {
     /// @throws IOException when the statement carries placeholders and their count
     /// is not `paramCount`, or when a literal, comment or
     /// dollar-quoted body is left unterminated
-    static String render(String sql, int paramCount, boolean dollars, boolean nestedComments,
+    static String render(String sql, int paramCount, String marker, boolean nestedComments,
                          boolean backslashEscapes, boolean hashComments,
                          boolean dollarQuotedStrings, boolean dashCommentNeedsSpace,
                          boolean bracketIdentifiers, int executableComments)
@@ -117,9 +117,9 @@ final class Placeholders {
                             + "execute(): [" + sql + "]");
                 }
                 found++;
-                if (dollars) {
+                if (marker != null) {
                     out = pending(out, sql, at);
-                    out.append('$').append(found);
+                    out.append(marker).append(found);
                 }
                 at++;
                 continue;
