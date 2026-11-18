@@ -99,6 +99,8 @@ dispatch() {
   # and never holds up finding the others. CN1SS_FIND_RUN_MINUTES overrides it.
   deadline=$(( $(date +%s) + ${CN1SS_FIND_RUN_MINUTES:-40} * 60 ))
   local -a ids=()
+  local pass=0 err_file
+  err_file="$(mktemp)"
   while :; do
     missing=0
     for i in "${!targets[@]}"; do
@@ -107,7 +109,15 @@ dispatch() {
       id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
               --event workflow_dispatch --limit 20 --json databaseId,createdAt \
               --jq "[.[] | select(.createdAt >= \"${sinces[$i]}\") | select(.databaseId | tostring | IN(\"${seens[$i]}\" | split(\",\")[]) | not)] | .[0].databaseId // empty" \
-              2>/dev/null || true)"
+              2>"$err_file")" || {
+        # A failing lookup (bad token, rate limit) must not pass for "not
+        # listed yet" for forty silent minutes: say so the first time, and
+        # every tenth pass while it keeps failing.
+        id=""
+        if [ $((pass % 10)) -eq 0 ]; then
+          log "listing runs of $wf failed (pass $pass): $(tr '\n' ' ' < "$err_file")"
+        fi
+      }
       if [ -n "$id" ]; then
         ids[$i]="$id"
         log "$wf -> run $id"
@@ -120,12 +130,14 @@ dispatch() {
       for i in "${!targets[@]}"; do
         [ -n "${ids[$i]:-}" ] || log "no run of ${targets[$i]} appeared after dispatch"
       done
+      [ -s "$err_file" ] && log "last listing error: $(tr '\n' ' ' < "$err_file")"
       # Record what did start, so the failure step cancels those runs.
       for i in "${!targets[@]}"; do
         [ -n "${ids[$i]:-}" ] && printf '%s %s\n' "${targets[$i]}" "${ids[$i]}" >> "$runs_file"
       done
       return 1
     fi
+    pass=$((pass + 1))
     sleep 20
   done
   for i in "${!targets[@]}"; do
