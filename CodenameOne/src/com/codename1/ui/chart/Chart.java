@@ -1374,30 +1374,40 @@ public class Chart extends Component {
         }
         String header = null;
         String[] lines = new String[rows.size()];
+        int lineCount = 0;
         for (int i = 0; i < rows.size(); i++) {
             ChartPoint cp = rows.get(i);
+            String line;
             if (tooltipRenderer != null) {
-                lines[i] = tooltipRenderer.formatRow(cp);
+                line = tooltipRenderer.formatRow(cp);
                 if (i == 0) {
                     header = tooltipRenderer.formatHeader(cp);
                 }
-                continue;
+            } else {
+                Series s = cp.getSeries();
+                line = s.formatTooltip(ctx, cp);
+                if (i == 0 && s.isCartesian()) {
+                    header = xAxis.format(cp.getX(), 0);
+                }
             }
-            Series s = cp.getSeries();
-            lines[i] = s.formatTooltip(ctx, cp);
-            if (i == 0 && s.isCartesian()) {
-                header = xAxis.format(cp.getX(), 0);
+            // a null row is left out, so a renderer can hide a series from the tooltip
+            if (line != null) {
+                rows.set(lineCount, cp);
+                lines[lineCount++] = line;
             }
+        }
+        if (lineCount == 0 && header == null) {
+            return;
         }
         int fh = f.getHeight();
         int pad = mm(1.5f);
         int sw = fh / 2;
         int boxW = header == null ? 0 : f.stringWidth(header);
-        for (String l : lines) {
-            boxW = Math.max(boxW, sw + pad + f.stringWidth(l));
+        for (int i = 0; i < lineCount; i++) {
+            boxW = Math.max(boxW, sw + pad + f.stringWidth(lines[i]));
         }
         boxW += pad * 2;
-        int boxH = pad * 2 + fh * lines.length + (header == null ? 0 : fh);
+        int boxH = pad * 2 + fh * lineCount + (header == null ? 0 : fh);
         int left = getX() + getStyle().getPaddingLeftNoRTL();
         int top = getY() + getStyle().getPaddingTop();
         int right = getX() + getWidth() - getStyle().getPaddingRightNoRTL();
@@ -1428,9 +1438,9 @@ public class Chart extends Component {
             g.drawString(h, rtl ? bx + boxW - pad - f.stringWidth(h) : bx + pad, ty);
             ty += fh;
         }
-        for (int i = 0; i < lines.length; i++) {
+        for (int i = 0; i < lineCount; i++) {
             g.setColor(rows.get(i).getSeries().getColor());
-            if (rows.get(i).getLabel() == null || rows.size() > 1 || !(rows.get(i).getSeries().getLegendEntryCount() > 1)) { //NOPMD LogicInversion - the negated comparison is also true for NaN
+            if (rows.get(i).getLabel() == null || lineCount > 1 || !(rows.get(i).getSeries().getLegendEntryCount() > 1)) { //NOPMD LogicInversion - the negated comparison is also true for NaN
                 g.fillRoundRect(rtl ? bx + boxW - pad - sw : bx + pad, ty + (fh - sw) / 2, sw, sw, sw / 2, sw / 2);
             }
             g.setColor(getTheme().getTooltipText());
@@ -1616,6 +1626,8 @@ public class Chart extends Component {
     private static int indexAtX(XYSeries s, double x) {
         int i;
         if (s.isAscending()) {
+            // nearestIndexOfX already steps over NaN y values to the nearest point with a value,
+            // so both paths skip gaps and the tolerance check below rejects a neighbour at another x
             i = s.nearestIndexOfX(x);
         } else {
             i = -1;

@@ -29,13 +29,16 @@ import com.codename1.ui.chart.series.CandlestickSeries;
 import com.codename1.ui.chart.series.Downsample;
 import com.codename1.ui.chart.series.ErrorBarSeries;
 import com.codename1.ui.chart.series.LineSeries;
+import com.codename1.ui.chart.series.RangeBarSeries;
 import com.codename1.ui.chart.series.ScatterSeries;
 import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Fifth review round of the chart package: one test per finding.
@@ -208,5 +211,106 @@ public class ChartReviewRound5Test extends UITestBase {
         c.addAnnotation(Annotation.valueLine(2, "two").setDashed(true));
         c.addAnnotation(Annotation.xLine(1, "one").setDashed(true));
         assertTrue(calls(c, 600, 400).size() > 0);
+    }
+
+    @FormTest
+    public void aNullTooltipRowIsLeftOut() {
+        Chart c = new Chart().setTooltipMode(Chart.TOOLTIP_SHARED);
+        c.addSeries(new LineSeries("A").setData(null, new double[]{1, 5, 2}));
+        c.addSeries(new LineSeries("B").setData(null, new double[]{2, 3, 4}));
+        c.setTooltipRenderer(new TooltipRenderer() {
+            public String formatHeader(ChartPoint first) {
+                return null;
+            }
+
+            public String formatRow(ChartPoint point) {
+                return "B".equals(point.getSeries().getName()) ? null : "row-" + point.getSeries().getName();
+            }
+        });
+        calls(c, 600, 400);
+        ChartContext ctx = c.getLastContext();
+        c.pointerHover(new int[]{ctx.getPlotX() + ctx.getPlotWidth() / 2}, new int[]{ctx.getPlotY() + 5});
+        implementation.setRecordDrawnStrings(true);
+        List<String> texts = new ArrayList<String>();
+        try {
+            c.paint(Image.createImage(600, 400).getGraphics());
+            for (Object[] d : implementation.getDrawnStrings()) {
+                texts.add((String) d[0]);
+            }
+        } finally {
+            implementation.setRecordDrawnStrings(false);
+        }
+        assertTrue(texts.contains("row-A"), texts.toString());
+        assertFalse(texts.contains("null"), texts.toString());
+    }
+
+    @FormTest
+    public void scatterWithNullSizesIsPlainScatter() {
+        ScatterSeries s = new ScatterSeries("s");
+        s.setData(null, new double[]{1, 2, 3}, null);
+        assertEquals(3, s.size());
+        // plain points: every dot the same size, as with no sizes at all
+        ScatterSeries plain = new ScatterSeries("s");
+        plain.setData(null, new double[]{1, 2, 3});
+        List<String> want = new ArrayList<String>();
+        for (Object[] o : calls(new Chart().addSeries(plain), 400, 300)) {
+            want.add(java.util.Arrays.toString(o));
+        }
+        List<String> got = new ArrayList<String>();
+        for (Object[] o : calls(new Chart().addSeries(s), 400, 300)) {
+            got.add(java.util.Arrays.toString(o));
+        }
+        assertEquals(want, got);
+    }
+
+    @FormTest
+    public void rangeBarEndIsExactlyWhatWasGiven() {
+        RangeBarSeries r = new RangeBarSeries("r");
+        r.setRanges(null, new double[]{0.1, -2}, new double[]{0.4, 7.3});
+        assertEquals(0.4, r.getEnd(0), 0);
+        assertEquals(7.3, r.getEnd(1), 0);
+        assertEquals(0.1, r.getStart(0), 0);
+        r.addRange(2, 0.1, 0.4);
+        assertEquals(0.4, r.getEnd(2), 0);
+        r.set(0, 1);
+        assertEquals(1.1, r.getEnd(0), 1e-12);
+        assertThrows(IllegalArgumentException.class, () -> r.setRanges(null, new double[]{1}, new double[]{2, 3}));
+        assertThrows(IllegalArgumentException.class,
+                () -> r.setRanges(new double[]{1}, new double[]{1, 2}, new double[]{2, 3}));
+        assertEquals(3, r.size());
+    }
+
+    @FormTest
+    public void sharedTooltipSkipsAGapWhateverTheSortOrder() {
+        // the point at x=1 is a gap in both series; the unsorted one must answer like the sorted one
+        LineSeries sorted = new LineSeries("s");
+        sorted.setData(new double[]{0, 1, 2}, new double[]{1, Double.NaN, 3});
+        LineSeries unsorted = new LineSeries("u");
+        unsorted.setData(new double[]{2, 1, 0}, new double[]{3, Double.NaN, 1});
+        Chart c = new Chart().setTooltipMode(Chart.TOOLTIP_SHARED).addSeries(sorted).addSeries(unsorted);
+        calls(c, 600, 400);
+        ChartContext ctx = c.getLastContext();
+        int mid = ctx.getPlotX() + ctx.getPlotWidth() / 2;
+        c.pointerHover(new int[]{mid}, new int[]{ctx.getPlotY() + 5});
+        implementation.setRecordDrawnStrings(true);
+        List<String> texts = new ArrayList<String>();
+        try {
+            c.paint(Image.createImage(600, 400).getGraphics());
+            for (Object[] d : implementation.getDrawnStrings()) {
+                texts.add((String) d[0]);
+            }
+        } finally {
+            implementation.setRecordDrawnStrings(false);
+        }
+        int s = 0;
+        int u = 0;
+        for (String t : texts) {
+            if (t.startsWith("s:")) {
+                s++;
+            } else if (t.startsWith("u:")) {
+                u++;
+            }
+        }
+        assertEquals(s, u, texts.toString());
     }
 }

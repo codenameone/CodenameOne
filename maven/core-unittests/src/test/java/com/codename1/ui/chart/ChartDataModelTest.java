@@ -43,6 +43,10 @@ import com.codename1.ui.chart.series.VolumeSeries;
 import com.codename1.ui.chart.series.WaterfallSeries;
 import com.codename1.ui.layouts.BorderLayout;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -62,6 +66,39 @@ public class ChartDataModelTest extends UITestBase {
         Image img = Image.createImage(300, 300, 0xffffffff);
         c.paint(img.getGraphics());
         return img.getRGB();
+    }
+
+    /// Every recorded draw call (operation and bounds) of one paint. The test implementation
+    /// rasterizes only fillRect, so comparing pixels cannot see a shape or a line.
+    private List<String> calls(Chart c) {
+        c.setAnimationDuration(0);
+        c.setX(0);
+        c.setY(0);
+        c.setWidth(300);
+        c.setHeight(300);
+        // without shape support Graphics drops fillShape before the implementation sees it
+        implementation.setShapeSupported(true);
+        implementation.setRecordDrawCalls(true);
+        try {
+            c.paint(Image.createImage(300, 300, 0xffffffff).getGraphics());
+            List<String> out = new ArrayList<String>();
+            for (Object[] call : implementation.getDrawCalls()) {
+                out.add(Arrays.toString(call));
+            }
+            return out;
+        } finally {
+            implementation.setRecordDrawCalls(false);
+        }
+    }
+
+    private static int count(List<String> calls, String op) {
+        int n = 0;
+        for (String s : calls) {
+            if (s.startsWith("[" + op + ",")) {
+                n++;
+            }
+        }
+        return n;
     }
 
     private static ChartContext paint(Chart c) {
@@ -130,7 +167,10 @@ public class ChartDataModelTest extends UITestBase {
     public void aNaNRadarValueDoesNotBlankTheChart() {
         RadarSeries a = new RadarSeries("a", "x", "y", "z").setValues(3, Double.NaN, 5);
         RadarSeries b = new RadarSeries("b", "x", "y", "z").setValues(3, 0, 5);
-        assertArrayEquals(render(new Chart().addSeries(b)), render(new Chart().addSeries(a)));
+        List<String> expected = calls(new Chart().addSeries(b));
+        // the polygon is drawn: a blanked chart would record only the grid
+        assertTrue(count(expected, "fillShape") > 0, expected.toString());
+        assertEquals(expected, calls(new Chart().addSeries(a)));
     }
 
     @FormTest
@@ -173,9 +213,9 @@ public class ChartDataModelTest extends UITestBase {
         c.setOhlc(null, new double[]{1, 2}, new double[]{3, 4}, new double[]{0, 1}, new double[]{2, 3});
         c.setStyle(CandlestickSeries.HEIKIN_ASHI);
         Chart chart = new Chart().addSeries(c);
-        int[] before = render(chart);
+        List<String> before = calls(chart);
         c.updateLast(10);
-        assertFalse(java.util.Arrays.equals(before, render(chart)));
+        assertFalse(before.equals(calls(chart)));
     }
 
     @FormTest
@@ -266,6 +306,9 @@ public class ChartDataModelTest extends UITestBase {
         f.setData(new String[]{"a", "b", "c"}, new double[]{10, Double.NaN, -4});
         FunnelSeries g = new FunnelSeries("f");
         g.setData(new String[]{"a", "b", "c"}, new double[]{10, 0, 0});
-        assertArrayEquals(render(new Chart().addSeries(g)), render(new Chart().addSeries(f)));
+        List<String> expected = calls(new Chart().addSeries(g));
+        // a NaN or negative stage must not shrink or shift the drawn bands
+        assertTrue(count(expected, "fillShape") > 0, expected.toString());
+        assertEquals(expected, calls(new Chart().addSeries(f)));
     }
 }

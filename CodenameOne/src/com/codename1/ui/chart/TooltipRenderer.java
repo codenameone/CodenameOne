@@ -27,6 +27,7 @@ public interface TooltipRenderer {
     /// The bold first line, typically the x value; null for none.
     String formatHeader(ChartPoint first);
 
-    /// The row for one point.
+    /// The row for one point; null leaves the point out of the tooltip. When every row is null
+    /// and there is no header, no tooltip is drawn.
     String formatRow(ChartPoint point);
 }

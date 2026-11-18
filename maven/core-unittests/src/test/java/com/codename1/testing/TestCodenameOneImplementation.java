@@ -1559,6 +1559,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         dipScale = 1f;
         shapeSupported = false;
         drawCalls = null;
+        drawnStrings = null;
         hardwareGameKeysSupported = true;
         repaintLog = null;
         // Back to the default a test class starts from. Runs on every UITestBase

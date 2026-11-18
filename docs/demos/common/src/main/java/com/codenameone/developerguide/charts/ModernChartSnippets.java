@@ -59,6 +59,8 @@ public class ModernChartSnippets {
 
         Chart volume = new Chart().setXAxis(new SessionTimeAxis(Axis.BOTTOM, times));
         volume.addSeries(new VolumeSeries("Volume", prices, vol));
+        main.setTooltipMode(Chart.TOOLTIP_SHARED);
+        volume.setTooltipMode(Chart.TOOLTIP_SHARED);
         main.syncWith(volume);
         // end::modern-chart-financial[]
     }

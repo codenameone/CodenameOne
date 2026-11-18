@@ -68,10 +68,18 @@ public class ScatterSeries extends XYSeries {
     ///
     /// - `y`: the values
     ///
-    /// - `sizes`: one size per point, NaN for a plain dot
+    /// - `sizes`: one size per point, NaN for a plain dot; null for plain points, as
+    ///   `setSizes(null)` does
     public ScatterSeries setData(double[] x, double[] y, double[] sizes) {
-        setRows(x, y, new double[][]{sizes});
-        setBubbles(true);
+        double[] channel = sizes;
+        if (channel == null) {
+            channel = new double[y.length];
+            for (int i = 0; i < channel.length; i++) {
+                channel[i] = Double.NaN;
+            }
+        }
+        setRows(x, y, new double[][]{channel});
+        setBubbles(sizes != null);
         return this;
     }
 

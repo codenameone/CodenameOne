@@ -2611,7 +2611,7 @@ For list rows and table cells, `Sparkline` is a small component that draws a tre
 include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=modern-chart-financial,indent=0]
 ----
 
-`syncWith` links two charts so that panning, zooming and the crosshair in one follow the other, which is how a price pane and a volume or RSI pane stay aligned.
+`syncWith` links two charts so that panning and zooming in one follow the other, which is how a price pane and a volume or RSI pane stay aligned. With `setTooltipMode(Chart.TOOLTIP_SHARED)` on both, the crosshair follows too.
 
 ==== Hierarchies and flows
 

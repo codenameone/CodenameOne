@@ -223,8 +223,42 @@ public class ChartReviewRound3Test extends UITestBase {
         FunnelSeries f = new FunnelSeries("Funnel");
         f.setData(names, vals);
         Chart c = new Chart().addSeries(f);
-        ChartContext ctx = paint(c, 300, 40);
+        // without shape support Graphics drops fillShape before the implementation sees it
+        implementation.setShapeSupported(true);
+        implementation.setRecordDrawCalls(true);
+        List<Object[]> calls;
+        ChartContext ctx;
+        try {
+            ctx = paint(c, 300, 40);
+            assertNull(f.hitTest(ctx, 150, -50, 0));
+            // too short for 30 one-pixel bands: nothing is drawn. Tall enough for the bands but
+            // not for the gaps, they must still fit
+            implementation.getDrawCalls().clear();
+            c.setLegendPosition(Chart.LEGEND_NONE);
+            ctx = paint(c, 300, 50);
+            calls = new ArrayList<Object[]>(implementation.getDrawCalls());
+        } finally {
+            implementation.setRecordDrawCalls(false);
+        }
         assertNull(f.hitTest(ctx, 150, -50, 0));
+        int plotBottom = ctx.getPlotY() + ctx.getPlotHeight();
+        // a negative band height stacked the bands upward, out of the plot and over each other
+        int bands = 0;
+        int prevBottom = ctx.getPlotY();
+        for (Object[] call : calls) {
+            if (!"fillShape".equals(call[0])) {
+                continue;
+            }
+            int top = ((Integer) call[2]).intValue();
+            int h = ((Integer) call[4]).intValue();
+            assertTrue(h >= 0, "band " + bands + " has height " + h);
+            assertTrue(top >= ctx.getPlotY() - 1 && top + h <= plotBottom + 1, "band " + bands + " spans " + top + ".." + (top + h));
+            // shape bounds round outward, so neighbours may share one row
+            assertTrue(top >= prevBottom - 1, "band " + bands + " starts at " + top + " above " + prevBottom);
+            prevBottom = top + h;
+            bands++;
+        }
+        assertTrue(bands > 0, "no band was drawn in a plot " + ctx.getPlotHeight() + " high, mm " + ctx.mm(0.6f));
     }
 
     @FormTest
