@@ -18,10 +18,12 @@
  */
 package com.codenameone.examples.slate;
 
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.spinner.MaterialDatePicker;
 import com.codename1.ui.spinner.MaterialTimePicker;
 import com.codename1.ui.spinner.Picker;
 import com.codenameone.examples.slate.client.Times;
+import com.codenameone.examples.slate.ui.Look;
 
 import java.util.Date;
 
@@ -50,6 +52,29 @@ public class HoursPickerTest extends E2e {
         shot("provider-hours-time");
         click("PickerMaterialOk");
         waitForForm("Hours");
+
+        // Dark: the same face on the dark surface, the hand still the brand's.
+        final int[] light = new int[2];
+        final int[] dark = new int[2];
+        onEdt(() -> {
+            face(light);
+            Prefs.setTheme(Prefs.THEME_DARK);
+            Look.apply();
+        });
+        click("start-1");
+        until(() -> open(MaterialTimePicker.class) != null, 20000, "the clock face");
+        onEdt(() -> face(dark));
+        shot("provider-hours-time-dark");
+        back();
+        waitForForm("Hours");
+        onEdt(() -> {
+            Prefs.setTheme(Prefs.THEME_LIGHT);
+            Look.apply();
+        });
+        assertTrue(luma(light[0]) > 200, "the light clock face is light");
+        assertTrue(luma(dark[0]) < 80, "the dark clock face is dark");
+        assertTrue(light[1] != light[0] && dark[1] != dark[0], "the hand stands out in both");
+        assertEqual(8 * 60 + 30, time("start-1"), "Back out of the dark face left the start alone");
         assertEqual(8 * 60 + 30, time("start-1"), "the time confirmed is the start");
 
         // A time between two quarters, as one typed can be, goes back to one.
@@ -120,5 +145,16 @@ public class HoursPickerTest extends E2e {
         final long[] millis = new long[1];
         onEdt(() -> millis[0] = ((Picker) findByName(name)).getDate().getTime());
         return millis[0];
+    }
+
+    // The colours the clock face is drawn in: the face, and the hand over it.
+    private static void face(int[] into) {
+        UIManager m = UIManager.getInstance();
+        into[0] = m.getComponentStyle("PickerMaterialDial").getBgColor();
+        into[1] = m.getComponentSelectedStyle("PickerMaterialDial").getBgColor();
+    }
+
+    private static int luma(int rgb) {
+        return (((rgb >> 16) & 0xff) * 299 + ((rgb >> 8) & 0xff) * 587 + (rgb & 0xff) * 114) / 1000;
     }
 }

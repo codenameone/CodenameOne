@@ -1485,7 +1485,6 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvDayPicker.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-pressed-dark); }
     PickerMaterial { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     PickerMaterialDialog { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    PickerMaterialHeadline { color: var(--text-dark); }
     PickerMaterialButton { color: var(--brand-dark); }
     PickerMaterialButton.selected { color: var(--brand-dark); }
     PickerMaterialButton.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
@@ -1555,13 +1554,10 @@ SchedulerSelection { color: var(--brand); background-color: var(--brand-tint); }
 /* tag::slate-picker-css[] */
 PickerMaterial { color: var(--text); background-color: var(--surface); padding: 0; margin: 0; }
 PickerMaterialDialog { color: var(--text); background-color: var(--surface); border-radius: 4mm; padding: 2mm; margin: 0; }
-/* The chosen day in words. Sized so that it fits beside the keyboard switch
-   in a dialog as narrow as the platform theme lets one be on a small phone. */
-PickerMaterialHeadline { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 3.6mm; padding: 1mm 0 0 0; margin: 0; }
 /* The month's name, the arrows, the keyboard switch, Cancel and OK. */
-PickerMaterialButton { color: var(--brand); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1.5mm 1.5mm 1.5mm; margin: 0.3mm; }
-PickerMaterialButton.selected { color: var(--brand); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1.5mm 1.5mm 1.5mm; margin: 0.3mm; }
-PickerMaterialButton.pressed { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1.5mm 1.5mm 1.5mm; margin: 0.3mm; }
+PickerMaterialButton { color: var(--brand); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; }
+PickerMaterialButton.selected { color: var(--brand); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; }
+PickerMaterialButton.pressed { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; }
 /* A day, the circle of the chosen one, and a day that cannot be chosen. */
 PickerMaterialDay { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
 PickerMaterialDay.selected { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }

@@ -19,6 +19,11 @@
 package com.codenameone.examples.slate;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.spinner.MaterialDatePicker;
 import com.codename1.ui.spinner.Picker;
@@ -116,7 +121,38 @@ public class DatePickerTest extends E2e {
             Prefs.setTheme(Prefs.THEME_LIGHT);
             Look.apply();
         });
+
+        // The calendar has no last day: how far ahead a booking may be is the
+        // server's to say, and a day past it comes back with the reason.
+        click("day-picker");
+        until(() -> calendar() != null, 20000, "the calendar");
+        onEdt(() -> calendar().setDate(new Date(Times.addDays(today, 200))));
+        click("PickerMaterialOk");
+        waitForForm("Book");
+        until(() -> shows(Display.getInstance().getCurrent(), TOO_FAR), 20000,
+                "the reason a day that far ahead has no times");
+        assertEqual("", firstNamed("slot-"), "a day past the horizon offers no times");
         return true;
+    }
+
+    private static final String TOO_FAR = "Bookings are not open that far ahead yet.";
+
+    private static boolean shows(Component c, String text) {
+        if (c instanceof Label && text.equals(((Label) c).getText())) {
+            return true;
+        }
+        if (c instanceof TextArea && text.equals(((TextArea) c).getText())) {
+            return true;
+        }
+        if (c instanceof Container) {
+            Container parent = (Container) c;
+            for (int i = 0; i < parent.getComponentCount(); i++) {
+                if (shows(parent.getComponentAt(i), text)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private long chosenDay() {

@@ -135,7 +135,7 @@ can't know: with the calendar check on, a start that clashes with the client's
 own phone calendar is marked, though it can still be booked. The day is a pill
 on a strip or, for a day the strip doesn't have, a date on the Material
 calendar. That calendar is bounded at today and nowhere else. The horizon is a
-rule of the slot engine, and a day past it is answered like any other refused
+rule of the slot engine, which answers a day past it like any other refused
 day, with no starts and the reason:
 
 [source,java,role=cn1-no-try]
