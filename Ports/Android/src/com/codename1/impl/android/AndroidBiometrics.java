@@ -36,6 +36,7 @@ import com.codename1.io.Log;
 import com.codename1.security.AuthenticationOptions;
 import com.codename1.security.BiometricError;
 import com.codename1.security.BiometricException;
+import com.codename1.security.BiometricPromptType;
 import com.codename1.security.BiometricType;
 import com.codename1.security.Biometrics;
 import com.codename1.ui.Display;
@@ -130,8 +131,29 @@ public final class AndroidBiometrics extends Biometrics {
         if (Build.VERSION.SDK_INT < 23) {
             return out;
         }
-        runOnUi(new CollectAvailableBiometricsRunnable(out));
+        // Wait for it. runOnUi() only posts when called off the main thread,
+        // and this is called from the EDT: the list was returned before the
+        // runnable had filled it, so it read as empty, canAuthenticate()
+        // answered false on an enrolled device, and the UI thread then wrote
+        // to a list the caller was reading.
+        CollectAvailableBiometricsRunnable collect = new CollectAvailableBiometricsRunnable(out);
+        if (Looper.getMainLooper().getThread() == Thread.currentThread()) {
+            collect.run();
+        } else {
+            AndroidImplementation.runOnUiThreadAndBlock(collect);
+        }
         return out;
+    }
+
+    /// One collection instead of the two the default makes: on this port
+    /// [#canAuthenticate()] is the list being non-empty.
+    @Override
+    public BiometricPromptType getPromptType() {
+        List<BiometricType> types = getAvailableBiometrics();
+        if (types.isEmpty()) {
+            return BiometricPromptType.NONE;
+        }
+        return promptTypeOf(types);
     }
 
     private static final class CollectAvailableBiometricsRunnable implements Runnable {

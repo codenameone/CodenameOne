@@ -40,11 +40,11 @@ public enum BiometricPromptType {
     /// Ask for the face (Face ID on iOS).
     FACE,
 
-    /// Biometric authentication can be used and the device does not say
-    /// which kind the user enrolled. Use neutral wording ("Use biometrics");
-    /// the system prompt directs the user to the right sensor. An Android
-    /// device with more than one kind of biometric hardware answers this,
-    /// because Android reports that some biometric is enrolled and not
-    /// which one.
+    /// Biometric authentication can be used and there is no single name
+    /// for it. Use neutral wording ("Use biometrics"); the system prompt
+    /// directs the user to the right sensor. An Android device with more
+    /// than one kind of biometric hardware answers this, because Android
+    /// reports that some biometric is enrolled and not which one. So do an
+    /// iris scanner and Windows Hello, which may verify with a PIN.
     BIOMETRICS
 }

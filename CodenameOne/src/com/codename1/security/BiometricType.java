@@ -26,17 +26,21 @@ package com.codename1.security;
 /// on a device. Returned from
 /// [Biometrics#getAvailableBiometrics()].
 ///
-/// The set returned at runtime depends on the platform and the user's
-/// enrolled credentials -- e.g. an iPhone with Face ID enrolled returns
-/// `[FACE]`; an Android Pixel with a fingerprint and a face enrolled
-/// returns `[FINGERPRINT, FACE]`. Use the list to drive UI affordances
-/// (icon, prompt copy) but never to gate the actual `authenticate()` call:
-/// always rely on [Biometrics#canAuthenticate()] for that decision.
+/// The set returned at runtime depends on the platform -- e.g. an iPhone
+/// with Face ID enrolled returns `[FACE]`; an Android phone with a
+/// fingerprint sensor and face hardware returns `[FINGERPRINT, FACE]` once
+/// either is enrolled, because Android 10 and later do not report which.
+/// For the wording and icon of the application's own UI use
+/// [Biometrics#getPromptType()], which reduces the list to one answer.
+/// Never use the list to gate the actual `authenticate()` call: always
+/// rely on [Biometrics#canAuthenticate()] for that decision.
 public enum BiometricType {
 
     /// Fingerprint sensor (iOS Touch ID, Android `FEATURE_FINGERPRINT`).
-    /// Populated on both platforms when the device has fingerprint hardware
-    /// AND at least one fingerprint is enrolled.
+    /// Populated on iOS when Touch ID is enrolled. On Android 10 and later
+    /// it means the device has fingerprint hardware and some biometric is
+    /// enrolled, not necessarily a fingerprint; on Android 6 to 9 a
+    /// fingerprint is enrolled.
     FINGERPRINT,
 
     /// Face recognition (iOS Face ID, Android `FEATURE_FACE`). Populated on

@@ -100,7 +100,7 @@ Call `Biometrics.getInstance().stopAuthentication()` to dismiss an active prompt
 
 === Listing enrolled biometrics
 
-`getAvailableBiometrics()` returns a `List<BiometricType>` to drive UI affordances (icon, prompt copy):
+`getAvailableBiometrics()` returns a `List<BiometricType>` of what the device can authenticate with. On Android 10 and later that's every modality the device has hardware for once any biometric is enrolled, so use `getPromptType()` (next section) to pick an icon or prompt copy:
 
 - `FINGERPRINT`: iOS Touch ID; Android fingerprint sensor.
 - `FACE`: iOS Face ID; Android face recognition (API 29+).
@@ -116,15 +116,17 @@ Never use this list to decide whether to call `authenticate()`; always use `canA
 
 [source,java]
 ----
-switch (Biometrics.getInstance().getPromptType()) {
-    case FINGERPRINT: label = "Sign in with fingerprint"; break;
-    case FACE: label = "Sign in with face"; break;
-    case BIOMETRICS: label = "Sign in with biometrics"; break;
-    default: label = null; // NONE: offer the password only
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BiometricAuthenticationJava005Snippet.java[tag=biometric-authentication-java-005,indent=0]
 ----
 
-iOS always names one of the two. Android reports that some biometric is enrolled and not which one, so an Android device with more than one kind of biometric hardware answers `BIOMETRICS`. Use neutral wording there; the system prompt directs the user to the right sensor.
+A single modality is named, and anything else that can authenticate is `BIOMETRICS`:
+
+- iOS names Touch ID or Face ID.
+- Android reports that some biometric is enrolled and not which one, so an Android device with more than one kind of biometric hardware answers `BIOMETRICS`. Use neutral wording there; the system prompt directs the user to the right sensor.
+- Windows always answers `BIOMETRICS`. Windows Hello doesn't say what it verifies with, and that may be a PIN.
+- Linux answers `FINGERPRINT`.
+
+The call asks the platform each time, so make it when you build the screen and keep the answer.
 
 === Simulator workflow
 

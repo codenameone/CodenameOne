@@ -25,6 +25,7 @@ package com.codename1.impl.windows;
 import com.codename1.security.AuthenticationOptions;
 import com.codename1.security.BiometricError;
 import com.codename1.security.BiometricException;
+import com.codename1.security.BiometricPromptType;
 import com.codename1.security.BiometricType;
 import com.codename1.security.Biometrics;
 import com.codename1.util.AsyncResource;
@@ -53,6 +54,13 @@ class WindowsBiometrics extends Biometrics {
     @Override
     public boolean canAuthenticate() {
         return WindowsNative.biometricAvailability() == AVAILABLE;
+    }
+
+    // Windows Hello does not say what it verifies with (face, fingerprint
+    // or PIN), so the answer is generic, from one availability query.
+    @Override
+    public BiometricPromptType getPromptType() {
+        return canAuthenticate() ? BiometricPromptType.BIOMETRICS : BiometricPromptType.NONE;
     }
 
     @Override
