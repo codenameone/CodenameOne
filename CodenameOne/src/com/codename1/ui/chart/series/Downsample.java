@@ -40,9 +40,11 @@ public final class Downsample {
 
     /// The indices of the points LTTB keeps, ascending; the first and last are always kept.
     ///
-    /// A NaN value is a gap. Gaps never take part in the triangle areas or bucket averages, and a
-    /// bucket that contains one keeps its first NaN index instead of a value, so the gap survives
-    /// downsampling as a gap marker rather than being bridged.
+    /// A NaN value is a gap. Gaps never take part in the triangle areas or bucket averages. A
+    /// bucket that contains one keeps its first NaN index as a gap marker, so the gap survives
+    /// downsampling rather than being bridged, and also keeps its best real point, so a sparse
+    /// NaN does not cost the bucket its peak. The result therefore has `threshold` indices when
+    /// the data has no gaps, and never more than `2 * threshold - 2`.
     ///
     /// #### Parameters
     ///
@@ -64,7 +66,9 @@ public final class Downsample {
             }
             return all;
         }
-        int[] out = new int[threshold];
+        // one slot per bucket, plus a gap marker for each bucket that holds a NaN
+        int[] out = new int[2 * threshold - 2];
+        int outLen = 1;
         double every = (n - 2) / (double) (threshold - 2);
         out[0] = 0;
         // the anchor is the last kept point that has a value; a NaN never anchors a triangle
@@ -102,7 +106,7 @@ public final class Downsample {
             int start = (int) Math.floor(i * every) + 1;
             int end = (int) Math.floor((i + 1) * every) + 1;
             double best = -1;
-            int pick = start;
+            int pick = -1;
             int gap = -1;
             for (int j = start; j < end; j++) {
                 if (y[j] != y[j]) {
@@ -117,17 +121,30 @@ public final class Downsample {
                     pick = j;
                 }
             }
-            if (gap >= 0) {
-                // a bucket holding a gap keeps the gap, so a line drawn from the result still breaks there
-                pick = gap;
-            } else {
-                ax = xAt(x, pick);
-                ay = y[pick];
+            if (pick < 0) {
+                // nothing but gap in this bucket
+                out[outLen++] = gap;
+                continue;
             }
-            out[i + 1] = pick;
+            ax = xAt(x, pick);
+            ay = y[pick];
+            if (gap >= 0 && gap < pick) {
+                // a bucket holding a gap keeps it, so a line drawn from the result still breaks there
+                out[outLen++] = gap;
+                gap = -1;
+            }
+            out[outLen++] = pick;
+            if (gap >= 0) {
+                out[outLen++] = gap;
+            }
         }
-        out[threshold - 1] = n - 1;
-        return out;
+        out[outLen++] = n - 1;
+        if (outLen == out.length) {
+            return out;
+        }
+        int[] trimmed = new int[outLen];
+        System.arraycopy(out, 0, trimmed, 0, outLen);
+        return trimmed;
     }
 
     /// The values at the given indices.

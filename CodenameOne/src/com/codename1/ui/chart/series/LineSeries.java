@@ -356,8 +356,10 @@ public class LineSeries extends XYSeries {
 
     private void drawDashed(Graphics g, float[] px, float[] py, int from, int to, float w, int dash) {
         Stroke s = new Stroke(w, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 4);
+        // a dash of 0 would make every step 0 and never advance along the segment
+        int d = Math.max(1, dash);
         boolean on = true;
-        float left = dash;
+        float left = d;
         for (int i = from; i < to; i++) {
             float x0 = px[i];
             float y0 = py[i];
@@ -377,7 +379,7 @@ public class LineSeries extends XYSeries {
                 left -= step;
                 if (left <= 0) {
                     on = !on;
-                    left = dash;
+                    left = d;
                 }
             }
         }

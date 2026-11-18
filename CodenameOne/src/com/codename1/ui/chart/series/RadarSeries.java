@@ -196,6 +196,10 @@ public class RadarSeries extends Series {
         maxLabel = Math.min(maxLabel, ctx.getPlotWidth() / 4);
         double[] ticks = Ticks.linear(0, max <= 0 ? 1 : max, 5);
         double step = ticks.length > 1 ? ticks[1] - ticks[0] : max;
+        if (!(step > 0)) { //NOPMD LogicInversion - also catches NaN
+            // the ring loops below step by this; 0 or NaN would never end them
+            step = 1;
+        }
         double top = ticks.length > 0 ? ticks[ticks.length - 1] : 1;
         if (top < max) {
             top += step;

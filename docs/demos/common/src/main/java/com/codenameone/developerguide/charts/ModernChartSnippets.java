@@ -29,7 +29,7 @@ import com.codename1.ui.chart.axis.CategoryAxis;
 import com.codename1.ui.chart.axis.SessionTimeAxis;
 import com.codename1.ui.chart.series.BarSeries;
 import com.codename1.ui.chart.series.CandlestickSeries;
-import com.codename1.ui.chart.series.Indicators;
+import com.codename1.ui.chart.indicator.Indicators;
 import com.codename1.ui.chart.series.LineSeries;
 import com.codename1.ui.chart.series.SankeySeries;
 import com.codename1.ui.chart.series.VolumeSeries;

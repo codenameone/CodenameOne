@@ -230,7 +230,8 @@ public final class Annotation {
         } else {
             float w = Math.max(1, ctx.mm(0.35f));
             Stroke s = new Stroke(w, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 4);
-            int dash = dashed ? ctx.mm(1.5f) : Math.max(pw, ph);
+            // at least a pixel: mm() rounds to 0 on a low density, and a 0 step never ends the loop
+            int dash = Math.max(1, dashed ? ctx.mm(1.5f) : Math.max(pw, ph));
             int len = horizontalLine ? pw : ph;
             for (int o = 0; o < len; o += dash * 2) {
                 GeneralPath p = new GeneralPath();

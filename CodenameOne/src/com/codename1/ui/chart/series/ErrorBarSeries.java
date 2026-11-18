@@ -113,7 +113,8 @@ public class ErrorBarSeries extends XYSeries {
         g.setAlpha((int) (alpha * getVisibilityFraction()));
         g.setColor(getColor());
         float t = ctx.getProgress();
-        int cap = Math.max(ctx.mm(1.2f), Math.round(ctx.xLength(getMinXSpacing()) * 0.15f));
+        // 15% of the spacing, but never wider than 4mm: zoomed in, the spacing spans the plot
+        int cap = Math.min(ctx.mm(4), Math.max(ctx.mm(1.2f), Math.round(ctx.xLength(getMinXSpacing()) * 0.15f)));
         int dot = ctx.mm(1.4f);
         boolean rot = ctx.isRotated();
         for (int i = r[0]; i <= r[1]; i++) {
@@ -121,19 +122,26 @@ public class ErrorBarSeries extends XYSeries {
             if (v != v) {
                 continue;
             }
-            double lo = v + (getLow(i) - v) * t;
-            double hi = v + (getHigh(i) - v) * t;
+            // a NaN end has no whisker: it would round to pixel 0, so that side collapses onto
+            // the value and gets no cap
+            double low = getLow(i);
+            double high = getHigh(i);
+            boolean hasLo = low == low;
+            boolean hasHi = high == high;
+            double lo = hasLo ? v + (low - v) * t : v;
+            double hi = hasHi ? v + (high - v) * t : v;
             int x0 = Math.round(ctx.screenX(this, getX(i), lo));
             int y0 = Math.round(ctx.screenY(this, getX(i), lo));
             int x1 = Math.round(ctx.screenX(this, getX(i), hi));
             int y1 = Math.round(ctx.screenY(this, getX(i), hi));
-            g.drawLine(x0, y0, x1, y1);
-            if (rot) {
-                g.drawLine(x0, y0 - cap / 2, x0, y0 + cap / 2);
-                g.drawLine(x1, y1 - cap / 2, x1, y1 + cap / 2);
-            } else {
-                g.drawLine(x0 - cap / 2, y0, x0 + cap / 2, y0);
-                g.drawLine(x1 - cap / 2, y1, x1 + cap / 2, y1);
+            if (hasLo || hasHi) {
+                g.drawLine(x0, y0, x1, y1);
+            }
+            if (hasLo) {
+                drawCap(g, rot, x0, y0, cap);
+            }
+            if (hasHi) {
+                drawCap(g, rot, x1, y1, cap);
             }
             if (markers) {
                 int cx = Math.round(ctx.screenX(this, getX(i), v));
@@ -142,6 +150,14 @@ public class ErrorBarSeries extends XYSeries {
             }
         }
         g.setAlpha(alpha);
+    }
+
+    private static void drawCap(Graphics g, boolean rot, int x, int y, int cap) {
+        if (rot) {
+            g.drawLine(x, y - cap / 2, x, y + cap / 2);
+        } else {
+            g.drawLine(x - cap / 2, y, x + cap / 2, y);
+        }
     }
 
     @Override

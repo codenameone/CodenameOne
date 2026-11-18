@@ -1556,6 +1556,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void reset() {
+        dipScale = 1f;
+        shapeSupported = false;
+        drawCalls = null;
         hardwareGameKeysSupported = true;
         repaintLog = null;
         // Back to the default a test class starts from. Runs on every UITestBase
@@ -2901,8 +2904,40 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return shapeSupported;
     }
 
+    private java.util.List<Object[]> drawCalls;
+
+    /// Starts (true) or stops recording drawLine, fillRect, fillArc, drawShape and fillShape as
+    /// `{String op, x, y, w-or-x2, h-or-y2}` with the translation applied; a shape records its
+    /// bounds.
+    public void setRecordDrawCalls(boolean record) {
+        drawCalls = record ? new java.util.ArrayList<Object[]>() : null;
+    }
+
+    /// The calls recorded since `setRecordDrawCalls(true)`, or null when not recording.
+    public java.util.List<Object[]> getDrawCalls() {
+        return drawCalls;
+    }
+
+    private void recordDraw(Object graphics, String op, int a, int b, int c, int d, boolean translateEnd) {
+        if (drawCalls != null && graphics instanceof TestGraphics) {
+            TestGraphics g = (TestGraphics) graphics;
+            int tx = g.translateX;
+            int ty = g.translateY;
+            drawCalls.add(new Object[]{op, Integer.valueOf(a + tx), Integer.valueOf(b + ty),
+                    Integer.valueOf(translateEnd ? c + tx : c), Integer.valueOf(translateEnd ? d + ty : d)});
+        }
+    }
+
+    private void recordShape(Object graphics, String op, Shape shape) {
+        if (drawCalls != null && shape != null) {
+            com.codename1.ui.geom.Rectangle r = shape.getBounds();
+            recordDraw(graphics, op, r.getX(), r.getY(), r.getWidth(), r.getHeight(), false);
+        }
+    }
+
     @Override
     public void drawShape(Object graphics, Shape shape, Stroke stroke) {
+        recordShape(graphics, "drawShape", shape);
         drawShapeInvoked = true;
         lastDrawShape = shape;
         lastDrawStroke = stroke;
@@ -2910,16 +2945,19 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void fillShape(Object graphics, Shape shape) {
+        recordShape(graphics, "fillShape", shape);
         fillShapeInvoked = true;
         lastFillShape = shape;
     }
 
     @Override
     public void drawLine(Object graphics, int x1, int y1, int x2, int y2) {
+        recordDraw(graphics, "drawLine", x1, y1, x2, y2, true);
     }
 
     @Override
     public void fillRect(Object graphics, int x, int y, int width, int height) {
+        recordDraw(graphics, "fillRect", x, y, width, height, false);
         if (!(graphics instanceof TestGraphics)) {
             return;
         }
@@ -3034,6 +3072,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void fillArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        recordDraw(graphics, "fillArc", x, y, width, height, false);
     }
 
     @Override
@@ -4143,9 +4182,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return deviceDensity;
     }
 
+    private float dipScale = 1f;
+
+    /// Scales `convertToPixels`, so a test can stand in for a low density device on which a
+    /// millimetre value rounds down to 0 pixels; reset() restores 1.
+    public void setDipScale(float scale) {
+        dipScale = scale;
+    }
+
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
-        return dipCount;
+        return (int) (dipCount * dipScale);
     }
 
     @Override

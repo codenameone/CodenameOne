@@ -255,7 +255,8 @@ public class ChartReviewRound3Test extends UITestBase {
         }
         y[0] = Double.NaN;
         int[] keep = Downsample.lttb(null, y, 100);
-        assertEquals(100, keep.length);
+        // a bucket with a gap keeps the gap marker and its best real point, so a few extra
+        assertTrue(keep.length >= 100 && keep.length <= 198, "length " + keep.length);
         boolean gap = false;
         int real = 0;
         for (int i = 0; i < keep.length; i++) {

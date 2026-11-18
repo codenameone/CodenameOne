@@ -223,6 +223,14 @@ public class CandlestickSeries extends XYSeries {
             double h = getHigh(i);
             double l = getLow(i);
             double c = getClose(i);
+            if (o != o || h != h || l != l || c != c) {
+                // a candle with any price missing is a gap, and the next one starts the average over
+                out[0][i] = Double.NaN;
+                out[1][i] = Double.NaN;
+                out[2][i] = Double.NaN;
+                out[3][i] = Double.NaN;
+                continue;
+            }
             double hc = (o + h + l + c) / 4;
             double prev = i == 0 ? Double.NaN : (out[0][i - 1] + out[3][i - 1]) / 2;
             // after a gap the average starts over, so one missing period does not blank the rest
@@ -293,6 +301,11 @@ public class CandlestickSeries extends XYSeries {
         return new double[]{b[0] - half, b[1] + half};
     }
 
+    // a candle missing any price is not drawn: a NaN would map to pixel 0
+    private static boolean isGap(double[] v) {
+        return v[0] != v[0] || v[1] != v[1] || v[2] != v[2] || v[3] != v[3];
+    }
+
     private int up(ChartContext ctx) {
         return upColor != null ? upColor.intValue() : ctx.getTheme().getPositiveColor();
     }
@@ -313,7 +326,7 @@ public class CandlestickSeries extends XYSeries {
         int wick = Math.max(1, Math.min(ctx.mm(0.25f), body / 4));
         for (int i = r[0]; i <= r[1]; i++) {
             double[] v = row(i);
-            if (v[3] != v[3]) {
+            if (isGap(v)) {
                 continue;
             }
             // grow from the close outward while animating
@@ -348,12 +361,17 @@ public class CandlestickSeries extends XYSeries {
         int ax = x + ctx.getOriginX();
         int ay = y + ctx.getOriginY();
         for (int i = r[0]; i <= r[1]; i++) {
-            float cx = ctx.screenX(this, getX(i), getY(i));
+            // the drawn row: Heikin-Ashi candles span their averaged high and low, not the raw ones
+            double[] v = row(i);
+            if (isGap(v)) {
+                continue;
+            }
+            float cx = ctx.screenX(this, getX(i), v[3]);
             if (Math.abs(ax - cx) > Math.max(slot / 2, radius / 2f)) {
                 continue;
             }
-            float yh = ctx.screenY(this, getX(i), getHigh(i));
-            float yl = ctx.screenY(this, getX(i), getLow(i));
+            float yh = ctx.screenY(this, getX(i), v[1]);
+            float yl = ctx.screenY(this, getX(i), v[2]);
             if (ay >= yh - radius && ay <= yl + radius) {
                 return getPoint(ctx, i);
             }

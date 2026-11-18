@@ -30,6 +30,7 @@ import com.codename1.ui.chart.axis.CategoryAxis;
 import com.codename1.ui.chart.series.BarSeries;
 import com.codename1.ui.chart.series.BoxPlotSeries;
 import com.codename1.ui.chart.series.CandlestickSeries;
+import com.codename1.ui.chart.series.ErrorBarSeries;
 import com.codename1.ui.chart.series.FunnelSeries;
 import com.codename1.ui.chart.series.GaugeSeries;
 import com.codename1.ui.chart.series.HeatmapSeries;
@@ -38,6 +39,7 @@ import com.codename1.ui.chart.series.LineSeries;
 import com.codename1.ui.chart.series.PieSeries;
 import com.codename1.ui.chart.series.RadarSeries;
 import com.codename1.ui.chart.series.SankeySeries;
+import com.codename1.ui.chart.series.ScatterSeries;
 import com.codename1.ui.chart.series.SunburstSeries;
 import com.codename1.ui.chart.series.TreemapSeries;
 import com.codename1.ui.chart.series.WaterfallSeries;
@@ -51,12 +53,43 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// Renders every chart type off screen and checks the accessible description and data table.
 public class ChartRenderTest extends UITestBase {
 
-    private static Chart render(Chart c) {
+    private Chart render(Chart c) {
         c.setAnimationDuration(0);
-        Image img = c.toImage(600, 400);
-        assertNotNull(img);
-        assertEquals(600, img.getWidth());
+        int shown = fills(c);
+        if (!c.getSeries().isEmpty()) {
+            // the series themselves must draw: hiding them has to take fills or shapes away,
+            // not merely leave the axes and background
+            for (Series s : c.getSeries()) {
+                s.setVisible(false);
+            }
+            int hidden = fills(c);
+            assertTrue(shown > hidden, "series drew nothing: " + shown + " fills shown, " + hidden + " hidden");
+            for (Series s : c.getSeries()) {
+                s.setVisible(true);
+            }
+        }
         return c;
+    }
+
+    // the drawing calls of one render (lines, rects, arcs, shapes); text is not counted
+    private int fills(Chart c) {
+        // without shape support Graphics drops fillShape/drawShape before the implementation sees them
+        implementation.setShapeSupported(true);
+        implementation.setRecordDrawCalls(true);
+        try {
+            Image img = c.toImage(600, 400);
+            assertNotNull(img);
+            assertEquals(600, img.getWidth());
+            c.setX(0);
+            c.setY(0);
+            c.setWidth(600);
+            c.setHeight(400);
+            implementation.getDrawCalls().clear();
+            c.paint(Image.createImage(600, 400).getGraphics());
+            return implementation.getDrawCalls().size();
+        } finally {
+            implementation.setRecordDrawCalls(false);
+        }
     }
 
     @FormTest
@@ -85,6 +118,8 @@ public class ChartRenderTest extends UITestBase {
         render(new Chart().addSeries(new TreemapSeries("t", root)));
         render(new Chart().addSeries(new SunburstSeries("s", root)));
         render(new Chart().addSeries(new SankeySeries("k").addLink("a", "b", 3).addLink("b", "c", 2)));
+        render(new Chart().addSeries(new ScatterSeries("sc").setData(null, new double[]{1, 2}, new double[]{3, 9})));
+        render(new Chart().addSeries(new ErrorBarSeries("e").setIntervals(null, new double[]{2, 3}, new double[]{1, 2}, new double[]{3, 4})));
         render(new Chart());
     }
 

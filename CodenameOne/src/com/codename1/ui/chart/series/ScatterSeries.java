@@ -30,7 +30,9 @@ import com.codename1.ui.chart.ChartPoint;
 /// *area*, not its radius, is proportional to the size value, so big values do not look
 /// quadratically bigger than they are.
 public class ScatterSeries extends XYSeries {
-    private double[] sizes;
+    // the bubble size is aux channel 0, so slide(), removeRow(), setMaxPoints() and the
+    // transitions keep it aligned with its point; NaN is "no size", drawn as a plain dot
+    private boolean bubbles;
     private float pointMm = 1.6f;
     private float maxBubbleMm = 9f;
     private int fillAlpha = 200;
@@ -41,17 +43,66 @@ public class ScatterSeries extends XYSeries {
     ///
     /// - `name`: the legend name
     public ScatterSeries(String name) {
-        super(name);
+        super(name, 1);
     }
 
-    /// Sets a size per point, making this a bubble series; null for plain points.
+    /// Sets a size per point of the points the series holds now, making this a bubble series;
+    /// null for plain points. A point past the end of `sizes`, or with a NaN size, is drawn as a
+    /// plain dot. Sizes move with their points as points are added, removed or slide out of a
+    /// `setMaxPoints` window; use `setData(double[], double[], double[])` or
+    /// `add(double, double, double)` to give new points theirs.
     public ScatterSeries setSizes(double... sizes) {
-        this.sizes = sizes;
-        if (sizes != null) {
-            fillAlpha = 150;
+        for (int i = 0; i < count; i++) {
+            aux[0][i] = sizes != null && i < sizes.length ? sizes[i] : Double.NaN;
         }
+        setBubbles(sizes != null);
         repaintChart();
         return this;
+    }
+
+    /// Replaces all points with bubbles of the given sizes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x values, or null for 0, 1, 2...
+    ///
+    /// - `y`: the values
+    ///
+    /// - `sizes`: one size per point, NaN for a plain dot
+    public ScatterSeries setData(double[] x, double[] y, double[] sizes) {
+        setRows(x, y, new double[][]{sizes});
+        setBubbles(true);
+        return this;
+    }
+
+    /// Appends a bubble, sliding the window when a maximum is set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x value
+    ///
+    /// - `y`: the value
+    ///
+    /// - `size`: the bubble size, NaN for a plain dot
+    public ScatterSeries add(double x, double y, double size) {
+        addRow(x, y, new double[]{size});
+        setBubbles(true);
+        return this;
+    }
+
+    /// The size of point `i`, NaN when it has none.
+    public double getSize(int i) {
+        return aux[0][i];
+    }
+
+    private void setBubbles(boolean b) {
+        bubbles = b;
+        fillAlpha = b ? 150 : 200;
+    }
+
+    @Override
+    protected double auxDefault(int channel, double y) {
+        return Double.NaN;
     }
 
     /// Diameter of plain points in millimetres.
@@ -69,18 +120,23 @@ public class ScatterSeries extends XYSeries {
     }
 
     private int diameter(ChartContext ctx, int i, double maxSize) {
-        if (sizes == null || i >= sizes.length || maxSize <= 0) {
+        double s = aux[0][i];
+        if (!bubbles || !(maxSize > 0) || s != s) { //NOPMD LogicInversion - also true for a NaN max
             return Math.max(3, ctx.mm(pointMm));
         }
-        double f = Math.sqrt(Math.max(0, sizes[i]) / maxSize);
+        double f = Math.sqrt(Math.max(0, s) / maxSize);
         return Math.max(3, (int) (ctx.mm(maxBubbleMm) * f));
     }
 
     private double maxSize() {
         double m = 0;
-        if (sizes != null) {
-            for (double s : sizes) {
-                m = Math.max(m, s);
+        if (bubbles) {
+            double[] sz = aux[0];
+            for (int i = 0; i < count; i++) {
+                // a NaN size is a plain dot; Math.max would carry it into every bubble
+                if (sz[i] > m) {
+                    m = sz[i];
+                }
             }
         }
         return m;
@@ -103,7 +159,7 @@ public class ScatterSeries extends XYSeries {
             if (v != v) {
                 continue;
             }
-            int d = (int) (diameter(ctx, i, ms) * Math.min(1, ctx.getProgress() * 1.5f + (sizes == null ? 1 : 0)));
+            int d = (int) (diameter(ctx, i, ms) * Math.min(1, ctx.getProgress() * 1.5f + (bubbles ? 0 : 1)));
             int sx = (int) ctx.screenX(this, xs[i], v);
             int sy = (int) ctx.screenY(this, xs[i], v);
             g.fillArc(sx - d / 2, sy - d / 2, d, d, 0, 360);
