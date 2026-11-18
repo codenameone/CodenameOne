@@ -116,10 +116,9 @@ public class Biometrics {
     /// iOS this is the enrolled one, [BiometricType#FINGERPRINT] or
     /// [BiometricType#FACE]. On Android 10 and later it is every modality
     /// the device has hardware for, once any biometric is enrolled: Android
-    /// does not report which one the user enrolled. The list may contain
-    /// [BiometricType#IRIS] there, and Android API 30+ adds the
-    /// [BiometricType#STRONG] / [BiometricType#WEAK] authenticator class
-    /// tags.
+    /// does not report which one the user enrolled, and the list may
+    /// contain [BiometricType#IRIS] there. Windows and Linux do not learn
+    /// the modality and report [BiometricType#STRONG] alone.
     ///
     /// To choose the wording of the application's own UI use
     /// [#getPromptType()], which reduces this list to one answer.
@@ -137,6 +136,7 @@ public class Biometrics {
     /// the application's own UI; it needs no platform or OS version check.
     ///
     /// ```java
+    /// String label;
     /// switch (Biometrics.getInstance().getPromptType()) {
     ///     case FINGERPRINT: label = "Sign in with fingerprint"; break;
     ///     case FACE: label = "Sign in with face"; break;
@@ -152,13 +152,13 @@ public class Biometrics {
     /// - **Android** reports that some biometric is enrolled and not which,
     ///   so a device with more than one kind of biometric hardware is
     ///   generic. A device with one kind is named.
-    /// - **Windows** is always generic: Windows Hello does not say what it
-    ///   verifies with, and that may be a PIN.
-    /// - **Linux** is a fingerprint, the only kind `fprintd` reads.
+    /// - **Windows and Linux** are always generic: Windows Hello does not
+    ///   say what it verifies with, and that may be a PIN.
     ///
     /// This asks the platform each time it is called, which on some ports
-    /// waits for another thread or process. Call it when building a screen
-    /// and keep the answer, not once per paint.
+    /// waits for another thread or process; on Android, [#canAuthenticate()]
+    /// and [#getAvailableBiometrics()] wait for the UI thread as well. Call
+    /// it when building a screen and keep the answer, not once per paint.
     ///
     /// #### Returns
     ///

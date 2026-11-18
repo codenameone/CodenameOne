@@ -135,7 +135,8 @@ public final class AndroidBiometrics extends Biometrics {
         // and this is called from the EDT: the list was returned before the
         // runnable had filled it, so it read as empty, canAuthenticate()
         // answered false on an enrolled device, and the UI thread then wrote
-        // to a list the caller was reading.
+        // to a list the caller was reading. Waiting from the EDT is an
+        // invokeAndBlock, as every other blocking query of this port is.
         CollectAvailableBiometricsRunnable collect = new CollectAvailableBiometricsRunnable(out);
         if (Looper.getMainLooper().getThread() == Thread.currentThread()) {
             collect.run();

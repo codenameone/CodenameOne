@@ -57,7 +57,8 @@ class WindowsBiometrics extends Biometrics {
     }
 
     // Windows Hello does not say what it verifies with (face, fingerprint
-    // or PIN), so the answer is generic, from one availability query.
+    // or PIN), so the answer is generic, and one availability query settles
+    // it where the default makes two.
     @Override
     public BiometricPromptType getPromptType() {
         return canAuthenticate() ? BiometricPromptType.BIOMETRICS : BiometricPromptType.NONE;

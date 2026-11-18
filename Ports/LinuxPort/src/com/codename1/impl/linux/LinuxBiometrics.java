@@ -56,11 +56,11 @@ class LinuxBiometrics extends Biometrics {
         return LinuxNative.biometricAvailability() == AVAILABLE;
     }
 
-    // `fprintd` reads fingerprints and nothing else, so the answer needs
-    // one availability query and no list.
+    // The list below never names a modality, so the answer is generic, and
+    // one availability query settles it where the default makes two.
     @Override
     public BiometricPromptType getPromptType() {
-        return canAuthenticate() ? BiometricPromptType.FINGERPRINT : BiometricPromptType.NONE;
+        return canAuthenticate() ? BiometricPromptType.BIOMETRICS : BiometricPromptType.NONE;
     }
 
     @Override
