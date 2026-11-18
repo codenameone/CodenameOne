@@ -88,9 +88,14 @@ public class CategoryAxis extends Axis {
             return new double[0];
         }
         int every = Math.max(1, (int) Math.ceil(n / (double) Math.max(1, maxCount)));
-        double[] out = new double[(n + every - 1) / every];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = lo + i * every;
+        // labels sit on multiples of the step, so panning never changes WHICH categories are
+        // labelled; starting at the visible edge made them jump at every integer crossed.
+        // Category indices are never negative.
+        int first = (Math.max(0, lo) + every - 1) / every * every;
+        int count = first > hi ? 0 : (hi - first) / every + 1;
+        double[] out = new double[count];
+        for (int i = 0; i < count; i++) {
+            out[i] = first + i * every;
         }
         return out;
     }

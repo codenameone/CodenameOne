@@ -86,10 +86,10 @@ public class ChartTheme {
     ///
     /// this theme
     public ChartTheme applyUIIDs(com.codename1.ui.plaf.UIManager ui) {
-        // an undefined UIID resolves to the default style, so only differences from it are applied
-        com.codename1.ui.plaf.Style none = ui.getComponentStyle("ChartUndefinedPart");
+        // only a UIID the theme declares is applied, so a colour that happens to equal the
+        // default style's is still honoured when the theme sets it on purpose
         com.codename1.ui.plaf.Style axis = ui.getComponentStyle("ChartAxis");
-        if (axis.getFgColor() != none.getFgColor()) {
+        if (ui.isThemeStyleDefined("ChartAxis")) {
             if (legendTextColor == null) {
                 // the legend shares the secondary text colour; an axis colour must not reach it
                 legendTextColor = Integer.valueOf(secondaryTextColor);
@@ -98,18 +98,16 @@ public class ChartTheme {
             axisColor = axis.getFgColor();
         }
         com.codename1.ui.plaf.Style grid = ui.getComponentStyle("ChartGrid");
-        if (grid.getFgColor() != none.getFgColor()) {
+        if (ui.isThemeStyleDefined("ChartGrid")) {
             gridColor = grid.getFgColor();
         }
         com.codename1.ui.plaf.Style legend = ui.getComponentStyle("ChartLegend");
-        if (legend.getFgColor() != none.getFgColor()) {
+        if (ui.isThemeStyleDefined("ChartLegend")) {
             legendTextColor = Integer.valueOf(legend.getFgColor());
         }
         com.codename1.ui.plaf.Style tip = ui.getComponentStyle("ChartTooltip");
-        if (tip.getBgColor() != none.getBgColor()) {
+        if (ui.isThemeStyleDefined("ChartTooltip")) {
             tooltipBackground = tip.getBgColor();
-        }
-        if (tip.getFgColor() != none.getFgColor()) {
             tooltipText = tip.getFgColor();
         }
         return this;
