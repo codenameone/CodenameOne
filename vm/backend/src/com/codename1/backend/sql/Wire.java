@@ -213,4 +213,33 @@ final class Wire {
     static String fromUtf8(byte[] data) {
         return data == null ? null : fromUtf8(data, 0, data.length);
     }
+
+    /// UTF-16LE, two bytes a code unit, which is how TDS carries every string.
+    /// Written out by hand: a surrogate pair is two code units in a Java string
+    /// already, so each char is exactly one little-endian pair.
+    static byte[] utf16le(String value) {
+        if (value == null) {
+            return new byte[0];
+        }
+        int length = value.length();
+        byte[] out = new byte[length * 2];
+        for (int i = 0; i < length; i++) {
+            char c = value.charAt(i);
+            out[i * 2] = (byte) c;
+            out[i * 2 + 1] = (byte) (c >> 8);
+        }
+        return out;
+    }
+
+    /// The reverse of [#utf16le]. `length` is in bytes; an odd trailing byte is
+    /// ignored. Built on a StringBuilder, never a char array, which this
+    /// runtime would widen every Latin-1 string to hold.
+    static String fromUtf16le(byte[] data, int offset, int length) {
+        int units = length / 2;
+        StringBuilder out = new StringBuilder(units);
+        for (int i = 0; i < units; i++) {
+            out.append((char) ((data[offset + i * 2] & 0xff) | ((data[offset + i * 2 + 1] & 0xff) << 8)));
+        }
+        return out.toString();
+    }
 }

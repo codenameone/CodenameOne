@@ -72,6 +72,7 @@ static long long cn1ClientTlsHandshakeBudget(void) {
 
 #ifndef _WIN32
 #include <unistd.h> /* CN1_RESUME_THREAD expands to usleep */
+#include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h> /* inet_pton, for telling an IP literal from a DNS name */
@@ -359,7 +360,258 @@ static int cn1IsIpLiteral(const char* host) {
     return inet_pton(AF_INET6, host, &v6) == 1;
 }
 
-JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost) {
+/*
+ * The transport of a TLS handshake that travels INSIDE another protocol's
+ * packets. SQL Server before TDS 8.0 negotiates encryption this way: every
+ * handshake flight is the payload of TDS PRELOGIN packets, each under the
+ * eight-byte TDS header, and when the handshake completes the framing stops and
+ * the connection is ordinary TLS on the bare socket.
+ *
+ * One BIO does both halves, switched by `framed`, so the SSL keeps one transport
+ * for its whole life and nothing has to be swapped under it at the moment the
+ * handshake ends.
+ *
+ * The descriptor is non-blocking during the handshake, so every partial state
+ * is kept here across a retry: a header that arrived in two pieces, a flight
+ * that was only partly sent.
+ */
+struct cn1TunnelBio {
+    int fd;
+    int framed;
+    int packetType;
+    unsigned char header[8];    /* the inbound packet header being collected */
+    int headerHave;
+    int remaining;              /* payload bytes left in the inbound packet */
+    unsigned char* pending;     /* a handshake flight, not yet framed */
+    int pendingLength;
+    int pendingCapacity;
+    unsigned char* wire;        /* that flight framed, being sent */
+    int wireLength;
+    int wireSent;
+};
+
+#define CN1_TUNNEL_PACKET 4096
+
+static int cn1TunnelWouldBlock(void) {
+#ifdef _WIN32
+    int err = WSAGetLastError();
+    return err == WSAEWOULDBLOCK || err == WSAEINTR;
+#else
+    return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR;
+#endif
+}
+
+/* Sends what is framed and waiting. 1 when nothing is left, 0 when the socket
+   would block (retry flagged), -1 on failure. */
+static int cn1TunnelDrain(BIO* bio, struct cn1TunnelBio* t) {
+    while(t->wireSent < t->wireLength) {
+        int sent = (int)send(t->fd, (const char*)t->wire + t->wireSent,
+                             (size_t)(t->wireLength - t->wireSent), 0);
+        if(sent <= 0) {
+            if(sent < 0 && cn1TunnelWouldBlock()) {
+                BIO_set_retry_write(bio);
+                return 0;
+            }
+            return -1;
+        }
+        t->wireSent += sent;
+    }
+    t->wireLength = 0;
+    t->wireSent = 0;
+    return 1;
+}
+
+/* Frames the collected flight as one TDS message and sends it. */
+static int cn1TunnelFlush(BIO* bio, struct cn1TunnelBio* t) {
+    BIO_clear_retry_flags(bio);
+    if(t->wireLength == 0 && t->pendingLength > 0) {
+        int payload = CN1_TUNNEL_PACKET - 8;
+        int packets = (t->pendingLength + payload - 1) / payload;
+        int total = t->pendingLength + packets * 8;
+        int at = 0;
+        int out = 0;
+        int id = 1;
+        unsigned char* framed = (unsigned char*)malloc((size_t)total);
+        if(framed == 0) {
+            return -1;
+        }
+        while(at < t->pendingLength) {
+            int chunk = t->pendingLength - at;
+            if(chunk > payload) {
+                chunk = payload;
+            }
+            framed[out] = (unsigned char)t->packetType;
+            framed[out + 1] = (unsigned char)(at + chunk == t->pendingLength ? 1 : 0);
+            framed[out + 2] = (unsigned char)((chunk + 8) >> 8);
+            framed[out + 3] = (unsigned char)(chunk + 8);
+            framed[out + 4] = 0;
+            framed[out + 5] = 0;
+            framed[out + 6] = (unsigned char)id++;
+            framed[out + 7] = 0;
+            memcpy(framed + out + 8, t->pending + at, (size_t)chunk);
+            out += chunk + 8;
+            at += chunk;
+        }
+        free(t->wire);
+        t->wire = framed;
+        t->wireLength = total;
+        t->wireSent = 0;
+        t->pendingLength = 0;
+    }
+    return cn1TunnelDrain(bio, t);
+}
+
+static int cn1TunnelWrite(BIO* bio, const char* data, int length) {
+    struct cn1TunnelBio* t = (struct cn1TunnelBio*)BIO_get_data(bio);
+    BIO_clear_retry_flags(bio);
+    if(t == 0 || data == 0 || length <= 0) {
+        return 0;
+    }
+    if(!t->framed) {
+        int sent = (int)send(t->fd, data, (size_t)length, 0);
+        if(sent < 0 && cn1TunnelWouldBlock()) {
+            BIO_set_retry_write(bio);
+        }
+        return sent;
+    }
+    if(t->pendingLength + length > t->pendingCapacity) {
+        int wanted = (t->pendingLength + length) * 2;
+        unsigned char* grown = (unsigned char*)realloc(t->pending, (size_t)wanted);
+        if(grown == 0) {
+            return -1;
+        }
+        t->pending = grown;
+        t->pendingCapacity = wanted;
+    }
+    memcpy(t->pending + t->pendingLength, data, (size_t)length);
+    t->pendingLength += length;
+    return length;
+}
+
+static int cn1TunnelRead(BIO* bio, char* data, int length) {
+    struct cn1TunnelBio* t = (struct cn1TunnelBio*)BIO_get_data(bio);
+    int got;
+    BIO_clear_retry_flags(bio);
+    if(t == 0 || data == 0 || length <= 0) {
+        return 0;
+    }
+    if(!t->framed) {
+        got = (int)recv(t->fd, data, (size_t)length, 0);
+        if(got < 0 && cn1TunnelWouldBlock()) {
+            BIO_set_retry_read(bio);
+        }
+        return got;
+    }
+    /* Nothing is read while a flight of ours is unsent: the peer answers what
+       it has received, and OpenSSL asks for the flush itself only where its
+       state machine knows a flight ended. */
+    if(t->pendingLength > 0 || t->wireLength > 0) {
+        int flushed = cn1TunnelFlush(bio, t);
+        if(flushed <= 0) {
+            return -1;
+        }
+    }
+    while(t->remaining == 0) {
+        int total;
+        while(t->headerHave < 8) {
+            got = (int)recv(t->fd, (char*)t->header + t->headerHave,
+                            (size_t)(8 - t->headerHave), 0);
+            if(got <= 0) {
+                if(got < 0 && cn1TunnelWouldBlock()) {
+                    BIO_set_retry_read(bio);
+                    return -1;
+                }
+                return got;
+            }
+            t->headerHave += got;
+        }
+        total = (t->header[2] << 8) | t->header[3];
+        t->headerHave = 0;
+        if(total < 8) {
+            return -1;
+        }
+        t->remaining = total - 8;
+    }
+    got = (int)recv(t->fd, data, (size_t)(length < t->remaining ? length : t->remaining), 0);
+    if(got < 0 && cn1TunnelWouldBlock()) {
+        BIO_set_retry_read(bio);
+        return -1;
+    }
+    if(got > 0) {
+        t->remaining -= got;
+    }
+    return got;
+}
+
+static long cn1TunnelCtrl(BIO* bio, int command, long number, void* pointer) {
+    struct cn1TunnelBio* t = (struct cn1TunnelBio*)BIO_get_data(bio);
+    (void)number;
+    switch(command) {
+        case BIO_CTRL_FLUSH:
+            if(t == 0 || !t->framed) {
+                return 1;
+            }
+            return cn1TunnelFlush(bio, t) == 1 ? 1 : -1;
+        case BIO_C_GET_FD:
+            /* SSL_get_fd asks here, and the read and write paths wait on its
+               answer when the socket would block. */
+            if(t == 0) {
+                return -1;
+            }
+            if(pointer != 0) {
+                *(int*)pointer = t->fd;
+            }
+            return t->fd;
+        case BIO_CTRL_GET_CLOSE:
+        case BIO_CTRL_SET_CLOSE:
+        case BIO_CTRL_DUP:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static int cn1TunnelCreate(BIO* bio) {
+    BIO_set_init(bio, 1);
+    return 1;
+}
+
+/* The socket is not this BIO's to close: Tcp owns it, as with SSL_set_fd. */
+static int cn1TunnelDestroy(BIO* bio) {
+    struct cn1TunnelBio* t = bio == 0 ? 0 : (struct cn1TunnelBio*)BIO_get_data(bio);
+    if(t != 0) {
+        free(t->pending);
+        free(t->wire);
+        free(t);
+        BIO_set_data(bio, 0);
+    }
+    return 1;
+}
+
+static BIO_METHOD* cn1TunnelMethod = 0;
+
+/* Under cn1ClientTlsMutex: the method table is built once and never freed. */
+static BIO_METHOD* cn1TunnelEnsureMethod(void) {
+    pthread_mutex_lock(&cn1ClientTlsMutex);
+    if(cn1TunnelMethod == 0) {
+        BIO_METHOD* method = BIO_meth_new(BIO_get_new_index() | BIO_TYPE_SOURCE_SINK
+                                          | BIO_TYPE_DESCRIPTOR, "cn1 tds tunnel");
+        if(method != 0) {
+            BIO_meth_set_write(method, cn1TunnelWrite);
+            BIO_meth_set_read(method, cn1TunnelRead);
+            BIO_meth_set_ctrl(method, cn1TunnelCtrl);
+            BIO_meth_set_create(method, cn1TunnelCreate);
+            BIO_meth_set_destroy(method, cn1TunnelDestroy);
+            cn1TunnelMethod = method;
+        }
+    }
+    pthread_mutex_unlock(&cn1ClientTlsMutex);
+    return cn1TunnelMethod;
+}
+
+/* tunnelType < 0 is a handshake on the bare socket; otherwise it travels in
+   TDS packets of that type. */
+static JAVA_LONG cn1ClientTlsStart(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost, int tunnelType) {
     SSL_CTX* ctx;
     SSL* ssl;
     char* h;
@@ -405,7 +657,31 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
         free(h);
         return 0;
     }
-    SSL_set_fd(ssl, fd);
+    if(tunnelType < 0) {
+        SSL_set_fd(ssl, fd);
+    } else {
+        BIO_METHOD* method = cn1TunnelEnsureMethod();
+        BIO* bio = method == 0 ? 0 : BIO_new(method);
+        struct cn1TunnelBio* t = bio == 0 ? 0
+                : (struct cn1TunnelBio*)calloc(1, sizeof(struct cn1TunnelBio));
+        if(t == 0) {
+            if(bio != 0) {
+                BIO_free(bio);
+            }
+            snprintf(cn1ClientTlsError, sizeof(cn1ClientTlsError), "out of memory");
+            SSL_free(ssl);
+            free(h);
+            return 0;
+        }
+        t->fd = fd;
+        t->framed = 1;
+        t->packetType = tunnelType;
+        BIO_set_data(bio, t);
+        SSL_set_bio(ssl, bio, bio);
+        /* A server that tunnels the handshake does not speak TLS 1.3 this way;
+           TDS 8.0, which does, starts TLS on the bare socket. */
+        SSL_set_max_proto_version(ssl, TLS1_2_VERSION);
+    }
     /* A write that answers WANT_WRITE is retried after a park, and the Java array
        it reads from is looked up again then: the retry must not be refused for
        arriving with a pointer OpenSSL has not seen before. */
@@ -472,6 +748,18 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
     CN1_RESUME_THREAD;
 #endif
     free(h);
+    if(rc == 1 && tunnelType >= 0) {
+        /* The handshake is over and so is the framing: from here the TLS
+           records go to the socket as they are. */
+        struct cn1TunnelBio* t = (struct cn1TunnelBio*)BIO_get_data(SSL_get_rbio(ssl));
+        if(t == 0 || t->pendingLength > 0 || t->wireLength > 0 || t->remaining > 0) {
+            snprintf(cn1ClientTlsError, sizeof(cn1ClientTlsError),
+                     "the tunnelled handshake ended mid-packet");
+            SSL_free(ssl);
+            return 0;
+        }
+        t->framed = 0;
+    }
     if(rc != 1) {
         long verify = SSL_get_verify_result(ssl);
         if(verify != X509_V_OK) {
@@ -484,6 +772,14 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
         return 0;
     }
     return (JAVA_LONG)(intptr_t)ssl;
+}
+
+JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost) {
+    return cn1ClientTlsStart(threadStateData, handle, host, caFile, verifyHost, -1);
+}
+
+JAVA_LONG com_codename1_backend_Tcp_startTlsTunnelledImpl___long_java_lang_String_java_lang_String_boolean_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost, JAVA_INT packetType) {
+    return cn1ClientTlsStart(threadStateData, handle, host, caFile, verifyHost, packetType & 0xff);
 }
 
 JAVA_OBJECT com_codename1_backend_Tcp_tlsErrorImpl___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
@@ -632,6 +928,10 @@ JAVA_OBJECT com_codename1_backend_Tcp_tlsPeerChainImpl___long_R_byte_1ARRAY(CODE
 #else /* CN1_BACKEND_NO_TLS */
 
 JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost) {
+    return 0;
+}
+
+JAVA_LONG com_codename1_backend_Tcp_startTlsTunnelledImpl___long_java_lang_String_java_lang_String_boolean_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost, JAVA_INT packetType) {
     return 0;
 }
 
