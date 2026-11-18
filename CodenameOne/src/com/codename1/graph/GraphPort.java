@@ -38,6 +38,7 @@ public class GraphPort {
     private String label;
     private String type;
     private int maxConnections = -1;
+    private Object value;
     GraphNode node;
 
     /// A port.
@@ -98,6 +99,21 @@ public class GraphPort {
     /// Limits the edges that may attach; -1 for any number.
     public void setMaxConnections(int maxConnections) {
         this.maxConnections = maxConnections;
+    }
+
+    /// The value an input uses while nothing is connected to it, such as the
+    /// number typed beside it in a node editor. Null by default.
+    public Object getValue() {
+        return value;
+    }
+
+    /// Sets the value. A model shown by a component is told through
+    /// `GraphModel.setPortValue`.
+    ///
+    /// `GraphJson` saves a value that is a string, a number or a boolean; a
+    /// number it reads back is a `Double`.
+    public void setValue(Object value) {
+        this.value = value;
     }
 
     /// The node the port belongs to, or null before it is added to one.

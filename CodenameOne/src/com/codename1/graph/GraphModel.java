@@ -95,6 +95,50 @@ public interface GraphModel {
     /// false when the model refuses
     boolean setCollapsed(GraphGroup group, boolean collapsed);
 
+    /// Adds a node the user made, from a palette or by pasting.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses, or already has a node with this id
+    boolean insertNode(GraphNode node);
+
+    /// Adds an edge as it is, without the checks `connect` makes: pasting and
+    /// undo put back edges that were valid when they were made.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses, has an edge with this id, or lacks one of
+    /// the nodes the edge names
+    boolean insertEdge(GraphEdge edge);
+
+    /// Gives a node a new size, in world units.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses
+    boolean resizeNode(GraphNode node, double width, double height);
+
+    /// Moves a node into a group or a lane, or out of every one with null.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses
+    boolean setNodeGroup(GraphNode node, String groupId);
+
+    /// Gives a lane new bounds, in world units.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses
+    boolean resizeGroup(GraphGroup group, double x, double y, double width, double height);
+
+    /// Sets the value an unconnected input port uses.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses
+    boolean setPortValue(GraphPort port, Object value);
+
     /// Adds a listener told about every change.
     void addChangeListener(GraphChangeListener l);
 

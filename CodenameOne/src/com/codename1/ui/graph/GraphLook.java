@@ -25,6 +25,7 @@ package com.codename1.ui.graph;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Stroke;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
@@ -51,6 +52,11 @@ final class GraphLook {
         {"NodeGraphEdge", 0x79747e, 0xffffff, 0x938f99, 0x1c1b1f, 0, 0},
         {"NodeGraphEdgeLabel", 0x49454f, 0xffffff, 0xcac4d0, 0x1c1b1f, 255, 1},
         {"NodeGraphMinimap", 0x49454f, 0xf3edf7, 0xcac4d0, 0x2b2930, 255, 0},
+        {"NodeGraphLane", 0x79747e, 0xffffff, 0x938f99, 0x1c1b1f, 110, 0},
+        {"NodeGraphLaneHeader", 0x1d1b20, 0xe7e0ec, 0xe6e1e5, 0x36343b, 255, 2},
+        {"NodeGraphHandle", 0x1a73e8, 0xffffff, 0x8ab4f8, 0x1c1b1f, 255, 0},
+        {"NodeGraphPalette", 0x1d1b20, 0xf3edf7, 0xe6e1e5, 0x211f26, 255, 0},
+        {"NodeGraphPaletteItem", 0x1d1b20, 0xffffff, 0xe6e1e5, 0x2b2930, 255, 1},
     };
 
     private static final HashMap<String, Style> STYLES = new HashMap<String, Style>();
@@ -178,6 +184,11 @@ final class GraphLook {
     }
 
     /// Mixes two RGB colours: 0 is all `a`, 255 all `b`.
+    /// A stroke for the outline of a shape.
+    static Stroke stroke(float width) {
+        return new Stroke(width, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 4f);
+    }
+
     static int mix(int a, int b, int amount) {
         int inv = 255 - amount;
         int r = (((a >> 16) & 0xff) * inv + ((b >> 16) & 0xff) * amount) / 255;
