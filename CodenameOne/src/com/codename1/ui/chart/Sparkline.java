@@ -147,6 +147,26 @@ public class Sparkline extends Component {
         return this;
     }
 
+    @Override
+    protected void refreshTheme(String id, boolean merge) {
+        super.refreshTheme(id, merge);
+        // a theme switch (light to dark, or a new theme) re-derives the palette from the style
+        theme = null;
+        repaint();
+    }
+
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+        super.styleChanged(propertyName, source);
+        if (Style.FG_COLOR.equals(propertyName)) {
+            theme = null;
+        }
+    }
+
+    ChartTheme currentTheme() {
+        return theme();
+    }
+
     private ChartTheme theme() {
         if (theme == null) {
             theme = ChartTheme.fromStyle(getStyle());

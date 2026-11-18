@@ -151,6 +151,42 @@ public abstract class XYSeries extends Series {
     /// #### Returns
     ///
     /// the channel's value for that point
+    /// Replaces the value and extra channels of the point at `i` in place.
+    void replaceRow(int i, double y, double[] values) {
+        begin();
+        ys[i] = y;
+        for (int k = 0; k < aux.length; k++) {
+            aux[k][i] = values[k];
+        }
+        dataChanged();
+    }
+
+    /// Removes the point at `i`, closing the gap it leaves.
+    void removeRow(int i) {
+        begin();
+        int tail = count - i - 1;
+        System.arraycopy(xs, i + 1, xs, i, tail);
+        System.arraycopy(ys, i + 1, ys, i, tail);
+        if (aux != null) {
+            for (double[] channel : aux) {
+                System.arraycopy(channel, i + 1, channel, i, tail);
+            }
+        }
+        count--;
+        dataChanged();
+    }
+
+    /// The index of the first point at exactly `x`, by a linear scan that does not assume the
+    /// series is sorted; -1 when there is none.
+    int scanIndexOfX(double x) {
+        for (int i = 0; i < count; i++) {
+            if (xs[i] == x) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     protected double auxDefault(int channel, double y) {
         return y;
     }

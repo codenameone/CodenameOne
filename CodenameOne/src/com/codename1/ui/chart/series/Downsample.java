@@ -40,6 +40,10 @@ public final class Downsample {
 
     /// The indices of the points LTTB keeps, ascending; the first and last are always kept.
     ///
+    /// A NaN value is a gap. Gaps never take part in the triangle areas or bucket averages, and a
+    /// bucket that contains one keeps its first NaN index instead of a value, so the gap survives
+    /// downsampling as a gap marker rather than being bridged.
+    ///
     /// #### Parameters
     ///
     /// - `x`: the x values, ascending; null means the index
@@ -62,36 +66,65 @@ public final class Downsample {
         }
         int[] out = new int[threshold];
         double every = (n - 2) / (double) (threshold - 2);
-        int a = 0;
         out[0] = 0;
+        // the anchor is the last kept point that has a value; a NaN never anchors a triangle
+        double ax = 0;
+        double ay = 0;
+        for (int j = 0; j < n; j++) {
+            if (y[j] == y[j]) {
+                ax = xAt(x, j);
+                ay = y[j];
+                break;
+            }
+        }
         for (int i = 0; i < threshold - 2; i++) {
-            // the average of the next bucket is the third corner of the triangle
+            // the average of the next bucket is the third corner of the triangle; NaN gaps are
+            // left out of it
             int avgStart = (int) Math.floor((i + 1) * every) + 1;
             int avgEnd = Math.min(n, (int) Math.floor((i + 2) * every) + 1);
             double avgX = 0;
             double avgY = 0;
+            int len = 0;
             for (int j = avgStart; j < avgEnd; j++) {
-                avgX += xAt(x, j);
-                avgY += y[j];
+                if (y[j] == y[j]) {
+                    avgX += xAt(x, j);
+                    avgY += y[j];
+                    len++;
+                }
             }
-            int len = Math.max(1, avgEnd - avgStart);
-            avgX /= len;
-            avgY /= len;
+            if (len > 0) {
+                avgX /= len;
+                avgY /= len;
+            } else {
+                avgX = ax;
+                avgY = ay;
+            }
             int start = (int) Math.floor(i * every) + 1;
             int end = (int) Math.floor((i + 1) * every) + 1;
-            double ax = xAt(x, a);
-            double ay = y[a];
             double best = -1;
             int pick = start;
+            int gap = -1;
             for (int j = start; j < end; j++) {
+                if (y[j] != y[j]) {
+                    if (gap < 0) {
+                        gap = j;
+                    }
+                    continue;
+                }
                 double area = Math.abs((ax - avgX) * (y[j] - ay) - (ax - xAt(x, j)) * (avgY - ay));
                 if (area > best) {
                     best = area;
                     pick = j;
                 }
             }
+            if (gap >= 0) {
+                // a bucket holding a gap keeps the gap, so a line drawn from the result still breaks there
+                pick = gap;
+            } else {
+                ax = xAt(x, pick);
+                ay = y[pick];
+            }
             out[i + 1] = pick;
-            a = pick;
         }
         out[threshold - 1] = n - 1;
         return out;

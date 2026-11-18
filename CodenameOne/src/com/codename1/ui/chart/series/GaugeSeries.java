@@ -212,8 +212,14 @@ public class GaugeSeries extends Series {
         float h = ctx.getPlotHeight();
         // the arc's lowest point decides how much height a given radius needs
         double lowest = -Math.cos(Math.toRadians(sweep / 2));
-        float needH = (float) (1 + Math.max(lowest, 0.3));
-        float r = Math.min(w / 2f, (h - fh) / needH) - ctx.mm(1);
+        // The value text is drawn up to 2.5x the font (capped by the radius, so this is an upper
+        // bound) with the name one line under it; the radius is the largest that leaves room for
+        // the arc's own lowest point AND for that text below the centre.
+        float bigCap = f.isTTFNativeFont() ? fh * 2.5f : fh;
+        float nameH = getName() != null ? fh : 0;
+        float rArc = h / (float) (1 + Math.max(lowest, 0));
+        float rText = needle ? (h - bigCap - nameH) / 1.25f : h - bigCap / 2f - nameH;
+        float r = Math.min(w / 2f, Math.min(rArc, rText)) - ctx.mm(1);
         r = Math.max(8, r);
         float cx = ctx.getPlotX() + w / 2f;
         float cy = ctx.getPlotY() + r + ctx.mm(0.5f);
@@ -227,6 +233,8 @@ public class GaugeSeries extends Series {
         g.setColor(ctx.getTheme().getGridColor());
         g.fillShape(Shapes.sector(cx, cy, r, r - th, start, sweep));
         double v = shown(ctx);
+        // NaN is "no reading": the track and bands are drawn, the value arc and needle are not
+        boolean hasValue = v == v;
         if (bands.isEmpty() || !needle) {
             if (!bands.isEmpty()) {
                 for (int i = 0; i < bands.size(); i++) {
@@ -235,22 +243,29 @@ public class GaugeSeries extends Series {
                     g.setAlpha((int) (alpha * 0.25f));
                     double a0 = angleOf(Math.max(min, b[0]));
                     double a1 = angleOf(Math.min(max, b[1]));
-                    g.fillShape(Shapes.sector(cx, cy, r, r - th, a0, a1 - a0));
+                    if (a1 > a0) {
+                        g.fillShape(Shapes.sector(cx, cy, r, r - th, a0, a1 - a0));
+                    }
                 }
                 g.setAlpha(alpha);
             }
-            g.setColor(colorFor(v));
-            g.fillShape(Shapes.sector(cx, cy, r, r - th, start, angleOf(v) - start));
+            if (hasValue) {
+                g.setColor(colorFor(v));
+                g.fillShape(Shapes.sector(cx, cy, r, r - th, start, angleOf(v) - start));
+            }
         } else {
             for (int i = 0; i < bands.size(); i++) {
                 double[] b = bands.get(i);
                 g.setColor((int) b[2]);
                 double a0 = angleOf(Math.max(min, b[0]));
                 double a1 = angleOf(Math.min(max, b[1]));
-                g.fillShape(Shapes.sector(cx, cy, r, r - th, a0, a1 - a0));
+                // a band wholly outside [min, max] clamps to an empty or reversed sweep
+                if (a1 > a0) {
+                    g.fillShape(Shapes.sector(cx, cy, r, r - th, a0, a1 - a0));
+                }
             }
         }
-        if (needle) {
+        if (needle && hasValue) {
             double a = angleOf(v);
             float nw = Math.max(2, ctx.mm(0.8f));
             com.codename1.ui.geom.GeneralPath p = new com.codename1.ui.geom.GeneralPath();
@@ -262,7 +277,7 @@ public class GaugeSeries extends Series {
             g.fillShape(p);
             g.fillArc(Math.round(cx - nw * 1.5f), Math.round(cy - nw * 1.5f), Math.round(nw * 3), Math.round(nw * 3), 0, 360);
         }
-        String text = formatValue(ctx, needle ? value : v) + unit;
+        String text = hasValue ? formatValue(ctx, needle ? value : v) + unit : "-";
         Font big = f;
         if (f.isTTFNativeFont()) {
             big = f.derive(Math.min(r * 0.45f, f.getPixelSize() * 2.5f), Font.STYLE_BOLD);

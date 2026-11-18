@@ -72,7 +72,14 @@ public class FunnelSeries extends CategoricalSeries {
             return;
         }
         int gap = ctx.mm(0.6f);
+        if (shown > 1) {
+            // a short chart gives up the gaps before the bands: each band keeps at least a pixel
+            gap = Math.max(0, Math.min(gap, (ctx.getPlotHeight() - shown) / (shown - 1)));
+        }
         float bandH = (ctx.getPlotHeight() - gap * (shown - 1)) / (float) shown;
+        if (bandH < 1) {
+            return;
+        }
         float cx = ctx.getPlotX() + ctx.getPlotWidth() / 2f;
         float maxW = ctx.getPlotWidth();
         lastCx = cx;

@@ -41,6 +41,8 @@ public class BoxPlotSeries extends XYSeries {
     private static final int Q3 = 2;
     private static final int MAX = 3;
     private float boxFraction = 0.5f;
+    // reused by paint so a frame allocates nothing per box
+    private final double[] paintBuf = new double[4];
     // outliers of boxes built from samples, as {x, outlier...} rows; keyed by x so a slide cannot
     // pair a box with another box's outliers
     private final java.util.ArrayList<double[]> outliers = new java.util.ArrayList<double[]>();
@@ -75,7 +77,7 @@ public class BoxPlotSeries extends XYSeries {
     /// this series
     public BoxPlotSeries addBox(double x, double min, double q1, double median, double q3, double max) {
         removeOutliers(x);
-        addRow(x, median, new double[]{min, q1, q3, max});
+        putBox(x, median, new double[]{min, q1, q3, max});
         return this;
     }
 
@@ -109,6 +111,12 @@ public class BoxPlotSeries extends XYSeries {
         }
         java.util.Arrays.sort(s);
         if (s.length == 0) {
+            // nothing measurable at x: whatever box and outliers an earlier call left there are stale
+            removeOutliers(x);
+            int old = scanIndexOfX(x);
+            if (old >= 0) {
+                removeRow(old);
+            }
             return this;
         }
         double q1 = quantile(s, 0.25);
@@ -139,8 +147,34 @@ public class BoxPlotSeries extends XYSeries {
             }
             outliers.add(row);
         }
-        addRow(x, quantile(s, 0.5), new double[]{wMin, q1, q3, wMax});
+        putBox(x, quantile(s, 0.5), new double[]{wMin, q1, q3, wMax});
         return this;
+    }
+
+    // One box per x: a second box for an x already present replaces the first instead of
+    // drawing over it.
+    private void putBox(double x, double median, double[] v) {
+        int old = scanIndexOfX(x);
+        if (old >= 0) {
+            replaceRow(old, median, v);
+        } else {
+            addRow(x, median, v);
+        }
+    }
+
+    // A box with any NaN statistic is a gap: it is neither drawn nor counted in the bounds.
+    private boolean isGap(int i) {
+        double m = getY(i);
+        if (m != m) {
+            return true;
+        }
+        for (int k = 0; k < 4; k++) {
+            double v = getAux(k, i);
+            if (v != v) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The outliers of box `i`: the samples `addSamples` placed beyond the whiskers. A box given
@@ -258,6 +292,9 @@ public class BoxPlotSeries extends XYSeries {
         double min = Double.MAX_VALUE;
         double max = -Double.MAX_VALUE;
         for (int i = 0; i < size(); i++) {
+            if (isGap(i)) {
+                continue;
+            }
             min = Math.min(min, getAux(MIN, i));
             max = Math.max(max, getAux(MAX, i));
             for (double o : getOutliers(i)) {
@@ -289,9 +326,12 @@ public class BoxPlotSeries extends XYSeries {
         float half = slot * boxFraction / 2;
         boolean rot = ctx.isRotated();
         int color = getColor();
+        double[] v = paintBuf;
         for (int i = r[0]; i <= r[1]; i++) {
+            if (isGap(i)) {
+                continue;
+            }
             double med = getY(i);
-            double[] v = new double[4];
             for (int k = 0; k < 4; k++) {
                 v[k] = med + (getAux(k, i) - med) * t;
             }

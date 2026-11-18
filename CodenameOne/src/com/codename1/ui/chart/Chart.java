@@ -792,11 +792,13 @@ public class Chart extends Component {
             }
             double[] xb = s.getXBounds();
             double[] yb = s.getYBounds();
-            if (xb != null) {
+            // A NaN bound would poison Math.min/max for every other series, so a
+            // series that reports one is left out of that axis rather than trusted.
+            if (xb != null && xb[0] == xb[0] && xb[1] == xb[1]) {
                 xmin = Math.min(xmin, xb[0]);
                 xmax = Math.max(xmax, xb[1]);
             }
-            if (yb != null) {
+            if (yb != null && yb[0] == yb[0] && yb[1] == yb[1]) {
                 int k = s.isSecondaryAxis() && secondaryYAxis != null ? 1 : 0;
                 ymin[k] = Math.min(ymin[k], yb[0]);
                 ymax[k] = Math.max(ymax[k], yb[1]);

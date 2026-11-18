@@ -90,43 +90,56 @@ public class BarSeries extends XYSeries {
         return new double[]{b[0] - half, b[1] + half};
     }
 
-    /// `{slot, slotCount}`: this series' place among the side by side bar groups.
-    private int[] slot() {
+    /// `{start, width, total}`: this series' place among the side by side bar groups, in
+    /// slot weights. Every series weighs its visibility fraction (a stack group the largest of its
+    /// members'), so a series fading in or out narrows its slot smoothly, and every series of the
+    /// chart computes the same layout during the fade.
+    private float[] slot() {
         List<Series> all = getChart().getSeries();
-        int slots = 0;
-        int mine = 0;
-        java.util.ArrayList<String> groups = new java.util.ArrayList<String>();
+        java.util.ArrayList<Object> keys = new java.util.ArrayList<Object>();
+        float[] w = new float[all.size()];
+        int mine = -1;
         for (Series s : all) {
-            if (!(s instanceof BarSeries) || !s.isVisible() && s != this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+            if (!(s instanceof BarSeries)) {
                 continue;
             }
-            String g = ((BarSeries) s).getStackGroup();
-            int idx;
-            if (g == null) {
-                idx = slots++;
-            } else {
-                int k = groups.indexOf(g);
-                if (k < 0) {
-                    groups.add(g);
-                    groups.add(String.valueOf(slots));
-                    idx = slots++;
-                } else {
-                    idx = Integer.parseInt(groups.get(k + 1));
-                }
+            BarSeries bs = (BarSeries) s;
+            float vis = bs.getVisibilityFraction();
+            if (vis <= 0 && s != this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+                continue;
             }
+            String g = bs.getStackGroup();
+            Object key = g == null ? s : g;
+            int idx = keys.indexOf(key);
+            if (idx < 0) {
+                idx = keys.size();
+                keys.add(key);
+            }
+            w[idx] = Math.max(w[idx], Math.max(0, vis));
             if (s == this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
                 mine = idx;
             }
         }
-        return new int[]{mine, Math.max(1, slots)};
+        float total = 0;
+        float start = 0;
+        for (int k = 0; k < keys.size(); k++) {
+            if (k == mine) {
+                start = total;
+            }
+            total += w[k];
+        }
+        if (mine < 0 || !(total > 0)) { //NOPMD LogicInversion - also rejects NaN
+            return new float[]{0, 1, 1};
+        }
+        return new float[]{start, w[mine], total};
     }
 
-    private float[] barRect(ChartContext ctx, int i, double base, double v, int[] slot) {
+    private float[] barRect(ChartContext ctx, int i, double base, double v, float[] slot) {
         // one slot is the closest spacing of the data: a category band, a day on a time axis
         float band = ctx.xLength(getMinXSpacing()) * barFraction;
-        float each = band / slot[1];
-        float offset = -band / 2 + each * slot[0];
-        float inset = slot[1] > 1 ? Math.min(each * 0.08f, ctx.mm(0.4f)) : 0;
+        float each = band * slot[1] / slot[2];
+        float offset = -band / 2 + band * slot[0] / slot[2];
+        float inset = slot[1] < slot[2] ? Math.max(0, Math.min(each * 0.08f, ctx.mm(0.4f))) : 0;
         if (ctx.isRotated()) {
             float cy = ctx.screenY(this, xs[i], 0);
             float x0 = ctx.screenX(this, xs[i], base);
@@ -145,7 +158,7 @@ public class BarSeries extends XYSeries {
         Graphics g = ctx.getGraphics();
         int alpha = g.getAlpha();
         g.setAlpha((int) (alpha * getVisibilityFraction()));
-        int[] slot = slot();
+        float[] slot = slot();
         int radius = ctx.mm(cornerMm);
         boolean top = getStackGroup() == null || isTopOfStack();
         for (int i = r[0]; i <= r[1]; i++) {
@@ -198,7 +211,7 @@ public class BarSeries extends XYSeries {
         return true;
     }
 
-    private void paintLabels(ChartContext ctx, int[] r, int[] slot) {
+    private void paintLabels(ChartContext ctx, int[] r, float[] slot) {
         Graphics g = ctx.getGraphics();
         g.setFont(ctx.getFont());
         int fh = ctx.getFont().getHeight();
@@ -259,7 +272,7 @@ public class BarSeries extends XYSeries {
     @Override
     public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
         int[] r = visibleRange(ctx);
-        int[] slot = slot();
+        float[] slot = slot();
         int ax = x + ctx.getOriginX();
         int ay = y + ctx.getOriginY();
         for (int i = r[0]; i <= r[1]; i++) {

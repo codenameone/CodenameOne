@@ -49,6 +49,17 @@ public class SankeySeries extends Series {
     private SankeyLayout last;
     private float nodeWidth;
     private boolean entering;
+    // the cached layout and the inputs it was built from
+    private boolean layoutDirty = true;
+    private int[] cacheSrc;
+    private int[] cacheDst;
+    private int cacheX;
+    private int cacheY;
+    private int cacheW;
+    private int cacheH;
+    private int cacheNodeW;
+    private int cacheFh;
+    private int cacheMaxLabel;
 
     /// Creates an empty diagram.
     ///
@@ -144,6 +155,12 @@ public class SankeySeries extends Series {
     }
 
     @Override
+    protected void dataChanged() {
+        layoutDirty = true;
+        super.dataChanged();
+    }
+
+    @Override
     public void paint(ChartContext ctx) {
         int n = nodeNames.size();
         int m = links.size();
@@ -155,28 +172,46 @@ public class SankeySeries extends Series {
         Font f = ctx.getFont();
         int fh = f.getHeight();
         nodeWidth = ctx.mm(2.5f);
-        int[] src = new int[m];
-        int[] dst = new int[m];
-        double[] val = new double[m];
-        for (int l = 0; l < m; l++) {
-            src[l] = links.get(l)[0];
-            dst[l] = links.get(l)[1];
-            val[l] = linkValues.get(l)[0];
-        }
-        // labels of the first and last columns sit outside: leave room for them
-        int maxLabel = 0;
-        for (int i = 0; i < n; i++) {
-            maxLabel = Math.max(maxLabel, f.stringWidth(nodeNames.get(i)));
-        }
-        maxLabel = Math.min(maxLabel, ctx.getPlotWidth() / 5);
         float x = ctx.getPlotX();
         float w = ctx.getPlotWidth();
-        SankeyLayout lay = new SankeyLayout(n, src, dst, val, x, ctx.getPlotY(), w, ctx.getPlotHeight(), nodeWidth, Math.max(fh / 2f, ctx.mm(2)));
-        if (lay.getColumns() > 1) {
-            float side = maxLabel + ctx.mm(1.5f);
-            lay = new SankeyLayout(n, src, dst, val, x, ctx.getPlotY(), w - side, ctx.getPlotHeight(), nodeWidth, Math.max(fh / 2f, ctx.mm(2)));
+        // The layout depends only on the data and the plot geometry, so it is built once per
+        // change of either and reused by every animation frame in between.
+        boolean stale = layoutDirty || last == null || cacheX != ctx.getPlotX() || cacheY != ctx.getPlotY() || cacheW != ctx.getPlotWidth()
+                || cacheH != ctx.getPlotHeight() || cacheNodeW != (int) nodeWidth || cacheFh != fh;
+        if (stale) {
+            cacheSrc = new int[m];
+            cacheDst = new int[m];
+            double[] val = new double[m];
+            for (int l = 0; l < m; l++) {
+                cacheSrc[l] = links.get(l)[0];
+                cacheDst[l] = links.get(l)[1];
+                val[l] = linkValues.get(l)[0];
+            }
+            // labels of the first and last columns sit outside: leave room for them
+            int maxLabel = 0;
+            for (int i = 0; i < n; i++) {
+                maxLabel = Math.max(maxLabel, f.stringWidth(nodeNames.get(i)));
+            }
+            maxLabel = Math.min(maxLabel, ctx.getPlotWidth() / 5);
+            cacheMaxLabel = maxLabel;
+            SankeyLayout built = new SankeyLayout(n, cacheSrc, cacheDst, val, x, ctx.getPlotY(), w, ctx.getPlotHeight(), nodeWidth, Math.max(fh / 2f, ctx.mm(2)));
+            if (built.getColumns() > 1) {
+                float side = maxLabel + ctx.mm(1.5f);
+                built = new SankeyLayout(n, cacheSrc, cacheDst, val, x, ctx.getPlotY(), w - side, ctx.getPlotHeight(), nodeWidth, Math.max(fh / 2f, ctx.mm(2)));
+            }
+            last = built;
+            layoutDirty = false;
+            cacheX = ctx.getPlotX();
+            cacheY = ctx.getPlotY();
+            cacheW = ctx.getPlotWidth();
+            cacheH = ctx.getPlotHeight();
+            cacheNodeW = (int) nodeWidth; // ctx.mm() is whole pixels
+            cacheFh = fh;
         }
-        last = lay;
+        int maxLabel = cacheMaxLabel;
+        int[] src = cacheSrc;
+        int[] dst = cacheDst;
+        SankeyLayout lay = last;
         float t = 1;
         if (entering) {
             t = ctx.getProgress();

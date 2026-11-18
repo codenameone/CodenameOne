@@ -208,7 +208,17 @@ public class RadarSeries extends Series {
         lastCy = cy;
         lastR = r;
         lastMax = top;
-        boolean first = rs.get(0) == this; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+        // The grid belongs to the first radar that is painted at all: a hidden
+        // first radar is never painted, so keying on rs.get(0) lost the grid.
+        RadarSeries gridOwner = null;
+        for (int k = 0; k < rs.size(); k++) {
+            RadarSeries candidate = (RadarSeries) rs.get(k);
+            if (candidate.getVisibilityFraction() > 0) {
+                gridOwner = candidate;
+                break;
+            }
+        }
+        boolean first = gridOwner == this; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
         if (first) {
             g.setColor(ctx.getTheme().getGridColor());
             for (double tk = step; tk <= top + step * 1e-6; tk += step) {
