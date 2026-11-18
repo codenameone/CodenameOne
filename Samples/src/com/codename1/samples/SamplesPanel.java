@@ -241,7 +241,7 @@ public class SamplesPanel extends JPanel {
             }
         });
         
-        JMenuItem winDesktopBuild = new JMenuItem("Send Windows Desktop Build");
+        JMenuItem winDesktopBuild = new JMenuItem("Send Windows Desktop Build (JVM, Pro)");
         winDesktopBuild.setToolTipText("Send Windows desktop build.");
         winDesktopBuild.addActionListener(e->{
             if (delegate != null) {
@@ -249,7 +249,7 @@ public class SamplesPanel extends JPanel {
             }
         });
         
-        JMenuItem macDesktopBuild = new JMenuItem("Send Mac Desktop Build");
+        JMenuItem macDesktopBuild = new JMenuItem("Send Mac Desktop Build (JVM, Pro)");
         macDesktopBuild.setToolTipText("Send Mac desktop build.");
         macDesktopBuild.addActionListener(e->{
             if (delegate != null) {

@@ -6,7 +6,7 @@ This goal is bound to the `package` phase of the <<cn1app-archetype>>, so you do
 
 ==== Example
 
-.Submitting a Mac Desktop build directly using this goal:
+.Submitting a native Mac build directly using this goal:
 
 [source,bash]
 ----
@@ -24,8 +24,10 @@ The build target. Different platforms support different build sets of build targ
 [options="header"]
 |====
 | Build Target | Platform | Description
-| mac-os-x-desktop | Java SE | Sends a Mac desktop build to the Codename One build server.
-| windows-desktop | Java SE | Sends a Windows desktop build to the Codename One build server.
+| mac-os-x-native | ios | Sends a native Mac build (no JVM) to the Codename One build server. Free.
+| windows-device | win | Sends a native Windows build (no JVM) to the Codename One build server. Free.
+| mac-os-x-desktop | Java SE | Sends a Mac desktop build, which bundles a JVM, to the Codename One build server. A Pro feature; `mac-os-x-native` is the free one.
+| windows-desktop | Java SE | Sends a Windows desktop build, which bundles a JVM, to the Codename One build server. A Pro feature; `windows-device` is the free one.
 | android-device | android | Sends an Android build to the Codename One build server.
 | android-source | android | Generates an Android Gradle project locally that can be opened and built in Android Studio.
 | ios-device | ios | Sends an iOS build to the Codename One build server.

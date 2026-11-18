@@ -1,5 +1,13 @@
 {"maven.terminal.favorites": [
   {
+    "alias": "Cloud > Windows Native Build (free)",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=win\" \"-Dcodename1.buildTarget=windows-device\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Cloud > Mac Native Build (free)",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=ios\" \"-Dcodename1.buildTarget=mac-os-x-native\" \"-U\" \"-e\""
+  },
+  {
     "alias": "Cloud > iOS Release Build",
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=ios\" \"-Dcodename1.buildTarget=ios-device-release\" \"-U\" \"-e\""
   },
@@ -18,14 +26,6 @@
   {
     "alias": "Run in Simulator",
     "command": "\"verify\" \"-Psimulator\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-e\""
-  },
-  {
-    "alias": "Cloud > Mac Desktop Build",
-    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-Dcodename1.buildTarget=mac-os-x-desktop\" \"-U\" \"-e\""
-  },
-  {
-    "alias": "Cloud > Mac Native Build",
-    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=ios\" \"-Dcodename1.buildTarget=mac-os-x-native\" \"-U\" \"-e\""
   },
   {
     "alias": "Cloud > Android Build",
@@ -52,16 +52,8 @@
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javascript\" \"-Dcodename1.buildTarget=local-javascript\" \"-U\" \"-e\""
   },
   {
-    "alias": "Cloud > Windows Desktop Build",
-    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-Dcodename1.buildTarget=windows-desktop\" \"-U\" \"-e\""
-  },
-  {
     "alias": "Run as Desktop App",
     "command": "\"verify\" \"-Prun-desktop\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-e\""
-  },
-  {
-    "alias": "Cloud > Windows Device Build",
-    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=win\" \"-Dcodename1.buildTarget=windows-device\" \"-U\" \"-e\""
   },
   {
     "alias": "Cloud > Linux Device Build",
@@ -86,5 +78,13 @@
   {
     "alias": "Local > Cross-platform (JavaSE) Desktop App",
     "command": "\"-Pexecutable-jar\" \"package\" \"-Dcodename1.platform=javase\" \"-Dcn1.ffmpeg.allPlatforms=true\" \"-DskipTests\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Cloud > Windows Desktop Build (JVM, Pro)",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-Dcodename1.buildTarget=windows-desktop\" \"-U\" \"-e\""
+  },
+  {
+    "alias": "Cloud > Mac Desktop Build (JVM, Pro)",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-Dcodename1.buildTarget=mac-os-x-desktop\" \"-U\" \"-e\""
   }
 ]}

@@ -27,6 +27,7 @@ goto :finish
 call "%MVNW%" package -DskipTests -Dcodename1.platform^=javase -Dcodename1.buildTarget^=windows-desktop -U -e
 
 goto :finish
+:windows_native
 :windows_device
 call "%MVNW%" package -DskipTests -Dcodename1.platform^=win -Dcodename1.buildTarget^=windows-device -U -e
 
@@ -118,16 +119,11 @@ echo   ios_release
 echo     Builds iOS app for submission to Apple appstore.
 echo   android
 echo     Builds android app.
-echo   mac_desktop
-echo     Builds Mac OS desktop app.
-echo     *Mac OS Desktop builds are a Pro user feature.
+echo   windows_native
+echo     Builds a native Windows app ^(a standalone .exe^, no JVM^). Free.
+echo     windows_device is the same build under its older name.
 echo   mac_native
-echo     Builds a native Mac app ^(no JVM^).
-echo   windows_desktop
-echo     Builds Windows desktop app.
-echo     *Windows Desktop builds are a Pro user feature.
-echo   windows_device
-echo     Builds a native Windows app ^(no JVM^).
+echo     Builds a native Mac app ^(no JVM^). Free.
 echo   linux_device
 echo     Builds a native Linux app ^(ELF^, no JVM^).
 echo   linux_local
@@ -138,6 +134,12 @@ echo   device_logs
 echo     Follows the app's log on CN1_DEVICE_HOST.
 echo   javascript_cloud
 echo     Builds the web app using the build server.
+echo   windows_desktop
+echo     Builds a Windows desktop app that bundles a JVM.
+echo     *Pro feature. Not the native build: windows_native is free.
+echo   mac_desktop
+echo     Builds a Mac OS desktop app that bundles a JVM.
+echo     *Pro feature. Not the native build: mac_native is free.
 
 goto :finish
 :settings

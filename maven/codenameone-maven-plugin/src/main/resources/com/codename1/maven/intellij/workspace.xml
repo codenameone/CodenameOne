@@ -445,7 +445,7 @@
             </MavenSettings>
             <method v="2" />
         </configuration>
-        <configuration name="Mac Desktop Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+        <configuration name="Mac Desktop Build (JVM, Pro)" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
             <MavenSettings>
                 <option name="myGeneralSettings" />
                 <option name="myRunnerSettings">
@@ -621,7 +621,7 @@
             </MavenSettings>
             <method v="2" />
         </configuration>
-        <configuration name="Windows Desktop Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+        <configuration name="Windows Desktop Build (JVM, Pro)" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
             <MavenSettings>
                 <option name="myGeneralSettings" />
                 <option name="myRunnerSettings">
@@ -666,7 +666,7 @@
             </MavenSettings>
             <method v="2" />
         </configuration>
-        <configuration name="Windows Device Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+        <configuration name="Windows Native Build (free)" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
             <MavenSettings>
                 <option name="myGeneralSettings" />
                 <option name="myRunnerSettings">
@@ -891,7 +891,7 @@
             </MavenSettings>
             <method v="2" />
         </configuration>
-        <configuration name="Mac Native Build" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
+        <configuration name="Mac Native Build (free)" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
             <MavenSettings>
                 <option name="myGeneralSettings" />
                 <option name="myRunnerSettings">
@@ -1055,13 +1055,14 @@
             <item itemvalue="Maven.Android Build" />
             <item itemvalue="Maven.iOS Debug Build" />
             <item itemvalue="Maven.iOS Release Build" />
+            <item itemvalue="Maven.Windows Native Build (free)" />
+            <item itemvalue="Maven.Mac Native Build (free)" />
             <item itemvalue="Maven.Javascript Build" />
             <item itemvalue="Maven.JavaScript Local Build" />
-            <item itemvalue="Maven.Mac Desktop Build" />
-            <item itemvalue="Maven.Windows Desktop Build" />
-            <item itemvalue="Maven.Windows Device Build" />
             <item itemvalue="Maven.Linux Desktop Build" />
             <item itemvalue="Maven.Linux Device Build" />
+            <item itemvalue="Maven.Windows Desktop Build (JVM, Pro)" />
+            <item itemvalue="Maven.Mac Desktop Build (JVM, Pro)" />
             <item itemvalue="Maven.Cross-platform (JavaSE) Desktop App" />
             <item itemvalue="Maven.Xcode iOS Project" />
             <item itemvalue="Maven.Gradle Android Project" />
