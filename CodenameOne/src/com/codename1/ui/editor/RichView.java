@@ -23,6 +23,7 @@
 
 package com.codename1.ui.editor;
 
+import com.codename1.util.Bidi;
 import com.codename1.ui.Font;
 import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.EncodedImage;
@@ -631,13 +632,13 @@ public class RichView extends EditorView {
 
     /// Visual (left to right) atom layout: each entry is `{logStart, logEnd, level, isImage, xLeft, width}`.
     private int[][] richVisualAtoms(int line, String text, int lineStart) {
-        byte[] levels = BidiUtil.resolveLevels(text, isRTL());
+        byte[] levels = Bidi.levels(text, isRTL());
         List<int[]> logical = richAtomsLogical(text, lineStart, levels);
         byte[] al = new byte[logical.size()];
         for (int i = 0; i < al.length; i++) {
             al[i] = (byte) logical.get(i)[2];
         }
-        int[] vis = BidiUtil.reorderVisual(al);
+        int[] vis = Bidi.visualOrder(al);
         RichBlocks.BlockAttr b = blocks.get(line);
         int[][] out = new int[vis.length][6];
         int x = 0;
@@ -681,7 +682,7 @@ public class RichView extends EditorView {
     protected int measureColumnX(int line, String text, int col, Font f) {
         int lineStart = getDocument().getLineStart(line);
         RichBlocks.BlockAttr b = blocks.get(line);
-        if (!BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (!Bidi.isLeftToRight(text, isRTL())) {
             int[][] atoms = richVisualAtoms(line, text, lineStart);
             for (int[] atom : atoms) {
                 int as = atom[0];
@@ -726,7 +727,7 @@ public class RichView extends EditorView {
 
     @Override
     protected int columnAtX(int line, String text, int localX, Font f) {
-        if (BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (Bidi.isLeftToRight(text, isRTL())) {
             return super.columnAtX(line, text, localX, f);
         }
         int lineStart = getDocument().getLineStart(line);
@@ -777,7 +778,7 @@ public class RichView extends EditorView {
 
     @Override
     protected int[] lineVisualSegments(int line, String text, int from, int to, Font f) {
-        if (BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (Bidi.isLeftToRight(text, isRTL())) {
             return super.lineVisualSegments(line, text, from, to, f);
         }
         int lineStart = getDocument().getLineStart(line);
@@ -865,7 +866,7 @@ public class RichView extends EditorView {
         // atoms (the same layout measureColumnX / columnAtX use) so glyphs, caret, selection
         // and hit testing all agree; each atom is single-style and single-direction so the
         // platform font engine shapes the glyphs within it.
-        if (!BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (!Bidi.isLeftToRight(text, isRTL())) {
             int[][] atoms = richVisualAtoms(line, text, lineStart);
             for (int[] atom : atoms) {
                 int ax = textStart + atom[4];

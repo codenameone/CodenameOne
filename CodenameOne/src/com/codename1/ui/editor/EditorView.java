@@ -23,6 +23,7 @@
 
 package com.codename1.ui.editor;
 
+import com.codename1.util.Bidi;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.ClipboardContent;
@@ -771,7 +772,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
             return;
         }
         g.setColor(fgColor);
-        if (BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (Bidi.isLeftToRight(text, isRTL())) {
             g.drawString(text, x, y);
             return;
         }
@@ -1194,7 +1195,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
     /// caret lines up with the reordered glyphs. The rich text editor overrides this to measure per styled
     /// run.
     protected int measureColumnX(int line, String text, int col, Font f) {
-        if (BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (Bidi.isLeftToRight(text, isRTL())) {
             return f.substringWidth(text, 0, col);
         }
         int[][] runs = bidiRuns(text, f);
@@ -1217,7 +1218,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
     /// visual run containing the pixel and maps back to a logical column. The rich text editor overrides
     /// it to be styled-run aware.
     protected int columnAtX(int line, String text, int localX, Font f) {
-        if (BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (Bidi.isLeftToRight(text, isRTL())) {
             int col = 0;
             while (col < text.length()) {
                 int wFull = measureColumnX(line, text, col + 1, f);
@@ -1270,8 +1271,8 @@ public class EditorView extends Component implements TextInputClient, TextInputC
     /// from the line content start. Runs are returned in visual (left to right) order.
     private int[][] bidiRuns(String text, Font f) {
         int n = text.length();
-        byte[] levels = BidiUtil.resolveLevels(text, isRTL());
-        int[] v2l = BidiUtil.reorderVisual(levels);
+        byte[] levels = Bidi.levels(text, isRTL());
+        int[] v2l = Bidi.visualOrder(levels);
         java.util.List<int[]> runs = new java.util.ArrayList<int[]>();
         int i = 0;
         while (i < n) {
@@ -1309,7 +1310,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
         if (from >= to) {
             return new int[0];
         }
-        if (BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (Bidi.isLeftToRight(text, isRTL())) {
             int xa = measureColumnX(line, text, from, f);
             int xb = measureColumnX(line, text, to, f);
             return new int[]{Math.min(xa, xb), Math.abs(xb - xa)};
@@ -2242,7 +2243,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
     /// Measures all insertion positions with one bulk request per directional run. Subclasses
     /// with styled runs or inline objects override this alongside measureColumnX().
     protected int[] measureLineCaretPositions(int line, String text, Font font) {
-        if (BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (Bidi.isLeftToRight(text, isRTL())) {
             return font.getTextRunPositions(text, false);
         }
         int[] positions = new int[text.length() + 1];

@@ -66,6 +66,15 @@ public final class Crypto {
 
     private static final class ServerEngine extends com.codename1.security.CryptoEngine {
         @Override
+        public byte[] aesCbc(boolean encrypt, byte[] key, byte[] iv, byte[] blocks) {
+            try {
+                return encrypt ? aesCbcEncryptBlocks(key, iv, blocks) : aesCbcDecryptBlocks(key, iv, blocks);
+            } catch (IOException e) {
+                return null;
+            }
+        }
+
+        @Override
         public boolean randomBytes(byte[] out) {
             byte[] r = randomBytesImpl(out.length);
             if (r == null) {

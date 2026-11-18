@@ -23,6 +23,7 @@
 
 package com.codename1.ui.editor;
 
+import com.codename1.util.Bidi;
 import com.codename1.ui.CodeCompletion;
 import com.codename1.ui.CodeDiagnostic;
 import com.codename1.ui.Display;
@@ -331,7 +332,7 @@ public class CodeView extends EditorView {
         // Right-to-left / mixed lines need the bidi run renderer (per-token coloring falls back to the
         // default foreground on those lines; code keywords are ASCII so this only affects RTL string and
         // comment content).
-        if (!BidiUtil.isTrivialLtr(text, isRTL())) {
+        if (!Bidi.isLeftToRight(text, isRTL())) {
             super.paintLine(g, line, text, x, y, lineHeight, f);
             return;
         }

@@ -924,4 +924,6 @@ toon
 detune
 rolloff
 worklet
+# PDF standard font names.
+Zapf
 Fieldline

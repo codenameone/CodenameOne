@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /// Headless integration tests for the bidi geometry wiring in {@link EditorView} (same package, so the
 /// protected {@code measureColumnX}/{@code columnAtX}/{@code lineVisualSegments} hooks are reachable).
-/// The Unicode Bidi Algorithm itself is covered by {@link BidiUtilTest}; this verifies the editor maps
+/// The Unicode Bidi Algorithm itself is covered by {@code com.codename1.util.BidiTest}; this verifies the editor maps
 /// logical columns to visual x and back correctly for right-to-left and mixed lines.
 class EditorViewBidiTest extends UITestBase {
 
