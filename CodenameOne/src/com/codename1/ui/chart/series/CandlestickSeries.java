@@ -224,7 +224,9 @@ public class CandlestickSeries extends XYSeries {
             double l = getLow(i);
             double c = getClose(i);
             double hc = (o + h + l + c) / 4;
-            double ho = i == 0 ? (o + c) / 2 : (out[0][i - 1] + out[3][i - 1]) / 2;
+            double prev = i == 0 ? Double.NaN : (out[0][i - 1] + out[3][i - 1]) / 2;
+            // after a gap the average starts over, so one missing period does not blank the rest
+            double ho = prev == prev ? prev : (o + c) / 2;
             out[0][i] = ho;
             out[1][i] = Math.max(h, Math.max(ho, hc));
             out[2][i] = Math.min(l, Math.min(ho, hc));
@@ -233,14 +235,26 @@ public class CandlestickSeries extends XYSeries {
         return out;
     }
 
+    // one buffer refilled per call: paint and hit testing read a row and are done with it
+    private final double[] rowBuf = new double[4];
+
     private double[] row(int i) {
+        double[] r = rowBuf;
         if (style == HEIKIN_ASHI) {
             if (ha == null || ha[0].length != size()) {
                 ha = heikinAshi();
             }
-            return new double[]{ha[0][i], ha[1][i], ha[2][i], ha[3][i]};
+            r[0] = ha[0][i];
+            r[1] = ha[1][i];
+            r[2] = ha[2][i];
+            r[3] = ha[3][i];
+            return r;
         }
-        return new double[]{getOpen(i), getHigh(i), getLow(i), getClose(i)};
+        r[0] = getOpen(i);
+        r[1] = getHigh(i);
+        r[2] = getLow(i);
+        r[3] = getClose(i);
+        return r;
     }
 
     @Override

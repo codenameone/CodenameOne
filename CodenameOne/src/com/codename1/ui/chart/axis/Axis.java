@@ -180,9 +180,17 @@ public abstract class Axis {
             max = fixedMax.doubleValue();
         }
         if (!(max > min)) { //NOPMD LogicInversion - the negated comparison is also true for NaN
-            double pad = min == 0 ? 1 : Math.abs(min) * 0.1;
-            min -= pad;
-            max += pad;
+            // a fixed bound beyond the data keeps its side; only the free side moves
+            double anchor = fixedMin != null ? min : max;
+            double pad = anchor == 0 ? 1 : Math.abs(anchor) * 0.1;
+            if (fixedMin != null && fixedMax == null) {
+                max = min + pad;
+            } else if (fixedMax != null && fixedMin == null) {
+                min = max - pad;
+            } else {
+                min -= pad;
+                max += pad;
+            }
         }
         double[] adj = adjustBounds(min, max);
         dataMin = adj[0];

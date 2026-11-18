@@ -154,9 +154,17 @@ public class SessionTimeAxis extends Axis {
         return a > hi ? -1 : a;
     }
 
+    private SimpleDateFormat formatter;
+    private String formatterPattern;
+
     @Override
     protected String defaultFormat(double value, double step) {
         String pattern = step <= 0 ? "MMM d, yyyy" : TimeAxis.patternFor(lastField);
-        return new SimpleDateFormat(pattern).format(new Date(timeAt(value)));
+        if (formatter == null || !pattern.equals(formatterPattern)) {
+            // one formatter per pattern, not one per label per frame
+            formatter = new SimpleDateFormat(pattern);
+            formatterPattern = pattern;
+        }
+        return formatter.format(new Date(timeAt(value)));
     }
 }

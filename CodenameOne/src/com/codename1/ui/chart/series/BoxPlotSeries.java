@@ -87,8 +87,20 @@ public class BoxPlotSeries extends XYSeries {
     ///
     /// this series
     public BoxPlotSeries addSamples(double x, double[] samples) {
-        double[] s = new double[samples.length];
-        System.arraycopy(samples, 0, s, 0, s.length);
+        // NaN has no place in an order statistic, and sort does not order it on every platform
+        int n = 0;
+        for (double v : samples) {
+            if (v == v) {
+                n++;
+            }
+        }
+        double[] s = new double[n];
+        n = 0;
+        for (double v : samples) {
+            if (v == v) {
+                s[n++] = v;
+            }
+        }
         java.util.Arrays.sort(s);
         if (s.length == 0) {
             return this;
@@ -108,6 +120,9 @@ public class BoxPlotSeries extends XYSeries {
     ///
     /// the quantile
     public static double quantile(double[] sorted, double q) {
+        if (sorted.length == 0) {
+            return Double.NaN;
+        }
         if (sorted.length == 1) {
             return sorted[0];
         }

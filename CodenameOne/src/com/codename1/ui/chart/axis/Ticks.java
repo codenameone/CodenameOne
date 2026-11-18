@@ -83,11 +83,18 @@ public final class Ticks {
         if (!(max > min)) { //NOPMD LogicInversion - the negated comparison is also true for NaN
             return new double[]{min};
         }
+        if (Double.isInfinite(max - min)) {
+            // a span past the double range has no round step; the ends are all that can be named
+            return new double[]{min, max};
+        }
         double step = niceStep((max - min) / (maxCount - 1));
         // a nice step can still yield maxCount + 1 ticks once aligned; widen until it fits
         int guard = 0;
         while (count(min, max, step) > maxCount && guard++ < 8) {
             step = niceStep(step * 1.5);
+        }
+        if (count(min, max, step) > maxCount) {
+            return new double[]{min, max};
         }
         return fill(min, max, step);
     }

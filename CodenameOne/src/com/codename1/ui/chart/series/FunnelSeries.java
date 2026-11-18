@@ -131,9 +131,11 @@ public class FunnelSeries extends CategoricalSeries {
     public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
         float ay = y + ctx.getOriginY();
         float ax = x + ctx.getOriginX();
-        for (int i = 0; i < lastTop.length; i++) {
+        // the arrays of the last paint may be longer than data changed since
+        int n = Math.min(lastTop.length, values.length);
+        for (int i = 0; i < n; i++) {
             if (lastH[i] > 0 && ay >= lastTop[i] && ay <= lastTop[i] + lastH[i]
-                    && Math.abs(ax - lastCx) <= Math.max(values[i] * lastScale / 2, radius)) {
+                    && Math.abs(ax - lastCx) <= Math.max(displayValue(ctx, i) * lastScale / 2, radius)) {
                 return getPoint(ctx, i);
             }
         }

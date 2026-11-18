@@ -164,9 +164,17 @@ public class TimeAxis extends Axis {
         c.set(Calendar.YEAR, c.get(Calendar.YEAR) / amount * amount);
     }
 
+    private SimpleDateFormat formatter;
+    private String formatterPattern;
+
     @Override
     protected String defaultFormat(double value, double step) {
         String pattern = step <= 0 ? "MMM d, yyyy HH:mm" : patternFor(lastField);
-        return new SimpleDateFormat(pattern).format(new Date((long) value));
+        if (formatter == null || !pattern.equals(formatterPattern)) {
+            // one formatter per pattern, not one per label per frame
+            formatter = new SimpleDateFormat(pattern);
+            formatterPattern = pattern;
+        }
+        return formatter.format(new Date((long) value));
     }
 }

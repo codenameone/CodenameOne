@@ -278,6 +278,9 @@ public abstract class XYSeries extends Series {
         }
         double sum = 0;
         double x = xs[i];
+        // positives stack up from zero and negatives down from it, so mixed signs never overlap.
+        // The same index is checked first, so the usual aligned stack costs one look per series.
+        boolean negative = ys[i] < 0;
         List<Series> all = getChart().getSeries();
         for (Series o : all) {
             if (o == this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
@@ -289,7 +292,7 @@ public abstract class XYSeries extends Series {
                     int j = i < xo.count && xo.xs[i] == x ? i : xo.indexOfX(x);
                     if (j >= 0) {
                         double v = xo.ys[j];
-                        if (v == v) {
+                        if (v == v && (v < 0) == negative) {
                             sum += v;
                         }
                     }
@@ -297,6 +300,32 @@ public abstract class XYSeries extends Series {
             }
         }
         return sum;
+    }
+
+    /// The index whose x is closest to `x`, by binary search over the ascending x values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: a data value on the x axis
+    ///
+    /// #### Returns
+    ///
+    /// the nearest index, or -1 for an empty series
+    public int nearestIndexOfX(double x) {
+        if (count == 0) {
+            return -1;
+        }
+        int lo = 0;
+        int hi = count - 1;
+        while (hi - lo > 1) {
+            int mid = (lo + hi) >>> 1;
+            if (xs[mid] < x) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        return Math.abs(xs[lo] - x) <= Math.abs(xs[hi] - x) ? lo : hi;
     }
 
     int indexOfX(double x) {

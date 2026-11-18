@@ -87,8 +87,11 @@ public class Chart extends Component {
     private final List<RangeListener> rangeListeners = new ArrayList<RangeListener>();
     private boolean brushEnabled;
     private boolean brushZooms = true;
-    private int brushFrom = -1;
-    private int brushTo = -1;
+    // paint coordinates can be negative (a scrolled parent), so a flag says whether a brush is live
+    private boolean brushing;
+    private boolean brushMoved;
+    private int brushFrom;
+    private int brushTo;
     private Axis xAxis = new NumberAxis(Axis.BOTTOM);
     private Axis yAxis = new NumberAxis(Axis.LEFT);
     private Axis secondaryYAxis;
@@ -705,8 +708,7 @@ public class Chart extends Component {
         }
 
         if (title != null && title.length() > 0) {
-            Font tf = font.isTTFNativeFont() ? font.derive(font.getPixelSize() * 1.2f, Font.STYLE_BOLD)
-                    : Font.createSystemFont(font.getFace(), Font.STYLE_BOLD, Font.SIZE_LARGE);
+            Font tf = titleFont(font);
             g.setFont(tf);
             g.setColor(getTheme().getTextColor());
             String t = LabelLayout.ellipsize(tf, title, w);
@@ -787,7 +789,7 @@ public class Chart extends Component {
             } else if (yl.tickCount() > Math.max(2, plotH / (fh * 2))) {
                 yl = layoutVertical(vertical, font, plotH, w);
             }
-            if (titleRow > 0) {
+            if (titleRow > 0 && xl != null) {
                 g.setColor(getTheme().getSecondaryTextColor());
                 if (vertical.getTitle() != null) {
                     g.drawString(LabelLayout.ellipsize(font, vertical.getTitle(), w / 2), x, y);
@@ -805,10 +807,15 @@ public class Chart extends Component {
         }
         ctx.plotX = plotX;
         ctx.plotY = plotY;
-        ctx.plotW = plotW;
-        ctx.plotH = plotH;
-        ctx.labels = new LabelLayout(plotX, plotY - fh / 2, plotW, plotH + fh / 2);
+        ctx.plotW = Math.max(0, plotW);
+        ctx.plotH = Math.max(0, plotH);
+        ctx.labels = new LabelLayout(plotX, plotY - fh / 2, ctx.plotW, ctx.plotH + fh / 2);
         lastContext = ctx;
+        if (ctx.plotW <= 0 || ctx.plotH <= 0) {
+            // the title and legend took the whole component: there is no plot to draw into
+            g.setAntiAliased(aa);
+            return;
+        }
 
         if (cartesian && xl != null) {
             paintGrid(g, ctx, xl, yl);
@@ -840,7 +847,7 @@ public class Chart extends Component {
         if (cartesian && xl != null) {
             paintAxes(g, ctx, xl, yl, y2l, font, gap);
         }
-        if (brushFrom >= 0 && brushTo >= 0) {
+        if (brushing && brushMoved) {
             paintBrush(g, ctx);
         }
         paintTooltip(g, ctx, font);
@@ -848,6 +855,19 @@ public class Chart extends Component {
             paintLoading(g, font, x, y, w, h);
         }
         g.setAntiAliased(aa);
+    }
+
+    // derived once per base font rather than on every frame
+    private Font titleFontBase;
+    private Font titleFontCached;
+
+    private Font titleFont(Font font) {
+        if (titleFontCached == null || titleFontBase != font) { //NOPMD CompareObjectsWithEquals - a different font instance is a different base
+            titleFontBase = font;
+            titleFontCached = font.isTTFNativeFont() ? font.derive(font.getPixelSize() * 1.2f, Font.STYLE_BOLD)
+                    : Font.createSystemFont(font.getFace(), Font.STYLE_BOLD, Font.SIZE_LARGE);
+        }
+        return titleFontCached;
     }
 
     private void paintLoading(Graphics g, Font font, int x, int y, int w, int h) {
@@ -1400,6 +1420,11 @@ public class Chart extends Component {
         if (s == null) {
             return -1;
         }
+        if (!rotated && s instanceof com.codename1.ui.chart.series.XYSeries && ctx.plotW > 0) {
+            // scrubbing runs on every move: search the sorted x values instead of every point
+            double n = (relX + getX() - ctx.plotX) / (double) ctx.plotW;
+            return ((com.codename1.ui.chart.series.XYSeries) s).nearestIndexOfX(xAxis.fromNormalized(n));
+        }
         int best = -1;
         int bestD = Integer.MAX_VALUE;
         for (int i = 0; i < s.getPointCount(); i++) {
@@ -1489,6 +1514,8 @@ public class Chart extends Component {
     @Override
     public void pointerPressed(int x, int y) {
         flinging = false;
+        // a touch takes over from a running zoom animation, keeping the range shown right now
+        viewportTo = null;
         pressX = toPaintX(x);
         pressY = toPaintY(y);
         lastX = pressX;
@@ -1508,6 +1535,9 @@ public class Chart extends Component {
                 super.pointerDragged(x, y);
                 return;
             }
+            // a second finger ends a brush: the gesture is a pinch now
+            brushing = false;
+            brushMoved = false;
             dragMode = DRAG_PAN;
             handlePinch(toPaintX(x[0]), toPaintY(y[0]), toPaintX(x[1]), toPaintY(y[1]));
             return;
@@ -1532,6 +1562,8 @@ public class Chart extends Component {
             if (brushEnabled && hasCartesian() && insidePlot(pressX, pressY)) {
                 dragMode = DRAG_BRUSH;
                 brushFrom = rotated ? pressY : pressX;
+                brushing = true;
+                brushMoved = false;
             } else if (zoomEnabled && zoomed && hasCartesian()) {
                 dragMode = DRAG_PAN;
             } else if (horizontalIntent && hasCartesian() && tooltipMode != TOOLTIP_NONE && insidePlot(pressX, pressY)) {
@@ -1546,6 +1578,7 @@ public class Chart extends Component {
         }
         if (dragMode == DRAG_BRUSH) {
             brushTo = rotated ? py : px;
+            brushMoved = true;
             repaint();
         } else if (dragMode == DRAG_PAN) {
             long now = System.currentTimeMillis();
@@ -1674,6 +1707,10 @@ public class Chart extends Component {
     }
 
     private static double clamp01(double v) {
+        if (v != v) {
+            // an empty plot has no size; zoom about its middle rather than poison the axes
+            return 0.5;
+        }
         return v < 0 ? 0 : v > 1 ? 1 : v;
     }
 
@@ -1759,7 +1796,7 @@ public class Chart extends Component {
 
     private void zoomAt(int x, int y, double factor, boolean animate) {
         ChartContext c = lastContext;
-        if (c == null) {
+        if (c == null || c.plotW <= 0 || c.plotH <= 0) {
             return;
         }
         double ax = clamp01((x - c.plotX) / (double) c.plotW);
@@ -1840,10 +1877,11 @@ public class Chart extends Component {
     private void finishBrush() {
         int from = brushFrom;
         int to = brushTo;
-        brushFrom = -1;
-        brushTo = -1;
+        boolean live = brushing && brushMoved;
+        brushing = false;
+        brushMoved = false;
         repaint();
-        if (from < 0 || to < 0 || lastContext == null || Math.abs(to - from) < mm(2)) {
+        if (!live || lastContext == null || Math.abs(to - from) < mm(2)) {
             return;
         }
         double a = brushValue(from);

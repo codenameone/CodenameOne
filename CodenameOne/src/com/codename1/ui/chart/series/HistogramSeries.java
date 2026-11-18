@@ -72,7 +72,8 @@ public class HistogramSeries extends BarSeries {
         if (bins <= 0) {
             bins = (int) Math.ceil(MathUtil.log(n) / MathUtil.log(2) + 1);
         }
-        bins = Math.max(1, bins);
+        // identical samples make one bar, not a run of empty ones
+        bins = max > min ? Math.max(1, bins) : 1;
         double width = max > min ? (max - min) / bins : 1;
         double[] x = new double[bins];
         double[] y = new double[bins];
