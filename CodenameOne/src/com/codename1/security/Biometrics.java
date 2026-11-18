@@ -125,6 +125,59 @@ public class Biometrics {
         return Collections.emptyList();
     }
 
+    /// Answers what the application should call biometric authentication on
+    /// this device: a fingerprint, the face, or biometrics in general when
+    /// the device cannot say which. Use it to choose the wording and icon of
+    /// the application's own UI; it needs no platform or OS version check.
+    ///
+    /// ```java
+    /// switch (Biometrics.getInstance().getPromptType()) {
+    ///     case FINGERPRINT: label = "Sign in with fingerprint"; break;
+    ///     case FACE: label = "Sign in with face"; break;
+    ///     case BIOMETRICS: label = "Sign in with biometrics"; break;
+    ///     default: label = null; // NONE: offer the password only
+    /// }
+    /// ```
+    ///
+    /// The answer is derived from [#canAuthenticate()] and
+    /// [#getAvailableBiometrics()]: a single modality is named, and anything
+    /// else that can authenticate is [BiometricPromptType#BIOMETRICS]. iOS
+    /// always names one. An Android device with more than one kind of
+    /// biometric hardware answers [BiometricPromptType#BIOMETRICS], because
+    /// Android reports that some biometric is enrolled and not which.
+    ///
+    /// #### Returns
+    ///
+    /// [BiometricPromptType#NONE] when [#canAuthenticate()] is `false`
+    public final BiometricPromptType getPromptType() {
+        if (!canAuthenticate()) {
+            return BiometricPromptType.NONE;
+        }
+        // STRONG and WEAK are authenticator classes, not modalities, so they
+        // do not count. An iris has no wording of its own and is generic.
+        BiometricPromptType found = null;
+        List<BiometricType> types = getAvailableBiometrics();
+        int size = types == null ? 0 : types.size();
+        for (int i = 0; i < size; i++) {
+            BiometricType t = types.get(i);
+            BiometricPromptType p;
+            if (t == BiometricType.FINGERPRINT) {
+                p = BiometricPromptType.FINGERPRINT;
+            } else if (t == BiometricType.FACE) {
+                p = BiometricPromptType.FACE;
+            } else if (t == BiometricType.IRIS) {
+                p = BiometricPromptType.BIOMETRICS;
+            } else {
+                continue;
+            }
+            if (found != null && found != p) {
+                return BiometricPromptType.BIOMETRICS;
+            }
+            found = p;
+        }
+        return found == null ? BiometricPromptType.BIOMETRICS : found;
+    }
+
     /// Prompts the user to authenticate. The returned `AsyncResource`
     /// completes with `true` on success, or with a [BiometricException] on
     /// failure (consult [BiometricException#getError()] for the typed code).

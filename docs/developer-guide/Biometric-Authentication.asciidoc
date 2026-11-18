@@ -110,6 +110,22 @@ Call `Biometrics.getInstance().stopAuthentication()` to dismiss an active prompt
 
 Never use this list to decide whether to call `authenticate()`; always use `canAuthenticate()` for that decision.
 
+=== Choosing the wording of your own UI
+
+`getPromptType()` answers one question: what should the app call biometric authentication on this device? It returns `FINGERPRINT`, `FACE`, `BIOMETRICS` or `NONE`, and the answer needs no platform or OS version check:
+
+[source,java]
+----
+switch (Biometrics.getInstance().getPromptType()) {
+    case FINGERPRINT: label = "Sign in with fingerprint"; break;
+    case FACE: label = "Sign in with face"; break;
+    case BIOMETRICS: label = "Sign in with biometrics"; break;
+    default: label = null; // NONE: offer the password only
+}
+----
+
+iOS always names one of the two. Android reports that some biometric is enrolled and not which one, so an Android device with more than one kind of biometric hardware answers `BIOMETRICS`. Use neutral wording there; the system prompt directs the user to the right sensor.
+
 === Simulator workflow
 
 The JavaSE simulator's `Simulate -> Biometric Simulation` submenu lets you exercise every code path without a device:
