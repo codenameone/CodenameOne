@@ -77,7 +77,9 @@ jobs:
       actions: read
       # The "Golden capture" status golden-capture.yml leaves pending.
       statuses: write
-      pull-requests: read
+      # The Golden capture comment on the PR (github-actions[bot]).
+      pull-requests: write
+      issues: write
     env:
       GH_TOKEN: ${{ github.token }}
       HEAD_SHA: ${{ github.event.workflow_run.head_sha || inputs.head_sha }}
@@ -149,6 +151,8 @@ jobs:
           # The runs at this head are a capture's (golden-capture.yml), not
           # only the PR's own: whichever run completed last started this.
           CAPTURE: ${{ steps.list.outputs.capture }}
+          # Re-runs a leg GitHub dropped; see redo-dropped in the script.
+          CN1SS_GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
         run: |
           set -euo pipefail
           cd pr
@@ -179,6 +183,17 @@ jobs:
           elif [ "$rc" != 0 ]; then
             exit "$rc"
           fi
+          if [ "$CAPTURE" = 1 ]; then
+            # A leg GitHub never gave a runner is re-run, not reported as a
+            # failed capture; its completion starts the harvest again.
+            redone="$(RERUN_TOKEN="$CN1SS_GH_TOKEN" ../trusted/scripts/ci/golden-harvest.sh redo-dropped ../runs.txt)"
+            if [ "$redone" -gt 0 ]; then
+              ../trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" pending \
+                "GitHub dropped $redone capture leg(s) for lack of a runner; re-running them"
+              echo "settled=1" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
           ok=1
           ../trusted/scripts/ci/golden-harvest.sh collect ../runs.txt "$PWD" || ok=0
           git add -A -- scripts
@@ -199,8 +214,6 @@ jobs:
               [ "$c" = success ] || failed="$failed ${wf%.yml}"
             done < ../runs.txt
             [ -z "$failed" ] || ok=0
-            # On the captured head and, when there is one, on the commit that
-            # replaced it: that is the head the PR now shows.
             if [ -n "${committed:-}" ] && [ "$ok" = 1 ]; then
               state=success desc="Goldens committed in ${committed:0:12}"
             elif [ -n "${committed:-}" ]; then
@@ -208,9 +221,15 @@ jobs:
             else
               state=failure desc="No leg produced a golden; golden-plan names the gaps"
             fi
-            for sha in "$HEAD_SHA" ${committed:-}; do
-              ../trusted/scripts/ci/golden-harvest.sh status "$sha" "$state" "$desc"
-            done
+            ../trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" "$state" "$desc"
+            # The commit is the head the PR now shows, and its push runs
+            # golden-capture.yml again, which captures (and sets this status
+            # pending) only if goldens are still missing there. A failure
+            # copied onto it stayed red on a PR that had every golden.
+            if [ -n "${committed:-}" ]; then
+              ../trusted/scripts/ci/golden-harvest.sh status "$committed" success \
+                "Goldens committed here; Golden capture re-checks this head for gaps"
+            fi
             echo "settled=1" >> "$GITHUB_OUTPUT"
           fi
           [ "$ok" = 1 ]

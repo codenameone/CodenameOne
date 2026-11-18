@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 #
-# Select the Xcode the iOS/macOS/Catalyst scripts build with.
+# Select the Xcode the iOS and macOS scripts build with.
 #
 # This used to be a twelve-line prologue copy-pasted into eight scripts and
 # inlined again in three workflows, every copy hardcoding "Xcode_26*". Moving to

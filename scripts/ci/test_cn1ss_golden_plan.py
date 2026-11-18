@@ -231,6 +231,57 @@ class CollectTest(unittest.TestCase):
         self.assertFalse(col.collect(dl, f.root, **f.args()))
         self.assertFalse(os.path.exists(os.path.join(f.root, "g/win/bar-image.png")))
 
+    @staticmethod
+    def png(changed=(), value=0):
+        """A 100x100 RGBA PNG, grey except the pixels in `changed` set to `value`."""
+        import struct
+        import zlib
+        rows = b""
+        for y in range(100):
+            row = bytearray([128] * 400)
+            for (cx, cy) in changed:
+                if cy == y:
+                    row[cx * 4:cx * 4 + 3] = bytes([value] * 3)
+            rows += b"\0" + bytes(row)
+
+        def chunk(kind, body):
+            return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+        return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 100, 100, 8, 6, 0, 0, 0))
+                + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+    def put_bytes(self, dl, run, art, rel, data):
+        path = os.path.join(dl, run, art, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as fh:
+            fh.write(data)
+
+    def test_legs_differing_only_by_anti_aliasing_commit_with_a_sidecar(self):
+        # #6265: Windows x64 and arm64 differed in one glyph pixel by 9.
+        g = complete()
+        g["g/win"].remove("bar-image")
+        f = Fixture(g)
+        dl = os.path.join(f.root, "dl")
+        self.put_bytes(dl, "1", "cn1ss-capture-a", "g/win/bar-image.png", self.png())
+        self.put_bytes(dl, "2", "cn1ss-capture-b", "g/win/bar-image.png", self.png([(5, 5)], 137))
+        self.assertTrue(col.collect(dl, f.root, **f.args()))
+        self.assertTrue(os.path.exists(os.path.join(f.root, "g/win/bar-image.png")))
+        with open(os.path.join(f.root, "g/win/bar-image.tolerance")) as fh:
+            side = fh.read()
+        self.assertIn("maxChannelDelta=16", side)
+        self.assertIn("maxMismatchPercent=0.1", side)
+
+    def test_legs_differing_beyond_anti_aliasing_still_fail(self):
+        for changed, value in (([(5, 5)], 200), ([(x, 5) for x in range(20)], 137)):
+            g = complete()
+            g["g/win"].remove("bar-image")
+            f = Fixture(g)
+            dl = os.path.join(f.root, "dl")
+            self.put_bytes(dl, "1", "cn1ss-capture-a", "g/win/bar-image.png", self.png())
+            self.put_bytes(dl, "2", "cn1ss-capture-b", "g/win/bar-image.png", self.png(changed, value))
+            self.assertFalse(col.collect(dl, f.root, **f.args()))
+            self.assertFalse(os.path.exists(os.path.join(f.root, "g/win/bar-image.png")))
+            self.assertFalse(os.path.exists(os.path.join(f.root, "g/win/bar-image.tolerance")))
+
     def emit(self, dl, run, art, listing):
         path = os.path.join(dl, run, art, "cn1ss-emitted.json")
         os.makedirs(os.path.dirname(path), exist_ok=True)

@@ -22,7 +22,6 @@
     "scripts/ios/screenshots-metal",
     "scripts/ios/screenshots-watch",
     "scripts/ios/screenshots-tv",
-    "scripts/mac-catalyst/screenshots",
     "scripts/macos/screenshots",
     "scripts/javascript/screenshots",
     "scripts/linux/screenshots",
@@ -47,12 +46,6 @@
       "name": "macOS",
       "detail": "Native AppKit build",
       "workflow": "scripts-macos.yml"
-    },
-    {
-      "id": "mac-catalyst",
-      "name": "macOS (Mac Catalyst)",
-      "detail": "Legacy Mac Catalyst build",
-      "workflow": "scripts-ios.yml"
     },
     {
       "id": "javascript",
@@ -126,7 +119,8 @@
         "AndroidCompatJetpackScreenshotTest",
         "AndroidCompatRecyclerScreenshotTest",
         "AndroidCompatMaterialScreenshotTest",
-        "AndroidCompatKotlinScreenshotTest"
+        "AndroidCompatKotlinScreenshotTest",
+        "AndroidCompatTallDialogScreenshotTest"
       ]
     },
     {
@@ -473,6 +467,15 @@
       "description": "Checks the node graph with a group, labeled curved edges, typed ports, the grid and a selected node, in light and dark themes.",
       "tests": [
         "NodeGraphThemeScreenshotTest"
+      ]
+    },
+    {
+      "id": "pdf-viewer",
+      "category": "Rich components",
+      "name": "PDF viewer",
+      "description": "Checks a generated invoice rendered by the pure-Java PDF renderer in the PDF viewer: text in standard fonts, a table with borders and fills, and vector graphics.",
+      "tests": [
+        "PdfViewerScreenshotTest"
       ]
     },
     {
@@ -1493,6 +1496,10 @@
       "test": "NodeGraphThemeScreenshotTest"
     },
     {
+      "pattern": "PdfViewer*",
+      "test": "PdfViewerScreenshotTest"
+    },
+    {
       "pattern": "ToolbarTheme_*",
       "test": "ToolbarThemeScreenshotTest"
     },
@@ -1727,6 +1734,10 @@
     {
       "pattern": "AndroidCompatKotlin",
       "test": "AndroidCompatKotlinScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatTallDialog",
+      "test": "AndroidCompatTallDialogScreenshotTest"
     },
     {
       "pattern": "UnityCompatSprites",

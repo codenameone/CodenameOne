@@ -76,6 +76,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     private static final String PKG = "Lcom/codename1/backend/annotations/";
     private static final String MVC_CONTROLLER = PKG + "Controller;";
+
+    private static boolean resolvesGraphQL(AnnotatedClass cls) {
+        for (MethodInfo m : cls.getMethods()) {
+            if (BackendGraphQL.isMapping(m)) {
+                return true;
+            }
+        }
+        return false;
+    }
     private static final String MODEL_ATTRIBUTE = PKG + "ModelAttribute;";
     private static final String MVC = "com.codename1.backend.mvc.";
     private static final String CONTROLLER = PKG + "RestController;";
@@ -503,6 +512,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     controller.routes.add(route);
                 }
             }
+        }
+        if (controller.routes.isEmpty() && controller.mvc && resolvesGraphQL(cls)) {
+            // A @Controller of GraphQL resolvers only, as Spring for GraphQL
+            // has them: BackendGraphQL wires it, and it serves no route.
+            return;
         }
         if (controller.routes.isEmpty()) {
             ctx.error(cls, "@RestController declares no mapped methods: " + controller.binaryName);
@@ -1787,7 +1801,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // A worker that only consumes messages is a server too: nothing else
         // would start its listeners.
         if (controllers.isEmpty() && webSockets.isEmpty() && !beans.hasJobs()
-                && !beans.hasListeners() && !beans.hasTools() && !beans.hasManaged() && !settings.management
+                && !beans.hasListeners() && !beans.hasTools() && !beans.hasManaged()
+                && !beans.hasGraphQL() && !settings.management
                 && !staticFiles) {
             // NOTHING LEFT, so a marker from an earlier build has to go. Maven
             // keeps target/classes across a build without clean, and returning

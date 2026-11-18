@@ -59,6 +59,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       tests: ${{ steps.find.outputs.tests }}
+      workflows: ${{ steps.find.outputs.workflows }}
     steps:
       # The merge commit, as golden-plan.yml sees it: its first parent is the
       # base, so a deleted golden is a gap as well.
@@ -73,6 +74,12 @@ jobs:
           tests="$(python3 scripts/ci/cn1ss-golden-plan.py --verbose --from-git --base=HEAD^1)"
           echo "New tests to capture: ${tests:-none}"
           echo "tests=$tests" >> "$GITHUB_OUTPUT"
+          # Only the workflows whose golden directories have a gap: a test
+          # missing on two ports does not need the other five suites.
+          mapfile -t dirs < <(python3 scripts/ci/cn1ss-golden-plan.py --from-git --base=HEAD^1 --pairs | cut -f2 | sort -u)
+          wfs="$(scripts/ci/golden-capture.sh workflows "${dirs[@]}" | paste -sd' ' -)"
+          echo "Workflows to capture on: ${wfs:-none}"
+          echo "workflows=$wfs" >> "$GITHUB_OUTPUT"
 
   capture:
     needs: detect
@@ -84,11 +91,14 @@ jobs:
     permissions:
       contents: read
       actions: write
-      pull-requests: read
+      # The Golden capture comment on the PR (github-actions[bot]).
+      pull-requests: write
+      issues: write
       statuses: write
     env:
       GH_TOKEN: ${{ github.token }}
       TESTS: ${{ needs.detect.outputs.tests }}
+      WORKFLOWS: ${{ needs.detect.outputs.workflows }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
       RUNS: /tmp/golden-capture-runs.txt
     steps:
@@ -132,7 +142,8 @@ jobs:
       - name: Dispatch the screenshot workflows in capture mode
         env:
           DISPATCH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-        run: scripts/ci/golden-capture.sh dispatch "$HEAD_REF" "$TESTS" "$RUNS"
+        # WORKFLOWS unquoted on purpose: one argument per workflow.
+        run: scripts/ci/golden-capture.sh dispatch "$HEAD_REF" "$TESTS" "$RUNS" $WORKFLOWS
 
       # Workflows the triggering push started after the first pass.
       - name: Cancel the PR's other runs again
@@ -149,11 +160,11 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          n="$(wc -l < "$RUNS")"
-          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f state=pending -f context="Golden capture" \
-            -f description="Goldens missing: other checks cancelled; capturing on $n screenshot workflows" \
-            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null \
-            || echo "::warning::could not set the Golden capture status; the capture runs anyway"
+          # Set only once every workflow is dispatched: golden-harvest.sh
+          # reads its presence as "the capture's workflows are all started".
+          names="$(cut -d' ' -f1 "$RUNS" | sed 's/\.yml$//' | paste -sd, - | sed 's/,/, /g')"
+          scripts/ci/golden-harvest.sh status "$HEAD_SHA" pending \
+            "Goldens missing for $TESTS; other checks cancelled; capturing on $names"
 
       # Failed or cancelled (a new push replaced this job mid-dispatch):
       # nothing else stops the captures it did start, and a part capture
@@ -168,6 +179,4 @@ jobs:
               gh run cancel "$id" --repo "$GITHUB_REPOSITORY" || true
             done < "$RUNS"
           fi
-          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f state=error -f context="Golden capture" \
-            -f description="The capture did not start; re-run Golden capture" \
-            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null || true
+          scripts/ci/golden-harvest.sh status "$HEAD_SHA" error "The capture did not start; re-run Golden capture" || true

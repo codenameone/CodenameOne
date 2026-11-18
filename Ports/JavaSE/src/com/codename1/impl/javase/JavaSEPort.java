@@ -549,7 +549,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public boolean isFullScreenSupported() {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false);
+        // The preference is the simulator's, and the bundle is found from the working
+        // directory: a desktop tool started in a project must not pick up its bundle (#6255).
+        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false)
+                && isSimulator();
         if (autoUpdateDefaultResourceBundle) {
             enableAutoLocalizationBundle();
         } else {
@@ -909,6 +912,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         isWindows = File.separatorChar == '\\';        
         if (System.getProperty("apple.laf.useScreenMenuBar") == null) {
             System.setProperty("apple.laf.useScreenMenuBar", "true");
+        }
+        // -Dcn1.simulator.inWindowMenus=true (or the inWindowMenus preference) keeps the
+        // menu bar inside the window, where screenshots and recordings can paint it.
+        if (SimulatorMenus.sessionInWindow()) {
+            System.setProperty("apple.laf.useScreenMenuBar", "false");
         }
         
         // New desktop fonts are opt-in with the native desktop theme. Keep legacy
@@ -2925,7 +2933,32 @@ public class JavaSEPort extends CodenameOneImplementation {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                frame.setJMenuBar(buildNativeMenuBar(encoded, icons, frame, null));
+                JMenuBar appBar = buildNativeMenuBar(encoded, icons, frame, null);
+                if (simulatorMenus == null && simulatorBar != null) {
+                    simulatorMenus = new java.util.ArrayList<JMenu>();
+                    for (int i = 0; i < simulatorBar.getMenuCount(); i++) {
+                        if (simulatorBar.getMenu(i) != null) {
+                            simulatorMenus.add(simulatorBar.getMenu(i));
+                        }
+                    }
+                }
+                if (simulatorMenus != null) {
+                    // The desktop preview: the application's menus first, as its desktop
+                    // build shows them, then the simulator's own, which a developer still needs.
+                    java.util.Set<String> titles = new java.util.HashSet<String>();
+                    for (int i = 0; i < appBar.getMenuCount(); i++) {
+                        if (appBar.getMenu(i) != null) {
+                            titles.add(appBar.getMenu(i).getText());
+                        }
+                    }
+                    for (JMenu m : simulatorMenus) {
+                        // The MCP menu is added to both bars; one is enough.
+                        if (!titles.contains(m.getText())) {
+                            appBar.add(m);
+                        }
+                    }
+                }
+                frame.setJMenuBar(appBar);
                 frame.revalidate();
             }
         });
@@ -3406,7 +3439,35 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// separate from {@link #resolveDesktopTitleBarMode()} so the "unset" case survives all the
     /// way to Form, where a desktop native theme's own constant gets to answer instead.
     private static String configuredDesktopTitleBarMode() {
-        return System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+        String m = System.getProperty("codename1.arg.desktop.titleBar", desktopTitleBarMode);
+        return m != null ? m : simulatorPreviewTitleBarMode;
+    }
+
+    /// The project's `desktop.titleBar` hint while the simulator runs without a skin, so
+    /// the desktop preview shows the menu bar the desktop build will have. Only "native":
+    /// "custom" would undecorate the simulator's own window. Null otherwise.
+    private static String simulatorPreviewTitleBarMode;
+
+    /// The simulator's own menus (Device, Simulate, Tools...), kept after the application's
+    /// when a desktop preview publishes native commands, so neither set is lost.
+    private java.util.List<JMenu> simulatorMenus;
+    private JMenuBar simulatorBar;
+
+    /// Reads `desktop.titleBar` from the project for the skinless simulator preview.
+    private static void readSimulatorPreviewTitleBarMode() {
+        File f = projectSettingsFile();
+        if (f == null || !f.exists()) {
+            return;
+        }
+        java.util.Properties props = new java.util.Properties();
+        try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+            props.load(in);
+        } catch (IOException err) {
+            return;
+        }
+        if ("native".equals(props.getProperty("codename1.arg.desktop.titleBar"))) {
+            simulatorPreviewTitleBarMode = "native";
+        }
     }
 
     /// @inheritDoc
@@ -5160,6 +5221,49 @@ public class JavaSEPort extends CodenameOneImplementation {
                 java.awt.Graphics g = presented.getGraphics();
                 g.drawImage(edtBuffer, 0, 0, null);
                 g.dispose();
+            }
+        }
+
+        /// Paints the window's Swing children -- the native text editor -- over
+        /// a frame for the recorder, where paint() puts them over `buffer`. The
+        /// kept frame is copied when the EDT finishes a pass, but the editor is
+        /// only painted later, on the AWT thread, into the window's buffer, so a
+        /// recording showed the simulated keyboard typing into an empty field.
+        /// Runs on the AWT thread, the only one that may paint a Swing component.
+        void paintChildrenForRecording(final BufferedImage frame) {
+            if (getComponentCount() == 0) {
+                return;
+            }
+            Runnable r = new Runnable() {
+                public void run() {
+                    Rectangle sc = getScreenCoordinates();
+                    if (sc == null) {
+                        return;
+                    }
+                    Graphics2D bg = frame.createGraphics();
+                    try {
+                        if (zoomLevel != 1) {
+                            bg.translate(-(sc.x + x) * zoomLevel, -(sc.y + y) * zoomLevel);
+                        } else {
+                            bg.translate(-sc.x - x, -sc.y - y);
+                        }
+                        paintChildrenIntoBuffer(bg);
+                    } finally {
+                        bg.dispose();
+                    }
+                }
+            };
+            if (EventQueue.isDispatchThread()) {
+                r.run();
+                return;
+            }
+            try {
+                EventQueue.invokeAndWait(r);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                // A frame without the editor beats a recording that stops.
+                Log.e(e);
             }
         }
 
@@ -8415,6 +8519,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         JMenuBar bar = new JMenuBar();
         frm.setJMenuBar(bar);
+        if (desktopSkin) {
+            simulatorBar = bar;
+            readSimulatorPreviewTitleBarMode();
+        }
 
         JMenu deviceMenu = new JMenu("Device");
         registerMenuWithBlit(deviceMenu);
@@ -12602,7 +12710,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         }*/
                 
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false);
+        // The preference is the simulator's, and the bundle is found from the working
+        // directory: a desktop tool started in a project must not pick up its bundle (#6255).
+        autoUpdateDefaultResourceBundle = pref.getBoolean(PREF_AUTO_UPDATE_DEFAULT_BUNDLE, false)
+                && isSimulator();
         if (autoUpdateDefaultResourceBundle) {
             enableAutoLocalizationBundle();
         } else {
@@ -13966,9 +14077,62 @@ public class JavaSEPort extends CodenameOneImplementation {
         return out;
     }
 
-    /// A frame for the recorder: the screen with its overlays, and for
-    /// [com.codename1.impl.javase.record.RecordingOptions.Frame#SKIN] the device skin
-    /// around it, at the skin's own resolution.
+    private BufferedImage composeDesktopMenus(final BufferedImage screen) {
+        final C c = canvas;
+        final JFrame f = findTopFrame();
+        if (c == null || f == null) {
+            return screen;
+        }
+        final BufferedImage[] out = {screen};
+        Runnable r = new Runnable() {
+            public void run() {
+                try {
+                    out[0] = SimulatorMenus.compose(screen, c, f);
+                } catch (RuntimeException e) {
+                    out[0] = screen;
+                }
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+        } else {
+            try {
+                EventQueue.invokeAndWait(r);
+            } catch (Exception e) {
+                return screen;
+            }
+        }
+        return out[0];
+    }
+
+    /// The simulator window's Swing menu bar, or null. For the sim_menu MCP tools.
+    public JFrame getSimulatorFrameForMenus() {
+        return findTopFrame();
+    }
+
+    /// Moves the desktop menu bar into the window while a recording runs (macOS
+    /// only; elsewhere it already is). Called from sim_record_start/stop.
+    public void setRecordingMenusInWindow(final boolean inWindow) {
+        if (!isDesktop() || getSkin() != null) {
+            return;
+        }
+        final JFrame f = findTopFrame();
+        Runnable r = new Runnable() {
+            public void run() {
+                SimulatorMenus.setInWindow(f, inWindow);
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+        } else {
+            try {
+                EventQueue.invokeAndWait(r);
+            } catch (Exception e) {
+                Log.e(e);
+            }
+        }
+    }
+
     /// A frame of a foldable skin: folded in 3D while the hinge is not flat,
     /// otherwise the flat inner or cover display.
     private BufferedImage captureFoldableFrame(com.codename1.impl.javase.record.RecordingOptions.Frame frame,
@@ -14179,6 +14343,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         return out;
     }
 
+    /// A frame for the recorder: the screen with its overlays, and for
+    /// [com.codename1.impl.javase.record.RecordingOptions.Frame#SKIN] the device skin
+    /// around it, at the skin's own resolution.
     BufferedImage captureSimulatorFrame(com.codename1.impl.javase.record.RecordingOptions.Frame frame) {
         if (canvas == null) {
             return null;
@@ -14186,12 +14353,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         BufferedImage buf = canvas.presentedFrame();
         if (buf == null) {
             buf = canvas.buffer;
+        } else {
+            // A private copy: the editor can be painted into it.
+            canvas.paintChildrenForRecording(buf);
         }
         Rectangle sc = getScreenCoordinates();
         if (buf == null) {
             return null;
         }
         BufferedImage screen = composeSimulatorOverlays(accessibilityFilteredImage(buf), true);
+        if (isDesktop() && getSkin() == null) {
+            // The real menu bar and any open menus, painted by Swing at their true offsets.
+            return composeDesktopMenus(screen);
+        }
         if (sc == null) {
             return screen;
         }
@@ -14254,6 +14428,39 @@ public class JavaSEPort extends CodenameOneImplementation {
                     c.mouseDragged(me);
                 } else {
                     c.mouseReleased(me);
+                }
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+            return;
+        }
+        try {
+            EventQueue.invokeAndWait(r);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            throw new RuntimeException(e.getCause());
+        }
+    }
+
+    /// Presses or releases a hardware key on the simulator canvas, through the
+    /// canvas's own key listener, as typing on the Mac keyboard would. `id` is
+    /// KeyEvent.KEY_PRESSED or KEY_RELEASED. Unlike the simulated keyboard this
+    /// reaches whatever component has focus, so a game can be driven by key
+    /// while a pointer gesture is in progress.
+    public void dispatchSimulatedKey(final int id, final int keyCode, final char keyChar) {
+        final C c = canvas;
+        if (c == null) {
+            throw new IllegalStateException("The simulator window is not up");
+        }
+        Runnable r = new Runnable() {
+            public void run() {
+                KeyEvent ke = new KeyEvent(c, id, System.currentTimeMillis(), 0, keyCode, keyChar);
+                if (id == KeyEvent.KEY_PRESSED) {
+                    c.keyPressed(ke);
+                } else {
+                    c.keyReleased(ke);
                 }
             }
         };
@@ -21266,7 +21473,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(resource.startsWith("raw")) {
             throw new RuntimeException("Files starting with 'raw' are reserved file names and can't be used in getResource()!");
         }
-        if ("/theme.res".equals(resource)) {
+        // The source tree's theme.res is the simulator's live copy, read in preference to the
+        // class path. Only the simulator may do that: the desktop tools (Certificate Wizard,
+        // Settings, GUI Builder) run on this port with the developer's project as their
+        // working directory, so a project with a theme.res under src/main/resources replaced
+        // the tool's own theme and drew it unstyled (issue #6255).
+        if ("/theme.res".equals(resource) && isSimulator()) {
             File srcThemeRes = new File(getSourceResourcesDir(),  "theme.res");
             if (srcThemeRes.exists()) {
                 try {
@@ -24620,6 +24832,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (peerImage != null) {
                 return peerImage;
             }
+            // A Swing peer (the 3D view among them) paints into "__buffer" at
+            // device size, and that image is what the canvas shows. Without a
+            // copy of it, lightweight mode drew a white rectangle where the
+            // peer was.
+            BufferedImage src = copyOfBuffer();
+            if (src != null) {
+                int w = src.getWidth();
+                int h = src.getHeight();
+                return com.codename1.ui.Image.createImage(src.getRGB(0, 0, w, h, null, 0, w), w, h);
+            }
             if (peerBuffer != null) {
                 peerBuffer.modifyBuffer(new Runnable() {
                     public void run() {
@@ -24641,6 +24863,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         
 
+        /// A copy of what the Swing peer last painted, or null when it has no buffer.
+        private BufferedImage copyOfBuffer() {
+            Object buffered = getClientProperty("__buffer");
+            if (!(buffered instanceof BufferedImage)) {
+                return null;
+            }
+            BufferedImage src = (BufferedImage) buffered;
+            BufferedImage copy = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D cg = copy.createGraphics();
+            cg.drawImage(src, 0, 0, null);
+            cg.dispose();
+            return copy;
+        }
+
         protected void setLightweightMode(final boolean l) {
             if (lightweightMode == l) {
                 if (l || init) {
@@ -24654,6 +24890,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 } 
             } else {
                 peerImage = null;
+                // The base class caches the image it painted; drop it too,
+                // or the next overlay shows this one's stale snapshot.
+                setPeerImage(null);
             }
             SwingUtilities.invokeLater(new Runnable() {
 

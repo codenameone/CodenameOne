@@ -57,6 +57,11 @@ public class NativeCryptoEngine extends CryptoEngine {
     }
 
     @Override
+    public byte[] aesCbc(boolean encrypt, byte[] key, byte[] iv, byte[] blocks) {
+        return next.aesCbc(encrypt, key, iv, blocks);
+    }
+
+    @Override
     public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
         int bits = bits(hashAlgorithm);
         if (bits == 0) {

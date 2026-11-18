@@ -1,8 +1,7 @@
 name: Test macOS UI build scripts
 
 # The native macOS (AppKit) port. A real macOS Xcode project: SDKROOT=macosx,
-# AppKit and Metal, no UIKit. The legacy Mac Catalyst suite is
-# scripts-mac-catalyst.yml.
+# AppKit and Metal, no UIKit.
 # The build routes the generated project to target/<finalName>-mac-source/
 # with every setting written at generation time -- no post-hoc injection and
 # no Ruby xcodeproj gem, because the project is macOS-shaped to begin with
@@ -226,10 +225,8 @@ jobs:
           mkdir -p ~/.codenameone
           cp maven/UpdateCodenameOne.jar ~/.codenameone/
           set -euo pipefail
-          # No xcodeproj gem here, deliberately. The Catalyst workflow needs it
-          # because that path injects its build settings into an
-          # already-generated iOS project; this one generates a macOS project
-          # with the settings already in it.
+          # No xcodeproj gem here, deliberately: this generates a macOS
+          # project with its settings already in it.
           echo "no gem dependencies for the AppKit build"
 
       - name: Compute setup-workspace hash

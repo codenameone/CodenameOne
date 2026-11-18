@@ -1,0 +1,6 @@
+# The x64 and arm64 legs share this golden and render one title glyph pixel
+# of the dimmed form behind the dialog differently (delta 9, measured on
+# capture run 44219033194); the dialog itself is identical. Absorb that
+# anti-aliasing variance only.
+maxChannelDelta=16
+maxMismatchPercent=0.1

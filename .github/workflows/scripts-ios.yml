@@ -66,10 +66,6 @@ on:
     - vm/ByteCodeTranslator/**
     - scripts/run-ios-device-release-build.sh
     - scripts/ios/**
-    - .github/workflows/scripts-mac-catalyst.yml
-    - scripts/build-mac-catalyst-app.sh
-    - scripts/run-mac-catalyst-ui-tests.sh
-    - scripts/mac-catalyst/**
     - scripts/common/java/**
     - '!**/*.md'
     - '!maven/cn1-ai-*/**'
@@ -132,10 +128,6 @@ on:
     - vm/ByteCodeTranslator/**
     - scripts/run-ios-device-release-build.sh
     - scripts/ios/**
-    - .github/workflows/scripts-mac-catalyst.yml
-    - scripts/build-mac-catalyst-app.sh
-    - scripts/run-mac-catalyst-ui-tests.sh
-    - scripts/mac-catalyst/**
     - scripts/common/java/**
     - '!**/*.md'
     - '!maven/cn1-ai-*/**'
@@ -186,14 +178,43 @@ jobs:
       ios: ${{ steps.plan.outputs.ios }}
       native: ${{ steps.plan.outputs.native }}
       packaging: ${{ steps.plan.outputs.packaging }}
-      catalyst: ${{ steps.plan.outputs.catalyst }}
       any: ${{ steps.plan.outputs.any }}
+      metal: ${{ steps.legs.outputs.metal }}
+      metal27: ${{ steps.legs.outputs.metal27 }}
+      tv: ${{ steps.legs.outputs.tv }}
+      watch: ${{ steps.legs.outputs.watch }}
     steps:
       - uses: actions/checkout@v6
       - id: plan
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: python3 scripts/ci/select-apple-checks.py
+      # A capture (golden-capture.yml) needs only the legs whose golden
+      # directory has a gap; the rest would render nothing to harvest and
+      # hold macOS runners, the scarcest ones, for an hour each. Everything
+      # else runs every leg the plan above selected.
+      - id: legs
+        env:
+          CAPTURE: ${{ inputs.cn1ss_capture || '' }}
+          IOS: ${{ steps.plan.outputs.ios }}
+        run: |
+          set -euo pipefail
+          metal="$IOS" metal27="$IOS" tv="$IOS" watch="$IOS"
+          if [ -n "$CAPTURE" ] && [ "$IOS" = true ]; then
+            metal=false metal27=false tv=false watch=false
+            for dir in $(python3 scripts/ci/cn1ss-golden-plan.py --pairs | cut -f2 | sort -u); do
+              case "$dir" in
+                scripts/ios/screenshots-metal) metal=true ;;
+                scripts/ios/screenshots-metal-27) metal27=true ;;
+                scripts/ios/screenshots-tv) tv=true ;;
+                scripts/ios/screenshots-watch) watch=true ;;
+              esac
+            done
+            echo "Capture legs: metal=$metal metal27=$metal27 tv=$tv watch=$watch"
+          fi
+          {
+            echo "metal=$metal"; echo "metal27=$metal27"; echo "tv=$tv"; echo "watch=$watch"
+          } >> "$GITHUB_OUTPUT"
 
   build-port:
     needs: [golden-plan, select]
@@ -204,7 +225,7 @@ jobs:
       test_server: true
 
   build-ios-metal:
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.ios == 'true') }}
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.metal == 'true') }}
     # The iOS renderer job. Metal is the only iOS rendering backend -- the
     # OpenGL ES 2 pipeline and the job that exercised it are gone -- so this
     # runs on every pull request rather than only on the nightly schedule.
@@ -614,7 +635,7 @@ jobs:
 
 
   build-ios-metal-27:
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.ios == 'true') }}
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') }}
     # The SAME suite as build-ios-metal, on the Xcode 27 / iOS 27 hosted image and
     # against its own baselines. A copy rather than a move: build-ios-metal keeps
     # gating the toolchain we actually pin (CN1_XCODE_MAJOR=26), which is what
@@ -1072,7 +1093,7 @@ jobs:
           path: artifacts/cn1ss-capture
           if-no-files-found: ignore
   build-ios-watch:
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.ios == 'true') }}
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.watch == 'true') }}
     # Native Apple Watch (watchOS) screenshot pipeline. The watch slice
     # auto-enables from codename1.watchMain in the sample, so build-ios-app.sh
     # generates the <Main>Watch target alongside the iOS app. This job renders
@@ -1259,7 +1280,7 @@ jobs:
           if-no-files-found: ignore
 
   build-ios-tv:
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.ios == 'true') }}
+    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.tv == 'true') }}
     # Native Apple TV (tvOS) screenshot pipeline. The tvOS slice auto-enables
     # from codename1.tvMain in the sample, so build-ios-app.sh generates the
     # <Main>TV target alongside the iOS app. tvOS reuses the iOS UIApplicationMain
@@ -1485,18 +1506,4 @@ jobs:
     with:
       port_prepared: true
       unity_prepared: true
-    secrets: inherit
-
-  catalyst:
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-    needs: [golden-plan, select, build-port, unity-gallery]
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.catalyst == 'true') }}
-    uses: ./.github/workflows/scripts-mac-catalyst.yml
-    with:
-      port_prepared: true
-      unity_prepared: true
-      cn1ss_capture: ${{ inputs.cn1ss_capture }}
     secrets: inherit

@@ -78,7 +78,6 @@ const PLATFORM_NAMES = {
     "android": "Android",
     "ios-metal": "iOS",
     "macos": "macOS",
-    "mac-catalyst": "macOS (Mac Catalyst)",
     "javascript": "Web",
     "linux-x64": "Linux x64",
     "linux-arm64": "Linux ARM64",
@@ -132,7 +131,7 @@ function validate() {
         fail("deployment, browser, or performance evidence is incomplete");
     }
     for (const required of [
-        "runtime CI evidence", "Mac Catalyst", "Chromium", "Firefox", "WebKit",
+        "runtime CI evidence", "Chromium", "Firefox", "WebKit",
         "glibc 2.28", "Ubuntu 20.04", "Debian 10", "RHEL/Rocky/AlmaLinux 8",
         "Integer arithmetic", "Transcendental math", "Object allocation", "Quicksort"
     ]) {

@@ -2,7 +2,8 @@
 # Dispatch the screenshot workflows of a golden capture. Called by
 # .github/workflows/golden-capture.yml; see that file for the model.
 #
-#   golden-capture.sh dispatch REF TESTS RUNS_FILE   start every workflow, record run ids
+#   golden-capture.sh dispatch REF TESTS RUNS_FILE [WF...]  start the workflows, record run ids
+#   golden-capture.sh workflows DIR...                    the workflows that render those golden dirs
 #
 # Nothing here waits for the runs: golden-harvest.yml collects them when the
 # last one completes, so no runner sits idle for the hours a slow leg takes.
@@ -14,8 +15,7 @@
 # were called inside one run.
 set -euo pipefail
 
-# The workflows that own a hellocodenameone golden directory. scripts-ios.yml
-# also carries Mac Catalyst (it passes the input on to that call).
+# The workflows that own a hellocodenameone golden directory.
 WORKFLOWS=(
   scripts-ios.yml
   scripts-android.yml
@@ -27,6 +27,28 @@ WORKFLOWS=(
 )
 
 log() { echo "[golden-capture] $*" >&2; }
+
+# The workflows whose legs compare against each golden directory (the
+# SCREENSHOT_REF_DIR / REF values in them; DIR_PORTS in cn1ss-golden-plan.py).
+# A directory not listed here takes every workflow: capturing too much is only
+# slower, capturing too little never harvests.
+workflows() {
+  local d want=""
+  for d in "$@"; do
+    case "$d" in
+      scripts/ios/*) want+=" scripts-ios.yml" ;;
+      scripts/android/*) want+=" scripts-android.yml" ;;
+      scripts/javascript/*) want+=" scripts-javascript.yml" ;;
+      scripts/linux/*) want+=" linux-build-run.yml" ;;
+      scripts/windows/*) want+=" parparvm-tests-windows.yml windows-cross-build-run.yml" ;;
+      scripts/macos/*) want+=" scripts-macos.yml" ;;
+      *) want+=" ${WORKFLOWS[*]}" ;;
+    esac
+  done
+  for d in "${WORKFLOWS[@]}"; do
+    case " $want " in *" $d "*) echo "$d" ;; esac
+  done
+}
 
 # A transient API error must not abandon a capture whose runs are fine.
 gh_retry() {
@@ -40,8 +62,11 @@ gh_retry() {
 
 dispatch() {
   local ref="$1" tests="$2" runs_file="$3" wf since seen id tries
+  shift 3
+  local targets=("$@")
+  [ "${#targets[@]}" -gt 0 ] || targets=("${WORKFLOWS[@]}")
   : > "$runs_file"
-  for wf in "${WORKFLOWS[@]}"; do
+  for wf in "${targets[@]}"; do
     # A capture of an earlier head of this branch is rendering code that is
     # gone; its harvest would be skipped anyway (the branch moved).
     for id in $(gh_retry gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
@@ -81,6 +106,7 @@ dispatch() {
 }
 
 case "${1:-}" in
-  dispatch) dispatch "$2" "$3" "$4" ;;
+  dispatch) shift; dispatch "$@" ;;
+  workflows) shift; workflows "$@" ;;
   *) echo "usage: $0 dispatch ..." >&2; exit 2 ;;
 esac

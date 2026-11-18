@@ -244,4 +244,24 @@ class RecordingTest {
         assertEquals(500, out[22150]);
         assertEquals(0, out[22250]);
     }
+
+    /// A rotated screen keeps its shape in a video of the old size: a
+    /// portrait frame in a landscape video is pillarboxed, never stretched.
+    @Test
+    void rotatedFrameIsFittedNotStretched() {
+        BufferedImage portrait = new BufferedImage(100, 200, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D pg = portrait.createGraphics();
+        pg.setColor(java.awt.Color.WHITE);
+        pg.fillRect(0, 0, 100, 200);
+        pg.dispose();
+        BufferedImage frame = new BufferedImage(400, 200, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = frame.createGraphics();
+        SimulatorRecorder.drawFitted(g, portrait, 400, 200);
+        g.dispose();
+        assertEquals(0, frame.getRGB(10, 100), "left bar left alone");
+        assertEquals(0, frame.getRGB(390, 100), "right bar left alone");
+        assertEquals(0xffffffff, frame.getRGB(200, 100), "content");
+        assertEquals(0xffffffff, frame.getRGB(152, 100), "content keeps its width");
+        assertEquals(0, frame.getRGB(148, 100), "outside the content");
+    }
 }

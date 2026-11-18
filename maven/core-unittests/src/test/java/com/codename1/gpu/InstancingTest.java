@@ -37,6 +37,7 @@ class InstancingTest {
     /// Records what each draw saw: its translation and the per copy uniforms.
     private static final class Recorder extends GraphicsDevice {
         final List<float[]> seen = new ArrayList<float[]>();
+        final List<Integer> colours = new ArrayList<Integer>();
 
         public GpuCapabilities getCapabilities() { // NOPMD MissingOverride
             return null;
@@ -58,6 +59,10 @@ class InstancingTest {
 
         public void draw(Mesh mesh, Material material, float[] modelMatrix) { // NOPMD MissingOverride
             ShaderMaterial sm = material.getShader();
+            if (sm == null) {
+                colours.add(Integer.valueOf(material.getColor()));
+                return;
+            }
             float[] u = sm.getUniformValues();
             int id = sm.getUniformSlot(ShaderMaterial.INSTANCE);
             int c = sm.getUniformSlot(ShaderMaterial.INSTANCE_COLOR);
@@ -98,5 +103,19 @@ class InstancingTest {
         assertNotEquals(r.seen.get(0)[2], r.seen.get(1)[2]);
         // a plain draw afterwards is copy 0 again
         assertEquals(0f, sm.getUniformValues()[sm.getUniformSlot(ShaderMaterial.INSTANCE) * 4], 0f);
+    }
+
+    @Test
+    void aMaterialWithoutAShaderTakesEachCopysColourThroughItsBase() {
+        // Plain PBR parts have no instanceColor uniform; they used to draw in
+        // the base colour alone, so every part of a place came out white.
+        Material m = new Material(Material.Type.PBR).setColor(0xff808080);
+        float[] mats = new float[2 * 16];
+        Recorder r = new Recorder();
+        r.drawInstanced(null, m, mats, new int[] {0xffff0000, 0x8000ff00}, 2);
+        assertEquals(2, r.colours.size());
+        assertEquals(0xff800000, r.colours.get(0).intValue());
+        assertEquals(0x80008000, r.colours.get(1).intValue());
+        assertEquals(0xff808080, m.getColor(), "the base colour is restored");
     }
 }

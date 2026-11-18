@@ -151,7 +151,11 @@ include::Backend-Messaging.asciidoc[]
 
 include::Backend-Mail.asciidoc[]
 
+include::Backend-Storage.asciidoc[]
+
 include::Backend-Observability.asciidoc[]
+
+include::Backend-GraphQL.asciidoc[]
 
 include::Backend-MCP.asciidoc[]
 
@@ -173,6 +177,8 @@ include::Skirmish-Implementors-Guide.asciidoc[]
 include::Dash-Implementors-Guide.asciidoc[]
 
 include::Splat-Implementors-Guide.asciidoc[]
+
+include::Brickyard-Implementors-Guide.asciidoc[]
 
 include::Parley-Users-Guide.asciidoc[]
 
@@ -231,6 +237,8 @@ include::Health.asciidoc[]
 include::Smart-Home.asciidoc[]
 
 include::Printing.asciidoc[]
+
+include::PDF.asciidoc[]
 
 include::Deep-Links-Routing.asciidoc[]
 
@@ -319,8 +327,6 @@ include::Desktop-Interop.asciidoc[]
 include::Kotlin-Multiplatform-Interop.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
-
-include::Working-with-Mac-Catalyst.asciidoc[]
 
 include::Working-With-Windows.asciidoc[]
 
