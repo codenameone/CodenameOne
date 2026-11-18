@@ -2602,7 +2602,7 @@ For list rows and table cells, `Sparkline` is a small component that draws a tre
 
 ==== Axes
 
-`NumberAxis` is the default. `LogAxis` spaces powers of ten evenly, `CategoryAxis` names each position, and `TimeAxis` takes epoch milliseconds and picks ticks from seconds to years, formatted for the device's locale. For trading data, `SessionTimeAxis` places one candle per index so that weekends and holidays leave no gaps.
+`NumberAxis` is the default. `LogAxis` spaces powers of ten evenly, `CategoryAxis` names each position, and `TimeAxis` takes epoch milliseconds and picks ticks from seconds to years. Its labels use fixed patterns chosen by tick spacing (`HH:mm:ss`, `HH:mm`, `MMM d`, `MMM yyyy`, `yyyy`), always on a 24-hour clock, with month names from the platform's `SimpleDateFormat`; for labels in the device's own date order or clock, set a `ValueFormatter` with `setFormatter`, for example one that calls `L10NManager.formatDateShortStyle`. For trading data, `SessionTimeAxis` places one candle per index so that weekends and holidays leave no gaps.
 
 ==== Financial charts
 

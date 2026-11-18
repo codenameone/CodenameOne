@@ -22,7 +22,9 @@
  */
 package com.codenameone.examples.hellocodenameone.tests.charts;
 
+import com.codename1.ui.Graphics;
 import com.codename1.ui.chart.Chart;
+import com.codename1.ui.chart.ChartContext;
 
 /// The animated zoom of a double tap in the plot: the viewport eases over 300ms from the full
 /// range to half of it, centered on the tap.
@@ -38,13 +40,29 @@ public class Chart2ZoomAnimationScreenshotTest extends AbstractChart2AnimationSc
 
     @Override
     protected void startAnimation(Chart c) {
-        int x = c.getAbsoluteX() + c.getWidth() / 2;
-        int y = c.getAbsoluteY() + c.getHeight() / 2;
+        // aim at the plot, not the component centre (title and legend move that), in absolute
+        // coordinates: the context is in the parent's paint coordinates. Near the plot's top
+        // edge, above the bars, so the first tap selects nothing: a tap selects whatever
+        // hitTest finds whatever the tooltip mode, and that highlight would show in every frame
+        ChartContext ctx = c.getLastContext();
+        int x = c.getAbsoluteX() - c.getX() + ctx.getPlotX() + ctx.getPlotWidth() / 2;
+        int y = c.getAbsoluteY() - c.getY() + ctx.getPlotY() + Math.max(1, ctx.getPlotHeight() / 50);
         // two taps at one pinned instant are a double tap
         c.pointerPressed(x, y);
         c.pointerReleased(x, y);
         c.pointerPressed(x, y);
         c.pointerReleased(x, y);
+        if (c.getSelection() != null) {
+            failAfterCapture("Chart2ZoomAnimation: the tap selected " + c.getSelection().getLabel());
+        }
+    }
+
+    @Override
+    protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
+        super.renderFrame(g, width, height, progress, frameIndex);
+        if (progress >= 1 && !getChart().getXAxis().isZoomed()) {
+            failAfterCapture("Chart2ZoomAnimation: the double tap did not zoom the x axis");
+        }
     }
 
     @Override

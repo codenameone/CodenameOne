@@ -28,6 +28,7 @@ import com.codename1.ui.chart.series.CandlestickSeries;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Values computed by the financial indicators and statistical series, checked against
@@ -59,6 +60,10 @@ public class ChartMathTest {
         for (int i = 3; i < V.length; i++) {
             assertEquals(b[1][i] - b[0][i], b[0][i] - b[2][i], 1e-9);
             assertTrue(b[1][i] > b[0][i]);
+            // every window of V is four consecutive integers: mean +1.5, population
+            // variance (2.25 + 0.25 + 0.25 + 2.25) / 4 = 1.25, so each band is 2 * sqrt(1.25) away
+            assertEquals(V[i] - 1.5, b[0][i], 1e-9);
+            assertEquals(2 * Math.sqrt(1.25), b[1][i] - b[0][i], 1e-9);
         }
     }
 
@@ -81,8 +86,24 @@ public class ChartMathTest {
         }
         double[][] m = Indicators.macd(v, 12, 26, 9);
         for (int i = 40; i < v.length; i++) {
+            assertFalse(Double.isNaN(m[0][i]) || Double.isInfinite(m[0][i]));
+            assertFalse(Double.isNaN(m[1][i]) || Double.isInfinite(m[1][i]));
             assertEquals(m[0][i] - m[1][i], m[2][i], 1e-9);
         }
+    }
+
+    @Test
+    public void macdIsTheDifferenceOfTwoEmas() {
+        // EMA(2), k = 2/3, seeded with the mean of the first two: 3, 19/3, 115/9, 691/27
+        // EMA(3), k = 1/2, seeded with the mean of the first three: 14/3, 31/3, 127/6
+        double[] v = {2, 4, 8, 16, 32};
+        double[][] m = Indicators.macd(v, 2, 3, 2);
+        assertTrue(Double.isNaN(m[0][1]));
+        assertEquals(19 / 3.0 - 14 / 3.0, m[0][2], 1e-9);
+        assertEquals(115 / 9.0 - 31 / 3.0, m[0][3], 1e-9);
+        assertEquals(691 / 27.0 - 127 / 6.0, m[0][4], 1e-9);
+        // signal EMA(2) of the MACD from index 2: seeded with the mean of the first two
+        assertEquals((m[0][2] + m[0][3]) / 2, m[1][3], 1e-9);
     }
 
     @Test

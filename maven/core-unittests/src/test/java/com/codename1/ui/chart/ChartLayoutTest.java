@@ -45,6 +45,7 @@ public class ChartLayoutTest {
             for (int max = 2; max <= 12; max++) {
                 double[] t = Ticks.linear(r[0], r[1], max);
                 assertTrue(t.length <= max, "too many ticks for " + r[0] + ".." + r[1]);
+                assertTrue(t.length >= 2, "too few ticks for " + r[0] + ".." + r[1]);
                 for (int i = 0; i < t.length; i++) {
                     assertTrue(t[i] >= r[0] - 1e-9 && t[i] <= r[1] + 1e-9);
                     if (i > 0) {

@@ -39,7 +39,7 @@ public final class ChartContext {
     float progress = 1;
     Font font;
     LabelLayout labels;
-    /// absolute screen origin of the chart component
+    /// the chart component's x and y in its parent's paint coordinates
     int originX;
     int originY;
 
@@ -61,12 +61,15 @@ public final class ChartContext {
         return chart.getTheme();
     }
 
-    /// Absolute left of the plot area.
+    /// Left of the plot area, in the parent's paint coordinates (the coordinate space of
+    /// `getGraphics()`), not absolute screen coordinates. A pointer's absolute x converts to
+    /// this space as `absX - chart.getAbsoluteX() + chart.getX()`.
     public int getPlotX() {
         return plotX;
     }
 
-    /// Absolute top of the plot area.
+    /// Top of the plot area, in the parent's paint coordinates. A pointer's absolute y
+    /// converts as `absY - chart.getAbsoluteY() + chart.getY()`.
     public int getPlotY() {
         return plotY;
     }
@@ -81,12 +84,13 @@ public final class ChartContext {
         return plotH;
     }
 
-    /// Absolute x of the chart component, to turn painted coordinates into chart relative ones.
+    /// The chart's x in its parent's paint coordinates (`chart.getX()`); subtract it from a
+    /// painted x to get one relative to the chart.
     public int getOriginX() {
         return originX;
     }
 
-    /// Absolute y of the chart component.
+    /// The chart's y in its parent's paint coordinates (`chart.getY()`).
     public int getOriginY() {
         return originY;
     }
@@ -122,7 +126,7 @@ public final class ChartContext {
         return s.isSecondaryAxis() && chart.getSecondaryYAxis() != null ? chart.getSecondaryYAxis() : chart.getYAxis();
     }
 
-    /// Absolute screen x of a data point.
+    /// The x of a data point in the parent's paint coordinates (see `getPlotX()`).
     public float screenX(Series s, double x, double y) {
         if (chart.isRotated()) {
             return (float) (plotX + getValueAxis(s).toNormalized(y) * plotW);
@@ -130,7 +134,7 @@ public final class ChartContext {
         return (float) (plotX + chart.getXAxis().toNormalized(x) * plotW);
     }
 
-    /// Absolute screen y of a data point.
+    /// The y of a data point in the parent's paint coordinates (see `getPlotY()`).
     public float screenY(Series s, double x, double y) {
         if (chart.isRotated()) {
             return (float) (plotY + chart.getXAxis().toNormalized(x) * plotH);
@@ -138,10 +142,18 @@ public final class ChartContext {
         return (float) (plotY + plotH - getValueAxis(s).toNormalized(y) * plotH);
     }
 
-    /// The length in pixels of `dx` units along the x axis (a category band, a bar width).
+    /// The length in pixels of `dx` units along the x axis (a category band, a bar width),
+    /// measured from the start of the visible range. On a linear axis that is the same
+    /// everywhere; on a non-linear one (a `LogAxis` x) it is the length at the low end only,
+    /// so slot widths derived from it stay uniform rather than following each point.
     public float xLength(double dx) {
         Axis a = chart.getXAxis();
-        double n = a.toNormalized(a.getVisibleMin() + dx);
+        double min = a.getVisibleMin();
+        double n = Math.abs(a.toNormalized(min + dx) - a.toNormalized(min));
+        if (n != n || n > 1) {
+            // NaN (a log axis cannot place a non-positive bound) or wider than the plot
+            n = n != n ? 0 : 1;
+        }
         return (float) (n * (chart.isRotated() ? plotH : plotW));
     }
 

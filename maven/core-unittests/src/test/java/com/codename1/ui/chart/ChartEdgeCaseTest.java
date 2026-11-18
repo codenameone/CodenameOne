@@ -158,6 +158,29 @@ public class ChartEdgeCaseTest extends UITestBase {
     }
 
     @FormTest
+    public void oneFingerOverTheSameGeometryBrushes() {
+        // positive control for aSecondFingerEndsTheBrush: the same drag with one finger
+        double[] y = new double[50];
+        for (int i = 0; i < y.length; i++) {
+            y[i] = i % 5;
+        }
+        Chart c = new Chart().addSeries(new LineSeries("l").setData(null, y));
+        c.setBrushEnabled(true);
+        ChartContext ctx = paint(c, 600, 400);
+        final int[] calls = new int[1];
+        c.addRangeListener((chart, from, to) -> calls[0]++);
+        int py = ctx.getPlotY() + ctx.getPlotHeight() / 2;
+        int x0 = ctx.getPlotX() + 50;
+        c.pointerPressed(x0, py);
+        c.pointerDragged(new int[]{x0 + 40}, new int[]{py});
+        c.pointerDragged(new int[]{x0 + 120}, new int[]{py});
+        c.pointerDragged(new int[]{x0 + 200}, new int[]{py});
+        c.pointerDragged(new int[]{x0 + 260}, new int[]{py});
+        c.pointerReleased(x0 + 260, py);
+        assertEquals(1, calls[0]);
+    }
+
+    @FormTest
     public void aPressStopsAZoomAnimation() {
         double[] y = new double[50];
         Chart c = new Chart().addSeries(new LineSeries("l").setData(null, y));
@@ -169,6 +192,15 @@ public class ChartEdgeCaseTest extends UITestBase {
         c.pointerReleased(px, py);
         c.pointerPressed(px, py);
         c.pointerReleased(px, py);
+        double startMin = c.getXAxis().getVisibleMin();
+        double startMax = c.getXAxis().getVisibleMax();
+        long until = System.currentTimeMillis() + 2000;
+        boolean moved = false;
+        while (!moved && System.currentTimeMillis() < until) {
+            c.animate();
+            moved = c.getXAxis().getVisibleMin() != startMin || c.getXAxis().getVisibleMax() != startMax;
+        }
+        assertTrue(moved, "the double tap should have started a zoom");
         c.pointerPressed(px, py);
         double min = c.getXAxis().getVisibleMin();
         double max = c.getXAxis().getVisibleMax();

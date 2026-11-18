@@ -96,6 +96,29 @@ public final class Ticks {
         if (count(min, max, step) > maxCount) {
             return new double[]{min, max};
         }
+        if (count(min, max, step) < 2) {
+            // a step as wide as the span can leave one round value inside it, or none
+            // (0.013..0.97 by 1). Take the next finer round step that puts two inside, and
+            // when it puts more than maxCount, the consecutive ones around the middle: still
+            // round, evenly spaced and inside, so an axis never has fewer than two labels
+            double[] finer = {step / 2, step / 4, step / 5, step / 10};
+            for (double f : finer) {
+                // only a step that is itself nice: half of 2.5 is 1.25, which is not
+                if (Math.abs(niceStep(f) - f) > f * 1e-9) {
+                    continue;
+                }
+                if (count(min, max, f) >= 2) {
+                    double[] all = fill(min, max, f);
+                    if (all.length <= maxCount) {
+                        return all;
+                    }
+                    double[] out = new double[maxCount];
+                    System.arraycopy(all, (all.length - maxCount) / 2, out, 0, maxCount);
+                    return out;
+                }
+            }
+            return new double[]{min, max};
+        }
         return fill(min, max, step);
     }
 

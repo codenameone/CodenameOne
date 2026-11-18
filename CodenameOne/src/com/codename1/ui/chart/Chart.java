@@ -2247,6 +2247,10 @@ public class Chart extends Component {
         }
     }
 
+    // No focus trap: Form moves focus on an arrow in keyPressed, after the focused component's
+    // keyPressed and only unless it handlesInput(); this chart overrides neither, so an
+    // arrow handled (or "consumed" by returning early) here in keyReleased never stops
+    // traversal. Returning early only skips super.keyReleased, which has no traversal role.
     @Override
     public void keyReleased(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);

@@ -291,6 +291,16 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
         return ANIM_BASE_TIME;
     }
 
+    /// Fails the test once its grid has been emitted, with `message`, through the same path
+    /// as a blank filmstrip. For a subclass that finds, while capturing, that the motion it
+    /// films never started. The first message wins.
+    protected final void failAfterCapture(String message) {
+        System.out.println("CN1SS:ERR:test=" + getImageName() + " " + message);
+        if (blankFilmstripMessage == null) {
+            blankFilmstripMessage = message;
+        }
+    }
+
     /// Allow subclasses to set up state (e.g. start an animation) before any
     /// frame is rendered. The clock is held at [getAnimationStartTime()] when
     /// this is called so any motions started here align with the first frame.
