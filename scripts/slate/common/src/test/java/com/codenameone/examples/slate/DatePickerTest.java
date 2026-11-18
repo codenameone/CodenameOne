@@ -113,7 +113,8 @@ public class DatePickerTest extends E2e {
         assertTrue(luma(light[0]) > 200, "the light calendar is on a light surface");
         assertTrue(luma(dark[0]) < 80, "the dark calendar is on a dark surface");
         assertTrue(light[1] != light[0] && dark[1] != dark[0], "the chosen day stands out in both");
-        // Back is a cancel too.
+        // Back is a cancel too: the day looked at is not kept.
+        onEdt(() -> calendar().setDate(new Date(Times.addDays(later, 4))));
         back();
         waitForForm("Book");
         assertEqual(Times.addDays(later, 1), chosenDay(), "Back leaves the day alone");

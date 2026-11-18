@@ -1483,20 +1483,22 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvPicker { color: var(--brand-pressed-dark); background-color: var(--surface-alt-dark); }
     SvDayPicker { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
     SvDayPicker.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-pressed-dark); }
-    PickerMaterial { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    PickerMaterialDialog { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    PickerMaterialButton { color: var(--brand-dark); }
-    PickerMaterialButton.selected { color: var(--brand-dark); }
-    PickerMaterialButton.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    PickerMaterialDay { color: var(--text-dark); }
-    PickerMaterialDay.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    PickerMaterialDay.disabled { color: var(--line-strong-dark); }
-    PickerMaterialYearSelected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    PickerMaterialYearSelected.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    PickerMaterialYearSelected.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-pressed-dark); }
-    PickerMaterialDial { color: var(--text-dark); background-color: var(--surface-press-dark); }
-    PickerMaterialDial.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    PickerMaterialDial.disabled { color: var(--line-strong-dark); background-color: var(--surface-press-dark); }
+    /* Whole styles, not colours alone: the platform themes state the size of
+       these in their own dark rules, and a pill keeps the fill it was built with. */
+    PickerMaterial { color: var(--text-dark); background-color: var(--surface-alt-dark); padding: 0; margin: 0; }
+    PickerMaterialDialog { color: var(--text-dark); background-color: var(--surface-alt-dark); border-radius: 4mm; padding: 2mm; margin: 0; }
+    PickerMaterialButton { color: var(--brand-dark); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; }
+    PickerMaterialButton.selected { color: var(--brand-dark); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; }
+    PickerMaterialButton.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-dark); font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 2.5mm 1.5mm 2.5mm; margin: 0.3mm; }
+    PickerMaterialDay { color: var(--text-dark); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+    PickerMaterialDay.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+    PickerMaterialDay.disabled { color: var(--line-strong-dark); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+    PickerMaterialYearSelected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); font-family: "native:MainBold"; font-size: 2.6mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; }
+    PickerMaterialYearSelected.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); font-family: "native:MainBold"; font-size: 2.6mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; }
+    PickerMaterialYearSelected.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-pressed-dark); font-family: "native:MainBold"; font-size: 2.6mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; }
+    PickerMaterialDial { color: var(--text-dark); background-color: var(--surface-press-dark); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+    PickerMaterialDial.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+    PickerMaterialDial.disabled { color: var(--line-strong-dark); background-color: var(--surface-press-dark); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
 }/* The owner's insights: the busy-hours heatmap (its colour is the cells',
    its font the labels'), the plan donut (the total in the middle) and the
    membership chart's legend, whose colours the chart draws its series in. */

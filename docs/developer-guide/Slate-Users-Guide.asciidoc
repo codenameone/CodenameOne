@@ -85,7 +85,7 @@ image::img/slate-client-home.png["The client's home with the next appointment an
 Booking starts from a service. Pills at the top choose the location and the
 provider, or anyone who offers it, and a strip of days chooses when. The button
 at the head of the strip opens a calendar for a day further ahead. The strip then
-moves to the weeks around the day chosen there. The screen
+moves on to the three weeks that hold the day chosen there. The screen
 shows only the starts that are free. A start appears only when every rule
 agrees:
 

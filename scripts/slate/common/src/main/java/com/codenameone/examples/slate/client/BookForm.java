@@ -391,6 +391,11 @@ public final class BookForm extends LiveChannel.Adapter {
             return;
         }
         DeviceCalendar.busy(null, from, Times.addDays(from, DAYS_SHOWN + 7), busy -> {
+            // An answer for a strip that has since been left is not this
+            // strip's busy time: the read that replaced it brings its own.
+            if (mineFrom != from) {
+                return;
+            }
             mine = busy;
             loadSlots();
         });

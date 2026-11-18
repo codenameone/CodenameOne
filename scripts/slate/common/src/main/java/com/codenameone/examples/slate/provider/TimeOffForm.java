@@ -110,9 +110,6 @@ public final class TimeOffForm {
         Ui.relayout(list);
     }
 
-    /// A day and a time of day, in the phone's zone. The theme's
-    /// `pickerStyle: material` makes the field open the Material calendar
-    /// and clock face behind two tabs.
     /// Brings a time that was typed between two quarters back to the one
     /// before it. The hour and the day are the calendar's, so it is the
     /// minute of the clock on the wall that is rounded.
@@ -129,6 +126,9 @@ public final class TimeOffForm {
         }
     }
 
+    /// A day and a time of day, in the phone's zone. The theme's
+    /// `pickerStyle: material` makes the field open the Material calendar
+    /// and clock face behind two tabs.
     private static Picker when(String name, long millis) {
         Picker p = new Picker();
         p.setType(Display.PICKER_TYPE_DATE_AND_TIME);

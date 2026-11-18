@@ -65,6 +65,7 @@ public class HoursPickerTest extends E2e {
         until(() -> open(MaterialTimePicker.class) != null, 20000, "the clock face");
         onEdt(() -> face(dark));
         shot("provider-hours-time-dark");
+        onEdt(() -> open(MaterialTimePicker.class).setTime(11, 15));
         back();
         waitForForm("Hours");
         onEdt(() -> {
