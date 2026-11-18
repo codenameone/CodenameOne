@@ -1412,14 +1412,10 @@ class PortStatusTest(unittest.TestCase):
         self.assertTrue(
             any("performance status is" in item for item in malformed), malformed)
 
-    def test_the_two_macos_ports_are_registered_separately(self):
-        # The native AppKit build and the legacy Mac Catalyst target are
-        # different ports, not two builds of one, and the site has to be able to
-        # say so. They were one id ("mac-native") for as long as Catalyst was the
-        # only Mac build there was.
+    def test_the_macos_port_is_registered(self):
         ids = {port["id"] for port in self.manifest["ports"]}
         self.assertIn("macos", ids)
-        self.assertIn("mac-catalyst", ids)
+        self.assertNotIn("mac-catalyst", ids)
         self.assertNotIn(
             "mac-native",
             ids,
@@ -1429,19 +1425,11 @@ class PortStatusTest(unittest.TestCase):
         )
 
         by_id = {port["id"]: port for port in self.manifest["ports"]}
-        # Backfill attributes reports to their automatic producer. Catalyst now
-        # shares the iOS coordinator; AppKit retains its performance-gated run.
         self.assertEqual("scripts-macos.yml", by_id["macos"]["workflow"])
-        self.assertEqual("scripts-ios.yml", by_id["mac-catalyst"]["workflow"])
+        self.assertIn(
+            "scripts/macos/screenshots", self.manifest["golden_directories"])
 
-        # And its own goldens. A Catalyst window is a UIWindowScene fed an
-        # off-screen raster and an AppKit one owns a real CAMetalLayer, so the
-        # two baselines can never converge into one set with a loose tolerance.
-        goldens = self.manifest["golden_directories"]
-        self.assertIn("scripts/macos/screenshots", goldens)
-        self.assertIn("scripts/mac-catalyst/screenshots", goldens)
-
-    def test_macos_support_row_discloses_both_targets(self):
+    def test_macos_support_row_describes_the_appkit_build(self):
         rows = {
             item.get("id"): item
             for item in port_status.read_json(
@@ -1449,11 +1437,8 @@ class PortStatusTest(unittest.TestCase):
             )["deployment_support"]
         }
         blob = json.dumps(rows.get("macos", {}))
-        # The guard this pins exists so the site cannot claim "macOS" while
-        # shipping only a Catalyst slice. It now has to name both, because a
-        # reader choosing between them needs to know both exist.
         self.assertIn("AppKit", blob)
-        self.assertIn("Catalyst", blob)
+        self.assertNotIn("Catalyst", blob)
 
     def test_every_report_the_site_serves_is_renderable(self):
         # Only malformed. Drift is asserted against deliberately: a checked-in snapshot is a

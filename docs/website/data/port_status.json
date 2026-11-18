@@ -22,7 +22,6 @@
     "scripts/ios/screenshots-metal",
     "scripts/ios/screenshots-watch",
     "scripts/ios/screenshots-tv",
-    "scripts/mac-catalyst/screenshots",
     "scripts/macos/screenshots",
     "scripts/javascript/screenshots",
     "scripts/linux/screenshots",
@@ -47,12 +46,6 @@
       "name": "macOS",
       "detail": "Native AppKit build",
       "workflow": "scripts-macos.yml"
-    },
-    {
-      "id": "mac-catalyst",
-      "name": "macOS (Mac Catalyst)",
-      "detail": "Legacy Mac Catalyst build",
-      "workflow": "scripts-ios.yml"
     },
     {
       "id": "javascript",

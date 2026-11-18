@@ -43,10 +43,6 @@ Windows are a desktop feature, and the API says so plainly:
 |Yes
 |Each window is a real `NSWindow`. See <<macos-windows>>.
 
-|macOS (Mac Catalyst)
-|Opt-in
-|Needs `macNative.multiWindow=true`. See <<mac-catalyst-windows>>.
-
 |iOS, Android, JavaScript
 |No
 |These platforms have no windowing system.
@@ -143,18 +139,10 @@ pretending.
 Consuming the event in a close listener vetoes the close regardless of the operation,
 which is how a window asks the user to save first.
 
-That veto isn't available on Mac Catalyst. UIKit hands a scene disconnection over
-after the scene is already gone, so there is nothing left to refuse: the window is
-disposed, the close listeners don't run, and `HIDE_ON_CLOSE` and
-`DO_NOTHING_ON_CLOSE` have no effect for the title-bar control. Don't rely on a save
-prompt there. An application that has to intervene should drive the close itself: ask
-the user from its own menu item or button, and call `dispose()` once they've answered.
-
 Note that `dispose()` isn't a close request on any platform. It destroys the window
 directly and doesn't run the close listeners, so a listener can't veto it - the
 confirmation belongs in the code that decides to call `dispose()`, not in a listener
-behind it. Close listeners fire for the platform's own close control, which is exactly
-the control Catalyst doesn't let anyone refuse.
+behind it. Close listeners fire for the platform's own close control.
 
 Every open window is disposed when the application shuts down, so a window can't outlive
 the event dispatch thread that paints it.
@@ -465,8 +453,8 @@ operating-system window is simply not in it. `Window.capture()` exists for that 
 returns an image of the window itself.
 
 Most desktop ports read the window's own pixels back, so what you get is what the
-window is showing -- native peers and editors included. The JavaSE simulator, Mac
-Catalyst and native Linux read their rasters directly. Native Windows takes a different
+window is showing -- native peers and editors included. The JavaSE simulator and
+native Linux read their rasters directly. Native Windows takes a different
 route to the same place: a secondary window renders into a Direct2D `HWND` target,
 which Direct2D gives no readback for, so the port asks the window to render itself into
 a device context with `PrintWindow`. That's a real readback of the client area rather
@@ -499,63 +487,7 @@ each screen's backing scale, so a window restored onto a Retina display and one
 restored onto a non-Retina display each get the right density. Dragging a window
 between them updates it.
 
-Every operation on the windowing API is implemented. That's worth saying
-explicitly because the Mac Catalyst target below can't implement several of
-them -- which is why windows are off by default there and on by default here.
-
-[[mac-catalyst-windows]]
-=== Mac Catalyst (legacy)
-
-Windows are opt-in on the macOS (Mac Catalyst) target. Set the `macNative.multiWindow`
-build hint to `true` alongside `macNative.enabled`:
-
-[source]
-----
-macNative.enabled=true
-macNative.multiWindow=true
-----
-
-A second Codename One window is a second `UIWindowScene`, which needs the
-`UIApplicationSupportsMultipleScenes` key in `Info.plist`. The builder emits that key
-only for a Catalyst build that asked for windows, and for no other target, so iPhone
-and iPad apps are unaffected either way.
-
-The opt-in exists because that key has a cost the rest of the app pays. It puts the
-process on the UIScene lifecycle, under which a Catalyst window opens four points
-shorter: the conformance suite measures 685 points of content height without the key
-and 681 with it.
-Every layout in the app shifts slightly. That's a fair trade when you want windows and
-an unpleasant surprise when you don't, so an app that doesn't ask for them keeps the
-bundle it has always had.
-
-`Desktop.isSupported()` reads the key back out of the running bundle rather than
-trusting a build flag, so the API and the `Info.plist` can never disagree -- including
-in a project that was generated once and then hand-edited.
-
-System sheets follow the focused window. Sharing (`ShareButton` and `Display.share()`),
-camera capture, the photo gallery, the file chooser and the full-screen video player are
-presented from the scene the user is actually in, and the share popover anchors against
-that window's own coordinates and screen scale rather than the main scene's. Invoking
-one from a secondary window opens it over that window, where it belongs.
-
-Catalyst differs in one implementation detail worth knowing: a window's Codename One
-content is rendered into an off-screen raster and presented to the scene's view, rather
-than the window owning a second GPU surface. The native macOS build doesn't do this. Native peers and text editing still use the
-scene's real view hierarchy, so they behave normally.
-
-Some window controls have no Mac Catalyst equivalent, because AppKit owns the
-behaviour and Catalyst doesn't expose it to a `UIWindowScene`. `setAlwaysOnTop`,
-`setUtilityWindow`, `minimize`, `restore` and `toggleMaximize` do nothing there; the
-getters keep reporting whatever the application set, so treat them as requests the
-platform may decline. `setDecorated(false)` is partial: it hides the title bar's
-title and toolbar -- which is what an application supplying its own chrome needs --
-but the window frame itself stays. Modality, the minimum window size and
-resizability all work.
-
-Scenes also arrive asynchronously. `show()` asks the system to activate one and is
-handed it back later, so a window exists for a moment before its scene does, and a closed
-window's scene is kept for the next one rather than destroyed -- asking for a scene
-while a destruction is still in flight is refused by the system.
+Every operation on the windowing API is implemented.
 
 === Threading
 

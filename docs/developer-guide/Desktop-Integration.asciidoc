@@ -103,9 +103,7 @@ The setting can also be supplied as a runtime property before constructing the f
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava001Snippet.java[tag=desktop-integration-java-001,indent=0]
 -----
 
-NOTE: On a phone or tablet iOS build these properties are ignored. The legacy Mac Catalyst target
-also honors them, through `UIWindowScene` and `UIMenuBuilder` rather than AppKit; see
-<<_working_with_mac_catalyst>>.
+NOTE: On a phone or tablet iOS build these properties are ignored.
 
 ==== Integrated title content on native desktops
 
@@ -273,7 +271,7 @@ Changing a command's enabled or checked state updates the visible menu. After ch
 anything else about a published command, such as its name or icon, call
 `Display.getInstance().refreshNativeMenu()`.
 
-Each platform draws these items in its own style. macOS and Mac Catalyst show a radio item with the same
+Each platform draws these items in its own style. macOS shows a radio item with the same
 checkmark as a check item, as every Mac application does. Windows draws a bullet. The Windows
 and Linux menus show no icons: Win32 menu bitmaps need a decoder that port doesn't have, and GTK 3
 deprecated menu item images, so no GNOME application shows them.

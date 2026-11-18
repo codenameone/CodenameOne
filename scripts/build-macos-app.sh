@@ -2,8 +2,7 @@
 # Build a sample "Hello Codename One" native macOS application from the
 # locally-built Codename One macOS port. This is a real AppKit app: its
 # Xcode project targets the macOS SDK, links AppKit and Metal, and carries
-# no UIKit at all. The legacy Mac Catalyst build is
-# scripts/build-mac-catalyst-app.sh. Mirrors scripts/build-ios-app.sh.
+# no UIKit at all. Mirrors scripts/build-ios-app.sh.
 set -euo pipefail
 
 bma_log() { echo "[build-macos-app] $1"; }
@@ -54,11 +53,9 @@ if ! command -v xcodebuild >/dev/null 2>&1; then
   exit 1
 fi
 
-# No Ruby / xcodeproj gem preflight here, deliberately. The Catalyst path needs
-# that gem because it injects its build settings into an already-generated iOS
-# project after the fact; the AppKit builder writes a macOS project with every
-# setting already in it, so there is nothing to inject and one less thing that
-# can break a build host.
+# No Ruby / xcodeproj gem preflight here, deliberately: the AppKit builder
+# writes a macOS project with every setting already in it, so there is
+# nothing to inject and one less thing that can break a build host.
 
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 BASE_PATH="$PATH"
@@ -203,8 +200,7 @@ if [ "${CN1_MACOS_STOP_AFTER_TRANSLATION:-0}" = "1" ]; then
   exit 0
 fi
 
-# The AppKit port has its own maven module, unlike Mac Catalyst, which builds
-# from ios/ because it is a variant of the iOS build.
+# The AppKit port has its own maven module.
 MAC_TARGET_DIR="$APP_DIR/mac/target"
 if [ ! -d "$MAC_TARGET_DIR" ]; then
   bma_log "macOS target directory not found at $MAC_TARGET_DIR" >&2

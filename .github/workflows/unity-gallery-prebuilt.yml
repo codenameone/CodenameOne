@@ -21,8 +21,8 @@ name: _Unity gallery prebuilt (reusable)
 # ONCE per workflow run. The artifact has a fixed name, and a second upload of
 # it in the same run is refused, so a workflow that is itself called by one
 # that already made the archive takes an input saying so and skips its own
-# call (`unity_prepared`, beside `port_prepared`, in scripts-ios-native.yml,
-# ios-packaging.yml and scripts-mac-catalyst.yml).
+# call (`unity_prepared`, beside `port_prepared`, in scripts-ios-native.yml
+# and ios-packaging.yml).
 #
 # The cache. A cold build is the framework up to the Maven plugin plus both
 # Unity modules, several minutes; the archive that comes out of it depends only

@@ -326,8 +326,6 @@ include::Kotlin-Multiplatform-Interop.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
 
-include::Working-with-Mac-Catalyst.asciidoc[]
-
 include::Working-With-Windows.asciidoc[]
 
 include::Working-With-Linux.asciidoc[]
