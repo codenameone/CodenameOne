@@ -195,7 +195,9 @@ public class BarSeries extends XYSeries {
     }
 
     private boolean fullyVisible(Series s) {
-        return s == this || ((BarSeries) s).getVisibilityFraction() >= 1; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+        // no shortcut for this series: every bar series must compute the identical band,
+        // or a fading series lays its slot out on a different width than the others
+        return ((BarSeries) s).getVisibilityFraction() >= 1;
     }
 
     private static double spacing(Series s) {

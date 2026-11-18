@@ -619,9 +619,13 @@ public class Chart extends Component {
         setY(0);
         setWidth(width);
         setHeight(height);
+        // the export shows the chart as it will settle: a transition still running on
+        // screen is drawn at its end, without being finished or restarted
+        exporting = true;
         try {
             paintChart(g, 0, 0, width, height);
         } finally {
+            exporting = false;
             setX(ox);
             setY(oy);
             setWidth(ow);
@@ -629,6 +633,14 @@ public class Chart extends Component {
             lastContext = keepContext;
             legendHits.clear();
             legendHits.addAll(keepHits);
+        }
+        // painting at the export size rewrote the geometry series keep for hit testing
+        // (treemap cells, sunburst center, sankey layout...); lay the chart out again at
+        // its own size, into a scratch image that keeps nothing, so a tap before the next
+        // screen paint still hits what is on screen
+        if (ow > 0 && oh > 0) {
+            paint(Image.createImage(1, 1).getGraphics());
+            repaint();
         }
         return img;
     }
@@ -733,6 +745,9 @@ public class Chart extends Component {
         repaint();
     }
 
+    /// true while `toImage` paints, which renders every transition at its end
+    private boolean exporting;
+
     private void finishTransition() {
         transitionLength = 0;
         axisFrom = null;
@@ -743,7 +758,7 @@ public class Chart extends Component {
     }
 
     private float progress() {
-        if (transitionLength <= 0) {
+        if (exporting || transitionLength <= 0) {
             return 1;
         }
         float t = (AnimationTime.now() - transitionStart) / (float) transitionLength;

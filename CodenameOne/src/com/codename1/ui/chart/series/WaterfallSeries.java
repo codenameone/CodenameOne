@@ -110,7 +110,9 @@ public class WaterfallSeries extends BarSeries {
             } else {
                 base[i] = run;
                 double d = ys[i];
-                if (d == d) {
+                // a NaN or infinite delta is a gap: it adds nothing, so one bad value
+                // cannot poison every later bar of the running total
+                if (!Double.isNaN(d) && !Double.isInfinite(d)) {
                     run += d;
                 }
             }
@@ -181,7 +183,7 @@ public class WaterfallSeries extends BarSeries {
             g.setColor(ctx.getTheme().getAxisColor());
             for (int i = 0; i + 1 < size(); i++) {
                 double d = getY(i);
-                double end = getBase(i) + (d == d ? d : 0);
+                double end = getBase(i) + (Double.isNaN(d) || Double.isInfinite(d) ? 0 : d);
                 float x0 = ctx.screenX(this, getX(i), end);
                 float y0 = ctx.screenY(this, getX(i), end);
                 float x1 = ctx.screenX(this, getX(i + 1), end);

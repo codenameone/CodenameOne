@@ -95,12 +95,15 @@ public class TimeAxis extends Axis {
                 break;
             }
         }
-        double[] tmp = new double[Math.max(2, maxCount) + 3];
         // a step as wide as the span can leave one calendar boundary inside it, or none;
         // step down until two land inside, as Ticks.linear does, so an axis never has a
-        // single label
+        // single label. The buffer is sized for the step being tried, so a finer step
+        // reached by stepping down is never cut short and the ticks span the whole range
+        // (months and years vary in length, hence the slack)
         while (true) {
             long[] step = STEPS[index];
+            double fit = span / step[0] * 1.1 + 4;
+            double[] tmp = new double[(int) Math.min(10000, Math.max(Math.max(2, maxCount) + 3, fit))];
             int field = (int) step[1];
             int n = fill(min, max, field, (int) step[2], tmp);
             if (n >= 2 || index == 0) {
