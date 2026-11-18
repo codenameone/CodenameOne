@@ -127,6 +127,48 @@
       ]
     },
     {
+      "test": "KanbanCardsThemeScreenshotTest",
+      "reason": "The Kanban cards baseline is three columns of cards. A watch face shows a strip of one column, which checks nothing of the board.",
+      "platform_support": "The KanbanBoard component compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "kanban-cards-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "FlowChartShapesScreenshotTest",
+      "reason": "The shapes baseline is eleven outlines in three swimlanes. A watch face has no room for it, so the capture there would only record how the diagram fails to fit.",
+      "platform_support": "The NodeGraph component and its flow chart shapes compile and run on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "flow-chart-shapes-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "NodeEditorThemeScreenshotTest",
+      "reason": "The node editor baseline is a palette beside a graph of four nodes. A watch face has no room for the two side by side.",
+      "platform_support": "The NodeGraph and GraphPalette components compile and run on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "node-editor-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "GanttThemeScreenshotTest",
       "reason": "The Gantt chart baseline is a task table beside a timeline of bars and dependency arrows. A watch face has no room for either, so the capture there would only record how the chart fails to fit.",
       "platform_support": "The Gantt component compiles and runs on watchOS; it is a planning view for phones, tablets and desktops, and only this baseline does not apply to the watch form factor.",
