@@ -21,7 +21,12 @@ on:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 60
+    # 90, not 60: without the cn1-built cache this job is setup-workspace plus
+    # the port build, and setup-workspace alone was measured at 27, 34 and 40+
+    # minutes on three macOS runners in one night (2026-11-18). See the step
+    # below. The steps' own limits add up to more than this on purpose: each
+    # stops a hang in its step, this one bounds the job.
+    timeout-minutes: 90
     outputs:
       cn1_built_cache_key: ${{ steps.cn1_built_key.outputs.key }}
     steps:
@@ -152,7 +157,15 @@ jobs:
         # restore from cache -- so an evicted tools cache breaks all of them.
         if: steps.cn1_built.outputs.cache-hit != 'true' || steps.cn1_tools.outputs.cache-hit != 'true'
         run: ./scripts/setup-workspace.sh -q -DskipTests
-        timeout-minutes: 40
+        # 60, not 40. This step runs when a cache above has no entry, and
+        # on a nightly that is the usual case: the repository's caches are
+        # at GitHub's limit (10.6 GB on 2026-11-18), so the cn1-built entry
+        # one nightly saved at 08:21 was gone when the next looked for it at
+        # 09:06, and the ~/.m2 cache with it. Each caller then builds the
+        # workspace cold: 27 and 34 minutes that night, and Purchase E2E's
+        # was stopped at 40. The limit is here to stop a hang, not to hold a
+        # budget. The eviction itself is not fixed by this.
+        timeout-minutes: 60
 
       - name: Build iOS port
         if: steps.cn1_built.outputs.cache-hit != 'true'

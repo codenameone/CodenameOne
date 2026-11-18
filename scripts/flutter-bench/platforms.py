@@ -16,6 +16,7 @@ Which adapters have actually been exercised is recorded per class in
 keeping honest: an unexercised adapter is a proposal, not a measurement.
 """
 
+import collections
 import glob
 import os
 import platform as _host
@@ -23,6 +24,7 @@ import re
 import shutil
 import queue
 import subprocess
+import sys
 import threading
 import time
 
@@ -82,6 +84,17 @@ _PRESENTED_AGO = re.compile(r"presentedAgoUs=(\d+)")
 ANDROID_WARMUP_LAUNCHES = int(os.environ.get("BENCH_ANDROID_WARMUP", "3"))
 LAUNCH_TIMEOUT_S = float(os.environ.get("BENCH_LAUNCH_TIMEOUT", "90"))
 SETTLE_S = float(os.environ.get("BENCH_SETTLE", "12"))
+# How much of its output is shown for a launch that never printed its marker:
+# this many lines from the START and as many from the END. Both, because the
+# first exception is the evidence and a broken application keeps running for
+# the whole launch timeout -- one that logs per frame would scroll the only
+# stack trace out of a tail. Enough for a Java trace with its "Caused by".
+UNMARKED_HEAD_LINES = 80
+UNMARKED_TAIL_LINES = 80
+# How many unmarked launches are explained per side. More than one, because an
+# intermittent failure need not look like the first; not all of them, because
+# nine rounds of one broken application say the same thing nine times.
+UNMARKED_REPORTS = 3
 
 
 # Compute mode (the VM workloads) runs every workload with warm-ups and repeats
@@ -222,6 +235,9 @@ class Adapter(object):
         """
         marker = MARKERS[side]
         lower_marker = LOWER_BOUND_MARKERS.get(side)
+        head = []
+        tail = collections.deque(maxlen=UNMARKED_TAIL_LINES)
+        dropped = 0
         upper = None
         lower = None
         exact = False
@@ -237,6 +253,12 @@ class Adapter(object):
                 break
             if line is None:
                 continue  # timed out; the checks above decide whether to stop
+            if len(head) < UNMARKED_HEAD_LINES:
+                head.append(line)
+            else:
+                if len(tail) == tail.maxlen:
+                    dropped += 1
+                tail.append(line)
             if lower is None and lower_marker and lower_marker.search(line):
                 lower = (time.time() - started) * 1000.0
             if upper is None and marker.search(line):
@@ -253,7 +275,46 @@ class Adapter(object):
         if exact:
             # The exact moment, so there is no bracket to report.
             lower = None
+        if upper is None:
+            self._report_unmarked(side, head, tail, dropped)
         return upper, lower
+
+    # How many unmarked launches have been explained, per (adapter, side).
+    _unmarked_reported = collections.Counter()
+
+    def _report_unmarked(self, side, head, tail, dropped):
+        """Says what a launch printed INSTEAD of its marker.
+
+        The application's output is otherwise read and dropped, so a launch
+        with no marker showed as `cold=--` and nothing else. The 2026-11-18
+        nightly reported exactly that on every desktop leg, six days after the
+        change that broke the gallery, while the application was printing the
+        exception that had killed its first frame; finding it took a local
+        build.
+
+        Only the adapters that time against a marker come through here: the
+        desktop ones, and iOS where it is measured at all. Android takes its figure from `am start -W` and
+        reads no marker, so a gallery that dies in its first layout is still
+        timed there, as a fast launch.
+        """
+        key = (self.id, side)
+        if Adapter._unmarked_reported[key] >= UNMARKED_REPORTS:
+            return
+        Adapter._unmarked_reported[key] += 1
+        out = sys.stderr
+        if not head:
+            out.write("  %s never printed its start-up marker, and wrote nothing at all\n" % side)
+            out.flush()
+            return
+        out.write("  %s never printed its start-up marker; it wrote %d line(s):\n"
+                  % (side, len(head) + len(tail) + dropped))
+        for line in head:
+            out.write("    | %s\n" % line.rstrip("\r\n"))
+        if dropped:
+            out.write("    | ... %d line(s) not shown ...\n" % dropped)
+        for line in tail:
+            out.write("    | %s\n" % line.rstrip("\r\n"))
+        out.flush()
 
 
 class _LineReader(object):
