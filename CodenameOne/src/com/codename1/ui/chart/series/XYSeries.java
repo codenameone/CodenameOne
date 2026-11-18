@@ -42,6 +42,9 @@ public abstract class XYSeries extends Series {
     // the x of each fromY slot, so a transition matches old values to new ones by x; null matches by index
     private double[] fromX;
     private double[] fromBase;
+    // each extra channel's offset from its point's value where the last transition started, per
+    // fromY slot; null on entry, so a first appearance grows out of the point's own value
+    private double[][] fromAux;
     private String stackGroup;
     private int maxPoints;
     /// Extra values per point (open/high/low, a range start, quartiles), parallel to `ys`.
@@ -531,6 +534,45 @@ public abstract class XYSeries extends Series {
         return lo > 0 ? lo - 1 : 0;
     }
 
+    /// Extra channel `channel` of point `i` as shown in the current frame. It moves with the
+    /// point's animated value and, like it, from where the last transition started, matched by x;
+    /// so a change to one point leaves every other point still. A point with no earlier state
+    /// (the series' entry) grows out of its own value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ctx`: the drawing context, or null for the settled value
+    ///
+    /// - `channel`: the extra channel
+    ///
+    /// - `i`: the point index
+    ///
+    /// #### Returns
+    ///
+    /// the channel value for this frame
+    public double animatedAux(ChartContext ctx, int channel, int i) {
+        double t = ctx == null ? 1 : ctx.getProgress();
+        double target = aux[channel][i];
+        if (fromY == null || t >= 1 || target != target) {
+            return target;
+        }
+        double y = ys[i];
+        double off = target - y;
+        if (off != off) {
+            return target;
+        }
+        double ay = animatedY(ctx, i);
+        int j = fromSlot(i);
+        double from = 0;
+        if (fromAux != null && j >= 0 && j < fromAux[channel].length) {
+            double f = fromAux[channel][j];
+            if (f == f) {
+                from = f;
+            }
+        }
+        return ay + lerp(from, off, t);
+    }
+
     /// The stacked base shown at `i` in the current frame.
     public double animatedBase(ChartContext ctx, int i) {
         double target = getBase(i);
@@ -551,6 +593,15 @@ public abstract class XYSeries extends Series {
             fy[i] = animatedY(ctx, i);
             fb[i] = animatedBase(ctx, i);
         }
+        double[][] fa = null;
+        if (aux != null) {
+            fa = new double[aux.length][count];
+            for (int k = 0; k < aux.length; k++) {
+                for (int i = 0; i < count; i++) {
+                    fa[k][i] = animatedAux(ctx, k, i) - fy[i];
+                }
+            }
+        }
         double[] fx = null;
         if (isAscending()) {
             fx = new double[count];
@@ -559,12 +610,14 @@ public abstract class XYSeries extends Series {
         fromY = fy;
         fromBase = fb;
         fromX = fx;
+        fromAux = fa;
     }
 
     @Override
     protected void captureEntryStart() {
         fromY = new double[count];
         fromX = null;
+        fromAux = null;
         fromBase = new double[count];
         for (int i = 0; i < count; i++) {
             fromBase[i] = getBase(i);

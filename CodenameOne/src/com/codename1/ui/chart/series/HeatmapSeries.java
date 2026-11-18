@@ -289,9 +289,24 @@ public class HeatmapSeries extends Series {
         }
     }
 
+    /// Every cell is a point, numbered row by row as `cellId(row, column)`, so a selection or a
+    /// tooltip survives a repaint and `Chart.select` can name a cell.
     @Override
     public int getPointCount() {
-        return -1;
+        return matrix.length * Math.max(1, getColumns());
+    }
+
+    @Override
+    public ChartPoint getPoint(ChartContext ctx, int index) {
+        int stride = Math.max(1, getColumns());
+        int r = index < 0 ? -1 : index / stride;
+        int c = index < 0 ? -1 : index % stride;
+        if (ctx == null || r < 0 || r >= matrix.length || c >= matrix[r].length || matrix[r][c] != matrix[r][c]) {
+            return null;
+        }
+        float[] b = cell(ctx, r, c);
+        return new ChartPoint(this, index, c, matrix[r][c], Math.round(b[0] + b[2] / 2) - ctx.getOriginX(),
+                Math.round(b[1] + b[3] / 2) - ctx.getOriginY(), null);
     }
 
     @Override
@@ -302,8 +317,7 @@ public class HeatmapSeries extends Series {
             for (int c = 0; c < matrix[r].length; c++) {
                 float[] b = cell(ctx, r, c);
                 if (ax >= b[0] && ax <= b[0] + b[2] && ay >= b[1] && ay <= b[1] + b[3] && matrix[r][c] == matrix[r][c]) {
-                    return new ChartPoint(this, cellId(r, c), c, matrix[r][c], Math.round(b[0] + b[2] / 2) - ctx.getOriginX(),
-                            Math.round(b[1] + b[3] / 2) - ctx.getOriginY(), null);
+                    return getPoint(ctx, cellId(r, c));
                 }
             }
         }

@@ -33,7 +33,10 @@ import com.codename1.ui.chart.ChartPoint;
 /// new WaterfallSeries("Profit").setSteps(new double[]{120, -30, -25, 40, 0}, new boolean[]{false, false, false, false, true});
 /// ```
 public class WaterfallSeries extends BarSeries {
-    private boolean[] totals = new boolean[0];
+    // channel 0 is each bar's base; channel 1 is 1 for a total bar, kept as a channel (not a
+    // parallel array) so every row mutation -- a slide, a setMaxPoints trim, a removed or replaced
+    // row -- moves the flag with its bar
+    private static final int TOTAL = 1;
     private boolean connectors = true;
 
     /// Creates an empty series.
@@ -42,7 +45,7 @@ public class WaterfallSeries extends BarSeries {
     ///
     /// - `name`: the series name
     public WaterfallSeries(String name) {
-        super(name, 1);
+        super(name, 2);
         setBarFraction(0.6f);
     }
 
@@ -59,15 +62,15 @@ public class WaterfallSeries extends BarSeries {
     /// this series
     public WaterfallSeries setSteps(double[] deltas, boolean[] isTotal) {
         int n = deltas.length;
-        totals = new boolean[n];
         double[] y = new double[n];
         double[] base = new double[n];
+        double[] total = new double[n];
         for (int i = 0; i < n; i++) {
-            totals[i] = isTotal != null && i < isTotal.length && isTotal[i];
+            total[i] = isTotal != null && i < isTotal.length && isTotal[i] ? 1 : 0;
             y[i] = deltas[i];
         }
         // the bases and totals are filled in by dataChanged, which every change goes through
-        setRows(null, y, new double[][]{base});
+        setRows(null, y, new double[][]{base, total});
         return this;
     }
 
@@ -109,7 +112,13 @@ public class WaterfallSeries extends BarSeries {
 
     /// True when bar `i` is a total.
     public boolean isTotal(int i) {
-        return i < totals.length && totals[i];
+        return i >= 0 && i < count && aux[TOTAL][i] != 0;
+    }
+
+    /// A point added by `add` is a plain step, never a total.
+    @Override
+    protected double auxDefault(int channel, double y) {
+        return 0;
     }
 
     @Override

@@ -178,12 +178,13 @@ public class RadarSeries extends Series {
         int maxLabel = 0;
         for (int k = 0; k < rs.size(); k++) {
             RadarSeries r = (RadarSeries) rs.get(k);
-            if (!r.isVisible()) {
+            // a series still fading out is painted against this scale, so it counts too
+            if (!(r.getVisibilityFraction() > 0)) { //NOPMD LogicInversion - also rejects NaN
                 continue;
             }
             for (int i = 0; i < r.values.length; i++) {
-                double rv = r.values[i];
-                if (rv == rv) {
+                double rv = pos(r.values[i]);
+                if (rv > 0) {
                     max = Math.max(max, rv);
                 }
             }
@@ -196,13 +197,20 @@ public class RadarSeries extends Series {
         maxLabel = Math.min(maxLabel, ctx.getPlotWidth() / 4);
         double[] ticks = Ticks.linear(0, max <= 0 ? 1 : max, 5);
         double step = ticks.length > 1 ? ticks[1] - ticks[0] : max;
-        if (!(step > 0)) { //NOPMD LogicInversion - also catches NaN
+        if (!(step > 0) || step == Double.POSITIVE_INFINITY) { //NOPMD LogicInversion - also catches NaN
             // the ring loops below step by this; 0 or NaN would never end them
             step = 1;
         }
         double top = ticks.length > 0 ? ticks[ticks.length - 1] : 1;
         if (top < max) {
             top += step;
+        }
+        if (!(top > 0) || top == Double.POSITIVE_INFINITY) { //NOPMD LogicInversion - also catches NaN
+            top = 1;
+        }
+        // the ring loops below stop at RINGS whatever the arithmetic says, so no scale can hang the EDT
+        if (top / step > MAX_RINGS) {
+            step = top / MAX_RINGS;
         }
         float cx = ctx.getPlotX() + ctx.getPlotWidth() / 2f;
         float cy = ctx.getPlotY() + ctx.getPlotHeight() / 2f;
@@ -225,7 +233,8 @@ public class RadarSeries extends Series {
         boolean first = gridOwner == this; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
         if (first) {
             g.setColor(ctx.getTheme().getGridColor());
-            for (double tk = step; tk <= top + step * 1e-6; tk += step) {
+            for (int rk = 1; rk <= MAX_RINGS && rk * step <= top + step * 1e-6; rk++) {
+                double tk = rk * step;
                 float rr = (float) (r * tk / top);
                 GeneralPath ring = new GeneralPath();
                 for (int i = 0; i <= n; i++) {
@@ -261,7 +270,8 @@ public class RadarSeries extends Series {
                 g.drawString(t, x, y);
             }
             g.setColor(ctx.getTheme().getSecondaryTextColor());
-            for (double tk = step; tk <= top + step * 1e-6; tk += step) {
+            for (int rk = 1; rk <= MAX_RINGS && rk * step <= top + step * 1e-6; rk++) {
+                double tk = rk * step;
                 String t = Axis.formatNumber(tk, Ticks.decimalsFor(step));
                 float rr = (float) (r * tk / top);
                 int x = Math.round(cx + ctx.mm(0.5f));
@@ -341,8 +351,11 @@ public class RadarSeries extends Series {
         }
     }
 
-    // NaN and negative values count as nothing; Math.max(0, NaN) is NaN and would poison the sums
+    private static final int MAX_RINGS = 50;
+
+    // NaN, infinite and negative values count as nothing; Math.max(0, NaN) is NaN and would poison
+    // the sums, and an infinite value would make the scale (and the ring loops' step) infinite
     private static double pos(double v) {
-        return !(v > 0) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
+        return !(v > 0) || v == Double.POSITIVE_INFINITY ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
     }
 }

@@ -90,66 +90,125 @@ public class BarSeries extends XYSeries {
         return new double[]{b[0] - half, b[1] + half};
     }
 
+    // scratch for one paint or hit test pass on the EDT, so neither allocates per bar or per frame
+    private final float[] slotBuf = new float[3];
+    private final float[] rectBuf = new float[4];
+
     /// `{start, width, total}`: this series' place among the side by side bar groups, in
     /// slot weights. Every series weighs its visibility fraction (a stack group the largest of its
     /// members'), so a series fading in or out narrows its slot smoothly, and every series of the
-    /// chart computes the same layout during the fade.
+    /// chart computes the same layout during the fade. Written into a reused buffer.
     private float[] slot() {
         List<Series> all = getChart().getSeries();
-        java.util.ArrayList<Object> keys = new java.util.ArrayList<Object>();
-        float[] w = new float[all.size()];
-        int mine = -1;
-        for (Series s : all) {
-            if (!(s instanceof BarSeries)) {
-                continue;
-            }
-            BarSeries bs = (BarSeries) s;
-            float vis = bs.getVisibilityFraction();
-            if (vis <= 0 && s != this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
-                continue;
-            }
-            String g = bs.getStackGroup();
-            Object key = g == null ? s : g;
-            int idx = keys.indexOf(key);
-            if (idx < 0) {
-                idx = keys.size();
-                keys.add(key);
-            }
-            w[idx] = Math.max(w[idx], Math.max(0, vis));
-            if (s == this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
-                mine = idx;
-            }
-        }
+        int n = all.size();
         float total = 0;
         float start = 0;
-        for (int k = 0; k < keys.size(); k++) {
-            if (k == mine) {
-                start = total;
+        float mineW = -1;
+        for (int k = 0; k < n; k++) {
+            if (!counts(all.get(k)) || keyedEarlier(all, k)) {
+                continue;
             }
-            total += w[k];
+            // the weight of this group: the largest visibility of its members
+            Object key = key(all.get(k));
+            float w = 0;
+            boolean holdsMe = false;
+            for (int j = k; j < n; j++) {
+                Series o = all.get(j);
+                if (counts(o) && key.equals(key(o))) {
+                    w = Math.max(w, Math.max(0, ((BarSeries) o).getVisibilityFraction()));
+                    holdsMe |= o == this; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+                }
+            }
+            if (holdsMe) {
+                start = total;
+                mineW = w;
+            }
+            total += w;
         }
-        if (mine < 0 || !(total > 0)) { //NOPMD LogicInversion - also rejects NaN
-            return new float[]{0, 1, 1};
+        float[] out = slotBuf;
+        if (mineW < 0 || !(total > 0)) { //NOPMD LogicInversion - also rejects NaN
+            out[0] = 0;
+            out[1] = 1;
+            out[2] = 1;
+        } else {
+            out[0] = start;
+            out[1] = mineW;
+            out[2] = total;
         }
-        return new float[]{start, w[mine], total};
+        return out;
     }
 
-    private float[] barRect(ChartContext ctx, int i, double base, double v, float[] slot) {
+    private boolean counts(Series s) {
+        if (!(s instanceof BarSeries)) {
+            return false;
+        }
+        return s == this || ((BarSeries) s).getVisibilityFraction() > 0; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+    }
+
+    private static Object key(Series s) {
+        String g = ((BarSeries) s).getStackGroup();
+        return g == null ? s : g;
+    }
+
+    private boolean keyedEarlier(List<Series> all, int k) {
+        Object key = key(all.get(k));
+        for (int j = 0; j < k; j++) {
+            if (counts(all.get(j)) && key.equals(key(all.get(j)))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The width in pixels of one category band, shared by every bar series of the chart so
+    /// grouped bars line up: the closest x spacing of any bar series that is painted. When no
+    /// bar series has two distinct x values (a single bar, which on a time axis would be one
+    /// millisecond wide) the band is a fifth of the plot instead.
+    private float bandPixels(ChartContext ctx) {
+        double m = Double.MAX_VALUE;
+        for (Series s : getChart().getSeries()) {
+            if (counts(s)) {
+                BarSeries bs = (BarSeries) s;
+                if (bs.size() > 1) {
+                    double d = bs.getMinXSpacing();
+                    if (d > 0 && d < m) {
+                        m = d;
+                    }
+                }
+            }
+        }
+        float span = ctx.isRotated() ? ctx.getPlotHeight() : ctx.getPlotWidth();
+        if (m == Double.MAX_VALUE) {
+            return span / 5f;
+        }
+        return Math.abs(ctx.xLength(m));
+    }
+
+    private float[] barRect(ChartContext ctx, int i, double base, double v, float[] slot, float bandPx) {
         // one slot is the closest spacing of the data: a category band, a day on a time axis
-        float band = ctx.xLength(getMinXSpacing()) * barFraction;
+        float band = bandPx * barFraction;
         float each = band * slot[1] / slot[2];
         float offset = -band / 2 + band * slot[0] / slot[2];
         float inset = slot[1] < slot[2] ? Math.max(0, Math.min(each * 0.08f, ctx.mm(0.4f))) : 0;
+        float[] out = rectBuf;
         if (ctx.isRotated()) {
             float cy = ctx.screenY(this, xs[i], 0);
             float x0 = ctx.screenX(this, xs[i], base);
             float x1 = ctx.screenX(this, xs[i], base + v);
-            return new float[]{Math.min(x0, x1), cy + offset + inset, Math.abs(x1 - x0), each - 2 * inset};
+            out[0] = Math.min(x0, x1);
+            out[1] = cy + offset + inset;
+            out[2] = Math.abs(x1 - x0);
+            out[3] = each - 2 * inset;
+            return out;
         }
         float cx = ctx.screenX(this, xs[i], 0);
         float y0 = ctx.screenY(this, xs[i], base);
         float y1 = ctx.screenY(this, xs[i], base + v);
-        return new float[]{cx + offset + inset, Math.min(y0, y1), each - 2 * inset, Math.abs(y1 - y0)};
+        out[0] = cx + offset + inset;
+        out[1] = Math.min(y0, y1);
+        out[2] = each - 2 * inset;
+        out[3] = Math.abs(y1 - y0);
+        return out;
     }
 
     @Override
@@ -159,6 +218,7 @@ public class BarSeries extends XYSeries {
         int alpha = g.getAlpha();
         g.setAlpha((int) (alpha * getVisibilityFraction()));
         float[] slot = slot();
+        float bandPx = bandPixels(ctx);
         int radius = ctx.mm(cornerMm);
         boolean top = getStackGroup() == null || isTopOfStack();
         for (int i = r[0]; i <= r[1]; i++) {
@@ -166,7 +226,7 @@ public class BarSeries extends XYSeries {
             if (v != v) {
                 continue;
             }
-            float[] b = barRect(ctx, i, animatedBase(ctx, i), v, slot);
+            float[] b = barRect(ctx, i, animatedBase(ctx, i), v, slot, bandPx);
             int x = Math.round(b[0]);
             int y = Math.round(b[1]);
             int w = Math.max(1, Math.round(b[2]));
@@ -191,7 +251,7 @@ public class BarSeries extends XYSeries {
             }
         }
         if (isShowValues()) {
-            paintLabels(ctx, r, slot);
+            paintLabels(ctx, r, slot, bandPx);
         }
         g.setAlpha(alpha);
     }
@@ -211,7 +271,7 @@ public class BarSeries extends XYSeries {
         return true;
     }
 
-    private void paintLabels(ChartContext ctx, int[] r, float[] slot) {
+    private void paintLabels(ChartContext ctx, int[] r, float[] slot, float bandPx) {
         Graphics g = ctx.getGraphics();
         g.setFont(ctx.getFont());
         int fh = ctx.getFont().getHeight();
@@ -222,7 +282,7 @@ public class BarSeries extends XYSeries {
             if (v != v) {
                 continue;
             }
-            float[] b = barRect(ctx, i, animatedBase(ctx, i), animatedY(ctx, i), slot);
+            float[] b = barRect(ctx, i, animatedBase(ctx, i), animatedY(ctx, i), slot, bandPx);
             String s = formatValue(ctx, v);
             int w = ctx.getFont().stringWidth(s);
             int x;
@@ -273,6 +333,7 @@ public class BarSeries extends XYSeries {
     public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
         int[] r = visibleRange(ctx);
         float[] slot = slot();
+        float bandPx = bandPixels(ctx);
         int ax = x + ctx.getOriginX();
         int ay = y + ctx.getOriginY();
         for (int i = r[0]; i <= r[1]; i++) {
@@ -280,7 +341,7 @@ public class BarSeries extends XYSeries {
             if (v != v) {
                 continue;
             }
-            float[] b = barRect(ctx, i, getBase(i), v, slot);
+            float[] b = barRect(ctx, i, getBase(i), v, slot, bandPx);
             float minExtent = radius / 2f;
             float bx = b[0];
             float by = b[1];

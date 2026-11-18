@@ -326,18 +326,36 @@ public class SankeySeries extends Series {
             int[] e = links.get(l);
             float x0 = lay.getNodeX(e[0]) + nodeWidth;
             float x1 = lay.getNodeX(e[1]);
-            if (ax < x0 || ax > x1 || x1 <= x0) {
+            // a back link runs right to left; its ribbon spans the same x range reversed
+            if (ax < Math.min(x0, x1) || ax > Math.max(x0, x1) || x1 == x0) {
                 continue;
             }
-            float u = (ax - x0) / (x1 - x0);
-            // the ribbon's edges are cubic curves whose y follows smoothstep in u
-            float s = u * u * (3 - 2 * u);
+            float s = ribbonEase((ax - x0) / (x1 - x0));
             float top = lay.getLinkSourceY(l) + (lay.getLinkTargetY(l) - lay.getLinkSourceY(l)) * s;
             if (ay >= top - 2 && ay <= top + Math.max(lay.getLinkWidth(l), 4) + 2) {
                 return getPoint(ctx, n + l);
             }
         }
         return null;
+    }
+
+    /// The fraction of the way down a ribbon edge (`Shapes.ribbon`) at the fraction `u` of the
+    /// way across it. The edge is a cubic Bezier with both inner control points at the middle x,
+    /// so across is `1.5t(1-t) + t^3` and down is `3t^2 - 2t^3` of the curve parameter t. Across
+    /// is strictly increasing (its slope is `3(t-0.5)^2 + 0.75`), so bisection finds t.
+    static float ribbonEase(float u) {
+        float lo = 0;
+        float hi = 1;
+        for (int k = 0; k < 20; k++) {
+            float t = (lo + hi) / 2;
+            if (1.5f * t * (1 - t) + t * t * t < u) {
+                lo = t;
+            } else {
+                hi = t;
+            }
+        }
+        float t = (lo + hi) / 2;
+        return t * t * (3 - 2 * t);
     }
 
     @Override

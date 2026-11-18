@@ -48,6 +48,10 @@ public class GaugeSeries extends Series {
     private final java.util.ArrayList<double[]> bands = new java.util.ArrayList<double[]>();
     private String unit = "";
     private float lastCx;
+    // the value font, derived once per (base font, size) rather than on every frame
+    private Font bigBase;
+    private float bigSize;
+    private Font bigCached;
     private float lastCy;
     private float lastR;
 
@@ -280,7 +284,7 @@ public class GaugeSeries extends Series {
         String text = hasValue ? formatValue(ctx, needle ? value : v) + unit : "-";
         Font big = f;
         if (f.isTTFNativeFont()) {
-            big = f.derive(Math.min(r * 0.45f, f.getPixelSize() * 2.5f), Font.STYLE_BOLD);
+            big = bigFont(f, Math.min(r * 0.45f, f.getPixelSize() * 2.5f));
         }
         g.setColor(ctx.getTheme().getTextColor());
         int ty = needle ? Math.round(cy + r * 0.25f) : Math.round(cy - big.getHeight() / 2f);
@@ -329,5 +333,14 @@ public class GaugeSeries extends Series {
     @Override
     public void collectTableRows(java.util.List<String[]> rows) {
         rows.add(new String[]{getName(), formatValue(null, min) + " - " + formatValue(null, max), formatValue(null, value) + unit});
+    }
+
+    private Font bigFont(Font f, float size) {
+        if (bigCached == null || bigBase != f || Float.floatToIntBits(bigSize) != Float.floatToIntBits(size)) { //NOPMD CompareObjectsWithEquals - a different font instance is a different base
+            bigBase = f;
+            bigSize = size;
+            bigCached = f.derive(size, Font.STYLE_BOLD);
+        }
+        return bigCached;
     }
 }

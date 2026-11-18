@@ -112,13 +112,14 @@ public class ErrorBarSeries extends XYSeries {
         int alpha = g.getAlpha();
         g.setAlpha((int) (alpha * getVisibilityFraction()));
         g.setColor(getColor());
-        float t = ctx.getProgress();
         // 15% of the spacing, but never wider than 4mm: zoomed in, the spacing spans the plot
         int cap = Math.min(ctx.mm(4), Math.max(ctx.mm(1.2f), Math.round(ctx.xLength(getMinXSpacing()) * 0.15f)));
         int dot = ctx.mm(1.4f);
         boolean rot = ctx.isRotated();
         for (int i = r[0]; i <= r[1]; i++) {
-            double v = getY(i);
+            // whiskers and marker move from where they were when the last transition started, so a
+            // change elsewhere leaves this one still; only a first appearance grows out of the value
+            double v = animatedY(ctx, i);
             if (v != v) {
                 continue;
             }
@@ -128,8 +129,8 @@ public class ErrorBarSeries extends XYSeries {
             double high = getHigh(i);
             boolean hasLo = low == low;
             boolean hasHi = high == high;
-            double lo = hasLo ? v + (low - v) * t : v;
-            double hi = hasHi ? v + (high - v) * t : v;
+            double lo = hasLo ? animatedAux(ctx, 0, i) : v;
+            double hi = hasHi ? animatedAux(ctx, 1, i) : v;
             int x0 = Math.round(ctx.screenX(this, getX(i), lo));
             int y0 = Math.round(ctx.screenY(this, getX(i), lo));
             int x1 = Math.round(ctx.screenX(this, getX(i), hi));

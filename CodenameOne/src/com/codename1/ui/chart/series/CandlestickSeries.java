@@ -320,38 +320,64 @@ public class CandlestickSeries extends XYSeries {
         Graphics g = ctx.getGraphics();
         int alpha = g.getAlpha();
         g.setAlpha((int) (alpha * getVisibilityFraction()));
-        float t = ctx.getProgress();
         float slot = ctx.xLength(getMinXSpacing());
         int body = Math.max(1, Math.round(slot * bodyFraction));
         int wick = Math.max(1, Math.min(ctx.mm(0.25f), body / 4));
+        boolean rot = ctx.isRotated();
+        boolean ha = style == HEIKIN_ASHI;
         for (int i = r[0]; i <= r[1]; i++) {
             double[] v = row(i);
             if (isGap(v)) {
                 continue;
             }
-            // grow from the close outward while animating
-            double o = v[3] + (v[0] - v[3]) * t;
-            double h = v[3] + (v[1] - v[3]) * t;
-            double l = v[3] + (v[2] - v[3]) * t;
+            // each candle moves from where it was when the last transition started, so a change to
+            // one candle (updateLast, a slide) leaves the rest still; only a first appearance grows.
+            // A Heikin-Ashi row is derived from every earlier candle, so it takes the raw candle's
+            // animated offset per price rather than being re-derived (and reallocated) each frame
+            double c = getClose(i);
+            double ac = animatedY(ctx, i);
+            double ao = animatedAux(ctx, OPEN, i);
+            double ah = animatedAux(ctx, HIGH, i);
+            double al = animatedAux(ctx, LOW, i);
+            double o = ha ? v[0] + ao - getOpen(i) : ao;
+            double h = ha ? v[1] + ah - getHigh(i) : ah;
+            double l = ha ? v[2] + al - getLow(i) : al;
+            double cl = ha ? v[3] + ac - c : ac;
             boolean rising = v[3] >= v[0];
             g.setColor(rising ? up(ctx) : down(ctx));
-            int cx = Math.round(ctx.screenX(this, getX(i), v[3]));
-            int yh = Math.round(ctx.screenY(this, getX(i), h));
-            int yl = Math.round(ctx.screenY(this, getX(i), l));
-            int yo = Math.round(ctx.screenY(this, getX(i), o));
-            int yc = Math.round(ctx.screenY(this, getX(i), v[3]));
+            double x = getX(i);
+            // the category position runs along x, or along y when the chart is rotated
+            int cx = Math.round(rot ? ctx.screenY(this, x, cl) : ctx.screenX(this, x, cl));
+            int ph = Math.round(pos(ctx, x, h, rot));
+            int pl = Math.round(pos(ctx, x, l, rot));
+            int po = Math.round(pos(ctx, x, o, rot));
+            int pc = Math.round(pos(ctx, x, cl, rot));
+            int wTop = Math.min(ph, pl);
+            int wLen = Math.max(1, Math.abs(pl - ph));
+            rect(g, rot, cx - wick / 2, wTop, wick, wLen);
             if (style == OHLC_BARS) {
-                g.fillRect(cx - wick / 2, yh, wick, Math.max(1, yl - yh));
-                g.fillRect(cx - body / 2, yo - wick / 2, body / 2, wick);
-                g.fillRect(cx, yc - wick / 2, body / 2, wick);
+                // open tick on the left (or top), close tick on the right (or bottom)
+                rect(g, rot, cx - body / 2, po - wick / 2, body / 2, wick);
+                rect(g, rot, cx, pc - wick / 2, body / 2, wick);
                 continue;
             }
-            g.fillRect(cx - wick / 2, yh, wick, Math.max(1, yl - yh));
-            int top = Math.min(yo, yc);
-            int hgt = Math.max(1, Math.abs(yo - yc));
-            g.fillRect(cx - body / 2, top, body, hgt);
+            rect(g, rot, cx - body / 2, Math.min(po, pc), body, Math.max(1, Math.abs(po - pc)));
         }
         g.setAlpha(alpha);
+    }
+
+    // a value's pixel along the value axis: y normally, x when rotated
+    private float pos(ChartContext ctx, double x, double v, boolean rot) {
+        return rot ? ctx.screenX(this, x, v) : ctx.screenY(this, x, v);
+    }
+
+    // a rectangle given as (category position, value position, category extent, value extent)
+    private static void rect(Graphics g, boolean rot, int a, int b, int w, int h) {
+        if (rot) {
+            g.fillRect(b, a, h, w);
+        } else {
+            g.fillRect(a, b, w, h);
+        }
     }
 
     @Override
@@ -366,13 +392,15 @@ public class CandlestickSeries extends XYSeries {
             if (isGap(v)) {
                 continue;
             }
-            float cx = ctx.screenX(this, getX(i), v[3]);
-            if (Math.abs(ax - cx) > Math.max(slot / 2, radius / 2f)) {
+            boolean rot = ctx.isRotated();
+            float cx = rot ? ctx.screenY(this, getX(i), v[3]) : ctx.screenX(this, getX(i), v[3]);
+            if (Math.abs((rot ? ay : ax) - cx) > Math.max(slot / 2, radius / 2f)) {
                 continue;
             }
-            float yh = ctx.screenY(this, getX(i), v[1]);
-            float yl = ctx.screenY(this, getX(i), v[2]);
-            if (ay >= yh - radius && ay <= yl + radius) {
+            float ph = pos(ctx, getX(i), v[1], rot);
+            float pl = pos(ctx, getX(i), v[2], rot);
+            float pv = rot ? ax : ay;
+            if (pv >= Math.min(ph, pl) - radius && pv <= Math.max(ph, pl) + radius) {
                 return getPoint(ctx, i);
             }
         }

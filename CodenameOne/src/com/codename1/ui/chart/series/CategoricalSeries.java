@@ -68,13 +68,15 @@ public abstract class CategoricalSeries extends Series {
     public CategoricalSeries setData(String[] labels, double[] values) {
         begin();
         int n = values.length;
+        String[] oldLabels = this.labels;
+        boolean[] oldHidden = hidden;
         this.labels = new String[n];
         this.values = new double[n];
         boolean[] h = new boolean[n];
         for (int i = 0; i < n; i++) {
             this.labels[i] = labels != null && i < labels.length ? labels[i] : String.valueOf(i + 1);
             this.values[i] = values[i];
-            h[i] = i < hidden.length && hidden[i];
+            h[i] = wasHidden(oldLabels, oldHidden, this.labels[i], i);
         }
         hidden = h;
         dataChanged();
@@ -92,6 +94,23 @@ public abstract class CategoricalSeries extends Series {
     /// #### Returns
     ///
     /// this series
+    // a part hidden from the legend stays hidden when new data still names it, wherever it moved;
+    // a label that keeps its index keeps that index's state, otherwise the first old part of that name decides
+    private static boolean wasHidden(String[] oldLabels, boolean[] oldHidden, String label, int i) {
+        if (oldLabels == null || label == null) {
+            return i < oldHidden.length && oldHidden[i];
+        }
+        if (i < oldLabels.length && label.equals(oldLabels[i])) {
+            return i < oldHidden.length && oldHidden[i];
+        }
+        for (int k = 0; k < oldLabels.length && k < oldHidden.length; k++) {
+            if (label.equals(oldLabels[k])) {
+                return oldHidden[k];
+            }
+        }
+        return false;
+    }
+
     public CategoricalSeries setValue(int i, double value) {
         begin();
         values[i] = value;

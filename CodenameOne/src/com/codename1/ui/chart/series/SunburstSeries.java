@@ -25,6 +25,7 @@ package com.codename1.ui.chart.series;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.chart.ChartContext;
+import com.codename1.ui.chart.ChartPoint;
 import com.codename1.ui.chart.TreeNode;
 import com.codename1.ui.chart.layout.LabelLayout;
 import com.codename1.ui.chart.layout.Shapes;
@@ -40,6 +41,7 @@ public class SunburstSeries extends HierarchySeries {
     private float cx;
     private float cy;
     private float hole;
+    private float outer;
 
     /// Creates a sunburst.
     ///
@@ -70,6 +72,7 @@ public class SunburstSeries extends HierarchySeries {
         int levels = Math.max(1, Math.min(getMaxDepth(), depthBelow(current)));
         float ring = r / (levels + 0.6f);
         hole = ring * 0.6f;
+        outer = r;
         int alpha = g.getAlpha();
         g.setAlpha((int) (alpha * getVisibilityFraction()));
         paintRing(ctx, current, 0, 360 * t, 1, levels, ring, t >= 1);
@@ -83,11 +86,28 @@ public class SunburstSeries extends HierarchySeries {
             String b = LabelLayout.ellipsize(f, formatValue(ctx, current.getValue()), (int) (hole * 1.8f));
             g.setColor(ctx.getTheme().getSecondaryTextColor());
             g.drawString(b, Math.round(cx - f.stringWidth(b) / 2f), Math.round(cy));
-            if (current != root) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
-                crumb = new int[]{Math.round(cx - hole), Math.round(cy - hole), Math.round(hole * 2), Math.round(hole * 2)};
-            }
+        }
+        // the hole goes back up even when it is too small for the label; hitTest also takes a
+        // tap outside the rings, so a sunburst too small to have a usable hole can still drill out
+        if (current != root) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+            crumb = new int[]{Math.round(cx - hole), Math.round(cy - hole), Math.round(hole * 2), Math.round(hole * 2)};
         }
         g.setAlpha(alpha);
+    }
+
+    @Override
+    public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
+        ChartPoint p = super.hitTest(ctx, x, y, radius);
+        if (p != null || crumb == null) {
+            return p;
+        }
+        float dx = x + ctx.getOriginX() - cx;
+        float dy = y + ctx.getOriginY() - cy;
+        if (dx * dx + dy * dy > outer * outer) {
+            TreeNode up = current.getParent();
+            return new ChartPoint(this, -1, 0, current.getValue(), x, y, up == null ? null : up.getLabel());
+        }
+        return null;
     }
 
     private static int depthBelow(TreeNode n) {

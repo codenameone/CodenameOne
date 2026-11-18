@@ -113,6 +113,7 @@ public class LineSeries extends XYSeries {
 
     @Override
     public void paint(ChartContext ctx) {
+        splineRotated = ctx.isRotated();
         int[] r = visibleRange(ctx);
         if (r[1] < r[0]) {
             return;
@@ -241,6 +242,8 @@ public class LineSeries extends XYSeries {
     private boolean[] bufGap = new boolean[0];
     private Stroke stroke;
     private final GeneralPath path = new GeneralPath();
+    // whether the chart being painted is rotated, so a spline takes its tangents along the category
+    private boolean splineRotated;
 
     private void ensureBuffers(int n) {
         if (bufX.length < n) {
@@ -308,16 +311,34 @@ public class LineSeries extends XYSeries {
                 p.lineTo(px[i], py[i]);
             }
         } else if (mode == SPLINE && to - from >= 2) {
-            float[] t = monotoneTangents(px, py, from, to);
-            for (int i = from; i < to; i++) {
-                float h = (px[i + 1] - px[i]) / 3f;
-                p.curveTo(px[i] + h, py[i] + t[i - from] * h, px[i + 1] - h, py[i + 1] - t[i - from + 1] * h,
-                        px[i + 1], py[i + 1]);
-            }
+            appendSpline(p, px, py, from, to, splineRotated);
         } else {
             for (int i = from + 1; i <= to; i++) {
                 p.lineTo(px[i], py[i]);
             }
+        }
+    }
+
+    // Monotone cubic segments from `from` to `to`. Rotated, the category (the independent variable)
+    // runs down the screen, so the tangents are taken against y: taken against x, which is then the
+    // value, a value that turns back makes the curve double back on itself (a cusp).
+    static void appendSpline(GeneralPath p, float[] px, float[] py, int from, int to, boolean rotated) {
+        if (rotated) {
+            // rotated, the category (the independent variable) runs down the screen: take the
+            // tangents against y, or a value that turns back reads as a cusp
+            float[] t = monotoneTangents(py, px, from, to);
+            for (int i = from; i < to; i++) {
+                float h = (py[i + 1] - py[i]) / 3f;
+                p.curveTo(px[i] + t[i - from] * h, py[i] + h, px[i + 1] - t[i - from + 1] * h, py[i + 1] - h,
+                        px[i + 1], py[i + 1]);
+            }
+            return;
+        }
+        float[] t = monotoneTangents(px, py, from, to);
+        for (int i = from; i < to; i++) {
+            float h = (px[i + 1] - px[i]) / 3f;
+            p.curveTo(px[i] + h, py[i] + t[i - from] * h, px[i + 1] - h, py[i + 1] - t[i - from + 1] * h,
+                    px[i + 1], py[i + 1]);
         }
     }
 
@@ -396,7 +417,8 @@ public class LineSeries extends XYSeries {
             if (v != v) {
                 continue;
             }
-            double top = getBase(i) + animatedY(ctx, i);
+            // the same animated base the line is drawn on, so a label rides its point mid-transition
+            double top = animatedBase(ctx, i) + animatedY(ctx, i);
             String s = formatValue(ctx, v);
             int w = ctx.getFont().stringWidth(s);
             int ax = (int) ctx.screenX(this, xs[i], top);

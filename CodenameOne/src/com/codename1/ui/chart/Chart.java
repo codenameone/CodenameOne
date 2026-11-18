@@ -987,16 +987,16 @@ public class Chart extends Component {
         legendHits.clear();
         int legendPos = effectiveLegendPosition();
         if (legendPos != LEGEND_NONE) {
-            int[] used = paintLegend(g, ctx, x, y, w, legendPos, false, w);
+            int[] used = paintLegend(g, ctx, x, y, w, legendPos, false, w, h);
             if (legendPos == LEGEND_TOP) {
-                paintLegend(g, ctx, x, y, w, legendPos, true, w);
+                paintLegend(g, ctx, x, y, w, legendPos, true, w, h);
                 y += used[1] + gap;
                 h -= used[1] + gap;
             } else if (legendPos == LEGEND_BOTTOM) {
-                paintLegend(g, ctx, x, y + h - used[1], w, legendPos, true, w);
+                paintLegend(g, ctx, x, y + h - used[1], w, legendPos, true, w, h);
                 h -= used[1] + gap;
             } else {
-                paintLegend(g, ctx, x + w - used[0], y, used[0], legendPos, true, w);
+                paintLegend(g, ctx, x + w - used[0], y, used[0], legendPos, true, w, h);
                 w -= used[0] + gap;
             }
         }
@@ -1173,9 +1173,11 @@ public class Chart extends Component {
         return entries < 2 ? LEGEND_NONE : legendPosition;
     }
 
-    /// Measures (and with `paint` draws) the legend; returns the `{width, height}` used.
+    /// Measures (and with `paint` draws) the legend; returns the `{width, height}` used. A
+    /// vertical legend is bounded by `maxH`: entries that do not fit are summed up in a final
+    /// "+N" row, and only the entries actually drawn record a hit area.
     private int[] paintLegend(Graphics g, ChartContext ctx, int x, int y, int w, int pos, boolean paint,
-            int fullWidth) {
+            int fullWidth, int maxH) {
         Font f = ctx.font;
         int fh = f.getHeight();
         int sw = Math.max(6, fh * 2 / 3);
@@ -1193,9 +1195,24 @@ public class Chart extends Component {
             cx = x + (w - rowWidth(f, sw, itemGap, maxItemW, w, 0)) / 2;
         }
         int entryIndex = 0;
+        int total = 0;
+        int limit = Integer.MAX_VALUE;
+        if (vertical) {
+            for (Series s : series) {
+                total += s.getLegendEntryCount();
+            }
+            int capacity = Math.max(1, (maxH + rowGap) / (rowH + rowGap));
+            if (total > capacity) {
+                limit = capacity - 1;
+            }
+        }
+        entries:
         for (Series s : series) {
             int n = s.getLegendEntryCount();
             for (int i = 0; i < n; i++) {
+                if (entryIndex >= limit) {
+                    break entries;
+                }
                 String name = s.getLegendEntryName(i);
                 if (name == null) {
                     name = "";
@@ -1230,6 +1247,17 @@ public class Chart extends Component {
                 }
                 entryIndex++;
             }
+        }
+        if (vertical && limit < total) {
+            String more = "+" + (total - limit);
+            int iw = f.stringWidth(more);
+            if (paint) {
+                g.setColor(getTheme().getLegendTextColor());
+                int tx = rtl ? x + w - iw : x + sw + mm(1);
+                g.drawString(more, tx, cy + (rowH - fh) / 2);
+            }
+            usedW = Math.max(usedW, sw + mm(1) + iw);
+            cy += rowH + rowGap;
         }
         int usedH = vertical ? cy - y : cy - y + rowH;
         return new int[]{usedW, usedH};

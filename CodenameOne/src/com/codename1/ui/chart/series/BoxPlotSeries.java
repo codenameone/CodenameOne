@@ -331,9 +331,11 @@ public class BoxPlotSeries extends XYSeries {
             if (isGap(i)) {
                 continue;
             }
-            double med = getY(i);
+            // each box moves from where it was when the last transition started, so a change to
+            // one box leaves the rest still; only a first appearance grows out of the median
+            double med = animatedY(ctx, i);
             for (int k = 0; k < 4; k++) {
-                v[k] = med + (getAux(k, i) - med) * t;
+                v[k] = animatedAux(ctx, k, i);
             }
             float c = rot ? ctx.screenY(this, getX(i), med) : ctx.screenX(this, getX(i), med);
             float pMin = pos(ctx, i, v[MIN], rot);
