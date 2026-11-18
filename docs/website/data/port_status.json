@@ -451,6 +451,16 @@
       ]
     },
     {
+      "id": "data-grid",
+      "category": "Rich components",
+      "name": "Data grid and tree grid",
+      "description": "Checks the data grid with a frozen column, sort arrows, grouping with aggregates and a selected row, and the tree grid with nested rows, in light and dark themes.",
+      "tests": [
+        "DataGridThemeScreenshotTest",
+        "TreeGridThemeScreenshotTest"
+      ]
+    },
+    {
       "id": "node-graph",
       "category": "Rich components",
       "name": "Node graph",
@@ -1472,6 +1482,14 @@
     {
       "pattern": "GanttTheme*",
       "test": "GanttThemeScreenshotTest"
+    },
+    {
+      "pattern": "DataGridTheme*",
+      "test": "DataGridThemeScreenshotTest"
+    },
+    {
+      "pattern": "TreeGridTheme*",
+      "test": "TreeGridThemeScreenshotTest"
     },
     {
       "pattern": "NodeGraphTheme*",

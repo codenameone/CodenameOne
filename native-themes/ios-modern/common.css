@@ -1273,6 +1273,14 @@ GanttLink { color: #8e8e93; background-color: transparent; }
 GanttLinkCritical { color: #ff3b30; background-color: transparent; }
 GanttLoad { background-color: var(--accent-color, #007aff); color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
 GanttOverload { background-color: #ff3b30; color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
+DataGrid { background-color: #ffffff; color: var(--text-color, #000000); padding: 0; margin: 0; }
+DataGridHeader { background-color: #f2f2f7; color: #6c6c70; font-family: "native:MainBold"; font-size: 2.3mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+DataGridRow { background-color: #ffffff; color: var(--text-color, #000000); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+DataGridRow.selected { background-color: #d6e9ff; color: #003e80; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+DataGridRowAlt { background-color: #f9f9fb; color: var(--text-color, #000000); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+DataGridGroupRow { background-color: #efeff4; color: var(--text-color, #000000); font-family: "native:MainBold"; font-size: 2.5mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+DataGridLine { color: #d1d1d6; background-color: transparent; }
+DataGridCheck { background-color: var(--accent-color, #007aff); color: var(--accent-on-color, #ffffff); }
 
 /* The node graph paints every node, edge and group from these. */
 NodeGraph { background-color: #f2f2f7; color: #000000; padding: 0; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
@@ -1632,6 +1640,14 @@ PickerMaterialTab.pressed { color: var(--accent-color, #007aff); background-colo
     GanttLinkCritical { color: #ff453a; background-color: transparent; }
     GanttLoad { background-color: var(--accent-color-dark, #0a84ff); color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
     GanttOverload { background-color: #ff453a; color: var(--accent-on-color, #ffffff); font-family: "native:MainRegular"; font-size: 2mm; }
+    DataGrid { background-color: var(--window-bg-color-dark, #1c1c1e); color: var(--text-color-dark, #ffffff); padding: 0; margin: 0; }
+    DataGridHeader { background-color: #2c2c2e; color: #8e8e93; font-family: "native:MainBold"; font-size: 2.3mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+    DataGridRow { background-color: var(--window-bg-color-dark, #1c1c1e); color: var(--text-color-dark, #ffffff); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+    DataGridRow.selected { background-color: #0a3a6e; color: #d6e9ff; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+    DataGridRowAlt { background-color: #232325; color: var(--text-color-dark, #ffffff); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+    DataGridGroupRow { background-color: #2c2c2e; color: var(--text-color-dark, #ffffff); font-family: "native:MainBold"; font-size: 2.5mm; padding: 0 1.5mm 0 1.5mm; margin: 0; }
+    DataGridLine { color: #38383a; background-color: transparent; }
+    DataGridCheck { background-color: var(--accent-color-dark, #0a84ff); color: var(--accent-on-color, #ffffff); }
     NodeGraph { background-color: #000000; color: #ffffff; padding: 0; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
     NodeGraphGrid { background-color: transparent; color: #38383a; }
     NodeGraphNode { background-color: #1c1c1e; color: #ffffff; font-family: "native:MainRegular"; font-size: 2.5mm; }
