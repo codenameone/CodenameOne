@@ -62,6 +62,8 @@ on:
       - 'maven/linux/**'
       - 'scripts/linux/**'
       - 'scripts/hellocodenameone/**'
+      # The Rive screenshot tests draw classes this translator generates.
+      - 'maven/rive-transcoder/**'
       # The screenshots these legs compare are produced by the core renderer and
       # the port's native theme, so a change to either can move them. Without
       # these the leg does not run on the pull request that changes them and the
@@ -100,6 +102,8 @@ on:
       - 'maven/linux/**'
       - 'scripts/linux/**'
       - 'scripts/hellocodenameone/**'
+      # The Rive screenshot tests draw classes this translator generates.
+      - 'maven/rive-transcoder/**'
       # The screenshots these legs compare are produced by the core renderer and
       # the port's native theme, so a change to either can move them. Without
       # these the leg does not run on the pull request that changes them and the

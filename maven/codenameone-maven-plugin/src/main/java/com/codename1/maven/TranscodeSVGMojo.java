@@ -45,6 +45,10 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
  *   <li>{@code src/main/svg/} -- {@code *.svg}</li>
  *   <li>{@code src/main/lottie/} -- {@code *.json}, {@code *.lottie}</li>
  *   <li>{@code src/main/css/} -- either of the above</li>
+ *   <li>{@code src/main/rive/} -- {@code *.riv}, each translated into a
+ *       {@code com.codename1.rive.RiveFile} subclass in
+ *       {@code com.codename1.generated.rive} ({@code coin.riv} becomes
+ *       {@code CoinRive})</li>
  * </ul>
  * Theme CSS keeps the natural {@code background: url(spinner.svg);}
  * reference for SVG, and the same {@code url(...)} syntax resolves

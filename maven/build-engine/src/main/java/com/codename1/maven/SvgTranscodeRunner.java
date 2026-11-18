@@ -25,6 +25,7 @@ package com.codename1.maven;
 import com.codename1.lottie.transcoder.LottieTranscoder;
 import com.codename1.lottie.transcoder.parser.DotLottie;
 import com.codename1.lottie.transcoder.parser.JsonParser;
+import com.codename1.rive.transcoder.RiveTranscoder;
 import com.codename1.svg.transcoder.SVGTranscoder;
 import com.codename1.svg.transcoder.SVGTranscoder.GeneratedClass;
 
@@ -82,6 +83,12 @@ public class SvgTranscodeRunner {
      *  {@code installGlobal()} call into the application stub, so it is a fixed
      *  name rather than a configurable one. */
     public static final String REGISTRY_CLASS_NAME = "SVGRegistry";
+
+    /** Package the classes translated from {@code .riv} files are emitted into. */
+    public static final String RIVE_PACKAGE = "com.codename1.generated.rive";
+
+    /** Where {@code .riv} files live, relative to the module root. */
+    static final String RIVE_DIR = "src/main/rive";
 
     static final String[] DEFAULT_SVG_DIRS = {
             "src/main/svg",
@@ -189,7 +196,7 @@ public class SvgTranscodeRunner {
 
     /** True when this module has at least one vector source to transcode. */
     public boolean hasVectorSources() {
-        return !locateSvgs().isEmpty();
+        return !locateSvgs().isEmpty() || !locateRive().isEmpty();
     }
 
     /** Filenames the theme CSS references through {@code url(...)}, whether or
@@ -209,6 +216,7 @@ public class SvgTranscodeRunner {
     /** Transcode every vector source, emit the registry and the CSS placeholders. */
     public void run() throws BuildException {
         transcodedCount = 0;
+        transcodeRive();
         List<File> svgs = locateSvgs();
         Map<String, CssHint> cssHints = scanCssHints();
 
@@ -284,6 +292,165 @@ public class SvgTranscodeRunner {
             emitRegistry(packageDir, generated, registrySrcMtime);
         }
         emitPlaceholders(cssHints.keySet());
+    }
+
+    /**
+     * Every {@code .riv} under {@link #RIVE_DIR}, sorted by path relative to
+     * it. Two files of one name in different folders then get their class
+     * names ({@code CoinRive}, {@code CoinRive2}) in the same order on every
+     * machine, whatever order the file system lists them in.
+     */
+    private List<File> locateRive() {
+        List<File> out = new ArrayList<File>();
+        final File root = new File(basedir, RIVE_DIR);
+        collectRive(root, out);
+        final String rootPath = root.getAbsolutePath();
+        out.sort(new Comparator<File>() {
+            @Override public int compare(File a, File b) {
+                return relative(rootPath, a).compareTo(relative(rootPath, b));
+            }
+        });
+        return out;
+    }
+
+    private static String relative(String rootPath, File f) {
+        String p = f.getAbsolutePath();
+        if (p.startsWith(rootPath)) {
+            p = p.substring(rootPath.length());
+        }
+        return p.replace(File.separatorChar, '/');
+    }
+
+    /** Starts the line of a generated Rive class that names the source it came from. */
+    static final String RIVE_SOURCE_PREFIX = "// rive-source: ";
+
+    /**
+     * The source line written into a generated Rive class: the {@code .riv}
+     * file's path relative to the rive directory and a CRC32 of its bytes.
+     * Comparing it, and not only modification times, regenerates a class when
+     * the files shift between class names (a rename, a new file sorting
+     * first) or when a source is replaced by one with an older timestamp.
+     */
+    static String riveSourceLine(String relativePath, byte[] bytes) {
+        java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+        crc.update(bytes);
+        StringBuilder sb = new StringBuilder(RIVE_SOURCE_PREFIX);
+        for (int i = 0; i < relativePath.length(); i++) {
+            char c = relativePath.charAt(i);
+            // The header is ASCII; a non-ASCII name is escaped so it still compares.
+            if (c < 32 || c > 126) {
+                sb.append("%").append(Integer.toHexString(c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.append(" crc=").append(Long.toHexString(crc.getValue())).toString();
+    }
+
+    /** True when {@code outFile} exists and carries this transcoder's stamp and {@code sourceLine}. */
+    static boolean riveUpToDate(File outFile, String sourceLine) {
+        if (!outFile.exists()) {
+            return false;
+        }
+        String expected = RiveTranscoder.STAMP_PREFIX + RiveTranscoder.stamp();
+        boolean stamped = false;
+        boolean sourced = false;
+        try (java.io.BufferedReader r = Files.newBufferedReader(outFile.toPath(), StandardCharsets.US_ASCII)) {
+            for (int i = 0; i < 5; i++) {
+                String line = r.readLine();
+                if (line == null) {
+                    break;
+                }
+                stamped |= line.equals(expected);
+                sourced |= line.equals(sourceLine);
+            }
+        } catch (IOException ex) {
+            return false;
+        }
+        return stamped && sourced;
+    }
+
+    /** Inserts {@code sourceLine} after the transcoder's stamp line. */
+    static String withSourceLine(String src, String sourceLine) {
+        int stampAt = src.indexOf(RiveTranscoder.STAMP_PREFIX);
+        int eol = stampAt < 0 ? -1 : src.indexOf('\n', stampAt);
+        if (eol < 0) {
+            return sourceLine + "\n" + src;
+        }
+        return src.substring(0, eol + 1) + sourceLine + "\n" + src.substring(eol + 1);
+    }
+
+    private static void collectRive(File dir, List<File> out) {
+        File[] entries = dir.listFiles();
+        if (entries == null) {
+            return;
+        }
+        for (File f : entries) {
+            if (f.isDirectory()) {
+                collectRive(f, out);
+            } else if (asciiLower(f.getName()).endsWith(".riv")) {
+                out.add(f);
+            }
+        }
+    }
+
+    /** The class a {@code .riv} file becomes: {@code coin.riv} is {@code CoinRive}. */
+    static String riveClassNameFor(String fileName) {
+        String base = SVGTranscoder.classNameFor(fileName);
+        return base.endsWith("Rive") ? base : base + "Rive";
+    }
+
+    /**
+     * Translates every {@code .riv} file into a {@code RiveFile} subclass in
+     * {@link #RIVE_PACKAGE}. The device never parses a Rive file: the class
+     * builds the file's objects directly, and names only the runtime classes
+     * that file uses. Classes whose source is gone are removed.
+     */
+    private void transcodeRive() throws BuildException {
+        List<File> rivs = locateRive();
+        File packageDir = new File(outputDir, RIVE_PACKAGE.replace('.', '/'));
+        Set<String> used = new HashSet<String>();
+        String riveRoot = new File(basedir, RIVE_DIR).getAbsolutePath();
+        for (File riv : rivs) {
+            String className = uniqueClassName(riveClassNameFor(riv.getName()), used);
+            used.add(className);
+            File outFile = new File(packageDir, className + ".java");
+            transcodedCount++;
+            byte[] bytes;
+            try {
+                bytes = Files.readAllBytes(riv.toPath());
+            } catch (IOException ex) {
+                throw new BuildException("Failed to read " + riv + ": " + ex.getMessage(), ex);
+            }
+            String sourceLine = riveSourceLine(relative(riveRoot, riv), bytes);
+            if (riveUpToDate(outFile, sourceLine)) {
+                log.debug("Rive transcoder up-to-date for " + riv.getName());
+                continue;
+            }
+            log.info("Transcoding Rive " + riv.getName() + " -> " + className + ".java");
+            try {
+                for (String skipped : RiveTranscoder.skippedTypes(bytes)) {
+                    log.warn(riv.getName() + ": objects of Rive " + skipped
+                            + " are not supported and do nothing on the device");
+                }
+                String src = withSourceLine(RiveTranscoder.transcode(bytes, RIVE_PACKAGE, className), sourceLine);
+                Files.createDirectories(packageDir.toPath());
+                Files.write(outFile.toPath(), src.getBytes(StandardCharsets.US_ASCII));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to transcode " + riv + ": " + ex.getMessage(), ex);
+            }
+        }
+        File[] existing = packageDir.listFiles();
+        if (existing != null) {
+            for (File f : existing) {
+                String n = f.getName();
+                if (n.endsWith(".java") && !used.contains(n.substring(0, n.length() - 5))) {
+                    if (!f.delete()) {
+                        log.warn("Could not remove stale " + f);
+                    }
+                }
+            }
+        }
     }
 
     private static long lastModified(List<File> files) {

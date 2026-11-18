@@ -238,6 +238,13 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Translates the Rive fixtures that RiveGeneratedClassTest compiles and runs. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-rive-transcoder</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>cn1-ads-mock</artifactId>

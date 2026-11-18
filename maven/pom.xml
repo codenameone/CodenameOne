@@ -106,6 +106,7 @@
         <module>compose-compat</module>
         <module>fxml-compiler</module>
         <module>lottie-transcoder</module>
+        <module>rive-transcoder</module>
         <!--
           dart-runtime and flutter-runtime are NOT here: they compile at
           release 17 and the framework's own build runs on JDK 8, so a JDK 8

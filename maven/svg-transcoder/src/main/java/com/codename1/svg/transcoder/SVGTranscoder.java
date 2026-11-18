@@ -156,7 +156,10 @@ public final class SVGTranscoder {
                 upper = true;
                 continue;
             }
-            if (!Character.isJavaIdentifierPart(c)) c = '_';
+            // Generated sources are ASCII only (the device javac reads them as
+            // ASCII), so a letter outside ASCII becomes '_' like any other
+            // character an identifier cannot hold.
+            if (c > 127 || !Character.isJavaIdentifierPart(c)) c = '_';
             sb.append(upper ? Character.toUpperCase(c) : c);
             upper = false;
         }

@@ -268,6 +268,112 @@ For animations that need higher fidelity than the subset above, export
 the relevant frame as an SVG and use the SVG transcoder path directly
 -- the runtime classes are identical.
 
+=== Rive animations
+
+Rive (`.riv`) files go through the same build step. Put them under
+`src/main/rive/` and each one becomes a Java class in
+`com.codename1.generated.rive`, named after the file: `juice.riv` becomes
+`JuiceRive`, `off_road_car.riv` becomes `OffRoadCarRive`.
+
+Rive can't be reduced to SVG the way Lottie is. A state machine blends
+several animations on one artboard while it runs, bones and meshes move
+geometry on every frame, and listeners respond to touches. Codename One
+therefore ships a runtime written in pure Java, translated from Rive's open source
+runtime. The generated class doesn't parse anything on the device: its
+code builds the file's objects directly. It names only the runtime classes
+that the file uses, so an application with no `.riv` file doesn't carry
+the runtime, and one with a single simple animation carries only what that
+animation needs.
+
+[source]
+----
+src/main/rive/
+  juice.riv
+----
+
+`RiveView` plays a file. It runs the artboard's first state machine, or
+its first animation when the artboard has no state machine, from the
+moment it is shown:
+
+[source]
+----
+RiveView view = new RiveView(new JuiceRive());
+form.add(BorderLayout.CENTER, view);
+----
+
+==== State machine inputs, view models and events
+
+A state machine is driven by its inputs, which are set by name.
+Rive's listeners react to touches and mouse hover on the view by
+themselves. While a state machine has listeners, a drag inside the view
+belongs to it and does not scroll the form:
+
+[source]
+----
+RiveView view = new RiveView(new LightSwitchRive(), "Artboard");
+view.setStateMachine("State Machine 1");
+view.setBoolean("isOn", true);
+view.setNumber("level", 3);
+view.fireTrigger("bump");
+----
+
+For a file that uses data binding, the `setViewModel...` and
+`getViewModel...` methods read and write the view model instance bound to
+the artboard. A path addresses a property of a nested view model with
+`/`, as in Rive's other runtimes:
+
+[source]
+----
+view.setViewModelString("profile/name", "Ada");
+view.setViewModelNumber("score", 42);
+float progress = view.getViewModelNumber("progress");
+----
+
+Events fired by the file arrive through a `RiveEventListener`.
+`RiveEvent.getProperties()` holds the event's custom properties, and an
+"open URL" event has the type `RiveEvent.TYPE_OPEN_URL`:
+
+[source]
+----
+view.addEventListener(e -> Log.p("Rive event " + e.getName()));
+----
+
+Events the entry state reports while the view is constructed are kept
+and delivered with the first batch after a listener is added.
+
+`pause()` stops the clock on the current frame and `play()` resumes it;
+`play()` on a one-shot animation that has finished starts it over.
+A paused view still reacts: an input, a view model property or a pointer
+event takes effect at once, at the paused time, without moving the
+animation. `advance(seconds)` moves time by hand, which together with
+`pause()` gives a frame that does not depend on the clock, for example in
+a screenshot test.
+
+==== Rive feature coverage
+
+|===
+| Feature | Status
+
+| Shapes, paths, parametric shapes, fills, strokes, linear and radial gradients | Supported
+| Clipping | Supported
+| Timeline animations, keyframes, interpolators | Supported
+| State machines: layers, transitions, conditions, blend states, listeners, events | Supported
+| Bones, skins, IK and the other constraints | Supported
+| Embedded images, meshes | Supported. When the GPU API is available, meshes are drawn through `com.codename1.gpu`; elsewhere they're drawn as image triangles
+| Nested artboards, trim paths, dashes | Supported
+| Text with embedded TrueType fonts | Supported: kerning, wrapping, alignment, overflow, modifier ranges. No OpenType CFF fonts, right-to-left text or ligatures, and fonts the file references without embedding them aren't loaded
+| Layouts | Flex layout, sizing to content, layout animation. No grid, stack or scrolling
+| Data binding | View models, two-way binds, converters, formulas, conditions, artboard lists
+| Audio events | Played through the media API
+| Scripting | Not supported
+|===
+
+The build step prints a warning for every type of object in a file that
+the runtime doesn't handle, by type name: types it has no class for, and
+types it builds but gives no behaviour yet (focus, grid, scroll physics,
+artboard transition conditions). A file that relies on a missing feature
+says so when it builds.
+
 === Troubleshooting
 
 `Resources.getImage("name.svg")` returns null or a 1×1 transparent PNG::

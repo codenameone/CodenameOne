@@ -49,6 +49,10 @@ on:
       - 'maven/windows/**'
       - 'scripts/windows/**'
       - 'scripts/hellocodenameone/**'
+      # The Rive screenshot tests draw classes this translator generates.
+      - 'maven/rive-transcoder/**'
+      - 'CodenameOne/src/com/codename1/rive/**'
+      - 'CodenameOne/src/com/codename1/impl/rive/**'
       # This job's first step runs through both CI shell helpers, so a change to either has
       # to be exercised here rather than merged untested -- the same reason every other
       # consumer lists them.

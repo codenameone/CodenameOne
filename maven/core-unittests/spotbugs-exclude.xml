@@ -471,4 +471,15 @@
         <Method name="mainEDTLoop" />
         <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
     </Match>
+    <!-- Rive runtime objects initialise in two phases, as rive-runtime does:
+         the generated class constructs them, then Artboard.initialize runs
+         onAddedDirty/onAddedClean, which resolve ids into fields read
+         later (constraint targets, nested artboards, layout nodes). Pooled
+         per-frame records follow the same rule: a GpuRiveRenderer op is
+         filled when it is recorded and a state machine layer's state when it
+         first advances, and neither is read before that. -->
+    <Match>
+        <Package name="com.codename1.impl.rive"/>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
+    </Match>
 </FindBugsFilter>

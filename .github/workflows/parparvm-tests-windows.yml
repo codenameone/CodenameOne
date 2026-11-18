@@ -46,6 +46,8 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'scripts/hellocodenameone/**'
+      # The Rive screenshot tests draw classes this translator generates.
+      - 'maven/rive-transcoder/**'
       # The screenshots this leg compares are produced by the core renderer and
       # the port's native theme, so a change to either can move them. Without
       # these the leg does not run on the pull request that changes them and the
@@ -80,6 +82,8 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'scripts/hellocodenameone/**'
+      # The Rive screenshot tests draw classes this translator generates.
+      - 'maven/rive-transcoder/**'
       # The screenshots this leg compares are produced by the core renderer and
       # the port's native theme, so a change to either can move them. Without
       # these the leg does not run on the pull request that changes them and the
