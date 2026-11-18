@@ -66,10 +66,12 @@ public class AlertDialogMessageTest {
                             .create();
                     dialog.show();
                     dialog.setMessage("second");
-                    // No title: the message is the first row of the dialog.
+                    // No title: the message's scrolling panel is the first
+                    // row of the dialog.
                     ViewGroup root = (ViewGroup) dialog.getButton(DialogInterface.BUTTON_POSITIVE)
                             .getParent().getParent();
-                    shown[0] = String.valueOf(((TextView) root.getChildAt(0)).getText());
+                    ViewGroup scroll = (ViewGroup) root.getChildAt(0);
+                    shown[0] = String.valueOf(((TextView) scroll.getChildAt(0)).getText());
                     dialog.dismiss();
                 } catch (Throwable t) {
                     failure[0] = t;

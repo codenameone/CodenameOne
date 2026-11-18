@@ -126,7 +126,8 @@
         "AndroidCompatJetpackScreenshotTest",
         "AndroidCompatRecyclerScreenshotTest",
         "AndroidCompatMaterialScreenshotTest",
-        "AndroidCompatKotlinScreenshotTest"
+        "AndroidCompatKotlinScreenshotTest",
+        "AndroidCompatTallDialogScreenshotTest"
       ]
     },
     {
@@ -1722,6 +1723,10 @@
     {
       "pattern": "AndroidCompatKotlin",
       "test": "AndroidCompatKotlinScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatTallDialog",
+      "test": "AndroidCompatTallDialogScreenshotTest"
     },
     {
       "pattern": "UnityCompatSprites",
