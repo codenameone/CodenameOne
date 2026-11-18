@@ -121,56 +121,65 @@ public class LineSeries extends XYSeries {
         int alpha = g.getAlpha();
         float vis = getVisibilityFraction();
         int color = getColor();
-        // reduce to screen points, splitting at gaps
+        // reduce to screen points, splitting at gaps; buffers are kept between frames
         int n = r[1] - r[0] + 1;
-        float[] px = new float[n];
-        float[] py = new float[n];
-        float[] pb = new float[n];
-        boolean[] gap = new boolean[n];
+        ensureBuffers(n);
+        float[] px = bufX;
+        float[] py = bufY;
+        float[] pb = bufB;
+        boolean[] gap = bufGap;
         int m = 0;
-        float lastCol = Float.NaN;
-        int colStart = -1;
-        boolean dense = n > ctx.getPlotWidth() * 2;
-        for (int i = r[0]; i <= r[1]; i++) {
-            double v = animatedY(ctx, i);
+        boolean dense = n > ctx.getPlotWidth() * 2 && !ctx.isRotated();
+        boolean needBase = getStackGroup() != null || fill;
+        // dense data keeps, per pixel column, the first, lowest, highest and last point in
+        // their own order (M4), which draws the same pixels as every point would
+        float col = Float.NaN;
+        int first = -1;
+        int lo = -1;
+        int hi = -1;
+        int last = -1;
+        float loY = 0;
+        float hiY = 0;
+        for (int i = r[0]; i <= r[1] + 1; i++) {
+            boolean end = i > r[1];
+            double v = end ? Double.NaN : animatedY(ctx, i);
             if (v != v) {
+                if (dense && first >= 0) {
+                    m = flushColumn(ctx, m, first, lo, hi, last, needBase);
+                    first = -1;
+                    col = Float.NaN;
+                }
                 if (m > 0) {
                     gap[m - 1] = true;
                 }
                 continue;
             }
+            if (!dense) {
+                m = emit(ctx, m, i, needBase);
+                continue;
+            }
             double b = animatedBase(ctx, i);
             float sx = ctx.screenX(this, xs[i], b + v);
             float sy = ctx.screenY(this, xs[i], b + v);
-            float sb = getStackGroup() != null || fill ? baseline(ctx, i, b) : 0;
-            if (dense && !ctx.isRotated()) {
-                float col = (float) Math.floor(sx);
-                if (col == lastCol && m - colStart >= 2) {
-                    // keep the column's extremes in its two slots so no spike is lost
-                    int lo = colStart;
-                    int hi = colStart + 1;
-                    if (py[lo] > py[hi]) {
-                        float t = py[lo];
-                        py[lo] = py[hi];
-                        py[hi] = t;
-                    }
-                    if (sy < py[lo]) {
-                        py[lo] = sy;
-                    }
-                    if (sy > py[hi]) {
-                        py[hi] = sy;
-                    }
-                    continue;
+            float c = (float) Math.floor(sx);
+            if (c != col) {
+                if (first >= 0) {
+                    m = flushColumn(ctx, m, first, lo, hi, last, needBase);
                 }
-                if (col != lastCol) {
-                    lastCol = col;
-                    colStart = m;
-                }
+                col = c;
+                first = i;
+                lo = i;
+                hi = i;
+                loY = sy;
+                hiY = sy;
+            } else if (sy < loY) {
+                loY = sy;
+                lo = i;
+            } else if (sy > hiY) {
+                hiY = sy;
+                hi = i;
             }
-            px[m] = sx;
-            py[m] = sy;
-            pb[m] = sb;
-            m++;
+            last = i;
         }
         if (m == 0) {
             return;
@@ -190,13 +199,16 @@ public class LineSeries extends XYSeries {
             g.setAlpha(fa);
         }
         float w = Math.max(1, ctx.mm(lineWidthMm));
-        Stroke stroke = new Stroke(w, Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 4);
+        if (stroke == null || stroke.getLineWidth() != w) {
+            stroke = new Stroke(w, Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 4);
+        }
         g.setColor(color);
         int start = 0;
         for (int i = 0; i < m; i++) {
             if (gap[i] || i == m - 1) {
                 if (i > start) {
-                    GeneralPath p = new GeneralPath();
+                    GeneralPath p = path;
+                    p.reset();
                     appendLine(p, px, py, start, i, true);
                     if (dashed) {
                         drawDashed(g, px, py, start, i, w, ctx.mm(2));
@@ -220,6 +232,51 @@ public class LineSeries extends XYSeries {
             paintValueLabels(ctx, r);
         }
         g.setAlpha(alpha);
+    }
+
+    private float[] bufX = new float[0];
+    private float[] bufY = new float[0];
+    private float[] bufB = new float[0];
+    private boolean[] bufGap = new boolean[0];
+    private Stroke stroke;
+    private final GeneralPath path = new GeneralPath();
+
+    private void ensureBuffers(int n) {
+        if (bufX.length < n) {
+            bufX = new float[n];
+            bufY = new float[n];
+            bufB = new float[n];
+            bufGap = new boolean[n];
+        } else {
+            for (int i = 0; i < n; i++) {
+                bufGap[i] = false;
+            }
+        }
+    }
+
+    private int emit(ChartContext ctx, int m, int i, boolean needBase) {
+        double v = animatedY(ctx, i);
+        double b = animatedBase(ctx, i);
+        bufX[m] = ctx.screenX(this, xs[i], b + v);
+        bufY[m] = ctx.screenY(this, xs[i], b + v);
+        bufB[m] = needBase ? baseline(ctx, i, b) : 0;
+        return m + 1;
+    }
+
+    private int flushColumn(ChartContext ctx, int m, int first, int lo, int hi, int last, boolean needBase) {
+        m = emit(ctx, m, first, needBase);
+        int a = Math.min(lo, hi);
+        int b = Math.max(lo, hi);
+        if (a != first) {
+            m = emit(ctx, m, a, needBase);
+        }
+        if (b != first && b != a) {
+            m = emit(ctx, m, b, needBase);
+        }
+        if (last != first && last != a && last != b) {
+            m = emit(ctx, m, last, needBase);
+        }
+        return m;
     }
 
     private float baseline(ChartContext ctx, int i, double base) {

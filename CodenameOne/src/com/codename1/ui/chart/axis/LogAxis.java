@@ -42,8 +42,13 @@ public class LogAxis extends Axis {
 
     @Override
     protected double[] adjustBounds(double min, double max) {
-        if (min <= 0) {
-            min = max > 1 ? 1 : max / 1000;
+        // a logarithm has no zero or negatives: a range given or found there falls back to
+        // the positive decades the data could still show
+        if (!(max > 0)) { //NOPMD LogicInversion - the negated comparison is also true for NaN
+            max = 10;
+        }
+        if (!(min > 0) || min >= max) { //NOPMD LogicInversion - the negated comparison is also true for NaN
+            min = max > 1 ? Math.min(1, max / 10) : max / 1000;
         }
         double lo = MathUtil.pow(10, Math.floor(lg(min)));
         double hi = MathUtil.pow(10, Math.ceil(lg(max)));
@@ -65,7 +70,8 @@ public class LogAxis extends Axis {
 
     @Override
     public double[] ticks(int maxCount) {
-        double a = Math.floor(lg(getVisibleMin()) - 1e-9);
+        double vmin = getVisibleMin() > 0 ? getVisibleMin() : getDataMin();
+        double a = Math.floor(lg(vmin) - 1e-9);
         double b = Math.ceil(lg(getVisibleMax()) + 1e-9);
         int decades = (int) (b - a);
         int every = Math.max(1, (int) Math.ceil(decades / (double) Math.max(1, maxCount - 1)));
@@ -73,7 +79,7 @@ public class LogAxis extends Axis {
         double[] tmp = new double[decades + 1];
         for (int e = (int) a; e <= (int) b; e += every) {
             double v = MathUtil.pow(10, e);
-            if (v >= getVisibleMin() * 0.999999 && v <= getVisibleMax() * 1.000001) {
+            if (v >= vmin * 0.999999 && v <= getVisibleMax() * 1.000001) {
                 tmp[n++] = v;
             }
         }

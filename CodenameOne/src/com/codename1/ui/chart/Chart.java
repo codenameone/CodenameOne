@@ -29,6 +29,8 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.animations.AnimationTime;
+import com.codename1.ui.chart.series.XYSeries;
 import com.codename1.ui.chart.axis.Axis;
 import com.codename1.ui.chart.axis.CategoryAxis;
 import com.codename1.ui.chart.axis.NumberAxis;
@@ -119,7 +121,8 @@ public class Chart extends Component {
     // interaction state
     private ChartPoint selected;
     private ChartPoint hover;
-    private int sharedIndex = -1;
+    // the data x the shared tooltip shows, NaN when none; series are matched by x, not index
+    private double sharedX = Double.NaN;
     private int pressX;
     private int pressY;
     private int lastX;
@@ -317,6 +320,7 @@ public class Chart extends Component {
     /// One of the `TOOLTIP_` constants.
     public Chart setTooltipMode(int mode) {
         tooltipMode = mode;
+        updateFocusable();
         return this;
     }
 
@@ -341,7 +345,43 @@ public class Chart extends Component {
     /// Whether pinch, wheel, double tap and drag zoom and pan the chart.
     public Chart setZoomEnabled(boolean zoomEnabled) {
         this.zoomEnabled = zoomEnabled;
+        updateFocusable();
         return this;
+    }
+
+    /// Zoom gestures scale the value axis too unless the x axis is a category or time axis.
+    public static final int ZOOM_AUTO = 0;
+
+    /// Zoom gestures scale the x (category) axis only; values keep their scale.
+    public static final int ZOOM_X = 1;
+
+    /// Zoom gestures scale both axes, following the direction of a pinch.
+    public static final int ZOOM_XY = 2;
+
+    private int zoomMode = ZOOM_AUTO;
+
+    /// Which axes pinch, wheel, double tap and keyboard zoom: `ZOOM_AUTO` (the default),
+    /// `ZOOM_X` or `ZOOM_XY`.
+    public Chart setZoomMode(int zoomMode) {
+        this.zoomMode = zoomMode;
+        return this;
+    }
+
+    /// One of the `ZOOM_` constants.
+    public int getZoomMode() {
+        return zoomMode;
+    }
+
+    private boolean zoomsValues() {
+        if (zoomMode == ZOOM_AUTO) {
+            return !(xAxis instanceof CategoryAxis) && !isTimeLike(xAxis);
+        }
+        return zoomMode == ZOOM_XY;
+    }
+
+    // a chart takes focus only when the keyboard can do something with it
+    private void updateFocusable() {
+        setFocusable(zoomEnabled || tooltipMode != TOOLTIP_NONE);
     }
 
     /// Transition length in milliseconds; 0 applies data changes without animating.
@@ -517,7 +557,7 @@ public class Chart extends Component {
             repaint();
             return;
         }
-        transitionStart = System.currentTimeMillis();
+        transitionStart = AnimationTime.now();
         transitionLength = animationDuration;
         repaint();
     }
@@ -535,7 +575,7 @@ public class Chart extends Component {
         if (transitionLength <= 0) {
             return 1;
         }
-        float t = (System.currentTimeMillis() - transitionStart) / (float) transitionLength;
+        float t = (AnimationTime.now() - transitionStart) / (float) transitionLength;
         if (t >= 1) {
             return 1;
         }
@@ -561,7 +601,7 @@ public class Chart extends Component {
             }
             axisFrom = null;
             captured = false;
-            transitionStart = System.currentTimeMillis();
+            transitionStart = AnimationTime.now();
             transitionLength = animationDuration > 0 ? (int) (animationDuration * 1.6f) : 0;
         }
     }
@@ -579,7 +619,7 @@ public class Chart extends Component {
     public boolean animate() {
         boolean changed = super.animate();
         if (transitionLength > 0) {
-            if (System.currentTimeMillis() - transitionStart >= transitionLength) {
+            if (AnimationTime.now() - transitionStart >= transitionLength) {
                 finishTransition();
             }
             changed = true;
@@ -1121,7 +1161,9 @@ public class Chart extends Component {
                 int px = ctx.plotX + (int) Math.round(n * ctx.plotW);
                 String s = xl.labels[i];
                 int sw = f.stringWidth(s);
-                int lx = Math.max(ctx.plotX - gap, Math.min(px - sw / 2, ctx.plotX + ctx.plotW - sw));
+                // clamped inside the plot so the first label never runs into the y axis labels;
+                // the skip below drops any label the clamp pushed into its neighbour
+                int lx = Math.max(ctx.plotX, Math.min(px - sw / 2, ctx.plotX + ctx.plotW - sw));
                 if (lx < prevRight + gap / 2) {
                     continue;
                 }
@@ -1166,10 +1208,11 @@ public class Chart extends Component {
         List<ChartPoint> rows = new ArrayList<ChartPoint>();
         int anchorX;
         int anchorY;
-        if (tooltipMode == TOOLTIP_SHARED && sharedIndex >= 0 && hasCartesian()) {
+        if (tooltipMode == TOOLTIP_SHARED && sharedX == sharedX && hasCartesian()) {
             for (Series s : series) {
-                if (s.isVisible() && s.isCartesian() && sharedIndex < s.getPointCount()) {
-                    ChartPoint cp = s.getPoint(ctx, sharedIndex);
+                if (s.isVisible() && s instanceof XYSeries) {
+                    int i = indexAtX((XYSeries) s, sharedX);
+                    ChartPoint cp = i < 0 ? null : s.getPoint(ctx, i);
                     if (cp != null) {
                         rows.add(cp);
                     }
@@ -1408,28 +1451,44 @@ public class Chart extends Component {
         return null;
     }
 
-    private int nearestIndex(int relX, int relY) {
+    /// The x value of the data point nearest the pointer along the category direction, over
+    /// every visible series, or NaN. Series sampled at different x values each take part, so a
+    /// point of a longer or offset series is reachable too.
+    private double nearestSharedX(int relX, int relY) {
         ChartContext ctx = lastContext;
-        if (ctx == null) {
-            return -1;
+        if (ctx == null || ctx.plotW <= 0 || ctx.plotH <= 0) {
+            return Double.NaN;
         }
-        // the first visible cartesian series with points is the reference for shared tooltips
-        Series s = null;
+        double n;
+        if (rotated) {
+            double t = (relY + getY() - ctx.plotY) / (double) ctx.plotH;
+            n = isTopDown(xAxis) ? t : 1 - t;
+        } else {
+            n = (relX + getX() - ctx.plotX) / (double) ctx.plotW;
+        }
+        double target = xAxis.fromNormalized(n);
+        double bestX = Double.NaN;
+        int bestD = Integer.MAX_VALUE;
         for (Series candidate : series) {
-            if (candidate.isVisible() && candidate.isCartesian() && candidate.getPointCount() > 0) {
-                s = candidate;
-                break;
+            if (!candidate.isVisible() || !(candidate instanceof XYSeries)) {
+                continue;
+            }
+            XYSeries xs = (XYSeries) candidate;
+            int i = xs.isAscending() ? xs.nearestIndexOfX(target) : scanNearest(xs, ctx, relX, relY);
+            ChartPoint p = i < 0 ? null : xs.getPoint(ctx, i);
+            if (p == null) {
+                continue;
+            }
+            int d = rotated ? Math.abs(p.getScreenY() - relY) : Math.abs(p.getScreenX() - relX);
+            if (d < bestD) {
+                bestD = d;
+                bestX = xs.getX(i);
             }
         }
-        if (s == null) {
-            return -1;
-        }
-        if (!rotated && s instanceof com.codename1.ui.chart.series.XYSeries && ctx.plotW > 0
-                && ((com.codename1.ui.chart.series.XYSeries) s).isAscending()) {
-            // scrubbing runs on every move: search the sorted x values instead of every point
-            double n = (relX + getX() - ctx.plotX) / (double) ctx.plotW;
-            return ((com.codename1.ui.chart.series.XYSeries) s).nearestIndexOfX(xAxis.fromNormalized(n));
-        }
+        return bestX;
+    }
+
+    private int scanNearest(XYSeries s, ChartContext ctx, int relX, int relY) {
         int best = -1;
         int bestD = Integer.MAX_VALUE;
         for (int i = 0; i < s.getPointCount(); i++) {
@@ -1446,6 +1505,30 @@ public class Chart extends Component {
         return best;
     }
 
+    /// The index of `s`'s point at exactly `x` (with a y value), or -1 when it has none there.
+    private static int indexAtX(XYSeries s, double x) {
+        int i;
+        if (s.isAscending()) {
+            i = s.nearestIndexOfX(x);
+        } else {
+            i = -1;
+            double bestD = Double.MAX_VALUE;
+            for (int k = 0; k < s.size(); k++) {
+                double y = s.getY(k);
+                double d = Math.abs(s.getX(k) - x);
+                if (y == y && d < bestD) {
+                    bestD = d;
+                    i = k;
+                }
+            }
+        }
+        if (i < 0) {
+            return -1;
+        }
+        double tol = 1e-9 * Math.max(1, Math.abs(x));
+        return Math.abs(s.getX(i) - x) <= tol ? i : -1;
+    }
+
     private boolean insidePlot(int x, int y) {
         ChartContext c = lastContext;
         return c != null && x >= c.plotX && x <= c.plotX + c.plotW && y >= c.plotY && y <= c.plotY + c.plotH;
@@ -1455,9 +1538,9 @@ public class Chart extends Component {
         int rx = x - getX();
         int ry = y - getY();
         if (tooltipMode == TOOLTIP_SHARED && insidePlot(x, y)) {
-            int idx = nearestIndex(rx, ry);
-            if (idx != sharedIndex) {
-                sharedIndex = idx;
+            double sx = nearestSharedX(rx, ry);
+            if (!sameX(sx, sharedX)) {
+                sharedX = sx;
                 fireCrosshair();
                 repaint();
             }
@@ -1525,7 +1608,7 @@ public class Chart extends Component {
         pressY = toPaintY(y);
         lastX = pressX;
         lastY = pressY;
-        lastMoveTime = System.currentTimeMillis();
+        lastMoveTime = AnimationTime.now();
         velocityX = 0;
         velocityY = 0;
         dragMode = DRAG_UNDECIDED;
@@ -1586,7 +1669,7 @@ public class Chart extends Component {
             brushMoved = true;
             repaint();
         } else if (dragMode == DRAG_PAN) {
-            long now = System.currentTimeMillis();
+            long now = AnimationTime.now();
             int dx = px - lastX;
             int dy = py - lastY;
             long dt = Math.max(1, now - lastMoveTime);
@@ -1614,17 +1697,18 @@ public class Chart extends Component {
     }
 
     private ChartPoint nearestPoint(int rx, int ry) {
-        int idx = nearestIndex(rx, ry);
-        if (idx < 0) {
+        double x = nearestSharedX(rx, ry);
+        if (x != x) {
             return hitTest(rx, ry);
         }
         ChartPoint best = null;
         int bestD = Integer.MAX_VALUE;
         for (Series s : series) {
-            if (!s.isVisible() || !s.isCartesian() || idx >= s.getPointCount()) {
+            if (!s.isVisible() || !(s instanceof XYSeries)) {
                 continue;
             }
-            ChartPoint p = s.getPoint(lastContext, idx);
+            int i = indexAtX((XYSeries) s, x);
+            ChartPoint p = i < 0 ? null : s.getPoint(lastContext, i);
             if (p != null) {
                 int d = rotated ? Math.abs(p.getScreenX() - rx) : Math.abs(p.getScreenY() - ry);
                 if (d < bestD) {
@@ -1634,6 +1718,10 @@ public class Chart extends Component {
             }
         }
         return best;
+    }
+
+    private static boolean sameX(double a, double b) {
+        return a == b || a != a && b != b;
     }
 
     private Axis[] verticalAxes() {
@@ -1671,7 +1759,7 @@ public class Chart extends Component {
 
     private void handlePinch(int x0, int y0, int x1, int y1) {
         ChartContext c = lastContext;
-        if (c == null) {
+        if (c == null || c.plotW <= 0 || c.plotH <= 0) {
             return;
         }
         double dx = Math.max(mm(4), Math.abs(x1 - x0));
@@ -1693,14 +1781,26 @@ public class Chart extends Component {
         boolean zy = angle > Math.PI * 0.15;
         double ax = clamp01((cx - c.plotX) / (double) c.plotW);
         double ay = verticalAnchor(cy);
+        boolean valueZoom = zoomsValues();
+        // one axis zooms by the whole finger distance, whatever its direction
+        double spread = Math.sqrt((dx * dx + dy * dy) / (pinchDistX * pinchDistX + pinchDistY * pinchDistY));
+        if (!valueZoom) {
+            // only the category direction zooms, whichever way the fingers spread
+            zx = !rotated;
+            zy = rotated;
+        }
         if (zx) {
             for (Axis h : horizontalAxes()) {
-                h.zoom(dx / pinchDistX, ax);
+                if (h == xAxis || valueZoom) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+                    h.zoom(valueZoom ? dx / pinchDistX : spread, ax);
+                }
             }
         }
         if (zy) {
             for (Axis v : verticalAxes()) {
-                v.zoom(dy / pinchDistY, ay);
+                if (v == xAxis || valueZoom) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+                    v.zoom(valueZoom ? dy / pinchDistY : spread, ay);
+                }
             }
         }
         panBy(cx - pinchCenterX, cy - pinchCenterY);
@@ -1731,10 +1831,10 @@ public class Chart extends Component {
         int mode = dragMode;
         dragMode = DRAG_UNDECIDED;
         if (mode == DRAG_PAN) {
-            if (System.currentTimeMillis() - lastMoveTime < 80
+            if (AnimationTime.now() - lastMoveTime < 80
                     && (Math.abs(velocityX) > 0.3f || Math.abs(velocityY) > 0.3f)) {
                 flinging = true;
-                flingLast = System.currentTimeMillis();
+                flingLast = AnimationTime.now();
             }
             super.pointerReleased(x, y);
             return;
@@ -1766,7 +1866,7 @@ public class Chart extends Component {
                 return;
             }
         }
-        long now = System.currentTimeMillis();
+        long now = AnimationTime.now();
         boolean doubleTap = now - lastTapTime < 350 && Math.abs(x - lastTapX) < mm(6) && Math.abs(y - lastTapY) < mm(6);
         lastTapTime = doubleTap ? 0 : now;
         lastTapX = x;
@@ -1807,7 +1907,7 @@ public class Chart extends Component {
         double ax = clamp01((x - c.plotX) / (double) c.plotW);
         double ay = verticalAnchor(y);
         // category and time charts zoom along x only: their values keep their scale
-        boolean valueZoom = !(xAxis instanceof CategoryAxis) && !isTimeLike(xAxis);
+        boolean valueZoom = zoomsValues();
         Axis[] axes = allAxes();
         double[] before = snapshot(axes);
         for (Axis h : horizontalAxes()) {
@@ -1927,13 +2027,13 @@ public class Chart extends Component {
     private void animateViewport(double[] target) {
         viewportFrom = snapshot(allAxes());
         viewportTo = target;
-        viewportStart = System.currentTimeMillis();
+        viewportStart = AnimationTime.now();
         repaint();
     }
 
     private void stepViewport() {
         Axis[] axes = allAxes();
-        float t = (System.currentTimeMillis() - viewportStart) / 300f;
+        float t = (AnimationTime.now() - viewportStart) / 300f;
         if (t >= 1 || viewportFrom.length != viewportTo.length || viewportTo.length != axes.length * 3) {
             restore(axes, viewportTo);
             viewportTo = null;
@@ -1950,7 +2050,7 @@ public class Chart extends Component {
     }
 
     private void stepFling() {
-        long now = System.currentTimeMillis();
+        long now = AnimationTime.now();
         long dt = Math.max(1, now - flingLast);
         flingLast = now;
         panBy((int) (velocityX * dt), (int) (velocityY * dt));
@@ -2002,17 +2102,21 @@ public class Chart extends Component {
     @Override
     public void pointerHoverReleased(int[] x, int[] y) {
         super.pointerHoverReleased(x, y);
-        if (hover != null || sharedIndex >= 0) {
+        if (hover != null || sharedX == sharedX) {
             hover = null;
-            sharedIndex = -1;
+            sharedX = Double.NaN;
             repaint();
         }
     }
 
     @Override
     public void keyReleased(int keyCode) {
+        int game = Display.getInstance().getGameAction(keyCode);
+        if (tooltipMode != TOOLTIP_NONE && lastContext != null && stepSelection(game)) {
+            return;
+        }
         if (zoomEnabled && hasCartesian() && lastContext != null) {
-            int action = Display.getInstance().getGameAction(keyCode);
+            int action = game;
             int step = lastContext.plotW / 10;
             int cx = lastContext.plotX + lastContext.plotW / 2;
             int cy = lastContext.plotY + lastContext.plotH / 2;
@@ -2038,6 +2142,68 @@ public class Chart extends Component {
             }
         }
         super.keyReleased(keyCode);
+    }
+
+    /// Arrow keys walk the data: left and right step through the points of the selected
+    /// series (panning a zoomed chart to keep the point in view), up and down move to the
+    /// next series. Each step is announced to the screen reader.
+    private boolean stepSelection(int game) {
+        boolean along = rotated ? game == Display.GAME_UP || game == Display.GAME_DOWN
+                : game == Display.GAME_LEFT || game == Display.GAME_RIGHT;
+        boolean across = rotated ? game == Display.GAME_LEFT || game == Display.GAME_RIGHT
+                : game == Display.GAME_UP || game == Display.GAME_DOWN;
+        if (!along && !across) {
+            return false;
+        }
+        List<Series> visible = new ArrayList<Series>();
+        for (Series s : series) {
+            if (s.isVisible() && s.getPointCount() > 0) {
+                visible.add(s);
+            }
+        }
+        if (visible.isEmpty()) {
+            return false;
+        }
+        int dir = game == Display.GAME_RIGHT || game == Display.GAME_DOWN ? 1 : -1;
+        Series s = selected != null && visible.contains(selected.getSeries()) ? selected.getSeries() : visible.get(0);
+        int index = selected != null && s == selected.getSeries() ? selected.getIndex() : -dir; //NOPMD CompareObjectsWithEquals - identity of the same series is intended
+        if (selected != null && across) {
+            s = visible.get((visible.indexOf(s) + dir + visible.size()) % visible.size());
+            index = Math.min(selected.getIndex(), s.getPointCount() - 1) - dir;
+            dir = dir > 0 ? 1 : -1;
+            if (index + dir < 0) {
+                index = -dir;
+            }
+        }
+        ChartPoint next = null;
+        for (int i = index + dir; i >= 0 && i < s.getPointCount(); i += dir) {
+            next = s.getPoint(lastContext, i);
+            if (next != null || !across) {
+                break;
+            }
+        }
+        if (next == null) {
+            return true;
+        }
+        if (s.isCartesian()) {
+            Axis h = xAxis;
+            if (h.isZoomed() && (next.getX() < h.getVisibleMin() || next.getX() > h.getVisibleMax())) {
+                double span = h.getVisibleMax() - h.getVisibleMin();
+                h.setVisibleRange(next.getX() - span / 2, next.getX() + span / 2);
+                fireViewportChanged();
+            }
+        }
+        selected = next;
+        for (SelectionListener l : new ArrayList<SelectionListener>(selectionListeners)) {
+            l.selectionChanged(this, next);
+        }
+        String text = s.formatTooltip(lastContext, next);
+        if (s.isCartesian()) {
+            text = xAxis.format(next.getX(), 0) + ", " + text;
+        }
+        announceForAccessibility(text);
+        repaint();
+        return true;
     }
 
     // ------------------------------------------------------------------ synchronization
@@ -2091,8 +2257,8 @@ public class Chart extends Component {
             }
             c.syncing = true;
             try {
-                if (c.sharedIndex != sharedIndex) {
-                    c.sharedIndex = sharedIndex;
+                if (!sameX(c.sharedX, sharedX)) {
+                    c.sharedX = sharedX;
                     c.repaint();
                 }
             } finally {
