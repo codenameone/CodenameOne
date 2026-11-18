@@ -20,15 +20,22 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.orm.session;
+package com.codename1.backend.annotations;
 
-/// A tenant-partitioned entity was used while no tenant was current. Raised
-/// instead of answering every tenant's rows.
-@com.codename1.impl.SharedWithBackend
-public final class MissingTenantException extends PersistenceException {
-    /// Creates an exception describing the persistence failure.
-    /// @param message failure description
-    public MissingTenantException(String message) {
-        super(message);
-    }
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/// Marks the `String` field that holds the tenant a row belongs to.
+///
+/// On the backend a managed session writes the current tenant into this field
+/// on every insert and adds it to the condition of every statement it issues
+/// for the entity: finds, criteria and JPQL queries, counts, bulk updates and
+/// deletes, and the update and delete of a single entity. A session with no
+/// current tenant refuses to touch the entity at all rather than read every
+/// tenant's rows. Native SQL is never rewritten.
+@Retention(RetentionPolicy.CLASS)
+@Target(ElementType.FIELD)
+public @interface TenantId {
 }

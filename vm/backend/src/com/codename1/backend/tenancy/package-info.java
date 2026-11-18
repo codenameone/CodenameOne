@@ -28,7 +28,7 @@
 /// build on it, and an application can use either or both:
 ///
 /// - **A shared table.** An entity with a
-///   [com.codename1.annotations.db.TenantId] field is partitioned by the
+///   [com.codename1.backend.annotations.TenantId] field is partitioned by the
 ///   managed session itself: every insert is stamped with the current tenant,
 ///   and every query, count, update and delete is limited to it. With no
 ///   tenant set the session refuses the entity instead of answering every

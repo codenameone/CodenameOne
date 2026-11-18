@@ -507,7 +507,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             pf.fieldName = fieldPath.path;pf.declaringType=fieldPath.declaringType;
             pf.embeddedParent = fieldPath.prefix;
             pf.version = f.getAnnotation("Lcom/codename1/annotations/db/Version;") != null;
-            pf.tenant = f.getAnnotation("Lcom/codename1/annotations/db/TenantId;") != null;
+            pf.tenant = f.getAnnotation("Lcom/codename1/backend/annotations/TenantId;") != null;
             pf.sortKey = f.getAnnotation("Lcom/codename1/backend/annotations/SortKey;") != null;
             pf.searchField = f.getAnnotation("Lcom/codename1/backend/annotations/SearchField;") != null;
             pf.kind = PropertyTypeKind.of(f);

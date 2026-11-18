@@ -252,7 +252,7 @@ Any other rule is a `TenantResolver`. A tenant identifier is 1 to 64 characters 
 
 ==== A shared table
 
-Mark a `String` field with `@TenantId`:
+Mark a `String` field with `@TenantId` (`com.codename1.backend.annotations`, so only server code can use it):
 
 [source,java,role=cn1-no-try]
 ----
@@ -284,8 +284,6 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/T
 Statements run straight through a `DataSource` don't pass through the session and aren't checked.
 
 Migrations, reports across tenants and provisioning jobs run inside `TenantContext.runUnscoped(...)`, which turns filtering off for that call only. Nothing turns it off for longer.
-
-On the client there's no current tenant, and `@TenantId` is an ordinary column.
 
 ==== A database or schema per tenant
 

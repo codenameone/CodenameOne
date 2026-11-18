@@ -25,11 +25,9 @@ package com.codename1.impl.orm;
 import com.codename1.orm.session.Identifier;
 import com.codename1.orm.session.LazyInitializationException;
 import com.codename1.orm.session.LockMode;
-import com.codename1.orm.session.MissingTenantException;
 import com.codename1.orm.session.OptimisticLockException;
 import com.codename1.orm.session.PersistenceException;
 import com.codename1.orm.session.SchemaReport;
-import com.codename1.orm.session.TenantMismatchException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -3186,11 +3184,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         return discriminator.length() == 0 ? tenant : discriminator + " AND " + tenant;
     }
 
-    /// The current tenant for an entity with a [com.codename1.annotations.db.TenantId]
+    /// The backend's exception for a tenancy failure. Only reached when the
+    /// connection is a [TenantSource].
+    private RuntimeException tenantFailure(int kind, String message) {
+        return ((TenantSource) sql).failure(kind, message);
+    }
+
+    /// The current tenant for an entity with a tenant field
     /// field, or null when the entity has none, the connection has no notion
     /// of a tenant (the client) or the caller asked to run unscoped.
     ///
-    /// @throws MissingTenantException when the connection is tenant aware and
+    /// @throws RuntimeException (the backend's MissingTenantException) when the connection is tenant aware and
     /// no tenant is current. Failing closed is the point: answering every
     /// tenant's rows is the leak this feature exists to prevent.
     String tenant(EntityModel model) {
@@ -3204,7 +3208,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         String tenant = source.currentTenant();
         if (tenant == null) {
-            throw new MissingTenantException("No current tenant for " + model.table());
+            throw tenantFailure(TenantSource.MISSING, "No current tenant for " + model.table());
         }
         TenantSource.Ids.check(tenant);
         bind(tenant);
@@ -3220,7 +3224,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (boundTenant == null) {
             boundTenant = tenant;
         } else if (!boundTenant.equals(tenant)) {
-            throw new TenantMismatchException("This session holds rows of " +
+            throw tenantFailure(TenantSource.MISMATCH, "This session holds rows of " +
                     (UNSCOPED_BINDING.equals(boundTenant) ? "an unscoped context" : "tenant " + boundTenant) +
                     " and cannot be used for " + (UNSCOPED_BINDING.equals(tenant) ? "unscoped work" : "tenant " + tenant) +
                     "; call clear() or open a new session");
@@ -3242,7 +3246,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         for (EntityModel<?> model : models.values()) {
             if (model.tenantIndex() >= 0) {
-                throw new com.codename1.orm.session.TenantNativeSqlException("Native SQL is not filtered by tenant and " +
+                throw tenantFailure(TenantSource.NATIVE_SQL, "Native SQL is not filtered by tenant and " +
                         "this session maps tenant-partitioned entities (" + model.table() + "). Run it inside " +
                         "TenantContext.allowNativeSql(...) after adding the tenant condition yourself, or inside " +
                         "TenantContext.runUnscoped(...)");
@@ -3276,7 +3280,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         int index = model.tenantIndex();
         Object existing = model.get(entry.entity, index);
         if (existing != null && !tenant.equals(existing)) {
-            throw new TenantMismatchException("Entity of " + model.table() + " belongs to tenant " + existing +
+            throw tenantFailure(TenantSource.MISMATCH, "Entity of " + model.table() + " belongs to tenant " + existing +
                                               ", not the current tenant " + tenant);
         }
         if (existing == null) {
@@ -3297,7 +3301,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         Object now = model.get(entry.entity, index);
         if (!same(now, entry.snapshot[index])) {
-            throw new TenantMismatchException("The tenant of a " + model.table() + " row cannot change (from " +
+            throw tenantFailure(TenantSource.MISMATCH, "The tenant of a " + model.table() + " row cannot change (from " +
                                               entry.snapshot[index] + " to " + now + ")");
         }
     }

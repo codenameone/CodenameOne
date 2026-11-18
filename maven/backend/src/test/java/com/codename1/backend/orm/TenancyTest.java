@@ -28,9 +28,9 @@ import com.codename1.impl.orm.Attribute;
 import com.codename1.impl.orm.BackendSqlAccess;
 import com.codename1.impl.orm.EntityModel;
 import com.codename1.impl.orm.SessionImpl;
-import com.codename1.orm.session.MissingTenantException;
-import com.codename1.orm.session.TenantNativeSqlException;
-import com.codename1.orm.session.TenantMismatchException;
+import com.codename1.backend.tenancy.MissingTenantException;
+import com.codename1.backend.tenancy.TenantNativeSqlException;
+import com.codename1.backend.tenancy.TenantMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 

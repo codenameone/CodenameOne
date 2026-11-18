@@ -24,8 +24,8 @@ package com.codename1.impl.orm;
 
 /// Implemented by a [SqlAccess] that knows the current tenant. A session over a
 /// connection that does not implement it treats
-/// [com.codename1.annotations.db.TenantId] as an ordinary column, which is
-/// what the client does.
+/// a tenant field as an ordinary column. Only the backend implements it; the
+/// tenant annotation, the exceptions and the context all live there.
 @com.codename1.impl.SharedWithBackend
 public interface TenantSource {
     /// The current tenant, or null when none is set.
@@ -38,6 +38,21 @@ public interface TenantSource {
     /// True while the caller has opted in to native SQL on a session that maps
     /// tenant-partitioned entities, taking on the tenant condition itself.
     boolean isNativeSqlAllowed();
+
+    /// No tenant is current. See [#failure(int, String)].
+    int MISSING = 0;
+    /// A row or a session belongs to another tenant.
+    int MISMATCH = 1;
+    /// Native SQL without the opt-in.
+    int NATIVE_SQL = 2;
+
+    /// The exception to throw for a tenancy failure of `kind`. The exception
+    /// types are backend classes, so the shared session asks for them here.
+    ///
+    /// @param kind [#MISSING], [#MISMATCH] or [#NATIVE_SQL]
+    /// @param message failure description
+    /// @return the exception to throw
+    RuntimeException failure(int kind, String message);
 
     /// Tenant identifier rules shared by every layer.
     @com.codename1.impl.SharedWithBackend

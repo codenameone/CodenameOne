@@ -20,14 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.orm.session;
+package com.codename1.backend.tenancy;
 
-/// An entity being saved names a tenant other than the current one.
-@com.codename1.impl.SharedWithBackend
-public final class TenantMismatchException extends PersistenceException {
+import com.codename1.orm.session.PersistenceException;
+
+/// Native SQL was attempted on a session that maps tenant-partitioned
+/// entities without opting in. Native statements are never filtered by tenant.
+public final class TenantNativeSqlException extends PersistenceException {
     /// Creates an exception describing the persistence failure.
     /// @param message failure description
-    public TenantMismatchException(String message) {
+    public TenantNativeSqlException(String message) {
         super(message);
     }
 }

@@ -148,11 +148,11 @@ public final class TenantDataSources {
     /// The pool of the current tenant.
     /// @return the pool
     /// @throws IOException when it cannot be opened
-    /// @throws com.codename1.orm.session.MissingTenantException when no tenant is current
+    /// @throws MissingTenantException when no tenant is current
     public DataSource current() throws IOException {
         String tenant = TenantContext.get();
         if (tenant == null) {
-            throw new com.codename1.orm.session.MissingTenantException("No current tenant to choose a database for");
+            throw new MissingTenantException("No current tenant to choose a database for");
         }
         return forTenant(tenant);
     }

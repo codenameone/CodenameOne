@@ -39,7 +39,7 @@ public abstract class EntityModel<T> {
     public int discriminatorIndex() {
         return -1;
     }
-    /// The index of the [com.codename1.annotations.db.TenantId] attribute, or
+    /// The index of the tenant attribute (the backend's `@TenantId`), or
     /// -1 when the entity is not partitioned by tenant.
     public int tenantIndex() {
         return -1;

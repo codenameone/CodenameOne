@@ -70,6 +70,18 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
     }
 
     @Override
+    public RuntimeException failure(int kind, String message) {
+        switch (kind) {
+            case MISSING:
+                return new com.codename1.backend.tenancy.MissingTenantException(message);
+            case NATIVE_SQL:
+                return new com.codename1.backend.tenancy.TenantNativeSqlException(message);
+            default:
+                return new com.codename1.backend.tenancy.TenantMismatchException(message);
+        }
+    }
+
+    @Override
     public String dialect() {
         return dialect.getName();
     }

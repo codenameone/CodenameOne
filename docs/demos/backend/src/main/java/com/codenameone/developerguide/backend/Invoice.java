@@ -25,7 +25,7 @@ package com.codenameone.developerguide.backend;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 import com.codename1.annotations.db.GeneratedValue;
-import com.codename1.annotations.db.TenantId;
+import com.codename1.backend.annotations.TenantId;
 
 /** The multi-tenancy section's shared-table entity, compiled so it cannot drift. */
 // tag::backend-tenancy-entity[]

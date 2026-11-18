@@ -23,7 +23,7 @@
 package com.codename1.backend.tenancy;
 
 import com.codename1.backend.DataSource;
-import com.codename1.orm.session.MissingTenantException;
+import com.codename1.backend.tenancy.MissingTenantException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

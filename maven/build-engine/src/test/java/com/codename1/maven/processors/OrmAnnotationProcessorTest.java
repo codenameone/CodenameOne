@@ -210,7 +210,7 @@ public class OrmAnnotationProcessorTest {
     public void tenantIdEntitiesArePartitionedOnTheBackend() throws Exception {
         File classes=tmp.newFolder();
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        sources.put("tenanted.Invoice","package tenanted; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Invoice { @Id public long id; @TenantId public String tenant; public String customer; }");
+        sources.put("tenanted.Invoice","package tenanted; import com.codename1.annotations.*; import com.codename1.backend.annotations.TenantId; @Entity public class Invoice { @Id public long id; @TenantId public String tenant; public String customer; }");
         sources.put("tenanted.Check","package tenanted; import com.codename1.orm.session.*; import com.codename1.backend.tenancy.TenantContext; public class Check { public static void run(Session s) throws Exception { "
             + "s.createTables(); "
             + "TenantContext.set(\"acme\"); s.beginTransaction(); Invoice a=new Invoice(); a.customer=\"x\"; s.persist(a); s.commitTransaction(); s.clear(); "
@@ -243,7 +243,7 @@ public class OrmAnnotationProcessorTest {
     public void tenantIdMisuseFailsTheBuild() throws Exception {
         File classes=tmp.newFolder();
         Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
-        String imports="import com.codename1.annotations.*; import com.codename1.annotations.db.*; ";
+        String imports="import com.codename1.annotations.*; import com.codename1.backend.annotations.TenantId; ";
         sources.put("badtenant.Numbered","package badtenant; "+imports+"@Entity public class Numbered { @Id public long id; @TenantId public long tenant; }");
         sources.put("badtenant.Twice","package badtenant; "+imports+"@Entity public class Twice { @Id public long id; @TenantId public String a; @TenantId public String b; }");
         sources.put("badtenant.Keyed","package badtenant; "+imports+"@Entity public class Keyed { @Id(autoIncrement=false) @TenantId public String tenant; }");
