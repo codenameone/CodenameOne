@@ -22,9 +22,11 @@
  */
 package com.codenameone.developerguide.screenshots;
 
+import com.codename1.spreadsheet.Workbook;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.Tabs;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.UIManager;
@@ -135,6 +137,13 @@ public final class DataGridFigures {
         Fig themed = new Fig("datagrid-appearance-theme", grid(DataGridSnippets::sorted), null, false);
         v.add(new FigureVariant(themed, FigureDevice.ANDROID, true, true, "datagrid-dark.png"));
         v.add(new FigureVariant(themed, FigureDevice.IOS, false, true, "datagrid-ios.png"));
+        v.add(wide("datagrid-sheet-orders", book("Regional sales", DataGridSnippets::salesWorkbook, null, 0), null));
+        v.add(wide("datagrid-sheet-summary", book("Regional sales", DataGridSnippets::salesWorkbook, null, 2), null));
+        v.add(wide("datagrid-sheet-recalc",
+                book("Regional sales", DataGridSnippets::salesWorkbook, DataGridSnippets::correctAnOrder, 2), null));
+        v.add(wide("datagrid-sheet-loan", book("Loan", DataGridSnippets::loanWorkbook, null, 1), null));
+        v.add(wide("datagrid-sheet-loan-rate",
+                book("Loan", DataGridSnippets::loanWorkbook, DataGridSnippets::raiseTheRate, 1), null));
         return v.toArray(new FigureVariant[v.size()]);
     }
 
@@ -150,6 +159,36 @@ public final class DataGridFigures {
         return () -> {
             Form f = new Form(title, new BorderLayout());
             f.add(BorderLayout.CENTER, s.build());
+            return f;
+        };
+    }
+
+    private interface BookSource {
+        Workbook open() throws IOException;
+    }
+
+    private interface BookEdit {
+        void apply(Workbook book);
+    }
+
+    /// A workbook of the guide's resources with a tab per sheet. The edit is made
+    /// after the grids exist, the way an application makes one: what the figure
+    /// shows is then what the recalculation told the grid to repaint.
+    private static Scene book(final String title, final BookSource source, final BookEdit edit, final int sheet) {
+        return () -> {
+            Workbook workbook;
+            try {
+                workbook = source.open();
+            } catch (IOException err) {
+                throw new IllegalStateException("the guide's workbook did not load", err);
+            }
+            Tabs tabs = DataGridSnippets.workbookTabs(workbook);
+            if (edit != null) {
+                edit.apply(workbook);
+            }
+            tabs.setSelectedIndex(sheet);
+            Form f = new Form(title, new BorderLayout());
+            f.add(BorderLayout.CENTER, tabs);
             return f;
         };
     }

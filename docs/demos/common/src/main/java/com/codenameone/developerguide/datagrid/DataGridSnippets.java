@@ -30,9 +30,11 @@ import com.codename1.spreadsheet.Workbook;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Slider;
+import com.codename1.ui.Tabs;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.layouts.BorderLayout;
@@ -632,5 +634,46 @@ public final class DataGridSnippets {
         writer.setEscapeFormulas(true);
         writer.write(output, rows);
         // end::grid-csv[]
+    }
+
+    public static Tabs workbookTabs(Workbook book) {
+        // tag::grid-sheet-workbook[]
+        Tabs tabs = new Tabs();
+        for (int i = 0; i < book.getSheetCount(); i++) {
+            Sheet sheet = book.getSheet(i);
+            sheet.setHeaderRow(true);
+            DataGrid grid = new DataGrid(sheet);
+            grid.setColumns(sheet.createColumns());
+            tabs.addTab(sheet.getName(), grid);
+        }
+        // end::grid-sheet-workbook[]
+        return tabs;
+    }
+
+    public static Workbook salesWorkbook() throws IOException {
+        // tag::grid-sheet-resource[]
+        InputStream input = Display.getInstance().getResourceAsStream(DataGridSnippets.class, "/regional-sales.xlsx");
+        Workbook book = Workbook.read(input, Workbook.Format.XLSX);
+        // end::grid-sheet-resource[]
+        return book;
+    }
+
+    public static Workbook loanWorkbook() throws IOException {
+        InputStream input = Display.getInstance().getResourceAsStream(DataGridSnippets.class, "/loan-schedule.ods");
+        return Workbook.read(input, Workbook.Format.ODS);
+    }
+
+    public static void correctAnOrder(Workbook book) {
+        // tag::grid-sheet-edit[]
+        // Order 1045 was for 40 compressors, not 6. Units are column E of the Orders sheet.
+        book.getSheet("Orders").setCellValue("E6", 40.0);
+        // end::grid-sheet-edit[]
+    }
+
+    public static void raiseTheRate(Workbook book) {
+        // tag::grid-sheet-name[]
+        // The schedule reads the yearly rate through the defined name Rate, which is Terms!B2.
+        book.getSheet("Terms").setCellValue("B2", 0.089);
+        // end::grid-sheet-name[]
     }
 }

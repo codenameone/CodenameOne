@@ -426,6 +426,37 @@ logical value is a `Boolean` and an error such as `#DIV/0!` is a `CellError`.
 `Workbook.Format.detect` picks the format from a file name and the first bytes
 of the file, for a file the user chose.
 
+==== A whole workbook
+
+A workbook usually has several sheets that read one another. The samples that
+follow open `regional-sales.xlsx`, a file LibreOffice saved, from the
+application's resources. It has a sheet of orders, a sheet of commission rates
+and sales targets for each region, and a summary that reads both:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-resource,indent=0]
+----
+
+Each sheet is a model of its own, so a grid for each one in a `Tabs` component
+is the workbook the way a spreadsheet shows it:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-workbook,indent=0]
+----
+
+.The Orders sheet. The dates, prices and discounts are formatted by the number formats of the file, and Net is a formula
+image::img/generated/datagrid-sheet-orders.png["A grid under three tabs named Orders, Rates and Summary showing orders with a date written as day, short month and year, a price such as 1,250.00, a discount such as 5.0% and a net amount",scaledwidth=70%]
+
+The Summary sheet has no values of its own. Every cell after the first column
+is a formula: `COUNTIF`, `SUMIF` and `SUMIFS` over the orders, `VLOOKUP` and
+`INDEX` with `MATCH` into the rates, and an `IF` that names the standing of
+each region:
+
+.The Summary sheet, calculated from the other two
+image::img/generated/datagrid-sheet-summary.png["The Summary tab with a row for North, South, East and West and a row for all regions; South has the largest revenue, 42,664.50, and the last row reads South leads",scaledwidth=70%]
+
 ==== Formulas
 
 Formulas are live. A formula reads other cells by their address in the sheet, so
@@ -437,6 +468,37 @@ the cells that changed:
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-formula,indent=0]
 ----
+
+An edit reaches other sheets the same way. This corrects one order on the
+Orders sheet:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-edit,indent=0]
+----
+
+The grid of the Summary sheet repaints the cells that depend on that order, and
+nothing in the application asks it to:
+
+.The Summary sheet after the correction: the row for West, the totals and the leading region have changed
+image::img/generated/datagrid-sheet-recalc.png["The Summary tab where West now has 180 units and a revenue of 60,117.10, the total revenue is 163,326.52 and the last row reads West leads",scaledwidth=70%]
+
+A formula can also read a cell through a defined name. `loan-schedule.ods` is
+an OpenDocument file whose Schedule sheet calculates every payment with `PMT`,
+`IPMT`, `PPMT` and `EDATE` from four names on its Terms sheet:
+
+.A loan schedule read from an OpenDocument file
+image::img/generated/datagrid-sheet-loan.png["A grid under tabs named Terms and Schedule with a row for each month: a due date, a payment of 1,556.65, the interest, the principal, the balance and the share repaid",scaledwidth=70%]
+
+Changing the cell a name stands for calculates the whole schedule again:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-name,indent=0]
+----
+
+.The same schedule at the higher rate
+image::img/generated/datagrid-sheet-loan-rate.png["The Schedule tab where every payment is now 1,573.29 and the interest of the first month is 133.50",scaledwidth=70%]
 
 Text given to `setValueAt` is read the way a spreadsheet reads what's typed into
 a cell, which is what the grid's editor does: `=B2*C2` is a formula, `25%` is the
