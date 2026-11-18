@@ -294,6 +294,23 @@ public abstract class Axis {
         visibleMax = max;
     }
 
+    /// Puts back a viewport exactly as `getVisibleMin()`, `getVisibleMax()` and `isZoomed()`
+    /// read it, without clamping or snapping; for undoing a temporary change such as an
+    /// export, so the screen is left bit for bit as it was even mid-animation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: the visible minimum to restore
+    ///
+    /// - `max`: the visible maximum to restore
+    ///
+    /// - `zoomed`: the zoom flag to restore
+    public void restoreViewport(double min, double max, boolean zoomed) {
+        visibleMin = min;
+        visibleMax = max;
+        viewportSet = zoomed;
+    }
+
     /// Returns to the full data range.
     public void resetViewport() {
         viewportSet = false;

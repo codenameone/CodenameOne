@@ -408,13 +408,28 @@ public abstract class XYSeries extends Series {
         super.dataChanged();
     }
 
+    /// True when point `i` has no value to show: its x or its y is NaN or infinite.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the point index
+    ///
+    /// #### Returns
+    ///
+    /// true for a gap
+    public boolean isGapAt(int i) {
+        return isGap(xs[i]) || isGap(ys[i]);
+    }
+
     /// True when the x values never decrease, as a time series' do; a scatter filled in any
     /// order is not. Checked once per change to the data.
     public boolean isAscending() {
         if (orderState == 0) {
-            orderState = 1;
+            orderState = count > 0 && isGap(xs[0]) ? 2 : 1;
             for (int i = 1; i < count; i++) {
-                if (xs[i] < xs[i - 1]) {
+                // a non-finite x cannot be ordered: binary searches over it would go astray, so
+                // such data takes the linear-scan paths that skip it as a gap
+                if (xs[i] < xs[i - 1] || isGap(xs[i]) || isGap(xs[i - 1])) {
                     orderState = 2;
                     break;
                 }
@@ -448,15 +463,15 @@ public abstract class XYSeries extends Series {
             }
         }
         int best = Math.abs(xs[lo] - x) <= Math.abs(xs[hi] - x) ? lo : hi;
-        if (ys[best] == ys[best]) {
+        if (!isGapAt(best)) {
             return best;
         }
         // a gap: the nearest neighbour on either side that has a value
         for (int d = 1; d < count; d++) {
             int a = best - d;
             int b = best + d;
-            boolean aok = a >= 0 && ys[a] == ys[a];
-            boolean bok = b < count && ys[b] == ys[b];
+            boolean aok = a >= 0 && !isGapAt(a);
+            boolean bok = b < count && !isGapAt(b);
             if (aok && bok) {
                 return Math.abs(xs[a] - x) <= Math.abs(xs[b] - x) ? a : b;
             }
@@ -766,7 +781,7 @@ public abstract class XYSeries extends Series {
         int best = -1;
         int bestD = Integer.MAX_VALUE;
         for (int i = 0; i < count; i++) {
-            if (ys[i] != ys[i]) {
+            if (isGapAt(i)) {
                 continue;
             }
             int d = Math.abs(screenPosition(ctx, i, vertical) - pos);
@@ -787,7 +802,7 @@ public abstract class XYSeries extends Series {
         int oy = ctx.getOriginY();
         for (int i = r[0]; i <= r[1]; i++) {
             double v = ys[i];
-            if (isGap(v)) {
+            if (isGap(v) || isGap(xs[i])) {
                 continue;
             }
             double top = getBase(i) + v;

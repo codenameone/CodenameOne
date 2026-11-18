@@ -180,7 +180,7 @@ public class ScatterSeries extends XYSeries {
         int px0 = ctx.getPlotX();
         int py0 = ctx.getPlotY();
         for (int i = 0; i < count; i++) {
-            if (xs[i] < xmin || xs[i] > xmax) {
+            if (isGap(xs[i]) || xs[i] < xmin || xs[i] > xmax) {
                 continue;
             }
             double v = animatedY(ctx, i);
@@ -221,7 +221,7 @@ public class ScatterSeries extends XYSeries {
         double bestD = Double.MAX_VALUE;
         for (int i = 0; i < count; i++) {
             double v = getY(i);
-            if (isGap(v)) {
+            if (isGap(v) || isGap(xs[i])) {
                 continue;
             }
             int r = Math.max(radius, diameter(ctx, i, ms) / 2);

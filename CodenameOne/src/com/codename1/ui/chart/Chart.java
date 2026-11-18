@@ -634,7 +634,9 @@ public class Chart extends Component {
             paintChart(g, 0, 0, width, height);
         } finally {
             if (keepViewport != null) {
-                restore(axes, keepViewport);
+                // mid-tween an axis shows a display range that is not its zoom state, which
+                // restore() would snap or clamp; put back exactly what was on screen
+                restoreExactly(axes, keepViewport);
             }
             exporting = false;
             setX(ox);
@@ -651,6 +653,9 @@ public class Chart extends Component {
         // screen paint still hits what is on screen
         if (ow > 0 && oh > 0) {
             paint(Image.createImage(1, 1).getGraphics());
+            // that paint rescales an unzoomed axis to its data range; mid-tween the screen
+            // shows a frame of the animation instead, so put it back again
+            restoreExactly(axes, keepViewport);
             repaint();
         }
         return img;
@@ -1719,8 +1724,8 @@ public class Chart extends Component {
         double min = Double.MAX_VALUE;
         double max = -Double.MAX_VALUE;
         for (int i = 0; i < xy.size(); i++) {
-            double v = xy.getY(i);
-            if (v == v) {
+            if (!xy.isGapAt(i)) {
+                double v = xy.getY(i);
                 min = Math.min(min, v);
                 max = Math.max(max, v);
             }
@@ -1805,9 +1810,8 @@ public class Chart extends Component {
             i = -1;
             double bestD = Double.MAX_VALUE;
             for (int k = 0; k < s.size(); k++) {
-                double y = s.getY(k);
                 double d = Math.abs(s.getX(k) - x);
-                if (y == y && d < bestD) {
+                if (!s.isGapAt(k) && d < bestD) {
                     bestD = d;
                     i = k;
                 }
@@ -2272,6 +2276,17 @@ public class Chart extends Component {
         }
     }
 
+    // puts back a snapshot without clamping or snapping, for undoing an export
+    private static void restoreExactly(Axis[] axes, double[] r) {
+        if (r == null) {
+            return;
+        }
+        int n = Math.min(axes.length, r.length / 3);
+        for (int i = 0; i < n; i++) {
+            axes[i].restoreViewport(r[i * 3], r[i * 3 + 1], r[i * 3 + 2] != 0);
+        }
+    }
+
     private static boolean isTimeLike(Axis a) {
         return a instanceof com.codename1.ui.chart.axis.TimeAxis;
     }
@@ -2507,7 +2522,7 @@ public class Chart extends Component {
         // a gap (a NaN y) is skipped, whether stepping along a series or onto another one
         XYSeries gaps = s instanceof XYSeries ? (XYSeries) s : null;
         for (int i = index + dir; i >= 0 && i < s.getPointCount(); i += dir) {
-            if (gaps != null && Series.isGap(gaps.getY(i))) {
+            if (gaps != null && gaps.isGapAt(i)) {
                 continue;
             }
             next = s.getPoint(lastContext, i);

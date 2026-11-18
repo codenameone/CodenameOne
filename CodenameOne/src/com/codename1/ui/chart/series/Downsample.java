@@ -75,7 +75,7 @@ public final class Downsample {
         double ax = 0;
         double ay = 0;
         for (int j = 0; j < n; j++) {
-            if (y[j] == y[j]) {
+            if (!isGap(x, y, j)) {
                 ax = xAt(x, j);
                 ay = y[j];
                 break;
@@ -90,7 +90,7 @@ public final class Downsample {
             double avgY = 0;
             int len = 0;
             for (int j = avgStart; j < avgEnd; j++) {
-                if (y[j] == y[j]) {
+                if (!isGap(x, y, j)) {
                     avgX += xAt(x, j);
                     avgY += y[j];
                     len++;
@@ -109,21 +109,24 @@ public final class Downsample {
             int pick = -1;
             int gap = -1;
             for (int j = start; j < end; j++) {
-                if (y[j] != y[j]) {
+                if (isGap(x, y, j)) {
                     if (gap < 0) {
                         gap = j;
                     }
                     continue;
                 }
                 double area = Math.abs((ax - avgX) * (y[j] - ay) - (ax - xAt(x, j)) * (avgY - ay));
-                if (area > best) {
+                // a NaN area (an overflow) still picks a point rather than none
+                if (area > best || pick < 0) {
                     best = area;
                     pick = j;
                 }
             }
             if (pick < 0) {
-                // nothing but gap in this bucket
-                out[outLen++] = gap;
+                // nothing but gap in this bucket; an empty bucket adds nothing
+                if (gap >= 0) {
+                    out[outLen++] = gap;
+                }
                 continue;
             }
             ax = xAt(x, pick);
@@ -167,6 +170,19 @@ public final class Downsample {
             out[i] = values[indices[i]];
         }
         return out;
+    }
+
+    /// A NaN or infinite y, or x, is a gap.
+    private static boolean isGap(double[] x, double[] y, int j) {
+        double v = y[j];
+        if (v != v || Double.isInfinite(v)) {
+            return true;
+        }
+        if (x == null) {
+            return false;
+        }
+        double xv = x[j];
+        return xv != xv || Double.isInfinite(xv);
     }
 
     private static double xAt(double[] x, int i) {
