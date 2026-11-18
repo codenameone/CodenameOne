@@ -8,6 +8,9 @@ directory is resolved to the binary to launch and the code to size. The
 measurements themselves still need real builds; see test_benchlib.py.
 """
 
+import collections
+import contextlib
+import io
 import os
 import stat
 import subprocess
@@ -54,6 +57,53 @@ class TimeStreamDeadlines(unittest.TestCase):
         (upper, lower), elapsed = self._time("codenameone", "import time; time.sleep(60)")
         self.assertIsNone(upper)
         self.assertLess(elapsed, 5.0, "a blocking read would have waited out the child")
+
+    def _unmarked(self, code, launches=1):
+        """What the harness said on stderr about `launches` launches of `code`."""
+        saved = platforms.Adapter._unmarked_reported
+        platforms.Adapter._unmarked_reported = collections.Counter()
+        err = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err):
+                for _ in range(launches):
+                    (upper, _), _ = self._time("codenameone", code)
+                    self.assertIsNone(upper)
+        finally:
+            platforms.Adapter._unmarked_reported = saved
+        return err.getvalue()
+
+    def test_a_launch_with_no_marker_shows_what_it_printed(self):
+        # The gallery died in its first layout and every desktop leg of the nightly
+        # said only "cold=--": the exception was in the output this loop read
+        # and dropped. FIRSTFRAME-INVALID is not the marker, so it lands here too.
+        said = self._unmarked(
+            "import time; print('java.lang.ExceptionInInitializerError');"
+            "print('BENCH:FIRSTFRAME-INVALID after=3ms'); time.sleep(60)")
+        self.assertIn("| java.lang.ExceptionInInitializerError", said)
+        self.assertIn("| BENCH:FIRSTFRAME-INVALID after=3ms", said)
+
+    def test_the_first_lines_survive_an_application_that_keeps_logging(self):
+        # The first exception is the evidence, and a broken application lives
+        # for the whole launch timeout: a tail alone would show only the noise.
+        total = platforms.UNMARKED_HEAD_LINES + platforms.UNMARKED_TAIL_LINES + 50
+        said = self._unmarked(
+            "import time; print('the first exception');"
+            "[print('noise %%d' %% i) for i in range(%d)]; print('the last line');"
+            "time.sleep(60)" % (total - 2))
+        self.assertIn("| the first exception", said)
+        self.assertIn("| the last line", said)
+        self.assertIn("... 50 line(s) not shown ...", said)
+        self.assertIn("it wrote %d line(s)" % total, said)
+
+    def test_unmarked_launches_are_explained_a_few_times_not_every_round(self):
+        said = self._unmarked("import time; print('boom'); time.sleep(60)",
+                              launches=platforms.UNMARKED_REPORTS + 1)
+        self.assertEqual(said.count("never printed its start-up marker"),
+                         platforms.UNMARKED_REPORTS)
+
+    def test_a_silent_unmarked_launch_says_so(self):
+        said = self._unmarked("import time; time.sleep(60)")
+        self.assertIn("wrote nothing at all", said)
 
     def test_a_quiet_app_after_its_marker_is_let_go_at_settle(self):
         # What a HEALTHY app does: print the marker, then nothing. The loop used
@@ -254,14 +304,17 @@ class AndroidInstall(unittest.TestCase):
         self.result = os.path.join(self.bin, "install_result")
         with open(self.result, "w") as handle:
             handle.write("Success")
+        self.logcat = os.path.join(self.bin, "logcat")
+        self._logcat("I System.out: BENCH:FIRSTFRAME after=81ms edtPasses=1")
         adb = os.path.join(self.bin, "adb")
         with open(adb, "w") as handle:
             handle.write("#!/bin/sh\n"
                          "echo \"$*\" >> '%s'\n"
                          "case \"$*\" in *\\ install\\ *|install\\ *) cat '%s';; "
                          "*'package compile'*) echo Success;; "
+                         "*'logcat -d'*) cat '%s';; "
                          "*'am start'*) echo 'TotalTime: 123';; esac\n"
-                         % (self.log, self.result))
+                         % (self.log, self.result, self.logcat))
         os.chmod(adb, 0o755)
         self._path = os.environ["PATH"]
         os.environ["PATH"] = self.bin + os.pathsep + self._path
@@ -281,6 +334,34 @@ class AndroidInstall(unittest.TestCase):
     def _calls(self):
         with open(self.log) as handle:
             return [line.strip() for line in handle]
+
+    def _logcat(self, *lines):
+        with open(self.logcat, "w") as handle:
+            handle.write("\n".join(lines) + "\n")
+
+    def test_a_launch_that_drew_without_its_marker_is_not_a_measurement(self):
+        # `am start -W` answers for a gallery that died in its first layout
+        # too, faster than for a working one: the 2026-11-18 nightly published
+        # that as an improvement.
+        self._logcat("I ActivityManager: Displayed com.example.bench/.Main",
+                     "I System.out: java.lang.ExceptionInInitializerError",
+                     "I System.out: BENCH:FIRSTFRAME-INVALID after=3ms edtPasses=1")
+        saved = platforms.Adapter._unmarked_reported
+        platforms.Adapter._unmarked_reported = collections.Counter()
+        err = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err):
+                measured = self.adapter.launch_and_time("codenameone")
+        finally:
+            platforms.Adapter._unmarked_reported = saved
+        self.assertEqual((None, None, None), measured)
+        self.assertIn("| I System.out: java.lang.ExceptionInInitializerError", err.getvalue())
+        self.assertNotIn("ActivityManager", err.getvalue())
+        self.assertFalse([c for c in self._calls() if "meminfo" in c],
+                         "no memory figure for a launch that does not count")
+
+    def test_a_marked_launch_is_timed_by_the_platform(self):
+        self.assertEqual(123.0, self.adapter.launch_and_time("codenameone")[0])
 
     def test_uninstalls_then_installs_before_the_first_launch_only(self):
         cold, _, _ = self.adapter.launch_and_time("codenameone")

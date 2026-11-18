@@ -4,6 +4,9 @@ name: Flutter gallery compiles
 # the largest real Dart program the transpiler sees -- and compiles the result,
 # on every change to the transpiler, the runtimes or the Flutter build steps.
 #
+# It then STARTS it, in the simulator, and requires the first frame: #6222
+# compiled and died in its first layout (first-frame-check.sh).
+#
 # The benchmark (flutter-bench.yml) does this too, but runs on a pull request
 # only when its own tree changes. #6154 therefore merged a transpiler that
 # turned the gallery into Java javac rejects (a private class's static
@@ -28,6 +31,7 @@ on:
       - 'maven/build-engine/src/main/java/com/codename1/maven/DartLineMapper.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Flutter*.java'
       - 'scripts/flutter-bench/app/prepare.sh'
+      - 'scripts/flutter-bench/app/first-frame-check.sh'
       - 'scripts/flutter-bench/app/cn1/**'
       - '.github/workflows/flutter-gallery-compile.yml'
   push:
@@ -42,6 +46,7 @@ on:
       - 'maven/build-engine/src/main/java/com/codename1/maven/DartLineMapper.java'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Flutter*.java'
       - 'scripts/flutter-bench/app/prepare.sh'
+      - 'scripts/flutter-bench/app/first-frame-check.sh'
       - 'scripts/flutter-bench/app/cn1/**'
       - '.github/workflows/flutter-gallery-compile.yml'
   workflow_dispatch:
@@ -148,3 +153,16 @@ jobs:
           JAVA_HOME="$JAVA_HOME_17" bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B compile \
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
               -DskipTests -DskipComplianceCheck=true -pl common -am
+
+      # Compiling is not starting. #6222's class initialization cycle compiled,
+      # passed every test and killed the gallery in its first layout; only the
+      # nightly benchmark launched it. The simulator needs a display, which is
+      # what xvfb is for here -- this starts an application, it compiles no CSS.
+      - name: Install xvfb
+        run: bash scripts/ci/apt-get-install.sh xvfb
+
+      - name: Start the gallery and require its first frame
+        run: |
+          JAVA_HOME="$JAVA_HOME_17" PATH="$JAVA_HOME_17/bin:$PATH" xvfb-run -a \
+              scripts/flutter-bench/app/first-frame-check.sh \
+              "$RUNNER_TEMP/fbench/cn1" "$GITHUB_WORKSPACE/m2"
