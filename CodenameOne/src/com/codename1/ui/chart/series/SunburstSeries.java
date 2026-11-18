@@ -88,7 +88,7 @@ public class SunburstSeries extends HierarchySeries {
             g.drawString(b, Math.round(cx - f.stringWidth(b) / 2f), Math.round(cy));
         }
         // the hole goes back up even when it is too small for the label; hitTest also takes a
-        // tap outside the rings, so a sunburst too small to have a usable hole can still drill out
+        // tap in a narrow band just outside the rings, so a sunburst too small to have a usable hole can still drill out
         if (current != root) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
             crumb = new int[]{Math.round(cx - hole), Math.round(cy - hole), Math.round(hole * 2), Math.round(hole * 2)};
         }
@@ -103,7 +103,11 @@ public class SunburstSeries extends HierarchySeries {
         }
         float dx = x + ctx.getOriginX() - cx;
         float dy = y + ctx.getOriginY() - cy;
-        if (dx * dx + dy * dy > outer * outer) {
+        // only a narrow band just past the outer ring goes up: farther out is the title, the
+        // legend or another row, and a tap or hover there must not drill out or show a tooltip
+        float d2 = dx * dx + dy * dy;
+        float band = outer + Math.max(radius, ctx.mm(4));
+        if (d2 > outer * outer && d2 <= band * band) {
             TreeNode up = current.getParent();
             return new ChartPoint(this, -1, 0, current.getValue(), x, y, up == null ? null : up.getLabel());
         }

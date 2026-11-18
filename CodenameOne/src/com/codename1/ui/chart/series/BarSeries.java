@@ -164,24 +164,43 @@ public class BarSeries extends XYSeries {
     /// grouped bars line up: the closest x spacing of any bar series that is painted. When no
     /// bar series has two distinct x values (a single bar, which on a time axis would be one
     /// millisecond wide) the band is a fifth of the plot instead.
+    ///
+    /// A series fading in or out narrows the band in proportion to its visibility, so the
+    /// bars change width smoothly rather than snapping when its fraction reaches zero.
     private float bandPixels(ChartContext ctx) {
         double m = Double.MAX_VALUE;
-        for (Series s : getChart().getSeries()) {
-            if (counts(s)) {
-                BarSeries bs = (BarSeries) s;
-                if (bs.size() > 1) {
-                    double d = bs.getMinXSpacing();
-                    if (d > 0 && d < m) {
-                        m = d;
-                    }
+        List<Series> all = getChart().getSeries();
+        for (Series s : all) {
+            if (counts(s) && fullyVisible(s)) {
+                double d = spacing(s);
+                if (d > 0 && d < m) {
+                    m = d;
                 }
             }
         }
         float span = ctx.isRotated() ? ctx.getPlotHeight() : ctx.getPlotWidth();
-        if (m == Double.MAX_VALUE) {
-            return span / 5f;
+        float px = m == Double.MAX_VALUE ? span / 5f : Math.abs(ctx.xLength(m));
+        for (Series s : all) {
+            if (counts(s) && !fullyVisible(s)) {
+                double d = spacing(s);
+                if (d > 0) {
+                    float dpx = Math.abs(ctx.xLength(d));
+                    if (dpx < px) {
+                        px += (dpx - px) * ((BarSeries) s).getVisibilityFraction();
+                    }
+                }
+            }
         }
-        return Math.abs(ctx.xLength(m));
+        return px;
+    }
+
+    private boolean fullyVisible(Series s) {
+        return s == this || ((BarSeries) s).getVisibilityFraction() >= 1; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+    }
+
+    private static double spacing(Series s) {
+        BarSeries bs = (BarSeries) s;
+        return bs.size() > 1 ? bs.getMinXSpacing() : 0;
     }
 
     private float[] barRect(ChartContext ctx, int i, double base, double v, float[] slot, float bandPx) {

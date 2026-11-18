@@ -29,7 +29,7 @@ import java.util.Date;
 
 /// A time axis whose values are milliseconds since the epoch. Ticks land on calendar
 /// boundaries (whole minutes, midnights, first of the month, new year) and the label
-/// format follows the tick unit, so zooming from years down to seconds stays readable.
+/// format follows the tick unit, so zooming from years down to milliseconds stays readable.
 public class TimeAxis extends Axis {
     private static final long SEC = 1000L;
     private static final long MIN = 60 * SEC;
@@ -40,6 +40,10 @@ public class TimeAxis extends Axis {
 
     /// Candidate tick steps, smallest first, as `{approximate millis, calendar field, amount}`.
     private static final long[][] STEPS = {
+        {1, Calendar.MILLISECOND, 1}, {2, Calendar.MILLISECOND, 2}, {5, Calendar.MILLISECOND, 5},
+        {10, Calendar.MILLISECOND, 10}, {20, Calendar.MILLISECOND, 20}, {50, Calendar.MILLISECOND, 50},
+        {100, Calendar.MILLISECOND, 100}, {200, Calendar.MILLISECOND, 200},
+        {500, Calendar.MILLISECOND, 500},
         {SEC, Calendar.SECOND, 1}, {5 * SEC, Calendar.SECOND, 5}, {15 * SEC, Calendar.SECOND, 15},
         {30 * SEC, Calendar.SECOND, 30}, {MIN, Calendar.MINUTE, 1}, {5 * MIN, Calendar.MINUTE, 5},
         {15 * MIN, Calendar.MINUTE, 15}, {30 * MIN, Calendar.MINUTE, 30}, {HOUR, Calendar.HOUR_OF_DAY, 1},
@@ -84,21 +88,48 @@ public class TimeAxis extends Axis {
         if (!(span > 0)) { //NOPMD LogicInversion - the negated comparison is also true for NaN
             return new double[]{min};
         }
-        long[] step = STEPS[STEPS.length - 1];
-        for (long[] candidate : STEPS) {
-            if (span / candidate[0] <= Math.max(1, maxCount - 1)) {
-                step = candidate;
+        int index = STEPS.length - 1;
+        for (int i = 0; i < STEPS.length; i++) {
+            if (span / STEPS[i][0] <= Math.max(1, maxCount - 1)) {
+                index = i;
                 break;
             }
         }
-        int field = (int) step[1];
-        int amount = (int) step[2];
-        fieldOut[0] = field;
+        double[] tmp = new double[Math.max(2, maxCount) + 3];
+        // a step as wide as the span can leave one calendar boundary inside it, or none;
+        // step down until two land inside, as Ticks.linear does, so an axis never has a
+        // single label
+        while (true) {
+            long[] step = STEPS[index];
+            int field = (int) step[1];
+            int n = fill(min, max, field, (int) step[2], tmp);
+            if (n >= 2 || index == 0) {
+                fieldOut[0] = field;
+                if (n < 2) {
+                    return new double[]{min, max};
+                }
+                double[] out = new double[n];
+                System.arraycopy(tmp, 0, out, 0, n);
+                return out;
+            }
+            index--;
+        }
+    }
+
+    private static int fill(double min, double max, int field, int amount, double[] tmp) {
+        int n = 0;
+        if (field == Calendar.MILLISECOND) {
+            // sub-second steps divide a second evenly, so epoch multiples are on boundaries
+            long t = (long) Math.ceil(min / amount) * amount;
+            while (n < tmp.length && t <= max) {
+                tmp[n++] = t;
+                t += amount;
+            }
+            return n;
+        }
         Calendar c = Calendar.getInstance();
         c.setTime(new Date((long) min));
         truncate(c, field, amount);
-        double[] tmp = new double[maxCount + 3];
-        int n = 0;
         int guard = 0;
         while (n < tmp.length && guard++ < 1000) {
             long t = c.getTime().getTime();
@@ -110,13 +141,14 @@ public class TimeAxis extends Axis {
             }
             c.add(field, amount);
         }
-        double[] out = new double[n];
-        System.arraycopy(tmp, 0, out, 0, n);
-        return out;
+        return n;
     }
 
     /// The date pattern for ticks spaced by `field`.
     static String patternFor(int field) {
+        if (field == Calendar.MILLISECOND) {
+            return "HH:mm:ss.SSS";
+        }
         if (field == Calendar.SECOND) {
             return "HH:mm:ss";
         }

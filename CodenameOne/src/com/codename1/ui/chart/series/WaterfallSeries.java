@@ -29,6 +29,14 @@ import com.codename1.ui.chart.ChartPoint;
 /// A waterfall (bridge) chart: each bar starts where the previous one ended, so a sequence of
 /// gains and losses reads as a running total. Total bars restart from zero and show the sum.
 ///
+/// A total's value is always computed: it is the sum of the steps before it that are still in
+/// the series, so `set` on a total bar is ignored, and once a `setMaxPoints` window slides the
+/// oldest steps out a total sums only the steps that remain (the bridge must stay joined to
+/// what is drawn). Which bars are totals is fixed by `setSteps`; `setData` keeps that marking
+/// by position (row `i` stays a total if it was one) and new rows are plain steps, so replacing
+/// the numbers of a bridge does not silently turn its totals into steps. To change the marking,
+/// call `setSteps` again. A point added by `add` is always a plain step.
+///
 /// ```java
 /// new WaterfallSeries("Profit").setSteps(new double[]{120, -30, -25, 40, 0}, new boolean[]{false, false, false, false, true});
 /// ```
@@ -71,6 +79,21 @@ public class WaterfallSeries extends BarSeries {
         }
         // the bases and totals are filled in by dataChanged, which every change goes through
         setRows(null, y, new double[][]{base, total});
+        return this;
+    }
+
+    /// Replaces the deltas, keeping which rows are totals by position: row `i` stays a total
+    /// when it was one, and rows past the old size are plain steps. Use `setSteps` to change
+    /// the marking.
+    @Override
+    public XYSeries setData(double[] x, double[] y) {
+        int n = y.length;
+        double[] base = new double[n];
+        double[] total = new double[n];
+        for (int i = 0; i < n; i++) {
+            total[i] = isTotal(i) ? 1 : 0;
+        }
+        setRows(x, y, new double[][]{base, total});
         return this;
     }
 

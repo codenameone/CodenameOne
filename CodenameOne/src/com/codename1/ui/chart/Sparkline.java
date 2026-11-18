@@ -201,7 +201,7 @@ public class Sparkline extends Component {
         int iMax = -1;
         for (int i = 0; i < n; i++) {
             double v = values[i];
-            if (v != v) {
+            if (gap(v)) {
                 continue;
             }
             if (v < min) {
@@ -236,7 +236,7 @@ public class Sparkline extends Component {
             int zero = y + (int) Math.round((max - 0) / span * h);
             for (int i = 0; i < n; i++) {
                 double v = values[i];
-                if (v != v) {
+                if (gap(v)) {
                     continue;
                 }
                 int vy = y + (int) Math.round((max - v) / span * h);
@@ -254,7 +254,7 @@ public class Sparkline extends Component {
             int segments = 0;
             for (int i = 0; i < n; i++) {
                 double v = values[i];
-                if (v != v) {
+                if (gap(v)) {
                     // a gap breaks the line and its area, as in LineSeries; never bridge across it
                     if (started) {
                         area.lineTo(lastX, y + h);
@@ -297,7 +297,7 @@ public class Sparkline extends Component {
             }
             if (showLast) {
                 int last = n - 1;
-                while (last >= 0 && values[last] != values[last]) {
+                while (last >= 0 && gap(values[last])) {
                     last--;
                 }
                 if (last >= 0) {
@@ -306,6 +306,12 @@ public class Sparkline extends Component {
             }
         }
         g.setAntiAliased(aa);
+    }
+
+    /// A value the sparkline cannot place: NaN, or an infinity that would make the span
+    /// infinite and every other point NaN. Both are drawn as a gap.
+    private static boolean gap(double v) {
+        return v != v || Double.isInfinite(v);
     }
 
     private static void dot(Graphics g, int x, int y, int w, int h, int n, int i, double v, double max, double span, int color, int d) {

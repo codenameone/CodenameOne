@@ -76,11 +76,36 @@ public abstract class CategoricalSeries extends Series {
         for (int i = 0; i < n; i++) {
             this.labels[i] = labels != null && i < labels.length ? labels[i] : String.valueOf(i + 1);
             this.values[i] = values[i];
-            h[i] = wasHidden(oldLabels, oldHidden, this.labels[i], i);
+            h[i] = wasHidden(oldLabels, oldHidden, this.labels, i);
         }
         hidden = h;
         dataChanged();
         return this;
+    }
+
+    // a part hidden from the legend stays hidden when new data still names it, wherever it moved.
+    // Labels may repeat, so the k-th part of a name takes the state of the k-th old part of that
+    // name; an unlabelled part keeps its index's state
+    private static boolean wasHidden(String[] oldLabels, boolean[] oldHidden, String[] labels, int i) {
+        String label = labels[i];
+        if (oldLabels == null || label == null) {
+            return i < oldHidden.length && oldHidden[i];
+        }
+        int occurrence = 0;
+        for (int k = 0; k < i; k++) {
+            if (label.equals(labels[k])) {
+                occurrence++;
+            }
+        }
+        for (int k = 0; k < oldLabels.length && k < oldHidden.length; k++) {
+            if (label.equals(oldLabels[k])) {
+                if (occurrence == 0) {
+                    return oldHidden[k];
+                }
+                occurrence--;
+            }
+        }
+        return false;
     }
 
     /// Changes the value of one part, animated.
@@ -94,23 +119,6 @@ public abstract class CategoricalSeries extends Series {
     /// #### Returns
     ///
     /// this series
-    // a part hidden from the legend stays hidden when new data still names it, wherever it moved;
-    // a label that keeps its index keeps that index's state, otherwise the first old part of that name decides
-    private static boolean wasHidden(String[] oldLabels, boolean[] oldHidden, String label, int i) {
-        if (oldLabels == null || label == null) {
-            return i < oldHidden.length && oldHidden[i];
-        }
-        if (i < oldLabels.length && label.equals(oldLabels[i])) {
-            return i < oldHidden.length && oldHidden[i];
-        }
-        for (int k = 0; k < oldLabels.length && k < oldHidden.length; k++) {
-            if (label.equals(oldLabels[k])) {
-                return oldHidden[k];
-            }
-        }
-        return false;
-    }
-
     public CategoricalSeries setValue(int i, double value) {
         begin();
         values[i] = value;

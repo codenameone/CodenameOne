@@ -33,7 +33,7 @@ public final class Squarify {
     ///
     /// #### Parameters
     ///
-    /// - `values`: the values, not necessarily sorted; negative values count as 0
+    /// - `values`: the values, not necessarily sorted; negative and non-finite values count as 0
     ///
     /// - `x`: the rectangle's left
     ///
@@ -65,7 +65,7 @@ public final class Squarify {
             order[i] = i;
         }
         for (int a = 1; a < n; a++) {
-            for (int b = a; b > 0 && values[order[b]] > values[order[b - 1]]; b--) {
+            for (int b = a; b > 0 && pos(values[order[b]]) > pos(values[order[b - 1]]); b--) {
                 int t = order[b];
                 order[b] = order[b - 1];
                 order[b - 1] = t;
@@ -143,6 +143,8 @@ public final class Squarify {
 
     // NaN and negative values count as nothing; Math.max(0, NaN) is NaN and would poison the sums
     private static double pos(double v) {
-        return !(v > 0) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
+        // an infinite value would make every other cell's share 0/inf and every rect NaN, so a
+        // non-finite value counts as 0, as it does on a radar
+        return !(v > 0) || Double.isInfinite(v) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
     }
 }

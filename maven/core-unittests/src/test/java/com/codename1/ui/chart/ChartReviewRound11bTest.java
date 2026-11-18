@@ -223,7 +223,7 @@ public class ChartReviewRound11bTest extends UITestBase {
     }
 
     @FormTest
-    public void smallSunburstCanDrillOut() {
+    public void smallSunburstCanDrillOut() throws Exception {
         TreeNode root = new TreeNode("root");
         TreeNode a = new TreeNode("A");
         a.add(new TreeNode("a1", 1)).add(new TreeNode("a2", 2));
@@ -234,8 +234,12 @@ public class ChartReviewRound11bTest extends UITestBase {
         s.setCurrent(a);
         calls(c, 60, 60);
         ChartContext ctx = c.getLastContext();
-        ChartPoint p = s.hitTest(ctx, 1 - ctx.getOriginX(), 1 - ctx.getOriginY(), 2);
-        assertNotNull(p, "a tap outside the rings goes back up");
+        // just past the outer ring (round 12 limits going up to a narrow band there, so a tap
+        // on the title or legend does not drill out)
+        int x = Math.round(ChartReviewRound12Test.fieldOf(s, "cx") + ChartReviewRound12Test.fieldOf(s, "outer") + 1);
+        int y = Math.round(ChartReviewRound12Test.fieldOf(s, "cy"));
+        ChartPoint p = s.hitTest(ctx, x - ctx.getOriginX(), y - ctx.getOriginY(), 2);
+        assertNotNull(p, "a tap just outside the rings goes back up");
         assertEquals(-1, p.getIndex());
         assertTrue(s.handleTap(p));
         assertEquals(root, s.getCurrent());
