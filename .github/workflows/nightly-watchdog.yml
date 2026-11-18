@@ -11,7 +11,8 @@ name: Nightly watchdog
 # This job reads the nightly set from the workflow files themselves -- every
 # workflow with an uncommented `- cron: '11 0 * * *'` -- so adding a suite to the
 # nightly is one cron line, with no list here to keep in sync. It then finds
-# the newest scheduled run of each on master and keeps ONE issue open,
+# the newest scheduled run of each on master, re-runs the failed jobs of a
+# suite's first failure once (see RETRY below), and keeps ONE issue open,
 # assigned to NIGHTLY_ALERT_ASSIGNEE, listing every suite that failed or has
 # not run in the last 30 hours -- except one that has never had a scheduled
 # run and reached master inside that window, which is awaiting its first night.
@@ -32,7 +33,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: read
+  # write: a first failure is re-run once before it is reported (see RETRY).
+  actions: write
   contents: read
   issues: write
 
@@ -111,6 +113,8 @@ jobs:
             const running = [];
             const awaiting = [];
             const cancelled = [];
+            const retries = [];
+            let retried = 0;
             for (const file of nightly) {
               let runs;
               try {
@@ -152,9 +156,17 @@ jobs:
                 problems.push(`- \`${file}\`: no scheduled run in the last 30 hours (workflow disabled, or the schedule did not fire)`);
                 continue;
               }
+              // A run past its first attempt has had its re-run, by this
+              // script or by hand; it counts against RETRY_CAP below.
+              if (newest.run_attempt > 1) retried++;
               const done = runs.find(r => r.status === 'completed');
               if (newest.status !== 'completed') {
-                running.push(`- [\`${file}\`](${newest.html_url}): still ${newest.status}`);
+                running.push(`- [\`${file}\`](${newest.html_url}): still ${newest.status}${newest.run_attempt > 1 ? ` (attempt ${newest.run_attempt}, re-run after a failure)` : ''}`);
+                // A re-run in progress IS tonight's verdict, still pending. The
+                // previous completed run is an older night, whose failure the
+                // re-run exists to supersede; listing it would report the
+                // suite failing and re-running at once.
+                if (newest.run_attempt > 1) continue;
               }
               // A cancelled run (a maintainer, or a newer run in its group) is
               // listed but is not a failure -- unless a job in it never got a
@@ -163,12 +175,70 @@ jobs:
               const parts = done && !GREEN.includes(done.conclusion)
                   && Date.now() - new Date(done.created_at).getTime() <= 2 * STALE_MS
                 ? await failedParts(done) : '';
-              if (done && done.conclusion === 'cancelled' && !parts.includes(STARVED)) {
+              // RETRY: a suite's first failure after a green night is a
+              // candidate for one re-run before it is reported; see where the
+              // candidates are settled, below the loop. Only the newest run,
+              // only its attempt 1, only when the night before was green -- a
+              // suite red two nights running is reported at once. Never a cancelled run,
+              // starved or not: that cannot be told from a maintainer
+              // clearing the queue (2026-11-17, every queued nightly at once).
+              const before = runs.find(r => r.id !== newest.id && r.status === 'completed');
+              if (done && done.id === newest.id && done.run_attempt === 1
+                  && !GREEN.includes(done.conclusion) && done.conclusion !== 'cancelled'
+                  && before && GREEN.includes(before.conclusion)) {
+                retries.push({ file, run: done, parts });
+                continue;
+              }
+              if (done && done.conclusion === 'cancelled' && done.run_attempt > 1
+                  && Date.now() - new Date(done.created_at).getTime() <= 2 * STALE_MS) {
+                // A cancelled RE-RUN is a failure whose second attempt never
+                // finished -- the next night's run cancels one still going,
+                // they share a concurrency group. Its first attempt failed,
+                // or there would have been nothing to re-run; filing it under
+                // "cancelled" would lose that failure and close the issue.
+                problems.push(`- [\`${file}\`](${done.html_url}): failed, and its re-run (attempt ${done.run_attempt}) was cancelled${parts}`);
+              } else if (done && done.conclusion === 'cancelled' && !parts.includes(STARVED)) {
                 cancelled.push(`- [\`${file}\`](${done.html_url}): cancelled`);
               } else if (done && !GREEN.includes(done.conclusion)
                   && Date.now() - new Date(done.created_at).getTime() <= 2 * STALE_MS) {
                 problems.push(`- [\`${file}\`](${done.html_url}): ${done.conclusion}${parts}`);
               }
+            }
+
+            // Much of a red night is not code. On 2026-11-18 Maven Central
+            // answered 429 through all of retry.sh's back-off (reel), and
+            // purchase-e2e's macOS setup-workspace was cut off at its limit
+            // because the cache it restores had been evicted. An alert that is
+            // usually infrastructure is one nobody reads, so such a failure
+            // gets its failed jobs run once more and is reported only if it
+            // fails again. What that costs: a real failure is reported a check
+            // or two later (the crons start hours late -- the nightlies near
+            // 07:15 UTC, these checks near 17:00, 21:50 and 01:45), and a test
+            // that fails once and passes on the re-run is NOT reported; the
+            // run's attempt count is its only trace.
+            //
+            // Not above RETRY_CAP: that many suites failing together is
+            // master or an outage, to be reported now, and re-running them
+            // would put the whole night back on the runners in the middle of
+            // the day's pull requests. The cap counts the night, not the
+            // check: suites finish hours apart, so the runs already past
+            // their first attempt are counted with this check's candidates. And only from the schedule -- a manual
+            // run of this workflow refreshes the issue and starts nothing.
+            const RETRY_CAP = 5;
+            const retrying = [];
+            const mayRetry = context.eventName === 'schedule' && retried + retries.length <= RETRY_CAP;
+            for (const { file, run, parts } of retries) {
+              if (mayRetry) {
+                try {
+                  await github.rest.actions.reRunWorkflowFailedJobs({ owner, repo, run_id: run.id });
+                  retrying.push(`- [\`${file}\`](${run.html_url}): first attempt ${run.conclusion}${parts}; its failed jobs are being re-run`);
+                  continue;
+                } catch (e) {
+                  // Could not re-run (too old, or the API refused): report it.
+                  core.warning(`could not re-run ${file} run ${run.id}: ${e.status || e.message}`);
+                }
+              }
+              problems.push(`- [\`${file}\`](${run.html_url}): ${run.conclusion}${parts}`);
             }
 
             const open = await github.paginate(github.rest.issues.listForRepo, {
@@ -179,22 +249,24 @@ jobs:
 
             await core.summary
               .addHeading('Nightly watchdog')
-              .addRaw(`${nightly.length} nightly workflows, ${problems.length} failing, ${running.length} still running, ${awaiting.length} awaiting a first run.\n\n`)
-              .addRaw([...problems, ...running, ...awaiting].join('\n') || 'All green.')
+              .addRaw(`${nightly.length} nightly workflows, ${problems.length} failing, ${running.length} still running, ${retrying.length} being re-run, ${awaiting.length} awaiting a first run.\n\n`)
+              .addRaw([...problems, ...retrying, ...running, ...awaiting].join('\n') || 'All green.')
               .write();
 
             if (problems.length === 0) {
               // Close only on a night where everything finished green.
-              if (issue && running.length === 0 && awaiting.length === 0) {
+              if (issue && running.length === 0 && awaiting.length === 0 && retrying.length === 0) {
                 await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
                   body: `Recovered: every nightly workflow passed on the run checked at ${now}.` });
                 await github.rest.issues.update({ owner, repo, issue_number: issue.number,
                   state: 'closed', state_reason: 'completed' });
               } else if (issue) {
-                // Nothing failing any more, but not every suite has finished:
+                // Nothing to report any more, but not every suite has finished:
                 // keep the issue open and stop it listing failures that are gone.
+                // "Reported", not "no failures": a first failure being re-run
+                // is a failure, listed here as one.
                 await github.rest.issues.update({ owner, repo, issue_number: issue.number, body: [
-                  marker, `No failures as of ${now}; the issue closes once these finish green:`, '', ...running, ...awaiting,
+                  marker, `Nothing reported failing as of ${now}; the issue closes once these finish green:`, '', ...retrying, ...running, ...awaiting,
                 ].join('\n') });
               }
               return;
@@ -205,7 +277,8 @@ jobs:
               `These nightly workflows failed on master (checked ${now}):`,
               '',
               ...problems,
-              ...(running.length ? ['', 'Still running when checked (judged by their previous completed run):', '', ...running] : []),
+              ...(retrying.length ? ['', 'Failed once after a green night; being re-run before they are reported:', '', ...retrying] : []),
+              ...(running.length ? ['', 'Still running when checked (a first attempt is judged by its previous completed run):', '', ...running] : []),
               ...(awaiting.length ? ['', 'Awaiting their first scheduled run (new to the nightly):', '', ...awaiting] : []),
               ...(cancelled.length ? ['', 'Cancelled (not counted as failures):', '', ...cancelled] : []),
               '',

@@ -1511,6 +1511,16 @@ never failed there. They now run:
   CI failures", open and assigned to `vars.NIGHTLY_ALERT_ASSIGNEE` (default
   `shai-almog`) until a night where every suite finished green. A suite with
   no scheduled run in 30 hours is reported too.
+- **A first failure after a green night is re-run before it is reported.**
+  The watchdog re-runs the failed jobs of such a run once and lists it apart;
+  only a second failure reaches the issue. Not a cancelled run, not a suite
+  that was already red the night before, not from a manual run of the
+  watchdog, and not when more than five suites fail together -- that is
+  master or an outage, and is reported at once. Maven Central 429s and
+  evicted caches are an ordinary night. A test that fails once and passes on
+  the re-run is therefore *not* reported -- the run's attempt count is the
+  only trace. Re-running a nightly by hand keeps `event: schedule`, so the
+  watchdog judges the re-run.
 
 - **The samples' nightly iOS builds are one workflow**,
   `samples-ios-nightly.yml`: the port built once, then two macOS shards build
