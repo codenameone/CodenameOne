@@ -135,7 +135,7 @@ renderers do for everything but their accents, and the cells follow the theme,
 the dark appearance and the selection. `getPreferredWidth` is what a column with
 no width is measured with.
 
-A value that is an `Image` is drawn as an image by the default renderer, scaled
+An `Image` value is drawn as an image by the default renderer, scaled
 to the row.
 
 === Sorting
