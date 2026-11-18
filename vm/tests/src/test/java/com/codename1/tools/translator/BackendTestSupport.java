@@ -93,16 +93,59 @@ final class BackendTestSupport {
         return build(mainClass, demoDir, binary, jdk8, false);
     }
 
+    /// The database engine a URL names, as CN1_BACKEND_DATABASE spells it. A
+    /// binary carries ONE server engine, so a test that visits several servers
+    /// builds once per engine; this is what tells it which build a URL needs.
+    static String engineOf(String url) {
+        if (url.regionMatches(true, 0, "postgres", 0, 8)) {
+            return "postgres";
+        }
+        if (url.regionMatches(true, 0, "mysql:", 0, 6) || url.regionMatches(true, 0, "mariadb:", 0, 8)) {
+            return "mysql";
+        }
+        return "sqlite";
+    }
+
+    /// The binary of `mainClass` built for the engine `url` names, building it
+    /// on first use. A SQLite URL takes a binary that is already there when one
+    /// is -- every binary links SQLite, and running it beside a server engine
+    /// is the more telling case -- and its own build only when there is none.
+    /// Skips or fails, as [#skipOrFail], when the build does.
+    static Path binaryFor(Map<String, Path> built, String url, String mainClass, String demoDir,
+            Path work, Path jdk8) throws Exception {
+        String engine = engineOf(url);
+        if ("sqlite".equals(engine) && !built.isEmpty()) {
+            return built.values().iterator().next();
+        }
+        Path binary = built.get(engine);
+        if (binary == null) {
+            binary = work.resolve(mainClass.toLowerCase(java.util.Locale.ROOT) + "-" + engine);
+            String failure = build(mainClass, demoDir, binary, jdk8, false, engine);
+            if (failure != null) {
+                skipOrFail(failure);
+            }
+            built.put(engine, binary);
+        }
+        return binary;
+    }
+
     /// As [#build(String, String, Path, Path)]; `standalone` builds a demo that needs
     /// neither the shared contract nor demo/common (CN1_BACKEND_STANDALONE_DEMO).
     static String build(String mainClass, String demoDir, Path binary, Path jdk8, boolean standalone)
             throws Exception {
+        return build(mainClass, demoDir, binary, jdk8, standalone, "sqlite");
+    }
+
+    /// As above, compiling in the one server engine named (`sqlite` for none).
+    static String build(String mainClass, String demoDir, Path binary, Path jdk8, boolean standalone,
+            String engine) throws Exception {
         ProcessBuilder build = new ProcessBuilder("./build.sh", mainClass, "com.demo",
                 binary.toString());
         build.directory(backendDir().toFile());
         build.environment().put("JDK_8_HOME", jdk8.toString());
         build.environment().put("JAVA_HOME", jdk8.toString());
         build.environment().put("CN1_BACKEND_DEMO", demoDir);
+        build.environment().put("CN1_BACKEND_DATABASE", engine);
         if (standalone) {
             build.environment().put("CN1_BACKEND_STANDALONE_DEMO", "1");
         }

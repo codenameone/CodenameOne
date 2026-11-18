@@ -25,6 +25,11 @@
     than a crash at start-up.
   -->
   <properties>
+    <!-- The ONE database engine this server is built for: sqlite, postgres or
+         mysql (which covers MariaDB). Only that engine's client is compiled in,
+         and a URL naming another is refused. sqlite means no database server.
+         -Dcn1.backend.database=... overrides it for one build. -->
+    <cn1.backend.database>sqlite</cn1.backend.database>
     <cn1.plugin.version>7.0.282</cn1.plugin.version>
     <cn1.version>7.0.282</cn1.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

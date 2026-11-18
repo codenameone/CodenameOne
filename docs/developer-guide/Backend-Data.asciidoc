@@ -36,6 +36,32 @@ MariaDB 10.3 works too. It has the same collation, which MariaDB added in 10.2.2
 but it reached its upstream end of life in 2023 and isn't among the versions the
 tests run against, so 10.4 is the oldest release that's verified.
 
+==== One engine for each application
+
+A server is built for one database engine, and the build names it:
+
+[source,xml]
+----
+<properties>
+    <cn1.backend.database>postgres</cn1.backend.database>
+</properties>
+----
+
+The value is `sqlite`, `postgres` or `mysql`, and `mysql` covers MariaDB. A
+Gradle project sets the same key in the backend's `gradle.properties`. `sqlite`
+means the server talks to no database server at all.
+
+Only the named engine's client is compiled into the binary, so a PostgreSQL
+service doesn't carry a MySQL client it never calls. The choice holds everywhere
+the server runs: on the JVM during development and in tests, a URL that names
+another engine is refused with a message that says which engine the build
+declared, exactly as the packaged binary refuses it. SQLite stays available
+beside a server engine unless `cn1.backend.sqlite=false` leaves it out.
+
+A build that declares no engine stops and names the property. To build the same
+server for another engine once, pass `-Dcn1.backend.database=mysql` to Maven or
+`-Pcn1.backend.database=mysql` to Gradle.
+
 ==== Encrypted connections
 
 TLS is set on the URL. `sslmode=require` and its synonym `verify-full` demand

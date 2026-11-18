@@ -19,6 +19,14 @@
        iOS, Android and the browser, and codenameone-backend is a server library that
        has no business on those classpaths.
   -->
+  <properties>
+    <!-- The ONE database engine this server is built for: sqlite, postgres or
+         mysql (which covers MariaDB). Only that engine's client is compiled in,
+         and a URL naming another is refused. sqlite means no database server.
+         -Dcn1.backend.database=... overrides it for one build. -->
+    <cn1.backend.database>sqlite</cn1.backend.database>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.codenameone</groupId>

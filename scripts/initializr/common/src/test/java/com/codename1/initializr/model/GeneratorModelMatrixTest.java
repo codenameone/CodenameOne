@@ -240,6 +240,20 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // Gradle builds -- from the IDE or ./gradlew -- report through the plugin's
         // settings half; a backend-only project has no client build to report.
         String gradleProperties = getText(entries, "gradle.properties");
+        // The engine a server is built for is declared beside its build script; an
+        // undeclared one fails the build, so every shape with a server has it.
+        if (type.hasNoClient()) {
+            assertContains(gradleProperties, "\ncn1.backend.database=sqlite\n",
+                    label + "a server at the root declares its database in the root gradle.properties");
+            assertNull(entries.get("backend/gradle.properties"), label + "backend-only has no backend/ directory");
+        } else {
+            assertFalse(gradleProperties.indexOf("cn1.backend.database=") >= 0,
+                    label + "an application's root declares no database");
+            if (type == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
+                assertContains(getText(entries, "backend/gradle.properties"), "\ncn1.backend.database=sqlite\n",
+                        label + "the backend declares its database");
+            }
+        }
         if (type.hasNoClient()) {
             assertFalse(gradleProperties.indexOf("cn1.telemetry.") >= 0,
                     label + "a backend-only project does not report builds");
@@ -460,6 +474,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 label + "the app depends on the contract");
         assertContains(getText(entries, "backend/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
                 label + "the server depends on the contract");
+        assertContains(getText(entries, "backend/pom.xml"), "<cn1.backend.database>",
+                label + "the template's server declares its database");
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
@@ -779,6 +795,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
         assertEqual(app.keySet(), withBackend.keySet(), "Maven App and App + backend should be the same download");
         assertNotNull(app.get("backend/pom.xml"), "Maven projects keep the backend module");
+        assertContains(getText(app, "backend/pom.xml"), "<cn1.backend.database>sqlite</cn1.backend.database>",
+                "The generic backend module declares its database");
 
         Map<String, byte[]> minimal = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.INTELLIJ, "SameApp",
                 "com.acme.same", ProjectOptions.defaults());
@@ -877,6 +895,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         }
         if (type == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
             assertNotNull(entries.get("backend/pom.xml"), label + "App + backend has the backend module");
+            assertContains(getText(entries, "backend/pom.xml"), "<cn1.backend.database>",
+                    label + "the backend module declares its database");
             assertContains(getText(entries, "README.md"), "## Backend", label + "README should explain the backend");
         }
         if (template.isFullStack()) {
@@ -902,6 +922,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     }
 
     private void validateMavenBackendOnly(Map<String, byte[]> entries, ProjectOptions.ProjectType type, IDE ide, String packageName, String label) {
+        assertContains(getText(entries, "pom.xml"), "<cn1.backend.database>sqlite</cn1.backend.database>",
+                label + "a backend-only pom declares its database");
         String packagePath = packageName.replace('.', '/');
         for (String path : entries.keySet()) {
             assertFalse(path.startsWith("common/") || path.startsWith("backend/"),

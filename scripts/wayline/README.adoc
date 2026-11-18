@@ -168,7 +168,9 @@ to the deployment.
 
 `backend/application.properties` lists every setting a deployment supplies. The
 database is the one named by `DATABASE_URL`: a `postgres://` or `mysql://`
-address, or the path of a SQLite file. The SMS and payment settings are listed
+address, or the path of a SQLite file. The server is built for one engine, named
+by `cn1.backend.database` in `backend/pom.xml`, which says `sqlite` as it ships:
+set it to `postgres` or `mysql` to deploy against a database server. The SMS and payment settings are listed
 there too, each also read from the environment in upper case with `_` for every
 dot (`WAYLINE_SMS_TWILIO_TOKEN`).
 

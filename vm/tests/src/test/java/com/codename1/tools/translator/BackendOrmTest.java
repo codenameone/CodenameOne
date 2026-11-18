@@ -88,13 +88,15 @@ class BackendOrmTest {
         }
 
         Path work = Files.createTempDirectory("backend-ormcheck");
-        Path binary = work.resolve("ormcheck");
-        String failure = BackendTestSupport.build("OrmCheck", "demo/ormcheck", binary, jdk8);
-        if (failure != null) {
-            BackendTestSupport.skipOrFail(failure);
-        }
+        // One build per server engine: a binary carries a single wire client,
+        // chosen when it is built. The SQLite pass rides on the first of them.
+        List<String> ordered = new ArrayList<String>(urls.subList(1, urls.size()));
+        ordered.add(urls.get(0));
+        urls = ordered;
+        Map<String, Path> binaries = new java.util.LinkedHashMap<String, Path>();
 
         for (String url : urls) {
+            Path binary = BackendTestSupport.binaryFor(binaries, url, "OrmCheck", "demo/ormcheck", work, jdk8);
             String translated = runTranslated(binary, url);
             assertOk("the translated runtime", url, translated);
             String local = runLocal(url, jdk8);
@@ -135,6 +137,7 @@ class BackendOrmTest {
         env.put("CN1_BACKEND_JAVA", System.getProperty("java.home"));
         env.put("CN1_BACKEND_DEMO", "demo/ormcheck");
         env.put("CN1_BACKEND_JDBC_JARS", BackendTestSupport.jdbcJars());
+        env.put("CN1_BACKEND_DATABASE", BackendTestSupport.engineOf(url));
         env.put("CN1_ORMCHECK_URL", url);
         env.put("JDK_8_HOME", jdk8.toString());
         int[] status = new int[1];

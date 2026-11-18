@@ -15,6 +15,8 @@
 #
 # Environment knobs:
 #   CN1_BACKEND_DEMO             demo source dir (default demo/petstore)
+#   CN1_BACKEND_DATABASE         the one server engine compiled in: sqlite (default,
+#                                none), postgres or mysql
 #   CN1_BACKEND_CFLAGS           extra clang flags
 #   CN1_BACKEND_TRANSLATOR_OPTS  extra -D properties for the translator JVM
 set -e
@@ -185,8 +187,19 @@ COMMON=""
 SHARED_LIST="$(./shared-sources.sh)"
 SHARED=()
 while IFS= read -r f; do SHARED+=("$f"); done <<< "$SHARED_LIST"
+# ONE server engine is compiled in, as in a packaged application: a ServerEngine
+# class exists per engine under engines/, and the wire clients of the others are
+# then referenced by nothing. An application build refuses to guess; this script
+# is the tree's own harness and most of what it builds never opens a server, so
+# it defaults to SQLite alone.
+case "${CN1_BACKEND_DATABASE:-sqlite}" in
+    sqlite|none) ENGINE=none ;;
+    postgres|postgresql) ENGINE=postgres ;;
+    mysql|mariadb) ENGINE=mysql ;;
+    *) echo "build.sh: CN1_BACKEND_DATABASE must be sqlite, postgres or mysql, not '$CN1_BACKEND_DATABASE'" >&2; exit 2 ;;
+esac
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" ${GEN:+-cp "$GEN"} -source 1.8 -target 1.8 \
-    -d "$WORK/classes" $(find src impl/parparvm $COMMON "$DEMO" -name '*.java') "${SHARED[@]}"
+    -d "$WORK/classes" $(find src impl/parparvm "engines/$ENGINE" $COMMON "$DEMO" -name '*.java') "${SHARED[@]}"
 if [ -n "$GEN" ]; then
     IFS=: read -r -a GEN_DIRS <<< "$GEN"
     for g in "${GEN_DIRS[@]}"; do cp -r "$g/." "$WORK/classes/"; done

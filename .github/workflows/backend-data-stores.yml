@@ -163,6 +163,7 @@ jobs:
         run: |
           mvn -B -pl backend test \
             -Dtest='MongoClientTest,DynamoDbTest,DocumentSessionTest,SearchEngineTest,SearchIndexerTest' \
+            -Dcn1.backend.database=postgres \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
@@ -175,6 +176,7 @@ jobs:
           CN1_TEST_DATABASE_URL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
         run: |
           mvn -B -pl backend test -Dtest='SearchEngineTest' \
+            -Dcn1.backend.database=mysql \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"

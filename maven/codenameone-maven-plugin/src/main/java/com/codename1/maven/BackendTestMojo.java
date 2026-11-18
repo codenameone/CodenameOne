@@ -101,6 +101,10 @@ public class BackendTestMojo extends AbstractMojo {
     @Parameter(property = "cn1.backend.cflags")
     private String cflags;
 
+    /** The database engine the backend is built for, as backend-package reads it. */
+    @Parameter(property = BackendEngines.PROPERTY)
+    private String database;
+
     /** Surefire's -Dtest, which selects the compiled run's classes as it selects the JVM run's. */
     @Parameter(property = "test")
     private String testSelection;
@@ -210,7 +214,7 @@ public class BackendTestMojo extends AbstractMojo {
             }
         };
         p.strict(strict).timeoutSeconds(timeoutSeconds);
-        p.jdk(jdkHome, jdk8Home).cflags(cflags);
+        p.jdk(jdkHome, jdk8Home).cflags(cflags).database(database);
         java.util.Properties userProperties = session == null ? new java.util.Properties() : session.getUserProperties();
         BackendPackageMojo.configureJavaLevel(p, project, userProperties);
         BackendPackageMojo.configureTestJavaLevel(p, project, userProperties);

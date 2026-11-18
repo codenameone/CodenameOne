@@ -33,6 +33,7 @@ import com.codename1.backend.ConcurrencyFailureException;
 import com.codename1.backend.DataIntegrityViolationException;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Tcp;
+import com.codename1.backend.annotations.Isolation;
 
 /// A PostgreSQL client speaking the v3 frontend/backend protocol directly.
 ///
@@ -825,6 +826,43 @@ public final class Postgres {
             // the connection is going away regardless
         }
         wire.getConnection().close();
+    }
+
+    /// Opens a transaction. PostgreSQL prepares transaction control like any
+    /// other statement, so the facade normally sends it through [#execute]
+    /// where it is traced; these exist so every engine answers the same calls.
+    public void begin() throws IOException {
+        execute("BEGIN", null);
+    }
+
+    public void beginReadOnly() throws IOException {
+        execute("BEGIN READ ONLY", null);
+    }
+
+    /// Opens a transaction at an isolation level. READ_UNCOMMITTED is refused:
+    /// PostgreSQL accepts the words and runs READ COMMITTED.
+    public void begin(boolean readOnly, Isolation isolation) throws IOException {
+        if (isolation == Isolation.READ_UNCOMMITTED) {
+            throw new IOException("PostgreSQL does not provide READ_UNCOMMITTED isolation");
+        }
+        StringBuilder sql = new StringBuilder("BEGIN");
+        if (isolation != Isolation.DEFAULT) {
+            sql.append(" ISOLATION LEVEL ").append(isolation.name().replace('_', ' '));
+        }
+        execute(sql.append(readOnly ? " READ ONLY" : " READ WRITE").toString(), null);
+    }
+
+    public void commit() throws IOException {
+        execute("COMMIT", null);
+    }
+
+    public void rollback() throws IOException {
+        execute("ROLLBACK", null);
+    }
+
+    /// Savepoint control; the name must be a plain identifier.
+    public void savepoint(String verb, String name) throws IOException {
+        execute(verb + " " + Dialect.checkIdentifier(name), null);
     }
 
     public boolean isClosed() {
