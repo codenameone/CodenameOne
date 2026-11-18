@@ -178,7 +178,13 @@ final class TextFunctions {
                 return substitute(a);
             case 20: { // TEXT
                 Object v = Evaluator.arg(a, 0);
-                return CellFormat.format(Evaluator.text(a, 1), v == Evaluator.MISSING ? null : v, ev.workbook.isDate1904()); //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object
+                String code = Evaluator.text(a, 1);
+                if (v instanceof Double && ((Double) v).doubleValue() < 0 && new CellFormat(code).isDate()) {
+                    // a cell shows a row of hashes for a date before the first one; a function
+                    // has an error to answer with
+                    throw EvalError.VALUE;
+                }
+                return CellFormat.format(code, v == Evaluator.MISSING ? null : v, ev.workbook.isDate1904()); //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object
             }
             case 21: // TEXTAFTER
             case 22: // TEXTBEFORE
@@ -209,7 +215,7 @@ final class TextFunctions {
                 if (!(v instanceof String)) {
                     throw EvalError.VALUE;
                 }
-                Double parsed = Values.parseNumber((String) v);
+                Double parsed = amount((String) v);
                 if (parsed == null) {
                     throw EvalError.VALUE;
                 }
@@ -299,45 +305,76 @@ final class TextFunctions {
         return -1;
     }
 
+    /// A number the way an amount is written: `$5`, and `(5)` for what is owed.
+    private static Double amount(String raw) {
+        String s = raw.trim();
+        boolean owed = s.length() > 2 && s.charAt(0) == '(' && s.charAt(s.length() - 1) == ')';
+        if (owed) {
+            s = s.substring(1, s.length() - 1).trim();
+        }
+        if (s.length() > 1 && s.charAt(0) == '$') {
+            s = s.substring(1);
+        }
+        Double parsed = Values.parseNumber(s);
+        return parsed != null && owed ? Double.valueOf(-parsed.doubleValue()) : parsed;
+    }
+
     /// A number with a fixed count of decimals, which may be negative to round to tens.
     static String fixed(double abs, int places, boolean grouping) {
         if (places > 127) {
             throw EvalError.VALUE;
         }
         double rounded = Values.round(abs, places);
+        if (Double.isNaN(rounded) || Double.isInfinite(rounded)) {
+            throw EvalError.NUM;
+        }
         int decimals = Math.max(0, places);
         StringBuilder digits = new StringBuilder();
+        StringBuilder tail = new StringBuilder();
+        // A number has fifteen digits that mean something. The ones after them are zeros
+        // here, as in a spreadsheet, and never the noise of the binary fraction.
+        int shown = 0;
+        long fraction = 0;
         if (rounded >= 1e15) {
-            digits.append(Values.general(Math.floor(rounded)));
-            decimals = 0;
+            int e = (int) Math.floor(com.codename1.util.MathUtil.log10(rounded));
+            double scaled = Math.floor(rounded / Values.pow10(e - 14) + 0.5);
+            if (scaled >= 1e15) {
+                scaled /= 10;
+                e++;
+            }
+            digits.append((long) scaled);
+            for (int i = 14; i < e; i++) {
+                digits.append('0');
+            }
         } else {
             long whole = (long) Math.floor(rounded);
+            int wholeDigits = whole == 0 ? 0 : Long.toString(whole).length();
+            shown = Math.min(decimals, Math.max(0, 15 - wholeDigits));
+            long scale = (long) Values.pow10(shown);
+            fraction = (long) Math.floor((rounded - whole) * scale + 0.5);
+            if (fraction >= scale) {
+                whole++;
+                fraction = 0;
+            }
             digits.append(whole);
-            if (decimals > 0) {
-                int shown = Math.min(decimals, 15);
-                long fraction = (long) Math.floor((rounded - whole) * Values.pow10(shown) + 0.5);
-                if (fraction >= (long) Values.pow10(shown)) {
-                    fraction = (long) Values.pow10(shown) - 1;
-                }
+        }
+        if (decimals > 0) {
+            tail.append('.');
+            if (shown > 0) {
                 String f = Long.toString(fraction);
-                StringBuilder tail = new StringBuilder(".");
                 for (int i = f.length(); i < shown; i++) {
                     tail.append('0');
                 }
                 tail.append(f);
-                for (int i = shown; i < decimals; i++) {
-                    tail.append('0');
-                }
-                if (grouping) {
-                    group(digits);
-                }
-                return digits.append(tail).toString();
+            }
+            for (int i = shown; i < decimals; i++) {
+                tail.append('0');
             }
         }
         if (grouping) {
             group(digits);
         }
-        return digits.toString();
+        return digits.append(tail).toString();
     }
 
     private static void group(StringBuilder digits) {

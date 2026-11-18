@@ -107,6 +107,10 @@ final class DateUtil {
         if (n == 60) {
             return new int[] {1900, 2, 29};
         }
+        if (n == 0) {
+            // day 0, where a time with no date is, is the zeroth of January to a spreadsheet
+            return new int[] {1900, 1, 0};
+        }
         if (n < 60) {
             return civilFromDays(n - EPOCH_1900 + 1);
         }

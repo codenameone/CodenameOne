@@ -81,11 +81,14 @@ final class CellFormat {
         double conditionValue;
     }
 
+    private static final int MAX_CODE = 1024;
     private final String code;
     private final Section[] sections;
 
     CellFormat(String code) {
-        this.code = code == null || code.length() == 0 ? GENERAL : code;
+        // a format code is 255 characters at most in the programs that write them; one far
+        // longer is not a format, and is not given the work of being read as one
+        this.code = code == null || code.length() == 0 || code.length() > MAX_CODE ? GENERAL : code;
         ArrayList<Section> list = new ArrayList<Section>();
         int start = 0;
         boolean quoted = false;
@@ -103,7 +106,11 @@ final class CellFormat {
                     continue;
                 }
                 if (ch == '\\' || ch == '_' || ch == '*') {
-                    i++;
+                    // the character it applies to is skipped, and at the end of the code
+                    // there is none: the section still has to be closed
+                    if (i + 1 < c.length()) {
+                        i++;
+                    }
                     continue;
                 }
                 if (ch == '[') {
@@ -284,7 +291,7 @@ final class CellFormat {
             if (c == '[') {
                 int end = s.indexOf(']', i);
                 if (end < 0) {
-                    end = n - 1;
+                    end = n;
                 }
                 bracket(sec, s.substring(i + 1, end));
                 i = end + 1;
@@ -508,6 +515,15 @@ final class CellFormat {
     /// format code spells. Only the first section is written: the format has conditions of
     /// its own for the others, and a sheet shows a negative number with its sign without
     /// them. Answers false, and writes nothing, for a format that needs no style.
+    private static boolean isDigits(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) < '0' || s.charAt(i) > '9') {
+                return false;
+            }
+        }
+        return s.length() > 0;
+    }
+
     boolean writeOds(XmlOut x, String name) throws java.io.IOException {
         Section s = sections[0];
         if (isGeneral() || s.tokens.isEmpty()) {
@@ -538,6 +554,26 @@ final class CellFormat {
         int minDecimals = 0;
         int exponentDigits = 0;
         int denominatorDigits = 0;
+        // What a fraction is made of: the digits of a whole number and a space when it has
+        // one, the numerator, the slash, and a denominator of digits or written out.
+        int slash = -1;
+        int wholeEnd = -1;
+        int fractionEnd = -1;
+        String fixedDenominator = null;
+        for (int i = 0; i < s.tokens.size() && s.fraction; i++) {
+            Token t = s.tokens.get(i);
+            if (t.kind == SLASH) {
+                slash = i;
+                fractionEnd = i;
+            } else if (t.kind == DIGIT && slash >= 0) {
+                fractionEnd = i;
+            } else if (t.kind == LITERAL && slash < 0 && " ".equals(t.text) && i > 0 && s.tokens.get(i - 1).kind == DIGIT) {
+                wholeEnd = i;
+            } else if (t.kind == LITERAL && slash == i - 1 && isDigits(t.text.trim())) {
+                fixedDenominator = t.text.trim();
+                fractionEnd = i;
+            }
+        }
         for (int i = 0; i < s.tokens.size(); i++) {
             Token t = s.tokens.get(i);
             if (t.kind == EXPONENT) {
@@ -545,7 +581,7 @@ final class CellFormat {
             } else if (t.kind == DIGIT) {
                 if (pastExponent) {
                     exponentDigits++;
-                } else if (t.text.charAt(0) == '/') {
+                } else if (slash >= 0 && i > slash) {
                     denominatorDigits++;
                 } else if (".0".equals(t.text)) {
                     minDecimals++;
@@ -556,6 +592,10 @@ final class CellFormat {
         }
         for (int i = 0; i < s.tokens.size(); i++) {
             Token t = s.tokens.get(i);
+            if (numberWritten && i <= fractionEnd) {
+                // the space, the slash and the denominator are the fraction element's own
+                continue;
+            }
             if (t.kind == LITERAL || t.kind == PERCENT) {
                 x.raw("<number:text>").text(t.text, false).raw("</number:text>");
             } else if (t.kind == GENERAL_TOKEN && !numberWritten) {
@@ -568,9 +608,18 @@ final class CellFormat {
                             .attr("number:min-integer-digits", Math.max(1, minInteger))
                             .attr("number:min-exponent-digits", Math.max(1, exponentDigits)).raw("/>");
                 } else if (s.fraction) {
-                    x.raw("<number:fraction").attr("number:min-integer-digits", 0)
-                            .attr("number:min-numerator-digits", 1)
-                            .attr("number:min-denominator-digits", Math.max(1, denominatorDigits)).raw("/>");
+                    x.raw("<number:fraction");
+                    if (wholeEnd >= 0) {
+                        // there, even at zero, it says a whole number is written first
+                        x.attr("number:min-integer-digits", 0);
+                    }
+                    x.attr("number:min-numerator-digits", 1);
+                    if (fixedDenominator != null) {
+                        x.attr("number:denominator-value", fixedDenominator);
+                    } else {
+                        x.attr("number:min-denominator-digits", Math.max(1, denominatorDigits));
+                    }
+                    x.raw("/>");
                 } else {
                     x.raw("<number:number").attr("number:decimal-places", s.decimals)
                             .attr("number:min-decimal-places", minDecimals)
@@ -729,6 +778,9 @@ final class CellFormat {
             return value.toString();
         }
         double v = ((Double) value).doubleValue();
+        if (Double.isNaN(v) || Double.isInfinite(v)) {
+            return CellError.NUM.toString();
+        }
         Section s = pick(v);
         if (s.date) {
             if (v < 0) {
@@ -759,7 +811,8 @@ final class CellFormat {
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < s.tokens.size(); i++) {
                 Token t = s.tokens.get(i);
-                if (t.kind == GENERAL_TOKEN) {
+                if (t.kind == GENERAL_TOKEN || t.kind == TEXT) {
+                    // "@" is the place of whatever the cell holds, a number included
                     sb.append(Values.general(abs));
                 } else if (t.kind == LITERAL || t.kind == PERCENT) {
                     sb.append(t.text);
@@ -782,7 +835,8 @@ final class CellFormat {
                 abs /= Values.pow10(step);
             }
         }
-        String digits = TextFunctions.fixed(abs, s.decimals, false);
+        // more decimal places than a number has digits are zeros, written by the placeholders
+        String digits = TextFunctions.fixed(abs, Math.min(s.decimals, 30), false);
         int point = digits.indexOf('.');
         String whole = point < 0 ? digits : digits.substring(0, point);
         String frac = point < 0 ? "" : digits.substring(point + 1);
@@ -883,6 +937,10 @@ final class CellFormat {
     }
 
     private static void appendDigit(StringBuilder sb, String whole, int index, boolean grouping) {
+        if (index < 0 || index >= whole.length()) {
+            // a placeholder where no format has one, after the exponent: it has no digit
+            return;
+        }
         sb.append(whole.charAt(index));
         int after = whole.length() - index - 1;
         if (grouping && after > 0 && after % 3 == 0) {

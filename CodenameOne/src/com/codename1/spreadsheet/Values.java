@@ -228,7 +228,20 @@ final class Values {
         double day = 0;
         int i = 0;
         boolean hasDate = false;
-        if (n >= 8 && s.indexOf('-') == 4) {
+        int[] named = {0};
+        double byName = namedDate(s, named);
+        if (byName >= 0) {
+            day = byName;
+            i = named[0];
+            hasDate = true;
+            if (i == n) {
+                return Double.valueOf(day);
+            }
+            if (s.charAt(i) != ' ') {
+                return null;
+            }
+            i++;
+        } else if (n >= 8 && s.indexOf('-') == 4) {
             int[] pos = {0};
             int y = digits(s, pos, 4);
             if (y < 0 || !eat(s, pos, '-')) {
@@ -282,10 +295,83 @@ final class Values {
         if (pos[0] < n && hasDate && s.charAt(pos[0]) == 'Z') {
             pos[0]++;
         }
+        // "6:35 AM", "6:35pm", "6:35 p": the hour is then one of a twelve hour clock
+        int meridiem = pos[0] < n && s.charAt(pos[0]) == ' ' ? pos[0] + 1 : pos[0];
+        if (meridiem < n && n - meridiem <= 2 && (n - meridiem == 1 || s.charAt(n - 1) == 'M' || s.charAt(n - 1) == 'm')) {
+            char half = s.charAt(meridiem);
+            boolean pm = half == 'P' || half == 'p';
+            if (!pm && half != 'A' && half != 'a' || h > 12) {
+                return null;
+            }
+            h = h == 12 ? 0 : h;
+            if (pm) {
+                h += 12;
+            }
+            pos[0] = n;
+        }
         if (pos[0] != n || h > 23 && hasDate) {
             return null;
         }
         return Double.valueOf(day + (h * 3600 + min * 60 + sec) / 86400);
+    }
+
+    private static final String[] MONTHS = {"JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST",
+        "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"};
+
+    private static int month(String s, int[] pos) {
+        int i = pos[0];
+        int start = i;
+        while (i < s.length() && (s.charAt(i) >= 'A' && s.charAt(i) <= 'Z' || s.charAt(i) >= 'a' && s.charAt(i) <= 'z')) {
+            i++;
+        }
+        int len = i - start;
+        for (int m = 0; m < 12 && len >= 3; m++) {
+            if ((len == 3 || len == MONTHS[m].length()) && s.regionMatches(true, start, MONTHS[m], 0, len)) {
+                pos[0] = i;
+                return m + 1;
+            }
+        }
+        return -1;
+    }
+
+    /// The day number of a date that names its month in English, `2-Jan-2020`,
+    /// `2 January 2020` or `Jan 2, 2020`, and -1 for anything else. `pos` is left after it.
+    ///
+    /// A date of digits and slashes is not read, here or anywhere: 1/2/2020 is the first of
+    /// February to half the world and the second of January to the other half, and a file
+    /// does not say which it was written for. `yyyy-mm-dd` and a named month mean one day.
+    static double namedDate(String s, int[] pos) {
+        if (s.length() < 8) {
+            return -1;
+        }
+        int d;
+        int m;
+        if (s.charAt(0) >= '0' && s.charAt(0) <= '9') {
+            d = digits(s, pos, 2);
+            if (!eat(s, pos, '-') && !eat(s, pos, ' ')) {
+                return -1;
+            }
+            m = month(s, pos);
+            if (m < 0 || !eat(s, pos, '-') && !eat(s, pos, ' ')) {
+                return -1;
+            }
+        } else {
+            m = month(s, pos);
+            if (m < 0 || !eat(s, pos, ' ')) {
+                return -1;
+            }
+            d = digits(s, pos, 2);
+            if (d < 0 || !eat(s, pos, ',')) {
+                return -1;
+            }
+            eat(s, pos, ' ');
+        }
+        int start = pos[0];
+        int y = digits(s, pos, 4);
+        if (pos[0] - start != 4 || y < 1900 || d < 1 || d > DateUtil.daysInMonth(y, m)) {
+            return -1;
+        }
+        return DateUtil.serial(y, m, d, false);
     }
 
     private static boolean eat(String s, int[] pos, char c) {
@@ -416,7 +502,9 @@ final class Values {
         if (scaled >= 9.007199254740992E15) {
             return d;
         }
-        double r = Math.floor(scaled * (1 + 8.9e-16) + 0.5);
+        // The nudge is a share of the number, and for a number of fifteen digits that share
+        // would be a half by itself: 999999999999999 is whole and stays what it is.
+        double r = scaled == Math.floor(scaled) ? scaled : Math.floor(scaled + Math.min(scaled * 8.9e-16, 0.1) + 0.5);
         double result = places >= 0 ? r / pow10(places) : r * pow10(-places);
         return d < 0 ? -result : result;
     }
@@ -448,7 +536,12 @@ final class Values {
         if (a instanceof Double) {
             double x = ((Double) a).doubleValue();
             double y = ((Double) b).doubleValue();
-            return x < y ? -1 : x > y ? 1 : 0;
+            // Two numbers that agree in their fifteen digits are the same number to a
+            // spreadsheet: 0.1+0.2=0.3 is true there, and it shows both as 0.3.
+            if (Math.abs(x - y) <= Math.max(Math.abs(x), Math.abs(y)) * 1e-15) {
+                return 0;
+            }
+            return x < y ? -1 : 1;
         }
         if (a instanceof String) {
             return compareText((String) a, (String) b);

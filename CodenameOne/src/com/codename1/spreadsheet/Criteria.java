@@ -80,7 +80,11 @@ final class Criteria {
             return;
         }
         Double number = Values.parseNumber(rest);
-        if (number != null) {
+        CellError error = rest.charAt(0) == '#' ? CellError.valueOf(rest) : null;
+        if (error != null) {
+            // "#N/A" as a condition counts the cells that hold that error
+            target = error;
+        } else if (number != null) {
             target = number;
         } else if ("TRUE".equalsIgnoreCase(rest)) {
             target = Boolean.TRUE;
@@ -92,6 +96,9 @@ final class Criteria {
     }
 
     boolean matches(Object v) {
+        if (target instanceof CellError) {
+            return target.equals(v) ? op == EQ : op == NE;
+        }
         if (v instanceof CellError) {
             return false;
         }

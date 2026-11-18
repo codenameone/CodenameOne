@@ -101,7 +101,9 @@ public final class Workbook {
                 if (start.indexOf("opendocument.spreadsheet") >= 0) {
                     return ODS;
                 }
-                if (start.indexOf("mimetype") < 0 || !ods) {
+                // An archive that does not say: the parts of an Excel workbook give it away,
+                // and failing that the name of the file is the better witness.
+                if (start.indexOf("[Content_Types]") >= 0 || start.indexOf("xl/") >= 0 || !ods) {
                     return XLSX;
                 }
                 return ODS;
@@ -158,6 +160,10 @@ public final class Workbook {
     private final ArrayList<Cell> volatileCells = new ArrayList<Cell>();
 
     /// Creates a workbook with no sheets.
+    private static long cellLimit = 4000000L;
+    private long allocatedCells;
+    private boolean loading;
+
     public Workbook() {
         formats.add(new CellFormat(CellFormat.GENERAL));
         formatIndex.put(CellFormat.GENERAL, Integer.valueOf(0));
@@ -182,22 +188,67 @@ public final class Workbook {
     /// - `IOException`: when the stream fails or the file is not of that format
     public static Workbook read(InputStream in, Format format) throws IOException {
         Workbook book = new Workbook();
-        switch (format) {
-            case XLSX:
-                new XlsxReader(book).read(in);
-                break;
-            case ODS:
-                new OdsReader(book).read(in);
-                break;
-            case TSV:
-                CsvFiles.read(book, in, '\t', false);
-                break;
-            default:
-                CsvFiles.read(book, in, ',', true);
-                break;
+        book.loading = true;
+        try {
+            switch (format) {
+                case XLSX:
+                    new XlsxReader(book).read(in);
+                    break;
+                case ODS:
+                    new OdsReader(book).read(in);
+                    break;
+                case TSV:
+                    CsvFiles.read(book, in, '\t', false);
+                    break;
+                default:
+                    CsvFiles.read(book, in, ',', true);
+                    break;
+            }
+        } catch (IllegalArgumentException e) {
+            // a cell outside what a sheet holds, or more cells than are read: the file is at
+            // fault, and a file at fault is what IOException says
+            throw new IOException("Cannot read the spreadsheet: " + e.getMessage()); //NOPMD PreserveStackTrace - the device library has no constructor that takes a cause
+        } finally {
+            book.loading = false;
         }
         book.rebuildReaders();
         return book;
+    }
+
+    /// Counts the places for cells a sheet has just made room for. A file is not trusted
+    /// with memory: a few hundred bytes can name a cell in the last column of every row, or
+    /// say that one cell repeats a million times.
+    void allocated(int cells) {
+        allocatedCells += cells;
+        if (loading && allocatedCells > cellLimit) {
+            throw new IllegalArgumentException("it has more cells than a workbook is read with, " + cellLimit
+                    + "; see Workbook.setCellLimit");
+        }
+    }
+
+    /// The most cells `read` fills before it gives up on a file with an `IOException`,
+    /// four million unless it is changed.
+    ///
+    /// A file is not trusted with memory: a few hundred bytes of a compressed file can name
+    /// a cell in the last column of every row, or say that one row repeats a million times.
+    /// What is counted is the room the rows take, so a single cell far to the right counts
+    /// as every cell to its left.
+    ///
+    /// #### Returns
+    ///
+    /// the limit
+    public static long getCellLimit() {
+        return cellLimit;
+    }
+
+    /// Changes the most cells `read` fills, for an application that reads larger files and
+    /// runs where there is memory for them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `limit`: the most cells
+    public static void setCellLimit(long limit) {
+        cellLimit = Math.max(1, limit);
     }
 
     /// Writes the workbook. Formulas are written with the values they have now, so that a
@@ -328,8 +379,19 @@ public final class Workbook {
     ///
     /// - `IllegalArgumentException`: when the workbook has a sheet of that name
     public Sheet addSheet(String name) {
-        if (name == null || name.length() == 0) {
+        if (name == null || name.trim().length() == 0) {
             throw new IllegalArgumentException("A sheet needs a name");
+        }
+        // What no spreadsheet accepts in the name of a sheet, because a formula could not
+        // refer to it. The 31 characters Excel stops at are not enforced: OpenDocument has no
+        // such limit, and a name is not shortened behind the caller's back.
+        for (int i = 0; i < name.length(); i++) {
+            if ("[]*?:/\\".indexOf(name.charAt(i)) >= 0) {
+                throw new IllegalArgumentException("A sheet name cannot contain " + name.charAt(i));
+            }
+        }
+        if (name.charAt(0) == '\'' || name.charAt(name.length() - 1) == '\'') {
+            throw new IllegalArgumentException("A sheet name cannot start or end with an apostrophe");
         }
         if (getSheet(name) != null) {
             throw new IllegalArgumentException("The workbook has a sheet named " + name);
@@ -348,6 +410,8 @@ public final class Workbook {
     public void removeSheet(int index) {
         sheets.remove(index);
         structureChanged();
+        // what was read from the sheet is an error now, and nothing else would say so
+        recalculate();
     }
 
     /// The number of sheets.
@@ -424,7 +488,14 @@ public final class Workbook {
     ///
     /// - `date1904`: true to count days from 1904
     public void setDate1904(boolean date1904) {
+        if (this.date1904 == date1904) {
+            return;
+        }
         this.date1904 = date1904;
+        if (!loading) {
+            // every function of a date answers differently now
+            recalculate();
+        }
     }
 
     // ------------------------------------------------------------------ names
@@ -455,6 +526,9 @@ public final class Workbook {
             }
             nameFormulas.remove(key);
         } else {
+            if (!FormulaParser.isName(name)) {
+                throw new IllegalArgumentException("Not a name a formula can use: " + name);
+            }
             String text = formula.startsWith("=") ? formula.substring(1) : formula;
             Node node;
             try {

@@ -76,6 +76,10 @@ class SpreadsheetFileTest {
             for (int r = 0; r < sheet.getRowCount(); r++) {
                 for (int c = 0; c < sheet.getColumnCount(); c++) {
                     if (sheet.getCellFormula(r, c) != null) {
+                        // a formula that was not understood keeps what the file stored, and
+                        // would agree with it without having calculated anything
+                        assertTrue(sheet.cell(r, c).formula != null, file + ": " + sheet.getName() + " row " + (r + 1)
+                                + " was not read: " + sheet.getCellFormula(r, c));
                         cached.add(new Object[] {sheet, Integer.valueOf(r), Integer.valueOf(c), sheet.getCellValue(r, c)});
                     }
                 }

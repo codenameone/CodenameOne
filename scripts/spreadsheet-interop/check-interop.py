@@ -119,6 +119,9 @@ def main():
             if path:
                 cells = compare(label, ours_values, ours_formulas, path)
                 print(f"{label}: {cells} cells, {formulas} formulas compared")
+                # a comparison that found nothing to compare has not found the files equal
+                if cells < 20:
+                    fail(f"{label}: only {cells} cells were compared")
     if failures:
         print(f"{len(failures)} failures")
         sys.exit(1)

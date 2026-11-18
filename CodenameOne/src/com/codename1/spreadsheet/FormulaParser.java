@@ -53,9 +53,36 @@ final class FormulaParser {
         this.argSeparator = ods ? ';' : ',';
     }
 
+    private static final int MAX_DEPTH = 200;
+    /// Twice the 8,192 characters Excel allows a formula.
+    private static final int MAX_LENGTH = 16384;
+    private int depth;
+
+    /// Whether text can be a defined name: a letter, an underscore or a backslash, then
+    /// letters, digits, periods and underscores, and nothing a formula reads as a cell or a
+    /// truth value.
+    static boolean isName(String name) {
+        if (name == null || name.length() == 0 || name.length() > 255) {
+            return false;
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            boolean start = isLetter(c) || c == '_' || c == '\\' || c > 127;
+            if (!(start || i > 0 && (isDigit(c) || c == '.'))) {
+                return false;
+            }
+        }
+        return !looksLikeCellOrLiteral(name);
+    }
+
     /// Parses formula text that does not include the leading equals sign.
     static Node parse(String text, boolean ods) {
         FormulaParser parser = new FormulaParser(text, ods);
+        // 1+1+1+... is not nested as written and is a tree as deep as it is long once parsed,
+        // which everything that walks the tree would then have to survive
+        if (text.length() > MAX_LENGTH) {
+            throw parser.fail();
+        }
         Node n = parser.comparison();
         parser.ws();
         if (parser.p < parser.len) {
@@ -180,6 +207,19 @@ final class FormulaParser {
     }
 
     private Node unary() {
+        // Every level of nesting -- a parenthesis, an argument, a sign -- comes through here.
+        // Excel nests 64 functions; a formula nested thousands deep is an attack on the stack
+        // of whoever reads it, and overflowing a stack is not an exception on every device.
+        depth++;
+        if (depth > MAX_DEPTH) {
+            throw fail();
+        }
+        Node n = unaryInner();
+        depth--;
+        return n;
+    }
+
+    private Node unaryInner() {
         ws();
         if (p < len) {
             char c = s.charAt(p);
@@ -322,6 +362,15 @@ final class FormulaParser {
             String sheet2 = null;
             if (eat(':')) {
                 sheet2 = p < len && s.charAt(p) == '\'' ? quoted() : plainName();
+            } else {
+                // 'First sheet:Last sheet'!A1 is how a spreadsheet writes a run of sheets when
+                // either name needs the quotes. No sheet name can hold a colon, so one inside
+                // the quotes always parts two names.
+                int colon = sheet.indexOf(':');
+                if (colon > 0 && colon < sheet.length() - 1) {
+                    sheet2 = sheet.substring(colon + 1);
+                    sheet = sheet.substring(0, colon);
+                }
             }
             if (!eat('!')) {
                 throw fail();

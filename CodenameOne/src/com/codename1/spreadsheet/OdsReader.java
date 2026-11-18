@@ -37,6 +37,7 @@ import java.util.zip.ZipInputStream;
 /// parsed into the same trees Excel's are.
 final class OdsReader {
     private final Workbook book;
+    private final long[] budget = {XmlScanner.MAX_DOCUMENT};
     private final HashMap<String, String> dataStyles = new HashMap<String, String>();
     private final HashMap<String, String> cellStyles = new HashMap<String, String>();
     private final HashMap<String, Double> columnStyleWidths = new HashMap<String, Double>();
@@ -55,13 +56,13 @@ final class OdsReader {
             String path = entry.getName();
             if ("content.xml".equals(path)) {
                 content = true;
-                readContent(new XmlScanner(zip));
+                readContent(new XmlScanner(zip, budget));
             } else if ("styles.xml".equals(path)) {
                 // number formats a document shares between its cells are here, and this part
                 // may come before the cells or after them
-                readContent(new XmlScanner(zip));
+                readContent(new XmlScanner(zip, budget));
             } else if ("settings.xml".equals(path)) {
-                readSettings(new XmlScanner(zip));
+                readSettings(new XmlScanner(zip, budget));
             }
             zip.closeEntry();
         }
@@ -311,7 +312,10 @@ final class OdsReader {
                         continue;
                     }
                     if (from.formula != null) {
-                        sheet.loadFormula(row + i, c, FormulaParser.shift(from.formula, i, 0), from.value, true, false);
+                        // the value beside the formula is the first row's; it is the next row's only
+                        // until that row is calculated, which a formula with no value is at once
+                        sheet.loadFormula(row + i, c, FormulaParser.shift(from.formula, i, 0), from.value,
+                                from.value != null, false);
                     } else if (from.value != null) {
                         sheet.storeRaw(row + i, c, from.value);
                     } else {
@@ -326,7 +330,7 @@ final class OdsReader {
                 sheet.setRowOutlineLevel(row + i, groupDepth);
             }
         }
-        row += rowRepeat;
+        row = (int) Math.min((long) row + rowRepeat, (long) Node.MAX_ROW + 1);
     }
 
     /// What a cell said about its format, which cannot be resolved until every part that may
@@ -432,7 +436,7 @@ final class OdsReader {
             } else if (inParagraph) {
                 if ("s".equals(x.name)) {
                     int n = x.intAttr("text:c", 1);
-                    for (int i = 0; i < n; i++) {
+                    for (int i = 0; i < n && text.length() < XmlScanner.MAX_TEXT; i++) {
                         text.append(' ');
                     }
                 } else if ("tab".equals(x.name)) {
@@ -496,7 +500,7 @@ final class OdsReader {
             formulaText = stripFormulaPrefix(formula);
         }
         if (spanColumns > 1 || spanRows > 1) {
-            sheet.addMergedRegion(row, col, row + spanRows - 1, col + spanColumns - 1);
+            sheet.loadMergedRegion(row, col, row + spanRows - 1, col + spanColumns - 1);
         }
         if (value == null && formulaText == null) {
             col += repeat;
@@ -504,6 +508,9 @@ final class OdsReader {
         }
         int format = pendingFormat(style, col, value instanceof Double ? fallbackFormat : null);
         rowHasContent = true;
+        if (col > Node.MAX_COL) {
+            throw new IllegalArgumentException("a cell with a value stands past the last column of a sheet");
+        }
         int count = Math.min(repeat, Node.MAX_COL + 1 - col);
         for (int i = 0; i < count; i++) {
             int c = col + i;
@@ -623,6 +630,13 @@ final class OdsReader {
                     repeat(sb, '0', minDecimals);
                     repeat(sb, '#', decimals - minDecimals);
                 }
+                // shown in thousands or in millions: a comma after the digits for each three
+                // places the number is divided by
+                double factor = x.doubleAttr("number:display-factor", 1);
+                for (int k = 0; k < 5 && factor >= 1000; k++) {
+                    sb.append(',');
+                    factor /= 1000;
+                }
                 x.skipElement();
             } else if ("scientific-number".equals(tag)) {
                 int decimals = x.intAttr("number:decimal-places", 0);
@@ -634,7 +648,9 @@ final class OdsReader {
                 sb.append("E+");
                 repeat(sb, '0', Math.max(1, x.intAttr("number:min-exponent-digits", 2)));
             } else if ("fraction".equals(tag)) {
-                if (x.intAttr("number:min-integer-digits", 0) > 0 || x.attr("number:min-integer-digits") == null) {
+                // the attribute is there, even at zero, when a whole number is written before
+                // the fraction; a format that is a fraction alone leaves it out
+                if (x.attr("number:min-integer-digits") != null) {
                     sb.append("# ");
                 }
                 repeat(sb, '?', Math.max(1, x.intAttr("number:min-numerator-digits", 1)));

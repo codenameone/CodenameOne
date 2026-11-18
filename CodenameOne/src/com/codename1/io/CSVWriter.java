@@ -114,6 +114,9 @@ public class CSVWriter {
     ///
     /// - `lineEnding`: the line ending
     public void setLineEnding(String lineEnding) {
+        if (lineEnding == null) {
+            throw new IllegalArgumentException("A line ending is needed; \"\\n\" and \"\\r\\n\" are the usual ones");
+        }
         this.lineEnding = lineEnding;
     }
 
@@ -356,11 +359,16 @@ public class CSVWriter {
         if (first != '+' && first != '-') {
             return false;
         }
-        try {
-            Double.parseDouble(value);
-            return false;
-        } catch (NumberFormatException notANumber) {
-            return true;
+        // A sign followed by nothing but what a number is written with -- digits, the
+        // separators of thousands and decimals, spaces, a percent sign -- is a negative
+        // amount, a phone number or a dash, and has nothing to run. Anything else after a
+        // sign could be an expression.
+        for (int i = 1; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if ((c < '0' || c > '9') && c != '.' && c != ',' && c != ' ' && c != '%') {
+                return true;
+            }
         }
+        return false;
     }
 }

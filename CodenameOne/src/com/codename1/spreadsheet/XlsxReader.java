@@ -39,6 +39,7 @@ import java.util.zip.ZipInputStream;
 /// the format leaves to the program that wrote the file.
 final class XlsxReader {
     private final Workbook book;
+    private final long[] budget = {XmlScanner.MAX_DOCUMENT};
     private final ArrayList<String> strings = new ArrayList<String>();
     /// The number format id of every cell style, in the order cells refer to them.
     private final ArrayList<Integer> styleFormats = new ArrayList<Integer>();
@@ -49,6 +50,7 @@ final class XlsxReader {
     private final ArrayList<String> sheetRelations = new ArrayList<String>();
     private final ArrayList<String[]> definedNames = new ArrayList<String[]>();
     private String workbookPath;
+    private final java.util.HashSet<Cell> isoDates = new java.util.HashSet<Cell>();
 
     XlsxReader(Workbook book) {
         this.book = book;
@@ -67,9 +69,9 @@ final class XlsxReader {
             }
             any = true;
             if (path.endsWith(".rels")) {
-                readRelations(path, new XmlScanner(zip));
+                readRelations(path, new XmlScanner(zip, budget));
             } else if (path.endsWith(".xml") && path.indexOf('/') >= 0) {
-                readPart(path, new XmlScanner(zip));
+                readPart(path, new XmlScanner(zip, budget));
             }
             zip.closeEntry();
         }
@@ -279,7 +281,7 @@ final class XlsxReader {
             } else if ("mergeCell".equals(tag)) {
                 int[] r = range(x.attr("ref"));
                 if (r != null) {
-                    sheet.addMergedRegion(r[0], r[1], r[2], r[3]);
+                    sheet.loadMergedRegion(r[0], r[1], r[2], r[3]);
                 }
             } else if ("pane".equals(tag)) {
                 String state = x.attr("state");
@@ -409,6 +411,7 @@ final class XlsxReader {
             }
         }
         Object value = null;
+        boolean isoDate = false;
         boolean hasValue = raw != null && (raw.length() > 0 || type == T_STRING || type == T_INLINE);
         if (hasValue) {
             switch (type) {
@@ -437,6 +440,7 @@ final class XlsxReader {
                 case T_DATE: {
                     Double d = Values.parseDateTime(raw.trim());
                     value = d == null ? (Object) raw : d;
+                    isoDate = d != null;
                     break;
                 }
                 default:
@@ -458,6 +462,9 @@ final class XlsxReader {
             sheet.storeRaw(row, col, value);
         } else if (style == 0) {
             return;
+        }
+        if (isoDate) {
+            isoDates.add(sheet.rowCells(row)[col]);
         }
         if (style != 0) {
             sheet.storeFormat(row, col, style);
@@ -537,6 +544,12 @@ final class XlsxReader {
                     cell.value = index >= 0 && index < strings.size() ? strings.get(index) : "";
                 }
                 cell.format = cell.format > 0 && cell.format < formats.length ? formats[cell.format] : 0;
+                // A cell written as an ISO date says it is a date by its type alone and need
+                // not have a date format; without one it would read as a bare day number.
+                if (cell.value instanceof Double && isoDates.contains(cell) && !book.format(cell.format).isDate()) {
+                    double day = ((Double) cell.value).doubleValue();
+                    cell.format = book.formatId(day - Math.floor(day) > 0 ? "yyyy-mm-dd hh:mm:ss" : "yyyy-mm-dd");
+                }
             }
         }
     }

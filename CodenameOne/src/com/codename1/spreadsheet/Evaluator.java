@@ -431,6 +431,12 @@ final class Evaluator {
             return y < 0 ? 1 / result : result;
         }
         if (x < 0) {
+            // an odd root of a negative number is a real one: (-8)^(1/3) is -2
+            double root = 1 / y;
+            double nearest = Math.floor(root + 0.5);
+            if (Math.abs(nearest) < 1e9 && Math.abs(root - nearest) < 1e-9 * Math.abs(nearest) && nearest % 2 != 0) {
+                return -MathUtil.pow(-x, y);
+            }
             throw EvalError.NUM;
         }
         return MathUtil.pow(x, y);
@@ -675,10 +681,22 @@ final class Evaluator {
             Object[][] m = (Object[][]) cond;
             Object yes = operand(eval(a[1]));
             Object no = a.length > 2 ? operand(eval(a[2])) : Boolean.FALSE;
-            Object[][] out = new Object[m.length][width(m)];
-            for (int r = 0; r < m.length; r++) {
-                for (int c = 0; c < out[r].length; c++) {
-                    Object e = m[r][c];
+            // A row of conditions against columns of values is a table of both, as the
+            // operators make of them: IF({1,0},B1:B2,A1:A2) is two columns side by side.
+            int rows = m.length;
+            int cols = width(m);
+            if (yes instanceof Object[][]) {
+                rows = Math.max(rows, ((Object[][]) yes).length);
+                cols = Math.max(cols, width((Object[][]) yes));
+            }
+            if (no instanceof Object[][]) {
+                rows = Math.max(rows, ((Object[][]) no).length);
+                cols = Math.max(cols, width((Object[][]) no));
+            }
+            Object[][] out = new Object[rows][cols];
+            for (int r = 0; r < rows; r++) {
+                for (int c = 0; c < cols; c++) {
+                    Object e = element(m, r, c);
                     if (e instanceof CellError) {
                         out[r][c] = e;
                         continue;

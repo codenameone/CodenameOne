@@ -129,6 +129,7 @@ public final class Sheet extends AbstractTableModel {
         Cell[] cells = rows.get(row);
         if (cells == null || cells.length <= col) {
             int size = cells == null ? Math.max(col + 1, Math.min(usedColumns, 64)) : Math.max(col + 1, cells.length * 2);
+            workbook.allocated(size - (cells == null ? 0 : cells.length));
             Cell[] grown = new Cell[size];
             if (cells != null) {
                 System.arraycopy(cells, 0, grown, 0, cells.length);
@@ -168,6 +169,9 @@ public final class Sheet extends AbstractTableModel {
             }
         } else if (value instanceof Double) {
             c.value = value;
+        } else if (value instanceof Float) {
+            // 1.1f widened is 1.100000023841858: the number meant is the one it prints as
+            c.value = Double.valueOf(Double.parseDouble(value.toString()));
         } else if (value instanceof Number) {
             c.value = Double.valueOf(((Number) value).doubleValue());
         } else if (value instanceof Boolean || value instanceof String || value instanceof CellError) {
@@ -331,6 +335,10 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `IllegalArgumentException`: when the formula cannot be read
     public void setCellFormula(int row, int column, String formula) {
+        if (formula == null) {
+            setCellValue(row, column, null);
+            return;
+        }
         String text = formula.startsWith("=") ? formula.substring(1) : formula;
         Node node;
         try {
@@ -339,6 +347,22 @@ public final class Sheet extends AbstractTableModel {
             throw new IllegalArgumentException(e.getMessage()); //NOPMD PreserveStackTrace - the device library has no constructor that takes a cause
         }
         putFormula(row, column, text, node);
+    }
+
+    /// The format a formula typed into a cell with none gives it, as a spreadsheet does for
+    /// the functions that make a date: `=TODAY()` shows a date and not the number of a day.
+    private void formatOfTyped(Cell c, Node node) {
+        if (node.kind != Node.FUNC || !(node.value instanceof String) || !workbook.format(c.format).isGeneral()) {
+            return;
+        }
+        String name = (String) node.value;
+        if ("DATE".equalsIgnoreCase(name) || "TODAY".equalsIgnoreCase(name)) {
+            c.format = workbook.formatId("yyyy-mm-dd");
+        } else if ("NOW".equalsIgnoreCase(name)) {
+            c.format = workbook.formatId("yyyy-mm-dd hh:mm:ss");
+        } else if ("TIME".equalsIgnoreCase(name)) {
+            c.format = workbook.formatId("hh:mm:ss");
+        }
     }
 
     /// Puts a formula into a cell named the way a formula names it.
@@ -359,6 +383,7 @@ public final class Sheet extends AbstractTableModel {
         c.formula = node;
         c.formulaText = text;
         c.state = Cell.DIRTY;
+        formatOfTyped(c, node);
         workbook.formulaSet(c);
         workbook.cellChanged(this, row, column);
     }
@@ -473,19 +498,20 @@ public final class Sheet extends AbstractTableModel {
             return;
         }
         Double number = Values.parseNumber(trimmed);
-        if (number == null) {
+        // 1E400 reads as a number and is none a cell can hold
+        if (number == null || Double.isInfinite(number.doubleValue()) || Double.isNaN(number.doubleValue())) {
             setCellValue(row, column, text);
             return;
         }
         double d = number.doubleValue();
         String format = null;
-        boolean digitsOnly = trimmed.indexOf(':') < 0 && trimmed.indexOf('-', 1) != 4;
+        // 1.2E-05 has a dash where a year would end, and is no date
+        boolean date = Values.namedDate(trimmed, new int[1]) >= 0 || trimmed.indexOf('-', 1) == 4
+                && trimmed.indexOf('e') < 0 && trimmed.indexOf('E') < 0;
+        boolean time = trimmed.indexOf(':') >= 0;
         if (trimmed.endsWith("%")) {
             format = trimmed.indexOf('.') < 0 ? "0%" : "0.00%";
-        } else if (!digitsOnly || trimmed.indexOf('-', 1) == 4 && trimmed.length() >= 8
-                && trimmed.indexOf('e') < 0 && trimmed.indexOf('E') < 0) {
-            boolean date = trimmed.indexOf('-', 1) == 4;
-            boolean time = trimmed.indexOf(':') >= 0;
+        } else if (date || time) {
             format = date ? time ? "yyyy-mm-dd hh:mm:ss" : "yyyy-mm-dd" : "hh:mm:ss";
             if (date && workbook.isDate1904()) {
                 d -= 1462;
@@ -597,6 +623,16 @@ public final class Sheet extends AbstractTableModel {
         return getCellFormula(row + offset(), column);
     }
 
+    /// Adds a listener that is told when a cell changes: the cell that was edited, and every
+    /// formula that reads it, directly or through other formulas.
+    ///
+    /// A formula is calculated when its value is asked for, not when what it reads changes,
+    /// so the event says that the cell is out of date. A cell that is out of date already,
+    /// because nobody read it since the last event, is not announced a second time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
     @Override
     public void addDataChangeListener(DataChangedListener d) {
         dispatcher.addListener(d);
@@ -1024,8 +1060,8 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `columns`: the count of columns at the left
     public void setFrozenPanes(int rows, int columns) {
-        frozenRows = Math.max(0, rows);
-        frozenColumns = Math.max(0, columns);
+        frozenRows = Math.max(0, Math.min(rows, Node.MAX_ROW));
+        frozenColumns = Math.max(0, Math.min(columns, Node.MAX_COL));
     }
 
     /// Merges a rectangle of cells into one, as the file formats record it. The value shown
@@ -1041,7 +1077,24 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `lastColumn`: the right column
     public void addMergedRegion(int firstRow, int firstColumn, int lastRow, int lastColumn) {
-        merges.add(new int[] {firstRow, firstColumn, lastRow, lastColumn});
+        if (!loadMergedRegion(firstRow, firstColumn, lastRow, lastColumn)) {
+            throw new IllegalArgumentException("Not a rectangle of the sheet: rows " + firstRow + " to " + lastRow
+                    + ", columns " + firstColumn + " to " + lastColumn);
+        }
+    }
+
+    /// Records a merge a file names. Corners given the wrong way around are put right; a
+    /// rectangle that leaves the sheet is not recorded, and false is the answer.
+    boolean loadMergedRegion(int firstRow, int firstColumn, int lastRow, int lastColumn) {
+        int r1 = Math.min(firstRow, lastRow);
+        int r2 = Math.max(firstRow, lastRow);
+        int c1 = Math.min(firstColumn, lastColumn);
+        int c2 = Math.max(firstColumn, lastColumn);
+        if (r1 < 0 || c1 < 0 || r2 > Node.MAX_ROW || c2 > Node.MAX_COL) {
+            return false;
+        }
+        merges.add(new int[] {r1, c1, r2, c2});
+        return true;
     }
 
     /// The number of merged regions.

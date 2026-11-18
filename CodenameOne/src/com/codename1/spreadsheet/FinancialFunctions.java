@@ -120,6 +120,10 @@ final class FinancialFunctions {
                 double future = Evaluator.num(a, 3, 0);
                 double type = Evaluator.num(a, 4, 0) != 0 ? 1 : 0;
                 double rate = Evaluator.num(a, 5, 0.1);
+                // no interest at all is an answer the search below cannot land on exactly
+                if (Math.abs(fv(0, nper, payment, pv, type) - future) <= 1e-12 * (Math.abs(pv) + Math.abs(payment * nper) + Math.abs(future))) {
+                    return d(0);
+                }
                 for (int i = 0; i < 100; i++) {
                     double y = fv(rate, nper, payment, pv, type) - future;
                     double h = Math.max(1e-7, Math.abs(rate) * 1e-7);

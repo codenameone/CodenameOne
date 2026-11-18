@@ -40,6 +40,12 @@ final class XmlScanner {
     static final int END = 2;
     static final int TEXT = 3;
 
+    /// The characters every part of one file together may unpack to.
+    static final long MAX_DOCUMENT = 256L * 1024 * 1024;
+    /// The longest text or attribute value, far past the 32,767 characters a cell holds.
+    static final int MAX_TEXT = 4 * 1024 * 1024;
+    private final long[] budget;
+    private int depth;
     private final Reader in;
     private final char[] buffer = new char[4096];
     private int pos;
@@ -58,7 +64,14 @@ final class XmlScanner {
     /// Reads a part as UTF-8, the encoding every spreadsheet program writes. The stream is
     /// not closed: it is one entry of an archive that has more.
     XmlScanner(InputStream stream) throws IOException {
+        this(stream, new long[] {MAX_DOCUMENT});
+    }
+
+    /// Reads a part against what is left of the characters one file may unpack to: `budget`
+    /// is shared by every part of the archive.
+    XmlScanner(InputStream stream, long[] budget) throws IOException {
         in = new InputStreamReader(stream, "UTF-8");
+        this.budget = budget;
     }
 
     private int read() throws IOException {
@@ -69,6 +82,15 @@ final class XmlScanner {
                 limit = 0;
                 return -1;
             }
+            // A compressed part unpacks to a thousand times its size, so the size of the file
+            // says nothing about what reading it takes.
+            budget[0] -= limit;
+            if (budget[0] < 0) {
+                throw new IOException("The spreadsheet unpacks to more than " + MAX_DOCUMENT + " characters");
+            }
+            if (sb.length() > MAX_TEXT) {
+                throw new IOException("The spreadsheet has a text of more than " + MAX_TEXT + " characters");
+            }
         }
         return buffer[pos++];
     }
@@ -78,11 +100,16 @@ final class XmlScanner {
     int next() throws IOException {
         if (pendingEnd) {
             pendingEnd = false;
+            depth--;
             return END;
         }
         for (;;) {
             int c = read();
             if (c < 0) {
+                if (depth > 0) {
+                    // half a part read as if it were whole is rows missing without a word
+                    throw new IOException("The spreadsheet ends in the middle of an element");
+                }
                 return EOF;
             }
             if (c != '<') {
@@ -123,10 +150,12 @@ final class XmlScanner {
                 while (e >= 0 && e != '>') {
                     e = read();
                 }
+                depth--;
                 return END;
             }
             name = readName(c);
             readAttributes();
+            depth++;
             return START; //NOPMD AvoidBranchingStatementAsLastInLoop - the loop only repeats past comments and declarations
         }
     }
@@ -181,9 +210,11 @@ final class XmlScanner {
             if (c < 0 || c == ';') {
                 break;
             }
-            if (e.length() > 10) {
-                // not an entity: an ampersand that should have been escaped
-                sb.append('&').append(e).append((char) c);
+            if (c == '<' || c == '&' || c == ' ' || c == '\n' || c == '\r' || c == '\t' || e.length() > 10) {
+                // not an entity: an ampersand that should have been escaped. What follows it
+                // is read again as what it is, so that a tag after it is still a tag.
+                sb.append('&').append(e);
+                pos--;
                 return;
             }
             e.append((char) c);
@@ -213,6 +244,11 @@ final class XmlScanner {
     }
 
     static void appendCodePoint(StringBuilder sb, int code) {
+        // what XML has no character for: half of a surrogate pair, and the control characters
+        if (code < 0x20 && code != 9 && code != 10 && code != 13 || code >= 0xd800 && code <= 0xdfff
+                || code == 0xfffe || code == 0xffff) {
+            return;
+        }
         if (code < 0x10000) {
             sb.append((char) code);
         } else if (code <= 0x10ffff) {
@@ -377,6 +413,18 @@ final class XmlScanner {
             }
         }
         return null;
+    }
+
+    double doubleAttr(String attribute, double fallback) {
+        String v = attr(attribute);
+        if (v == null) {
+            return fallback;
+        }
+        try {
+            return Double.parseDouble(v.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     int intAttr(String attribute, int fallback) {

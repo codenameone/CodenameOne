@@ -56,6 +56,9 @@ class FormulaEvaluationTest {
 
     private Object eval(String formula) {
         sheet.setCellFormula("Z100", formula);
+        // a formula that makes a date gives its cell a date format, and the cell would then
+        // answer with a Date: these tests compare the numbers of the days
+        sheet.setCellFormat(99, 25, "General");
         return sheet.getCellValue("Z100");
     }
 

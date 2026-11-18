@@ -343,7 +343,18 @@ final class DateFunctions {
         boolean[] off = weekend(ev, intl ? Evaluator.arg(a, 2) : Evaluator.MISSING);
         DoubleList holidays = new DoubleList();
         int h = intl ? 3 : 2;
-        if (Evaluator.has(a, h)) {
+        if (Evaluator.has(a, h) && a[h] instanceof Object[][]) {
+            // An array written into the formula lists its holidays as text as often as as
+            // numbers, {"2026-01-01","2026-12-25"}, and a spreadsheet reads each one as the
+            // date it spells. A range is different: text in a cell is skipped there.
+            for (Object[] line : (Object[][]) a[h]) {
+                for (Object value : line) {
+                    if (value != null) {
+                        holidays.add(Values.num(value));
+                    }
+                }
+            }
+        } else if (Evaluator.has(a, h)) {
             ev.numbers(a[h], holidays, false);
         }
         double[] days = holidays.sorted();

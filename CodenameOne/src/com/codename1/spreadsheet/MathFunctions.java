@@ -484,7 +484,11 @@ final class MathFunctions {
                     throw EvalError.VALUE;
                 }
                 boolean[][] mask = Criteria.mask(ev, a, 1, a.length);
-                Object[][] values = ev.shaped(a[0], mask.length, Evaluator.width2(mask));
+                Object[][] values = ev.matrix(a[0]);
+                // unlike SUMIF, which stretches what it sums to the size of what it tests
+                if (values.length != mask.length || Evaluator.width(values) != Evaluator.width2(mask)) {
+                    throw EvalError.VALUE;
+                }
                 return d(maskedSum(mask, values));
             }
             case 6: // GCD

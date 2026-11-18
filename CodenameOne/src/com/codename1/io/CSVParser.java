@@ -513,7 +513,8 @@ public class CSVParser {
         String text = sample.toString();
         if (text.length() > 5 && text.regionMatches(true, 0, "sep=", 0, 4)) {
             char after = text.charAt(5);
-            if (after == '\n' || after == '\r') {
+            // "sep=" and an empty line is not a separator: a line ending separates nothing
+            if ((after == '\n' || after == '\r') && text.charAt(4) != '\n' && text.charAt(4) != '\r') {
                 separatorChar = text.charAt(4);
                 int skip = 6;
                 if (after == '\r' && text.length() > 6 && text.charAt(6) == '\n') {

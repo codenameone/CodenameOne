@@ -426,6 +426,12 @@ logical value is a `Boolean` and an error such as `#DIV/0!` is a `CellError`.
 `Workbook.Format.detect` picks the format from a file name and the first bytes
 of the file, for a file the user chose.
 
+A file the user chose is a file someone else wrote. `Workbook.read` throws an
+`IOException` for one that's damaged, that isn't a spreadsheet, or that asks for
+more memory than a sheet should take: a few hundred compressed bytes can
+describe millions of cells. It stops at four million cells, and
+`Workbook.setCellLimit` raises that for an application that reads larger files.
+
 ==== A whole workbook
 
 A workbook usually has several sheets that read one another. The samples that
@@ -556,9 +562,13 @@ then.
 
 Three things work differently from Excel:
 
-* A formula that returns an array keeps the whole array for the formulas that
-  read it, but the cell shows its first value. Results don't spill into the
-  neighboring cells.
+* A formula that returns an array shows its first value, and that value is
+  what another cell reads from it. Results don't spill into the neighboring
+  cells: a formula that needs the whole array wraps the call that makes it, as
+  in `=SUM(SEQUENCE(3))`.
+* Text is read as a date when it's written `2026-01-12` or names its month,
+  as in `12-Jan-2026`. A date of digits and slashes isn't: `1/2/2026` is a
+  different day in different countries.
 * Functions of complex numbers, such as `IMSUM`, and the regression functions
   that return an array, such as `LINEST` and `TREND`, aren't included.
 * Formulas use `A1` references. The `R1C1` style isn't read.
@@ -595,6 +605,11 @@ lines when the file uses a semicolon, a tab or a bar instead of a comma.
 
 A cell that starts with `=` stays text when it's read from CSV. A file from
 somewhere else doesn't get to run a formula.
+
+Writing CSV applies the same care in the other direction. Text that a
+spreadsheet would run as a formula when it opens the file, such as `=1+1` or
+`@SUM(A1)`, is written with an apostrophe in front, which tells the spreadsheet
+that it's text. Numbers aren't touched, so `-5` stays a number.
 
 `CSVParser` and `CSVWriter` in `com.codename1.io` read and write the text itself,
 without a workbook:
