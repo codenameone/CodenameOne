@@ -2630,7 +2630,7 @@ A line draws only the highest and lowest point of each pixel column, so a long s
 
 ==== Annotations, selection and export
 
-`Annotation.valueLine`, `valueBand`, `xLine` and `xBand` mark targets, thresholds and periods behind the data. `addSelectionListener` reports the point the user tapped. With `setBrushEnabled(true)`, dragging across the plot selects a range of X values: `addRangeListener` receives it, and the chart zooms to it unless you call `setBrushZooms(false)`. `toImage(width, height)` renders the chart off-screen for sharing or for a report.
+`Annotation.valueLine`, `valueBand`, `xLine` and `xBand` mark targets, thresholds and periods behind the data. `addSelectionListener` reports the point the user tapped. `setSelection(series, index)` selects a point from code and shows its tooltip, as a tap would, without calling the selection listeners; the arrow keys continue from it and a screen reader announces it. In shared tooltip mode `showTooltipAtX(x)` places the crosshair. `addLegendListener` is told of every legend tap, and `setLegendToggles(false)` stops those taps from hiding series. With `setBrushEnabled(true)`, dragging across the plot selects a range of X values: `addRangeListener` receives it, and the chart zooms to it unless you call `setBrushZooms(false)`. `toImage(width, height)` renders the chart off-screen for sharing or for a report.
 
 ==== Accessibility
 

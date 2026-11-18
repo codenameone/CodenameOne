@@ -86,6 +86,10 @@ public class Chart extends Component {
     private final List<Series> series = new ArrayList<Series>();
     private final List<Annotation> annotations = new ArrayList<Annotation>();
     private final List<SelectionListener> selectionListeners = new ArrayList<SelectionListener>();
+    private final List<LegendListener> legendListeners = new ArrayList<LegendListener>();
+    private boolean legendToggles = true;
+    private Series pendingSelection;
+    private int pendingSelectionIndex;
     private final List<RangeListener> rangeListeners = new ArrayList<RangeListener>();
     private boolean brushEnabled;
     private boolean brushZooms = true;
@@ -148,7 +152,8 @@ public class Chart extends Component {
     private int lastTapY;
     private boolean flinging;
     private long flingLast;
-    private final List<int[]> legendHits = new ArrayList<int[]>();
+    // package access: tests tap the legend through it
+    final List<int[]> legendHits = new ArrayList<int[]>();
     private double[] viewportFrom;
     private double[] viewportTo;
     private long viewportStart;
@@ -179,6 +184,7 @@ public class Chart extends Component {
         beginChange();
         s.chart = this;
         series.add(s);
+        legendHits.clear();
         s.visibility = s.isVisible() ? 1 : 0;
         if (isInitialized()) {
             s.captureEntryStart();
@@ -195,6 +201,11 @@ public class Chart extends Component {
         series.remove(s);
         s.chart = null;
         dropPointsOf(s);
+        // the legend hit boxes hold series indices, which no longer line up until the next paint
+        legendHits.clear();
+        if (pendingSelection == s) { //NOPMD CompareObjectsWithEquals - identity of the same series is intended
+            pendingSelection = null;
+        }
         if (!inBatch) {
             startTransition();
         }
@@ -207,6 +218,8 @@ public class Chart extends Component {
             s.chart = null;
         }
         series.clear();
+        legendHits.clear();
+        pendingSelection = null;
         selected = null;
         hover = null;
         repaint();
@@ -497,6 +510,89 @@ public class Chart extends Component {
     /// Stops listening.
     public void removeSelectionListener(SelectionListener l) {
         selectionListeners.remove(l);
+    }
+
+    /// Selects point `index` of `s` and shows its tooltip, as a tap on it would; null
+    /// clears the selection. Arrow-key stepping continues from the point, and the screen
+    /// reader announces it. Selection listeners are not called: they report the user's
+    /// taps and keys, and the caller already knows what it selected. Before the chart is
+    /// first painted the selection is kept and applied by that paint.
+    public Chart setSelection(Series s, int index) {
+        if (s == null) {
+            pendingSelection = null;
+            selected = null;
+            repaint();
+            return this;
+        }
+        if (lastContext == null) {
+            pendingSelection = s;
+            pendingSelectionIndex = index;
+            return this;
+        }
+        selectQuietly(s, index);
+        repaint();
+        return this;
+    }
+
+    private void selectQuietly(Series s, int index) {
+        if (s.chart != this || index < 0 || index >= s.getPointCount()) { //NOPMD CompareObjectsWithEquals - identity of the owning chart is intended
+            return;
+        }
+        ChartPoint p = s.getPoint(lastContext, index);
+        if (p == null) {
+            return;
+        }
+        selected = p;
+        announceForAccessibility(describe(s, p));
+    }
+
+    private String describe(Series s, ChartPoint p) {
+        String text = s.formatTooltip(lastContext, p);
+        if (s.isCartesian()) {
+            text = xAxis.format(p.getX(), 0) + ", " + text;
+        }
+        return text;
+    }
+
+    /// Shows the shared tooltip and crosshair at data x `x`, as a tap there would in
+    /// `TOOLTIP_SHARED` mode; linked charts follow. Does nothing in other modes.
+    public Chart showTooltipAtX(double x) {
+        if (tooltipMode != TOOLTIP_SHARED) {
+            return this;
+        }
+        if (!sameX(x, sharedX)) {
+            sharedX = x;
+            fireCrosshair();
+        }
+        repaint();
+        return this;
+    }
+
+    /// The data x the shared tooltip shows, or NaN when it shows none.
+    public double getTooltipX() {
+        return sharedX;
+    }
+
+    /// Whether tapping a legend entry hides and shows its series (the default). Legend
+    /// listeners are told of taps either way.
+    public Chart setLegendToggles(boolean toggles) {
+        legendToggles = toggles;
+        return this;
+    }
+
+    /// Whether tapping a legend entry hides and shows its series.
+    public boolean isLegendToggles() {
+        return legendToggles;
+    }
+
+    /// Listens for taps on legend entries.
+    public void addLegendListener(LegendListener l) {
+        legendListeners.add(l);
+    }
+
+    /// Stops listening.
+    public void removeLegendListener(LegendListener l) {
+        legendListeners.remove(l);
     }
 
     /// The selected point, or null.
@@ -968,6 +1064,11 @@ public class Chart extends Component {
         ctx.plotH = Math.max(0, plotH);
         ctx.labels = new LabelLayout(plotX, plotY - fh / 2, ctx.plotW, ctx.plotH + fh / 2);
         lastContext = ctx;
+        if (pendingSelection != null) {
+            Series ps = pendingSelection;
+            pendingSelection = null;
+            selectQuietly(ps, pendingSelectionIndex);
+        }
         if (ctx.plotW <= 0 || ctx.plotH <= 0) {
             // the title and legend took the whole component: there is no plot to draw into,
             // but a loading state must still show
@@ -1990,8 +2091,16 @@ public class Chart extends Component {
         int ry = y - getY();
         for (int[] hit : legendHits) {
             if (rx >= hit[0] && rx <= hit[0] + hit[2] && ry >= hit[1] - mm(1) && ry <= hit[1] + hit[3] + mm(1)) {
+                if (hit[4] < 0 || hit[4] >= series.size()) {
+                    return;
+                }
                 Series s = series.get(hit[4]);
-                s.toggleLegendEntry(hit[5]);
+                if (legendToggles) {
+                    s.toggleLegendEntry(hit[5]);
+                }
+                for (LegendListener l : new ArrayList<LegendListener>(legendListeners)) {
+                    l.legendTapped(this, s, hit[5]);
+                }
                 return;
             }
         }
@@ -2077,7 +2186,10 @@ public class Chart extends Component {
     }
 
     private static void restore(Axis[] axes, double[] r) {
-        for (int i = 0; i < axes.length; i++) {
+        // a secondary axis added or removed mid animation leaves the snapshot a different
+        // length from the axes: restore only the axes both have
+        int n = Math.min(axes.length, r.length / 3);
+        for (int i = 0; i < n; i++) {
             if (r[i * 3 + 2] == 0) {
                 axes[i].resetViewport();
             } else {
@@ -2344,11 +2456,7 @@ public class Chart extends Component {
         for (SelectionListener l : new ArrayList<SelectionListener>(selectionListeners)) {
             l.selectionChanged(this, next);
         }
-        String text = s.formatTooltip(lastContext, next);
-        if (s.isCartesian()) {
-            text = xAxis.format(next.getX(), 0) + ", " + text;
-        }
-        announceForAccessibility(text);
+        announceForAccessibility(describe(s, next));
         repaint();
         return true;
     }

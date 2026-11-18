@@ -25,6 +25,7 @@ package com.codename1.ui.chart.series;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.chart.ChartContext;
 import com.codename1.ui.chart.ChartPoint;
+import java.util.Arrays;
 
 /// Unconnected points. Giving the points sizes turns it into a bubble chart: the bubble's
 /// *area*, not its radius, is proportional to the size value, so big values do not look
@@ -150,6 +151,9 @@ public class ScatterSeries extends XYSeries {
         return m;
     }
 
+    // one bit per plot pixel, reused across frames, for the dense-scatter dedupe in paint
+    private int[] drawnCells;
+
     @Override
     public void paint(ChartContext ctx) {
         Graphics g = ctx.getGraphics();
@@ -159,6 +163,22 @@ public class ScatterSeries extends XYSeries {
         double ms = maxSize();
         double xmin = ctx.getXAxis().getVisibleMin();
         double xmax = ctx.getXAxis().getVisibleMax();
+        // a dense plain scatter draws many markers onto the same pixel; past twice the plot
+        // width, a marker whose center pixel already holds one of the same size is skipped.
+        // Bubbles differ in size per point, so they are always drawn.
+        int pw = ctx.getPlotWidth();
+        int ph = ctx.getPlotHeight();
+        boolean dedupe = !bubbles && count > 2 * pw && pw > 0 && ph > 0;
+        if (dedupe) {
+            int words = (pw * ph + 31) / 32;
+            if (drawnCells == null || drawnCells.length < words) {
+                drawnCells = new int[words];
+            } else {
+                Arrays.fill(drawnCells, 0, words, 0);
+            }
+        }
+        int px0 = ctx.getPlotX();
+        int py0 = ctx.getPlotY();
         for (int i = 0; i < count; i++) {
             if (xs[i] < xmin || xs[i] > xmax) {
                 continue;
@@ -170,6 +190,25 @@ public class ScatterSeries extends XYSeries {
             int d = (int) (diameter(ctx, i, ms) * Math.min(1, ctx.getProgress() * 1.5f + (bubbles ? 0 : 1)));
             int sx = (int) ctx.screenX(this, xs[i], v);
             int sy = (int) ctx.screenY(this, xs[i], v);
+            if (dedupe) {
+                int cx = sx - px0;
+                int cy = sy - py0;
+                // a point on the plot's far edge lands one past it; it shares the edge cell
+                if (cx == pw) {
+                    cx--;
+                }
+                if (cy == ph) {
+                    cy--;
+                }
+                if (cx >= 0 && cx < pw && cy >= 0 && cy < ph) {
+                    int cell = cy * pw + cx;
+                    int bit = 1 << (cell & 31);
+                    if ((drawnCells[cell >> 5] & bit) != 0) {
+                        continue;
+                    }
+                    drawnCells[cell >> 5] |= bit;
+                }
+            }
             g.fillArc(sx - d / 2, sy - d / 2, d, d, 0, 360);
         }
         g.setAlpha(alpha);
