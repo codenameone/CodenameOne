@@ -59,7 +59,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/kanban/Kan
 ----
 
 .Two swimlanes, a column over its limit and a folded column
-image::img/generated/kanban-lanes.png["A board split into two rows titled App and Server. The Doing column shows 2 of 1 in a red pill, and the Done column is folded to a narrow strip",scaledwidth=70%]
+image::img/generated/kanban-lanes.png["A board split into two rows titled App and Server. The Doing column shows its count, 2/1, in red, and the Done column is folded to a narrow strip",scaledwidth=70%]
 
 === Adding and editing cards
 

@@ -1296,7 +1296,12 @@ public class KanbanBoard extends Container {
             g.fillRoundRect(cx, y - arc, colW[c], bottom - y + arc, arc, arc);
             g.setAlpha(a);
             if (cols.get(c).isCollapsed()) {
-                paintFoldedTitle(g, cols.get(c), cx, Math.max(y, clipY), colW[c]);
+                // a lane's title bar crosses the strip, so the title starts under the first one
+                int titleTop = Math.max(y, clipY);
+                if (!lanes.isEmpty() && laneTop.length > 0) {
+                    titleTop = Math.max(titleTop, y + laneTop[0] + bandH);
+                }
+                paintFoldedTitle(g, cols.get(c), cx, titleTop, colW[c]);
             }
         }
         for (int l = 0; l < cells.length; l++) {
