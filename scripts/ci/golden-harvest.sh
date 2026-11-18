@@ -8,6 +8,8 @@
 #   golden-harvest.sh status SHA STATE DESC set the "Golden capture" commit status on SHA,
 #                                           and the PR's Golden capture comment
 #   golden-harvest.sh comment SHA STATE DESC the comment alone
+#   golden-harvest.sh redo-dropped RUNS_FILE  re-run the failed jobs of every listed run that
+#                                           GitHub never gave a runner; prints how many runs
 #
 # A run is a pull_request run (a normal PR run, harvest mode) or a
 # workflow_dispatch run (golden-capture.yml's capture mode); both are listed,
@@ -175,11 +177,42 @@ Whatever did arrive is committed; the next push captures only what is still miss
   fi || echo "::warning::could not update the Golden capture comment on #$pr"
 }
 
+# GitHub fails a queued job it cannot place ("The job was not acquired by
+# Runner of type hosted even after multiple attempts"), most often a macOS
+# arm64 one while that pool is short. The leg never ran, so it rendered
+# nothing, and harvesting would report a failed capture for what is only a
+# wait. Re-run those jobs instead, at most twice per run. The re-run must use
+# CN1SS_GH_TOKEN (RERUN_TOKEN): GitHub starts no workflow_run, and so no
+# harvest, for a run (re-)started with the job's own token.
+redo-dropped() {
+  local runs_file="$1" wf id attempt jobs job dropped n=0
+  while read -r wf id; do
+    attempt="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq 'if .conclusion == "success" then 0 else .run_attempt end')"
+    [ "$attempt" -gt 0 ] && [ "$attempt" -lt 3 ] || continue
+    jobs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?per_page=100" \
+              --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .id')"
+    dropped=0
+    for job in $jobs; do
+      if gh api "repos/$GITHUB_REPOSITORY/check-runs/$job/annotations" \
+           --jq '.[].message' 2>/dev/null | grep -q "not acquired by Runner"; then
+        dropped=1
+        break
+      fi
+    done
+    [ "$dropped" = 1 ] || continue
+    log "$wf run $id: GitHub dropped a job before it got a runner; re-running its failed jobs (attempt $((attempt + 1)))"
+    GH_TOKEN="${RERUN_TOKEN:-$GH_TOKEN}" gh run rerun "$id" --repo "$GITHUB_REPOSITORY" --failed
+    n=$((n + 1))
+  done < "$runs_file"
+  echo "$n"
+}
+
 case "${1:-}" in
   count) count "$2" ;;
   list) list "$2" "$3" ;;
   collect) collect "$2" "$3" ;;
   status) status "$2" "$3" "$4" ;;
   comment) comment "$2" "$3" "$4" ;;
-  *) echo "usage: $0 list|count|collect|status|comment ..." >&2; exit 2 ;;
+  redo-dropped) redo-dropped "$2" ;;
+  *) echo "usage: $0 list|count|collect|status|comment|redo-dropped ..." >&2; exit 2 ;;
 esac
