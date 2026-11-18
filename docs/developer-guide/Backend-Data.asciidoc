@@ -236,7 +236,7 @@ A server that hosts many customers in one deployment has to keep each customer's
 
 The current tenant lives in `TenantContext`, one value per thread. `TenantFilter` sets it for each request and clears it afterwards:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 // Tenant from the first label of the host name: acme.example.com is "acme".
 new TenantFilter(TenantFilter.subdomain("example.com"), true);
@@ -246,7 +246,7 @@ new TenantFilter(TenantFilter.header("X-Tenant-ID"), true);
 
 A header or a host name is whatever the client sent. A user signed in to one tenant who sends another tenant's name reads that tenant's data, and nothing in the ORM can tell. Only trust one that a gateway strips and sets after authenticating the caller. Otherwise, derive the tenant from the authenticated principal, with the filter installed after authentication:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 // accounts.tenantOf is your own lookup, from a user table or a token claim.
 new TenantFilter(TenantFilter.authenticated(auth -> accounts.tenantOf(auth.getName())), true);
@@ -258,7 +258,7 @@ Any other rule is a `TenantResolver`. A tenant identifier is 1 to 64 characters 
 
 Mark a `String` field with `@TenantId`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 @Entity
 public class Invoice {
@@ -285,7 +285,7 @@ Entities with a `@TenantId` field need a managed session; the plain dao refuses 
 
 Native SQL is never rewritten. Instead of letting one quietly read every tenant's rows, a session that maps any `@TenantId` entity refuses to create or run a native query (`TenantNativeSqlException`). The check runs again when the query executes, so a query created inside the opt-in can't be run outside it. Add the tenant condition yourself and opt in for that call:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 Long open = (Long) TenantContext.allowNativeSql(() -> session
         .createNativeQuery("SELECT COUNT(*) FROM invoice WHERE tenant_id = :t", Long.class)
@@ -313,7 +313,7 @@ cn1.tenancy.datasource.pool.size=4
 cn1.tenancy.datasource.maxPools=32
 ----
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 TenantDataSources tenants = TenantDataSources.fromConfig(config);
 tenants.migrateAll(Arrays.asList("acme", "globex"), config);
@@ -326,7 +326,7 @@ EntityManager entities = EntityManager.open(tenants.current());
 
 A task submitted to an executor runs on another thread, which has no tenant. `TenantContext.decorator()` carries the submitting thread's tenant into the task:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 Tasks.executor("mail").setTaskDecorator(TenantContext.decorator());
 ----
