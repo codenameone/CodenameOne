@@ -106,6 +106,9 @@ public final class BookForm extends LiveChannel.Adapter {
     private List<long[]> mine = new ArrayList<long[]>();
     /// The first day of the strip `mine` was read for.
     private long mineFrom;
+    /// Counts the reads of the busy time, so that an answer can tell whether
+    /// a later read has replaced the one it belongs to.
+    private int mineRead;
     /// Beside the times on a wide window: the start picked, held, with its
     /// price and the button that books it. Null on a phone.
     private final Container summary;
@@ -384,6 +387,7 @@ public final class BookForm extends LiveChannel.Adapter {
     /// The client's own busy time, when they asked for it to be checked.
     private void readMine() {
         final long from = stripStart();
+        final int read = ++mineRead;
         mineFrom = from;
         if (!DeviceCalendar.canReadBusy() || !Preferences.get(CHECK_CALENDAR, false)) {
             mine = new ArrayList<long[]>();
@@ -391,9 +395,10 @@ public final class BookForm extends LiveChannel.Adapter {
             return;
         }
         DeviceCalendar.busy(null, from, Times.addDays(from, DAYS_SHOWN + 7), busy -> {
-            // An answer for a strip that has since been left is not this
-            // strip's busy time: the read that replaced it brings its own.
-            if (mineFrom != from) {
+            // An answer that a later read has replaced -- the strip was left,
+            // or the check was turned off -- is not the busy time to mark:
+            // the later read brings its own.
+            if (read != mineRead) {
                 return;
             }
             mine = busy;

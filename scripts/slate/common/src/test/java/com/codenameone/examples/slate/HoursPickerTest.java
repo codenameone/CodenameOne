@@ -52,6 +52,7 @@ public class HoursPickerTest extends E2e {
         shot("provider-hours-time");
         click("PickerMaterialOk");
         waitForForm("Hours");
+        assertEqual(8 * 60 + 30, time("start-1"), "the time confirmed is the start");
 
         // Dark: the same face on the dark surface, the hand still the brand's.
         final int[] light = new int[2];
@@ -76,7 +77,6 @@ public class HoursPickerTest extends E2e {
         assertTrue(luma(dark[0]) < 80, "the dark clock face is dark");
         assertTrue(light[1] != light[0] && dark[1] != dark[0], "the hand stands out in both");
         assertEqual(8 * 60 + 30, time("start-1"), "Back out of the dark face left the start alone");
-        assertEqual(8 * 60 + 30, time("start-1"), "the time confirmed is the start");
 
         // A time between two quarters, as one typed can be, goes back to one.
         click("start-1");
