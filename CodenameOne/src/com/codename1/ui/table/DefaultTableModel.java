@@ -196,9 +196,11 @@ public class DefaultTableModel extends AbstractTableModel {
     /// - `row`: array or row items, notice that row.length should match the column count exactly!
     public void insertRow(int offset, Object... row) {
         data.add(offset, row);
+        // The inserted row's own cells first: a listener that sees the row
+        // count grow learns from the first event where the row went.
         for (int col = 0; col < row.length; col++) {
-            dispatcher.fireDataChangeEvent(col, data.size() - 1);
             dispatcher.fireDataChangeEvent(col, offset);
+            dispatcher.fireDataChangeEvent(col, data.size() - 1);
         }
     }
 

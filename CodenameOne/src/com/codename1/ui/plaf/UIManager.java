@@ -2127,6 +2127,26 @@ public class UIManager {
     /// give each one the default black on white, and a week view would be a
     /// white rectangle. A theme that styles a UIID owns it whole, so nothing
     /// here is merged into a UIID the theme mentions.
+    // The bold of the titles and group rows, at the size of the theme's own
+    // text. A grid's rows take the theme's text font, so a bold at a fixed
+    // size reads as a different scale wherever a theme's text is larger or
+    // smaller than it -- titles half the height of the rows under a desktop
+    // theme.
+    private static Font gridBold(HashMap<String, Object> installedTheme, Font fallback) {
+        if (installedTheme == null || !Font.isNativeFontSchemeSupported()) {
+            return fallback;
+        }
+        Object base = installedTheme.get("Label.font");
+        if (!(base instanceof Font)) {
+            base = installedTheme.get("font");
+        }
+        if (!(base instanceof Font) || !((Font) base).isTTFNativeFont() || ((Font) base).getPixelSize() <= 0) {
+            return fallback;
+        }
+        return Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD, Font.NATIVE_MAIN_BOLD)
+                .derive(((Font) base).getPixelSize(), Font.STYLE_BOLD);
+    }
+
     private void installSchedulingDefaults(HashMap<String, Object> installedTheme, boolean darkMode,
                                            Font plain, Font bold) {
         java.util.HashSet<String> themed = new java.util.HashSet<String>();
@@ -2148,7 +2168,8 @@ public class UIManager {
                 if (followsDevice && key.startsWith("$Dark")) {
                     dark = true;
                 }
-                if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")) {
+                if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")
+                        || key.startsWith("DataGrid")) {
                     // A default from the last pass is not the theme's: it
                     // was the light palette if that pass was light, and a
                     // refresh into dark mode has to be able to replace it.
@@ -2255,6 +2276,23 @@ public class UIManager {
         schedulingStyle("GanttLoad", onPrimary, primary, "255", null, small);
         schedulingStyle("GanttOverload", onPrimary, error, "255", null, small);
 
+        // the data grid: painted, so only colours, fonts and paddings are read
+        Font gridBold = gridBold(installedTheme, bold);
+        schedulingStyle("DataGrid", onSurface, surface, "255", "0,0,0,0", null);
+        schedulingStyle("DataGridHeader", variant, raised, "255", "0,0,1.5,1.5", gridBold);
+        if (schedulingStyle("DataGridRow", onSurface, surface, "255", "0,0,1.5,1.5", null)) {
+            schedulingState("DataGridRow", "sel#", onTint, tint, "255");
+        }
+        schedulingStyle("DataGridRowAlt", onSurface, dark ? "232227" : "f8f9fa", "255", "0,0,1.5,1.5", null);
+        schedulingStyle("DataGridGroupRow", onSurface, raised, "255", "0,0,1.5,1.5", gridBold);
+        schedulingStyle("DataGridLine", line, surface, "0", null, null);
+        schedulingStyle("DataGridCheck", onPrimary, primary, "255", null, null);
+        if (!themed.contains("DataGridEditor")) {
+            schedulingDefault("DataGridEditor", "DataGridEditor.derive", "TextField");
+            schedulingDefault("DataGridEditor", "DataGridEditor.sel#derive", "TextField.sel");
+            schedulingDefault("DataGridEditor", "DataGridEditor.press#derive", "TextField.press");
+        }
+
         // the toolbar the scheduler and the chart share
         schedulingStyle("SchedulerToolbar", onSurface, surface, "255", "1,1,1,1", null);
         schedulingStyle("SchedulerTitle", onSurface, surface, "0", "1,1,2,2", bold);
@@ -2330,7 +2368,8 @@ public class UIManager {
         schedulingDefaults.clear();
         for (Map.Entry<String, Object> e : themeProps.entrySet()) {
             String key = e.getKey();
-            if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")) {
+            if (key.startsWith("Scheduler") || key.startsWith("Gantt") || key.startsWith("PickerMaterial")
+                        || key.startsWith("DataGrid")) {
                 schedulingDefaults.put(key, e.getValue());
             }
         }

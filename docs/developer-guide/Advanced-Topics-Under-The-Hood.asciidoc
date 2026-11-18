@@ -1344,9 +1344,9 @@ binary payloads and multiple files.
 |A drag crosses applications through `DRAG_FLAG_GLOBAL`, which arrived in Nougat. Files
 travel as content URIs, the same way the clipboard carries them.
 
-|iPadOS and Mac Catalyst
+|iPadOS
 |yes |yes
-|Drops into another application beside this one, and into Files or the Finder.
+|Drops into another application beside this one, and into Files.
 
 |iPhone
 |yes |iOS 15 and later

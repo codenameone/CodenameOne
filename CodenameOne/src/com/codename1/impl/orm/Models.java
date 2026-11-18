@@ -43,6 +43,11 @@ public final class Models {
         }
         REGISTRY.put(model.type().getName(), model);
     }
+    /// Removes the model of `type`, for tests that register generated models
+    /// into this process-wide registry and must not leave them for the next.
+    public static synchronized void unregister(Class type) {
+        REGISTRY.remove(type.getName());
+    }
     /// The identifier of `entity` by its registered model; null for null, or
     /// for a type with no model.
     public static Object identifierOf(Object entity) {

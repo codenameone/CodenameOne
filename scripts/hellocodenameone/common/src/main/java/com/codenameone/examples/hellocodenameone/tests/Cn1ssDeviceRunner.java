@@ -45,6 +45,7 @@ import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidComp
 import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatRecyclerScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatMaterialScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatKotlinScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatTallDialogScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatAnimatorScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatCanvasScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatCinemachineScreenshotTest;
@@ -470,6 +471,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SchedulerMonthThemeScreenshotTest(),
             new SchedulerResourceThemeScreenshotTest(),
             new GanttThemeScreenshotTest(),
+            new DataGridThemeScreenshotTest(),
+            new TreeGridThemeScreenshotTest(),
             new NodeGraphThemeScreenshotTest(),
             new PdfViewerScreenshotTest(),
             new ToolbarThemeScreenshotTest(),
@@ -711,6 +714,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new AndroidCompatRecyclerScreenshotTest(),
             new AndroidCompatMaterialScreenshotTest(),
             new AndroidCompatKotlinScreenshotTest(),
+            new AndroidCompatTallDialogScreenshotTest(),
             // The Unity compatibility gallery (scripts/unity-compat-samples/gallery),
             // compiled into this app from its unmodified Unity project: one capture per
             // scene, each loaded by itself, stepped a fixed number of fixed frames with

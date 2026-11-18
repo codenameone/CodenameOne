@@ -39,10 +39,12 @@ public final class GuideFigures {
         FigureVariant[] general = general(button, appearance);
         FigureVariant[] scheduling = SchedulingFigures.variants();
         FigureVariant[] graph = GraphFigures.variants();
-        FigureVariant[] all = new FigureVariant[general.length + scheduling.length + graph.length];
+        FigureVariant[] grid = DataGridFigures.variants();
+        FigureVariant[] all = new FigureVariant[general.length + scheduling.length + graph.length + grid.length];
         System.arraycopy(general, 0, all, 0, general.length);
         System.arraycopy(scheduling, 0, all, general.length, scheduling.length);
         System.arraycopy(graph, 0, all, general.length + scheduling.length, graph.length);
+        System.arraycopy(grid, 0, all, general.length + scheduling.length + graph.length, grid.length);
         return all;
     }
 

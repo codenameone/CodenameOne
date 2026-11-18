@@ -411,6 +411,14 @@ public class AppBuilder {
             return;
         }
 
+        // The JVM desktop targets are the ones developers reach for by name and the only desktop
+        // targets that need a Pro subscription; say so, and name the free native target, before
+        // the build is sent rather than in the server's refusal.
+        String desktopNotice = desktopBuildNotice(buildTarget);
+        if (desktopNotice != null) {
+            getLog().info(desktopNotice);
+        }
+
         // Run the hardening pre-flight BEFORE the Android up-to-date cache short-circuit below. The cache
         // check keys only on source-file timestamps (getSourcesModificationTime), not on build hints, so an
         // explicit hardening request -- especially one made via a -D command-line property -- would
@@ -780,6 +788,29 @@ public class AppBuilder {
         } else {
             hardeningLibraryJars = null;
         }
+    }
+
+    /// What to tell a developer who asked for a JVM desktop build of Windows or
+    /// macOS: that target bundles a JVM and needs a Pro subscription, while the
+    /// native target for the same system is free. `null` for every other target.
+    /// The two are confused by name, and the server's refusal does not say that
+    /// a free alternative exists.
+    ///
+    /// It names the target and the platform and nothing else. The build tool is
+    /// updated apart from a project's launch scripts and is shared by Maven and
+    /// Gradle, so a script function, a goal or a `-D` flag printed here would
+    /// not exist for some of the developers who read it. It names no module
+    /// either: a project without platform modules builds both from `common`.
+    static String desktopBuildNotice(String buildTarget) {
+        if ("windows-desktop".equals(buildTarget)) {
+            return "windows-desktop is the JVM desktop build, a Pro feature. The native Windows build is free "
+                    + "and needs no JVM: build target windows-device with platform win.";
+        }
+        if ("mac-os-x-desktop".equals(buildTarget)) {
+            return "mac-os-x-desktop is the JVM desktop build, a Pro feature. The native Mac build is free "
+                    + "and needs no JVM: build target mac-os-x-native with platform ios.";
+        }
+        return null;
     }
 
     /**

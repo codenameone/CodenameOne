@@ -88,7 +88,7 @@ ios_release::
 Builds app for submission to the iOS appstore.  Uses the Codename One build server.
 
 mac_desktop::
-Builds app for Mac OS.  Uses Codename One build server.
+Builds a Mac OS desktop app that bundles a JVM.  Uses Codename One build server.  This is not the native Mac build (`-Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native`), which has no JVM and is free.
 +
 [IMPORTANT]
 ====
@@ -96,7 +96,7 @@ Mac Desktop builds are a Pro user feature.  https://www.codenameone.com/pricing.
 ====
 
 windows_desktop::
-Builds app for Windows.  Uses Codename One build server.
+Builds a Windows desktop app that bundles a JVM.  Uses Codename One build server.  This is not the native Windows build (`-Dcodename1.platform=win -Dcodename1.buildTarget=windows-device`), which has no JVM and is free.
 +
 [IMPORTANT]
 ====

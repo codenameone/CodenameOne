@@ -112,17 +112,99 @@ public class Biometrics {
         return false;
     }
 
-    /// Lists the biometric modalities currently enrolled. On iOS this is
-    /// [BiometricType#FINGERPRINT] or [BiometricType#FACE]; on Android the
-    /// list may contain [BiometricType#IRIS] as well, and Android API 30+
-    /// adds [BiometricType#STRONG] / [BiometricType#WEAK] authenticator
-    /// class tags.
+    /// Lists the biometric modalities the device can authenticate with. On
+    /// iOS this is the enrolled one, [BiometricType#FINGERPRINT] or
+    /// [BiometricType#FACE]. On Android 10 and later it is every modality
+    /// the device has hardware for, once any biometric is enrolled: Android
+    /// does not report which one the user enrolled, and the list may
+    /// contain [BiometricType#IRIS] there. Windows and Linux do not learn
+    /// the modality and report [BiometricType#STRONG] alone.
+    ///
+    /// To choose the wording of the application's own UI use
+    /// [#getPromptType()], which reduces this list to one answer.
     ///
     /// #### Returns
     ///
     /// an empty list when nothing is enrolled or the device is unsupported
     public List<BiometricType> getAvailableBiometrics() {
         return Collections.emptyList();
+    }
+
+    /// Answers what the application should call biometric authentication on
+    /// this device: a fingerprint, the face, or biometrics in general when
+    /// the device cannot say which. Use it to choose the wording and icon of
+    /// the application's own UI; it needs no platform or OS version check.
+    ///
+    /// ```java
+    /// String label;
+    /// switch (Biometrics.getInstance().getPromptType()) {
+    ///     case FINGERPRINT: label = "Sign in with fingerprint"; break;
+    ///     case FACE: label = "Sign in with face"; break;
+    ///     case BIOMETRICS: label = "Sign in with biometrics"; break;
+    ///     default: label = null; // NONE: offer the password only
+    /// }
+    /// ```
+    ///
+    /// A single modality is named, and anything else that can authenticate
+    /// is [BiometricPromptType#BIOMETRICS]:
+    ///
+    /// - **iOS** names Touch ID or Face ID; any other sensor is generic.
+    /// - **Android** reports that some biometric is enrolled and not which,
+    ///   so a device with more than one kind of biometric hardware is
+    ///   generic. A device with one kind is named.
+    /// - **Windows and Linux** are always generic: Windows Hello does not
+    ///   say what it verifies with, and that may be a PIN.
+    ///
+    /// This asks the platform each time it is called, which on some ports
+    /// waits for another thread or process; on Android, [#canAuthenticate()]
+    /// and [#getAvailableBiometrics()] wait for the UI thread as well. Call
+    /// it when building a screen and keep the answer, not once per paint.
+    ///
+    /// #### Returns
+    ///
+    /// [BiometricPromptType#NONE] when [#canAuthenticate()] is `false`
+    public BiometricPromptType getPromptType() {
+        if (!canAuthenticate()) {
+            return BiometricPromptType.NONE;
+        }
+        return promptTypeOf(getAvailableBiometrics());
+    }
+
+    /// The answer of [#getPromptType()] for a device that can authenticate
+    /// with the given modalities. A port that learns both facts from one
+    /// platform query overrides [#getPromptType()] and calls this, so the
+    /// rule stays in one place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `types`: what [#getAvailableBiometrics()] reported, may be `null`
+    ///
+    /// #### Returns
+    ///
+    /// never [BiometricPromptType#NONE]
+    protected static BiometricPromptType promptTypeOf(List<BiometricType> types) {
+        // STRONG and WEAK are authenticator classes, not modalities, so they
+        // do not count. An iris has no wording of its own and is generic.
+        BiometricPromptType found = null;
+        int size = types == null ? 0 : types.size();
+        for (int i = 0; i < size; i++) {
+            BiometricType t = types.get(i);
+            BiometricPromptType p = null;
+            if (t == BiometricType.FINGERPRINT) {
+                p = BiometricPromptType.FINGERPRINT;
+            } else if (t == BiometricType.FACE) {
+                p = BiometricPromptType.FACE;
+            } else if (t == BiometricType.IRIS) {
+                p = BiometricPromptType.BIOMETRICS;
+            }
+            if (p != null) {
+                if (found != null && found != p) {
+                    return BiometricPromptType.BIOMETRICS;
+                }
+                found = p;
+            }
+        }
+        return found == null ? BiometricPromptType.BIOMETRICS : found;
     }
 
     /// Prompts the user to authenticate. The returned `AsyncResource`

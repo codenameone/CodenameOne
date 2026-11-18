@@ -27,9 +27,12 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
 /**
- * Build wrapper for the native Mac cloud target ({@code mac-os-x-native}), which
+ * Sends a native macOS build (AppKit, no JVM) to the build server. Free; the JVM desktop
+ * build, {@code buildMacDesktop}, is the one that is a Pro feature.
+ *
+ * <p>Build wrapper for the native Mac cloud target ({@code mac-os-x-native}), which
  * produces a native macOS {@code .app} -- the Mac analog of the iOS and Windows
- * device builds.
+ * device builds.</p>
  *
  * <p>Distinct from {@link BuildMacDesktopMojo}, which bundles the JVM/JavaSE app
  * ({@code mac-os-x-desktop}). There is deliberately no wrapper for Mac Catalyst:

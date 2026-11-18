@@ -45,6 +45,9 @@ PAIRS = [
             ("CN1_WARNING_LEG: ios-sim-debug-xcode27", "CN1_WARNING_LEG: ios-sim-debug"),
             # Each leg's golden capture lands under its own artifact name.
             ("name: cn1ss-capture-ios-metal-27", "name: cn1ss-capture-ios-metal"),
+            # A capture starts only the legs whose goldens are missing
+            # (scripts-ios.yml's select job), so each leg has its own switch.
+            ("needs.select.outputs.metal27 ==", "needs.select.outputs.metal =="),
         ],
         # Lines the COPY must contain, checked before any substitution. The
         # subs list cannot do this job: it describes differences that are

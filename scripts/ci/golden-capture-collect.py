@@ -19,19 +19,102 @@ the source cannot predict: a new variant of an existing test, a platform's own
 image set. An image no mapping owns fails, naming it.
 
 Either way nothing in DEST is overwritten, and two legs that share a directory
-(the Windows legs) must produce identical bytes.
+(the Windows legs) must produce the same image. Glyph anti-aliasing may differ
+between x64 and arm64 by a few pixels; when the legs differ only within
+AA_MAX_DELTA on at most AA_MAX_PERCENT of the pixels, the first leg's image is
+committed with a <stem>.tolerance sidecar of exactly those bounds. Anything
+more is a real difference: neither image is committed.
 """
 import filecmp
 import importlib.util
 import json
 import os
 import shutil
+import struct
 import sys
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location("plan", os.path.join(HERE, "cn1ss-golden-plan.py"))
 plan = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(plan)
+
+
+# Bounds within which two legs sharing a directory count as rendering alike
+# (see the module comment). They match the hand-written sidecars this
+# replaced; widening them hides real layout differences.
+AA_MAX_DELTA = 16
+AA_MAX_PERCENT = 0.1
+
+
+def read_png(path):
+    """(width, height, channels, rows) of an 8-bit non-interlaced PNG, or None."""
+    with open(path, "rb") as fh:
+        data = fh.read()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    pos, idat, hdr = 8, b"", None
+    while pos < len(data):
+        n, kind = struct.unpack(">I4s", data[pos:pos + 8])
+        body = data[pos + 8:pos + 8 + n]
+        if kind == b"IHDR":
+            hdr = struct.unpack(">IIBBBBB", body)
+        elif kind == b"IDAT":
+            idat += body
+        pos += 12 + n
+    if not hdr:
+        return None
+    w, h, depth, ctype, _, _, interlace = hdr
+    ch = {0: 1, 2: 3, 4: 2, 6: 4}.get(ctype)
+    if depth != 8 or interlace or ch is None:
+        return None
+    raw, stride, rows, prev = zlib.decompress(idat), w * ch, [], bytearray(w * ch)
+    for y in range(h):
+        f, line = raw[y * (stride + 1)], bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        for i in range(stride):
+            a = line[i - ch] if i >= ch else 0
+            b, c = prev[i], prev[i - ch] if i >= ch else 0
+            if f == 1:
+                line[i] = (line[i] + a) & 255
+            elif f == 2:
+                line[i] = (line[i] + b) & 255
+            elif f == 3:
+                line[i] = (line[i] + (a + b) // 2) & 255
+            elif f == 4:
+                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                line[i] = (line[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        rows.append(line)
+        prev = line
+    return w, h, ch, rows
+
+
+def aa_only(a, b):
+    """True when two images differ only by anti-aliasing (see AA_MAX_*)."""
+    pa, pb = read_png(a), read_png(b)
+    if not pa or not pb or pa[:3] != pb[:3]:
+        return False
+    w, h, ch, ra = pa
+    bad = 0
+    for y in range(h):
+        x1, x2 = ra[y], pb[3][y]
+        if x1 == x2:
+            continue
+        for x in range(0, w * ch, ch):
+            d = max(abs(x1[x + k] - x2[x + k]) for k in range(ch))
+            if d > AA_MAX_DELTA:
+                return False
+            bad += d > 0
+    return bad * 100.0 <= AA_MAX_PERCENT * w * h
+
+
+def write_aa_tolerance(target, legs):
+    side = target[:-4] + ".tolerance"
+    if os.path.exists(side):
+        return
+    with open(side, "w") as fh:
+        fh.write("# Written by golden-capture-collect.py: %s render this image with\n"
+                 "# glyph anti-aliasing that differs by a few pixels.\n"
+                 "maxChannelDelta=%d\nmaxMismatchPercent=%s\n" % (" and ".join(legs), AA_MAX_DELTA, AA_MAX_PERCENT))
 
 
 def owner_of(stem, mappings):
@@ -51,7 +134,7 @@ def collect(dl, dest, base=None, harvest=False, **plan_args):
         lost = {}
         gaps, _ = plan.plan(root=dest, base=base, lost_out=lost, **plan_args)
     open_gaps = set(gaps)
-    added, emitted = {}, {}
+    added, emitted, first_art = {}, {}, {}
     for run in sorted(os.listdir(dl)):
         for art in sorted(os.listdir(os.path.join(dl, run))):
             base_dir = os.path.join(dl, run, art)
@@ -86,7 +169,12 @@ def collect(dl, dest, base=None, harvest=False, **plan_args):
                         print("[golden-capture] ignored %s (%s): fills no gap" % (rel, art), file=sys.stderr)
                         continue
                     if rel in added:
-                        if added[rel] and not filecmp.cmp(added[rel], src, shallow=False):
+                        if (added[rel] and not filecmp.cmp(added[rel], src, shallow=False)
+                                and aa_only(added[rel], src)):
+                            write_aa_tolerance(os.path.join(dest, rel), [first_art[rel], art])
+                            print("[golden-capture] %s: %s differs from the first leg only by anti-aliasing; "
+                                  "kept the first with a tolerance sidecar" % (rel, art), file=sys.stderr)
+                        elif added[rel] and not filecmp.cmp(added[rel], src, shallow=False):
                             # One file cannot be a golden for both legs: take
                             # neither, so no leg is left failing against the
                             # other's image.
@@ -104,6 +192,7 @@ def collect(dl, dest, base=None, harvest=False, **plan_args):
                     os.makedirs(os.path.dirname(target), exist_ok=True)
                     shutil.copyfile(src, target)
                     added[rel] = src
+                    first_art[rel] = art
                     print("[golden-capture] added %s (%s)" % (rel, art), file=sys.stderr)
     for t, gd in sorted(open_gaps):
         dropped = [r for r, src in added.items() if src is None and os.path.dirname(r) == gd]

@@ -15,6 +15,9 @@ function windows_desktop {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javase" "-Dcodename1.buildTarget=windows-desktop" "-U" "-e"
 }
+function windows_native {
+  windows_device
+}
 function windows_device {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=win" "-Dcodename1.buildTarget=windows-device" "-U" "-e"
@@ -102,16 +105,11 @@ function help {
   "echo" "-e" "    Builds iOS app for submission to Apple appstore."
   "echo" "-e" "  android"
   "echo" "-e" "    Builds android app."
-  "echo" "-e" "  mac_desktop"
-  "echo" "-e" "    Builds Mac OS desktop app."
-  "echo" "-e" "    *Mac OS Desktop builds are a Pro user feature."
+  "echo" "-e" "  windows_native"
+  "echo" "-e" "    Builds a native Windows app (a standalone .exe, no JVM). Free."
+  "echo" "-e" "    windows_device is the same build under its older name."
   "echo" "-e" "  mac_native"
-  "echo" "-e" "    Builds a native Mac app (no JVM)."
-  "echo" "-e" "  windows_desktop"
-  "echo" "-e" "    Builds Windows desktop app."
-  "echo" "-e" "    *Windows Desktop builds are a Pro user feature."
-  "echo" "-e" "  windows_device"
-  "echo" "-e" "    Builds a native Windows app (no JVM)."
+  "echo" "-e" "    Builds a native Mac app (no JVM). Free."
   "echo" "-e" "  linux_device"
   "echo" "-e" "    Builds a native Linux app (ELF, no JVM)."
   "echo" "-e" "  linux_local"
@@ -122,6 +120,12 @@ function help {
   "echo" "-e" "    Follows the app's log on CN1_DEVICE_HOST."
   "echo" "-e" "  javascript_cloud"
   "echo" "-e" "    Builds the web app using the build server."
+  "echo" "-e" "  windows_desktop"
+  "echo" "-e" "    Builds a Windows desktop app that bundles a JVM."
+  "echo" "-e" "    *Pro feature. Not the native build: windows_native is free."
+  "echo" "-e" "  mac_desktop"
+  "echo" "-e" "    Builds a Mac OS desktop app that bundles a JVM."
+  "echo" "-e" "    *Pro feature. Not the native build: mac_native is free."
 }
 function settings {
   

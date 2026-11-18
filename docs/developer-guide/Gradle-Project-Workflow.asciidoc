@@ -195,13 +195,13 @@ Gradle runs one Codename One build at a time, even when a command line names sev
 | `cn1:buildIos`, `cn1:buildIosRelease`, `cn1:buildIosXcodeProject`
 | An iOS debug or App Store cloud build; an Xcode project generated locally.
 
-| `buildMacNative`, `buildMacDesktop`
-| `cn1:buildMacNative`, `cn1:buildMacDesktop`
-| A native macOS build; a macOS desktop (JVM) build.
+| `buildMacNative`, `buildWindowsNative`
+| `cn1:buildMacNative`, `cn1:buildWindowsNative`
+| A native macOS build; a native Windows build. No JVM, and free. `buildWindowsDevice` is an older name for the second.
 
-| `buildWindowsDesktop`, `buildWindowsDevice`
-| `cn1:buildWindowsDesktop`, `cn1:buildWindowsDevice`
-| A Windows desktop (JVM) build; a native Windows build.
+| `buildMacDesktop`, `buildWindowsDesktop`
+| `cn1:buildMacDesktop`, `cn1:buildWindowsDesktop`
+| A macOS or Windows desktop build, which bundles a JVM. A Pro feature, and not the native build above.
 
 | `buildLinuxDevice`
 | `cn1:buildLinuxDevice`

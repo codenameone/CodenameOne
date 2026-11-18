@@ -25,6 +25,7 @@ package com.codename1.impl.linux;
 import com.codename1.security.AuthenticationOptions;
 import com.codename1.security.BiometricError;
 import com.codename1.security.BiometricException;
+import com.codename1.security.BiometricPromptType;
 import com.codename1.security.BiometricType;
 import com.codename1.security.Biometrics;
 import com.codename1.util.AsyncResource;
@@ -53,6 +54,13 @@ class LinuxBiometrics extends Biometrics {
     @Override
     public boolean canAuthenticate() {
         return LinuxNative.biometricAvailability() == AVAILABLE;
+    }
+
+    // The list below never names a modality, so the answer is generic, and
+    // one availability query settles it where the default makes two.
+    @Override
+    public BiometricPromptType getPromptType() {
+        return canAuthenticate() ? BiometricPromptType.BIOMETRICS : BiometricPromptType.NONE;
     }
 
     @Override

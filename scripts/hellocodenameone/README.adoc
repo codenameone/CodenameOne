@@ -94,8 +94,7 @@ suite.
 
 `docs/website/data/port_status_support.json` is the deployment-support and
 performance-evidence contract. It keeps declared release floors separate from
-the environments that CI actually launches, and it discloses the Mac Catalyst
-scope independently of the broader Linux desktop port. The
+the environments that CI actually launches. The
 `Nightly platform and browser evidence` workflow boots the generated JavaScript
 application in Playwright's Chromium, Firefox, and WebKit engines and publishes
 their exact versions to `evidence/environment.json` on the data branch. Website

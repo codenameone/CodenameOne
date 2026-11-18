@@ -239,11 +239,8 @@ XCODE_BUILD_CMD=(
 # the destination list. macOS is not a downloadable runtime -- it is the host
 # xcodebuild can report an empty destination list on a cold runner before its
 # destination cache warms. That race is a property of xcodebuild rather than of
-# any one platform, so a single warm-up poll stays; everything the Catalyst
-# script did beyond this -- downloading the iOS platform, restarting
-# CoreSimulator, three build attempts -- existed only because a Catalyst
-# destination is a destination of an SDKROOT=iphoneos target. A native macOS
-# target needs none of it.
+# any one platform, so a single warm-up poll stays. A native macOS target
+# needs nothing more: no iOS platform download, no CoreSimulator restart.
 warm_macos_destination() {
   local deadline=$(( $(date +%s) + 90 ))
   while [ "$(date +%s)" -lt "$deadline" ]; do

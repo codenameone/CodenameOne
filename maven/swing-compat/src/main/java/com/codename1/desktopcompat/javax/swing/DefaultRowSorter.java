@@ -23,6 +23,7 @@
 package com.codename1.desktopcompat.javax.swing;
 
 import com.codename1.desktopcompat.rt.Comparators;
+import com.codename1.ui.table.GridSorter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -239,60 +240,61 @@ public abstract class DefaultRowSorter<M, I> extends RowSorter<M> {
             }
             rows.add(Integer.valueOf(i));
         }
-        if (sorted()) {
-            Collections.sort(rows, new Comparator<Integer>() {
-                @Override
-                public int compare(Integer a, Integer b) {
-                    return compareRows(a.intValue(), b.intValue());
-                }
-            });
+        int n = rows.size();
+        int[] kept = new int[n];
+        for (int i = 0; i < n; i++) {
+            kept[i] = rows.get(i).intValue();
         }
-        viewToModel = new int[rows.size()];
+        if (sorted()) {
+            kept = sortRows(kept);
+        }
+        viewToModel = kept;
         modelToView = new int[modelRowCount];
         for (int i = 0; i < modelToView.length; i++) {
             modelToView[i] = -1;
         }
         for (int i = 0; i < viewToModel.length; i++) {
-            viewToModel[i] = rows.get(i).intValue();
             modelToView[viewToModel[i]] = i;
         }
         fireRowSorterChanged(before);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private int compareRows(int model1, int model2) {
+    /// Orders the rows a filter kept with the core grid's sort
+    /// (`com.codename1.ui.table.GridSorter`): every key is read from the
+    /// model once per row rather than once per comparison, and the sort is
+    /// stable, so equal rows keep the model's order as Swing's do. A null
+    /// sorts first, and last when its key descends, as Swing's does by
+    /// negating the comparison.
+    private int[] sortRows(int[] kept) {
+        int n = kept.length;
+        ArrayList<SortKey> active = new ArrayList<SortKey>();
         for (int i = 0; i < sortKeys.size(); i++) {
-            SortKey key = sortKeys.get(i);
-            SortOrder order = key.getSortOrder();
-            if (order == SortOrder.UNSORTED) {
-                continue;
-            }
-            int column = key.getColumn();
-            Object v1;
-            Object v2;
-            Comparator comparator;
-            if (useToString(column)) {
-                v1 = modelWrapper.getStringValueAt(model1, column);
-                v2 = modelWrapper.getStringValueAt(model2, column);
-                comparator = Comparators.STRINGS;
-            } else {
-                v1 = modelWrapper.getValueAt(model1, column);
-                v2 = modelWrapper.getValueAt(model2, column);
-                comparator = getComparator(column);
-            }
-            int result;
-            if (v1 == null) {
-                result = v2 == null ? 0 : -1;
-            } else if (v2 == null) {
-                result = 1;
-            } else {
-                result = comparator.compare(v1, v2);
-            }
-            if (result != 0) {
-                return order == SortOrder.DESCENDING ? -result : result;
+            if (sortKeys.get(i).getSortOrder() != SortOrder.UNSORTED) {
+                active.add(sortKeys.get(i));
             }
         }
-        return model1 - model2;
+        int k = active.size();
+        Object[][] keys = new Object[k][n];
+        Comparator[] comparators = new Comparator[k];
+        boolean[] ascending = new boolean[k];
+        for (int j = 0; j < k; j++) {
+            SortKey key = active.get(j);
+            int column = key.getColumn();
+            boolean strings = useToString(column);
+            comparators[j] = strings ? Comparators.STRINGS : getComparator(column);
+            ascending[j] = key.getSortOrder() != SortOrder.DESCENDING;
+            Object[] dest = keys[j];
+            for (int i = 0; i < n; i++) {
+                dest[i] = strings ? modelWrapper.getStringValueAt(kept[i], column)
+                        : modelWrapper.getValueAt(kept[i], column);
+            }
+        }
+        int[] order = GridSorter.order(n, keys, comparators, ascending);
+        int[] out = new int[n];
+        for (int i = 0; i < n; i++) {
+            out[i] = kept[order[i]];
+        }
+        return out;
     }
 
     /// Whether the column's values are compared by their strings.

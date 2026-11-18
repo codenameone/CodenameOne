@@ -97,6 +97,30 @@ public class SchedulingThemeTest extends UITestBase {
         }
     }
 
+    /// A theme with `$Dark` styles turns dark with the device; a refresh into
+    /// dark mode replaces the light fallbacks of the last pass, the data
+    /// grid's among them.
+    @Test
+    public void aRefreshIntoDarkModeDarkensTheFallbacks() {
+        UIManager m = UIManager.getInstance();
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("Label.fgColor", "000000");
+        theme.put("$DarkLabel.fgColor", "ffffff");
+        try {
+            display.setDarkMode(Boolean.FALSE);
+            m.setThemeProps(theme);
+            assertEquals(0xffffff, m.getComponentStyle("DataGridRow").getBgColor());
+            display.setDarkMode(Boolean.TRUE);
+            m.refreshTheme();
+            assertEquals(0x1c1b1f, m.getComponentStyle("GanttRow").getBgColor());
+            assertEquals(0x1c1b1f, m.getComponentStyle("DataGridRow").getBgColor());
+            assertEquals(0x2b2930, m.getComponentStyle("DataGridHeader").getBgColor());
+        } finally {
+            display.setDarkMode(null);
+            m.setThemeProps(new Hashtable<String, Object>());
+        }
+    }
+
     @Test
     public void aTransparentGridStaysTransparentAcrossARefresh() {
         UIManager m = UIManager.getInstance();

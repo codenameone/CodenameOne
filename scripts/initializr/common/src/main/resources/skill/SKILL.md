@@ -76,8 +76,8 @@ Every path in this skill and its references is written relative to the **app dir
 | iOS cloud build (debug / App Store) | `mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (`ios-device-release`) | `./gradlew buildIos` / `./gradlew buildIosRelease` |
 | Xcode / Android Studio project, locally | `-Dcodename1.buildTarget=ios-source` / `android-source`, always with `-Dopen=false` | `./gradlew buildIosXcodeProject -Pcodename1.open=false` / `./gradlew buildAndroidGradleProject -Pcodename1.open=false` |
 | Web app, locally / in the cloud | `mvn package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript` (`javascript`) | `./gradlew buildJavascriptLocal` / `./gradlew buildJavascript` |
-| Desktop app (JVM) | `-Dcodename1.buildTarget=mac-os-x-desktop` / `windows-desktop` | `./gradlew buildMacDesktop` / `./gradlew buildWindowsDesktop` |
-| Native desktop | `windows-device` / `linux-device` / `mac-os-x-native` | `./gradlew buildWindowsDevice` / `buildLinuxDevice` / `buildMacNative` |
+| Native desktop app, no JVM. The default for "a Mac/Windows app"; the Mac and Windows ones are free | `mac-os-x-native` (platform `ios`) / `windows-device` (platform `win`) / `linux-device` (platform `linux`) | `./gradlew buildMacNative` / `buildWindowsDevice` / `buildLinuxDevice` |
+| Mac or Windows desktop app on a bundled JVM (**Pro feature**; only when asked for by name) | `-Dcodename1.buildTarget=mac-os-x-desktop` / `windows-desktop` | `./gradlew buildMacDesktop` / `./gradlew buildWindowsDesktop` |
 | Any other build target | `-Dcodename1.platform=<p> -Dcodename1.buildTarget=<t>` | `./gradlew cn1Build -Pcodename1.platform=<p> -Pcodename1.buildTarget=<t>` |
 | Regenerate GUI builder / CodeRAD view sources | `mvn -pl common generate-sources` | `./gradlew generateGuiSources` (also runs before every compile) |
 | Generate native interface stubs | `mvn cn1:generate-native-interfaces` | `./gradlew generateNativeInterfaces` |
