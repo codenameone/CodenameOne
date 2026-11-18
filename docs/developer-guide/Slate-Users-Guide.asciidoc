@@ -83,7 +83,9 @@ image::img/slate-client-home.png["The client's home with the next appointment an
 ==== Finding a time
 
 Booking starts from a service. Pills at the top choose the location and the
-provider, or anyone who offers it, and a strip of days chooses when. The screen
+provider, or anyone who offers it, and a strip of days chooses when. The button
+at the head of the strip opens a calendar for a day further ahead. The strip then
+moves to the weeks around the day chosen there. The screen
 shows only the starts that are free. A start appears only when every rule
 agrees:
 
@@ -98,8 +100,15 @@ agrees:
 * the client isn't booked elsewhere at the same time, and hasn't reached the
   business's limit for the day.
 
+.The calendar, for a day the strip doesn't reach
+image::img/slate-book-date.png["A calendar of the month in a dialog over the booking screen, with the chosen day in a filled circle and the days before today greyed out",scaledwidth=40%]
+
+The calendar starts today and has no last day. How far ahead a booking can be
+made is the business's rule, so a day past it opens with no starts and says so.
+*Cancel* closes the calendar and leaves the day as it was.
+
 When a day has nothing, the screen says why -- fully booked, not working that
-day, or too soon to book -- and offers the waiting list. The week view shows the
+day, too far ahead or too soon to book -- and offers the waiting list. The week view shows the
 next seven days at once, for a client who cares about the time more than the day.
 
 // vale-skip: Microsoft.FirstPerson: the switch's own label.
@@ -168,11 +177,24 @@ which refunds the client in full and tells them at once.
 ==== Hours and time off
 
 *Working hours* sets the week: which days and from when to when. Saving replaces
-the whole week at once, so a half-edited week is never bookable. *Time off*
-blocks anything from an hour to a holiday. Appointments already booked inside it
-aren't moved; the provider sees them and decides.
+the whole week at once, so a half-edited week is never bookable.
 
 image::img/slate-provider-hours.png["The provider's working week, one row per day",scaledwidth=40%]
+
+Tapping a start or an end opens a clock face. The hand stops on the quarter
+hours, and a time typed between two of them is brought back to the earlier one.
+*OK* keeps the time and *Cancel* leaves the one that was there.
+
+image::img/slate-provider-hours-time.png["A clock face in a dialog over the working week, the hand on half past eight",scaledwidth=40%]
+
+*Time off*
+blocks anything from an hour to a holiday. Its start and its end are each chosen
+in one dialog, a calendar and a clock face behind two tabs. Time off can't start
+before today, and an end left behind by a new start moves after it.
+Appointments already booked inside the block
+aren't moved; the provider sees them and decides.
+
+image::img/slate-provider-time-off-date.png["The time off dialog with its Date and Time tabs, the calendar showing",scaledwidth=40%]
 
 ==== Calendars
 

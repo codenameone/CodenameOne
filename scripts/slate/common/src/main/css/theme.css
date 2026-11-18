@@ -36,6 +36,9 @@
     endsWith3PointsBool: true;
     /* Screens change quickly: nothing waits for an animation. */
     transitionSpeedInt: "200";
+    /* A date or a time is chosen on the Material calendar and clock face, in
+       a dialog, on every platform. The rules for them are at the end. */
+    pickerStyle: material;
     /* The switch, sized from the Switch style's font. */
     switchThumbScaleY: "1.5";
     switchTrackScaleY: "1.8";
@@ -1477,6 +1480,24 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
 /* The owner's insights, members and billing. */
 
     SvLegendActive { color: var(--brand-dark); }
+    SvPicker { color: var(--brand-pressed-dark); background-color: var(--surface-alt-dark); }
+    SvDayPicker { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvDayPicker.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-pressed-dark); }
+    PickerMaterial { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PickerMaterialDialog { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PickerMaterialHeadline { color: var(--text-dark); }
+    PickerMaterialButton { color: var(--brand-dark); }
+    PickerMaterialButton.selected { color: var(--brand-dark); }
+    PickerMaterialButton.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PickerMaterialDay { color: var(--text-dark); }
+    PickerMaterialDay.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PickerMaterialDay.disabled { color: var(--line-strong-dark); }
+    PickerMaterialYearSelected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PickerMaterialYearSelected.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PickerMaterialYearSelected.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-pressed-dark); }
+    PickerMaterialDial { color: var(--text-dark); background-color: var(--surface-press-dark); }
+    PickerMaterialDial.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PickerMaterialDial.disabled { color: var(--line-strong-dark); background-color: var(--surface-press-dark); }
 }/* The owner's insights: the busy-hours heatmap (its colour is the cells',
    its font the labels'), the plan donut (the total in the middle) and the
    membership chart's legend, whose colours the chart draws its series in. */
@@ -1491,6 +1512,10 @@ SvSmall { color: var(--text-muted); font-family: "native:MainRegular"; font-size
 SvValue { color: var(--text); font-family: "native:MainBold"; font-size: 3mm; padding: 0 0.5mm 0 1mm; margin: 0; background-color: transparent; }
 SvCheck { color: var(--text); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
 SvPicker { color: var(--brand-pressed); font-family: "native:MainBold"; font-size: 2.75mm; padding: 1mm 1.5mm 1mm 1.5mm; margin: 0 0.5mm 0 0.5mm; background-color: var(--surface-alt); border-radius: var(--radius-small); }
+/* The calendar button at the head of the strip of days: a pill like them, in
+   the brand's colour because it is the one that opens something. */
+SvDayPicker { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainBold"; font-size: 2.6mm; border-radius: 4mm; padding: 1.8mm 3.2mm 1.8mm 2.6mm; margin: 0 1.6mm 2mm 0; text-align: center; }
+SvDayPicker.pressed { color: var(--brand-contrast); background-color: var(--brand-pressed); }
 SvSlotGrid { padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
 SvSlot { color: var(--brand-pressed); background-color: var(--brand-tint); font-family: "native:MainBold"; font-size: 2.6mm; text-align: center; padding: 2mm 0.5mm 2mm 0.5mm; margin: 0.6mm; border-radius: var(--radius-small); }
 SvSlot.pressed { background-color: var(--brand); color: var(--brand-contrast); }
@@ -1522,3 +1547,31 @@ SchedulerHeaderToday { color: var(--brand-contrast); background-color: var(--bra
 SchedulerTimeLabel { color: var(--text-muted); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.2mm; }
 SchedulerNow { color: var(--danger); background-color: var(--danger); }
 SchedulerSelection { color: var(--brand); background-color: var(--brand-tint); }
+/* The Material date and time pickers (pickerStyle above). A style named here
+   is the theme's whole style for it, in each of its states, so every rule
+   carries its font, padding and alignment as well as its colours. The parts
+   of the dialogs not named here keep the look the platform's theme, or the
+   framework, gives them. */
+/* tag::slate-picker-css[] */
+PickerMaterial { color: var(--text); background-color: var(--surface); padding: 0; margin: 0; }
+PickerMaterialDialog { color: var(--text); background-color: var(--surface); border-radius: 4mm; padding: 2mm; margin: 0; }
+/* The chosen day in words. Sized so that it fits beside the keyboard switch
+   in a dialog as narrow as the platform theme lets one be on a small phone. */
+PickerMaterialHeadline { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 3.6mm; padding: 1mm 0 0 0; margin: 0; }
+/* The month's name, the arrows, the keyboard switch, Cancel and OK. */
+PickerMaterialButton { color: var(--brand); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1.5mm 1.5mm 1.5mm; margin: 0.3mm; }
+PickerMaterialButton.selected { color: var(--brand); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1.5mm 1.5mm 1.5mm; margin: 0.3mm; }
+PickerMaterialButton.pressed { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1.5mm 1.5mm 1.5mm; margin: 0.3mm; }
+/* A day, the circle of the chosen one, and a day that cannot be chosen. */
+PickerMaterialDay { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+PickerMaterialDay.selected { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+PickerMaterialDay.disabled { color: var(--line-strong); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+/* The year that is chosen, in the grid of years. */
+PickerMaterialYearSelected { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainBold"; font-size: 2.6mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; }
+PickerMaterialYearSelected.selected { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainBold"; font-size: 2.6mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; }
+PickerMaterialYearSelected.pressed { color: var(--brand-contrast); background-color: var(--brand-pressed); font-family: "native:MainBold"; font-size: 2.6mm; text-align: center; cn1-background-type: cn1-pill-border; padding: 1.5mm 1mm 1.5mm 1mm; margin: 0.5mm; }
+/* The clock face, the hand with the number under it, and an hour out of range. */
+PickerMaterialDial { color: var(--text); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+PickerMaterialDial.selected { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+PickerMaterialDial.disabled { color: var(--line-strong); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; }
+/* end::slate-picker-css[] */
