@@ -27,22 +27,11 @@ package com.codename1.backend;
 /// principal -- to the one that runs the task, and to clear it afterwards.
 ///
 /// ```java
-/// Tasks.executor("mail").setTaskDecorator(new TaskDecorator() {
-///     public Runnable decorate(final Runnable task) {
-///         final String tenant = Tenant.current();
-///         return new Runnable() {
-///             public void run() {
-///                 Tenant.set(tenant);
-///                 try {
-///                     task.run();
-///                 } finally {
-///                     Tenant.clear();
-///                 }
-///             }
-///         };
-///     }
-/// });
+/// Tasks.executor("mail").setTaskDecorator(TenantContext.decorator());
 /// ```
+///
+/// [com.codename1.backend.tenancy.TenantContext#decorator] carries the tenant;
+/// write one of these by hand for anything else held per thread.
 public interface TaskDecorator {
     /// The runnable to run in place of `task`, called on the submitting thread.
     /// @param task the task as submitted

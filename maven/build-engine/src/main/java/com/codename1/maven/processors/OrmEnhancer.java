@@ -239,7 +239,7 @@ final class OrmEnhancer {
         if(!entity.relations.isEmpty() || !entity.embedded.isEmpty() || !entity.indexes.isEmpty()
                 || entity.generation!=0 || entity.idFields.size()>1 || entity.hierarchyRoot!=null) return true;
         for(OrmAnnotationProcessor.PersistedField field:entity.fields)
-            if(field.version || field.unique || field.converter!=null) return true;
+            if(field.version || field.tenant || field.unique || field.converter!=null) return true;
         for(String callback:entity.callbacks) if(callback!=null) return true;
         return false;
     }

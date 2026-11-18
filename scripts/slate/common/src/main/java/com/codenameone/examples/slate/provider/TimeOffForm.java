@@ -32,6 +32,7 @@ import com.codename1.appkit.Net;
 import com.codenameone.examples.slate.ui.Layouts;
 import com.codenameone.examples.slate.ui.Ui;
 
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -48,6 +49,20 @@ public final class TimeOffForm {
         long tomorrow = Times.addDays(System.currentTimeMillis(), 1);
         final Picker from = when("off-from", tomorrow + 9 * Times.HOUR);
         final Picker to = when("off-to", tomorrow + 17 * Times.HOUR);
+        // An end left behind by a new start follows it, the same length away.
+        final long[] length = {to.getDate().getTime() - from.getDate().getTime()};
+        from.addActionListener(e -> {
+            quarter(from);
+            if (to.getDate().getTime() <= from.getDate().getTime()) {
+                to.setDate(new Date(from.getDate().getTime() + length[0]));
+            }
+        });
+        to.addActionListener(e -> {
+            quarter(to);
+            if (to.getDate().getTime() > from.getDate().getTime()) {
+                length[0] = to.getDate().getTime() - from.getDate().getTime();
+            }
+        });
         add.add(Ui.label("From", "SvLabel")).add(from);
         add.add(Ui.label("Until", "SvLabel")).add(to);
         final TextField reason = Ui.field(add, "Reason", "off-reason", "Only you and the owner see it");
@@ -95,9 +110,31 @@ public final class TimeOffForm {
         Ui.relayout(list);
     }
 
+    /// Brings a time that was typed between two quarters back to the one
+    /// before it. The hour and the day are the calendar's, so it is the
+    /// minute of the clock on the wall that is rounded.
+    private static void quarter(Picker p) {
+        Calendar c = Calendar.getInstance();
+        c.setTime(p.getDate());
+        int minute = c.get(Calendar.MINUTE);
+        if (minute % HoursForm.QUARTER != 0 || c.get(Calendar.SECOND) != 0
+                || c.get(Calendar.MILLISECOND) != 0) {
+            c.set(Calendar.MINUTE, minute / HoursForm.QUARTER * HoursForm.QUARTER);
+            c.set(Calendar.SECOND, 0);
+            c.set(Calendar.MILLISECOND, 0);
+            p.setDate(c.getTime());
+        }
+    }
+
+    /// A day and a time of day, in the phone's zone. The theme's
+    /// `pickerStyle: material` makes the field open the Material calendar
+    /// and clock face behind two tabs.
     private static Picker when(String name, long millis) {
         Picker p = new Picker();
         p.setType(Display.PICKER_TYPE_DATE_AND_TIME);
+        p.setMinuteStep(HoursForm.QUARTER);
+        // Time off that is already over blocks nothing.
+        p.setStartDate(new Date(Times.dayStart(System.currentTimeMillis())));
         p.setDate(new Date(millis));
         p.setName(name);
         p.setUIID("SvPicker");

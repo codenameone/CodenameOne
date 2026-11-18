@@ -85,6 +85,9 @@ public final class DataSource {
     private final int busyTimeoutMillis;
     private final long borrowTimeoutMillis;
     private final Dialect dialect;
+    /// A statement run on every connection as it opens, or null. How a pool is
+    /// pinned to one schema (`SET search_path`, `USE`) for a schema per tenant.
+    private final String connectionInit;
     private final List idle = new ArrayList();
     private final List all = new ArrayList();
     /// Whether the connections are this pool's to close. False for [#of],
@@ -101,7 +104,8 @@ public final class DataSource {
     private long timeouts;
 
     private DataSource(String url, String describedAs, int maxSize, int busyTimeoutMillis,
-                       long borrowTimeoutMillis, Dialect dialect, boolean owns) {
+                       long borrowTimeoutMillis, Dialect dialect, boolean owns, String connectionInit) {
+        this.connectionInit = connectionInit;
         this.url = url;
         this.describedAs = describedAs;
         this.maxSize = maxSize;
@@ -138,6 +142,24 @@ public final class DataSource {
     /// before failing; 0 waits forever
     public static DataSource open(String url, int size, int busyTimeoutMillis,
                                   long borrowTimeoutMillis) throws IOException {
+        return open(url, size, busyTimeoutMillis, borrowTimeoutMillis, null);
+    }
+
+    /// Opens a pool whose every connection runs `connectionInit` as soon as it
+    /// opens, before any borrower sees it -- `SET search_path TO tenant_a` on
+    /// PostgreSQL or `USE tenant_a` on MySQL pins the pool to one schema.
+    /// @param url the database URL
+    /// @param size the pool size, 0 for the default
+    /// @param connectionInit the statement, or null for none
+    /// @return the pool
+    /// @throws IOException when the first connection cannot be opened or the
+    /// statement fails on it
+    public static DataSource open(String url, int size, String connectionInit) throws IOException {
+        return open(url, size, 5000, 10000, connectionInit);
+    }
+
+    private static DataSource open(String url, int size, int busyTimeoutMillis,
+                                   long borrowTimeoutMillis, String connectionInit) throws IOException {
         if (url == null || url.length() == 0) {
             throw new IOException("No database URL");
         }
@@ -176,7 +198,7 @@ public final class DataSource {
             throw memoryCannotBePooled(limit);
         }
         DataSource out = new DataSource(url, first.toString(), limit, busyTimeoutMillis,
-                borrowTimeoutMillis, dialect, true);
+                borrowTimeoutMillis, dialect, true, connectionInit);
         try {
             out.configure(first);
         } catch (IOException err) {
@@ -221,7 +243,7 @@ public final class DataSource {
         if (db == null) {
             throw new IOException("No database");
         }
-        DataSource out = new DataSource(null, db.toString(), 1, 0, 0, db.dialect(), false);
+        DataSource out = new DataSource(null, db.toString(), 1, 0, 0, db.dialect(), false, null);
         // In `all` as well as `idle`, or the pool would count itself empty and
         // try to open a second connection from a URL it does not have -- the
         // description this was constructed with is not one.
@@ -243,7 +265,20 @@ public final class DataSource {
         if (joined != null) {
             return joined;
         }
-        return borrowFromPool();
+        Database db = borrowFromPool();
+        if (connectionInit != null) {
+            // On every borrow, not only on open: native SQL run inside
+            // TenantContext.allowNativeSql can move a connection to another
+            // schema, and the pool would then hand that schema to the tenant's
+            // next request.
+            try {
+                db.execute(connectionInit, new Object[0]);
+            } catch (IOException err) {
+                releaseToPool(db);
+                throw err;
+            }
+        }
+        return db;
     }
 
     /// Takes a connection from the pool itself, never the thread's transaction's.
@@ -628,6 +663,9 @@ public final class DataSource {
         // journal and get SQLITE_BUSY, so the extra connections buy nothing.
         // Zero is a legitimate timeout, meaning do not wait, and it stays that.
         db.tuneForConcurrency(busyTimeoutMillis);
+        if (connectionInit != null) {
+            db.execute(connectionInit, new Object[0]);
+        }
     }
 
     /// How many connections to hold when nobody said.
