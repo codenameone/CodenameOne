@@ -542,9 +542,10 @@ image::img/generated/datagrid-sheet-formula-complete.png["A cell holding =ROU wi
 While the caret is where a reference can go, after an operator, a comma or an
 opening parenthesis, tapping a cell inserts its address instead of moving the
 selection. Tapping another cell replaces that reference, and a tap with Shift held
-makes a range from the first. Enter or Tab writes the formula. A formula that
-doesn't parse is marked at the error and isn't written, and Escape leaves the
-cell as it was.
+makes a range from the first. On a keyboard, F4 cycles the reference at the
+caret through `$A$1`, `A$1`, `$A1` and `A1`. Enter or Tab writes the formula, and
+so does moving the focus to another control. A formula that doesn't parse is
+marked at the error and isn't written, and Escape leaves the cell as it was.
 
 A `FormulaBar` is the field above the sheet: the address of the selected cell
 and its formula, edited with the same help.

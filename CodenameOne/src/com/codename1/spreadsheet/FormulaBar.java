@@ -37,11 +37,17 @@ import com.codename1.ui.table.GridColumn;
 /// hinted, a tap on a cell putting its address in -- and Enter writes it to the cell.
 ///
 /// ```java
-/// Sheet sheet = workbook.getSheet(0);
+/// Workbook book = new Workbook();
+/// // com.codename1.ui has a Sheet too, hence the full name
+/// com.codename1.spreadsheet.Sheet sheet = book.addSheet("Prices");
+/// sheet.setCellValue("A1", Double.valueOf(3.5));
+/// sheet.setCellValue("B1", "=A1*2");
 /// DataGrid grid = new DataGrid(sheet);
 /// grid.setColumns(sheet.createColumns());
+/// Form form = new Form("Prices", new BorderLayout());
 /// form.add(BorderLayout.NORTH, new FormulaBar(sheet, grid));
 /// form.add(BorderLayout.CENTER, grid);
+/// form.show();
 /// ```
 ///
 /// The bar follows the grid's selection and the sheet's changes. Escape puts back what the

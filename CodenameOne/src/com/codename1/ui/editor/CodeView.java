@@ -979,6 +979,12 @@ public class CodeView extends EditorView {
 
     @Override
     public void keyPressed(int keyCode) {
+        if (keyCode == KEY_CODE_F4) {
+            if (singleLine) {
+                singleLineKey("f4");
+            }
+            return;
+        }
         if (singleLine && singleLineVertical(Display.getInstance().getGameAction(keyCode))) {
             return;
         }
@@ -1001,6 +1007,9 @@ public class CodeView extends EditorView {
 
     @Override
     public void keyReleased(int keyCode) {
+        if (keyCode == KEY_CODE_F4) {
+            return;
+        }
         if (singleLine && keyCode == 27) {
             singleLineKey("escape");
             return;

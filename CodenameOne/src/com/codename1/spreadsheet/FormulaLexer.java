@@ -22,6 +22,8 @@
  */
 package com.codename1.spreadsheet;
 
+import com.codename1.io.Util;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -438,4 +440,75 @@ final class FormulaLexer {
         }
         return null;
     }
+
+    /// The next of F4's four forms of a reference without its sheet: `A1`, `$A$1`, `A$1`,
+    /// `$A1` and back to `A1`. A range takes the form its first corner leads to; a whole
+    /// column or row has only its own part to fix.
+    static String cycleAbsolute(String ref) {
+        String[] corners = Util.split(ref, ":");
+        boolean[] first = absolute(corners[0]);
+        boolean col;
+        boolean row;
+        if (!first[0] && !first[1]) {
+            col = true;
+            row = true;
+        } else if (first[0] && first[1]) {
+            col = false;
+            row = true;
+        } else if (first[1]) {
+            col = true;
+            row = false;
+        } else {
+            col = false;
+            row = false;
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < corners.length; i++) {
+            if (i > 0) {
+                out.append(':');
+            }
+            String c = corners[i];
+            StringBuilder letters = new StringBuilder();
+            StringBuilder digits = new StringBuilder();
+            for (int k = 0; k < c.length(); k++) {
+                char ch = c.charAt(k);
+                if (ch >= '0' && ch <= '9') {
+                    digits.append(ch);
+                } else if (ch != '$') {
+                    letters.append(ch);
+                }
+            }
+            boolean onlyColumn = digits.length() == 0;
+            boolean onlyRow = letters.length() == 0;
+            if (letters.length() > 0) {
+                if (col || onlyColumn && row) {
+                    out.append('$');
+                }
+                out.append(letters);
+            }
+            if (digits.length() > 0) {
+                if (row || onlyRow && col) {
+                    out.append('$');
+                }
+                out.append(digits);
+            }
+        }
+        return out.toString();
+    }
+
+    /// Whether a corner's column and row are absolute.
+    private static boolean[] absolute(String corner) {
+        boolean[] out = new boolean[2];
+        int k = 0;
+        if (k < corner.length() && corner.charAt(k) == '$') {
+            out[0] = true;
+            k++;
+        }
+        while (k < corner.length() && corner.charAt(k) != '$' && (corner.charAt(k) < '0' || corner.charAt(k) > '9')) {
+            k++;
+        }
+        out[1] = k < corner.length() && corner.charAt(k) == '$';
+        return out;
+    }
+
 }

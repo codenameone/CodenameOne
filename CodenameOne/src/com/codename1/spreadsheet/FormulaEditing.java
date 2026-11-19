@@ -35,7 +35,10 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.Display;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.table.DataGrid;
 import com.codename1.ui.table.GridCellPicker;
 import com.codename1.ui.table.GridColumn;
@@ -61,6 +64,7 @@ final class FormulaEditing implements GridCellPicker, Painter, ActionListener {
 
     private String text = "";
     private int caret;
+    private boolean focusWatched;
     private List<FormulaLexer.Token> tokens = new ArrayList<FormulaLexer.Token>();
     private boolean dark;
 
@@ -157,13 +161,18 @@ final class FormulaEditing implements GridCellPicker, Painter, ActionListener {
         int bg = row.getBgColor();
         dark = (((bg >> 16) & 0xff) * 3 + ((bg >> 8) & 0xff) * 6 + (bg & 0xff)) / 10 < 110 && row.getBgTransparency() != 0;
         editor.setTheme(dark ? "dark" : "light");
-        final Font cellFont = row.getFont();
+        final Font cellFont = cellFont();
         editor.onReady(new Runnable() {
             @Override
             public void run() {
                 // a formula is edited in the font of the cells, as a spreadsheet does
                 for (int i = 0; i < editor.getComponentCount(); i++) {
-                    editor.getComponentAt(i).getAllStyles().setFont(cellFont);
+                    Component inner = editor.getComponentAt(i);
+                    inner.getAllStyles().setFont(cellFont);
+                    if (editor instanceof CellEditor && !focusWatched) {
+                        focusWatched = true;
+                        inner.addFocusListener(new LeaveListener());
+                    }
                 }
                 editor.revalidateLater();
             }
@@ -179,6 +188,50 @@ final class FormulaEditing implements GridCellPicker, Painter, ActionListener {
             pane.revalidate();
         }
         refresh();
+    }
+
+    /// Focus leaving a cell's editor for something that is neither it nor the grid enters the
+    /// formula, as a spreadsheet does when another control is clicked; one that does not read
+    /// stays in the cell with its error shown. A tap in the grid is the grid's to handle: it
+    /// either points at a cell or ends the edit itself.
+    private final class LeaveListener implements FocusListener {
+        @Override
+        public void focusGained(Component cmp) {
+        }
+
+        @Override
+        public void focusLost(Component cmp) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    Form form = editor.getComponentForm();
+                    if (form == null || !grid.isEditing()) {
+                        return;
+                    }
+                    Component now = form.getFocused();
+                    if (now != null && (isInside(now, editor) || isInside(now, grid))) {
+                        return;
+                    }
+                    read();
+                    String problem = problem(text);
+                    if (problem != null) {
+                        error = problem;
+                        changed();
+                        return;
+                    }
+                    commit.run();
+                }
+            });
+        }
+    }
+
+    private static boolean isInside(Component c, Component parent) {
+        for (Component p = c; p != null; p = p.getParent()) {
+            if (p == parent) { // NOPMD CompareObjectsWithEquals - identity: the same component
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Gives the grid back what `#attach()` took.
@@ -307,6 +360,8 @@ final class FormulaEditing implements GridCellPicker, Painter, ActionListener {
         }
         if (key == CodeEditor.KEY_ESCAPE) {
             cancel.run();
+        } else if (key == CodeEditor.KEY_F4) {
+            cycleAbsolute();
         } else if (key == CodeEditor.KEY_ENTER || key == CodeEditor.KEY_TAB || key == CodeEditor.KEY_BACK_TAB) {
             read();
             String problem = problem(text);
@@ -435,6 +490,23 @@ final class FormulaEditing implements GridCellPicker, Painter, ActionListener {
         }
         String insert = inserts.get(index);
         replace(wordStart, caret, insert);
+    }
+
+    /// F4: the reference the caret is in or just after goes from relative to absolute, to an
+    /// absolute row, to an absolute column and back, as a spreadsheet does.
+    private void cycleAbsolute() {
+        read();
+        tokens = FormulaLexer.lex(text);
+        for (FormulaLexer.Token t : tokens) {
+            if (t.kind == FormulaLexer.REFERENCE && t.start <= caret && caret <= t.end) {
+                String ref = text.substring(t.start, t.end);
+                int bang = ref.lastIndexOf('!') + 1;
+                String cycled = ref.substring(0, bang) + FormulaLexer.cycleAbsolute(ref.substring(bang));
+                pickedEnd = -1;
+                replace(t.start, t.end, cycled);
+                return;
+            }
+        }
     }
 
     /// Replaces the whole text, as typing it would, with the caret at its end.
@@ -606,6 +678,12 @@ final class FormulaEditing implements GridCellPicker, Painter, ActionListener {
         g.drawString(s, x + 1, y);
     }
 
+    /// The font the grid draws its cells in, which is the row style's and not the grid's own.
+    static Font cellFont() {
+        Font f = UIManager.getInstance().getComponentStyle("DataGridRow").getFont();
+        return f == null ? Font.getDefaultFont() : f;
+    }
+
     private static String fit(Font font, String s, int width) {
         if (font.stringWidth(s) <= width) {
             return s;
@@ -629,7 +707,7 @@ final class FormulaEditing implements GridCellPicker, Painter, ActionListener {
         }
 
         private Font font() {
-            return grid.getUnselectedStyle().getFont();
+            return cellFont();
         }
 
         private int lines() {
@@ -873,7 +951,7 @@ final class FormulaEditing implements GridCellPicker, Painter, ActionListener {
             int wanted = width;
             Form form = getComponentForm();
             if (editing != null && form != null) {
-                Font font = editing.grid.getUnselectedStyle().getFont();
+                Font font = cellFont();
                 int text = font.stringWidth(editing.text) + font.getHeight() * 4;
                 int room = form.getAbsoluteX() + form.getWidth() - getAbsoluteX();
                 wanted = Math.max(width, Math.min(text, room));

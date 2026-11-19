@@ -145,7 +145,7 @@ public final class DataGridFigures {
         v.add(wide("datagrid-sheet-recalc",
                 book("Regional sales", DataGridSnippets::salesWorkbook, DataGridSnippets::correctAnOrder, 2), null));
         v.add(wide("datagrid-sheet-formula-hint", book("Regional sales", DataGridSnippets::salesWorkbook, null, 2),
-                (form, g) -> type(form, g, 0, 5, "=ROUND(D2*VLOOKUP(A2, Rates!$A$2:$C$5, 2, FALSE), ")));
+                (form, g) -> type(form, g, 0, 5, "=ROUND(D2*VLOOKUP(A2, Rates!A2:C5, 2), ")));
         v.add(wide("datagrid-sheet-formula-complete", book("Regional sales", DataGridSnippets::salesWorkbook, null, 2),
                 (form, g) -> type(form, g, 1, 5, "=ROU")));
         v.add(wide("datagrid-sheet-formula-bar", () -> {

@@ -83,6 +83,8 @@ public class CodeEditor extends AbstractEditorComponent {
     public static final int KEY_UP = 5;
     /// The down arrow, in an editor of one line.
     public static final int KEY_DOWN = 6;
+    /// F4, in an editor of one line, on a port with a keyboard that delivers it.
+    public static final int KEY_F4 = 7;
 
     /// Creates an empty code editor.
     public CodeEditor() {
@@ -371,7 +373,7 @@ public class CodeEditor extends AbstractEditorComponent {
 
     /// Adds a listener told of the keys an editor of one line leaves to the application. The
     /// event's `ActionEvent#getKeyEvent()` is one of `#KEY_ENTER`, `#KEY_TAB`,
-    /// `#KEY_BACK_TAB`, `#KEY_ESCAPE`, `#KEY_UP` and `#KEY_DOWN`.
+    /// `#KEY_BACK_TAB`, `#KEY_ESCAPE`, `#KEY_UP`, `#KEY_DOWN` and `#KEY_F4`.
     ///
     /// #### Parameters
     ///
@@ -403,7 +405,8 @@ public class CodeEditor extends AbstractEditorComponent {
         if ("key".equals(type)) {
             int key = "enter".equals(value) ? KEY_ENTER : "tab".equals(value) ? KEY_TAB
                     : "backtab".equals(value) ? KEY_BACK_TAB : "escape".equals(value) ? KEY_ESCAPE
-                    : "up".equals(value) ? KEY_UP : "down".equals(value) ? KEY_DOWN : 0;
+                    : "up".equals(value) ? KEY_UP : "down".equals(value) ? KEY_DOWN
+                    : "f4".equals(value) ? KEY_F4 : 0;
             if (key != 0) {
                 keyListeners.fireActionEvent(new ActionEvent(this, key));
             }

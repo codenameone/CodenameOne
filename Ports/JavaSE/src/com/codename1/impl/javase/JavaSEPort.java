@@ -5795,6 +5795,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 case KeyEvent.VK_BACK_SPACE:
                 case KeyEvent.VK_DELETE:
                 case KeyEvent.VK_TAB:
+                // Escape's character is below 32, so the test below dropped it and an editor
+                // never saw it; F4's key code is 's', so it is delivered as KEY_CODE_F4
+                case KeyEvent.VK_ESCAPE:
+                case KeyEvent.VK_F4:
                     return true;
                 default:
                     break;
@@ -5882,6 +5886,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     code = '\n';
                 } else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
                     code = ' ';
+                } else if (e.getKeyCode() == KeyEvent.VK_F4) {
+                    code = com.codename1.ui.editor.EditorView.KEY_CODE_F4;
+                } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    code = 27;
                 }
             }
             if (testRecorder != null) {
@@ -5918,6 +5926,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     code = '\n';
                 } else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
                     code = ' ';
+                } else if (e.getKeyCode() == KeyEvent.VK_F4) {
+                    code = com.codename1.ui.editor.EditorView.KEY_CODE_F4;
+                } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    code = 27;
                 }
             }
             if (testRecorder != null) {

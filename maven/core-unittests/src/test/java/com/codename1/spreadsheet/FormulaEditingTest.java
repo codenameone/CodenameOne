@@ -192,6 +192,10 @@ class FormulaEditingTest extends UITestBase {
         assertEquals("=SUM(B4", ed.currentText(), "a second tap replaces the reference it put in");
         editing.cellPicked(grid, 1, 2, true);
         assertEquals("=SUM(B3:C4", ed.currentText(), "shift extends it into a range");
+        editing.press(CodeEditor.KEY_F4);
+        assertEquals("=SUM($B$3:$C$4", ed.currentText(), "F4 fixes the reference before the caret");
+        editing.press(CodeEditor.KEY_F4);
+        assertEquals("=SUM(B$3:C$4", ed.currentText());
 
         type(ed, "=SUM(B3:C4, ");
         assertEquals(1, editing.hintArgument(), "past number2 the repeating argument stays bold");
@@ -290,4 +294,48 @@ class FormulaEditingTest extends UITestBase {
         assertEquals(Double.valueOf(32), sheet.getValueAt(1, 1), "moving on enters what was typed");
         assertEquals("B4", bar.getAddress());
     }
+
+    @Test
+    void f4CyclesTheReferenceAtTheCaretAsASpreadsheetDoes() {
+        assertEquals("$A$1", FormulaLexer.cycleAbsolute("A1"));
+        assertEquals("A$1", FormulaLexer.cycleAbsolute("$A$1"));
+        assertEquals("$A1", FormulaLexer.cycleAbsolute("A$1"));
+        assertEquals("A1", FormulaLexer.cycleAbsolute("$A1"));
+        assertEquals("$B$2:$C$3", FormulaLexer.cycleAbsolute("B2:C3"));
+        assertEquals("B$2:C$3", FormulaLexer.cycleAbsolute("$B$2:$C$3"));
+        assertEquals("$A:$A", FormulaLexer.cycleAbsolute("A:A"));
+        assertEquals("A:A", FormulaLexer.cycleAbsolute("$A:$A"));
+        assertEquals("$1:$1", FormulaLexer.cycleAbsolute("1:1"));
+        assertEquals("1:1", FormulaLexer.cycleAbsolute("$1:$1"));
+    }
+
+
+    @FormTest
+    void focusLeavingForAnotherControlEntersTheFormula() {
+        open();
+        Form form = Display.getInstance().getCurrent();
+        com.codename1.ui.Button other = new com.codename1.ui.Button("Other");
+        form.add(BorderLayout.SOUTH, other);
+        form.revalidate();
+        FormulaEditing.CellEditor ed = edit(0, 3);
+        Component inner = ed.getComponentAt(0);
+        inner.requestFocus();
+        flushSerialCalls();
+        type(ed, "=B2*2");
+
+        other.requestFocus();
+        flushSerialCalls();
+        assertFalse(grid.isEditing(), "the edit ended");
+        assertTrue(String.valueOf(sheet.getCellFormula(1, 3)).endsWith("B2*2"), sheet.getCellFormula(1, 3));
+
+        FormulaEditing.CellEditor bad = edit(0, 3);
+        bad.getComponentAt(0).requestFocus();
+        flushSerialCalls();
+        type(bad, "=B2*");
+        other.requestFocus();
+        flushSerialCalls();
+        assertTrue(grid.isEditing(), "a formula that does not read stays in its cell");
+        assertNotNull(bad.getEditing().error());
+    }
+
 }
