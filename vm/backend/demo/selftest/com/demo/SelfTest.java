@@ -1725,6 +1725,11 @@ public class SelfTest {
                 "\ud83d\ude00 smile",
                 escapeText,
                 "plain ascii",
+                // The top of Latin-1, which a compact string stores in one byte
+                // and UTF-8 needs two for; and text outside Latin-1 entirely,
+                // three UTF-8 bytes a character, which the binder sizes apart.
+                "\u00ff\u00e0\u0080",
+                "\u65e5\u672c\u8a9e",
             };
             for(int iter = 0 ; iter < values.length ; iter++) {
                 db.execute("INSERT INTO texts (id, body) VALUES (?, ?)",

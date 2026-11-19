@@ -287,7 +287,30 @@ public final class PySet extends PyObject {
             }
             return;
         }
+        if (iterable instanceof PyList && iterable.getClass() == PyList.class) { //NOPMD CompareObjectsWithEquals - exactly list: a subclass may override __iter__
+            // set(names) over a plain list, sqlite-utils' check of every
+            // query's columns: indexed, as the list's own iterator reads it
+            // (live, so an __eq__ that changes the list ends it the same way).
+            PyList l = (PyList) iterable;
+            for (int i = 0; i < l.size(); i++) {
+                Object v = l.get(i);
+                insert(v, hashOf(v));
+            }
+            return;
+        }
         Object it = Py.iter(iterable);
+        if (it instanceof PyGenerator) {
+            // Stepped under one handler (see PyList.extend).
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object v = PyGenerator.loopNext(g); v != null; v = PyGenerator.loopNext(g)) {
+                    insert(v, hashOf(v));
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
+            }
+            return;
+        }
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             insert(v, hashOf(v));
         }
@@ -305,6 +328,16 @@ public final class PySet extends PyObject {
         }
         PySet s = new PySet();
         s.merge(constant);
+        return s;
+    }
+
+    /// The frozenset constant CPython folds `x in {"a", "b"}` to; the
+    /// transpiler makes it once per module.
+    public static PySet frozenConstants(Object... items) {
+        PySet s = new PySet(true);
+        for (Object item : items) {
+            s.addRaw(item);
+        }
         return s;
     }
 

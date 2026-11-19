@@ -3,6 +3,10 @@
 # exception, as the rest of the Codename One Python runtime.
 """JSON encoding and decoding (RFC 8259), with the json module's interface."""
 
+import _cn1json
+
+_NATIVE_KW = frozenset(("strict", "object_hook", "object_pairs_hook"))
+
 __all__ = ["dump", "dumps", "load", "loads", "JSONDecoder", "JSONDecodeError", "JSONEncoder"]
 
 _ESC = {'"': '\\"', "\\": "\\\\", "\n": "\\n", "\r": "\\r", "\t": "\\t", "\b": "\\b", "\f": "\\f"}
@@ -80,7 +84,28 @@ class JSONEncoder:
         raise TypeError("Object of type %s is not JSON serializable" % type(o).__name__)
 
     def encode(self, o):
+        if type(self) is JSONEncoder:
+            # The builtin types are written in Java; every other value comes
+            # back to _other, so isinstance and default decide as below.
+            opts = self.__dict__.get("_cn1opts")
+            if opts is None:
+                # The settings, made into one value the first time this encoder
+                # is used (they may be assigned after __init__), so each encode
+                # passes two arguments rather than ten.
+                opts = _cn1json.options(self.ensure_ascii, self.check_circular, self.allow_nan, self.sort_keys,
+                                        self.indent, self.item_separator, self.key_separator, self.skipkeys,
+                                        self._other)
+                self._cn1opts = opts
+            return _cn1json.encode(o, opts)
         return "".join(self.iterencode(o))
+
+    def _other(self, o, markers, level):
+        # level -1: a dict key that is a subclass of str, int or float.
+        if level < 0:
+            return self._key(o)
+        out = []
+        self._enc(o, out, level, markers if self.check_circular else None)
+        return "".join(out)
 
     def iterencode(self, o, _one_shot=False):
         out = []
@@ -383,11 +408,33 @@ class JSONDecoder:
 
 def dumps(obj, *, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None,
           indent=None, separators=None, default=None, sort_keys=False, **kw):
+    # CPython's own shortcut: with every default, its shared encoder.
+    if (not skipkeys and ensure_ascii and check_circular and allow_nan and cls is None and indent is None
+            and separators is None and default is None and not sort_keys and not kw):
+        return _default_encoder.encode(obj)
+    if (cls is None and indent is None and default is None and not kw
+            and (separators is None or type(separators) is tuple)):
+        # Any other fixed set of options: an encoder holds nothing but them, so
+        # one per set is kept rather than built and initialised on every call --
+        # a canonical form (sorted keys, compact separators) is asked for this
+        # way once per value hashed.
+        key = (skipkeys, ensure_ascii, check_circular, allow_nan, sort_keys, separators)
+        enc = _encoders.get(key)
+        if enc is None:
+            enc = JSONEncoder(skipkeys=skipkeys, ensure_ascii=ensure_ascii, check_circular=check_circular,
+                              allow_nan=allow_nan, separators=separators, sort_keys=sort_keys)
+            if len(_encoders) < 32:
+                _encoders[key] = enc
+        return enc.encode(obj)
     if cls is None:
         cls = JSONEncoder
     return cls(skipkeys=skipkeys, ensure_ascii=ensure_ascii, check_circular=check_circular,
                allow_nan=allow_nan, indent=indent, separators=separators, default=default,
                sort_keys=sort_keys, **kw).encode(obj)
+
+
+_default_encoder = JSONEncoder()
+_encoders = {}
 
 
 def dump(obj, fp, **kw):
@@ -399,6 +446,12 @@ def loads(s, *, cls=None, **kw):
         s = s.decode("utf-8")
     if not isinstance(s, str):
         raise TypeError("the JSON object must be str, bytes or bytearray, not " + type(s).__name__)
+    if cls is None and all(k in _NATIVE_KW for k in kw):
+        # Codename One's strict reader builds the values in Java; anything it
+        # refuses is decoded again below, which raises CPython's own error.
+        r = _cn1json.loads(s, kw.get("strict", True), kw.get("object_hook"), kw.get("object_pairs_hook"))
+        if r is not _cn1json.FAILED:
+            return r
     if cls is None:
         cls = JSONDecoder
     return cls(**kw).decode(s)

@@ -36,8 +36,9 @@
       <defaultValue>none</defaultValue>
     </requiredProperty>
     <requiredProperty key="projectType">
-      <!-- app (the default), app-with-backend (adds the backend/ module), or
-           backend-only (a single-module server at the root, no app).
+      <!-- app (the default), app-with-backend (adds the backend/ module),
+           backend-only (a single-module server at the root, no app), or cli
+           (the same single module as a command-line tool, run once and exit).
            -DplatformModules=all -DprojectType=app-with-backend is the layout every
            project used to get. -->
       <defaultValue>app</defaultValue>

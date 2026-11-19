@@ -25,6 +25,7 @@ package com.codename1.backend;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /// Distributed tracing for the server, and the hooks it is instrumented through.
 ///
@@ -51,6 +52,17 @@ import java.util.Map;
 /// outage.
 public final class Tracing {
     /// The installed tracer, or null. Volatile: installed once, read by every host.
+    /// Whether a tracer was ever installed or bound to a thread. Every span
+    /// needs one, so while this is false no statement can be traced.
+    private static final AtomicBoolean EVER_TRACED = new AtomicBoolean();
+
+    /// Records that `own`, a tracer handed in rather than installed, exists.
+    private static void markTraced(Tracer own) {
+        if (own != null && own != NONE && !EVER_TRACED.get()) { //NOPMD CompareObjectsWithEquals - the untraced marker
+            EVER_TRACED.set(true);
+        }
+    }
+
     private static volatile Tracer tracer; //NOPMD AvoidUsingVolatile - read on every request without the lock
     private static final ThreadLocal CURRENT = new ThreadLocal();
     private static final ThreadLocal SUPPRESSED = new ThreadLocal();
@@ -156,6 +168,9 @@ public final class Tracing {
     /// process with no tracer at all, while the first server kept running untraced.
     static Swap swap(Tracer installed) {
         synchronized (LIFECYCLE) {
+            if (installed != null) {
+                EVER_TRACED.set(true);
+            }
             Swap claim = new Swap(installed, tracer);
             tracer = installed;
             PENDING.add(claim);
@@ -348,6 +363,7 @@ public final class Tracing {
     /// its own is current; answers what to hand [#disown] afterwards. A null
     /// `own` leaves the installed tracer in charge.
     static Object own(Tracer own) {
+        markTraced(own);
         Object previous = OWNER.get();
         OWNER.set(own);
         return previous;
@@ -373,6 +389,7 @@ public final class Tracing {
         // The parent's tracer: the run belongs to whoever started it.
         Tracer t = parent != null && parent.owner != null ? parent.owner
                 : own != null ? own : tracer;
+        markTraced(own);
         if (t == null || t == NONE || isSuppressed()) { //NOPMD CompareObjectsWithEquals - the untraced marker
             return work.run(NOOP);
         }
@@ -499,6 +516,7 @@ public final class Tracing {
     /// the process installs its tracer over the first's, and the first's requests
     /// must still go to the first's endpoint under its service name.
     static Span startServer(HttpServer.Request request, boolean secure, Tracer own) {
+        markTraced(own);
         Tracer t = own != null ? own : tracer;
         if (t == null || t == NONE || request == null) { //NOPMD CompareObjectsWithEquals - the untraced marker
             return null;
@@ -714,6 +732,12 @@ public final class Tracing {
         finish(span);
     }
 
+    /// Whether a tracer was ever installed in this process: while not, no
+    /// statement can have a span and a caller may skip asking for one.
+    static boolean everTraced() {
+        return EVER_TRACED.get();
+    }
+
     /// A span for one database statement, made current while it runs.
     ///
     /// The statement is recorded as the application wrote it, placeholders and
@@ -721,6 +745,11 @@ public final class Tracing {
     /// inlines literals into its SQL can drop the text with
     /// `cn1.otel.attributes.exclude=db.query.text`.
     static Span startDatabase(String system, String sql) {
+        // A process that never had a tracer answers without the thread-local
+        // reads active() and isSuppressed() make, on every statement.
+        if (!EVER_TRACED.get()) {
+            return null;
+        }
         Tracer t = active();
         if (t == null || isSuppressed()) {
             return null;

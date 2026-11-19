@@ -237,6 +237,10 @@ public abstract class Node {
 
     public static final class SetExpr extends Expr {
         public final List<Expr> elts;
+        /// The right side of `in` with only constants in it: CPython folds it
+        /// to a frozenset constant, and so does the emitter (one per module,
+        /// never a set per test).
+        public boolean frozenConstant;
 
         public SetExpr(List<Expr> elts) {
             this.elts = elts;

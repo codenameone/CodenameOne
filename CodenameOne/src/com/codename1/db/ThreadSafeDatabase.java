@@ -23,6 +23,8 @@
 
 package com.codename1.db;
 
+import java.util.function.Function;
+
 import com.codename1.util.EasyThread;
 import com.codename1.util.RunnableWithResultSync;
 
@@ -316,6 +318,43 @@ public class ThreadSafeDatabase extends Database {
             @Override
             public void run() throws IOException {
                 underlying.changeKey(config);
+            }
+        });
+    }
+
+    @Override
+    public long changes() throws IOException {
+        return ((Long) invokeWithException(new RunnableWithResponseOrIOException() {
+            @Override
+            public Object run() throws IOException {
+                return Long.valueOf(underlying.changes());
+            }
+        })).longValue();
+    }
+
+    @Override
+    public long lastInsertRowId() throws IOException {
+        return ((Long) invokeWithException(new RunnableWithResponseOrIOException() {
+            @Override
+            public Object run() throws IOException {
+                return Long.valueOf(underlying.lastInsertRowId());
+            }
+        })).longValue();
+    }
+
+    @Override
+    public boolean supportsFunctions() {
+        return underlying.supportsFunctions();
+    }
+
+    @Override
+    public void createFunction(final String name, final int argCount, final Function<Object[], Object> function)
+            throws IOException {
+        // The function then runs on the worker too, the thread that steps every statement.
+        invokeWithException(new RunnableWithIOException() {
+            @Override
+            public void run() throws IOException {
+                underlying.createFunction(name, argCount, function);
             }
         });
     }

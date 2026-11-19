@@ -40,6 +40,7 @@ final public class CRC32 implements Checksum {
     // The following logic has come from zlib.1.2.
     private static final int GF2_DIM = 32;
     private static int[] crc_table = null;
+    private static final int[] SLICES;
 
     static {
         crc_table = new int[256];
@@ -54,6 +55,19 @@ final public class CRC32 implements Checksum {
                 }
             }
             crc_table[n] = c;
+        }
+        // Slice-by-8, as zlib does: T[k][n] is the CRC of byte n followed by
+        // k zero bytes, so eight bytes are folded in with eight independent
+        // lookups instead of eight dependent ones. Zip and gzip reading spent
+        // more time here than in inflate itself.
+        SLICES = new int[8 * 256];
+        System.arraycopy(crc_table, 0, SLICES, 0, 256);
+        for (int n = 0; n < 256; n++) {
+            int c = crc_table[n];
+            for (int k = 1; k < 8; k++) {
+                c = crc_table[c & 0xff] ^ (c >>> 8);
+                SLICES[k * 256 + n] = c;
+            }
         }
     }
 
@@ -144,8 +158,18 @@ final public class CRC32 implements Checksum {
     @Override
     public void update(byte[] buf, int index, int len) {
         int c = ~v;
-        while (--len >= 0) {
-            c = crc_table[(c ^ buf[index++]) & 0xff] ^ (c >>> 8);
+        int[] t = SLICES;
+        int i = index;
+        int end = index + len;
+        while (end - i >= 8) {
+            int lo = c ^ (buf[i] & 0xff | (buf[i + 1] & 0xff) << 8 | (buf[i + 2] & 0xff) << 16 | buf[i + 3] << 24);
+            c = t[1792 + (lo & 0xff)] ^ t[1536 + (lo >>> 8 & 0xff)] ^ t[1280 + (lo >>> 16 & 0xff)] ^ t[1024 + (lo >>> 24)]
+                    ^ t[768 + (buf[i + 4] & 0xff)] ^ t[512 + (buf[i + 5] & 0xff)] ^ t[256 + (buf[i + 6] & 0xff)]
+                    ^ t[buf[i + 7] & 0xff];
+            i += 8;
+        }
+        while (i < end) {
+            c = t[(c ^ buf[i++]) & 0xff] ^ (c >>> 8);
         }
         v = ~c;
     }

@@ -28,6 +28,7 @@ class ShutDown(Exception):
 
 
 class Queue:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, maxsize=0):
         self.maxsize = maxsize
         self._init(maxsize)
@@ -151,6 +152,7 @@ class Queue:
 
 
 class PriorityQueue(Queue):
+    __class_getitem__ = classmethod(type(list[int]))
     def _init(self, maxsize):
         self.queue = []
 
@@ -165,6 +167,7 @@ class PriorityQueue(Queue):
 
 
 class LifoQueue(Queue):
+    __class_getitem__ = classmethod(type(list[int]))
     def _init(self, maxsize):
         self.queue = []
 
@@ -179,6 +182,7 @@ class LifoQueue(Queue):
 
 
 class SimpleQueue:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self):
         self._queue = deque()
         self._count = threading.Semaphore(0)

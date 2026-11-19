@@ -99,7 +99,7 @@ public class TryCatch extends Instruction {
         hasTryCatch = true;
         if(firstException) {
             // we need to append basic exception handling logic
-            //b.append("    DEFINE_EXCEPTION_HANDLING_CONSTANTS();\n");
+            b.append("    CN1_TRY_ENTRY();\n");
             firstException = false;
         }
         
@@ -110,7 +110,7 @@ public class TryCatch extends Instruction {
         LabelInstruction.addTryBeginLabel(start, cid, counter);
         LabelInstruction.addHandlerLabel(handler);
         // VOLATILE is load-bearing: both variables are assigned at TRY-ENTRY,
-        // i.e. AFTER the setjmp in DEFINE_CATCH_BLOCK, and read back in the
+        // i.e. AFTER the setjmp in CN1_TRY_ENTRY, and read back in the
         // catch handler -- which runs after a longjmp. C11 7.13.2.1: non-volatile
         // automatics modified between setjmp and longjmp are INDETERMINATE after
         // the jump. gcc register-allocates them (longjmp rolls the register back

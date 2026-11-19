@@ -388,7 +388,18 @@ class ZipFile:
         off = zinfo.header_offset
         if data[off:off + 4] != _LOCAL:
             raise BadZipFile("Bad magic number for file header")
+        lflags = struct.unpack("<H", data[off + 6:off + 8])[0]
         nlen, xlen = struct.unpack("<HH", data[off + 26:off + 30])
+        raw_name = data[off + 30:off + 30 + nlen]
+        if lflags & 0x800:
+            fname = raw_name.decode("utf-8")
+        elif self.metadata_encoding:
+            fname = raw_name.decode(self.metadata_encoding)
+        else:
+            fname = _cp437(raw_name)
+        if fname != zinfo.orig_filename:
+            raise BadZipFile("File name in directory %r and header %r differ."
+                             % (zinfo.orig_filename, raw_name))
         start = off + 30 + nlen + xlen
         if zinfo.flag_bits & 0x1:
             raise NotImplementedError("That compression method is not supported")

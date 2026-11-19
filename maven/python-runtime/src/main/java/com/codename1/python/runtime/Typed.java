@@ -66,7 +66,12 @@ public final class Typed {
     }
 
     public static PyException mismatch(Object o) {
-        return Py.runtimeError("internal error: typed code received a value of type '" + Py.typeOf(o).name + "'");
+        // Reached when a value arrives by a path the compiler could not
+        // see by name -- a computed setattr, a write through __dict__, a
+        // method found with a computed getattr -- and is not of the type
+        // every path it did see gives. Raised where the value is read.
+        return Py.typeError("a value of type '" + Py.typeOf(o).name
+                + "' reached compiled code through a computed attribute name, where every named use holds another type");
     }
 
     public static boolean asBool(Object o) {
@@ -111,19 +116,11 @@ public final class Typed {
     /// `len(s)`: code points, which Java's UTF-16 length overcounts by one
     /// per surrogate pair.
     public static long slen(String s) {
-        int n = s.length();
-        long r = n;
-        for (int i = 0; i < n; i++) {
-            char c = s.charAt(i);
-            if (c >= 0xD800 && c < 0xDC00 && i + 1 < n) {
-                char d = s.charAt(i + 1);
-                if (d >= 0xDC00 && d < 0xE000) {
-                    r--;
-                    i++;
-                }
-            }
-        }
-        return r;
+        // codePointCount counts a lone surrogate as one, as Python does, and
+        // on ParparVM answers a Latin-1 string without reading it; a wide
+        // string a decoder made has its count in PyStr's cache.
+        int pairs = PyStr.cachedSurrogates(s);
+        return pairs >= 0 ? s.length() - pairs : s.codePointCount(0, s.length());
     }
 
     /// Int `o` modulo 2^64: its low 64 bits, as two's complement keeps them.
@@ -147,15 +144,34 @@ public final class Typed {
         int size;
     }
 
+    /// Each thread's own stack, looked up only when the GIL changes hands.
     private static final ThreadLocal<Returned> RETURNED = new ThreadLocal<Returned>();
 
-    private static Returned returned() {
+    /// The stack of the thread that holds the GIL. One thread runs Python at
+    /// a time, so the stack is a static that [Gil] points at the new owner's
+    /// as it takes the lock: a `try` and a big-int return were each a
+    /// ThreadLocal lookup, which was a tenth of a loop that catches. Code that
+    /// runs Python without ever taking the lock shares the first stack, which
+    /// is right for the one thread such a program has.
+    private static Returned current = new Returned();
+
+    /// Points [#current] at the calling thread's stack: [Gil] calls it on
+    /// every acquisition, while it holds the lock.
+    static void adoptThread() {
         Returned r = RETURNED.get();
         if (r == null) {
-            r = new Returned();
+            r = current.size == 0 && !adopted ? current : new Returned();
+            adopted = true;
             RETURNED.set(r);
         }
-        return r;
+        current = r;
+    }
+
+    /// Whether some thread has claimed the initial stack as its own.
+    private static boolean adopted;
+
+    private static Returned returned() {
+        return current;
     }
 
     /// Returns int `o` from a typed function whose result is a `long`: the
@@ -193,17 +209,13 @@ public final class Typed {
     /// How many results are waiting to be taken: kept at the start of a
     /// `try`, for `untake`.
     public static int taken() {
-        Returned r = RETURNED.get();
-        return r == null ? 0 : r.size;
+        return current.size;
     }
 
     /// Drops the results an exception left untaken, back to `mark`: one
     /// raised between a call returning a marker and its caller taking it.
     public static void untake(int mark) {
-        Returned r = RETURNED.get();
-        if (r == null) {
-            return;
-        }
+        Returned r = current;
         while (r.size > mark) {
             r.items[--r.size] = null;
         }
@@ -287,6 +299,17 @@ public final class Typed {
         return Py.isTrue(Py.ge(a, b));
     }
 
+    /// `x in c`, without the view a str container would otherwise allocate.
+    public static boolean in(Object x, Object c) {
+        if (c instanceof String && x instanceof String) {
+            return ((String) c).indexOf((String) x) >= 0;
+        }
+        if (c instanceof PyDict) {
+            return ((PyDict) c).contains(x);
+        }
+        return Py.obj(c).contains(x);
+    }
+
     public static boolean eq(Object a, Object b) {
         if (a instanceof Long && b instanceof Long) {
             return ((Long) a).longValue() == ((Long) b).longValue();
@@ -312,6 +335,22 @@ public final class Typed {
     }
 
     /// `a / b` of two ints.
+    /// `x ** y` for two floats the transpiler proved has a real answer (an
+    /// integral exponent, or a base that cannot be negative). The cases Python
+    /// raises on, a zero base to a negative power and an overflow, go through
+    /// the boxed operator so they raise as it does.
+    public static double pow(double x, double y) {
+        double r = Py.powd(x, y);
+        if (!Double.isNaN(r) && !Double.isInfinite(r)) {
+            return r;
+        }
+        Object o = Py.pow(Double.valueOf(x), Double.valueOf(y));
+        if (o instanceof Double) {
+            return ((Double) o).doubleValue();
+        }
+        throw Py.error(Py.TYPE_ERROR, "float ** float answered a complex");
+    }
+
     public static double truediv(Object a, Object b) {
         return Py.asDouble(Py.truediv(a, b));
     }
@@ -380,6 +419,38 @@ public final class Typed {
             }
         }
         l.setItem(i, Double.valueOf(v));
+    }
+
+    /// `x % k` for `k` above zero: Python's remainder, which takes the
+    /// divisor's sign.
+    public static long imod(long x, long k) {
+        long r = x % k;
+        return r < 0 ? r + k : r;
+    }
+
+    /// `x % y`: Python's remainder, which takes the divisor's sign; a zero
+    /// divisor raises ZeroDivisionError.
+    public static long lmod(long x, long y) {
+        if (y == 0) {
+            throw Py.zeroDivision("integer modulo by zero");
+        }
+        long r = x % y;
+        return r != 0 && (r ^ y) < 0 ? r + y : r;
+    }
+
+    /// `l[k]` with the index as a long.
+    public static Object at(PyList l, long k) {
+        nzl(l);
+        if (k >= 0 && k < l.size && l.floats == null) {
+            int[] n = l.ints;
+            return n != null ? Long.valueOf(n[(int) k]) : l.items[(int) k];
+        }
+        return get(l, Long.valueOf(k));
+    }
+
+    /// `len(l)` as a Java long; a missing list raises as `len` does.
+    public static long llen(PyList l) {
+        return l != null ? l.size : Py.len(Py.NONE);
     }
 
     public static Object len(PyList l) {
@@ -471,6 +542,81 @@ public final class Typed {
     }
 
     /// `m[k] = v` for an int key.
+    /// `s.split()` / `s.split(sep)` on a str: a fresh list of strs.
+    public static PyList split(String s, Object sep) {
+        return TypeMethods.split(s, sep, -1);
+    }
+
+    /// `d[k]` on a dict the transpiler followed from a display: a plain
+    /// `PyDict`, so a key that is not there raises KeyError, as the generic
+    /// read does.
+    public static Object dgetv(Object d, Object k) {
+        Object v = ((PyDict) d).getOrNull(k);
+        return v != null ? v : Py.getitem(d, k);
+    }
+
+    /// `d.get(k, def)` on a plain `PyDict`: no attribute lookup, no call.
+    public static Object dgetd(Object d, Object k, Object def) {
+        Object v = ((PyDict) d).getOrNull(k);
+        return v != null ? v : def;
+    }
+
+    /// Where the next word of `s.split()` starts at or after `a`:
+    /// `s.length()` when there is none. With [#wordEnd], a loop over the
+    /// words that makes no list.
+    public static int wordStart(String s, int a) {
+        int n = s.length();
+        while (a < n) {
+            char c = s.charAt(a);
+            if ((c <= ' ' || c >= '\u0085') && TypeMethods.isSpace(c)) {
+                a++;
+            } else {
+                break;
+            }
+        }
+        return a;
+    }
+
+    /// Where the word of `s.split()` starting at `a` ends.
+    public static int wordEnd(String s, int a) {
+        int n = s.length();
+        int b = a + 1;
+        while (b < n) {
+            char c = s.charAt(b);
+            if ((c <= ' ' || c >= '\u0085') && TypeMethods.isSpace(c)) {
+                break;
+            }
+            b++;
+        }
+        return b;
+    }
+
+    /// The separator of `s.split(sep)` in a loop over the pieces.
+    public static String splitSep(String sep) {
+        if (sep.isEmpty()) {
+            throw Py.valueError("empty separator");
+        }
+        return sep;
+    }
+
+    /// `d[k]` probed on a plain dict: the value, or [Py#MISS] -- never a
+    /// [Py.Miss], since a plain dict raises no KeyError of its own.
+    public static Object dprobe(Object d, long k) {
+        Object v = ((PyDict) d).getLong(k);
+        return v != null ? v : Py.MISS;
+    }
+
+    public static Object dprobe(Object d, Object k) {
+        Object v = ((PyDict) d).getOrNull(k);
+        return v != null ? v : Py.MISS;
+    }
+
+    /// Whether `o` is a plain dict, of no subclass: what a typed function
+    /// taking a dict the transpiler followed may be entered with.
+    public static boolean isDict(Object o) {
+        return o != null && o.getClass() == PyDict.class;
+    }
+
     public static void dset(Object m, long k, Object v) {
         if (m instanceof PyDict) {
             ((PyDict) m).setLong(k, v);
@@ -533,5 +679,162 @@ public final class Typed {
 
     /// An expression statement whose value is dropped.
     public static void drop(Object ignored) {
+    }
+
+    /// `s.strip()`, `lstrip()` and `rstrip()` with no argument, on a str
+    /// the transpiler knows is one.
+    public static String strip(String s, boolean left, boolean right) {
+        return TypeMethods.strip(s, null, left, right);
+    }
+
+    /// `s.strip(chars)` and its one-sided forms.
+    public static String strip(String s, String chars, boolean left, boolean right) {
+        return TypeMethods.strip(s, chars, left, right);
+    }
+
+    /// `s.find(sub)` and `s.rfind(sub)` over the whole string.
+    public static long find(String s, String sub, boolean last) {
+        return TypeMethods.findWhole(s, sub, last);
+    }
+
+    /// `s[i]` of a str: the one character there, counted in code points
+    /// and from the end when negative.
+    public static String sat(String s, long i) {
+        if (i >= 0 && i < s.length() && PyStr.surrogates(s) == 0) {
+            return ch(s.charAt((int) i));
+        }
+        return asStr(Py.getitem(s, Long.valueOf(i)));
+    }
+
+    /// `s.find(sub, start, end)` and `s.rfind(sub, start, end)`; a bound left
+    /// out is `Py.NONE`.
+    public static long find(String s, String sub, Object start, Object end, boolean last) {
+        return TypeMethods.findIn(s, sub, start, end, last);
+    }
+
+    /// `s.startswith(sub, start, end)` and `s.endswith(sub, start, end)`.
+    public static boolean affix(String s, String sub, Object start, Object end, boolean startsWith) {
+        return TypeMethods.affixIn(s, sub, start, end, startsWith);
+    }
+
+    /// `s.find(sub, start)` and `s.rfind(sub, start)`.
+    public static long find(String s, String sub, long start, boolean last) {
+        return TypeMethods.findFrom(s, sub, start, last);
+    }
+
+    /// `s.startswith(sub, start)` and `s.endswith(sub, start)`.
+    public static boolean affix(String s, String sub, long start, boolean startsWith) {
+        return TypeMethods.affixFrom(s, sub, start, startsWith);
+    }
+
+    /// `s.isspace()` and the other tests of every character, by name.
+    public static boolean isAll(String s, int kind) {
+        switch (kind) {
+            case 0:
+                return TypeMethods.allOf(s, Unicode.SPACE);
+            case 1:
+                return TypeMethods.allOf(s, Unicode.DIGIT);
+            case 2:
+                return TypeMethods.allOf(s, Unicode.DECIMAL);
+            case 3:
+                return TypeMethods.allOf(s, Unicode.NUMERIC);
+            case 4:
+                return TypeMethods.allOf(s, Unicode.ALPHA);
+            default:
+                return TypeMethods.allOf(s, Unicode.ALPHA | Unicode.DECIMAL | Unicode.DIGIT | Unicode.NUMERIC);
+        }
+    }
+
+    /// `s.replace(old, new)` with no count.
+    public static String replace(String v, String old, String nw) {
+        if (old.length() == 0) {
+            StringBuilder sb = new StringBuilder(nw);
+            for (int i = 0; i < v.length(); i++) {
+                sb.append(v.charAt(i)).append(nw);
+            }
+            return sb.toString();
+        }
+        return v.replace(old, nw);
+    }
+
+    /// `s.count(sub)` over the whole string.
+    public static long count(String v, String sub) {
+        if (sub.length() == 0) {
+            return PyStr.codePoints(v) + 1;
+        }
+        long n = 0;
+        for (int i = v.indexOf(sub); i >= 0; i = v.indexOf(sub, i + sub.length())) {
+            n++;
+        }
+        return n;
+    }
+
+    /// `s.lower()` (mode 0) and `s.upper()` (mode 1).
+    public static String mapCase(String s, int mode) {
+        return TypeMethods.mapCase(s, mode);
+    }
+
+    /// `sep.join(items)`.
+    public static String join(String sep, Object items) {
+        return TypeMethods.join(sep, items);
+    }
+
+    /// `s[a:b:c]` on a str the transpiler knows is one.
+    public static String slice(String s, Object a, Object b, Object c) {
+        Object r = Py.getslice(s, a, b, c);
+        return r instanceof String ? (String) r : String.valueOf(r);
+    }
+
+    /// `s[a:b]` with int bounds held as longs: `aw` / `bw`, when not
+    /// null, is the bound's real value (a big int, a bool) and `a` / `b`
+    /// are ignored.
+    public static String sliceL(String s, long a, Object aw, long b, Object bw) {
+        int n = s.length();
+        if (aw != null || bw != null || PyStr.surrogates(s) != 0) {
+            // A big int or bool bound, or a string whose code points are not
+            // its chars: the generic slice.
+            return slice(s, aw != null ? aw : Long.valueOf(a), bw != null ? bw : b == Long.MAX_VALUE ? Py.NONE
+                    : Long.valueOf(b), Py.NONE);
+        }
+        int i = Py.clampSlice(a, n);
+        int j = b == Long.MAX_VALUE ? n : Py.clampSlice(b, n);
+        return j <= i ? "" : i == 0 && j == n ? s : s.substring(i, j);
+    }
+
+    /// `s.encode(enc, errors)` on a str; a null encoding or handler is the
+    /// default. The result may share its array with the bytes `s` was
+    /// decoded from (see `Codecs.encodeShared`).
+    public static Object encode(String s, String enc, String errors) {
+        return new PyBytes(Codecs.encodeShared(s, enc == null ? "utf-8" : enc, errors == null ? "strict" : errors));
+    }
+
+    /// `b.decode(enc, errors)` on a value the transpiler typed as bytes; a
+    /// null encoding or handler is the default. Anything else (only a
+    /// rebinding the inference cannot see) takes the method call.
+    public static String decode(Object b, String enc, String errors) {
+        String e = enc == null ? "utf-8" : enc;
+        String h = errors == null ? "strict" : errors;
+        if (b instanceof PyBytes) {
+            return Codecs.decodeKeep(((PyBytes) b).value, e, h);
+        }
+        return Py.toStr(Py.callMethod(b, "decode", e, h));
+    }
+
+    /// `b[i]` on a value the transpiler typed as bytes: the byte as an int.
+    public static long bat(Object b, long i) {
+        if (b instanceof PyBytes) {
+            byte[] v = ((PyBytes) b).value;
+            long k = i < 0 ? i + v.length : i;
+            if (k >= 0 && k < v.length) {
+                return v[(int) k] & 0xff;
+            }
+        }
+        return toLong(Py.getitem(b, Long.valueOf(i)));
+    }
+
+    /// `fmt % args` for a str format and a tuple of values.
+    public static String format(String fmt, Object args) {
+        Object r = Py.mod(fmt, args);
+        return r instanceof String ? (String) r : Py.toStr(r);
     }
 }

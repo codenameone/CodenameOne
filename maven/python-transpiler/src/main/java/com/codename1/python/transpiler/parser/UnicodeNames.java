@@ -23,6 +23,11 @@
  */
 package com.codename1.python.transpiler.parser;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -35,7 +40,10 @@ import java.util.Map;
 /// the first time a source uses the escape. The names the Unicode standard
 /// derives by algorithm are computed instead, because the JDK spells them
 /// differently from Python ("CJK UNIFIED IDEOGRAPHS 4E00" rather than
-/// "CJK UNIFIED IDEOGRAPH-4E00"). Python's name aliases are not covered.
+/// "CJK UNIFIED IDEOGRAPH-4E00"). Python also accepts the formal name
+/// aliases ("BYTE ORDER MARK", "LINE FEED", "NBSP"), which the JDK does not
+/// know; they come from the Unicode Character Database's `NameAliases.txt`,
+/// kept verbatim beside this class.
 final class UnicodeNames {
     private static final String[] JAMO_L = {"G", "GG", "N", "D", "DD", "R", "M", "B", "BB", "S", "SS", "", "J", "JJ",
         "C", "K", "T", "P", "H"};
@@ -45,6 +53,7 @@ final class UnicodeNames {
         "LT", "LP", "LH", "M", "B", "BS", "S", "SS", "NG", "J", "C", "K", "T", "P", "H"};
 
     private static Map<String, Integer> table;
+    private static Map<String, Integer> aliases;
 
     private UnicodeNames() {
     }
@@ -57,7 +66,34 @@ final class UnicodeNames {
             return cp;
         }
         Integer v = table().get(key);
+        if (v == null) {
+            v = aliases().get(key);
+        }
         return v == null ? -1 : v.intValue();
+    }
+
+    private static synchronized Map<String, Integer> aliases() {
+        if (aliases == null) {
+            Map<String, Integer> m = new HashMap<String, Integer>();
+            try (InputStream in = UnicodeNames.class.getResourceAsStream("NameAliases.txt")) {
+                if (in == null) {
+                    throw new IllegalStateException("NameAliases.txt is missing from the transpiler");
+                }
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                    for (String l = r.readLine(); l != null; l = r.readLine()) {
+                        String[] f = l.split(";");
+                        if (l.startsWith("#") || f.length < 2) {
+                            continue;
+                        }
+                        m.put(f[1].trim(), Integer.valueOf(Integer.parseInt(f[0].trim(), 16)));
+                    }
+                }
+            } catch (IOException e) {
+                throw new IllegalStateException("cannot read NameAliases.txt", e);
+            }
+            aliases = m;
+        }
+        return aliases;
     }
 
     private static int derived(String key) {

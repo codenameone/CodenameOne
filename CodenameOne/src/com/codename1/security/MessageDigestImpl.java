@@ -35,6 +35,14 @@ abstract class MessageDigestImpl {
     abstract byte[] digest();
     abstract int digestLength();
     abstract void reset();
+    /// An independent digest in the same state, so a common prefix is hashed
+    /// once and finished several ways.
+    abstract MessageDigestImpl copy();
+
+    /// The digest so far, this digest left as it was.
+    byte[] peekDigest() {
+        return copy().digest();
+    }
 
     static MessageDigestImpl create(String algorithm) {
         if (algorithm == null) {
@@ -95,6 +103,14 @@ abstract class MessageDigestImpl {
 
         abstract void processBlock(byte[] block, int offset);
         abstract void writeStateBigEndian(byte[] out);
+
+        /// Copies the block buffer and the byte count into `to`.
+        final <T extends Block64> T copyBlockTo(T to) {
+            System.arraycopy(buffer, 0, to.buffer, 0, bufferLen);
+            to.bufferLen = bufferLen;
+            to.byteCount = byteCount;
+            return to;
+        }
 
         @Override
         void update(byte[] data, int offset, int length) {
@@ -177,6 +193,16 @@ abstract class MessageDigestImpl {
     // ===============================================================
     // MD5 -- RFC 1321 (little-endian length, little-endian word loads)
     static final class Md5 extends Block64 {
+        @Override
+        MessageDigestImpl copy() {
+            Md5 c = copyBlockTo(new Md5());
+            c.a = a;
+            c.b = b;
+            c.c = this.c;
+            c.d = d;
+            return c;
+        }
+
         int a;
         int b;
         int c;
@@ -340,6 +366,17 @@ abstract class MessageDigestImpl {
     // ===============================================================
     // SHA-1 -- RFC 3174
     static final class Sha1 extends Block64 {
+        @Override
+        MessageDigestImpl copy() {
+            Sha1 c = copyBlockTo(new Sha1());
+            c.h0 = h0;
+            c.h1 = h1;
+            c.h2 = h2;
+            c.h3 = h3;
+            c.h4 = h4;
+            return c;
+        }
+
         int h0;
         int h1;
         int h2;
@@ -466,6 +503,20 @@ abstract class MessageDigestImpl {
         Sha256Family(boolean truncated) {
             this.truncated = truncated;
             reset();
+        }
+
+        @Override
+        MessageDigestImpl copy() {
+            Sha256Family c = copyBlockTo(new Sha256Family(truncated));
+            c.h0 = h0;
+            c.h1 = h1;
+            c.h2 = h2;
+            c.h3 = h3;
+            c.h4 = h4;
+            c.h5 = h5;
+            c.h6 = h6;
+            c.h7 = h7;
+            return c;
         }
 
         @Override
@@ -601,6 +652,23 @@ abstract class MessageDigestImpl {
         Sha512Family(boolean truncated) {
             this.truncated = truncated;
             reset();
+        }
+
+        @Override
+        MessageDigestImpl copy() {
+            Sha512Family c = new Sha512Family(truncated);
+            c.h0 = h0;
+            c.h1 = h1;
+            c.h2 = h2;
+            c.h3 = h3;
+            c.h4 = h4;
+            c.h5 = h5;
+            c.h6 = h6;
+            c.h7 = h7;
+            System.arraycopy(buffer, 0, c.buffer, 0, bufferLen);
+            c.bufferLen = bufferLen;
+            c.byteCount = byteCount;
+            return c;
         }
 
         @Override
@@ -801,6 +869,15 @@ abstract class MessageDigestImpl {
             this.rate = 200 - 2 * outLen;
             this.domain = domain;
             this.buffer = new byte[rate];
+        }
+
+        @Override
+        MessageDigestImpl copy() {
+            Keccak c = new Keccak(outLen, domain);
+            System.arraycopy(state, 0, c.state, 0, 25);
+            System.arraycopy(buffer, 0, c.buffer, 0, bufferLen);
+            c.bufferLen = bufferLen;
+            return c;
         }
 
         @Override
@@ -1051,6 +1128,17 @@ abstract class MessageDigestImpl {
     // RIPEMD-160 (Dobbertin, Bosselaers, Preneel), unrolled: both lines of
     // 80 steps run on locals, and the sixteen message words are read once.
     static final class Ripemd160 extends Block64 {
+        @Override
+        MessageDigestImpl copy() {
+            Ripemd160 c = copyBlockTo(new Ripemd160());
+            c.h0 = h0;
+            c.h1 = h1;
+            c.h2 = h2;
+            c.h3 = h3;
+            c.h4 = h4;
+            return c;
+        }
+
         int h0;
         int h1;
         int h2;
@@ -1303,6 +1391,1507 @@ abstract class MessageDigestImpl {
             out[2] = rc;
             out[3] = rd;
             out[4] = re;
+        }
+    }
+
+    /// BLAKE2b and BLAKE2s, sequential mode. BLAKE2s keeps its 32-bit words
+    /// in the low half of each long, so one compression function serves
+    /// both.
+    static final class Blake2 extends MessageDigestImpl {
+        private static final long[] IV_B = {0x6a09e667f3bcc908L, 0xbb67ae8584caa73bL, 0x3c6ef372fe94f82bL,
+            0xa54ff53a5f1d36f1L, 0x510e527fade682d1L, 0x9b05688c2b3e6c1fL, 0x1f83d9abfb41bd6bL,
+            0x5be0cd19137e2179L};
+        private static final int[] IV_S = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f,
+            0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+        private static final byte[][] SIGMA = {
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+            {14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3},
+            {11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4},
+            {7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8},
+            {9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13},
+            {2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9},
+            {12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11},
+            {13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10},
+            {6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5},
+            {10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0}};
+
+        final boolean big;
+        final int digestSize;
+        private final byte[] key;
+        private final byte[] salt;
+        private final byte[] person;
+        final long[] h = new long[8];
+        final byte[] buf;
+        int bufLen;
+        long t0;
+        long t1;
+        // BLAKE2s's working arrays, made on its first block: a hash object is
+        // made per hash. BLAKE2b keeps all of its words in locals.
+        private long[] v;
+        private long[] m;
+
+        Blake2(boolean big, int digestSize, byte[] key, byte[] salt, byte[] person) {
+            this.big = big;
+            this.digestSize = digestSize;
+            this.key = key;
+            this.salt = salt;
+            this.person = person;
+            buf = new byte[big ? 128 : 64];
+            reset();
+        }
+
+        @Override
+        void reset() {
+            bufLen = 0;
+            t0 = 0;
+            t1 = 0;
+            // Only a key block needs the buffer clear: it is the key padded with
+            // zeros to a whole block. Without a key, digest() zero pads from
+            // bufLen itself, and clearing here cost a pass over the block on
+            // every hash -- most hashes are one short block.
+            if (key.length > 0) {
+                for (int i = 0; i < buf.length; i++) {
+                    buf[i] = 0;
+                }
+            }
+            if (big) {
+                h[0] = IV_B[0] ^ (0x01010000L | (long) key.length << 8 | digestSize);
+                for (int i = 1; i < 8; i++) {
+                    h[i] = IV_B[i];
+                }
+                h[4] ^= word(salt, 0, 8);
+                h[5] ^= word(salt, 8, 8);
+                h[6] ^= word(person, 0, 8);
+                h[7] ^= word(person, 8, 8);
+            } else {
+                h[0] = (IV_S[0] ^ (0x01010000 | key.length << 8 | digestSize)) & 0xffffffffL;
+                for (int i = 1; i < 8; i++) {
+                    h[i] = IV_S[i] & 0xffffffffL;
+                }
+                h[4] ^= word(salt, 0, 4);
+                h[5] ^= word(salt, 4, 4);
+                h[6] ^= word(person, 0, 4);
+                h[7] ^= word(person, 4, 4);
+            }
+            if (key.length > 0) {
+                System.arraycopy(key, 0, buf, 0, key.length);
+                bufLen = buf.length;
+            }
+        }
+
+        /// The little-endian word of `w` bytes at `off`, zero padded.
+        private static long word(byte[] b, int off, int w) {
+            if (off >= b.length) {
+                return 0;
+            }
+            long r = 0;
+            for (int i = w - 1; i >= 0; i--) {
+                r = r << 8 | (off + i < b.length ? b[off + i] & 0xff : 0);
+            }
+            return r;
+        }
+
+        @Override
+        void update(byte b) {
+            update(new byte[] {b}, 0, 1);
+        }
+
+        @Override
+        int digestLength() {
+            return digestSize;
+        }
+
+        @Override
+        void update(byte[] b, int off, int len) {
+            int bs = buf.length;
+            while (len > 0) {
+                // The last block is compressed in finish(), flagged final, so
+                // a full buffer is held back until more input arrives.
+                if (bufLen == bs) {
+                    count(bs);
+                    compress(buf, 0, false);
+                    bufLen = 0;
+                }
+                int n = Math.min(bs - bufLen, len);
+                System.arraycopy(b, off, buf, bufLen, n);
+                bufLen += n;
+                off += n;
+                len -= n;
+            }
+        }
+
+        private void count(int n) {
+            if (big) {
+                t0 += n;
+                if (Long.compareUnsigned(t0, n) < 0) {
+                    t1++;
+                }
+            } else {
+                t0 += n;
+            }
+        }
+
+        private void compress(byte[] b, int off, boolean last) {
+            if (big) {
+                compressBig(b, last);
+                return;
+            }
+            if (v == null) {
+                m = new long[16];
+                v = new long[16];
+            }
+            for (int i = 0; i < 16; i++) {
+                m[i] = le32(b, off + 4 * i) & 0xffffffffL;
+            }
+            for (int i = 0; i < 8; i++) {
+                v[i] = h[i];
+                v[i + 8] = IV_S[i] & 0xffffffffL;
+            }
+            v[12] ^= t0 & 0xffffffffL;
+            v[13] ^= t0 >>> 32;
+            if (last) {
+                v[14] ^= 0xffffffffL;
+            }
+            for (int r = 0; r < 10; r++) {
+                byte[] s = SIGMA[r];
+                gs(0, 4, 8, 12, m[s[0]], m[s[1]]);
+                gs(1, 5, 9, 13, m[s[2]], m[s[3]]);
+                gs(2, 6, 10, 14, m[s[4]], m[s[5]]);
+                gs(3, 7, 11, 15, m[s[6]], m[s[7]]);
+                gs(0, 5, 10, 15, m[s[8]], m[s[9]]);
+                gs(1, 6, 11, 12, m[s[10]], m[s[11]]);
+                gs(2, 7, 8, 13, m[s[12]], m[s[13]]);
+                gs(3, 4, 9, 14, m[s[14]], m[s[15]]);
+            }
+            for (int i = 0; i < 8; i++) {
+                h[i] ^= v[i] ^ v[i + 8];
+            }
+        }
+
+        /// BLAKE2b's compression with the sixteen words of the state and the sixteen
+        /// message words in locals and all twelve rounds written out, the message
+        /// schedule folded into which local each mix reads. The state lives in
+        /// registers for the whole of it, and the rounds read no array at all: an
+        /// indexed schedule cost two checked loads per mix.
+        private void compressBig(byte[] b, boolean last) {
+            // The message words, read straight into locals: eight independent
+            // byte loads per word, where a gather loop over the block (one
+            // byte an iteration, a branch per byte to store each word) was a
+            // dependency chain of 128 steps before the first round could start.
+            // Written out rather than through a helper, which the C compiler
+            // left as a call per word. b is always this object's own 128-byte
+            // block buffer.
+            long m0 = b[0] & 0xffL | (b[1] & 0xffL) << 8 | (b[2] & 0xffL) << 16 | (b[3] & 0xffL) << 24
+                    | (b[4] & 0xffL) << 32 | (b[5] & 0xffL) << 40 | (b[6] & 0xffL) << 48 | (long) b[7] << 56;
+            long m1 = b[8] & 0xffL | (b[9] & 0xffL) << 8 | (b[10] & 0xffL) << 16 | (b[11] & 0xffL) << 24
+                    | (b[12] & 0xffL) << 32 | (b[13] & 0xffL) << 40 | (b[14] & 0xffL) << 48 | (long) b[15] << 56;
+            long m2 = b[16] & 0xffL | (b[17] & 0xffL) << 8 | (b[18] & 0xffL) << 16 | (b[19] & 0xffL) << 24
+                    | (b[20] & 0xffL) << 32 | (b[21] & 0xffL) << 40 | (b[22] & 0xffL) << 48 | (long) b[23] << 56;
+            long m3 = b[24] & 0xffL | (b[25] & 0xffL) << 8 | (b[26] & 0xffL) << 16 | (b[27] & 0xffL) << 24
+                    | (b[28] & 0xffL) << 32 | (b[29] & 0xffL) << 40 | (b[30] & 0xffL) << 48 | (long) b[31] << 56;
+            long m4 = b[32] & 0xffL | (b[33] & 0xffL) << 8 | (b[34] & 0xffL) << 16 | (b[35] & 0xffL) << 24
+                    | (b[36] & 0xffL) << 32 | (b[37] & 0xffL) << 40 | (b[38] & 0xffL) << 48 | (long) b[39] << 56;
+            long m5 = b[40] & 0xffL | (b[41] & 0xffL) << 8 | (b[42] & 0xffL) << 16 | (b[43] & 0xffL) << 24
+                    | (b[44] & 0xffL) << 32 | (b[45] & 0xffL) << 40 | (b[46] & 0xffL) << 48 | (long) b[47] << 56;
+            long m6 = b[48] & 0xffL | (b[49] & 0xffL) << 8 | (b[50] & 0xffL) << 16 | (b[51] & 0xffL) << 24
+                    | (b[52] & 0xffL) << 32 | (b[53] & 0xffL) << 40 | (b[54] & 0xffL) << 48 | (long) b[55] << 56;
+            long m7 = b[56] & 0xffL | (b[57] & 0xffL) << 8 | (b[58] & 0xffL) << 16 | (b[59] & 0xffL) << 24
+                    | (b[60] & 0xffL) << 32 | (b[61] & 0xffL) << 40 | (b[62] & 0xffL) << 48 | (long) b[63] << 56;
+            long m8 = b[64] & 0xffL | (b[65] & 0xffL) << 8 | (b[66] & 0xffL) << 16 | (b[67] & 0xffL) << 24
+                    | (b[68] & 0xffL) << 32 | (b[69] & 0xffL) << 40 | (b[70] & 0xffL) << 48 | (long) b[71] << 56;
+            long m9 = b[72] & 0xffL | (b[73] & 0xffL) << 8 | (b[74] & 0xffL) << 16 | (b[75] & 0xffL) << 24
+                    | (b[76] & 0xffL) << 32 | (b[77] & 0xffL) << 40 | (b[78] & 0xffL) << 48 | (long) b[79] << 56;
+            long m10 = b[80] & 0xffL | (b[81] & 0xffL) << 8 | (b[82] & 0xffL) << 16 | (b[83] & 0xffL) << 24
+                    | (b[84] & 0xffL) << 32 | (b[85] & 0xffL) << 40 | (b[86] & 0xffL) << 48 | (long) b[87] << 56;
+            long m11 = b[88] & 0xffL | (b[89] & 0xffL) << 8 | (b[90] & 0xffL) << 16 | (b[91] & 0xffL) << 24
+                    | (b[92] & 0xffL) << 32 | (b[93] & 0xffL) << 40 | (b[94] & 0xffL) << 48 | (long) b[95] << 56;
+            long m12 = b[96] & 0xffL | (b[97] & 0xffL) << 8 | (b[98] & 0xffL) << 16 | (b[99] & 0xffL) << 24
+                    | (b[100] & 0xffL) << 32 | (b[101] & 0xffL) << 40 | (b[102] & 0xffL) << 48 | (long) b[103] << 56;
+            long m13 = b[104] & 0xffL | (b[105] & 0xffL) << 8 | (b[106] & 0xffL) << 16 | (b[107] & 0xffL) << 24
+                    | (b[108] & 0xffL) << 32 | (b[109] & 0xffL) << 40 | (b[110] & 0xffL) << 48 | (long) b[111] << 56;
+            long m14 = b[112] & 0xffL | (b[113] & 0xffL) << 8 | (b[114] & 0xffL) << 16 | (b[115] & 0xffL) << 24
+                    | (b[116] & 0xffL) << 32 | (b[117] & 0xffL) << 40 | (b[118] & 0xffL) << 48 | (long) b[119] << 56;
+            long m15 = b[120] & 0xffL | (b[121] & 0xffL) << 8 | (b[122] & 0xffL) << 16 | (b[123] & 0xffL) << 24
+                    | (b[124] & 0xffL) << 32 | (b[125] & 0xffL) << 40 | (b[126] & 0xffL) << 48 | (long) b[127] << 56;
+            long[] hw = h;
+            long v0 = hw[0];
+            long v1 = hw[1];
+            long v2 = hw[2];
+            long v3 = hw[3];
+            long v4 = hw[4];
+            long v5 = hw[5];
+            long v6 = hw[6];
+            long v7 = hw[7];
+            long v8 = 0x6a09e667f3bcc908L;
+            long v9 = 0xbb67ae8584caa73bL;
+            long v10 = 0x3c6ef372fe94f82bL;
+            long v11 = 0xa54ff53a5f1d36f1L;
+            long v12 = 0x510e527fade682d1L ^ t0;
+            long v13 = 0x9b05688c2b3e6c1fL ^ t1;
+            long v14 = last ? ~0x1f83d9abfb41bd6bL : 0x1f83d9abfb41bd6bL;
+            long v15 = 0x5be0cd19137e2179L;
+            long w;
+            // round 0
+            v0 += v4 + m0;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m1;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m2;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m3;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m4;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m5;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m6;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m7;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m8;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m9;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m10;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m11;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m12;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m13;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m14;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m15;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 1
+            v0 += v4 + m14;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m10;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m4;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m8;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m9;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m15;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m13;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m6;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m1;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m12;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m0;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m2;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m11;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m7;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m5;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m3;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 2
+            v0 += v4 + m11;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m8;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m12;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m0;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m5;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m2;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m15;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m13;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m10;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m14;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m3;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m6;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m7;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m1;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m9;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m4;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 3
+            v0 += v4 + m7;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m9;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m3;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m1;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m13;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m12;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m11;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m14;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m2;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m6;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m5;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m10;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m4;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m0;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m15;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m8;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 4
+            v0 += v4 + m9;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m0;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m5;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m7;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m2;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m4;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m10;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m15;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m14;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m1;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m11;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m12;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m6;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m8;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m3;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m13;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 5
+            v0 += v4 + m2;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m12;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m6;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m10;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m0;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m11;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m8;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m3;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m4;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m13;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m7;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m5;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m15;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m14;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m1;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m9;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 6
+            v0 += v4 + m12;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m5;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m1;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m15;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m14;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m13;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m4;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m10;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m0;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m7;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m6;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m3;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m9;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m2;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m8;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m11;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 7
+            v0 += v4 + m13;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m11;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m7;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m14;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m12;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m1;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m3;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m9;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m5;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m0;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m15;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m4;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m8;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m6;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m2;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m10;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 8
+            v0 += v4 + m6;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m15;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m14;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m9;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m11;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m3;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m0;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m8;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m12;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m2;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m13;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m7;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m1;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m4;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m10;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m5;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 9
+            v0 += v4 + m10;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m2;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m8;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m4;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m7;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m6;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m1;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m5;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m15;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m11;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m9;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m14;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m3;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m12;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m13;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m0;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 10
+            v0 += v4 + m0;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m1;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m2;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m3;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m4;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m5;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m6;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m7;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m8;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m9;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m10;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m11;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m12;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m13;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m14;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m15;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            // round 11
+            v0 += v4 + m14;
+            w = v12 ^ v0;
+            v12 = w >>> 32 | w << 32;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 24 | w << 40;
+            v0 += v4 + m10;
+            w = v12 ^ v0;
+            v12 = w >>> 16 | w << 48;
+            v8 += v12;
+            w = v4 ^ v8;
+            v4 = w >>> 63 | w << 1;
+            v1 += v5 + m4;
+            w = v13 ^ v1;
+            v13 = w >>> 32 | w << 32;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 24 | w << 40;
+            v1 += v5 + m8;
+            w = v13 ^ v1;
+            v13 = w >>> 16 | w << 48;
+            v9 += v13;
+            w = v5 ^ v9;
+            v5 = w >>> 63 | w << 1;
+            v2 += v6 + m9;
+            w = v14 ^ v2;
+            v14 = w >>> 32 | w << 32;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 24 | w << 40;
+            v2 += v6 + m15;
+            w = v14 ^ v2;
+            v14 = w >>> 16 | w << 48;
+            v10 += v14;
+            w = v6 ^ v10;
+            v6 = w >>> 63 | w << 1;
+            v3 += v7 + m13;
+            w = v15 ^ v3;
+            v15 = w >>> 32 | w << 32;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 24 | w << 40;
+            v3 += v7 + m6;
+            w = v15 ^ v3;
+            v15 = w >>> 16 | w << 48;
+            v11 += v15;
+            w = v7 ^ v11;
+            v7 = w >>> 63 | w << 1;
+            v0 += v5 + m1;
+            w = v15 ^ v0;
+            v15 = w >>> 32 | w << 32;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 24 | w << 40;
+            v0 += v5 + m12;
+            w = v15 ^ v0;
+            v15 = w >>> 16 | w << 48;
+            v10 += v15;
+            w = v5 ^ v10;
+            v5 = w >>> 63 | w << 1;
+            v1 += v6 + m0;
+            w = v12 ^ v1;
+            v12 = w >>> 32 | w << 32;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 24 | w << 40;
+            v1 += v6 + m2;
+            w = v12 ^ v1;
+            v12 = w >>> 16 | w << 48;
+            v11 += v12;
+            w = v6 ^ v11;
+            v6 = w >>> 63 | w << 1;
+            v2 += v7 + m11;
+            w = v13 ^ v2;
+            v13 = w >>> 32 | w << 32;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 24 | w << 40;
+            v2 += v7 + m7;
+            w = v13 ^ v2;
+            v13 = w >>> 16 | w << 48;
+            v8 += v13;
+            w = v7 ^ v8;
+            v7 = w >>> 63 | w << 1;
+            v3 += v4 + m5;
+            w = v14 ^ v3;
+            v14 = w >>> 32 | w << 32;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 24 | w << 40;
+            v3 += v4 + m3;
+            w = v14 ^ v3;
+            v14 = w >>> 16 | w << 48;
+            v9 += v14;
+            w = v4 ^ v9;
+            v4 = w >>> 63 | w << 1;
+            hw[0] ^= v0 ^ v8;
+            hw[1] ^= v1 ^ v9;
+            hw[2] ^= v2 ^ v10;
+            hw[3] ^= v3 ^ v11;
+            hw[4] ^= v4 ^ v12;
+            hw[5] ^= v5 ^ v13;
+            hw[6] ^= v6 ^ v14;
+            hw[7] ^= v7 ^ v15;
+        }
+
+        private void gs(int a, int b, int c, int d, long x, long y) {
+            int va = (int) v[a];
+            int vb = (int) v[b];
+            int vc = (int) v[c];
+            int vd = (int) v[d];
+            va = va + vb + (int) x;
+            vd = Integer.rotateRight(vd ^ va, 16);
+            vc = vc + vd;
+            vb = Integer.rotateRight(vb ^ vc, 12);
+            va = va + vb + (int) y;
+            vd = Integer.rotateRight(vd ^ va, 8);
+            vc = vc + vd;
+            vb = Integer.rotateRight(vb ^ vc, 7);
+            v[a] = va & 0xffffffffL;
+            v[b] = vb & 0xffffffffL;
+            v[c] = vc & 0xffffffffL;
+            v[d] = vd & 0xffffffffL;
+        }
+
+        @Override
+        MessageDigestImpl copy() {
+            Blake2 c = new Blake2(big, digestSize, key, salt, person);
+            System.arraycopy(h, 0, c.h, 0, 8);
+            System.arraycopy(buf, 0, c.buf, 0, buf.length);
+            c.bufLen = bufLen;
+            c.t0 = t0;
+            c.t1 = t1;
+            return c;
+        }
+
+        @Override
+        byte[] digest() {
+            byte[] out = finish();
+            reset();
+            return out;
+        }
+
+        /// Finishing changes only the chain words and the counters (the
+        /// padding lands past bufLen, where more input overwrites it), so
+        /// they are saved and put back instead of copying the whole digest:
+        /// hashlib's digest() and hexdigest() made a copy per call.
+        @Override
+        byte[] peekDigest() {
+            long[] hw = h;
+            long h0 = hw[0];
+            long h1 = hw[1];
+            long h2 = hw[2];
+            long h3 = hw[3];
+            long h4 = hw[4];
+            long h5 = hw[5];
+            long h6 = hw[6];
+            long h7 = hw[7];
+            long s0 = t0;
+            long s1 = t1;
+            byte[] out = finish();
+            hw[0] = h0;
+            hw[1] = h1;
+            hw[2] = h2;
+            hw[3] = h3;
+            hw[4] = h4;
+            hw[5] = h5;
+            hw[6] = h6;
+            hw[7] = h7;
+            t0 = s0;
+            t1 = s1;
+            return out;
+        }
+
+        private byte[] finish() {
+            count(bufLen);
+            for (int i = bufLen; i < buf.length; i++) {
+                buf[i] = 0;
+            }
+            compress(buf, 0, true);
+            // Shifts, not i / w and i % w: with w a variable those were two
+            // divisions per digest byte.
+            int sh = big ? 3 : 2;
+            int lane = (1 << sh) - 1;
+            byte[] out = new byte[digestSize];
+            for (int i = 0; i < out.length; i++) {
+                out[i] = (byte) (h[i >>> sh] >>> ((i & lane) << 3));
+            }
+            return out;
+        }
+
+        private static int le32(byte[] b, int i) {
+            return b[i] & 0xff | (b[i + 1] & 0xff) << 8 | (b[i + 2] & 0xff) << 16 | (b[i + 3] & 0xff) << 24;
         }
     }
 }

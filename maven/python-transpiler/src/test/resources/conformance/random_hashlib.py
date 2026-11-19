@@ -49,3 +49,23 @@ for call in [lambda: random.choice([]), lambda: random.randrange(0), lambda: ran
         call()
     except (ValueError, IndexError, TypeError) as e:
         print(type(e).__name__, e)
+
+# Every length around the block boundaries, fed whole and a byte at a time.
+data = bytes(range(256)) * 3
+for name in ["md5", "sha1", "sha224", "sha256", "sha384", "sha512", "blake2b", "blake2s"]:
+    acc = []
+    for n in (0, 1, 55, 56, 63, 64, 65, 111, 112, 127, 128, 129, 300, 768):
+        whole = hashlib.new(name, data[:n]).hexdigest()
+        h = hashlib.new(name)
+        for i in range(n):
+            h.update(data[i:i + 1])
+        acc.append(whole[:8] + ("" if h.hexdigest() == whole else "!"))
+    print(name, " ".join(acc))
+print(hashlib.blake2b(b"abc", digest_size=16).hexdigest())
+print(hashlib.blake2b(b"abc", key=b"k" * 64, salt=b"s" * 16, person=b"p" * 16).hexdigest())
+print(hashlib.blake2s(b"abc", digest_size=20, key=b"key", salt=b"salt", person=b"me").hexdigest())
+b = hashlib.blake2b(b"a" * 200, digest_size=32)
+c = b.copy()
+c.update(b"tail")
+print(b.hexdigest(), c.hexdigest(), b.digest_size, c.digest_size, c.name)
+print(hashlib.pbkdf2_hmac("sha512", b"pw", b"salt", 3, 80).hex())

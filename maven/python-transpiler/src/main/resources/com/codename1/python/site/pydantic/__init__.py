@@ -471,6 +471,17 @@ def _parse_duration(s):
 
 
 def _v(tp, val, loc, c):
+    # The common case first: a value already of the exact scalar type its
+    # field declares, which every branch below would hand back unchanged
+    # after a dozen hasattr and typing lookups. A str only when no config
+    # transforms strings.
+    tv = type(val)
+    if tv is tp:
+        if tv is int or tv is float or tv is bool or tv is bytes:
+            return val
+        if tv is str and not (c.cfg.get("str_strip_whitespace") or c.cfg.get("str_to_lower")
+                              or c.cfg.get("str_to_upper")):
+            return val
     if tp is None:
         tp = _NoneType
     if isinstance(tp, str) or hasattr(tp, "__forward_arg__"):
@@ -502,9 +513,44 @@ def _v(tp, val, loc, c):
         return _vgeneric(org, _typing.get_args(tp), val, loc, c)
     if isinstance(tp, ModelMetaclass):
         return _vmodel(tp, val, loc, c)
+    if _typing.is_typeddict(tp):
+        return _vtypeddict(tp, val, loc, c)
     if isinstance(tp, type):
         return _vplain(tp, val, loc, c)
     return val
+
+
+def _vtypeddict(tp, val, loc, c):
+    """A TypedDict: a dict holding every required key, each declared key's
+    value validated against its annotation. Undeclared keys are dropped,
+    as pydantic's default extra='ignore' drops them."""
+    if not isinstance(val, dict):
+        return _E(c, loc, "dict_type", val, None, "Input should be an object" if c.json else None)
+    saved = c.cls
+    c.cls = tp
+    try:
+        out = {}
+        bad = False
+        required = getattr(tp, "__required_keys__", frozenset())
+        for key, hint in tp.__annotations__.items():
+            if isinstance(hint, str) or hasattr(hint, "__forward_arg__"):
+                hint = _resolve_forward(hint, c)
+            form = _typing.get_origin(hint)
+            if form is _typing.Required or form is _typing.NotRequired:
+                hint = _typing.get_args(hint)[0]
+            if key not in val:
+                if key in required:
+                    _E(c, loc + (key,), "missing", val, None, "Field required")
+                    bad = True
+                continue
+            r = _v(hint, val[key], loc + (key,), c)
+            if r is _BAD:
+                bad = True
+            else:
+                out[key] = r
+        return _BAD if bad else out
+    finally:
+        c.cls = saved
 
 
 def _join_or(items):
@@ -1045,6 +1091,31 @@ def _complete(cls):
     return True
 
 
+def _core_schema(tp):
+    org = _typing.get_origin(tp)
+    if org is Annotated:
+        return _core_schema(_typing.get_args(tp)[0])
+    if org is Literal:
+        return {"type": "literal", "expected": list(_typing.get_args(tp))}
+    if org is Union:
+        args = [a for a in _typing.get_args(tp) if a is not type(None)]
+        if len(args) < len(_typing.get_args(tp)):
+            inner = _core_schema(args[0]) if len(args) == 1 else \
+                {"type": "union", "choices": [_core_schema(a) for a in args]}
+            return {"type": "nullable", "schema": inner}
+        return {"type": "union", "choices": [_core_schema(a) for a in args]}
+    if org in (list, tuple, set, frozenset):
+        return {"type": org.__name__ if org is not frozenset else "frozenset"}
+    if org is dict:
+        return {"type": "dict"}
+    names = {str: "str", int: "int", float: "float", bool: "bool", bytes: "bytes"}
+    if tp in names:
+        return {"type": names[tp]}
+    if isinstance(tp, type) and isinstance(tp, ModelMetaclass):
+        return {"type": "model", "cls": tp}
+    return {"type": "any"}
+
+
 def _ensure(cls):
     if not cls.__dict__.get("__pydantic_complete__"):
         if not _complete(cls):
@@ -1150,6 +1221,23 @@ class ModelMetaclass(type):
     def __init__(cls, name, bases, ns, **kwargs):
         type.__init__(cls, name, bases, ns)
 
+    @property
+    def __pydantic_core_schema__(cls):
+        # The shape pydantic-core gives a model, enough for code that walks
+        # it (the openai SDK reads field types and aliases from it). Nothing
+        # here validates through it; validation is this module's own.
+        _ensure(cls)
+        fields = {}
+        for name, fi in cls.model_fields.items():
+            f = {"type": "model-field", "schema": _core_schema(fi.annotation)}
+            alias = fi.serialization_alias or fi.alias
+            if alias is not None:
+                f["serialization_alias"] = alias
+            fields[name] = f
+        return {"type": "model", "cls": cls, "schema": {
+            "type": "model-fields", "fields": fields, "model_name": cls.__name__,
+            "computed_fields": []}}
+
 
 class _Opts:
     def __init__(self, mode="python", by_alias=False, exclude_unset=False, exclude_defaults=False,
@@ -1161,10 +1249,49 @@ class _Opts:
         self.exclude_none = exclude_none
 
 
+class _Plan:
+    """What validating a class needs that does not change per call: read
+    once per class instead of once per field of every instance. The
+    sqlite-backed llm app validated a model per prompt, and the config
+    lookups, the MRO walk of _is_root and a ValidationInfo per field (with a
+    copy of the values so far) were most of what that cost."""
+    __slots__ = ("fields_obj", "cfg", "by_name", "root", "extra_mode", "fields", "model_decls")
+
+    def __init__(self, cls):
+        cfg = cls.model_config
+        self.fields_obj = cls.model_fields
+        self.cfg = cfg
+        self.by_name = cfg.get("populate_by_name") or cfg.get("validate_by_name")
+        self.root = _is_root(cls)
+        self.extra_mode = cfg.get("extra") or "ignore"
+        fdecls = cls.__pydantic_decorators__["field"]
+        fields = []
+        for name, fi in cls.model_fields.items():
+            alias = fi.validation_alias if fi.validation_alias is not None else fi.alias
+            hooked = False
+            for d in fdecls:
+                if name in d.fields or "*" in d.fields:
+                    hooked = True
+            fields.append((name, fi, alias, hooked))
+        self.fields = fields
+        self.model_decls = cls.__pydantic_decorators__["model"]
+
+
+def _plan(cls):
+    p = cls.__dict__.get("__pydantic_plan__")
+    # Kept while the class still has the same field table and config: a
+    # model_rebuild, or a program that replaces either, gets a new plan.
+    if p is None or p.fields_obj is not cls.model_fields or p.cfg is not cls.model_config:
+        p = _Plan(cls)
+        type.__setattr__(cls, "__pydantic_plan__", p)
+    return p
+
+
 def _fill(cls, data, loc, c):
     """Validates a mapping against cls's fields. Returns (values, fields_set,
     extras) or None, with the problems appended to c.errs."""
-    cfg = cls.model_config
+    plan = _plan(cls)
+    cfg = plan.cfg
     saved_cfg = c.cfg
     saved_cls = c.cls
     c.cfg = cfg
@@ -1173,10 +1300,9 @@ def _fill(cls, data, loc, c):
     values = {}
     fset = set()
     used = set()
-    by_name = cfg.get("populate_by_name") or cfg.get("validate_by_name")
-    root = _is_root(cls)
-    for name, fi in cls.model_fields.items():
-        alias = fi.validation_alias if fi.validation_alias is not None else fi.alias
+    by_name = plan.by_name
+    root = plan.root
+    for name, fi, alias, hooked in plan.fields:
         key = _MISSING_KEY
         if alias is not None and alias in data:
             key = alias
@@ -1192,18 +1318,20 @@ def _fill(cls, data, loc, c):
                 if isinstance(d, (list, dict, set, bytearray)):
                     d = _copy.deepcopy(d)
                 if fi.validate_default or cfg.get("validate_default"):
-                    d = _vfield(cls, fi, name, d, loc + (name,), c, values)
+                    d = _vfield(cls, fi, name, d, loc + (name,), c, values, hooked)
                     if d is _BAD:
                         continue
                 values[name] = d
             continue
         used.add(key)
-        v = _vfield(cls, fi, name, data[key], loc if root else loc + (key,), c, values)
+        v = _vfield(cls, fi, name, data[key], loc if root else loc + (key,), c, values, hooked)
         if v is not _BAD:
             values[name] = v
             fset.add(name)
-    extra_mode = cfg.get("extra") or "ignore"
+    extra_mode = plan.extra_mode
     extras = {}
+    if extra_mode == "ignore":
+        data = ()
     for k in data:
         if k in used:
             continue
@@ -1221,7 +1349,26 @@ def _fill(cls, data, loc, c):
 _MISSING_KEY = _Undefined()
 
 
-def _vfield(cls, fi, name, raw, loc, c, values):
+def _vfield(cls, fi, name, raw, loc, c, values, hooked=True):
+    if not hooked:
+        # No validator names this field: nothing can read a ValidationInfo.
+        was = c.strict
+        if fi.strict is not None:
+            c.strict = fi.strict
+        elif c.cfg.get("strict"):
+            c.strict = True
+        full = fi._full if fi._full is not None else Any
+        v = _v(full, raw, loc, c)
+        c.strict = was
+        if v is _BAD:
+            return _BAD
+        if fi.constraints and v is not None:
+            v = _constrain(v, fi.constraints, loc, c)
+            if v is _BAD:
+                return _BAD
+        if c.cfg.get("use_enum_values") and isinstance(v, _enum.Enum):
+            v = v.value
+        return v
     info = ValidationInfo(c, name, dict(values))
     decls = cls.__pydantic_decorators__["field"]
     v = raw
@@ -1339,8 +1486,8 @@ class BaseModel(metaclass=ModelMetaclass):
         _ensure(cls)
         c = _Ctx()
         c.cls = cls
-        info = ValidationInfo(c)
         decls = cls.__pydantic_decorators__["model"]
+        info = ValidationInfo(c) if decls else None
         v = data
         for d in decls:
             if d.mode == "before":
@@ -2173,3 +2320,38 @@ class SecretStr:
 class SecretBytes(SecretStr):
     def __repr__(self):
         return "SecretBytes(b'" + ("**********" if self._secret_value else "") + "')"
+
+
+def create_model(model_name, /, *, __config__=None, __doc__=None, __base__=None, __module__="pydantic.main",
+                 __validators__=None, __cls_kwargs__=None, **field_definitions):
+    """A model class built at run time from field definitions: each one a
+    type, a ``(type, default)`` pair (``...`` for a required field) or a
+    ``(type, Field(...))`` pair."""
+    if __base__ is None:
+        bases = (BaseModel,)
+    elif isinstance(__base__, tuple):
+        bases = __base__
+    else:
+        bases = (__base__,)
+    annotations = {}
+    ns = {"__annotations__": annotations, "__module__": __module__, "__qualname__": model_name}
+    if __doc__:
+        ns["__doc__"] = __doc__
+    if __config__ is not None:
+        ns["model_config"] = __config__
+    if __validators__:
+        ns.update(__validators__)
+    for name, definition in field_definitions.items():
+        if isinstance(definition, tuple):
+            if len(definition) != 2:
+                raise PydanticUserError(
+                    f"Field definition for {name!r} should a single element representing the type or a two-tuple, "
+                    "the first element being the type and the second element the assigned value "
+                    "(either a default or the `Field()` function).")
+            tp, default = definition
+            annotations[name] = tp
+            if default is not ...:
+                ns[name] = default
+        else:
+            annotations[name] = definition
+    return ModelMetaclass(model_name, bases, ns, **(__cls_kwargs__ or {}))

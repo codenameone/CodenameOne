@@ -1395,6 +1395,45 @@ class DataFrame:
                     for i in range(len(self._index))}
         return {c.name: dict(zip(self._index._v, c._v)) for c in self._cols}
 
+    def to_html(self, buf=None, index=True, header=True, na_rep="NaN", escape=True, border=1):
+        """pandas' HTML table: the classic `dataframe` table, cells formatted
+        as the text repr formats them."""
+        def esc(t):
+            if not escape:
+                return t
+            return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        out = ['<table border="%d" class="dataframe">' % border]
+        if header:
+            out.append("  <thead>")
+            out.append('    <tr style="text-align: right;">')
+            if index:
+                out.append("      <th></th>")
+            for n in self._names():
+                out.append("      <th>" + esc(_label(n)) + "</th>")
+            out.append("    </tr>")
+            out.append("  </thead>")
+        out.append("  <tbody>")
+        cells = [[x.strip() for x in _fmt_values(c._v, c._dt)] for c in self._cols]
+        for r in range(len(self._index)):
+            out.append("    <tr>")
+            if index:
+                out.append("      <th>" + esc(_label(self._index._v[r])) + "</th>")
+            for col in cells:
+                v = col[r]
+                out.append("      <td>" + esc(na_rep if v == "NaN" else v) + "</td>")
+            out.append("    </tr>")
+        out.append("  </tbody>")
+        out.append("</table>")
+        text = "\n".join(out)
+        if buf is None:
+            return text
+        if isinstance(buf, str):
+            with open(buf, "w") as f:
+                f.write(text)
+            return None
+        buf.write(text)
+        return None
+
     def to_csv(self, path_or_buf=None, index=True, sep=",", header=True):
         out = []
 
@@ -1858,6 +1897,71 @@ def read_csv(filepath_or_buffer, sep=",", header=0, names=None, index_col=None, 
         df = df.set_index(key)
     return df
 
+def _excel_cell(cell):
+    # pandas' openpyxl reader: an empty cell is "", a whole float is an int
+    v = cell.value
+    if v is None:
+        return ""
+    if cell.data_type == "e":
+        return nan
+    if cell.data_type == "n" and isinstance(v, float):
+        return int(v) if v == int(v) else v
+    if isinstance(v, bool) or not isinstance(v, float):
+        return v
+    return v
+
+
+def _excel_sheet(ws, header):
+    rows = []
+    for row in ws.rows:
+        vals = [_excel_cell(c) for c in row]
+        while vals and vals[-1] == "":
+            vals.pop()
+        rows.append(vals)
+    while rows and not rows[-1]:
+        rows.pop()
+    if not rows:
+        return DataFrame()
+    width = max(len(r) for r in rows)
+    rows = [r + [""] * (width - len(r)) for r in rows]
+    if header is None:
+        names = list(range(width))
+        body = rows
+    else:
+        names = []
+        seen = {}
+        for j, v in enumerate(rows[header]):
+            n = "Unnamed: %d" % j if v == "" else v
+            if n in seen:
+                seen[n] += 1
+                n = "%s.%d" % (n, seen[n])
+            else:
+                seen[n] = 0
+            names.append(n)
+        body = rows[header + 1:]
+    data = {}
+    for j, n in enumerate(names):
+        data[n] = [None if r[j] == "" else r[j] for r in body]
+    return DataFrame(data)
+
+
+def read_excel(io, sheet_name=0, header=0, engine=None, **kwargs):
+    """Sheets of an .xlsx workbook through openpyxl, the engine pandas uses
+    for them; `sheet_name=None` reads every sheet into a dict."""
+    if engine not in (None, "openpyxl"):
+        raise ValueError("Unknown engine: %s" % engine)
+    import openpyxl
+    wb = openpyxl.load_workbook(io, read_only=True, data_only=True, keep_links=False)
+    try:
+        names = wb.sheetnames
+        if sheet_name is None:
+            return {n: _excel_sheet(wb[n], header) for n in names}
+        if isinstance(sheet_name, list):
+            return {n: _excel_sheet(wb[names[n] if isinstance(n, int) else n], header) for n in sheet_name}
+        return _excel_sheet(wb[names[sheet_name] if isinstance(sheet_name, int) else sheet_name], header)
+    finally:
+        wb.close()
+
 
 def read_json(path_or_buf, orient=None):
     if isinstance(path_or_buf, str):
@@ -1911,3 +2015,36 @@ def to_numeric(arg, errors="raise"):
 
 def unique(values):
     return Series(values).unique()
+
+
+import datetime as _dt
+
+
+class Timestamp(_dt.datetime):
+    """A point in time: a datetime that also parses an ISO 8601 string.
+
+    Nanoseconds, time zone names and the frequency arguments are not
+    supported; a Timestamp is the type code keys on (sqlite-utils maps it to
+    a column type) and the value a parsed date column holds.
+    """
+
+    def __new__(cls, value=None, *args, **kwargs):
+        if isinstance(value, str):
+            d = _dt.datetime.fromisoformat(value)
+        elif isinstance(value, _dt.datetime):
+            d = value
+        elif isinstance(value, _dt.date):
+            d = _dt.datetime(value.year, value.month, value.day)
+        elif isinstance(value, (int, float)) and not args:
+            d = _dt.datetime.fromtimestamp(value, _dt.timezone.utc).replace(tzinfo=None)
+        else:
+            return _dt.datetime.__new__(cls, value, *args, **kwargs)
+        return _dt.datetime.__new__(cls, d.year, d.month, d.day, d.hour, d.minute, d.second,
+                                    d.microsecond, d.tzinfo)
+
+    @classmethod
+    def now(cls, tz=None):
+        return cls(_dt.datetime.now(tz))
+
+    def isoformat(self, sep="T", timespec="auto"):
+        return _dt.datetime.isoformat(self, sep, timespec)

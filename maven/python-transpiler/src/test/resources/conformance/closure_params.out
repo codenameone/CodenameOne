@@ -1,0 +1,9 @@
+[10, 11, 12, 13] cdab 1180591620717411303425
+45 [2, 5] 12.0
+6 7 8
+720 8 [0, 3, 6, 9]
+make_adder make_adder.<locals>.add
+5
+NameError True
+2
+NameError True

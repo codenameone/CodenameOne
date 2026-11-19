@@ -53,6 +53,12 @@ final class Layouts {
         final ClassDef def;
         final String javaName;
         final String typeVar;
+        /// `javaName` qualified by the module's Java class: how code in any
+        /// module of the program names this class.
+        String ref;
+        /// The typed code of the module declaring the class, once its typed
+        /// fields are decided: whether a field is held typed, and how.
+        TypedEmit typed;
         final Cls parent;
         final List<String> fields = new ArrayList<String>();
         /// Every field, the inherited ones first: the index order the
@@ -69,8 +75,50 @@ final class Layouts {
             this.javaName = javaName;
             this.typeVar = typeVar;
             this.parent = parent;
-            this.bodyNames = def.scope.assigned;
+            this.bodyNames = bodyBindings(def);
         }
+    }
+
+    /// The names a class body binds. A bare annotation (`name_rules: List[Rule]`)
+    /// binds nothing -- it only records the annotation -- so a name that only
+    /// appears that way is left out, and stays free to be a field: bs4 annotates
+    /// every instance attribute of `Tag` and `SoupStrainer` in the class body. A body
+    /// with any statement whose bindings are not read here keeps the scope's set.
+    static Set<String> bodyBindings(ClassDef def) {
+        Set<String> bare = new HashSet<String>();
+        Set<String> bound = new HashSet<String>();
+        for (Stmt s : def.body) {
+            if (s instanceof AnnAssign && ((AnnAssign) s).value == null) {
+                if (((AnnAssign) s).target instanceof Name) {
+                    bare.add(((Name) ((AnnAssign) s).target).id);
+                }
+            } else if (s instanceof AnnAssign) {
+                names(((AnnAssign) s).target, bound);
+            } else if (s instanceof Assign) {
+                for (Expr t : ((Assign) s).targets) {
+                    names(t, bound);
+                }
+            } else if (s instanceof AugAssign) {
+                names(((AugAssign) s).target, bound);
+            } else if (s instanceof FunctionDef) {
+                bound.add(((FunctionDef) s).name);
+            } else if (s instanceof ClassDef) {
+                bound.add(((ClassDef) s).name);
+            } else if (!(s instanceof ExprStmt) && !(s instanceof Pass)) {
+                return def.scope.assigned;
+            }
+        }
+        bare.removeAll(bound);
+        if (bare.isEmpty()) {
+            return def.scope.assigned;
+        }
+        Set<String> r = new HashSet<String>(def.scope.assigned);
+        r.removeAll(bare);
+        return r;
+    }
+
+    private static boolean bareAnnotation(Stmt s) {
+        return s instanceof AnnAssign && ((AnnAssign) s).value == null;
     }
 
     final Map<ClassDef, Cls> classes = new LinkedHashMap<ClassDef, Cls>();
@@ -81,6 +129,28 @@ final class Layouts {
     final Map<FunctionDef, String> staticNames = new LinkedHashMap<FunctionDef, String>();
     /// The class each compiled method belongs to.
     final Map<FunctionDef, Cls> methodClass = new LinkedHashMap<FunctionDef, Cls>();
+
+    /// Field name -> every class of the whole program declaring it, typed
+    /// (`Cls.typed`) or not. The program is closed: a class compiled in
+    /// one module is a class code in every other module may read the
+    /// fields of directly (`ShadowTypes`). Filled once every module's
+    /// typed fields are known, before any module is emitted.
+    static Map<String, List<Cls>> program(List<Layouts> all) {
+        Map<String, List<Cls>> r = new LinkedHashMap<String, List<Cls>>();
+        for (Layouts l : all) {
+            for (Cls k : l.classes.values()) {
+                for (String f : k.fields) {
+                    List<Cls> o = r.get(f);
+                    if (o == null) {
+                        o = new ArrayList<Cls>();
+                        r.put(f, o);
+                    }
+                    o.add(k);
+                }
+            }
+        }
+        return r;
+    }
 
     private static final Set<String> FORBIDDEN = new HashSet<String>();
 
@@ -97,13 +167,15 @@ final class Layouts {
         FORBIDDEN.add("__new__");
     }
 
+    /// `moduleAssigned` is every name the module binds, imports included.
     /// `attrStores` is the module scope's (`Scope.attrStores`): a field the
     /// module itself assigns on a class is left to the generic path, since
     /// the class attribute -- a property, say -- must then decide its reads.
-    static Layouts plan(List<Stmt> body, String prefix, Set<String> attrStores) {
+    static Layouts plan(List<Stmt> body, String prefix, Set<String> attrStores, Set<String> moduleAssigned) {
         Layouts l = new Layouts();
         Map<String, Cls> byName = new LinkedHashMap<String, Cls>();
         int n = 0;
+        boolean bindsObject = moduleAssigned.contains("object");
         for (Stmt s : body) {
             if (!(s instanceof ClassDef)) {
                 continue;
@@ -113,8 +185,15 @@ final class Layouts {
             boolean ok = c.keywords.isEmpty() && c.decorators.isEmpty() && c.bases.size() <= 1;
             if (ok && c.bases.size() == 1) {
                 Expr b = c.bases.get(0);
-                parent = b instanceof Name ? byName.get(((Name) b).id) : null;
-                ok = parent != null;
+                // `class X(object)` is a class with no base: the builtin adds
+                // nothing a compiled layout must defer to. Only when the
+                // module never rebinds the name, which it then could.
+                if (b instanceof Name && "object".equals(((Name) b).id) && !bindsObject) {
+                    ok = true;
+                } else {
+                    parent = b instanceof Name ? byName.get(((Name) b).id) : null;
+                    ok = parent != null;
+                }
             }
             for (String f : FORBIDDEN) {
                 ok &= !c.scope.assigned.contains(f);
@@ -128,16 +207,74 @@ final class Layouts {
             l.classes.put(c, k);
             byName.put(c.name, k);
         }
-        Set<String> bodyNames = new HashSet<String>();
+        // A name a class body binds cannot be a field of that class, of any
+        // class above it, or of any compiled class below it (whose instances
+        // pass the `instanceof` of every class above). An unrelated class
+        // binding the same name changes nothing: only the exact compiled
+        // class gets the layout, so no instance of it reaches that body.
+        // Module-wide, a property `name` on `LoggerAdapter` cost `Logger`
+        // every field set after `name`, which then all lived in the shape.
+        Map<Cls, Set<String>> related = new LinkedHashMap<Cls, Set<String>>();
         for (Cls k : l.classes.values()) {
-            bodyNames.addAll(k.bodyNames);
+            Set<String> r = new HashSet<String>();
+            for (Cls c : l.classes.values()) {
+                if (ancestorOf(k, c) || ancestorOf(c, k)) {
+                    r.addAll(c.bodyNames);
+                }
+            }
+            related.put(k, r);
+        }
+        // `tag = None` in a class body is a default, not a descriptor: a
+        // constant has no `__set__` or `__get__`, so a store to the name on an
+        // instance binds the instance's own attribute, which a field holds,
+        // and an unset field falls back to the generic read, which finds the
+        // class's value. Only a name that every class binds that way and
+        // nothing else rebinds is freed.
+        Set<String> constants = new HashSet<String>();
+        Set<String> otherwise = new HashSet<String>();
+        for (Cls k : l.classes.values()) {
+            for (Stmt s : k.def.body) {
+                if (s instanceof Assign && ((Assign) s).targets.size() == 1 && ((Assign) s).targets.get(0) instanceof Name
+                        && ((Assign) s).value instanceof Constant) {
+                    constants.add(((Name) ((Assign) s).targets.get(0)).id);
+                } else {
+                    Set<String> b = new HashSet<String>();
+                    if (s instanceof FunctionDef) {
+                        b.add(((FunctionDef) s).name);
+                    } else if (s instanceof ClassDef) {
+                        b.add(((ClassDef) s).name);
+                    } else if (s instanceof Assign) {
+                        for (Expr t : ((Assign) s).targets) {
+                            names(t, b);
+                        }
+                    } else if (s instanceof AugAssign) {
+                        names(((AugAssign) s).target, b);
+                    } else if (s instanceof AnnAssign) {
+                        if (!bareAnnotation(s)) {
+                            names(((AnnAssign) s).target, b);
+                        }
+                    } else if (!(s instanceof ExprStmt) && !(s instanceof Pass)) {
+                        b.addAll(k.bodyNames);
+                    }
+                    otherwise.addAll(b);
+                }
+            }
+        }
+        constants.removeAll(otherwise);
+        for (Set<String> r : related.values()) {
+            r.removeAll(constants);
         }
         boolean noFields = false;
         for (String st : attrStores) {
             int dot = st.indexOf('.');
-            if (byName.containsKey(st.substring(0, dot))) {
+            Cls owner = byName.get(st.substring(0, dot));
+            if (owner != null) {
                 String a = st.substring(dot + 1);
-                bodyNames.add(a);
+                for (Map.Entry<Cls, Set<String>> e : related.entrySet()) {
+                    if (ancestorOf(e.getKey(), owner) || ancestorOf(owner, e.getKey())) {
+                        e.getValue().add(a);
+                    }
+                }
                 // An attribute hook added from outside sees every access.
                 noFields |= "*".equals(a) || FORBIDDEN.contains(a);
             }
@@ -159,7 +296,9 @@ final class Layouts {
                 } else if (s instanceof AugAssign) {
                     names(((AugAssign) s).target, rebound);
                 } else if (s instanceof AnnAssign) {
-                    names(((AnnAssign) s).target, rebound);
+                    if (!bareAnnotation(s)) {
+                        names(((AnnAssign) s).target, rebound);
+                    }
                 } else if (s instanceof For) {
                     names(((For) s).target, rebound);
                 } else if (s instanceof ClassDef) {
@@ -171,6 +310,17 @@ final class Layouts {
             }
             Set<String> stored = new LinkedHashSet<String>();
             for (Stmt s : k.def.body) {
+                if (s instanceof FunctionDef && !((FunctionDef) s).args.names().isEmpty()) {
+                    selfStores(((FunctionDef) s).body, ((FunctionDef) s).args.names().get(0), stored);
+                }
+            }
+            // A method the instance may shadow (`self.default = default`)
+            // is looked up per call, here and in every class above.
+            for (Cls a = k.parent; a != null; a = a.parent) {
+                a.typable.keySet().removeAll(stored);
+                a.methods.keySet().removeAll(stored);
+            }
+            for (Stmt s : k.def.body) {
                 if (!(s instanceof FunctionDef)) {
                     continue;
                 }
@@ -179,8 +329,7 @@ final class Layouts {
                 if (names.isEmpty()) {
                     continue;
                 }
-                selfStores(f.body, names.get(0), stored);
-                boolean plain = f.decorators.isEmpty() && !f.isAsync && !f.scope.hasYield && f.args.vararg == null
+                boolean plain = !stored.contains(f.name) && f.decorators.isEmpty() && !f.isAsync && !f.scope.hasYield && f.args.vararg == null
                         && f.args.kwarg == null && f.args.kwonly.isEmpty() && defined.get(f.name) == 1
                         && !rebound.contains(f.name) && !hasFree(f);
                 if (plain && names.size() <= 8) {
@@ -197,7 +346,7 @@ final class Layouts {
                 k.allFields.addAll(k.parent.allFields);
             }
             for (String f : stored) {
-                if (noFields || f.startsWith("__") && f.endsWith("__") || bodyNames.contains(f) || k.allFields.contains(f)) {
+                if (noFields || f.startsWith("__") && f.endsWith("__") || related.get(k).contains(f) || k.allFields.contains(f)) {
                     continue;
                 }
                 k.fields.add(f);
@@ -211,6 +360,16 @@ final class Layouts {
             }
         }
         return l;
+    }
+
+    /// Whether `a` is `k` or one of the compiled classes above it.
+    private static boolean ancestorOf(Cls a, Cls k) {
+        for (Cls c = k; c != null; c = c.parent) {
+            if (c == a) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Whether the method uses `super()` or `__class__`, the one way a method

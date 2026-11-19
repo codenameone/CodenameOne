@@ -60,4 +60,16 @@ public final class PyJavaIter extends PyObject {
         }
         return v;
     }
+
+    /// The source, while it has values left; null once it ran out. For a
+    /// consumer that drains a source it knows without stepping it value by
+    /// value (`dict(zip(keys, row))`), which then calls [#finish].
+    Source liveSource() {
+        return done ? null : source;
+    }
+
+    /// Marks this iterator exhausted, after its source was drained directly.
+    void finish() {
+        done = true;
+    }
 }

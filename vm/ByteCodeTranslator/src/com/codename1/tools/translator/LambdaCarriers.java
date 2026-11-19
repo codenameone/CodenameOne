@@ -227,7 +227,8 @@ final class LambdaCarriers {
         return c;
     }
 
-    /** The call through fn: a call, so its method gets a real frame. */
+    /** The call through fn. Frameless-eligible on the terms an Invoke is; see
+     *  BytecodeMethod.isFramelessEligibleImpl. */
     static final class IndirectCall extends CustomIntruction {
         IndirectCall(String code) {
             super(code, code, null);

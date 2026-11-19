@@ -108,6 +108,8 @@ public final class PythonPackageResolver {
         public final List<String> installed = new ArrayList<String>();
         /// Requirements the runtime provides, by name.
         public final List<String> provided = new ArrayList<String>();
+        /// Package-installer tooling that was required but not installed.
+        public final List<String> skipped = new ArrayList<String>();
         /// The compiled modules found, by dotted name, each with the Java
         /// class that stands in for it.
         public final Map<String, String> nativeModules = new TreeMap<String, String>();
@@ -149,6 +151,8 @@ public final class PythonPackageResolver {
         Map<String, Pinned> chosen = new LinkedHashMap<String, Pinned>();
         Map<String, String> sources = new TreeMap<String, String>();
         Map<String, List<String>> nativeByDist = new LinkedHashMap<String, List<String>>();
+        Map<String, byte[]> data = new TreeMap<String, byte[]>();
+        List<String[]> distributions = new ArrayList<String[]>();
         Deque<Object[]> queue = new ArrayDeque<Object[]>();
         for (String line : requirements) {
             PythonRequirement r = PythonRequirement.parse(line);
@@ -162,6 +166,14 @@ public final class PythonPackageResolver {
             if (providedByRuntime(r.name)) {
                 if (!result.provided.contains(r.name)) {
                     result.provided.add(r.name);
+                }
+                continue;
+            }
+            if (installerTooling(r.name)) {
+                if (!result.skipped.contains(r.name)) {
+                    result.skipped.add(r.name);
+                    log.info("Not installing " + r.name + ", required by " + item[1]
+                            + ": an application cannot install packages at run time");
                 }
                 continue;
             }
@@ -179,6 +191,8 @@ public final class PythonPackageResolver {
             byte[] archive = fetchVerified(p);
             Unpacked u = unpack(p, archive);
             sources.putAll(u.sources);
+            data.putAll(u.data);
+            distributions.add(distribution(p, u));
             nativeByDist.put(p.name, u.nativeModules);
             result.installed.add(p.name + "==" + p.version);
             for (String dep : u.requires) {
@@ -189,7 +203,8 @@ public final class PythonPackageResolver {
             }
         }
         try {
-            writeTree(target, sources);
+            sources.put(DISTRIBUTIONS_MODULE + ".py", distributionsModule(distributions));
+            writeTree(target, sources, data);
             writeLock(new File(target, LOCK), chosen.values());
             PythonExtensionStubs stubs = new PythonExtensionStubs(sources);
             for (Map.Entry<String, List<String>> e : nativeByDist.entrySet()) {
@@ -210,6 +225,16 @@ public final class PythonPackageResolver {
             throw new BuildException("Cannot write " + target + ": " + e.getMessage(), e);
         }
         return result;
+    }
+
+    /// Whether `name` is the packaging toolchain -- pip, setuptools, wheel.
+    /// A tool such as llm requires them for its "install a plugin" command,
+    /// which shells out to pip; an application's packages are fixed when it
+    /// is built, so nothing can call them, and translating them would add
+    /// about ten megabytes of source to every build.
+    static boolean installerTooling(String name) {
+        String n = PythonRequirement.normalize(name);
+        return "pip".equals(n) || "setuptools".equals(n) || "wheel".equals(n);
     }
 
     /// Whether the runtime provides the distribution `name`: its import
@@ -356,6 +381,11 @@ public final class PythonPackageResolver {
         final Map<String, String> sources = new TreeMap<String, String>();
         final List<String> nativeModules = new ArrayList<String>();
         final List<String> requires = new ArrayList<String>();
+        /// Package data: every other file the package installs beside its
+        /// modules, by path relative to site-packages.
+        final Map<String, byte[]> data = new TreeMap<String, byte[]>();
+        /// The wheel's `entry_points.txt`, or empty.
+        String entryPoints = "";
     }
 
     static Unpacked unpack(Pinned p, byte[] archive) throws BuildException {
@@ -375,6 +405,8 @@ public final class PythonPackageResolver {
             if (top.endsWith(".dist-info")) {
                 if (path.endsWith("/METADATA")) {
                     requiresDist(new String(e.getValue(), StandardCharsets.UTF_8), u.requires);
+                } else if (path.endsWith("/entry_points.txt")) {
+                    u.entryPoints = new String(e.getValue(), StandardCharsets.UTF_8);
                 }
                 continue;
             }
@@ -447,7 +479,28 @@ public final class PythonPackageResolver {
             if (!u.nativeModules.contains(dotted)) {
                 u.nativeModules.add(dotted);
             }
+            return;
         }
+        if (isPackageData(path, name)) {
+            u.data.put(path, data);
+        }
+    }
+
+    /// Whether a non-module file of a package ships with the application as
+    /// package data (`PyPackageData`): anything a library may open beside
+    /// its modules, but not type stubs, C sources or packaging markers.
+    static boolean isPackageData(String path, String name) {
+        if (!path.contains("/") || name.startsWith(".") || path.contains("/__pycache__/")) {
+            return false;
+        }
+        String[] skip = {".pyi", ".pyc", ".pyo", ".c", ".h", ".cpp", ".pxd", ".pyx", ".so", ".pyd", ".dll",
+            ".dylib", ".lib", ".a", ".o"};
+        for (String suffix : skip) {
+            if (name.endsWith(suffix)) {
+                return false;
+            }
+        }
+        return !"py.typed".equals(name);
     }
 
     private static void requiresDist(String metadata, List<String> into) {
@@ -550,8 +603,22 @@ public final class PythonPackageResolver {
         return out.toByteArray();
     }
 
-    /// Makes `target` hold exactly `sources`, keeping the lock and index.
-    private static void writeTree(File target, Map<String, String> sources) throws IOException {
+    /// Makes `target` hold exactly `sources` and the package `data`,
+    /// keeping the lock and index. The data files written are listed in
+    /// [#DATA_MANIFEST], so the next install removes the ones it no longer
+    /// has.
+    private static void writeTree(File target, Map<String, String> sources, Map<String, byte[]> data)
+            throws IOException {
+        File manifest = new File(target, DATA_MANIFEST);
+        if (manifest.isFile()) {
+            for (String line : new String(Files.readAllBytes(manifest.toPath()), StandardCharsets.UTF_8)
+                    .split("\n")) {
+                File old = new File(target, line.trim());
+                if (line.trim().length() > 0 && old.isFile() && !data.containsKey(line.trim())) {
+                    Files.delete(old.toPath());
+                }
+            }
+        }
         if (target.isDirectory()) {
             deletePy(target);
         }
@@ -560,6 +627,72 @@ public final class PythonPackageResolver {
             Files.createDirectories(f.getParentFile().toPath());
             Files.write(f.toPath(), e.getValue().getBytes(StandardCharsets.UTF_8));
         }
+        StringBuilder list = new StringBuilder();
+        for (Map.Entry<String, byte[]> e : data.entrySet()) {
+            File f = new File(target, e.getKey());
+            Files.createDirectories(f.getParentFile().toPath());
+            Files.write(f.toPath(), e.getValue());
+            list.append(e.getKey()).append('\n');
+        }
+        Files.createDirectories(target.toPath());
+        Files.write(manifest.toPath(), list.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /// The module `importlib.metadata` reads the installed distributions
+    /// from: a translated program has no site-packages to scan.
+    public static final String DISTRIBUTIONS_MODULE = "_cn1_distributions";
+    /// The list of package data files the last install wrote.
+    public static final String DATA_MANIFEST = "cn1-package-data.txt";
+
+    private static String[] distribution(Pinned p, Unpacked u) {
+        java.util.Set<String> top = new java.util.TreeSet<String>();
+        for (String path : u.sources.keySet()) {
+            int slash = path.indexOf('/');
+            top.add(slash < 0 ? path.substring(0, path.length() - 3) : path.substring(0, slash));
+        }
+        StringBuilder requires = new StringBuilder();
+        for (String r : u.requires) {
+            requires.append(pyString(r)).append(", ");
+        }
+        StringBuilder tops = new StringBuilder();
+        for (String t : top) {
+            tops.append(pyString(t)).append(", ");
+        }
+        return new String[] {p.name, p.version, requires.toString(), u.entryPoints, tops.toString()};
+    }
+
+    static String distributionsModule(List<String[]> distributions) {
+        StringBuilder b = new StringBuilder();
+        b.append("\"\"\"The installed distributions, written by cn1:import-python-project for")
+                .append(" importlib.metadata.\"\"\"\n");
+        b.append("DISTRIBUTIONS = {\n");
+        for (String[] d : distributions) {
+            b.append("    ").append(pyString(d[0])).append(": {\"version\": ").append(pyString(d[1]))
+                    .append(", \"requires\": [").append(d[2]).append("], \"entry_points\": ")
+                    .append(pyString(d[3])).append(", \"top_level\": [").append(d[4]).append("]},\n");
+        }
+        b.append("}\n");
+        return b.toString();
+    }
+
+    /// A Python string literal for `s`, ASCII only.
+    static String pyString(String s) {
+        StringBuilder b = new StringBuilder("\"");
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' || c == '"') {
+                b.append('\\').append(c);
+            } else if (c == '\n') {
+                b.append("\\n");
+            } else if (c == '\r') {
+                b.append("\\r");
+            } else if (c < 0x20 || c > 0x7e) {
+                b.append(String.format("\\u%04x", (int) c));
+            } else {
+                b.append(c);
+            }
+        }
+        return b.append('"').toString();
     }
 
     private static void deletePy(File dir) throws IOException {

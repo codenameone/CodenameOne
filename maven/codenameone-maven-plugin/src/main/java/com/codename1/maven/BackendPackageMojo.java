@@ -85,6 +85,13 @@ public class BackendPackageMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    /// The project as the forked compile left it. A source root a goal in the
+    /// fork adds -- the Python transpiler's generated sources -- is recorded on
+    /// this copy only, so the packager reads it: from [#project] a Python
+    /// command-line tool's program never reached the native build.
+    @Parameter(defaultValue = "${executedProject}", readonly = true)
+    private MavenProject executedProject;
+
     @Parameter(defaultValue = "${reactorProjects}", readonly = true)
     private java.util.List<MavenProject> reactorProjects;
 
@@ -224,7 +231,8 @@ public class BackendPackageMojo extends AbstractMojo {
 
     /** The engine packager, answering from this mojo's project and parameters. */
     private BackendPackager packager() throws MojoExecutionException {
-        BackendPackager p = new BackendPackager(new MavenModuleHost(project, MavenLog.of(getLog()))) {
+        BackendPackager p = new BackendPackager(new MavenModuleHost(
+                executedProject != null ? executedProject : project, MavenLog.of(getLog()))) {
             @Override
             protected String binaryName() {
                 return project.getArtifactId();

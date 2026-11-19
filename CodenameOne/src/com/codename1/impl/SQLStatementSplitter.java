@@ -67,6 +67,13 @@ public final class SQLStatementSplitter {
         if (sql == null) {
             return new String[0];
         }
+        if (sql.indexOf(';') < 0) {
+            // A statement ends only at a semicolon, so text without one is a single candidate:
+            // what the scan below would answer, without the scan. Every execute on every port
+            // splits its SQL more than once (attachments, transaction control, the
+            // single-statement check), and almost all of it is one statement.
+            return hasContent(sql) ? new String[] {sql.trim()} : new String[0];
+        }
         int length = sql.length();
         int statementStart = 0;
         boolean sawCreate = false;
@@ -564,16 +571,15 @@ public final class SQLStatementSplitter {
     }
 
     private static void addIfNotBlank(List statements, String candidate) {
-        String trimmed = stripToContent(candidate);
-        if (trimmed.length() > 0) {
+        if (hasContent(candidate)) {
             statements.add(candidate.trim());
         }
     }
 
     /// Returns the statement with comments and whitespace removed, purely to decide whether it
     /// carries any actual SQL. A chunk that is only a trailing comment is not a statement.
-    private static String stripToContent(String sql) {
-        StringBuilder out = new StringBuilder();
+    /// True when the text holds anything but whitespace and comments.
+    private static boolean hasContent(String sql) {
         int length = sql.length();
         int iter = 0;
         while (iter < length) {
@@ -587,11 +593,11 @@ public final class SQLStatementSplitter {
                 continue;
             }
             if (c > ' ') {
-                out.append(c);
+                return true;
             }
             iter++;
         }
-        return out.toString();
+        return false;
     }
 
     private static int skipQuoted(String sql, int openIndex, char quote) {

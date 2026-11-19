@@ -38,8 +38,11 @@ import java.util.Arrays;
 /// | `FLOAT` | `double` | -- |
 /// | `INT` | `Object` (a `Long`, or a big int) | -- |
 /// | `STR` | `String` | null when `opt` |
+/// | `BYTES` | `Object` (a `PyBytes`) | -- |
 /// | `INST` | the class's layout class | null when `opt` |
 /// | `LIST` | `PyList` | null when `opt` |
+/// | `TUPLE` | `Object` (the generic tuple) | -- |
+/// | `DICT` | `Object` (a `PyDict`) | -- |
 /// | `NONE`, `DYN`, `BOT` | `Object` | `Py.NONE` |
 ///
 /// An int stays an object because a Python int has no bound: overflowing a
@@ -47,7 +50,7 @@ import java.util.Arrays;
 /// On ParparVM a `Long` below 2^60 is a tagged immediate, so keeping it
 /// boxed allocates nothing.
 final class Ty {
-    enum K { BOT, NONE, BOOL, INT, FLOAT, STR, INST, LIST, DYN }
+    enum K { BOT, NONE, BOOL, INT, FLOAT, STR, BYTES, INST, LIST, TUPLE, DICT, DYN }
 
     static final Ty BOT = new Ty(K.BOT, null, false, null);
     static final Ty NONE = new Ty(K.NONE, null, false, null);
@@ -55,6 +58,7 @@ final class Ty {
     static final Ty INT = new Ty(K.INT, null, false, null);
     static final Ty FLOAT = new Ty(K.FLOAT, null, false, null);
     static final Ty STR = new Ty(K.STR, null, false, null);
+    static final Ty BYTES = new Ty(K.BYTES, null, false, null);
     static final Ty DYN = new Ty(K.DYN, null, false, null);
 
     /// The list sites a `LIST` value may have come from (see `Infer`). Past
@@ -82,6 +86,21 @@ final class Ty {
         return new Ty(K.LIST, null, opt, sites);
     }
 
+    /// A tuple from these allocation sites. It is held as the generic
+    /// object; what the kind adds is the type of each position (see
+    /// `Infer.slot`), so unpacking it or indexing it with a constant gives
+    /// typed values instead of dynamic ones.
+    static Ty tuple(int[] sites) {
+        return new Ty(K.TUPLE, null, false, sites);
+    }
+
+    /// A dict from these allocation sites. It is held as the generic object;
+    /// what the kind adds is the type of its keys and values (see
+    /// `Infer.dictVal`), so a read of it gives a typed value.
+    static Ty dict(int[] sites) {
+        return new Ty(K.DICT, null, false, sites);
+    }
+
     Ty orNone() {
         switch (k) {
             case BOT:
@@ -107,7 +126,7 @@ final class Ty {
     }
 
     boolean isObject() {
-        return k == K.BOT || k == K.NONE || k == K.DYN || k == K.INT;
+        return k == K.BOT || k == K.NONE || k == K.DYN || k == K.INT || k == K.BYTES || k == K.TUPLE || k == K.DICT;
     }
 
     static Ty join(Ty a, Ty b) {
@@ -144,6 +163,10 @@ final class Ty {
             }
             case LIST:
                 return list(union(a.sites, b.sites), opt);
+            case TUPLE:
+                return tuple(union(a.sites, b.sites));
+            case DICT:
+                return dict(union(a.sites, b.sites));
             case STR:
                 return opt ? STR.orNone() : STR;
             default:
@@ -206,7 +229,9 @@ final class Ty {
 
     @Override
     public String toString() {
-        String s = k == K.INST ? cls.def.name : k == K.LIST ? "list" + Arrays.toString(sites) : k.name();
+        String s = k == K.INST ? cls.def.name : k == K.LIST ? "list" + Arrays.toString(sites)
+                : k == K.TUPLE ? "tuple" + Arrays.toString(sites)
+                : k == K.DICT ? "dict" + Arrays.toString(sites) : k.name();
         return opt ? s + "?" : s;
     }
 }

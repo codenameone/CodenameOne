@@ -76,6 +76,12 @@ import java.util.Map;
 /// Exit codes: 0 for success, the command's own code from a `Callable`, 1 when
 /// the command throws, 2 for a command line that does not parse.
 public final class CommandLine {
+    static {
+        // A packaged tool never builds a server, and without this its resources,
+        // digests and random bytes had no host to answer them.
+        com.codename1.backend.Backend.prepareRuntime();
+    }
+
     /// The exit code for a command line that does not parse.
     public static final int USAGE_ERROR = 2;
 

@@ -25,6 +25,52 @@ def _type_repr(obj):
     return repr(obj)
 
 
+# Subscriptions are memoized, as CPython's typing does with _tp_cache: code
+# that writes cast(List[X], v) in a loop builds the alias once. The type of
+# the parameters is part of the key (Literal[1] is not Literal[True]), and an
+# unhashable subscription is simply not cached.
+_tp_cache = {}
+
+
+# One dict per kind, of one dict per owner, for a subscript by a single
+# class (`List[str]` in a `cast` that runs in a loop): a class hashes and
+# compares by identity, so it is the key by itself -- no key tuple, and no
+# closure made on every hit as `_cached` needs.
+_by_class = ({}, {}, {}, {})
+
+
+def _cached_class(kind, owner, params, make):
+    per = _by_class[kind].get(owner)
+    if per is None:
+        per = {}
+        if len(_by_class[kind]) >= 4096:
+            _by_class[kind].clear()
+        _by_class[kind][owner] = per
+    hit = per.get(params)
+    if hit is None:
+        hit = make(owner, params)
+        per[params] = hit
+    return hit
+
+
+def _form_getitem(form, params):
+    return form._getitem(form, params)
+
+
+def _cached(kind, owner, params, make):
+    key = (kind, owner, params, type(params))
+    try:
+        hit = _tp_cache.get(key)
+    except TypeError:
+        return make()
+    if hit is None:
+        hit = make()
+        if len(_tp_cache) >= 4096:
+            _tp_cache.clear()
+        _tp_cache[key] = hit
+    return hit
+
+
 class _Final:
     __slots__ = ()
 
@@ -70,7 +116,9 @@ class _SpecialForm(_Final):
     def __getitem__(self, params):
         if self._getitem is None:
             raise TypeError(self._name + " is not subscriptable")
-        return self._getitem(self, params)
+        if type(params) is type:
+            return _cached_class(0, self, params, _form_getitem)
+        return _cached(0, self, params, lambda: self._getitem(self, params))
 
     def __call__(self, *args, **kwds):
         raise TypeError("Cannot instantiate " + repr(self))
@@ -123,6 +171,11 @@ class _GenericAlias(_Final):
         return result
 
     def __getitem__(self, params):
+        if type(params) is type:
+            return _cached_class(1, self, params, type(self)._subscript)
+        return _cached(1, self, params, lambda: self._subscript(params))
+
+    def _subscript(self, params):
         if not isinstance(params, tuple):
             params = (params,)
         subst = dict(zip(self.__parameters__, params))
@@ -242,6 +295,11 @@ class _SpecialGenericAlias(_Final):
         return "typing." + self._name
 
     def __getitem__(self, params):
+        if type(params) is type:
+            return _cached_class(2, self, params, _SpecialGenericAlias._subscript)
+        return _cached(2, self, params, lambda: self._subscript(params))
+
+    def _subscript(self, params):
         if self._name == "Callable" and isinstance(params, tuple) and len(params) == 2:
             args, result = params
             if args is ...:
@@ -326,6 +384,15 @@ Text = str
 AnyStr = None
 
 
+def _lazy_re():
+    import re
+    return re
+
+
+Pattern = _SpecialGenericAlias(_lazy_re().Pattern, "Pattern", 1)
+Match = _SpecialGenericAlias(_lazy_re().Match, "Match", 1)
+
+
 class TypeVar(_Final):
     def __init__(self, name, *constraints, bound=None, covariant=False, contravariant=False,
                  infer_variance=False, default=None):
@@ -400,14 +467,20 @@ class Generic:
     __slots__ = ()
 
     def __class_getitem__(cls, params):
-        if not isinstance(params, tuple):
-            params = (params,)
-        if cls is Generic or cls is Protocol:
-            return _GenericAlias(cls, params, cls.__name__)
-        return _GenericAlias(cls, params)
+        if type(params) is type:
+            return _cached_class(3, cls, params, _generic_alias)
+        return _cached(3, cls, params, lambda: _generic_alias(cls, params))
 
     def __init_subclass__(cls, *args, **kwargs):
         super().__init_subclass__(*args, **kwargs)
+
+
+def _generic_alias(cls, params):
+    if not isinstance(params, tuple):
+        params = (params,)
+    if cls is Generic or cls is Protocol:
+        return _GenericAlias(cls, params, cls.__name__)
+    return _GenericAlias(cls, params)
 
 
 class _ProtocolMeta(type(_abc.Sized)):
@@ -455,8 +528,9 @@ def runtime_checkable(cls):
     return cls
 
 
-def cast(typ, val):
-    return val
+# A builtin, so that a call the compiler can see is this one skips building
+# its type argument (see StdModules.CAST).
+from _cn1op import cast
 
 
 def assert_type(val, typ, /):
@@ -658,7 +732,20 @@ def get_type_hints(obj, globalns=None, localns=None, include_extras=False):
             for k, v in base.__dict__.get("__annotations__", {}).items():
                 hints[k] = _resolve_hint(v, ns)
     else:
-        ns = dict(globalns) if globalns is not None else dict(getattr(obj, "__globals__", {}))
+        # As CPython does: a bound method or a decorated function is read
+        # through to the function it wraps, whose module the names are in.
+        while True:
+            inner = getattr(obj, "__wrapped__", None) or getattr(obj, "__func__", None)
+            if inner is None or inner is obj:
+                break
+            obj = inner
+        if globalns is not None:
+            ns = dict(globalns)
+        else:
+            g = getattr(obj, "__globals__", None)
+            if g is None:
+                g = getattr(sys.modules.get(getattr(obj, "__module__", None)), "__dict__", {})
+            ns = dict(g)
         if localns:
             ns.update(localns)
         for k, v in getattr(obj, "__annotations__", {}).items():
@@ -745,14 +832,31 @@ NamedTuple.__mro_entries__ = _namedtuple_mro_entries
 class _TypedDictMeta(type):
     def __new__(cls, name, bases, ns, total=True):
         annotations = {}
+        required = set()
+        optional = set()
         for base in bases:
             annotations.update(base.__dict__.get("__annotations__", {}))
-        annotations.update(ns.get("__annotations__", {}))
+            required.update(base.__dict__.get("__required_keys__", ()))
+            optional.update(base.__dict__.get("__optional_keys__", ()))
+        own = ns.get("__annotations__", {})
+        annotations.update(own)
+        # Each key takes its class's totality, unless Required[...] or
+        # NotRequired[...] (possibly inside Annotated) says otherwise.
+        for key, hint in own.items():
+            form = get_origin(hint)
+            if form is Annotated:
+                form = get_origin(get_args(hint)[0])
+            if form is Required or (form is not NotRequired and total):
+                required.add(key)
+                optional.discard(key)
+            else:
+                optional.add(key)
+                required.discard(key)
         tp_dict = type.__new__(_TypedDictMeta, name, (dict,), ns)
         tp_dict.__annotations__ = annotations
         tp_dict.__total__ = total
-        tp_dict.__required_keys__ = frozenset(annotations) if total else frozenset()
-        tp_dict.__optional_keys__ = frozenset() if total else frozenset(annotations)
+        tp_dict.__required_keys__ = frozenset(required)
+        tp_dict.__optional_keys__ = frozenset(optional)
         return tp_dict
 
     def __call__(cls, *args, **kwargs):
@@ -812,3 +916,18 @@ runtime_checkable(SupportsFloat)
 runtime_checkable(SupportsIndex)
 runtime_checkable(SupportsAbs)
 runtime_checkable(SupportsRound)
+
+
+class IO(Generic[AnyStr]):
+    """The type of a file object, for annotations; the runtime's files are
+    not subclasses of it, as CPython's are not either."""
+    __slots__ = ()
+
+
+class BinaryIO(IO[bytes]):
+    __slots__ = ()
+
+
+class TextIO(IO[str]):
+    __slots__ = ()
+

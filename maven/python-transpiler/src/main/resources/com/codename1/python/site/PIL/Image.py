@@ -135,6 +135,9 @@ def _wrap(mode, size, handle):
 
 class Image:
     format = None
+    # The file an opened image was read from, as Pillow keeps it: a file
+    # object passed in, or a BytesIO of a named file's bytes.
+    fp = None
 
     def __init__(self):
         self.mode = ""
@@ -494,8 +497,22 @@ def open(fp, mode="r", formats=None):
     if isinstance(fp, (str, os.PathLike)):
         with builtins.open(os.fspath(fp), "rb") as f:
             data = f.read()
+        import io
+        source = io.BytesIO(data)
     else:
+        # Pillow reads a file object from its start, wherever it was left
+        try:
+            fp.seek(0)
+        except (AttributeError, OSError):
+            pass
         data = fp.read()
+        source = fp
+    im = _open_data(fp, data)
+    im.fp = source
+    return im
+
+
+def _open_data(fp, data):
     if data[:8] == _PNG_SIG and not _cn1image.exact():
         # A device decodes through the platform, then takes the file's mode
         mode = {0: "L", 2: "RGB", 3: "RGBA", 4: "LA", 6: "RGBA"}.get(data[25], "RGBA")

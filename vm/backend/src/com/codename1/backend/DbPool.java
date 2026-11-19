@@ -28,9 +28,9 @@ import java.util.List;
 
 /// A fixed pool of connections to one SQLite database.
 ///
-/// Why a pool at all, when SQLite is compiled SQLITE_THREADSAFE=1 and a single
-/// connection is already safe to share: serialized mode makes concurrent use SAFE
-/// by serializing it, which means one connection gives no read concurrency at all.
+/// Why a pool at all: SQLite is compiled SQLITE_THREADSAFE=2, so a connection is
+/// used by one thread at a time (Db's monitor), and one connection gives no read
+/// concurrency at all.
 /// Several connections against a WAL database do, because WAL lets readers proceed
 /// while a writer is active.
 ///

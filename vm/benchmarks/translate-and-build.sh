@@ -92,8 +92,9 @@ SOURCES=("src/com/bench/$MAIN.java")
 if [ "$MAIN" = "Bench" ]; then
     SOURCES+=("common/src/main/java/com/bench/CommonWorkloads.java")
 fi
+# -sourcepath lets a driver reuse another one (EarlyFreeAudit runs GraceAudit).
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" -source 1.8 -target 1.8 \
-    -d "$WORK/classes" "${SOURCES[@]}"
+    -sourcepath src -d "$WORK/classes" "${SOURCES[@]}"
 
 # 5. translate to C
 mkdir -p "$WORK/out"

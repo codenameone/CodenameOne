@@ -49,7 +49,6 @@ class UnsupportedTest {
         {"m = __import__('os')\n", "1", "__import__()"},
         {"run = eval\n", "1", "eval()"},
         {"import sys\n\ndef t(*a):\n    pass\n\nsys.settrace(t)\n", "6", "sys.settrace"},
-        {"import sys\nprint(sys._getframe().f_lineno)\n", "2", "sys._getframe"},
         {"def f():\n    x = 1\n    return locals()\n", "3", "locals()"},
         {"x = 1\nfrom java.java.util import NoSuchList\n", "2", "no Java class java.util.NoSuchList"},
         {"import java.java.util\n", "1", "import the Java classes by name"},

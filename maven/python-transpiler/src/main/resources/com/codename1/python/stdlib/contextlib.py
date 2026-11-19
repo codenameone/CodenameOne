@@ -8,6 +8,7 @@ from collections import deque
 
 
 class AbstractContextManager:
+    __class_getitem__ = classmethod(type(list[int]))
     def __enter__(self):
         return self
 
@@ -16,6 +17,7 @@ class AbstractContextManager:
 
 
 class AbstractAsyncContextManager:
+    __class_getitem__ = classmethod(type(list[int]))
     async def __aenter__(self):
         return self
 

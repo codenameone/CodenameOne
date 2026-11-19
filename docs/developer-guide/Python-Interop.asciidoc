@@ -13,10 +13,17 @@ runs at the speed of the equivalent Java.
 
 Two things follow from compiling ahead of time rather than interpreting:
 
-* The program is known in full at build time. A module imported by a
-  name computed while the program runs, `exec`, `eval` and `compile` of a
-  string, and frame introspection are build errors that name the file and the
-  line. None of them reaches a device as a hidden failure.
+* The program is known in full at build time. A module imported by a name
+  computed while the program runs, `exec` and `eval` of a string, and the
+  tracing hooks (`sys.settrace`, `sys.setprofile`) are build errors that
+  name the file and the line, in your own sources and in a package from
+  PyPI alike. They're errors only where the program reaches them: a
+  function nothing calls isn't compiled, and libraries keep most such calls
+  in code an application never runs, such as a command line option. For one
+  the program does reach, a line in `cn1-python.properties` leaves the
+  function out or replaces it with Java; see
+  <<python-directives,Leaving code out of a build>>. `sys._getframe` works,
+  answered from the call stack.
 * Packages with C extensions are supported. The package's Python is
   translated like your own code, and each compiled module is replaced by a
   Java class with the same functions; see <<python-c-extensions,C extensions>>.
@@ -220,6 +227,26 @@ the real package:
   native font. Those results are drawn by the platform, so they look right
   but aren't Pillow's exact pixels.
 | `flask`, `fastapi`, `uvicorn` | See <<python-backends,Python backends>>.
+| `lxml` | `lxml.etree` in Python: lxml's tree model (parents, tails,
+  `nsmap`), custom element classes, `XMLParser` and `iterparse`, XPath 1.0,
+  and `tostring` byte for byte as libxml2 writes it. That's what
+  `python-pptx` and `mammoth` use. XSLT, schemas, `lxml.objectify` and
+  `lxml.html` aren't provided.
+| `magika` | Magika's API and result shape, answered from file signatures and
+  the contents of ZIP and OLE containers rather than from Google's neural
+  model, which needs `onnxruntime`. A content it can't place is `unknown`.
+| `cryptography` | AES in CBC and ECB modes from
+  `hazmat.primitives.ciphers`, over `com.codename1.security.Cipher`: what
+  `pdfminer.six` needs to read encrypted PDFs.
+| `jiter`, `pydantic_core` | The parts the `openai` SDK imports: `jiter`'s
+  JSON parser with its partial mode, and ``pydantic_core``'s sentinel and
+  error types.
+| `pypdfium2`, `cobble` | `pypdfium2` imports and reports every document
+  as one it can't render, as `pdfplumber` expects from a PDF it can't draw.
+  `cobble` generates its data class methods as closures instead of with
+  `exec`.
+| `pytest-httpx` | The `httpx_mock` and `httpx2_mock` fixtures, for testing
+  code that uses `httpx`.
 | `typing_extensions`, `six`, `tabulate`, `idna`, `packaging` |
 |===
 
@@ -247,6 +274,91 @@ delete its line from the lock, or the file itself, and import again.
 
 You can also copy a package's sources into the source directory by hand;
 they translate like the application's own modules.
+
+[[python-directives]]
+==== Leaving code out of a build
+
+The build translates the whole program at once, the application and every
+package together, so it knows which functions the program can reach. A
+function that nothing calls, names or can find by a computed name isn't
+compiled. Its body is replaced by one that raises, saying the function was
+left out, so a package's command line code or an optional feature costs
+nothing in an application that never uses it.
+
+Code the program does reach has to translate. `eval`, `exec`, `__import__`
+and the frame hooks of `sys` run or inspect Python that wasn't compiled
+with the program, so a function that uses one and is reached fails the
+build. The error lists every such place at once, and ends with the line
+that fixes it:
+
+[source,text]
+----
+llm/cli.py:4424:9: a translated program cannot run or inspect code that was not compiled with it, and this one reaches code that does:
+  llm/cli.py:4424:9: exec() in llm.cli._tools_from_code
+  sqlite_utils/utils.py:534:9: exec() in sqlite_utils.utils._compile_code
+Name each of those functions in cn1-python.properties, beside the Python sources. To leave them out (each then raises if it is called):
+  remove=llm.cli._tools_from_code,sqlite_utils.utils._compile_code
+----
+
+`cn1-python.properties` sits in `src/main/python`. Each line names
+functions as `module.function` or `module.Class.method`, separated by
+commas, and a key can appear on as many lines as you like. It reaches into
+any package, however deep, without an edit to the package.
+
+[cols="1,3",options="header"]
+|===
+| Line | Meaning
+| `remove=` | Leaves the function out. It raises `RuntimeError`, naming
+  itself, if something calls it after all.
+| `replace=` | Replaces the function's body with Java you write. Everything
+  else about the function stays: its name, its decorators, its place in the
+  class.
+| `keep=` | Compiles a function the build would leave out, for one that's
+  only reached from Java or in a way the build can't see.
+|===
+
+`remove=` also takes more than one function at a time:
+
+[cols="1,3",options="header"]
+|===
+| Name | What's left out
+| `pkg.module.Class` | Every method of the class. The class itself stays, so
+  code that imports it, tests against it or derives from it still runs.
+| `pkg.module` | The whole module.
+| `pkg` | The package and every module under it.
+|===
+
+A module that's left out can still be imported, and so can a name from it.
+That matters because a package usually imports all of its modules as it
+loads. The error comes at the first use: calling something the module would
+have held, reading an attribute of it, or deriving a class from it raises
+`RuntimeError`, naming the module and the line that removed it. Use this
+for the parts of a large package an application never touches, such as the
+API surface of a client library it calls one endpoint of.
+
+A name that matches nothing in the program is an error, so a directive
+never goes stale without the build saying so.
+
+For `replace=`, the build writes a class per module into the project's Java
+sources, `com.codename1.python.ext.<Module>Shims`, with a stub for each
+function. The comment over a stub lists the values it receives:
+
+[source,java]
+----
+public final class SqliteUtilsUtilsShims {
+    public static void install() {
+        // args: code, imports, column
+        NativeModule.replace("sqlite_utils.utils._compile_code", args -> {
+            throw NativeModule.notReplaced("sqlite_utils.utils._compile_code");
+        });
+    }
+}
+----
+
+The file is yours. The build writes it once and never overwrites it. Until
+you fill a stub in, calling its function raises `NotImplementedError` with
+the function's name. When you add a function to `replace=` for a module
+whose class already exists, add its `NativeModule.replace` call by hand.
 
 [[python-c-extensions]]
 ==== C extensions
@@ -305,6 +417,12 @@ does.
 storage class SQLite recorded for it. The Linux, Windows and JavaScript ports
 don't report storage classes, so a value comes back as an `int` or a `float`
 when its text is a number, and as a `str` otherwise.
+
+`create_function` registers a Python function for use in SQL where the
+platform's SQLite accepts one, which is on the JVM. iOS, Android and the
+other ports expose no way to register one, so there it raises
+`NotSupportedError`; compute the value in Python before the query, or after
+it.
 
 [[python-backends]]
 === Python backends

@@ -54,6 +54,7 @@
         <Or>
             <Method name="executeUntraced" />
             <Method name="queryUntraced" />
+            <Method name="queryIntoUntraced" />
         </Or>
         <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING" />
     </Match>

@@ -13,6 +13,7 @@ from math import log as _log, exp as _exp, sqrt as _sqrt, cos as _cos, sin as _s
 from math import floor as _floor, ceil as _ceil, isfinite as _isfinite, acos as _acos
 from itertools import accumulate as _accumulate, repeat as _repeat
 from bisect import bisect as _bisect
+from _cn1hash import urandom as _urandom
 
 __all__ = ["Random", "SystemRandom", "seed", "random", "uniform", "randint", "choice", "sample",
            "randrange", "shuffle", "normalvariate", "lognormvariate", "expovariate",
@@ -449,8 +450,24 @@ def _lgamma(x):
 class SystemRandom(Random):
     """Draws from the platform's entropy rather than a seeded sequence."""
 
+    def __init__(self, x=None):
+        # No sequence to seed: every draw below reads the platform.
+        self.gauss_next = None
+
     def seed(self, *args, **kwds):
-        Random.seed(self, None)
+        return None
+
+    def random(self):
+        return (int.from_bytes(_urandom(7), "big") >> 3) * (1.0 / 9007199254740992.0)
+
+    def getrandbits(self, k):
+        if k < 0:
+            raise ValueError("number of bits must be non-negative")
+        numbytes = (k + 7) // 8
+        return int.from_bytes(_urandom(numbytes), "big") >> (numbytes * 8 - k)
+
+    def randbytes(self, n):
+        return _urandom(n)
 
     def getstate(self, *args, **kwds):
         raise NotImplementedError("System entropy source does not have state.")

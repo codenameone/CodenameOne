@@ -1,0 +1,356 @@
+[[python-hero-ports]]
+=== Case study: Porting llm and MarkItDown
+
+Two popular open source Python projects were built as Codename One
+applications, to find out what porting real code costs and what it gains:
+
+* https://llm.datasette.io[`llm`] by Simon Willison, a command line tool and
+  library for talking to language models. It logs every prompt and reply to
+  SQLite, keeps conversations, templates, fragments, tools and schemas, and
+  computes embeddings for similarity search. Its dependencies include
+  `pydantic`, `sqlite-utils`, `pluggy` and the OpenAI SDK over `httpx`.
+* https://github.com/microsoft/markitdown[MarkItDown] by Microsoft, which
+  converts PDF, Word, PowerPoint, Excel, HTML, EPUB, notebooks and archives
+  into Markdown for language models. Its converters sit on `pdfminer.six`,
+  `mammoth`, `python-pptx`, `openpyxl`, `beautifulsoup4` and `markdownify`.
+
+Both are AI tools that people use from a laptop, and both are more useful on a
+phone: a chat client that reads the `logs.db` your laptop writes, and a share
+target that turns any attachment into Markdown without uploading it anywhere.
+Neither had a mobile version.
+
+The applications are in `scripts/python-heroes`: `llm-mobile` and
+`markitdown-mobile`, each a `requirements.txt` and a new user interface in
+`src/main.py`.
+
+==== The upstream code stays untouched
+
+Each application installs its project and every dependency from PyPI at the
+pinned release, exactly as `pip` would. **Not one line of `llm`, MarkItDown
+or any of their dependencies was changed.** Every gap the port found was
+fixed in the transpiler or the runtime instead, so every Codename One
+application now has the fix.
+
+That rule is what makes the result worth anything. A port that edits the
+library proves only that the edited library works, and leaves the developer
+to redo the edits at every upgrade. Here an upgrade is a new version number
+in `requirements.txt`.
+
+==== What the user interface looks like
+
+The interface is the only new code, written in Python against the Codename
+One API. The MarkItDown screen that picks a document and converts it off the
+EDT is this much:
+
+[source,python]
+----
+from markitdown import MarkItDown, StreamInfo
+from java.com.codename1.components import InfiniteProgress
+from java.com.codename1.ui import Display
+
+def pick(self):
+    def chosen(event):
+        if event is not None and event.getSource():
+            self.run(convert_file, str(event.getSource()))
+    Display.getInstance().openFileChooser(chosen, ACCEPT)
+
+def run(self, job, arg):
+    progress = InfiniteProgress().showInfiniteBlocking()
+    def work():
+        outcome = job(arg)
+        Display.getInstance().callSerially(
+            lambda: (progress.dispose(), Result(self, *outcome).show()))
+    threading.Thread(target=work, daemon=True).start()
+----
+
+`llm-mobile` has a streaming chat screen, a history browser over llm's own
+full-text index, and settings for the model, the key and an
+OpenAI-compatible endpoint such as Ollama or LM Studio. It reads and writes
+llm's `logs.db` and `keys.json` in llm's own formats, so files copied from a
+laptop work unchanged.
+
+==== The upstream test suites
+
+Both projects' own tests, at the tags the requirements pin, run transpiled
+and under CPython's `pytest` from the same files. The transpiled run uses the
+runtime's `pytest`, which collects and runs the same tests, fixtures and
+parameters.
+
+[cols="2,1,1,3",options="header"]
+|===
+| Suite | CPython | Codename One | Difference
+
+| `llm` (12 modules)
+| 428 passed
+| 428 passed
+| None.
+
+| MarkItDown (11 modules)
+| 776 passed
+| 763 passed
+| Both sides have the same packages, `pandas` included, and neither
+  installs the optional extras (legacy XLS, Outlook, speech); the tests
+  that need those fail on both. The 13 tests that fail only transpiled are
+  the decisions described below: nine for legacy text encodings and four
+  for the recursion limit.
+|===
+
+`llm`'s command line tests are left out, because a phone application has no
+command line. MarkItDown's tests for the cloud services (Azure Document
+Intelligence, Content Understanding), YouTube transcripts and image
+description are left out because they call a network service.
+
+The suites run transpiled on the JVM; the native binary runs the benchmark
+workloads below, built from the same classes. The CI job
+`.github/workflows/python-heroes.yml` runs both suites nightly and fails if
+the transpiled side fails a test CPython passes, other than the listed
+differences, or if a listed difference starts passing, so the list can't go
+stale.
+
+==== Measured against CPython
+
+`scripts/python-heroes/bench/run_heroes.py` builds a workload of each project
+with the production build steps, runs it as a native binary translated by
+ParparVM (what ships on iOS and the native desktop targets), on the JVM (the
+simulator) and under CPython 3.14 with the same package versions, checks that
+all three produce the same output, and records the times, the memory and
+the size of what ships.
+
+* `llm_session`: imports llm and its plugins, holds a conversation with a
+  local model, logs every turn to `logs.db`, searches the log, and embeds and
+  ranks a set of documents.
+* `markitdown_convert`: converts one document of each kind from MarkItDown's
+  own test files (PDF, DOCX, PPTX, XLSX, EPUB, two HTML pages, RSS, a
+  notebook, JSON and a ZIP). The Markdown must hash identically on every
+  side.
+
+Measured on an Apple silicon Mac against CPython 3.14.5. Each workload runs
+five rounds per launch; CPython and the native binary are launched five times
+each, alternately, after a warm-up launch that's discarded, and every figure
+is the median of the five. "Wall" is the whole process, from launch to exit.
+"Ships" is what a machine with nothing installed needs: the stripped binary
+and its packaged data, against CPython's interpreter, standard library and
+installed packages. The JVM rows are one launch each.
+
+[cols="3,1,1,1,1,1,1",options="header"]
+|===
+| Workload | Import | First round | Best round | Wall | Peak memory | Ships
+
+| `llm_session`, CPython
+| 348 ms | 129 ms | 115 ms | 1,132 ms | 72 MB | 94 MB
+| `llm_session`, Codename One native
+| 83 ms | 173 ms | 125 ms | 916 ms | 236 MB | 175 MB
+| `llm_session`, Codename One on the JVM
+| 1,578 ms | 675 ms | 201 ms | 3,539 ms | 636 MB | 57 MB
+| `markitdown_convert`, CPython
+| 370 ms | 559 ms | 504 ms | 3,152 ms | 228 MB | 320 MB
+| `markitdown_convert`, Codename One native
+| 80 ms | 420 ms | 387 ms | 2,135 ms | 537 MB | 132 MB
+| `markitdown_convert`, Codename One on the JVM
+| 2,152 ms | 1,143 ms | 408 ms | 5,874 ms | 782 MB | 45 MB
+|===
+
+===== Why these two projects are hard
+
+Neither project was chosen to flatter a compiler. Both spend their time
+where ahead-of-time translation helps least:
+
+* *They're dynamic by design.* `pydantic` builds its models' validators
+  when a class is defined, from annotations it reads at run time, and llm
+  constructs a model for every prompt, response and log row. MarkItDown's
+  converters walk trees of objects whose attributes are set by name. Code
+  like this gives the transpiler few types to compile against, so most of
+  it runs through the same dictionary lookups and boxed values that CPython
+  uses.
+* *Their hot code is C in CPython.* `lxml`, `pydantic_core` (Rust), the
+  regular expression engine, `zlib` and `sqlite3` are compiled extensions
+  under CPython. On Codename One each is a reimplementation in Java or
+  Python, so the comparison in those parts is between Codename One's code and
+  optimised native libraries, not the interpreter.
+* *llm's round is mostly I/O.* Profiling the round with `sample` puts about
+  half of it in system calls on both sides, `fsync`, journal writes and the
+  creation and deletion of SQLite's rollback journal, because llm commits
+  each log entry. Both sides make the same calls and retire about the same
+  number of instructions over the whole run, so that half can't get faster
+  and a 2-to-1 win on the rest would show as a third.
+
+===== Where Codename One is faster, and why
+
+* *Startup.* The native binary imports llm 4 times faster than CPython and
+  MarkItDown 4.6 times faster. An import under CPython finds the module's
+  file, reads its cached bytecode, unmarshals it into code objects and
+  runs the top level. A translated module is compiled code already linked
+  into the binary, so importing it runs the top level and nothing else.
+* *Typed code.* Where a function's local types can be inferred, as in much
+  of the string building and the loops over cells, runs and tokens in the
+  converters and their parsers, the transpiler emits typed Java and
+  ParparVM compiles it to C with no boxing and no dictionary lookup. The
+  MarkItDown round is 23% faster than CPython's for that reason, and the
+  JSON and notebook converters several times faster.
+* *Whole program.* The build sees every module, so attribute reads on
+  classes whose layout it knows become field reads, and calls to known
+  functions become direct calls. CPython specialises at run time and has to
+  guard each specialisation.
+
+===== Where it's slower, and why
+
+* *llm's round, 9% slower.* The time that isn't I/O goes, under ParparVM,
+  to allocation and collection: 20% of the samples are in the allocator or
+  the collector, against 4% for CPython's allocator. `pydantic` validation
+  and the SQLite row-to-dictionary path create many small, short-lived
+  objects (dictionaries, tuples, boxed integers and strings) per row.
+  CPython frees each one when its reference count reaches zero, into a
+  free list that the next allocation reuses while it's still in the cache;
+  a tracing collector reaches it only at the next collection.
+* *The first round.* The first round touches code for the first time, and
+  the native binary's code is 175 MB, so its first round pays for page
+  faults that CPython's interpreter, a few megabytes, mostly doesn't.
+* *Peak memory, 3.3 times for llm and 2.4 times for MarkItDown.* Part of it
+  isn't memory the application allocates: `vmmap` shows 85 MB of the native
+  llm process's resident pages are its code, and 32 MB its link-edit
+  segment. Both are clean pages mapped from the binary, which the system
+  can drop and read back at any time; iOS doesn't count them against an
+  application's memory limit. The pages the application wrote come to
+  about 130 MB for llm, against CPython's 72 MB, and MarkItDown's physical
+  footprint peaks at 413 MB, against 228 MB. The rest of the difference is
+  the collector: the heap grows to a threshold before it's collected, where
+  reference counting frees memory as it goes, and every Python value is a
+  Java object with a header.
+* *Size, for llm.* A translated module is larger than its bytecode, and the
+  binary contains the runtime, its standard library and every package llm
+  imports. MarkItDown's binary is smaller than CPython's install, because
+  the build includes only the modules the application imports, and the
+  converters' native wheels (`onnxruntime` among them) aren't needed.
+* *The JVM.* The simulator is a development tool and is slowest to start,
+  because the JVM compiles the hot code as it runs; its figures aren't
+  what a device runs.
+
+===== Guarding the numbers
+
+A nightly job, `.github/workflows/python-heroes.yml`, builds both workloads
+natively on Linux, runs them against CPython on the same runner, and fails
+when a ratio to CPython grows past the baseline by more than 20% (30% for
+the first round, 10% for memory). Comparing ratios measured on one machine
+in one run makes the gate independent of how fast the runner is; the
+baseline is kept per platform in `bench/baseline/ratios.json`, along with
+the rounds and launches it was measured with. The job runs on pull requests
+only when the workflow itself changes.
+
+The comparison is with a desktop interpreter because no phone ships one:
+on iOS and Android, the alternative to the translated application isn't
+CPython, but no application.
+
+==== What had to be built
+
+The port found gaps of three kinds. Every one was closed in the runtime.
+
+*Standard library breadth.* Real libraries import far more of the standard
+library than application code does: `xml.dom.minidom` and `xml.sax` for
+`python-pptx` and `mammoth`, `html.parser` for BeautifulSoup, `difflib`,
+`ipaddress`, `mimetypes`, `gettext`, `tempfile`, `importlib.metadata` for
+`pluggy`'s plugin discovery, `contextvars` and the full `asyncio` event loop
+API for the OpenAI SDK. About seventy modules were added.
+
+*C extensions.* A package whose compiled part is the reason it exists gets
+a Codename One implementation of the same public API, in Python or Java:
+
+* `lxml` (used by `python-pptx`), with lxml's tree model, over the
+  runtime's expat parser, whose tokenizer scans the common tag shapes in
+  Java and leaves anything unusual to its regular expressions.
+* `pydantic_core` and `jiter`, the Rust core of `pydantic` and the OpenAI
+  SDK's JSON parser.
+* `cryptography`, as far as `pdfminer.six` uses it for encrypted PDFs.
+* `magika`, Google's file type detector, which runs a neural network through
+  onnxruntime. The runtime's version reads file signatures and answers with
+  the same labels for the formats MarkItDown converts.
+
+*Language semantics that only libraries exercise.* Code written by
+experienced Python developers leans on corners application code seldom
+reaches. The port found and fixed, among others:
+
+* Positional-only parameters: `inspect.signature` printed no `/`, and a
+  positional-only parameter passed by keyword was accepted instead of
+  raising `TypeError`, or routed into `**kwargs` as CPython does.
+* `sqlite3`: `executescript` opened an implicit transaction, so llm's
+  migrations failed on their second statement. User-defined SQL functions
+  (`create_function`), which `sqlite-utils` relies on, were added.
+* `asyncio`: task cancellation counts (`cancelling`, `uncancel`), task
+  factories, `asyncio.Runner`, and context propagation through `call_soon`.
+* `httpx`: streamed responses (`Response.stream`), which the OpenAI SDK reads
+  for server-sent events.
+* `sys._getframe`, which `pydantic` calls while defining models, so that a
+  model's annotations resolve against the module that declared it.
+
+Each fix has a conformance test, `hero_ports.py` among them, compared
+against CPython's output.
+
+==== Decisions where CPython wasn't followed
+
+Three behaviours differ from CPython by design. The test suites show each one.
+
+*Legacy text encodings.* The runtime decodes UTF-8, UTF-16, ASCII and
+Latin-1. A document in Shift-JIS, GB18030 or Windows-1252 fails to decode
+instead of being guessed at. Carrying every codec table would add megabytes
+to every application, for files that are increasingly rare. Nine MarkItDown
+tests cover these encodings.
+
+*No recursion limit.* `sys.setrecursionlimit` is accepted and not enforced:
+the depth a thread can reach is set by its stack size, and the limit
+CPython uses to protect its own C stack doesn't mean the same thing on the
+JVM or under ParparVM. Running out of stack still raises `RecursionError`,
+on the JVM and natively alike, because both turn a stack overflow into one,
+so the program doesn't crash; it only gets much deeper first. Four MarkItDown
+tests lower the limit, feed it nested documents, and expect `RecursionError`
+at that depth, where the transpiled side converts the document in full.
+
+*Plugins are requirements.* llm installs plugins with `pip` at run time. An
+application can't install code after it's reviewed and signed, so a plugin
+is listed in `requirements.txt` and built in. `pluggy` finds it through the
+`entry_points.txt` the plugin's package ships, which the build packages with
+it. `pip`, `setuptools` and `wheel` are never
+installed into an application.
+
+==== What the developer gets
+
+* *The library, not a rewrite.* The code that runs on the phone is the code
+  the project's maintainers test, at the version they released.
+* *One build for every platform.* The same sources build for iOS, Android,
+  the desktop and the web, with no interpreter in the application and
+  nothing downloaded at run time.
+* *Native user interface.* The interface is written in Python against
+  Codename One's components, so it looks and behaves like the rest of the
+  platform and needs no web view or bridge.
+* *Problems at build time.* What can't work on a device -- `exec` of a
+  string, a module imported by a computed name -- fails the build when the
+  program reaches it, with every file and line in one message. Five
+  functions of llm and `sqlite-utils` run Python handed to them as text;
+  `llm-mobile/src/cn1-python.properties` leaves them out by name, with no
+  edit to either package (see <<python-directives>>).
+* *Data stays on the device.* MarkItDown converts documents locally, and llm
+  can point at a model running on the local network.
+
+==== Lessons for porting other projects
+
+* *Run the project's own test suite first, not your application.* The suites
+  found the positional-only, `executescript` and cancellation bugs before
+  any screen was written. Run them under CPython as well: a test that fails
+  there is missing an extra, not a bug in the port.
+* *Pin everything.* `requirements.txt` names every transitive dependency
+  at the version the tests were run against. A floating version turns a
+  working build into a different program.
+* *Decide what to leave out.* The build stops on each `exec`, `eval` or
+  `__import__` the program reaches and prints the `remove=` line for them.
+  Most are in command line code an application never needs. For one it
+  does need, `replace=` swaps the function for Java.
+* *Fix the platform, not the library.* An edit to a dependency must be
+  repeated at every upgrade; a fix to the runtime is made once and helps the
+  next project too.
+* *Measure a real workload, not a micro benchmark.* The first MarkItDown
+  measurement was 80 times slower than CPython. Every test passed; the cause
+  was that indexing a string with one character outside Latin-1 counted the
+  string's code points on each access, and `html.parser` indexes the page it
+  parses character by character. Two small runtime fixes brought it to
+  twice CPython's time, and every application that parses text got them.
+* *Keep a CPython comparison running.* `run_heroes.py` refuses a result that
+  differs from CPython's, which is how a path difference in the ZIP
+  converter's output was told apart from a conversion bug.

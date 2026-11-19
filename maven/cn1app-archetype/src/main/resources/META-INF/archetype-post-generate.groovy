@@ -9,16 +9,16 @@ applyJavaVersionTransforms(rootDir, rootPom, resolvedJava);
 
 def projectType = (request.getProperties().getProperty("projectType", "app") ?: "app").trim()
 def platformModules = (request.getProperties().getProperty("platformModules", "none") ?: "none").trim()
-if (!(projectType in ["app", "app-with-backend", "backend-only"])) {
-    throw new IllegalArgumentException("projectType must be app, app-with-backend or backend-only, not '"
+if (!(projectType in ["app", "app-with-backend", "backend-only", "cli"])) {
+    throw new IllegalArgumentException("projectType must be app, app-with-backend, backend-only or cli, not '"
             + projectType + "'")
 }
 def keptModules = parsePlatformModules(platformModules)
-if (projectType == "backend-only") {
+if (projectType == "backend-only" || projectType == "cli") {
     if (!keptModules.isEmpty()) {
-        throw new IllegalArgumentException("A backend-only project has no platform modules; drop -DplatformModules")
+        throw new IllegalArgumentException("A " + projectType + " project has no platform modules; drop -DplatformModules")
     }
-    assembleBackendOnly(rootDir, request)
+    assembleBackendOnly(rootDir, request, projectType == "cli")
 } else {
     pruneModules(rootDir, rootPom, keptModules, projectType == "app-with-backend")
 }
@@ -34,7 +34,7 @@ deleteRecursively(new java.io.File(rootDir, ".cn1-backend-only"))
     }
 }
 
-if (projectType != "backend-only" && request.getProperties().getProperty("ide", null) == "netbeans") {
+if (projectType != "backend-only" && projectType != "cli" && request.getProperties().getProperty("ide", null) == "netbeans") {
     def netbeansDir = new java.io.File(rootDir, "tools/netbeans");
     if (netbeansDir.exists()) {
         netbeansDir.listFiles().each {
@@ -267,9 +267,11 @@ def pruneModules(rootDir, rootPom, keptModules, keepBackend) {
 /**
  * Turns the generated tree into a backend-only project: one module, the server,
  * at the root. Its files are the ones the initializr and the Gradle generators
- * use, staged into .cn1-backend-only/ when the archetype is built.
+ * use, staged into .cn1-backend-only/ when the archetype is built. A command-line
+ * tool (-DprojectType=cli) is the same module with a @Command in place of the
+ * controllers: the packaged binary runs it and exits instead of serving.
  */
-def assembleBackendOnly(rootDir, request) {
+def assembleBackendOnly(rootDir, request, boolean cli) {
     def staged = new java.io.File(rootDir, ".cn1-backend-only")
     def pkg = request.getPackage()
     def props = request.getProperties()
@@ -277,15 +279,21 @@ def assembleBackendOnly(rootDir, request) {
         text.replace("./gradlew __BACKEND__runBackend", "./mvnw cn1:backend")
             .replace("./gradlew __BACKEND__backendPackage", "./mvnw cn1:backend-package")
             .replace("under `runBackend`", "under `cn1:backend`")
+            .replace("-Pcn1.backend.args=", "-Dcn1.backend.args=")
+            .replace("__PROJECT_NAME__", request.getArtifactId())
             .replace("\${package}", pkg)
     }
     def pom = new java.io.File(staged, "backend-only-pom.xml").getText("UTF-8")
             .replace("<groupId>com.example.myapp</groupId>", "<groupId>" + request.getGroupId() + "</groupId>")
             .replace("myappname", request.getArtifactId())
             .replace("<version>1.0-SNAPSHOT</version>", "<version>" + request.getVersion() + "</version>")
-            .replace("<cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>",
+            // Whatever version the template carries: it is the Initializr's, and the
+            // release workflow bumps it to each release (initializr-cn1-version-pr.yml),
+            // so matching a literal 8.0-SNAPSHOT never matched and every backend-only
+            // project was pinned to that release instead of the archetype's version.
+            .replaceFirst("<cn1\\.plugin\\.version>[^<]*</cn1\\.plugin\\.version>",
                     "<cn1.plugin.version>" + props.getProperty("cn1PluginVersion") + "</cn1.plugin.version>")
-            .replace("<cn1.version>8.0-SNAPSHOT</cn1.version>",
+            .replaceFirst("<cn1\\.version>[^<]*</cn1\\.version>",
                     "<cn1.version>" + props.getProperty("cn1Version") + "</cn1.version>")
 
     def keep = ["pom.xml", "mvnw", "mvnw.cmd", ".mvn", ".gitignore", ".cn1-backend-only"] as Set
@@ -295,16 +303,22 @@ def assembleBackendOnly(rootDir, request) {
         }
     }
     new java.io.File(rootDir, "pom.xml").newWriter("UTF-8").withWriter { w -> w << pom }
-    ["application.properties", "application-dev.properties"].each { name ->
+    def templates = cli ? new java.io.File(staged, "cli") : staged
+    (cli ? ["application.properties"] : ["application.properties", "application-dev.properties"]).each { name ->
         new java.io.File(rootDir, name).newWriter("UTF-8").withWriter { w ->
-            w << maven(new java.io.File(staged, name + ".txt").getText("UTF-8"))
+            w << maven(new java.io.File(templates, name + ".txt").getText("UTF-8"))
         }
     }
-    def srcDir = new java.io.File(rootDir, "src/main/java/" + pkg.replace('.', '/'))
-    srcDir.mkdirs()
-    ["Api", "Greeter"].each { name ->
-        new java.io.File(srcDir, name + ".java").newWriter("UTF-8").withWriter { w ->
-            w << maven(new java.io.File(staged, name + ".java.txt").getText("UTF-8"))
+    def pkgPath = pkg.replace('.', '/')
+    def sources = cli ? ["src/main/java": ["Hello"], "src/test/java": ["HelloTest"]]
+                      : ["src/main/java": ["Api", "Greeter"]]
+    sources.each { root, names ->
+        def srcDir = new java.io.File(rootDir, root + "/" + pkgPath)
+        srcDir.mkdirs()
+        names.each { name ->
+            new java.io.File(srcDir, name + ".java").newWriter("UTF-8").withWriter { w ->
+                w << maven(new java.io.File(templates, name + ".java.txt").getText("UTF-8"))
+            }
         }
     }
     def gitignore = new java.io.File(rootDir, ".gitignore")
@@ -312,12 +326,17 @@ def assembleBackendOnly(rootDir, request) {
         gitignore.newWriter("UTF-8").withWriter { w -> w << "target/\n" }
     }
     new java.io.File(rootDir, "README.md").newWriter("UTF-8").withWriter { w ->
-        w << "# " + request.getArtifactId() + "\n\n" +
+        w << (cli ? "# " + request.getArtifactId() + "\n\n" +
+             "A Codename One command-line tool. The commands are the @Command classes under src/main/java.\n\n" +
+             "    ./mvnw cn1:backend -Dcn1.backend.args=\"--help\"   # run it on this JVM\n" +
+             "    ./mvnw cn1:backend-package                         # build a single native executable\n\n" +
+             "Settings are read from application.properties, beside this file.\n" :
+             "# " + request.getArtifactId() + "\n\n" +
              "A Codename One backend. The routes are the @RestController classes under src/main/java.\n\n" +
              "    ./mvnw cn1:backend                   # run it on this JVM\n" +
              "    CN1_PROFILE=dev ./mvnw cn1:backend   # with application-dev.properties\n" +
              "    ./mvnw cn1:backend-package           # build a single native binary\n\n" +
-             "Settings are read from application.properties, beside this file.\n"
+             "Settings are read from application.properties, beside this file.\n")
     }
 }
 
