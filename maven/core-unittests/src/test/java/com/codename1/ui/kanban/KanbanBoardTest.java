@@ -141,6 +141,9 @@ class KanbanBoardTest extends UITestBase {
         to[1] += 4;
         drag(b, from, to);
         assertEquals("bca", ids("todo", null));
+        // one step, and undo puts it back
+        assertTrue(b.undo());
+        assertEquals("abc", ids("todo", null));
     }
 
     @FormTest

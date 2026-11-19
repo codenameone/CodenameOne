@@ -196,7 +196,7 @@ image::img/generated/graph-flowchart.png["Six flow chart symbols in two bands ti
 
 `LayeredArrangement.setRespectLanes(true)` arranges a chart without taking a
 node out of its lane. The layers run along the lanes, and each node stays in
-the band of its own.
+the band of its own. Nodes in no lane go past the last one.
 
 With `setResizable(true)` a selected node shows a handle on each corner, and
 dragging one resizes it. The edges of a lane are dragged the same way. To draw

@@ -5885,6 +5885,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     // released at once: the real release is blocked, and a press with
                     // no release leaves Display repeating the key for as long as
                     // nothing else is typed
+                    if (testRecorder != null) {
+                        testRecorder.eventKeyReleased(letter);
+                    }
                     JavaSEPort.this.windowKeyReleased(windowId, letter);
                 }
                 return;

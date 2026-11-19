@@ -71,7 +71,8 @@ public class GraphGroup {
     }
 
     /// Collapses or expands the group. A model shown by a component is told
-    /// through `GraphModel.setCollapsed`.
+    /// through `GraphModel.setCollapsed`. A lane does not collapse: its band
+    /// is where its members are placed, and the flag is ignored for it.
     public void setCollapsed(boolean collapsed) {
         this.collapsed = collapsed;
     }

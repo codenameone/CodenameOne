@@ -500,7 +500,7 @@
       "id": "kanban-board",
       "category": "Rich components",
       "name": "Kanban board",
-      "description": "Checks the Kanban board with two swimlanes, a column over its limit, a folded column, tagged and badged cards and a selected card, in light and dark themes.",
+      "description": "Checks the Kanban board with two swimlanes and a folded one, a column over its limit, a folded column, tagged and badged cards and a selected card, in light and dark themes.",
       "tests": [
         "KanbanBoardThemeScreenshotTest"
       ]

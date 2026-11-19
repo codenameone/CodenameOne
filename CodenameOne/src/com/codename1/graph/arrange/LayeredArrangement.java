@@ -100,7 +100,8 @@ public class LayeredArrangement implements GraphArrangement {
     ///
     /// It applies to lanes that run along the direction: horizontal lanes
     /// with `LEFT_TO_RIGHT`, vertical ones with `TOP_TO_BOTTOM`. A lane lying
-    /// the other way, and a node in no lane, are arranged as without it. An
+    /// the other way is treated as no lane. The nodes in no lane keep the
+    /// arrangement they had among themselves, placed past the last lane. An
     /// edge gets no route through hidden points then, since a node moved
     /// into its band is no longer where the route went around it. Off by
     /// default.
@@ -139,6 +140,29 @@ public class LayeredArrangement implements GraphArrangement {
         }
         for (int i = 0; i < n; i++) {
             along[i] += start + nodeGap;
+        }
+        // the nodes in no lane keep their own arrangement, moved past the
+        // last lane so that none of them lands in a lane's band
+        double laneEnd = 0;
+        double freeStart = 0;
+        boolean anyFree = false;
+        for (int i = 0; i < n; i++) {
+            if (laneOf[i] != null) {
+                GraphGroup lane = laneOf[i];
+                laneEnd = Math.max(laneEnd, tb ? lane.getX() + lane.getWidth() : lane.getY() + lane.getHeight());
+            } else {
+                double s = center[i] - breadth[i] / 2;
+                freeStart = anyFree ? Math.min(freeStart, s) : s;
+                anyFree = true;
+            }
+        }
+        if (anyFree) {
+            double shift = laneEnd + nodeGap - freeStart;
+            for (int i = 0; i < n; i++) {
+                if (laneOf[i] == null) {
+                    center[i] += shift;
+                }
+            }
         }
         boolean[] done = new boolean[n];
         for (int i = 0; i < n; i++) {

@@ -239,9 +239,10 @@ public class UndoHistory {
     }
 
     private void fireChanged() {
-        int n = listeners.size();
-        for (int i = 0; i < n; i++) {
-            listeners.get(i).historyChanged(this);
+        // a copy: a listener may add or remove listeners while it is told
+        UndoHistoryListener[] all = listeners.toArray(new UndoHistoryListener[listeners.size()]);
+        for (int i = 0; i < all.length; i++) {
+            all[i].historyChanged(this);
         }
     }
 

@@ -228,6 +228,8 @@ public class NodeGraph extends Container {
     // the ports the factory had no editor for, with the value each had then:
     // it is asked again only once that value changes
     private final Map<String, Object> declinedPorts = new HashMap<String, Object>();
+    // stands for a null value in declinedPorts
+    private static final Object NO_VALUE = new Object();
     private GraphJson.UserDataCodec userDataCodec;
     private int pasteCount;
 
@@ -1543,7 +1545,7 @@ public class NodeGraph extends Container {
                 String key = n.getId() + "\n" + p.getId();
                 Component c = portEditors.get(key);
                 if (onScreen && !isPortConnected(n, p)) {
-                    Object v = p.getValue() == null ? declinedPorts : p.getValue();
+                    Object v = p.getValue() == null ? NO_VALUE : p.getValue();
                     if (c == null && !v.equals(declinedPorts.get(key))) {
                         // a factory that had no editor for a port is asked again
                         // once its value changes: the answer may depend on it

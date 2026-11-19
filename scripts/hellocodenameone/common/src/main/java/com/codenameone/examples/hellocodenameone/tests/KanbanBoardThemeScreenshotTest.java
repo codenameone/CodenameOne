@@ -68,6 +68,7 @@ public class KanbanBoardThemeScreenshotTest extends DualAppearanceBaseTest {
         model.addColumn(new KanbanColumn("done", "Done").setCollapsed(true));
         model.addLane(new KanbanLane("app", "App"));
         model.addLane(new KanbanLane("server", "Server"));
+        model.addLane(new KanbanLane("docs", "Docs").setCollapsed(true));
         model.addCard("todo", new KanbanCard("c1", "Dark mode for the settings screen")
                 .setLaneId("app").addTag("ui").setBadge("3d").setStyleKey("feature"));
         model.addCard("todo", new KanbanCard("c2", "Crash on rotate")
@@ -78,6 +79,7 @@ public class KanbanBoardThemeScreenshotTest extends DualAppearanceBaseTest {
         model.addCard("todo", new KanbanCard("c5", "Rate limit the login").setLaneId("server").addTag("security"));
         model.addCard("doing", new KanbanCard("c6", "Move reports to a queue").setLaneId("server").setBadge("1w"));
         model.addCard("done", new KanbanCard("c7", "Upgrade the database").setLaneId("server"));
+        model.addCard("todo", new KanbanCard("c8", "Guide chapter").setLaneId("docs"));
 
         KanbanBoard board = new KanbanBoard(model);
         DefaultKanbanCardRenderer renderer = new DefaultKanbanCardRenderer();

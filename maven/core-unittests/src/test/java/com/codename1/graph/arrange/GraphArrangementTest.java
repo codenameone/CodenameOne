@@ -245,4 +245,27 @@ class GraphArrangementTest {
             assertEquals(plain.getPosition(id)[1], across.getPosition(id)[1], 0.001);
         }
     }
+
+    @Test
+    void layeredPutsNodesInNoLanePastTheLanes() {
+        DefaultGraphModel m = new DefaultGraphModel();
+        m.addGroup(GraphGroup.lane("top", "Top", true, 0, 0, 900, 120));
+        m.addGroup(GraphGroup.lane("low", "Low", true, 0, 120, 900, 120));
+        String[] ids = {"a", "b", "c", "d", "e"};
+        for (int i = 0; i < ids.length; i++) {
+            GraphNode n = new GraphNode(ids[i], ids[i], 0, 0, 100, 40);
+            n.setGroupId(i < 2 ? "top" : i < 4 ? "low" : null);
+            m.addNode(n);
+        }
+        m.addEdge("a", "b");
+        m.addEdge("a", "c");
+        m.addEdge("a", "e");
+        m.addEdge("c", "d");
+        LayeredArrangement lay = new LayeredArrangement();
+        lay.setDirection(LayeredArrangement.LEFT_TO_RIGHT);
+        lay.setRespectLanes(true);
+        ArrangementResult r = lay.arrange(m);
+        assertNoOverlap(m, r);
+        assertTrue(r.getPosition("e")[1] >= 240, "e is at " + r.getPosition("e")[1] + ", inside a lane");
+    }
 }
