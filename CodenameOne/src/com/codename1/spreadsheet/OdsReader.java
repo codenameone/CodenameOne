@@ -686,6 +686,12 @@ final class OdsReader {
                 literal(sb, s, date ? " -/:.," : percent ? " $-+()%" : " $-+()");
             } else if ("currency-symbol".equals(tag)) {
                 literal(sb, x.elementText(), "$");
+            } else if ("number".equals(tag) && x.attr("number:decimal-places") == null
+                    && x.attr("number:min-integer-digits") == null && !x.boolAttr("number:grouping")
+                    && x.attr("number:display-factor") == null && x.attr("number:min-decimal-places") == null) {
+                // a number with nothing said about its digits is General, as LibreOffice reads it
+                // and as CellFormat writes a General section
+                sb.append("General");
             } else if ("number".equals(tag)) {
                 int decimals = x.intAttr("number:decimal-places", 0);
                 int minDecimals = Math.min(decimals, x.intAttr("number:min-decimal-places", decimals));

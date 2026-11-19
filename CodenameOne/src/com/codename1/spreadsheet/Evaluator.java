@@ -133,10 +133,10 @@ final class Evaluator {
     static final long MAX_ARRAY_TEXT = 4L * 1024 * 1024;
 
     /// How deep evaluation may go, defined names included. One formula is held to
-    /// FormulaParser.MAX_DEPTH, but names chain formulas into each other, and a file could
-    /// nest them past any stack; past this the result is #NUM!, Excel's error for a
-    /// calculation it cannot finish.
-    static final int MAX_EVAL_DEPTH = FormulaParser.MAX_DEPTH + 32;
+    /// FormulaParser.MAX_DEPTH, so a formula at its limit using a name at its limit fits;
+    /// names chained further could nest past any stack, and past this the result is #NUM!,
+    /// Excel's error for a calculation it cannot finish.
+    static final int MAX_EVAL_DEPTH = 2 * FormulaParser.MAX_DEPTH + 32;
 
     private int evalDepth;
 

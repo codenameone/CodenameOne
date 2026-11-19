@@ -532,7 +532,8 @@ final class CellFormat {
     /// OpenDocument spells sections. Answers false, and writes nothing, for a format that
     /// needs no style.
     boolean writeOds(XmlOut x, String name) throws java.io.IOException {
-        if (isGeneral() || sections[0].tokens.isEmpty()) {
+        // an empty first section with others after it is a format (;;; hides everything)
+        if (isGeneral() || sections[0].tokens.isEmpty() && sections.length == 1) {
             return false;
         }
         // the number sections; a fourth is for text. A section may be empty (the "hide"

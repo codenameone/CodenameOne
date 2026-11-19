@@ -905,7 +905,9 @@ class SpreadsheetHostileFileTest extends UITestBase {
 
     @Test
     void roundEightLosses() throws Exception {
-        // names nested in names are held to one depth, on a small stack too
+        // names nested in names are held to one depth, on a small stack too. 1 MB, not
+        // less: the coverage agent the build runs tests under makes every frame larger, and
+        // a plain 512 KB thread calculates both cases below.
         final StringBuilder failure = new StringBuilder();
         Thread t = new Thread(null, new Runnable() {
             public void run() {
@@ -932,11 +934,33 @@ class SpreadsheetHostileFileTest extends UITestBase {
                     failure.append(err);
                 }
             }
-        }, "small", 512 * 1024);
+        }, "small", 1024 * 1024);
         t.start();
         t.join(60000);
         same(Boolean.FALSE, Boolean.valueOf(t.isAlive()), "the nested names finished");
         same("", failure.toString(), "nested names");
+        // one name at the limit, used by a formula at the limit, still calculates
+        final StringBuilder single = new StringBuilder();
+        Thread one = new Thread(null, new Runnable() {
+            public void run() {
+                try {
+                    Workbook w = new Workbook();
+                    Sheet s = w.addSheet("S");
+                    w.setDefinedName("Rate", "=" + repeat("ABS(", 63) + repeat("(", 61) + "-2" + repeat(")", 61)
+                            + repeat(")", 63));
+                    s.setCellFormula("A1", "=" + repeat("ABS(", 64) + "Rate" + repeat(")", 64));
+                    w.recalculate();
+                    if (!Double.valueOf(2).equals(s.getCellValue("A1"))) {
+                        single.append("a name in a formula gave ").append(s.getCellValue("A1"));
+                    }
+                } catch (Throwable err) {
+                    single.append(err);
+                }
+            }
+        }, "small-one", 1024 * 1024);
+        one.start();
+        one.join(60000);
+        same("", single.toString(), "one deep name");
         // 64 functions nested is Excel's limit, and parentheses are not functions
         Sheet s = new Workbook().addSheet("S");
         s.setCellFormula("A1", "=" + repeat("ABS(", 64) + "-1" + repeat(")", 64));
@@ -950,7 +974,7 @@ class SpreadsheetHostileFileTest extends UITestBase {
             // Excel refuses it too
         }
         // every section of a format survives OpenDocument: empty ones, dates, text
-        String[] codes = {"0;;;", "0;;;@", "0;-0;", "0;-0;;@", "yyyy-mm-dd;-0;0;@", "0;-0;0;\"x\"",
+        String[] codes = {";;;", ";0", "General;General;;", "0;;;", "0;;;@", "0;-0;", "0;-0;;@", "yyyy-mm-dd;-0;0;@", "0;-0;0;\"x\"",
             "[>100]0;[<0]0;0;@"};
         Object[] values = {Double.valueOf(5), Double.valueOf(-5), Double.valueOf(0), "tx", Double.valueOf(500)};
         Workbook formats = new Workbook();
