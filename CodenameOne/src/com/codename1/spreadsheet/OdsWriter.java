@@ -383,7 +383,10 @@ final class OdsWriter {
             if (cell.arrayFormula || book.spreads(cell)) {
                 // a one-cell matrix: LibreOffice then calculates the formula over arrays, as
                 // this evaluator did, instead of meeting each range at the formula's row
-                x.raw(" table:number-matrix-columns-spanned=\"1\" table:number-matrix-rows-spanned=\"1\"");
+                int cols = cell.arrayFormula ? cell.arrayCols : 1;
+                int rows = cell.arrayFormula ? cell.arrayRows : 1;
+                x.raw(" table:number-matrix-columns-spanned=\"" + cols + "\" table:number-matrix-rows-spanned=\""
+                        + rows + "\"");
             }
         } else if (cell.formulaText != null && cell.odsSyntax) {
             x.attr("table:formula", "of:=" + cell.formulaText);
@@ -393,9 +396,11 @@ final class OdsWriter {
         if (v instanceof Double) {
             double d = ((Double) v).doubleValue();
             // past Excel's last day a date has no four-digit year, and the number is kept instead
-            // a serial before day 1 is no date of the 1900 calendar, so outside a time-only
+            // a serial before day 1, and day 60 -- Excel's 29 February 1900 -- are no dates
+            // of the 1900 calendar an OpenDocument file can name, so outside a time-only
             // format it stays a number under its date style
-            if (format.isDate() && d >= 0 && d <= DateFunctions.LAST_DAY && (d >= 1 || format.isTimeOnly())) {
+            if (format.isDate() && d >= 0 && d <= DateFunctions.LAST_DAY && (d >= 1 || format.isTimeOnly())
+                    && (book.isDate1904() || Math.floor(d) != 60 || format.isTimeOnly())) {
                 StringBuilder sb = new StringBuilder();
                 // nanoseconds, so a time reads back as the number it was, not whole seconds
                 long nanos = (long) Math.floor((d - Math.floor(d)) * 86400.0E9 + 0.5);

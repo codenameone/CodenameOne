@@ -485,6 +485,8 @@ final class OdsReader {
         int spanColumns = x.intAttr("table:number-columns-spanned", 1);
         int spanRows = x.intAttr("table:number-rows-spanned", 1);
         boolean array = x.attr("table:number-matrix-columns-spanned") != null;
+        int matrixColumns = x.intAttr("table:number-matrix-columns-spanned", 1);
+        int matrixRows = x.intAttr("table:number-matrix-rows-spanned", 1);
         String end = covered ? "covered-table-cell" : "table-cell";
 
         text.setLength(0);
@@ -599,6 +601,9 @@ final class OdsReader {
             if (formulaText != null) {
                 if (i == 0) {
                     sheet.loadFormula(row, c, formulaText, true, value, value != null, array);
+                    if (array) {
+                        book.arraySpan(sheet, row, c, matrixRows, matrixColumns);
+                    }
                     node = sheet.cell(row, c).formula;
                 } else if (node != null) {
                     sheet.loadFormula(row, c, FormulaParser.shift(node, 0, i), value, value != null, false);

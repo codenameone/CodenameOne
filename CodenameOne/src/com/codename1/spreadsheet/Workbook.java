@@ -161,6 +161,77 @@ public final class Workbook {
     private final ArrayList<CellFormat> formats = new ArrayList<CellFormat>();
     private final HashMap<String, Integer> formatIndex = new HashMap<String, Integer>();
     private final Evaluator evaluator = new Evaluator(this);
+    private ArrayList<Object[]> arraySpans;
+
+    /// A reader found an array formula filling several cells. Applied once every cell is
+    /// read, since the cells it fills come after the one holding it.
+    void arraySpan(Sheet sheet, int row, int col, int rows, int cols) {
+        if (rows * (long) cols <= 1 || rows < 1 || cols < 1) {
+            return;
+        }
+        if (arraySpans == null) {
+            arraySpans = new ArrayList<Object[]>();
+        }
+        arraySpans.add(new Object[] {sheet, new int[] {row, col, rows, cols}});
+    }
+
+    private void applyArraySpans() {
+        if (arraySpans == null) {
+            return;
+        }
+        for (Object[] span : arraySpans) {
+            Sheet sheet = (Sheet) span[0];
+            int[] at = (int[]) span[1];
+            Cell anchor = sheet.cell(at[0], at[1]);
+            if (anchor == null || anchor.formula == null || !anchor.arrayFormula) {
+                continue;
+            }
+            int rows = Math.min(at[2], Node.MAX_ROW + 1 - at[0]);
+            int cols = Math.min(at[3], Node.MAX_COL + 1 - at[1]);
+            allocated((long) rows * cols);
+            anchor.arrayRows = rows;
+            anchor.arrayCols = cols;
+            for (int r = 0; r < rows; r++) {
+                for (int c = 0; c < cols; c++) {
+                    if (r == 0 && c == 0) {
+                        continue;
+                    }
+                    Cell member = sheet.ensure(at[0] + r, at[1] + c);
+                    if (member.formula == null) {
+                        member.arrayAnchor = anchor;
+                    }
+                }
+            }
+        }
+        arraySpans = null;
+    }
+
+    /// Hands the elements of an array formula's result to the other cells it fills.
+    private void distribute(Cell anchor, Object[][] m, Object scalar) {
+        for (int r = 0; r < anchor.arrayRows; r++) {
+            for (int c = 0; c < anchor.arrayCols; c++) {
+                if (r == 0 && c == 0) {
+                    continue;
+                }
+                Cell member = anchor.sheet.cell(anchor.row + r, anchor.col + c);
+                if (member == null || member.arrayAnchor != anchor || !member.isArrayMember()) { //NOPMD CompareObjectsWithEquals - a cell is an identity
+                    continue;
+                }
+                Object v;
+                if (m == null) {
+                    v = scalar;
+                } else {
+                    // a one row or one column result repeats along the other dimension, as Excel
+                    // fills a range larger than the result; past it is #N/A
+                    int rr = m.length == 1 ? 0 : r;
+                    int cc = m.length > 0 && m[0].length == 1 ? 0 : c;
+                    v = rr < m.length && cc < m[rr].length ? m[rr][cc] : CellError.NA;
+                }
+                member.value = v;
+                member.state = Cell.CLEAN;
+            }
+        }
+    }
 
     /// Whether a formula takes a range or an array whole where one value is wanted, so a
     /// writer saves it as an array formula. A formula read from a file and never calculated
@@ -242,6 +313,7 @@ public final class Workbook {
                     CsvFiles.read(book, in, ',', true);
                     break;
             }
+            book.applyArraySpans();
         } catch (IllegalArgumentException e) {
             // a cell outside what a sheet holds, or more cells than are read: the file is at
             // fault, and a file at fault is what IOException says
@@ -937,12 +1009,19 @@ public final class Workbook {
             // everything this cell reads directly is up to date
             stack.remove(top);
             Object v;
-            if (c.formula == null) {
+            if (c.formula == null && c.isArrayMember()) {
+                // filled by its array formula, which hands it its element
+                valueOf(c.arrayAnchor);
+                v = c.value;
+            } else if (c.formula == null) {
                 v = c.value;
             } else {
                 v = evaluator.evaluate(c.formula, c.sheet, c.row, c.col, c.arrayFormula);
                 c.spreads = evaluator.lastSpread;
                 c.spreadsKnown = true;
+                if (c.arrayRows * c.arrayCols > 1 && c.arrayFormula) {
+                    distribute(c, evaluator.lastMatrix, v);
+                }
             }
             int last = visiting.size() - 1;
             if (last >= 0 && visiting.get(last) == c) { //NOPMD CompareObjectsWithEquals - a cell is an identity
@@ -1221,6 +1300,19 @@ public final class Workbook {
         if (reader.state == Cell.CLEAN && reader.formula != null && reader.sheet != null) {
             reader.state = Cell.DIRTY;
             queue.add(reader);
+            if (reader.arrayFormula && reader.arrayRows * reader.arrayCols > 1) {
+                // the cells it fills change with it, and whatever reads them
+                for (int r = 0; r < reader.arrayRows; r++) {
+                    for (int c = 0; c < reader.arrayCols; c++) {
+                        Cell member = r == 0 && c == 0 ? null : reader.sheet.cell(reader.row + r, reader.col + c);
+                        if (member != null && member.arrayAnchor == reader && member.isArrayMember() //NOPMD CompareObjectsWithEquals - a cell is an identity
+                                && member.state == Cell.CLEAN) {
+                            member.state = Cell.DIRTY;
+                            queue.add(member);
+                        }
+                    }
+                }
+            }
         }
     }
 

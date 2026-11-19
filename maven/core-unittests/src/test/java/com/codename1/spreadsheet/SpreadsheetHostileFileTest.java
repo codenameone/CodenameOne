@@ -116,6 +116,12 @@ class SpreadsheetHostileFileTest extends UITestBase {
     /// The same XLSX with every array mark taken off its formulas, as Excel 365 writes a
     /// dynamic-array formula.
     private static byte[] stripArray(byte[] xlsx) throws IOException {
+        return rewriteSheet(xlsx, null, null);
+    }
+
+    /// The same XLSX with one text of its worksheets replaced, or with every array mark taken
+    /// off when the text is null.
+    private static byte[] rewriteSheet(byte[] xlsx, String from, String to) throws IOException {
         java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(new ByteArrayInputStream(xlsx));
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         java.util.zip.ZipOutputStream out = new java.util.zip.ZipOutputStream(bytes);
@@ -127,7 +133,9 @@ class SpreadsheetHostileFileTest extends UITestBase {
             }
             byte[] data = part.toByteArray();
             if (e.getName().startsWith("xl/worksheets/")) {
-                data = new String(data, "UTF-8").replaceAll("<f t=\"array\" ref=\"[A-Z0-9]+\">", "<f>").getBytes("UTF-8");
+                String text = new String(data, "UTF-8");
+                text = from == null ? text.replaceAll("<f t=\"array\" ref=\"[A-Z0-9]+\">", "<f>") : text.replace(from, to);
+                data = text.getBytes("UTF-8");
             }
             out.putNextEntry(new java.util.zip.ZipEntry(e.getName()));
             out.write(data);
@@ -984,6 +992,53 @@ class SpreadsheetHostileFileTest extends UITestBase {
         if (new String(unzip(oout.toByteArray(), "content.xml"), "UTF-8").indexOf("number-matrix-columns-spanned") < 0) {
             wrong.append("\nthe ODS cell is no matrix formula");
         }
+        Sheet lk = new Workbook().addSheet("L");
+        for (int r = 0; r < 3; r++) {
+            lk.setCellValue(r, 0, Double.valueOf(r + 1));
+        }
+        String[][] lifted = {
+            {"=SUM(VLOOKUP(A1:A3,A1:A3,1,0))", "6"}, {"=SUM(MATCH(A1:A3,A1:A3,0))", "6"},
+            {"=SUM(COUNTIF(A1:A3,A1:A3))", "3"}, {"=SUM(CHOOSE({1,2},10,20))", "30"}, {"=SUM(INDEX(A1:A3,{1,2}))", "3"},
+        };
+        for (int i = 0; i < lifted.length; i++) {
+            lk.setCellFormula(10, i, lifted[i][0]);
+            same(Double.valueOf(lifted[i][1]), lk.getCellValue(10, i), lifted[i][0]);
+        }
+        // an array formula filling A1:A3, as Excel writes one entered with Ctrl+Shift+Enter
+        Workbook cse = new Workbook();
+        Sheet cs = cse.addSheet("C");
+        for (int r = 0; r < 3; r++) {
+            cs.setCellValue(r, 1, Double.valueOf(r + 1));
+        }
+        cs.setCellFormula(0, 0, "=B1:B3*2");
+        ByteArrayOutputStream cout = new ByteArrayOutputStream();
+        cse.write(cout, Workbook.Format.XLSX);
+        byte[] spanned = rewriteSheet(cout.toByteArray(), "<f>B1:B3*2</f>", "<f t=\"array\" ref=\"A1:A3\">B1:B3*2</f>");
+        for (Workbook.Format f : new Workbook.Format[] {Workbook.Format.XLSX, Workbook.Format.ODS}) {
+            Workbook in = Workbook.read(new ByteArrayInputStream(spanned), Workbook.Format.XLSX);
+            if (f == Workbook.Format.ODS) {
+                ByteArrayOutputStream o = new ByteArrayOutputStream();
+                in.write(o, Workbook.Format.ODS);
+                in = Workbook.read(new ByteArrayInputStream(o.toByteArray()), Workbook.Format.ODS);
+            }
+            Sheet ins = in.getSheet(0);
+            ins.setCellValue(1, 1, Double.valueOf(10));
+            same(Double.valueOf(20), ins.getCellValue(1, 0), f + ": a cell an array formula fills follows it");
+            same(Double.valueOf(6), ins.getCellValue(2, 0), f + ": the last cell it fills");
+            ByteArrayOutputStream o = new ByteArrayOutputStream();
+            in.write(o, Workbook.Format.XLSX);
+            if (new String(unzip(o.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8").indexOf("ref=\"A1:A3\"") < 0) {
+                wrong.append("\n").append(f).append(": the array formula no longer fills A1:A3");
+            }
+        }
+        Workbook leap = new Workbook();
+        Sheet ls = leap.addSheet("D");
+        ls.setCellValue(0, 0, Double.valueOf(60));
+        ls.setCellFormat(0, 0, "yyyy-mm-dd");
+        ByteArrayOutputStream lout = new ByteArrayOutputStream();
+        leap.write(lout, Workbook.Format.ODS);
+        same("1900-02-29", Workbook.read(new ByteArrayInputStream(lout.toByteArray()), Workbook.Format.ODS).getSheet(0)
+                .getCellText(0, 0), "day 60 through OpenDocument");
         scal.setCellFormula(1, 9, "=VALUE(Z9)");
         same(Double.valueOf(0), scal.getCellValue(1, 9), "VALUE of a blank cell");
         Workbook tw = new Workbook();

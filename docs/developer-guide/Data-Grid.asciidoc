@@ -576,7 +576,8 @@ A few things work differently from Excel:
 * A formula that returns an array shows its first value, and that value is
   what another cell reads from it. Results don't spill into the neighboring
   cells: a formula that needs the whole array wraps the call that makes it, as
-  in `=SUM(SEQUENCE(3))`.
+  in `=SUM(SEQUENCE(3))`. An array formula a file brings that fills several
+  cells, as one entered in Excel with Ctrl+Shift+Enter, keeps filling them.
 * A range given where one value is wanted is taken whole, as Excel 365 takes
   it: `=SUM(ABS(A1:A3))` adds all three. Older spreadsheet applications take
   the cell in the formula's own row instead, so the writers save such a

@@ -429,7 +429,10 @@ final class XlsxWriter {
         x.raw(">");
         if (formula != null) {
             if (cell.arrayFormula || book.spreads(cell)) {
-                x.raw("<f t=\"array\"").attr("ref", ref(row, col)).raw(">");
+                // an array formula filling several cells names all of them
+                String span = cell.arrayFormula && cell.arrayRows * cell.arrayCols > 1
+                        ? ref(row, col) + ":" + ref(row + cell.arrayRows - 1, col + cell.arrayCols - 1) : ref(row, col);
+                x.raw("<f t=\"array\"").attr("ref", span).raw(">");
             } else {
                 x.raw("<f>");
             }

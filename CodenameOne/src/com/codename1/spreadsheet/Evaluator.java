@@ -52,6 +52,9 @@ final class Evaluator {
     private boolean spread;
     /// What spread was for the last formula evaluate finished.
     boolean lastSpread;
+    /// The whole result of the last formula evaluate finished, when it was an array.
+    Object[][] lastMatrix;
+    private Object[][] matrixResult;
     private int nameDepth;
     boolean skipSubtotals;
     private final ArrayList<String> letNames = new ArrayList<String>();
@@ -70,6 +73,8 @@ final class Evaluator {
         int savedDepth = argDepth;
         boolean savedSpread = spread;
         spread = false;
+        Object[][] savedMatrix = matrixResult;
+        matrixResult = null;
         int savedLets = letNames.size();
         sheet = inSheet;
         row = inRow;
@@ -88,6 +93,8 @@ final class Evaluator {
             argDepth = savedDepth;
             lastSpread = spread;
             spread = savedSpread;
+            lastMatrix = matrixResult;
+            matrixResult = savedMatrix;
             while (letNames.size() > savedLets) {
                 letNames.remove(letNames.size() - 1);
                 letValues.remove(letValues.size() - 1);
@@ -103,10 +110,12 @@ final class Evaluator {
             } else if (!arrayFormula) {
                 v = intersectImplicitly(r);
             } else {
+                matrixResult = matrix(r);
                 v = value(r.sheet, r.r1, r.c1);
             }
         } else if (v instanceof Object[][]) {
             Object[][] m = (Object[][]) v;
+            matrixResult = m;
             spread = true;
             v = m.length == 0 || m[0].length == 0 ? null : m[0][0];
         }
@@ -523,7 +532,7 @@ final class Evaluator {
             if ((info & Functions.SCALAR) != 0) {
                 return liftCall(info, name, args);
             }
-            return Functions.call(info, name, this, args);
+            return callLifted(info, name, args);
         } catch (EvalError e) {
             return e.error; //NOPMD UnnecessaryLocalBeforeReturn - the caught error carries the value
         } finally {
@@ -663,7 +672,23 @@ final class Evaluator {
                 if (a.length < 2) {
                     return CellError.VALUE;
                 }
-                Object index = scalar(eval(a[0]));
+                Object first = operand(eval(a[0]));
+                if (first instanceof Object[][]) {
+                    // an array of choices: one per element, as Excel 365 answers
+                    Object[][] m = (Object[][]) first;
+                    spread = true;
+                    Object[][] out = new Object[m.length][width(m)];
+                    for (int r = 0; r < m.length; r++) {
+                        for (int c = 0; c < out[r].length; c++) {
+                            Object e = m[r][c];
+                            int k = e instanceof CellError ? -1 : (int) Math.floor(Values.num(e));
+                            out[r][c] = e instanceof CellError ? e : k < 1 || k >= a.length ? CellError.VALUE
+                                    : scalar(operand(eval(a[k])));
+                        }
+                    }
+                    return out;
+                }
+                Object index = first;
                 if (index instanceof CellError) {
                     return index;
                 }
@@ -812,13 +837,78 @@ final class Evaluator {
         spread = true;
     }
 
+    /// The arguments of the function being called, so scalar can tell an argument that is an
+    /// array from an array the function made itself.
+    private Object[] callArgs;
+    private int liftArg;
+
+    /// Calls a function, and when it wants one value of an argument that holds several, calls
+    /// it once per element instead and answers the array of results.
+    private Object callLifted(int info, String name, Object[] args) {
+        Object[] saved = callArgs;
+        callArgs = args;
+        try {
+            return Functions.call(info, name, this, args);
+        } catch (EvalError e) {
+            if (e != EvalError.LIFT) { //NOPMD CompareObjectsWithEquals - the signal is a constant
+                throw e;
+            }
+        } finally {
+            callArgs = saved;
+        }
+        spread = true;
+        int at = liftArg;
+        Object[][] m = matrix(args[at]);
+        Object[][] out = new Object[m.length][width(m)];
+        for (int r = 0; r < m.length; r++) {
+            for (int c = 0; c < out[r].length; c++) {
+                Object[] one = new Object[args.length];
+                System.arraycopy(args, 0, one, 0, args.length);
+                one[at] = m[r][c];
+                Object v;
+                try {
+                    v = callLifted(info, name, one);
+                } catch (EvalError e) {
+                    v = e.error;
+                }
+                if (v instanceof Object[][]) {
+                    Object[][] inner = (Object[][]) v;
+                    v = inner.length == 0 || inner[0].length == 0 ? null : inner[0][0];
+                } else if (v instanceof Ref) {
+                    v = scalar(v);
+                }
+                out[r][c] = v;
+            }
+        }
+        return out;
+    }
+
+    private boolean isArgument(Object v) {
+        if (callArgs == null) {
+            return false;
+        }
+        for (int i = 0; i < callArgs.length; i++) {
+            if (callArgs[i] == v) { //NOPMD CompareObjectsWithEquals - which argument, by identity
+                liftArg = i;
+                return true;
+            }
+        }
+        return false;
+    }
+
     Object scalar(Object v) {
         if (v instanceof Ref) {
             Ref r = (Ref) v;
+            if (!r.isSingleCell() && r.next == null && r.lastSheet == null && isArgument(v)) {
+                throw EvalError.LIFT;
+            }
             return value(r.sheet, r.r1, r.c1);
         }
         if (v instanceof Object[][]) {
             Object[][] m = (Object[][]) v;
+            if ((m.length > 1 || m.length == 1 && m[0].length > 1) && isArgument(v)) {
+                throw EvalError.LIFT;
+            }
             return m.length == 0 || m[0].length == 0 ? null : m[0][0];
         }
         return v == MISSING ? null : v;

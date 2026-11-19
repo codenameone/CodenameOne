@@ -53,6 +53,24 @@ final class Cell {
     /// Whether spreads has been worked out: a formula read from a file keeps its cached value
     /// and is not calculated until something it reads changes.
     boolean spreadsKnown;
+    /// The rows and columns an array formula fills, on the cell that holds it; 1 by 1 for a
+    /// formula of one cell.
+    int arrayRows = 1;
+    int arrayCols = 1;
+    /// On the other cells an array formula fills: the cell that holds it. Their values are
+    /// the elements of its result.
+    Cell arrayAnchor;
+
+    /// Whether this cell is one an array formula of several cells fills, other than its own.
+    boolean isArrayMember() {
+        Cell a = arrayAnchor;
+        if (a == null || a.formula == null || !a.arrayFormula || a.sheet != sheet) { //NOPMD CompareObjectsWithEquals - a sheet is an identity
+            return false;
+        }
+        int dr = row - a.row;
+        int dc = col - a.col;
+        return dr >= 0 && dc >= 0 && dr < a.arrayRows && dc < a.arrayCols && (dr > 0 || dc > 0);
+    }
     // the format came from a typed formula such as =TODAY(), and goes when the formula does
     boolean autoFormat;
     // calls a function this package does not have: the value its file stored stands until

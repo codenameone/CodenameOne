@@ -34,6 +34,9 @@ final class EvalError extends RuntimeException {
     static final EvalError NAME = new EvalError(CellError.NAME);
     static final EvalError NULL = new EvalError(CellError.NULL);
     static final EvalError CIRCULAR = new EvalError(CellError.CIRCULAR);
+    /// Thrown by Evaluator.scalar when a function's argument is an array where the function
+    /// wants one value: the call is then made once per element, as Excel 365 makes it.
+    static final EvalError LIFT = new EvalError(CellError.VALUE);
 
     final transient CellError error;
 

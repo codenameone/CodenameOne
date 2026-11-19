@@ -399,6 +399,7 @@ final class XlsxReader {
         String formula = null;
         Node sharedNode = null;
         boolean array = false;
+        String arrayRef = null;
         boolean hasFormula = false;
         for (int e = x.next(); e != XmlScanner.EOF; e = x.next()) {
             if (e == XmlScanner.END && "c".equals(x.name)) {
@@ -414,6 +415,7 @@ final class XlsxReader {
             } else if ("f".equals(x.name)) {
                 String kind = x.attr("t");
                 int si = x.intAttr("si", -1);
+                arrayRef = x.attr("ref");
                 String text = x.elementText();
                 if ("dataTable".equals(kind)) {
                     continue;
@@ -497,6 +499,10 @@ final class XlsxReader {
                 sheet.loadFormula(row, col, sharedNode, value, hasValue, false);
             } else {
                 sheet.loadFormula(row, col, formula, false, value, hasValue, array);
+                int[] span = array ? range(arrayRef) : null;
+                if (span != null && span[0] == row && span[1] == col) {
+                    book.arraySpan(sheet, row, col, span[2] - span[0] + 1, span[3] - span[1] + 1);
+                }
             }
         } else if (value != null) {
             sheet.storeRaw(row, col, value);
