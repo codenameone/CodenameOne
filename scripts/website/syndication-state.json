@@ -3447,6 +3447,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-19T01:01:10+00:00"
+      },
+      "devto": {
+        "id": 5074693,
+        "url": "https://dev.to/codenameone/debug-your-dart-in-a-java-debugger-and-jfx-central-on-a-phone-366e",
+        "syndicated_at": "2026-11-19T14:01:11+00:00"
       }
     }
   }
