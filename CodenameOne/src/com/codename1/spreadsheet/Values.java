@@ -413,7 +413,9 @@ final class Values {
     /// produced here, not by `Double.toString`: 0.1+0.2 has to read `0.3`, and the same on
     /// every platform.
     static String general(double d) {
-        if (d == 0) {
+        // A spreadsheet holds nothing smaller than the smallest normal double, and shows such
+        // a number as 0; the digits of one would also need more precision than a long scales to.
+        if (d == 0 || Math.abs(d) < 2.2250738585072014E-308) {
             return "0";
         }
         if (Double.isNaN(d) || Double.isInfinite(d)) {

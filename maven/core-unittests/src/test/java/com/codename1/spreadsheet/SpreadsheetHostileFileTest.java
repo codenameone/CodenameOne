@@ -817,6 +817,27 @@ class SpreadsheetHostileFileTest extends UITestBase {
         same("4.00E-320", CellFormat.format("0.00E+00", Double.valueOf(4e-320), false), "a subnormal number");
         same("4.94E-324", CellFormat.format("0.00E+00", Double.valueOf(Double.MIN_VALUE), false), "the smallest number");
         same("40.0E-321", CellFormat.format("##0.0E+0", Double.valueOf(4e-320), false), "in engineering notation");
+        // nothing smaller than the smallest normal number is shown with digits it does not have
+        Workbook tiny = new Workbook();
+        Sheet ts = tiny.addSheet("S");
+        ts.setCellValue("A1", Double.valueOf(1e-320));
+        same("0", ts.getCellText(0, 0), "a subnormal number in General");
+        // a date the format cannot show keeps its number in a text file
+        ts.setCellValue("B1", Double.valueOf(-5));
+        ts.setCellFormat(0, 1, "yyyy-mm-dd");
+        try {
+            ByteArrayOutputStream csv = new ByteArrayOutputStream();
+            tiny.write(csv, Workbook.Format.CSV);
+            same("0,-5", new String(csv.toByteArray(), "UTF-8").trim(), "a date before the first day in CSV");
+            // an xlsx whose sheets are all missing is no workbook
+            refused("a workbook whose sheet parts are missing", zip("[Content_Types].xml", "<Types/>",
+                    "xl/workbook.xml", "<workbook xmlns=\"" + MAIN + "\" xmlns:r=\"" + REL + "\"><sheets><sheet name=\"S\""
+                            + " sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>",
+                    "xl/_rels/workbook.xml.rels", "<Relationships><Relationship Id=\"rId1\" Type=\"" + REL
+                            + "/worksheet\" Target=\"../../etc/passwd\"/></Relationships>"), Workbook.Format.XLSX);
+        } catch (IOException e) {
+            wrong.append('\n').append(e);
+        }
         // TEXTAFTER ignoring case does not cut the text where a folded copy would
         val("B", "TEXTAFTER(\"\u0130a-B\",\"-\",1,1)");
         val("x", "TEXTAFTER(\"aBcx\",\"bc\",1,1)");

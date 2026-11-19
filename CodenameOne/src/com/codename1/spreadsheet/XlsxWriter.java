@@ -164,6 +164,9 @@ final class XlsxWriter {
         x.raw("<bookViews><workbookView/></bookViews><sheets>");
         for (int i = 0; i < sheets; i++) {
             String name = i < book.getSheetCount() ? book.getSheet(i).getName() : "Sheet1";
+            // Excel refuses a sheet name over 31 characters, and the name History. They are
+            // written as they are: renaming here would leave every formula that names the
+            // sheet pointing at nothing, and LibreOffice reads them. Workbook.addSheet says so.
             x.raw("<sheet").attr("name", name).attr("sheetId", i + 1).raw(" r:id=\"rId").raw(i + 1).raw("\"/>");
         }
         x.raw("</sheets>");

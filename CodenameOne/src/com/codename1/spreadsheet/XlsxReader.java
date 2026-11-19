@@ -79,6 +79,10 @@ final class XlsxReader {
             throw new IOException("Not an Excel workbook: the archive has no workbook part");
         }
         finish();
+        if (book.getSheetCount() == 0) {
+            // every sheet the workbook lists is missing or is not a worksheet
+            throw new IOException("Not an Excel workbook: none of its sheets could be found");
+        }
     }
 
     private void readPart(String path, XmlScanner x) throws IOException {

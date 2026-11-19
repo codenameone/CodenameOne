@@ -145,10 +145,16 @@ final class CsvFiles {
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < columns; c++) {
                 String shown = sheet.getCellText(r, c);
+                Object value = sheet.getCellValue(r, c);
+                if (shown.length() > 0 && shown.charAt(0) == '#' && shown.replace('#', ' ').trim().length() == 0
+                        && value instanceof Double) {
+                    // ######## is a date the format cannot show; the file keeps the number instead
+                    shown = Values.general(((Double) value).doubleValue());
+                }
                 // Text that a spreadsheet opening this file would run as a formula is written
                 // with the apostrophe that says it is text. Only text: a number is a number,
                 // and -5 must stay one.
-                data[r][c] = sheet.getCellValue(r, c) instanceof String && runsAsFormula(shown) ? "'" + shown : shown;
+                data[r][c] = value instanceof String && runsAsFormula(shown) ? "'" + shown : shown;
             }
         }
         writer.write(out, data);

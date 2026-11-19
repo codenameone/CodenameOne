@@ -167,11 +167,11 @@ public final class Workbook {
     /// formula that is printed.
     private static final int MAX_SHEET_NAME = 255;
 
-    /// Creates a workbook with no sheets.
     private static long cellLimit = 1000000L;
     private long allocatedCells;
     private boolean loading;
 
+    /// Creates a workbook with no sheets.
     public Workbook() {
         formats.add(new CellFormat(CellFormat.GENERAL));
         formatIndex.put(CellFormat.GENERAL, Integer.valueOf(0));
@@ -380,7 +380,9 @@ public final class Workbook {
     ///
     /// #### Parameters
     ///
-    /// - `name`: the name of the sheet, which formulas on other sheets use to refer to it
+    /// - `name`: the name of the sheet, which formulas on other sheets use to refer to it.
+    ///   Excel opens no file with a sheet name over 31 characters or named `History`, so keep
+    ///   to that for a workbook that is written as XLSX
     ///
     /// #### Returns
     ///
