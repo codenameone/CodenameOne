@@ -101,6 +101,9 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
             return SessionImpl.sqliteColumns(query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]),
                     createSql instanceof String ? (String) createSql : null, collations);
         }
+        if ("sqlserver".equals(dialect())) {
+            return query(SQLSERVER_DESCRIBE, new Object[]{quote(table)}, new int[8]);
+        }
         boolean mysql = "mysql".equals(dialect());
         // PostgreSQL: the schema an unqualified name resolves to through the
         // whole search_path, which is the table the ORM's SQL actually reads.
@@ -146,6 +149,30 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
                 new int[8]);
     }
 
+    /// SQL Server's columns, read from the catalog views rather than
+    /// INFORMATION_SCHEMA, which has no identity or computed flag. The type is
+    /// spelled the way the other engines' describes spell theirs -- lower case,
+    /// the length in characters (sys.columns counts NVARCHAR in bytes) and
+    /// `max` for an unbounded one -- so SessionImpl's type families read it
+    /// unchanged. An IDENTITY column refuses an explicit value, so it is both
+    /// generated and read only, as PostgreSQL's GENERATED ALWAYS is.
+    private static final String SQLSERVER_DESCRIBE = "SELECT c.name, CASE"
+            + " WHEN t.name IN ('nvarchar','nchar') THEN t.name + '(' + CASE WHEN c.max_length = -1 THEN 'max' ELSE CAST(c.max_length / 2 AS VARCHAR(10)) END + ')'"
+            + " WHEN t.name IN ('varchar','char','varbinary','binary') THEN t.name + '(' + CASE WHEN c.max_length = -1 THEN 'max' ELSE CAST(c.max_length AS VARCHAR(10)) END + ')'"
+            + " WHEN t.name IN ('decimal','numeric') THEN t.name + '(' + CAST(c.precision AS VARCHAR(10)) + ',' + CAST(c.scale AS VARCHAR(10)) + ')'"
+            + " WHEN t.name = 'float' THEN 'float(' + CAST(c.precision AS VARCHAR(10)) + ')'"
+            + " WHEN t.name IN ('datetime2','time','datetimeoffset') THEN t.name + '(' + CAST(c.scale AS VARCHAR(10)) + ')'"
+            + " ELSE t.name END AS column_type,"
+            + " CASE WHEN c.is_nullable = 0 THEN 1 ELSE 0 END AS required,"
+            + " CASE WHEN EXISTS (SELECT 1 FROM sys.index_columns ic INNER JOIN sys.indexes i ON i.object_id = ic.object_id AND i.index_id = ic.index_id"
+            + " WHERE i.is_primary_key = 1 AND ic.object_id = c.object_id AND ic.column_id = c.column_id) THEN 1 ELSE 0 END AS primary_key,"
+            + " CASE WHEN c.default_object_id <> 0 OR c.is_identity = 1 OR c.is_computed = 1 THEN 1 ELSE 0 END AS filled,"
+            + " c.collation_name,"
+            + " CASE WHEN c.is_identity = 1 THEN 1 ELSE 0 END AS key_generated,"
+            + " CASE WHEN c.is_identity = 1 OR c.is_computed = 1 THEN 1 ELSE 0 END AS read_only"
+            + " FROM sys.columns c INNER JOIN sys.types t ON t.user_type_id = c.system_type_id"
+            + " WHERE c.object_id = OBJECT_ID(?) ORDER BY c.column_id";
+
     @Override
     public String quote(String name) {
         return dialect.quote(name);
@@ -178,7 +205,13 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
 
     @Override
     public String likePattern(String pattern, String escape) {
-        return escape == null ? dialect.likePattern(pattern) : SqlPatterns.normalize(pattern, escape, "sqlite".equals(dialect()));
+        if (escape == null) {
+            return dialect.likePattern(pattern);
+        }
+        String normalized = SqlPatterns.normalize(pattern, escape, "sqlite".equals(dialect()));
+        // normalize escapes with '!' only before ! % _; SQL Server also reads
+        // '[' as a wildcard, so it gets the same escape.
+        return normalized != null && "sqlserver".equals(dialect()) ? normalized.replace("[", "![") : normalized;
     }
 
     @Override
@@ -193,6 +226,13 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
         }
         if ("sqlite".equals(dialect.getName())) {
             throw new UnsupportedOperationException("SQLite does not support pessimistic row locks");
+        }
+        if ("sqlserver".equals(dialect.getName())) {
+            // Table hints, which SessionImpl.locked writes after the table.
+            // UPDLOCK is held to the end of the transaction and excludes other
+            // writers and lockers; HOLDLOCK keeps a shared lock as long, which
+            // is what FOR SHARE means elsewhere.
+            return mode == LockMode.PESSIMISTIC_WRITE ? " WITH (UPDLOCK, ROWLOCK)" : " WITH (HOLDLOCK, ROWLOCK)";
         }
         if (mode == LockMode.PESSIMISTIC_WRITE) {
             return " FOR UPDATE";

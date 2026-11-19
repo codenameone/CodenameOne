@@ -69,17 +69,40 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// statement or after [#clear].
     private String boundTenant;
     private static final String UNSCOPED_BINDING = "*";
+    /// SQL Server, whose foreign keys cannot be deferred, which pads trailing
+    /// spaces in every comparison and spells several types its own way. Its
+    /// answers are kept beside the other engines' in each method below, as
+    /// theirs are, rather than behind a hook per decision.
+    private boolean sqlServer() {
+        return "sqlserver".equals(sql.dialect());
+    }
+    /// Whether foreign keys are checked per statement and cannot be deferred to
+    /// commit, so a row must be written after the rows it references and a
+    /// required cycle cannot be written at all: MySQL and SQL Server.
+    private boolean immediateForeignKeys() {
+        return "mysql".equals(sql.dialect()) || sqlServer();
+    }
     String deleteFrom(String table, String alias) {
         // Older platform SQLite versions do not accept a DELETE target alias.
         if ("sqlite".equals(sql.dialect())) {
             return "DELETE FROM " + q(table);
         }
         // MariaDB before 11.6 needs the target alias before FROM.
-        String prefix = "mysql".equals(sql.dialect()) ? "DELETE " + alias + " FROM " : "DELETE FROM ";
+        String prefix = "mysql".equals(sql.dialect()) || sqlServer() ? "DELETE " + alias + " FROM " : "DELETE FROM ";
         return prefix + q(table) + " AS " + alias;
     }
     String updateTable(String table, String alias) {
+        if (sqlServer()) {
+            // T-SQL takes no alias after UPDATE's table; the alias is updated
+            // and the table named in the FROM that [#updateFrom] adds.
+            return "UPDATE " + alias;
+        }
         return "UPDATE " + q(table) + ("sqlite".equals(sql.dialect()) ? "" : " AS " + alias);
+    }
+    /// What follows an UPDATE's SET list, before its WHERE: SQL Server's FROM
+    /// naming the aliased table, nothing elsewhere.
+    String updateFrom(String table, String alias) {
+        return sqlServer() ? " FROM " + q(table) + " AS " + alias : "";
     }
     QueryImpl queryForMutation(EntityModel model) {
         return new QueryImpl(this, model, "sqlite".equals(sql.dialect()) ? q(model.table()) : nextAlias());
@@ -108,13 +131,26 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         return "CAST(" + expression + " AS " + ("mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT") + ")";
     }
     String functionName(String function) {
-        return "LENGTH".equals(function) && "mysql".equals(sql.dialect()) ? "CHAR_LENGTH" : function;
+        if (!"LENGTH".equals(function)) {
+            return function;
+        }
+        if (sqlServer()) {
+            // LEN ignores trailing spaces. DATALENGTH counts the bytes of the
+            // NVARCHAR value, two per UTF-16 unit, which is String.length();
+            // the halving is written by the caller's "/ 2" below.
+            return "DATALENGTH";
+        }
+        return "mysql".equals(sql.dialect()) ? "CHAR_LENGTH" : function;
     }
     String numericOperand(String value, int kind) {
         if ("postgresql".equals(sql.dialect())) {
             return "CAST(" + value + " AS " + (kind == Attribute.REAL ? "DOUBLE PRECISION" : "BIGINT") + ")";
         }
         if (kind == Attribute.REAL) {
+            if (sqlServer()) {
+                // REAL is single precision here.
+                return "CAST(" + value + " AS FLOAT(53))";
+            }
             return "mysql".equals(sql.dialect()) ? "(1e0 * " + value + ")" : "CAST(" + value + " AS REAL)";
         }
         return value;
@@ -152,10 +188,24 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 || !keyColumn(model, index)) {
             return expression;
         }
-        String length = functionName("LENGTH") + "(" + expression + ")";
-        String textType = "mysql".equals(sql.dialect()) ? "CHAR" : "TEXT";
+        String length = lengthOf(expression);
+        String textType = "mysql".equals(sql.dialect()) ? "CHAR" : sqlServer() ? "NVARCHAR(20)" : "TEXT";
         return "(CASE WHEN " + length + " > 255 THEN CAST(" + integralOverflow(length)
                 + " AS " + textType + ") ELSE " + expression + " END)";
+    }
+    /// The length of a text expression in UTF-16 units, trailing spaces counted.
+    String lengthOf(String expression) {
+        return lengthResult(functionName("LENGTH") + "(" + expression + ")");
+    }
+    /// A rendered LENGTH call as a count of UTF-16 units: SQL Server's
+    /// DATALENGTH counts two bytes per unit of an NVARCHAR value.
+    String lengthResult(String call) {
+        return sqlServer() ? "(" + call + " / 2)" : call;
+    }
+    /// The argument of AVG: SQL Server averages integers as integers and
+    /// truncates, so an integral argument is widened before the average.
+    String averageOperand(String expression, int kind) {
+        return sqlServer() && kind != Attribute.REAL ? "CAST(" + expression + " AS FLOAT(53))" : expression;
     }
     private String integralOverflow(String value) {
         if ("sqlite".equals(sql.dialect())) {
@@ -255,10 +305,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         this.sql = sql;
         this.models = new LinkedHashMap<String, EntityModel<?>>(models);
-        if ("mysql".equals(sql.dialect())) {
+        if (immediateForeignKeys()) {
             for (EntityModel model : this.models.values()) {
                 if (hasRequiredPath(model, model, new ArrayList<EntityModel>())) {
-                    throw new PersistenceException("MySQL/MariaDB does not support required relationship cycles: "
+                    throw new PersistenceException(sql.dialect() + " does not support required relationship cycles: "
                             + model.type().getName());
                 }
             }
@@ -521,7 +571,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         Object[] keyValues = model.keyValues(id);
         autoFlush();
         List<Object[]> rows =
-                read(select(model) + " WHERE " + keyCondition(model, null) + clause, keyValues, kinds(model));
+                read(locked(select(model) + " WHERE " + keyCondition(model, null), clause), keyValues, kinds(model));
         if (rows.isEmpty()) {
             return null;
         }
@@ -1399,6 +1449,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return "DATE";
         }
         String dialect = sql.dialect();
+        if ("sqlserver".equals(dialect)) {
+            // TIMESTAMP is a row version here, not a date.
+            return "DATETIME2(3)";
+        }
         return "postgresql".equals(dialect) ? "TIMESTAMP(3)" : "mysql".equals(dialect) ? "DATETIME(3)" : "TIMESTAMP";
     }
 
@@ -1533,7 +1587,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String statement = "CONSTRAINT " + q(constraintName("fk", key.table, key.columns)) + " FOREIGN KEY (" +
                            quoted(key.columns) + ") REFERENCES " + q(key.target) + " (" + quoted(key.targetColumns) +
                            ")";
-        if (!"mysql".equals(sql.dialect())) {
+        if (!immediateForeignKeys()) {
             statement += " DEFERRABLE INITIALLY DEFERRED";
         }
         return statement;
@@ -1924,6 +1978,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // distinct strings can compare equal.
             return !collation.startsWith("nondeterministic ");
         }
+        if (sqlServer()) {
+            // Every collation pads trailing spaces in a comparison, a binary one
+            // included, so the collation cannot keep "a" and "a " apart; the
+            // ORM's own key columns are bounded and given a binary one, and the
+            // padding is the documented difference of this engine.
+            return collation.endsWith("_BIN2") || collation.endsWith("_BIN");
+        }
         if (!"mysql".equals(sql.dialect())) {
             return true;
         }
@@ -2137,6 +2198,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if ("mysql".equals(sql.dialect())) {
             // FLOAT(M,D) is single precision whatever M is.
             return "float".equals(token) && (precision < 0 || precision <= 24 || type.indexOf(',') >= 0);
+        }
+        if (sqlServer()) {
+            return "real".equals(token) || "float".equals(token) && precision >= 1 && precision <= 24;
         }
         return false;
     }
@@ -3168,8 +3232,159 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         requireTransaction();
         return sql.lockClause(mode);
     }
-    String limit(int count, int offset) {
-        return sql.limit(count, offset);
+    /// `statement` with the lock `clause` from [SqlAccess#lockClause] applied.
+    /// Everywhere but SQL Server that is a trailing FOR UPDATE / FOR SHARE.
+    /// SQL Server locks with a table hint, which is written after the table
+    /// it applies to, so it goes after the alias of the statement's first
+    /// table -- the root entity's, in every statement the ORM renders.
+    String locked(String statement, String clause) {
+        if (clause.length() == 0 || !sqlServer()) {
+            return statement + clause;
+        }
+        int at = rootTableEnd(statement);
+        if (at < 0) {
+            throw new PersistenceException("SQL Server locks with a table hint after the table it applies to; "
+                    + "write WITH (UPDLOCK, ROWLOCK) in the native statement instead of passing a lock mode");
+        }
+        return statement.substring(0, at) + clause + statement.substring(at);
+    }
+    /// Where the first table reference of `statement`'s top-level FROM ends --
+    /// past its name and alias -- or -1 when it is not a plain table.
+    static int rootTableEnd(String statement) {
+        int depth = 0;
+        int length = statement.length();
+        for (int i = 0; i < length; i++) {
+            char c = statement.charAt(i);
+            if (c == '\'' || c == '"' || c == '[' || c == '`') {
+                i = quotedEnd(statement, i) - 1;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (depth == 0 && statement.regionMatches(true, i, "FROM", 0, 4)
+                    && (i == 0 || statement.charAt(i - 1) <= ' ')
+                    && i + 4 < length && statement.charAt(i + 4) <= ' ') {
+                int at = skipBlanks(statement, i + 4);
+                if (at >= length || statement.charAt(at) == '(') {
+                    return -1;
+                }
+                at = wordEnd(statement, at);
+                int alias = skipBlanks(statement, at);
+                if (statement.regionMatches(true, alias, "AS", 0, 2) && alias + 2 < length
+                        && statement.charAt(alias + 2) <= ' ') {
+                    alias = skipBlanks(statement, alias + 2);
+                }
+                int aliasEnd = wordEnd(statement, alias);
+                if (aliasEnd > alias && !keyword(statement.substring(alias, aliasEnd))) {
+                    return aliasEnd;
+                }
+                return at;
+            }
+        }
+        return -1;
+    }
+    private static final String CLAUSE_WORDS = " WHERE JOIN INNER LEFT RIGHT FULL CROSS ORDER GROUP HAVING UNION OFFSET ON ";
+    private static boolean keyword(String word) {
+        for (int i = 0; i < word.length(); i++) {
+            char c = word.charAt(i);
+            if (!(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z')) {
+                return false;
+            }
+        }
+        return CLAUSE_WORDS.indexOf(" " + asciiUpper(word) + " ") >= 0;
+    }
+    private static String asciiUpper(String word) {
+        StringBuilder out = new StringBuilder(word.length());
+        for (int i = 0; i < word.length(); i++) {
+            char c = word.charAt(i);
+            out.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+        }
+        return out.toString();
+    }
+    private static int skipBlanks(String text, int from) {
+        int at = from;
+        while (at < text.length() && text.charAt(at) <= ' ') {
+            at++;
+        }
+        return at;
+    }
+    /// The end of the possibly quoted, possibly dotted name at `from`.
+    private static int wordEnd(String text, int from) {
+        int at = from;
+        while (at < text.length()) {
+            char c = text.charAt(at);
+            if (c == '[' || c == '"' || c == '`') {
+                at = quotedEnd(text, at);
+            } else if (c <= ' ' || c == ',' || c == '(' || c == ')') {
+                break;
+            } else {
+                at++;
+            }
+        }
+        return at;
+    }
+    /// The index just past the quoted run opening at `from`; a doubled
+    /// closing character is part of the run.
+    private static int quotedEnd(String text, int from) {
+        char open = text.charAt(from);
+        char close = open == '[' ? ']' : open;
+        int at = from + 1;
+        while (at < text.length()) {
+            if (text.charAt(at) == close) {
+                if (at + 1 < text.length() && text.charAt(at + 1) == close) {
+                    at += 2;
+                    continue;
+                }
+                return at + 1;
+            }
+            at++;
+        }
+        return at;
+    }
+    /// The paging clause for `statement`. SQL Server pages only an ordered
+    /// result, so a statement with no ORDER BY of its own is given one that
+    /// orders nothing.
+    String limit(String statement, int count, int offset) {
+        String paging = sql.limit(count, offset);
+        if (paging.length() == 0 || !sqlServer() || hasTopLevelOrderBy(statement)) {
+            return paging;
+        }
+        return " ORDER BY (SELECT NULL)" + paging;
+    }
+    /// Whether `statement` ends in an ORDER BY of its own, outside any
+    /// parentheses, string literal or quoted identifier.
+    static boolean hasTopLevelOrderBy(String statement) {
+        int depth = 0;
+        boolean found = false;
+        int length = statement.length();
+        for (int i = 0; i < length; i++) {
+            char c = statement.charAt(i);
+            if (c == '\'' || c == '"' || c == '[' || c == '`') {
+                char close = c == '[' ? ']' : c;
+                i++;
+                while (i < length && !(statement.charAt(i) == close
+                        && !(i + 1 < length && statement.charAt(i + 1) == close))) {
+                    if (statement.charAt(i) == close) {
+                        i++;
+                    }
+                    i++;
+                }
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (depth == 0 && (c == 'O' || c == 'o') && statement.regionMatches(true, i, "ORDER", 0, 5)
+                    && (i == 0 || !Character.isLetterOrDigit(statement.charAt(i - 1)))) {
+                int j = i + 5;
+                while (j < length && statement.charAt(j) <= ' ') {
+                    j++;
+                }
+                if (j > i + 5 && statement.regionMatches(true, j, "BY", 0, 2)) {
+                    found = true;
+                }
+            }
+        }
+        return found;
     }
     /// The discriminator condition and the tenant condition of `model`, joined
     /// by `AND`; empty when the entity has neither. Every read goes through
@@ -3490,7 +3705,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                                         model(model.relationships()[ri].target).idIndexes().length) {
                     Entry dependency = entries.get(model.relation(entry.entity, ri));
                     if (dependency != null && dependency.fresh &&
-                            (dependency.model.attributes()[dependency.model.idIndex()].generated || "mysql".equals(sql.dialect()))) {
+                            (dependency.model.attributes()[dependency.model.idIndex()].generated || immediateForeignKeys())) {
                         // MySQL also defers known keys until their rows exist.
                         // Required cycles are rejected when the session opens.
                         bound = null;

@@ -28,6 +28,7 @@ import java.util.List;
 
 import com.codename1.backend.Config;
 import com.codename1.backend.DataSource;
+import com.codename1.backend.Database;
 import com.codename1.backend.orm.Dao;
 import com.codename1.backend.orm.EntityManager;
 import com.codename1.backend.orm.Query;
@@ -786,6 +787,10 @@ public class OrmCheck {
             // primary key there -- measured, "Duplicate entry 'token '" --
             // while SQLite and PostgreSQL kept them apart. The NO PAD
             // collation makes the three agree.
+            //
+            // SQL Server is the documented exception: it pads the shorter
+            // operand of every string comparison, under every collation,
+            // binary ones included, so there the second key is a duplicate.
             Coupon padded = new Coupon();
             padded.code = "PAD";
             padded.discount = 6;
@@ -793,13 +798,24 @@ public class OrmCheck {
             Coupon spaced = new Coupon();
             spaced.code = "PAD ";
             spaced.discount = 7;
-            coupons.insert(spaced);
-            check("a trailing space makes a different key", "6",
-                    String.valueOf(coupons.findById("PAD").discount));
-            check("and the padded one is its own row", "7",
-                    String.valueOf(coupons.findById("PAD ").discount));
-            coupons.delete(padded);
-            coupons.delete(spaced);
+            if("sqlserver".equals(em.dialect().getName())) {
+                String padRefused = "accepted";
+                try {
+                    coupons.insert(spaced);
+                } catch(Exception expected) {
+                    padRefused = "refused";
+                }
+                check("SQL Server: a trailing space is not part of the key", "refused", padRefused);
+                coupons.delete(padded);
+            } else {
+                coupons.insert(spaced);
+                check("a trailing space makes a different key", "6",
+                        String.valueOf(coupons.findById("PAD").discount));
+                check("and the padded one is its own row", "7",
+                        String.valueOf(coupons.findById("PAD ").discount));
+                coupons.delete(padded);
+                coupons.delete(spaced);
+            }
 
             check("delete by a string key reports the row", "true",
                     String.valueOf(coupons.delete(ten)));
@@ -858,7 +874,7 @@ public class OrmCheck {
      */
     private static void anExplicitKeyLeavesTheNextGeneratedOneUsable(DataSource pool)
             throws Exception {
-        String table = "cn1_idsync";
+        final String table = "cn1_idsync";
         pool.execute("DROP TABLE IF EXISTS " + table, null);
         pool.execute("CREATE TABLE " + table + " (id "
                 + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
@@ -870,8 +886,23 @@ public class OrmCheck {
             // outright, since the identity's sequence starts at 1. The clamp is
             // what keeps the resync portable, and an explicit 1 would not have
             // exercised it.
-            pool.execute("INSERT INTO " + table + " (id, name) VALUES (?, ?)",
-                    new Object[] {Long.valueOf(-5L), "imported"});
+            // SQL Server refuses an explicit value for an IDENTITY column
+            // unless the session allows it, which is a setting of the
+            // connection, so the import runs on one.
+            final boolean sqlServer = "sqlserver".equals(pool.dialect().getName());
+            pool.withConnection(new DataSource.Work() {
+                public Object run(Database db) throws Exception {
+                    if(sqlServer) {
+                        db.execute("SET IDENTITY_INSERT " + table + " ON", null);
+                    }
+                    db.execute("INSERT INTO " + table + " (id, name) VALUES (?, ?)",
+                            new Object[] {Long.valueOf(-5L), "imported"});
+                    if(sqlServer) {
+                        db.execute("SET IDENTITY_INSERT " + table + " OFF", null);
+                    }
+                    return null;
+                }
+            });
             // RAW NAMES: the dialect spells each one for the position it lands
             // in. Passing the quoted forms double-quoted them and PostgreSQL
             // looked for a relation called "\"cn1_idsync\"".
@@ -939,11 +970,15 @@ public class OrmCheck {
     private static void anIgnoredInsertAnswersNoKey(DataSource pool) throws Exception {
         String engine = pool.dialect().getName();
         boolean mysql = "mysql".equals(engine);
+        boolean sqlServer = "sqlserver".equals(engine);
         pool.execute("DROP TABLE IF EXISTS cn1_ignored", null);
         pool.execute("CREATE TABLE cn1_ignored (id "
                 + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + (mysql ? "VARCHAR(64)" : "TEXT")
-                + " NOT NULL UNIQUE)", null);
+                // SQL Server's INSERT IGNORE is a property of the index:
+                // IGNORE_DUP_KEY drops a duplicate row with a warning.
+                + ", name " + (mysql ? "VARCHAR(64)" : sqlServer ? "NVARCHAR(64)" : "TEXT")
+                + (sqlServer ? " NOT NULL, CONSTRAINT cn1_ignored_name UNIQUE (name) WITH (IGNORE_DUP_KEY = ON))"
+                        : " NOT NULL UNIQUE)"), null);
         try {
             pool.insert("INSERT INTO cn1_ignored (name) VALUES (?)",
                     new Object[] {"a"}, "id");
@@ -951,7 +986,10 @@ public class OrmCheck {
                     new Object[] {"b"}, "id");
             check("the second fixture row has a key", "true", String.valueOf(second > 0));
             String ignore;
-            if("postgresql".equals(engine)) {
+            Object[] ignoreArgs = new Object[] {"a"};
+            if(sqlServer) {
+                ignore = "INSERT INTO cn1_ignored (name) VALUES (?)";
+            } else if("postgresql".equals(engine)) {
                 ignore = "INSERT INTO cn1_ignored (name) VALUES (?) ON CONFLICT DO NOTHING";
             } else if(mysql) {
                 ignore = "INSERT IGNORE INTO cn1_ignored (name) VALUES (?)";
@@ -960,7 +998,7 @@ public class OrmCheck {
             }
             // Zero, and specifically NOT the key of row b.
             check("an insert that conflicted answers no key", "0",
-                    String.valueOf(pool.insert(ignore, new Object[] {"a"}, "id")));
+                    String.valueOf(pool.insert(ignore, ignoreArgs, "id")));
             check("and it wrote nothing", "2",
                     String.valueOf(((java.util.Map)pool.query(
                             "SELECT COUNT(*) AS c FROM cn1_ignored", null).get(0))
@@ -973,10 +1011,11 @@ public class OrmCheck {
     private static void anUpsertThatUpdatesStillAnswers(DataSource pool) throws Exception {
         String engine = pool.dialect().getName();
         boolean mysql = "mysql".equals(engine);
+        boolean sqlServer = "sqlserver".equals(engine);
         pool.execute("DROP TABLE IF EXISTS cn1_upsert", null);
         pool.execute("CREATE TABLE cn1_upsert (id "
                 + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + (mysql ? "VARCHAR(64)" : "TEXT")
+                + ", name " + (mysql ? "VARCHAR(64)" : sqlServer ? "NVARCHAR(64)" : "TEXT")
                 + " NOT NULL UNIQUE, hits INTEGER)", null);
         try {
             long first = pool.insert("INSERT INTO cn1_upsert (name, hits) VALUES (?, ?)",
@@ -989,7 +1028,14 @@ public class OrmCheck {
                     new Object[] {"b", Long.valueOf(1)}, "id");
             check("the second fixture row has its own key", "true",
                     String.valueOf(second > first));
-            String upsert = mysql
+            // SQL Server has neither form; MERGE is its upsert, HOLDLOCK keeps
+            // two of them from both taking the insert branch, and MERGE must end
+            // in a semicolon.
+            String upsert = sqlServer
+                    ? "MERGE cn1_upsert WITH (HOLDLOCK) AS t USING (VALUES (?, ?)) AS s (name, hits) "
+                            + "ON t.name = s.name WHEN MATCHED THEN UPDATE SET hits = t.hits + 1 "
+                            + "WHEN NOT MATCHED THEN INSERT (name, hits) VALUES (s.name, s.hits);"
+                    : mysql
                     ? "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "
                             + "ON DUPLICATE KEY UPDATE hits = hits + 1"
                     : "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "

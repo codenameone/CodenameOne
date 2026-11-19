@@ -426,9 +426,14 @@ public final class SqlServer {
         // afterwards can see into this one.
         boolean insert = rows == null && startsWithInsert(sql);
         String sent = sql;
+        if (rows == null) {
+            // The key belongs to the statement that generated it. Kept across
+            // statements, a MERGE or an UPDATE would answer with the key of an
+            // INSERT before it.
+            lastIdentity = 0;
+        }
         if (insert) {
             sent = sql + "\n; SELECT SCOPE_IDENTITY()";
-            lastIdentity = 0;
         }
         readingIdentity = insert;
         try {
@@ -1167,6 +1172,13 @@ public final class SqlServer {
             u16();      // flags
             readType(column, true);
             column.name = shortName();
+            if (column.name.length() == 0) {
+                // SQL Server leaves an expression without an alias unnamed,
+                // and two unnamed columns would be one entry in the row map.
+                // PostgreSQL and MySQL name every column; this names it by its
+                // position.
+                column.name = "column" + (iter + 1);
+            }
             columns[iter] = column;
         }
         return columns;

@@ -114,7 +114,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         if (max == 0) {
             return result;
         }
-        List<Object[]> rows = session.read(bound.sql + session.limit(max, offset) + session.lockClause(lock), bound.args, plan.kinds);
+        List<Object[]> rows = session.read(session.locked(bound.sql, session.lockClause(lock)) + session.limit(bound.sql, max, offset), bound.args, plan.kinds);
         if (plan.entity != null) {
             List entities = session.hydrateAll(plan.entity, rows, plan.fetches);
             for (Object entity : entities) {
@@ -496,7 +496,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     where = where.length() == 0 ? " WHERE " + filter : where + " AND " + filter;
                 }
                 plan.sql = session.updateTable(root.model.table(), root.rootAlias) + " SET " + assignments +
-                           where;
+                           session.updateFrom(root.model.table(), root.rootAlias) + where;
                 refuseImplicitBulkJoins();
                 return plan;
             }
@@ -1216,7 +1216,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                                 .append('.')
                                 .append(session.q(arg.entity.attributes()[arg.entity.idIndex()].column));
                     } else {
-                        sql.append(arg.sql);
+                        sql.append("AVG".equals(function) ? session.averageOperand(arg.sql, arg.kind) : arg.sql);
                     }
                 }
                 if ("NULLIF".equals(function)) {
@@ -1233,6 +1233,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     result.sql = session.integralSum(result.sql);
                 } else if ("AVG".equals(function)) {
                     result.sql = session.numericOperand(result.sql, Attribute.REAL);
+                } else if ("LENGTH".equals(function)) {
+                    result.sql = session.lengthResult(result.sql);
                 }
                 result.nonNull = "COUNT".equals(function);
                 result.coalesce = "COALESCE".equals(function);

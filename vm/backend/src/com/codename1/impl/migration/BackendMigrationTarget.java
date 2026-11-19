@@ -44,6 +44,7 @@ public final class BackendMigrationTarget implements MigrationTarget {
     private final Dialect dialect;
     private final boolean mysql;
     private final boolean postgres;
+    private final boolean sqlServer;
     private Database db;
     private final boolean supplied;
     /// A transaction a script opened for itself, which the connection does not track.
@@ -59,6 +60,7 @@ public final class BackendMigrationTarget implements MigrationTarget {
         this.dialect = pool.dialect();
         this.mysql = "mysql".equals(dialect.getName());
         this.postgres = "postgresql".equals(dialect.getName());
+        this.sqlServer = "sqlserver".equals(dialect.getName());
     }
 
     /// Migrates through a connection the caller owns.
@@ -72,6 +74,7 @@ public final class BackendMigrationTarget implements MigrationTarget {
         this.dialect = db.dialect();
         this.mysql = "mysql".equals(dialect.getName());
         this.postgres = "postgresql".equals(dialect.getName());
+        this.sqlServer = "sqlserver".equals(dialect.getName());
     }
 
     private Database db() throws IOException {
@@ -144,6 +147,9 @@ public final class BackendMigrationTarget implements MigrationTarget {
         } else if (postgres) {
             sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() "
                     + "AND table_type = '" + (views ? "VIEW" : "BASE TABLE") + "'";
+        } else if (sqlServer) {
+            sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = SCHEMA_NAME() "
+                    + "AND table_type = '" + (views ? "VIEW" : "BASE TABLE") + "'";
         } else {
             sql = "SELECT name FROM sqlite_master WHERE type = '" + (views ? "view" : "table") + "'";
         }
@@ -161,7 +167,9 @@ public final class BackendMigrationTarget implements MigrationTarget {
         for (String name : names(false)) {
             // MySQL folds table names by the file system it runs on, so the same name can come
             // back in another case than it was created with.
-            if (mysql ? name.equalsIgnoreCase(table) : name.equals(table)) {
+            // SQL Server's catalog compares names under the database's
+            // collation, which is case insensitive unless it was made otherwise.
+            if (mysql || sqlServer ? name.equalsIgnoreCase(table) : name.equals(table)) {
                 return true;
             }
         }
@@ -232,6 +240,17 @@ public final class BackendMigrationTarget implements MigrationTarget {
             }
             return false;
         }
+        if (sqlServer) {
+            // An application lock owned by the session, so a dead process
+            // releases it; sp_getapplock waits inside the server, and answers
+            // 0 or 1 when the lock is granted. One batch with no terminators:
+            // T-SQL needs none between these, and Database refuses a ';' that
+            // would make it look like several statements.
+            List<String[]> rows = query("DECLARE @granted INT EXEC @granted = sp_getapplock @Resource = N'"
+                    + literal(name) + "', @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = "
+                    + (attempts * 1000) + " SELECT CASE WHEN @granted >= 0 THEN 1 ELSE 0 END AS granted", null);
+            return answeredOne(rows);
+        }
         if (postgres) {
             String key = String.valueOf(lockKey(name));
             for (int i = 0; i < attempts; i++) {
@@ -256,7 +275,14 @@ public final class BackendMigrationTarget implements MigrationTarget {
             query("SELECT RELEASE_LOCK('" + name + "')", null);
         } else if (postgres) {
             query("SELECT pg_advisory_unlock(" + lockKey(name) + ")", null);
+        } else if (sqlServer) {
+            db.execute("EXEC sp_releaseapplock @Resource = N'" + literal(name) + "', @LockOwner = 'Session'",
+                    new Object[0]);
         }
+    }
+
+    private static String literal(String text) {
+        return text.indexOf('\'') < 0 ? text : text.replace("'", "''");
     }
 
     private static long lockKey(String name) {
@@ -271,8 +297,9 @@ public final class BackendMigrationTarget implements MigrationTarget {
 
     @Override
     public String currentUser() throws IOException {
-        if (mysql || postgres) {
-            List<String[]> rows = query(mysql ? "SELECT CURRENT_USER()" : "SELECT current_user", null);
+        if (mysql || postgres || sqlServer) {
+            List<String[]> rows = query(mysql ? "SELECT CURRENT_USER()" : sqlServer ? "SELECT SUSER_SNAME()"
+                    : "SELECT current_user", null);
             if (!rows.isEmpty() && rows.get(0).length > 0 && rows.get(0)[0] != null) {
                 return rows.get(0)[0];
             }
@@ -293,6 +320,15 @@ public final class BackendMigrationTarget implements MigrationTarget {
                 db().execute("PRAGMA foreign_keys = OFF", none);
                 if (answeredOne(query("PRAGMA foreign_keys", null))) {
                     throw new IOException("SQLite clean requires a connection outside a transaction");
+                }
+            }
+            if (sqlServer) {
+                // No switch turns foreign keys off for a DROP here, so they go
+                // first.
+                for (String[] row : query("SELECT OBJECT_NAME(parent_object_id) AS table_name, name FROM sys.foreign_keys "
+                        + "WHERE OBJECT_SCHEMA_NAME(parent_object_id) = SCHEMA_NAME()", null)) {
+                    db().execute("ALTER TABLE " + dialect.quote(row[0]) + " DROP CONSTRAINT "
+                            + dialect.quote(row[1]), none);
                 }
             }
             for (String name : names(true)) {

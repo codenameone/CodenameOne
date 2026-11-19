@@ -294,7 +294,7 @@ public abstract class Dialect {
         if (sql == null) {
             throw new IOException("No statement");
         }
-        return Placeholders.render(sql, paramCount, parameterMarker(), nestedBlockComments(),
+        return Placeholders.render(conditionalDdl(sql), paramCount, parameterMarker(), nestedBlockComments(),
                 backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
                 dashCommentNeedsSpace(), bracketIdentifiers(),
                 executableComments());
@@ -590,6 +590,115 @@ public abstract class Dialect {
                 executableComments());
     }
 
+    /// `sql` with a leading `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF
+    /// NOT EXISTS`, `DROP TABLE IF EXISTS` or `DROP VIEW IF EXISTS` spelled
+    /// the way this engine spells it.
+    ///
+    /// The conditional forms are part of the portable form, like the ?
+    /// placeholder: SQLite, PostgreSQL and MySQL take them as written, and the
+    /// engines that have no such clause get the test their own way here, so the
+    /// runtime's own tables and an application's are created by one statement
+    /// wherever it runs.
+    String conditionalDdl(String sql) {
+        return sql;
+    }
+
+    /// The parts of a conditional DDL statement, or null when `sql` is not one:
+    /// the verb and kind ("CREATE TABLE", "CREATE INDEX", "CREATE UNIQUE INDEX",
+    /// "DROP TABLE", "DROP VIEW"), the object's name as written, and the rest of
+    /// the statement after the name.
+    static String[] conditionalParts(String sql) {
+        int at = blanks(sql, 0);
+        boolean create = sql.regionMatches(true, at, "CREATE", 0, 6);
+        if (!create && !sql.regionMatches(true, at, "DROP", 0, 4)) {
+            return null;
+        }
+        at = blanks(sql, at + (create ? 6 : 4));
+        String unique = "";
+        if (create && word(sql, at, "UNIQUE")) {
+            unique = "UNIQUE ";
+            at = blanks(sql, at + 6);
+        }
+        String kind;
+        if (word(sql, at, "TABLE") && unique.length() == 0) {
+            kind = "TABLE";
+        } else if (word(sql, at, "INDEX") && create) {
+            kind = "INDEX";
+        } else if (word(sql, at, "VIEW") && !create) {
+            kind = "VIEW";
+        } else {
+            return null;
+        }
+        at = blanks(sql, at + kind.length());
+        if (!word(sql, at, "IF")) {
+            return null;
+        }
+        at = blanks(sql, at + 2);
+        if (create) {
+            if (!word(sql, at, "NOT")) {
+                return null;
+            }
+            at = blanks(sql, at + 3);
+        }
+        if (!word(sql, at, "EXISTS")) {
+            return null;
+        }
+        at = blanks(sql, at + 6);
+        int end = nameEnd(sql, at);
+        if (end <= at) {
+            return null;
+        }
+        return new String[] {(create ? "CREATE " : "DROP ") + unique + kind,
+            sql.substring(at, end), sql.substring(end)};
+    }
+
+    static int blanks(String sql, int from) {
+        int at = from;
+        while (at < sql.length() && sql.charAt(at) <= ' ') {
+            at++;
+        }
+        return at;
+    }
+
+    static boolean word(String sql, int at, String word) {
+        int end = at + word.length();
+        return sql.regionMatches(true, at, word, 0, word.length())
+                && (end >= sql.length() || sql.charAt(end) <= ' ');
+    }
+
+    /// Where the possibly quoted, possibly dotted name starting at `from` ends.
+    static int nameEnd(String sql, int from) {
+        int at = from;
+        while (at < sql.length()) {
+            char c = sql.charAt(at);
+            if (c == '[' || c == '"' || c == '`') {
+                char close = c == '[' ? ']' : c;
+                at++;
+                while (at < sql.length()) {
+                    if (sql.charAt(at) == close) {
+                        if (at + 1 < sql.length() && sql.charAt(at + 1) == close) {
+                            at++;
+                        } else {
+                            break;
+                        }
+                    }
+                    at++;
+                }
+                at++;
+            } else if (c <= ' ' || c == '(' || c == ';') {
+                break;
+            } else {
+                at++;
+            }
+        }
+        return at > sql.length() ? sql.length() : at;
+    }
+
+    /// `text` as the body of a single-quoted SQL literal.
+    static String literalBody(String text) {
+        return text.indexOf('\'') < 0 ? text : text.replace("'", "''");
+    }
+
     /// Whether this engine's parameters are written $1, $2 rather than ?.
     boolean dollarPlaceholders() {
         return false;
@@ -791,6 +900,78 @@ public abstract class Dialect {
         @Override
         String parameterMarker() {
             return "@p";
+        }
+
+        /// MERGE is SQL Server's upsert, and like ON CONFLICT it may update a
+        /// row instead of inserting one, so no generated key is its answer.
+        @Override
+        public boolean updatesOnConflict(String sql) throws IOException {
+            if (super.updatesOnConflict(sql)) {
+                return true;
+            }
+            int at = blanks(sql, 0);
+            return word(sql, at, "MERGE");
+        }
+
+        /// SQL Server refuses an empty ESCAPE and has no default one, and it
+        /// reads `[` as the start of a character class. So the escape is `!`,
+        /// and [#likePattern] escapes `!` and `[` to keep both literal.
+        @Override
+        public String likeOperator() {
+            return " LIKE ? ESCAPE '!'";
+        }
+
+        @Override
+        public String likePattern(String pattern) {
+            if (pattern == null || pattern.indexOf('!') < 0 && pattern.indexOf('[') < 0) {
+                return pattern;
+            }
+            StringBuilder out = new StringBuilder(pattern.length() + 4);
+            for (int iter = 0 ; iter < pattern.length() ; iter++) {
+                char c = pattern.charAt(iter);
+                if (c == '!' || c == '[') {
+                    out.append('!');
+                }
+                out.append(c);
+            }
+            return out.toString();
+        }
+
+        /// SQL Server has DROP ... IF EXISTS and no CREATE ... IF NOT EXISTS, so
+        /// the two CREATE forms are guarded by a lookup of the object.
+        @Override
+        String conditionalDdl(String sql) {
+            String[] parts = conditionalParts(sql);
+            if (parts == null || !parts[0].startsWith("CREATE")) {
+                return sql;
+            }
+            if ("CREATE TABLE".equals(parts[0])) {
+                return "IF OBJECT_ID(N'" + literalBody(parts[1]) + "', N'U') IS NULL CREATE TABLE "
+                        + parts[1] + parts[2];
+            }
+            // CREATE [UNIQUE] INDEX name ON table (...): the index is looked up by
+            // name on its table, since two tables may each have one of that name.
+            String rest = parts[2];
+            int on = blanks(rest, 0);
+            if (!word(rest, on, "ON")) {
+                return sql;
+            }
+            int table = blanks(rest, on + 2);
+            int tableEnd = nameEnd(rest, table);
+            return "IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'"
+                    + literalBody(unquoted(parts[1])) + "' AND object_id = OBJECT_ID(N'"
+                    + literalBody(rest.substring(table, tableEnd)) + "')) " + parts[0] + " "
+                    + parts[1] + rest;
+        }
+
+        private static String unquoted(String name) {
+            if (name.length() >= 2 && name.charAt(0) == '[') {
+                return name.substring(1, name.length() - 1).replace("]]", "]");
+            }
+            if (name.length() >= 2 && name.charAt(0) == '"') {
+                return name.substring(1, name.length() - 1).replace("\"\"", "\"");
+            }
+            return name;
         }
 
         @Override

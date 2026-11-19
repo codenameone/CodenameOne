@@ -64,6 +64,7 @@ public final class HistoryTable {
     private final String quoted;
     private final boolean mysql;
     private final boolean postgres;
+    private final boolean sqlServer;
 
     /// Binds a table name to a target.
     public HistoryTable(MigrationTarget target, String table) {
@@ -73,6 +74,7 @@ public final class HistoryTable {
         String dialect = target.dialect();
         mysql = "mysql".equals(dialect);
         postgres = "postgresql".equals(dialect);
+        sqlServer = "sqlserver".equals(dialect);
         quoted = quote(table);
     }
 
@@ -124,6 +126,9 @@ public final class HistoryTable {
         } else if (postgres) {
             timestamp = "TIMESTAMP NOT NULL DEFAULT now()";
             bool = "BOOLEAN";
+        } else if (sqlServer) {
+            timestamp = "DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()";
+            bool = "BIT";
         } else {
             timestamp = "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now'))";
             bool = "BOOLEAN";
@@ -145,11 +150,13 @@ public final class HistoryTable {
 
     /// Reads every row in the order it was written.
     public List<Row> read() throws IOException {
-        String text = mysql ? "CHAR" : "TEXT";
+        String text = mysql ? "CHAR" : sqlServer ? "NVARCHAR(30)" : "TEXT";
+        // BIT is a number on SQL Server, not a truth value a CASE can test.
+        String succeeded = quote("success") + (sqlServer ? " = 1" : "");
         List<String[]> raw = target.query("SELECT " + quote("installed_rank") + ", " + quote("version") + ", "
                 + quote("description") + ", " + quote("type") + ", " + quote("script") + ", " + quote("checksum")
                 + ", CAST(" + quote("installed_on") + " AS " + text + "), " + quote("execution_time")
-                + ", CASE WHEN " + quote("success") + " THEN 1 ELSE 0 END FROM " + quoted + " ORDER BY "
+                + ", CASE WHEN " + succeeded + " THEN 1 ELSE 0 END FROM " + quoted + " ORDER BY "
                 + quote("installed_rank"), null);
         List<Row> rows = new ArrayList<Row>();
         for (String[] values : raw) {
