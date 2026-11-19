@@ -50,6 +50,9 @@ final class Cell {
     /// The last calculation took an array where one value is wanted; written as an array
     /// formula so Excel calculates it the same way.
     boolean spreads;
+    /// Whether spreads has been worked out: a formula read from a file keeps its cached value
+    /// and is not calculated until something it reads changes.
+    boolean spreadsKnown;
     // the format came from a typed formula such as =TODAY(), and goes when the formula does
     boolean autoFormat;
     // calls a function this package does not have: the value its file stored stands until

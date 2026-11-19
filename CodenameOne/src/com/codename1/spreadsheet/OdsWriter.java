@@ -380,7 +380,7 @@ final class OdsWriter {
         spans(x, region);
         if (cell.formula != null) {
             x.attr("table:formula", "of:=" + FormulaParser.print(cell.formula, true));
-            if ((cell.arrayFormula || cell.spreads) && region == null) {
+            if (cell.arrayFormula || book.spreads(cell)) {
                 // a one-cell matrix: LibreOffice then calculates the formula over arrays, as
                 // this evaluator did, instead of meeting each range at the formula's row
                 x.raw(" table:number-matrix-columns-spanned=\"1\" table:number-matrix-rows-spanned=\"1\"");
@@ -406,8 +406,13 @@ final class OdsWriter {
                 }
                 long seconds = nanos / 1000000000L;
                 if (format.isTimeOnly()) {
-                    long totalNanos = (long) Math.floor(d * 86400.0E9 + 0.5);
-                    long total = totalNanos / 1000000000L;
+                    // whole seconds and the part of one apart: nanoseconds of a long duration
+                    // pass what a long holds
+                    long total = (long) (Math.floor(d) * 86400) + nanos / 1000000000L;
+                    if (day > Math.floor(d)) {
+                        total = (long) (day * 86400);
+                    }
+                    long totalNanos = nanos;
                     sb.append("PT");
                     two(sb, total / 3600);
                     sb.append('H');

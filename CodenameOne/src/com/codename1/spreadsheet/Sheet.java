@@ -198,6 +198,7 @@ public final class Sheet extends AbstractTableModel {
         c.odsSyntax = false;
         c.alwaysDirty = false;
         c.arrayFormula = false;
+        c.spreadsKnown = false;
         c.keepsCached = false;
         c.circular = false;
         c.state = Cell.CLEAN;
@@ -224,6 +225,7 @@ public final class Sheet extends AbstractTableModel {
         workbook.allocated(formulaCost(text.length()));
         storeRaw(row, col, cached);
         c.arrayFormula = array;
+        c.spreadsKnown = false;
         try {
             c.formula = FormulaParser.parse(text, ods);
             c.formulaText = FormulaParser.display(c.formula);
@@ -244,6 +246,7 @@ public final class Sheet extends AbstractTableModel {
         Cell c = ensure(row, col);
         storeRaw(row, col, cached);
         c.arrayFormula = array;
+        c.spreadsKnown = false;
         c.formula = node;
         c.formulaText = FormulaParser.display(node);
         workbook.allocated(formulaCost(c.formulaText.length()));

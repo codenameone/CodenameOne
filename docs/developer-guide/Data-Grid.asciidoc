@@ -580,8 +580,9 @@ A few things work differently from Excel:
 * A range given where one value is wanted is taken whole, as Excel 365 takes
   it: `=SUM(ABS(A1:A3))` adds all three. Older spreadsheet applications take
   the cell in the formula's own row instead, so the writers save such a
-  formula as an array formula, and every application calculates the value
-  shown here.
+  formula as an array formula, so they calculate it over the whole range
+  too. A range that's the whole formula, as in `=A1:A3`, is still the cell in
+  the formula's own row.
 * Text is read as a date when it's written `2026-01-12` or names its month,
   as in `12-Jan-2026`. A date of digits and slashes isn't: `1/2/2026` is a
   different day in different countries.

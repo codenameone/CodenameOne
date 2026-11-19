@@ -113,6 +113,30 @@ class SpreadsheetHostileFileTest extends UITestBase {
                         + "</sheetData></worksheet>");
     }
 
+    /// The same XLSX with every array mark taken off its formulas, as Excel 365 writes a
+    /// dynamic-array formula.
+    private static byte[] stripArray(byte[] xlsx) throws IOException {
+        java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(new ByteArrayInputStream(xlsx));
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream out = new java.util.zip.ZipOutputStream(bytes);
+        for (java.util.zip.ZipEntry e = in.getNextEntry(); e != null; e = in.getNextEntry()) {
+            ByteArrayOutputStream part = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            for (int n = in.read(buf); n > 0; n = in.read(buf)) {
+                part.write(buf, 0, n);
+            }
+            byte[] data = part.toByteArray();
+            if (e.getName().startsWith("xl/worksheets/")) {
+                data = new String(data, "UTF-8").replaceAll("<f t=\"array\" ref=\"[A-Z0-9]+\">", "<f>").getBytes("UTF-8");
+            }
+            out.putNextEntry(new java.util.zip.ZipEntry(e.getName()));
+            out.write(data);
+            out.closeEntry();
+        }
+        out.close();
+        return bytes.toByteArray();
+    }
+
     private static byte[] unzip(byte[] zip, String name) throws IOException {
         java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(new ByteArrayInputStream(zip));
         for (java.util.zip.ZipEntry e = in.getNextEntry(); e != null; e = in.getNextEntry()) {
@@ -947,6 +971,14 @@ class SpreadsheetHostileFileTest extends UITestBase {
         if (sheetXml.indexOf("<f t=\"array\" ref=\"C2\">") < 0 || sheetXml.indexOf("<f t=\"array\" ref=\"D2\">") >= 0) {
             wrong.append("\nonly the formula taking a range whole is an array formula: ").append(sheetXml);
         }
+        // read back and written again without a calculation, it is still an array formula
+        ByteArrayOutputStream again = new ByteArrayOutputStream();
+        Workbook.read(new ByteArrayInputStream(stripArray(aout.toByteArray())), Workbook.Format.XLSX)
+                .write(again, Workbook.Format.XLSX);
+        if (new String(unzip(again.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8").indexOf("<f t=\"array\" ref=\"C2\">") < 0) {
+            wrong.append("\na formula read from a file lost its array mark");
+        }
+        scal.addMergedRegion(1, 2, 2, 2);
         ByteArrayOutputStream oout = new ByteArrayOutputStream();
         scal.getWorkbook().write(oout, Workbook.Format.ODS);
         if (new String(unzip(oout.toByteArray(), "content.xml"), "UTF-8").indexOf("number-matrix-columns-spanned") < 0) {
@@ -965,6 +997,12 @@ class SpreadsheetHostileFileTest extends UITestBase {
         ByteArrayOutputStream tout = new ByteArrayOutputStream();
         tw.write(tout, Workbook.Format.ODS);
         Sheet back = Workbook.read(new ByteArrayInputStream(tout.toByteArray()), Workbook.Format.ODS).getSheet(0);
+        ts.setCellValue(3, 0, Double.valueOf(200000.5));
+        ts.setCellFormat(3, 0, "[h]:mm:ss");
+        tout = new ByteArrayOutputStream();
+        tw.write(tout, Workbook.Format.ODS);
+        back = Workbook.read(new ByteArrayInputStream(tout.toByteArray()), Workbook.Format.ODS).getSheet(0);
+        same(Double.valueOf(200000.5), back.getCellValue(3, 0), "a duration past what a long holds in nanoseconds");
         double[] wants = {0.2598929522439878, 45000.2598929522439878, 0.3};
         for (int r = 0; r < 3; r++) {
             Object v = back.getCellValue(r, 0);

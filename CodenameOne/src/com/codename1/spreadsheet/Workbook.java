@@ -161,6 +161,21 @@ public final class Workbook {
     private final ArrayList<CellFormat> formats = new ArrayList<CellFormat>();
     private final HashMap<String, Integer> formatIndex = new HashMap<String, Integer>();
     private final Evaluator evaluator = new Evaluator(this);
+
+    /// Whether a formula takes a range or an array whole where one value is wanted, so a
+    /// writer saves it as an array formula. A formula read from a file and never calculated
+    /// is evaluated once to find out; its cached value is left as it was.
+    boolean spreads(Cell c) {
+        if (c.formula == null) {
+            return false;
+        }
+        if (!c.spreadsKnown) {
+            evaluator.evaluate(c.formula, c.sheet, c.row, c.col, c.arrayFormula);
+            c.spreads = evaluator.lastSpread;
+            c.spreadsKnown = true;
+        }
+        return c.spreads;
+    }
     private boolean date1904;
     /// Set while a file is read: cells change and nobody is told.
     boolean silent;
@@ -927,6 +942,7 @@ public final class Workbook {
             } else {
                 v = evaluator.evaluate(c.formula, c.sheet, c.row, c.col, c.arrayFormula);
                 c.spreads = evaluator.lastSpread;
+                c.spreadsKnown = true;
             }
             int last = visiting.size() - 1;
             if (last >= 0 && visiting.get(last) == c) { //NOPMD CompareObjectsWithEquals - a cell is an identity
