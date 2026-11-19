@@ -67,6 +67,10 @@ public class CSVWriter {
     /// #### Parameters
     ///
     /// - `separatorChar`: the separator, a tab for tab separated values
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a line break or a double quote, which no reader could tell from a row end or a quote
     public CSVWriter(char separatorChar) {
         if (separatorChar == '\n' || separatorChar == '\r' || separatorChar == '"') {
             throw new IllegalArgumentException("A separator no reader could tell from a line ending or a quote");
@@ -97,6 +101,10 @@ public class CSVWriter {
     /// #### Parameters
     ///
     /// - `quoteChar`: the quote character, a double quote by default
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for the separator or a line break
     public void setQuoteChar(char quoteChar) {
         if (quoteChar == separatorChar || quoteChar == '\n' || quoteChar == '\r') {
             throw new IllegalArgumentException("A quote no reader could tell from the separator or a line ending");
@@ -119,6 +127,10 @@ public class CSVWriter {
     /// #### Parameters
     ///
     /// - `lineEnding`: the line ending
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for anything but CR LF, LF or CR
     public void setLineEnding(String lineEnding) {
         if (!"\r\n".equals(lineEnding) && !"\n".equals(lineEnding) && !"\r".equals(lineEnding)) {
             throw new IllegalArgumentException("A line ending is needed; \"\\n\" and \"\\r\\n\" are the usual ones");

@@ -488,7 +488,7 @@ final class XlsxReader {
                         // resolved when the table of strings has been read
                         value = Integer.valueOf(Integer.parseInt(raw.trim()));
                     } catch (NumberFormatException err) {
-                        value = null;
+                        throw new IllegalArgumentException("Not a shared string index: " + raw); //NOPMD PreserveStackTrace - the message names the value
                     }
                     break;
                 case T_STRING:
@@ -498,7 +498,14 @@ final class XlsxReader {
                     value = raw;
                     break;
                 case T_BOOLEAN:
-                    value = "1".equals(raw.trim()) || "true".equalsIgnoreCase(raw.trim()) ? Boolean.TRUE : Boolean.FALSE;
+                    String b = raw.trim();
+                    if ("1".equals(b) || "true".equalsIgnoreCase(b)) {
+                        value = Boolean.TRUE;
+                    } else if ("0".equals(b) || "false".equalsIgnoreCase(b)) {
+                        value = Boolean.FALSE;
+                    } else {
+                        throw new IllegalArgumentException("Not a boolean: " + raw);
+                    }
                     break;
                 case T_ERROR: {
                     CellError err = CellError.valueOf(raw.trim());
@@ -732,7 +739,10 @@ final class XlsxReader {
                 }
                 if (cell.value instanceof Integer) {
                     int index = ((Integer) cell.value).intValue();
-                    cell.value = index >= 0 && index < strings.size() ? strings.get(index) : "";
+                    if (index < 0 || index >= strings.size()) {
+                        throw new IllegalArgumentException("No such shared string: " + index);
+                    }
+                    cell.value = strings.get(index);
                 }
                 cell.format = cell.format > 0 && cell.format < formats.length ? formats[cell.format] : 0;
                 // A cell written as an ISO date says it is a date by its type alone and need

@@ -198,7 +198,7 @@ final class OdsReader {
                     readCell(x, "covered-table-cell".equals(tag));
                 }
             } else if ("table-row".equals(tag)) {
-                rowRepeat = Math.max(1, x.intAttr("table:number-rows-repeated", 1));
+                rowRepeat = x.count("table:number-rows-repeated", 1, 1, Integer.MAX_VALUE);
                 col = 0;
                 rowHasContent = false;
             } else if ("table".equals(tag)) {
@@ -341,7 +341,10 @@ final class OdsReader {
     private void endRow() {
         if (rowHasContent && rowRepeat > 1) {
             Cell[] cells = sheet.rowCells(row);
-            int copies = Math.min(rowRepeat - 1, Node.MAX_ROW - row);
+            if ((long) row + rowRepeat - 1 > Node.MAX_ROW) {
+                throw new IllegalArgumentException("a row with values repeated past the last row of a sheet");
+            }
+            int copies = rowRepeat - 1;
             for (int i = 1; i <= copies && cells != null; i++) {
                 for (int c = 0; c < cells.length; c++) {
                     Cell from = cells[c];
@@ -611,7 +614,10 @@ final class OdsReader {
         if (col > Node.MAX_COL) {
             throw new IllegalArgumentException("a cell with a value stands past the last column of a sheet");
         }
-        int count = Math.min(repeat, Node.MAX_COL + 1 - col);
+        if ((long) col + repeat - 1 > Node.MAX_COL) {
+            throw new IllegalArgumentException("a cell with a value repeated past the last column of a sheet");
+        }
+        int count = repeat;
         for (int i = 0; i < count; i++) {
             int c = col + i;
             if (formulaText != null) {

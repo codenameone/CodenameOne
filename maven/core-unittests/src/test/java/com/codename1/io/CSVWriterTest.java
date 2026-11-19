@@ -36,6 +36,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CSVWriterTest {
     @Test
+    void refusesSettingsNoReaderCouldReadBack() {
+        assertThrows(IllegalArgumentException.class, () -> new CSVWriter('\n'));
+        assertThrows(IllegalArgumentException.class, () -> new CSVWriter('"'));
+        assertThrows(IllegalArgumentException.class, () -> new CSVWriter().setQuoteChar(','));
+        assertThrows(IllegalArgumentException.class, () -> new CSVWriter().setLineEnding("x"));
+        new CSVWriter().setLineEnding("\n");
+    }
+
+    @Test
     void quotesOnlyWhatNeedsIt() {
         String text = new CSVWriter().toString(new String[][]{
                 {"plain", "a,b", "say \"hi\"", "two\nlines", " padded", null, ""}

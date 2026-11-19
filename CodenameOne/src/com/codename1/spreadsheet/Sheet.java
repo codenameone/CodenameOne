@@ -535,6 +535,10 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `format`: a format code in Excel's syntax, such as `0.0%` or `d mmm yyyy`; null for
     ///   none
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a format code no file can hold: more than four sections, or a quote, bracket or escape left open
     public void setCellFormat(int row, int column, String format) {
         CellFormat.check(format);
         Cell c = ensure(row, column);
@@ -1342,6 +1346,10 @@ public final class Sheet extends AbstractTableModel {
     /// - `lastRow`: the bottom row
     ///
     /// - `lastColumn`: the right column
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a rectangle outside the sheet or over a merge the sheet has
     public void addMergedRegion(int firstRow, int firstColumn, int lastRow, int lastColumn) {
         if (!mergeRegion(firstRow, firstColumn, lastRow, lastColumn, Integer.MAX_VALUE)) {
             throw new IllegalArgumentException("Not a rectangle of the sheet, or over a merge it has: rows " + firstRow + " to " + lastRow

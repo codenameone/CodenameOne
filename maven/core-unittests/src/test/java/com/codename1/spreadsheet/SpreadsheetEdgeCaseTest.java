@@ -147,8 +147,8 @@ class SpreadsheetEdgeCaseTest extends UITestBase {
                 + "<row r=\"1\"><c r=\"A1\"><v>1</v></c><c r=\"B1\"><f t=\"shared\" ref=\"B1:B3\" si=\"0\">A1*$A$1+1</f><v>2</v></c>"
                 + "<c r=\"C1\" t=\"s\"><v>0</v></c><c r=\"D1\" t=\"inlineStr\"><is><t>in</t><r><t>line</t></r></is></c>"
                 + "<c r=\"E1\" t=\"b\"><v>1</v></c><c r=\"F1\" t=\"e\"><v>#DIV/0!</v></c>"
-                + "<c r=\"G1\" t=\"str\"><f>\"a\"&amp;\"b\"</f><v>ab</v></c><c r=\"H1\" t=\"s\"><v>99</v></c>"
-                + "<c r=\"I1\" t=\"s\"><v>many</v></c><c r=\"J1\"><v></v></c><c r=\"K1\" t=\"b\"><v>0</v></c></row>"
+                + "<c r=\"G1\" t=\"str\"><f>\"a\"&amp;\"b\"</f><v>ab</v></c>"
+                + "<c r=\"J1\"><v></v></c><c r=\"K1\" t=\"b\"><v>0</v></c></row>"
                 + "<row r=\"2\"><c r=\"A2\"><v>2</v></c><c r=\"B2\"><f t=\"shared\" si=\"0\"/><v>3</v></c>"
                 + "<c r=\"C2\" t=\"s\"><v>1</v></c><c r=\"D2\" t=\"d\"><v>2026-03-04T09:05:00</v></c>"
                 + "<c r=\"E2\"><f t=\"shared\" si=\"7\"/><v>5</v></c></row>"
@@ -170,8 +170,7 @@ class SpreadsheetEdgeCaseTest extends UITestBase {
         same(Boolean.FALSE, s.getCellValue("K1"), "K1");
         same(CellError.DIV0, s.getCellValue("F1"), "F1");
         same("ab", s.getCellValue("G1"), "G1");
-        same("", s.getCellValue("H1"), "a string index past the table");
-        same(null, s.getCellValue("I1"), "a string index that is no number");
+        // a string index that is no number is a damaged file: SpreadsheetHostileFileTest
         same(null, s.getCellValue("J1"), "an empty value");
         same(Double.valueOf(5), s.getCellValue("E2"), "a shared formula that was never written keeps its value");
         same(null, s.getCellFormula(1, 4), "and has no formula");

@@ -1081,6 +1081,7 @@ class SpreadsheetHostileFileTest extends UITestBase {
         String[][] refused = {
             {"<row r=\"1\"", "<row r=\"1\" outlineLevel=\"9\""},
             {"<sheetData>", "<cols><col min=\"5\" max=\"2\" width=\"3\"/></cols><sheetData>"},
+            {"<row r=\"1\"", "<row r=\"9\"><c r=\"A9\" t=\"b\"><v>2</v></c><c r=\"B9\" t=\"s\"><v>999</v></c></row><row r=\"11\"><c r=\"A11\" t=\"s\"><v>many</v></c></row><row r=\"10\""},
             {"<sheetData>", "<cols><col min=\"1\" max=\"1\" width=\"wide\" customWidth=\"1\"/></cols><sheetData>"},
         };
         for (int k = 0; k < refused.length; k++) {
