@@ -322,7 +322,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
             // Found by the index on expires_at, a bounded number at a time, and
             // deleted by key: a purge never holds more than one row.
             List tokens = dataSource.query("SELECT token_hash FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE "
-                    + "expires_at < ? ORDER BY expires_at LIMIT " + bound,
+                    + "expires_at < ? ORDER BY expires_at " + dataSource.dialect().limit(bound, 0),
                     new Object[] {Long.valueOf(now)});
             for (Object row : tokens) {
                 purged += dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE token_hash = ? "
@@ -330,7 +330,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
                             Long.valueOf(now)});
             }
             List grants = dataSource.query("SELECT id FROM " + SecuritySchema.table("cn1_oauth2_authorization") + " WHERE "
-                    + "expires_at < ? ORDER BY expires_at LIMIT " + bound,
+                    + "expires_at < ? ORDER BY expires_at " + dataSource.dialect().limit(bound, 0),
                     new Object[] {Long.valueOf(now)});
             for (Object row : grants) {
                 Object id = ((Map) row).get("id");

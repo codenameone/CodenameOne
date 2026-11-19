@@ -203,6 +203,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             throw new IllegalStateException("Query has no SQL plan");
         }
         List<Object> values = new ArrayList<Object>();
+        // SQL Server matches a GROUP BY term against the SELECT list by its
+        // text, and @p1 and @p2 are different text even when equal; a named
+        // parameter repeated there reuses the first occurrence's @p name.
+        Map<String, Integer> reused = session.sqlServer() ? new LinkedHashMap<String, Integer>() : null;
         // Render each occurrence separately: dialect ordering and checked
         // arithmetic can repeat expressions containing the same bound value.
         StringBuilder statement = new StringBuilder();
@@ -257,10 +261,32 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (value instanceof Iterable || value instanceof Object[]) {
                         throw new IllegalArgumentException("Collection parameter requires IN: " + parameter.name);
                     }
+                    Integer slot = reused == null ? null : reused.get(parameter.name);
+                    if (slot != null) {
+                        statement.setLength(statement.length() - 1);
+                        statement.append("@p").append(slot.intValue());
+                        continue;
+                    }
                     values.add(parameter.convert(value));
+                    if (reused != null) {
+                        reused.put(parameter.name, Integer.valueOf(values.size()));
+                    }
                 }
             } else {
-                values.add(boundValue(binding));
+                Object value = boundValue(binding);
+                // An equal literal repeated is reused the same way, by value.
+                String key = reused != null && binding instanceof LiteralBinding && value != null
+                        ? "'" + value.getClass().getName() + ":" + value : null;
+                Integer slot = key == null ? null : reused.get(key);
+                if (slot != null) {
+                    statement.setLength(statement.length() - 1);
+                    statement.append("@p").append(slot.intValue());
+                    continue;
+                }
+                values.add(value);
+                if (key != null) {
+                    reused.put(key, Integer.valueOf(values.size()));
+                }
             }
         }
         SessionImpl.checkParameterCount(values.size());
@@ -671,7 +697,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                             selectedPositions.append(i + 1);
                         }
                     }
-                    terms.append(selectedPositions.length() == 0 ? term.sql : selectedPositions.toString());
+                    // SQL Server has no positions in GROUP BY; it is given the
+                    // expression, whose parameters arguments() names alike.
+                    terms.append(selectedPositions.length() == 0 || session.sqlServer() ? term.sql
+                            : selectedPositions.toString());
                 } while (take(","));
                 group = " GROUP BY " + terms;
             }
@@ -984,7 +1013,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 bindType(left, right);
                 bindType(right, left);
                 if (left.kind == Attribute.BOOLEAN || right.kind == Attribute.BOOLEAN) {
-                    return node("(" + condition(left) + " " + op + " " + condition(right) + ")", Attribute.BOOLEAN, left, right);
+                    return node("(" + comparable(left) + " " + op + " " + comparable(right) + ")", Attribute.BOOLEAN, left, right);
                 }
                 if (numericKind(left.kind) && numericKind(right.kind)
                         && (left.kind == Attribute.REAL || right.kind == Attribute.REAL)) {
@@ -1049,7 +1078,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     String left = operand.sql;
                     String right = test.sql;
                     if (operand.kind == Attribute.BOOLEAN || test.kind == Attribute.BOOLEAN) {
-                        left = condition(operand); right = condition(test);
+                        left = comparable(operand); right = comparable(test);
                     } else if (numericKind(operand.kind) && numericKind(test.kind)
                             && (operand.kind == Attribute.REAL || test.kind == Attribute.REAL)) {
                         left = session.numericOperand(left, Attribute.REAL);
@@ -1215,6 +1244,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         sql.append(arg.query.rootAlias)
                                 .append('.')
                                 .append(session.q(arg.entity.attributes()[arg.entity.idIndex()].column));
+                    } else if (session.sqlServer() && arg.literal && arg.literalValue == null) {
+                        // SQL Server refuses an untyped NULL as an aggregate's operand.
+                        sql.append("CAST(").append(arg.sql).append(" AS INT)");
                     } else {
                         sql.append("AVG".equals(function) ? session.averageOperand(arg.sql, arg.kind) : arg.sql);
                     }
@@ -1711,6 +1743,13 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 value.parameter.logical = true;
             }
             return value.predicate ? value.sql : "(" + value.sql + " <> 0)";
+        }
+        /// A boolean as an operand of a comparison. T-SQL has no boolean values,
+        /// so a predicate cannot be compared with another there; it is turned
+        /// into 1 or 0 first.
+        private String comparable(Expr value) {
+            String predicate = condition(value);
+            return session.sqlServer() ? "(CASE WHEN " + predicate + " THEN 1 ELSE 0 END)" : predicate;
         }
         private Expr logical(Expr left, String op, Expr right) {
             return node("(" + condition(left) + " " + op + " " + condition(right) + ")", Attribute.BOOLEAN, left, right);

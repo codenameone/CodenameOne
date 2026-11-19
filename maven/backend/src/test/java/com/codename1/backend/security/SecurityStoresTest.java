@@ -138,7 +138,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void theSchemaIsAppliedOnceUnderItsOwnHistory(String engine) throws Exception {
         DataSource pool = open(engine);
         // open() migrated: every table is there and empty.
@@ -173,7 +173,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void users(String engine) throws Exception {
         JdbcUserDetailsManager users = new JdbcUserDetailsManager(open(engine));
         assertFalse(users.userExists("Ada"));
@@ -234,7 +234,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void deletingAUserRemovesDurableCredentialsBeforeNameReuse(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcUserDetailsManager users = new JdbcUserDetailsManager(pool);
@@ -282,7 +282,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void deletingCredentialsAndUserIsOneTransaction(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcUserDetailsManager users = new JdbcUserDetailsManager(pool);
@@ -297,7 +297,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void apiKeys(String engine) throws Exception {
         JdbcApiKeyRepository keys = new JdbcApiKeyRepository(open(engine));
         Ticking clock = new Ticking();
@@ -340,7 +340,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void persistentLogins(String engine) throws Exception {
         JdbcTokenRepository tokens = new JdbcTokenRepository(open(engine));
         tokens.createNewToken(new PersistentRememberMeToken("Ada", "series-1", "hash-a", 1000L));
@@ -374,7 +374,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void replacedTotpEnrollmentRejectsPreviouslyVerifiedCodes(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcTotpRepository repo = new JdbcTotpRepository(pool, Crypto.sha256(new byte[] {1, 2, 3}));
@@ -412,7 +412,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void secondFactors(String engine) throws Exception {
         DataSource pool = open(engine);
         byte[] key = Crypto.sha256("a key".getBytes("UTF-8"));
@@ -495,7 +495,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void rateLimits(String engine) throws Exception {
         DataSource pool = open(engine);
         Ticking clock = new Ticking();
@@ -566,7 +566,7 @@ class SecurityStoresTest {
         assertTrue(longName.tryAcquire("ip:2"), "every caller of a long-named limiter was one row");
         assertFalse(longName.tryAcquire("ip:1"));
         assertEquals(0L, ((Number) pool.queryOne("SELECT COUNT(*) AS n FROM cn1_rate_limit WHERE "
-                + "LENGTH(limit_key) > 200", null).get("n")).longValue());
+                + ("SQLSERVER".equals(engine) ? "LEN" : "LENGTH") + "(limit_key) > 200", null).get("n")).longValue());
 
         // Atomic: many callers at one moment, as several processes would be,
         // and exactly the permits are taken -- for a key that has no row yet,
@@ -599,7 +599,7 @@ class SecurityStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void rateLimitCleanupPreservesActiveWindows(String engine) throws Exception {
         DataSource pool = open(engine);
         Ticking clock = new Ticking();

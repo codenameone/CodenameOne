@@ -337,7 +337,19 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
             execute("CREATE SEQUENCE IF NOT EXISTS " + quote(name) + " START WITH 1", new Object[0]);
             return;
         }
+        boolean sqlServer = "sqlserver".equals(dialect.getName());
+        if (strategy == 2 && sqlServer) {
+            execute("IF OBJECT_ID(?, 'SO') IS NULL EXEC('CREATE SEQUENCE ' + ?  + ' AS BIGINT START WITH 1')",
+                    new Object[]{quote(name), quote(name)});
+            return;
+        }
         execute("CREATE TABLE IF NOT EXISTS cn1_orm_sequences (sequence_name " + dialect.assignedKeyColumn(Dialect.TEXT) + ", next_value " + dialect.columnType(Dialect.BIGINT) + " NOT NULL)", new Object[0]);
+        if (sqlServer) {
+            execute("INSERT INTO cn1_orm_sequences WITH (HOLDLOCK) (sequence_name,next_value) SELECT ?,0 "
+                    + "WHERE NOT EXISTS (SELECT 1 FROM cn1_orm_sequences WITH (UPDLOCK, HOLDLOCK) WHERE sequence_name = ?)",
+                    new Object[]{name, name});
+            return;
+        }
         String sql = "INSERT " + ("mysql".equals(dialect.getName()) ? "IGNORE " : "") + "INTO cn1_orm_sequences (sequence_name,next_value) VALUES (?,0)";
         if (!"mysql".equals(dialect.getName())) {
             sql += " ON CONFLICT (sequence_name) DO NOTHING";
@@ -363,6 +375,9 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
         }
         if (strategy == 2 && "postgresql".equals(dialect.getName())) {
             return query("SELECT nextval(CAST(? AS regclass))", new Object[]{quote(name)}, new int[]{Dialect.BIGINT}).get(0)[0];
+        }
+        if (strategy == 2 && "sqlserver".equals(dialect.getName())) {
+            return query("SELECT NEXT VALUE FOR " + quote(name), new Object[0], new int[]{Dialect.BIGINT}).get(0)[0];
         }
         long max = kind == Dialect.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE;
         if (execute("UPDATE cn1_orm_sequences SET next_value = next_value + 1 WHERE sequence_name = ? AND next_value < ?", new Object[]{name, Long.valueOf(max)}) != 1) {

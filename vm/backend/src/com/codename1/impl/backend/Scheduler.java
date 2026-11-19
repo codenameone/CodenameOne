@@ -595,6 +595,8 @@ public final class Scheduler {
             sql = "SELECT CAST(EXTRACT(EPOCH FROM clock_timestamp()) * 1000 AS BIGINT) AS db_now";
         } else if ("mysql".equals(name)) {
             sql = "SELECT CAST(ROUND(UNIX_TIMESTAMP(NOW(3)) * 1000) AS SIGNED) AS db_now";
+        } else if ("sqlserver".equals(name)) {
+            sql = "SELECT DATEDIFF_BIG(MILLISECOND, '1970-01-01', SYSUTCDATETIME()) AS db_now";
         } else {
             // SQLite runs in this process: its clock is this host's anyway.
             return System.currentTimeMillis();

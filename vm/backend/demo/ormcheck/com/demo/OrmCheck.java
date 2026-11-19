@@ -76,6 +76,7 @@ public class OrmCheck {
             try {
                 generatedRepositories(em, pool.dialect().getName());
                 nativeDatesRoundTripInUtc(em);
+                generatedKeys(em);
                 roundTripsEveryColumn(notes);
                 updatesAndDeletes(notes);
                 queriesByFieldName(notes, pool.dialect().getName());
@@ -108,6 +109,38 @@ public class OrmCheck {
         System.out.println(failures.isEmpty() ? "ORMCHECK OK" : "ORMCHECK FAILED");
         if(!failures.isEmpty()) {
             System.exit(1);
+        }
+    }
+
+    /// SEQUENCE and TABLE keys: each engine supplies a sequence its own way (or
+    /// the key table stands in), and both must hand out distinct ascending keys.
+    private static void generatedKeys(EntityManager em) {
+        com.codename1.orm.session.Session s = em.openSession();
+        try {
+            s.createTables();
+            s.beginTransaction();
+            Serial a = new Serial();
+            a.label = "a";
+            Serial b = new Serial();
+            b.label = "b";
+            Counted c = new Counted();
+            c.label = "c";
+            Counted d = new Counted();
+            d.label = "d";
+            s.persist(a);
+            s.persist(b);
+            s.persist(c);
+            s.persist(d);
+            s.commitTransaction();
+            check("sequence keys ascend", "true", "" + (a.id > 0 && b.id > a.id));
+            check("table keys ascend", "true", "" + (c.id > 0 && d.id > c.id));
+            s.clear();
+            check("a sequence-keyed row reads back", "b", s.find(Serial.class, Long.valueOf(b.id)).label);
+            check("a table-keyed row reads back", "d", s.find(Counted.class, Long.valueOf(d.id)).label);
+        } catch (RuntimeException err) {
+            check("generated keys", "no exception", "" + err);
+        } finally {
+            s.close();
         }
     }
 

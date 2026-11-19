@@ -73,7 +73,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// spaces in every comparison and spells several types its own way. Its
     /// answers are kept beside the other engines' in each method below, as
     /// theirs are, rather than behind a hook per decision.
-    private boolean sqlServer() {
+    boolean sqlServer() {
         return "sqlserver".equals(sql.dialect());
     }
     /// Whether foreign keys are checked per statement and cannot be deferred to
@@ -152,6 +152,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 return "CAST(" + value + " AS FLOAT(53))";
             }
             return "mysql".equals(sql.dialect()) ? "(1e0 * " + value + ")" : "CAST(" + value + " AS REAL)";
+        }
+        if ("mysql".equals(sql.dialect()) && value.startsWith("/*cn1-bind-") && value.endsWith("*/?")
+                && value.indexOf("*/?") == value.length() - 3) {
+            // MySQL types a parameter it cannot infer, as in ABS(?), as DOUBLE,
+            // so an integral one is cast to keep the result integral.
+            return "CAST(" + value + " AS SIGNED)";
         }
         return value;
     }

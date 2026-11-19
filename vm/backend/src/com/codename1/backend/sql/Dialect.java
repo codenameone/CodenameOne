@@ -941,6 +941,10 @@ public abstract class Dialect {
         /// the two CREATE forms are guarded by a lookup of the object.
         @Override
         String conditionalDdl(String sql) {
+            String added = addColumn(sql);
+            if (added != null) {
+                return added;
+            }
             String[] parts = conditionalParts(sql);
             if (parts == null || !parts[0].startsWith("CREATE")) {
                 return sql;
@@ -962,6 +966,28 @@ public abstract class Dialect {
                     + literalBody(unquoted(parts[1])) + "' AND object_id = OBJECT_ID(N'"
                     + literalBody(rest.substring(table, tableEnd)) + "')) " + parts[0] + " "
                     + parts[1] + rest;
+        }
+
+        /// "ALTER TABLE t ADD COLUMN c ..." without the COLUMN, which SQL Server
+        /// does not accept; null for any other statement.
+        private static String addColumn(String sql) {
+            int at = blanks(sql, 0);
+            if (!word(sql, at, "ALTER")) {
+                return null;
+            }
+            at = blanks(sql, at + 5);
+            if (!word(sql, at, "TABLE")) {
+                return null;
+            }
+            at = blanks(sql, nameEnd(sql, blanks(sql, at + 5)));
+            if (!word(sql, at, "ADD")) {
+                return null;
+            }
+            int column = blanks(sql, at + 3);
+            if (!word(sql, column, "COLUMN")) {
+                return null;
+            }
+            return sql.substring(0, at + 3) + sql.substring(column + 6);
         }
 
         private static String unquoted(String name) {

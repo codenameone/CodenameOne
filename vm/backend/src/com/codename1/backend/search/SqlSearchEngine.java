@@ -71,6 +71,10 @@ public final class SqlSearchEngine implements SearchEngine {
     private static final int SQLITE = 0;
     private static final int POSTGRES = 1;
     private static final int MYSQL = 2;
+    /// Matched like SQLite, by LIKE and then word by word in memory: full-text
+    /// search on SQL Server needs a catalog the administrator creates, which an
+    /// application cannot assume.
+    private static final int SQLSERVER = 3;
 
     /// An engine over `data`, creating its table if needed. `ownsData` closes the
     /// data source along with the engine.
@@ -82,6 +86,8 @@ public final class SqlSearchEngine implements SearchEngine {
             kind = POSTGRES;
         } else if (Dialect.MYSQL.equals(d) || Dialect.MARIADB.equals(d)) {
             kind = MYSQL;
+        } else if (Dialect.SQLSERVER.equals(d)) {
+            kind = SQLSERVER;
         } else {
             kind = SQLITE;
         }
@@ -102,6 +108,11 @@ public final class SqlSearchEngine implements SearchEngine {
                     + "id VARCHAR(191) NOT NULL, body LONGTEXT NOT NULL, doc LONGTEXT NOT NULL, "
                     + "PRIMARY KEY (idx, id), FULLTEXT KEY " + TABLE + "_fts (body)) "
                     + "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", null);
+        } else if (kind == SQLSERVER) {
+            // 191 characters keeps the key inside SQL Server's 900-byte limit.
+            data.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (idx NVARCHAR(191) NOT NULL, "
+                    + "id NVARCHAR(191) NOT NULL, body NVARCHAR(MAX) NOT NULL, doc NVARCHAR(MAX) NOT NULL, "
+                    + "PRIMARY KEY (idx, id))", null);
         } else {
             data.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (idx TEXT NOT NULL, "
                     + "id TEXT NOT NULL, body TEXT NOT NULL, doc TEXT NOT NULL, "
@@ -121,7 +132,11 @@ public final class SqlSearchEngine implements SearchEngine {
         requireId(id);
         StringBuilder body = new StringBuilder();
         collectText(document, body, 0);
-        String sql = "INSERT INTO " + TABLE + " (idx, id, body, doc) VALUES (?, ?, ?, ?) "
+        String sql = kind == SQLSERVER
+                ? "MERGE " + TABLE + " WITH (HOLDLOCK) AS t USING (VALUES (?, ?, ?, ?)) AS s (idx, id, body, doc) "
+                        + "ON t.idx = s.idx AND t.id = s.id WHEN MATCHED THEN UPDATE SET body = s.body, doc = s.doc "
+                        + "WHEN NOT MATCHED THEN INSERT (idx, id, body, doc) VALUES (s.idx, s.id, s.body, s.doc);"
+                : "INSERT INTO " + TABLE + " (idx, id, body, doc) VALUES (?, ?, ?, ?) "
                 + (kind == MYSQL
                 ? "ON DUPLICATE KEY UPDATE body = VALUES(body), doc = VALUES(doc)"
                 : "ON CONFLICT (idx, id) DO UPDATE SET body = excluded.body, doc = excluded.doc");
@@ -225,7 +240,7 @@ public final class SqlSearchEngine implements SearchEngine {
         int cap = MAX_CANDIDATES + 1;
         if (terms.isEmpty()) {
             return data.query("SELECT id, doc, body FROM " + TABLE + " WHERE idx = ? "
-                    + "ORDER BY id LIMIT " + cap, new Object[] {index});
+                    + "ORDER BY id " + data.dialect().limit(cap, 0), new Object[] {index});
         }
         if (kind == POSTGRES) {
             StringBuilder q = new StringBuilder();
@@ -279,7 +294,7 @@ public final class SqlSearchEngine implements SearchEngine {
             System.arraycopy(params, 0, used, 0, n);
             params = used;
         }
-        sql.append(" ORDER BY id LIMIT ").append(cap);
+        sql.append(" ORDER BY id ").append(data.dialect().limit(cap, 0));
         return data.query(sql.toString(), params);
     }
 
@@ -310,7 +325,7 @@ public final class SqlSearchEngine implements SearchEngine {
         }
         if (q.getSortField() != null) {
             sortHits(matched, q.getSortField(), q.isSortAscending());
-        } else if (kind == SQLITE && !terms.isEmpty()) {
+        } else if ((kind == SQLITE || kind == SQLSERVER) && !terms.isEmpty()) {
             sortByScore(matched);
         }
         Map facets = new LinkedHashMap();
@@ -329,7 +344,7 @@ public final class SqlSearchEngine implements SearchEngine {
     /// on SQLite, whose `LIKE` also matches inside a longer word, and on MySQL
     /// the words InnoDB leaves out of its index.
     private List checkedTerms(List terms) {
-        if (kind == SQLITE) {
+        if (kind == SQLITE || kind == SQLSERVER) {
             return terms;
         }
         List out = new ArrayList();
