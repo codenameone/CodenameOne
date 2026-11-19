@@ -78,6 +78,7 @@ public class OrmCheck {
                 nativeDatesRoundTripInUtc(em);
                 generatedKeys(em);
                 roundTripsEveryColumn(notes, pool.dialect().getName());
+                emptyStringInJpql(em, notes);
                 updatesAndDeletes(notes);
                 queriesByFieldName(notes, pool.dialect().getName());
                 anExplicitKeyLeavesTheNextGeneratedOneUsable(pool);
@@ -256,6 +257,25 @@ public class OrmCheck {
      * BIGINT rather than a native timestamp whose text format follows the
      * server's time zone, and a blob is BYTEA, BLOB or LONGBLOB.
      */
+    /// JPQL comparing with '' agrees with the stored empty string: on
+    /// Oracle, where '' is NULL, the comparison is rendered as IS [NOT] NULL.
+    private static void emptyStringInJpql(EntityManager em, Dao<Note> notes) throws Exception {
+        Note blank = new Note();
+        blank.title = "";
+        notes.insert(blank);
+        com.codename1.orm.session.Session s = em.openSession();
+        try {
+            int empty = s.createQuery("select n.id from com.demo.Note n where n.title = '' and n.id = "
+                    + blank.id).list().size();
+            int nonEmpty = s.createQuery("select n.id from com.demo.Note n where n.title <> '' and n.id = "
+                    + blank.id).list().size();
+            check("JPQL = '' finds the empty string, <> '' does not", "1/0", empty + "/" + nonEmpty);
+        } finally {
+            s.close();
+            notes.delete(blank);
+        }
+    }
+
     private static void roundTripsEveryColumn(Dao<Note> notes, String engine) throws Exception {
         boolean oracle = "oracle".equals(engine);
         Note note = new Note();
@@ -298,6 +318,26 @@ public class OrmCheck {
         check("byte[] length", "5", String.valueOf(back.payload == null ? -1 : back.payload.length));
         // A NUL INSIDE the blob, which is where a length-unaware path truncates.
         check("byte[] content", "1,2,3,0,4", join(back.payload));
+
+        // An EMPTY required string. Oracle stores '' as NULL, so a NOT NULL
+        // column refuses it there; the mapping keeps such a column nullable
+        // on Oracle and reads the NULL back as "".
+        Note blank = new Note();
+        blank.title = "";
+        notes.insert(blank);
+        Note blankBack = notes.findById(Long.valueOf(blank.id));
+        check("an empty required string round-trips", "[]",
+                blankBack == null ? "missing" : "[" + blankBack.title + "]");
+        notes.delete(blank);
+        // And null is still refused for it, on every engine.
+        Note untitled = new Note();
+        String nullTitle = "accepted";
+        try {
+            notes.insert(untitled);
+        } catch(Exception expected) {
+            nullTitle = "refused";
+        }
+        check("a null required string is refused", "refused", nullTitle);
         check("a null boxed field stays null", "null", String.valueOf(back.revision));
         check("char", "x", String.valueOf(back.initial));
         // A nullable char has no default to fall back on, so it is read through

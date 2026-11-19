@@ -55,9 +55,15 @@ wallets and connection descriptors aren't supported.
 The portable statements, the object mapping and migrations work on both. Two
 differences can't be hidden:
 
-* Oracle stores an empty string as NULL. A `NOT NULL` text column refuses
-  `""` there, and a nullable one reads `""` back as `null`. The runtime's own
-  tables account for this; an application's schema has to as well.
+* Oracle stores an empty string as NULL. The mapping handles this for a
+  required text field. On Oracle the column is created nullable, the session
+  refuses `null` itself, and a NULL read back becomes `""`. A JPQL comparison
+  with the literal `''` becomes `IS NULL` or `IS NOT NULL`. Three things it
+  can't cover:
+** A nullable text field can't tell `""` from `null`, and reads back `null`.
+** A parameter bound to `""` reaches Oracle as NULL, so `= :p` matches nothing.
+** A schema written by hand must declare required text columns nullable, as the
+   Oracle migrations of the samples do.
 * Oracle commits around every DDL statement, as MySQL does, so a migration
   that fails part way leaves what it created. The migration records the
   failure and refuses to run again until `repair()` is called.
@@ -427,11 +433,13 @@ script.
 ==== One schema, several engines
 
 A script directly in `db/migration` runs on every engine, so it has to be SQL
-that SQLite, PostgreSQL and MySQL all accept. Where they differ, put one script
-per engine in the `sqlite`, `postgresql` and `mysql` directories instead, under
-the same file name. MariaDB reads the `mysql` directory. A version needs either
-the one common script or a script for each engine the server runs on, never
-both.
+that each engine the server runs on accepts. Where they differ, put one script
+per engine in the `sqlite`, `postgresql`, `mysql`, `sqlserver` and `oracle`
+directories, under the same file name. MariaDB reads the `mysql` directory. A
+version needs a common script or a script for each engine the server runs on.
+An engine's own script beside a common one replaces it on that engine, which is
+how a schema written for the other engines gets an Oracle version of a script
+without copying it everywhere else.
 
 On MySQL and MariaDB, text key columns need a case-sensitive NO PAD collation.
 The server refuses to start when one uses the default, `utf8mb4_0900_ai_ci`,

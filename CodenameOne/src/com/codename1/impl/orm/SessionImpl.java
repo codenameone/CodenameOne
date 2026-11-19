@@ -81,6 +81,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     boolean oracle() {
         return "oracle".equals(sql.dialect());
     }
+    /// A required text attribute whose column is nullable: on Oracle, which
+    /// stores "" as NULL, a NOT NULL column could never hold an empty string.
+    /// The session enforces "required" itself and reads NULL back as "".
+    private boolean looseText(Attribute a) {
+        return oracle() && a.kind == Attribute.TEXT && a.temporal == 0 && !a.nullable && !a.id && !a.generated;
+    }
     /// Whether foreign keys are checked per statement and cannot be deferred to
     /// commit, so a row must be written after the rows it references and a
     /// required cycle cannot be written at all: MySQL and SQL Server.
@@ -1279,7 +1285,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                                 + "not " + a.declaredType + ": " + model.table() + "." + a.column);
                     }
                     statement.append(columnType(model, i)).append(collateClause(a))
-                            .append(a.nullable && !a.id ? "" : " NOT NULL");
+                            .append(a.nullable && !a.id || looseText(a) ? "" : " NOT NULL");
                 }
             }
             if (!attrs[model.idIndex()].generated) {
@@ -1592,6 +1598,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     private void validateTextKey(EntityModel model, int index, Object value) {
         Attribute attr = model.attributes()[index];
+        if (value == null && looseText(attr)) {
+            throw new PersistenceException("Required attribute is null: " + model.table() + "." + attr.column);
+        }
         if (attr.kind == Attribute.TEXT && attr.declaredType == null && value instanceof String
                 && ((String) value).length() > 255 && keyColumn(model, index)
                 && characterCount((String) value) > 255) {
@@ -1688,7 +1697,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
                             "Primary key mismatch on " + name));
                 }
-                if (attr.nullable == required) {
+                if (attr.nullable == required && !(looseText(attr) && !required)) {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, model.table(),
                             attr.column, (required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ") + name));
                 }
@@ -2347,10 +2356,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return 8;
         }
         if ("number".equals(token)) {
-            // Oracle's NUMBER(p) holds p decimal digits: NUMBER(10) every int,
-            // NUMBER(19) every long. Read by the digits the column keeps.
+            // Oracle's NUMBER(p) holds p decimal digits, so each width is the
+            // fewest digits that hold its range: NUMBER(3) a TINYINT, (5) a
+            // SMALLINT, (10) an int, (19) a long -- what a schema written for
+            // the other engines becomes on Oracle.
             int precision = leadingNumber(type);
-            return precision <= 0 ? 0 : precision <= 4 ? 2 : precision <= 10 ? 4 : precision <= 19 ? 8 : 9;
+            return precision <= 0 ? 0 : precision <= 3 ? 1 : precision <= 5 ? 2 : precision <= 8 ? 3
+                    : precision <= 10 ? 4 : precision <= 19 ? 8 : 9;
         }
         return 0;
     }
@@ -3671,6 +3683,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
     private <T> T hydrateInternal(EntityModel<T> model, Object[] values) {
+        if (oracle()) {
+            Attribute[] attrs = model.attributes();
+            for (int i = 0; i < attrs.length && i < values.length; i++) {
+                if (values[i] == null && looseText(attrs[i])) {
+                    values[i] = "";
+                }
+            }
+        }
         if (model.discriminatorIndex() >= 0) {
             Object tag = values[model.discriminatorIndex()];
             EntityModel selected = null;

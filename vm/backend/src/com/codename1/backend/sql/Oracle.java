@@ -99,6 +99,7 @@ public final class Oracle {
     private static final int MSG_STATUS = 9;
     private static final int MSG_WARNING = 15;
     private static final int MSG_DESCRIBE_INFO = 16;
+    private static final int MSG_FLUSH_OUT_BINDS = 19;
     private static final int MSG_PIGGYBACK = 17;
     private static final int MSG_BIT_VECTOR = 21;
     private static final int MSG_SERVER_PIGGYBACK = 23;
@@ -1267,6 +1268,13 @@ public final class Oracle {
                     return;
                 case MSG_END_OF_RESPONSE:
                     return;
+                case MSG_FLUSH_OUT_BINDS:
+                    // The response ends here: the server holds the out binds
+                    // (the values RETURNING ... INTO wrote) until the client
+                    // asks for them with the same one-byte message, and then
+                    // sends them as the rest of this response.
+                    sendData(new byte[] {(byte) MSG_FLUSH_OUT_BINDS});
+                    break;
                 default:
                     throw new IOException("The Oracle server sent message " + type
                             + ", which this client does not read");

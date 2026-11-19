@@ -561,18 +561,14 @@ public class MigrationGeneratorTest {
         assertTrue(twice, twice.contains("V1__ok.sql"));
         assertTrue(twice, twice.contains("V1_0__again.sql"));
 
-        String both = errorsFor(true, "postgresql/V1__ok.sql", "SELECT 3;");
-        assertTrue(both, both.contains("has a script for every engine"));
-        assertTrue(both, both.contains("postgresql"));
-
         String empty = errorsFor(true, "V2__empty.sql", "  \n\t\n");
         assertTrue(empty, empty.contains("is empty"));
 
         String control = errorsFor(true, "V2__nul.sql", "SELECT 'a\u0001b';");
         assertTrue(control, control.contains("control character (code 1)"));
 
-        String oracle = errorsFor(true, "oracle/V2__x.sql", "SELECT 1 FROM dual;");
-        assertTrue(oracle, oracle.contains("Only the directories sqlite, postgresql and mysql"));
+        String db2 = errorsFor(true, "db2/V2__x.sql", "SELECT 1 FROM sysibm.sysdummy1;");
+        assertTrue(db2, db2.contains("Only the directories sqlite, postgresql, mysql, sqlserver and oracle"));
 
         module(true);
         script(true, "V1__ok.sql", "SELECT 1;");
@@ -593,6 +589,15 @@ public class MigrationGeneratorTest {
 
         String server = errorsFor(false, "postgresql/V2__x.sql", "SELECT 1;");
         assertTrue(server, server.contains("The application database is SQLite"));
+    }
+
+    @Test
+    public void anEngineScriptBesideACommonOneIsAccepted() throws Exception {
+        module(true);
+        script(true, "V1__ok.sql", "SELECT 1;");
+        script(true, "oracle/V1__ok.sql", "SELECT 1 FROM DUAL;");
+        ProcessorContext ctx = run(true);
+        assertFalse(errors(ctx), ctx.hasErrors());
     }
 
     @Test

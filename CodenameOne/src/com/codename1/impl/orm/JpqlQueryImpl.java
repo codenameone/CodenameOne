@@ -1029,9 +1029,21 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     return node("(" + session.orderValue(left.sql, sqlKind(left, right.temporal)) + " " + op + " "
                             + session.orderValue(right.sql, sqlKind(right, left.temporal)) + ")", Attribute.BOOLEAN, left, right);
                 }
+                if (session.oracle()) {
+                    // Oracle stores '' as NULL, so `x <> ''` is never true and
+                    // `x = ''` never matches there; the empty string IS the null.
+                    Expr column = emptyText(right) ? left : emptyText(left) ? right : null;
+                    if (column != null) {
+                        return node("(" + column.sql + ("=".equals(op) ? " IS NULL)" : " IS NOT NULL)"),
+                                Attribute.BOOLEAN, column);
+                    }
+                }
                 return binary(left, op, right, Attribute.BOOLEAN);
             }
             return left;
+        }
+        private boolean emptyText(Expr e) {
+            return e.literal && "".equals(e.literalValue);
         }
         private Expr add() {
             Expr left = multiply();
