@@ -196,6 +196,12 @@ jobs:
           ok=1
           ../trusted/scripts/ci/golden-harvest.sh collect ../runs.txt "$PWD" || ok=0
           git add -A -- scripts
+          # A push restarts a capture, and the restart cancels the legs still
+          # rendering: in a capture, commit only once every leg is done.
+          if [ "$CAPTURE" = 1 ] && [ "${{ steps.list.outputs.ready }}" != 1 ]; then
+            echo "Legs are still rendering; the harvest of the last one commits."
+            exit 0
+          fi
           if ! git diff --cached --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

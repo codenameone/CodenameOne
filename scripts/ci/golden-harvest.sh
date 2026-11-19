@@ -31,7 +31,7 @@ runs_at() {
 }
 
 list() {
-  local sha="$1" runs_file="$2" wf line runs pending=0 capture=0 all dispatched=false
+  local sha="$1" runs_file="$2" wf line runs pending=0 completed=0 capture=0 all dispatched=false
   [ "${#WORKFLOWS[@]}" -gt 0 ] || { log "no workflows read from golden-capture.sh"; return 1; }
   : > "$runs_file"
   # A capture (golden-capture.yml) dispatches the workflows one after another
@@ -78,6 +78,8 @@ list() {
       if [ "$2" != completed ]; then
         log "$wf run $1 is $2"
         pending=1
+      else
+        completed=$((completed + 1))
       fi
       printf '%s %s\n' "$wf" "$1" >> "$runs_file"
     # In a capture, its own run: a PR run made later at the same head (the
@@ -87,12 +89,8 @@ list() {
                  | "\(.id) \(.status)"' <<<"$runs")
   done
   echo "capture=$capture" >> "${GITHUB_OUTPUT:-/dev/null}"
-  if [ -s "$runs_file" ]; then
-    completed="$(awk '$2 == "completed" { n++ } END { print n+0 }' "$runs_file")"
-    echo "runs=$completed" >> "${GITHUB_OUTPUT:-/dev/null}"
-  else
-    echo "runs=" >> "${GITHUB_OUTPUT:-/dev/null}"
-  fi
+  # counted as listed: the runs file holds only "workflow id", no status
+  echo "runs=$completed" >> "${GITHUB_OUTPUT:-/dev/null}"
   if [ "$pending" = 0 ] && [ -s "$runs_file" ]; then
     echo "ready=1" >> "${GITHUB_OUTPUT:-/dev/null}"
   else
@@ -189,16 +187,18 @@ Whatever did arrive is committed; the next push captures only what is still miss
 # CN1SS_GH_TOKEN (RERUN_TOKEN): GitHub starts no workflow_run, and so no
 # harvest, for a run (re-)started with the job's own token.
 redo-dropped() {
-  local runs_file="$1" wf id attempt jobs job dropped n=0
+  local runs_file="$1" wf id attempt jobs job dropped notes n=0
   while read -r wf id; do
-    attempt="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq 'if .conclusion == "success" then 0 else .run_attempt end')"
+    attempt="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq 'if .conclusion == "success" then 0 else .run_attempt end')" || continue
     [ "$attempt" -gt 0 ] && [ "$attempt" -lt 3 ] || continue
     jobs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?per_page=100" \
-              --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .id')"
+              --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .id')" || continue
     dropped=0
     for job in $jobs; do
-      if gh api "repos/$GITHUB_REPOSITORY/check-runs/$job/annotations" \
-           --jq '.[].message' 2>/dev/null | grep -q "not acquired by Runner"; then
+      # read whole first: grep -q quitting early would SIGPIPE gh and, under
+      # pipefail, read as no match
+      notes="$(gh api "repos/$GITHUB_REPOSITORY/check-runs/$job/annotations" --jq '.[].message' 2>/dev/null)" || notes=""
+      if [[ "$notes" == *"not acquired by Runner"* ]]; then
         dropped=1
         break
       fi

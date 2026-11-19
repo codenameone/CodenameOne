@@ -80,10 +80,10 @@ has no such keys, so the same commands are methods of the board, ready for a
 menu or a toolbar: `copySelection`, `cutSelection`, `paste`,
 `duplicateSelection`, `undo` and `redo`.
 `setEditingEnabled(false)` makes the board read-only, undo and redo included.
-Columns and lanes still fold, and a fold made then is not a step to undo.
+Columns and lanes still fold, and a fold made then isn't a step to undo.
 
 The board takes its colors from the `Kanban*` UIIDs of the theme, not from
-its own style, so it is restyled through the theme.
+its own style, so restyle it through the theme.
 
 === Listening and refusing
 

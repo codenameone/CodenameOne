@@ -533,7 +533,8 @@ public class KanbanBoard extends ScrollSurface {
     ///
     /// #### Returns
     ///
-    /// false when there is no history or nothing to undo
+    /// false when there is no history, nothing to undo, editing is off, or a
+    /// card or column is being dragged
     public boolean undo() {
         endEdit(true);
         // a read-only board changes nothing, and nothing in the middle of a drag
@@ -544,7 +545,8 @@ public class KanbanBoard extends ScrollSurface {
     ///
     /// #### Returns
     ///
-    /// false when there is no history or nothing to redo
+    /// false when there is no history, nothing to redo, editing is off, or a
+    /// card or column is being dragged
     public boolean redo() {
         endEdit(true);
         return editable && dragCard == null && dragColumn == null && undoHistory != null && undoHistory.redo();
@@ -1733,7 +1735,8 @@ public class KanbanBoard extends ScrollSurface {
                 return img;
             }
             // a long board is painted a band at a time and each band scaled
-            // into the result, so memory follows the band and not the board
+            // into the result, so memory follows the band's height and not
+            // the board's; a band is as wide as the whole board
             Image out = Image.createImage(tw, th, 0xffffffff);
             Graphics og = out.getGraphics();
             int band = Math.max(1, Math.min(h, 1024));

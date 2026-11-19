@@ -163,6 +163,8 @@ public class NodeGraph extends Container {
     private boolean labelEditing;
 
     private final List<GraphNode> selection = new ArrayList<GraphNode>();
+    // the selection as a set while painting, when it is too long to scan per node
+    private final Set<GraphNode> paintSelected = new HashSet<GraphNode>();
     private GraphEdge selectedEdge;
 
     private final Canvas canvas = new Canvas();
@@ -174,7 +176,9 @@ public class NodeGraph extends Container {
     // the bounds of every group, minX, minY, maxX, maxY, from the last refresh
     private final Map<String, double[]> groupBounds = new HashMap<String, double[]>();
     private boolean groupsDirty = true;
-    private final Map<String, Boolean> connectedPorts = new HashMap<String, Boolean>();
+    // the ports some edge ends at, by the port object; null maps to TRUE once
+    // it is filled, so an empty answer is told from one not yet worked out
+    private final Map<GraphPort, Boolean> connectedPorts = new HashMap<GraphPort, Boolean>();
 
     // gesture
     private int gesture;
@@ -829,6 +833,10 @@ public class NodeGraph extends Container {
     /// label goes to `GraphModel.renameNode` when editing ends.
     public void startLabelEdit(final GraphNode node) {
         endLabelEdit();
+        // a read-only graph renames nothing, as it undoes nothing
+        if (!editable || node == null) {
+            return;
+        }
         final TextField tf = new TextField(node.getLabel());
         tf.putClientProperty("cn1$graphNode", node.getId());
         tf.putClientProperty("cn1$graphLabel", Boolean.TRUE);
@@ -902,7 +910,7 @@ public class NodeGraph extends Container {
     ///
     /// #### Returns
     ///
-    /// false when there is no history or nothing to undo
+    /// false when there is no history, nothing to undo, or editing is off
     public boolean undo() {
         // a read-only graph changes nothing
         if (undoHistory == null || !editable) {
@@ -919,7 +927,7 @@ public class NodeGraph extends Container {
     ///
     /// #### Returns
     ///
-    /// false when there is no history or nothing to redo
+    /// false when there is no history, nothing to redo, or editing is off
     public boolean redo() {
         // a read-only graph changes nothing
         if (undoHistory == null || !editable) {
@@ -1662,18 +1670,33 @@ public class NodeGraph extends Container {
     boolean isPortConnected(GraphNode node, GraphPort port) {
         if (connectedPorts.isEmpty()) {
             List<GraphEdge> edges = model.getEdges();
-            connectedPorts.put("", Boolean.TRUE);
+            connectedPorts.put(null, Boolean.TRUE);
             for (int i = 0; i < edges.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator
                 GraphEdge e = edges.get(i);
-                if (e.getSourcePortId() != null) {
-                    connectedPorts.put(e.getSourceId() + "\n>" + e.getSourcePortId(), Boolean.TRUE);
-                }
-                if (e.getTargetPortId() != null) {
-                    connectedPorts.put(e.getTargetId() + "\n<" + e.getTargetPortId(), Boolean.TRUE);
-                }
+                markConnected(e.getSourceId(), e.getSourcePortId(), false);
+                markConnected(e.getTargetId(), e.getTargetPortId(), true);
             }
         }
-        return connectedPorts.containsKey(node.getId() + (port.isInput() ? "\n<" : "\n>") + port.getId());
+        // asked for every port on every frame: a lookup by the object builds nothing
+        return port != null && connectedPorts.containsKey(port);
+    }
+
+    private void markConnected(String nodeId, String portId, boolean input) {
+        if (portId == null) {
+            return;
+        }
+        GraphNode n = model.getNode(nodeId);
+        if (n == null) {
+            return;
+        }
+        // an input and an output of one node may share an id
+        List<GraphPort> ports = input ? n.getInputs() : n.getOutputs();
+        for (int i = 0; i < ports.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed, no iterator
+            if (portId.equals(ports.get(i).getId())) {
+                connectedPorts.put(ports.get(i), Boolean.TRUE);
+                return;
+            }
+        }
     }
 
     private void refreshGroups() {
@@ -2101,6 +2124,13 @@ public class NodeGraph extends Container {
             }
         }
         List<GraphNode> nodes = model.getNodes();
+        // a list scan per node is fine for a few selected; after select-all
+        // it would be one per node per node, so a large selection is hashed
+        boolean bigSelection = selection.size() > 8;
+        if (bigSelection) {
+            paintSelected.clear();
+            paintSelected.addAll(selection);
+        }
         for (int i = 0; i < nodes.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator
             GraphNode n = nodes.get(i);
             if (n.getX() > wx1 || n.getY() > wy1 || n.getX() + n.getWidth() < wx0 || n.getY() + n.getHeight() < wy0
@@ -2117,7 +2147,7 @@ public class NodeGraph extends Container {
                 g.fillRect(x, y, Math.max(1, nw), Math.max(1, nh));
                 continue;
             }
-            nodeRenderer.paintNode(g, this, n, x, y, nw, nh, selection.contains(n));
+            nodeRenderer.paintNode(g, this, n, x, y, nw, nh, bigSelection ? paintSelected.contains(n) : selection.contains(n));
         }
         g.setAntiAliased(aa);
     }
@@ -2358,22 +2388,26 @@ public class NodeGraph extends Container {
         selection.clear();
         selectedEdge = null;
         minimapVisible = false;
-        double[] b = contentBounds();
-        if (b != null) {
-            int margin = GraphLook.mm(3);
-            double bw = Math.max(1, b[2] - b[0]);
-            double bh = Math.max(1, b[3] - b[1]);
-            scale = (float) Math.min(unit(), Math.min((width - margin * 2) / bw, (height - margin * 2) / bh));
-            viewX = (b[0] + b[2]) / 2 - width / 2.0 / scale;
-            viewY = (b[1] + b[3]) / 2 - height / 2.0 / scale;
+        // a renderer that throws must not leave the live view zoomed and unselected
+        try {
+            double[] b = contentBounds();
+            if (b != null) {
+                int margin = GraphLook.mm(3);
+                double bw = Math.max(1, b[2] - b[0]);
+                double bh = Math.max(1, b[3] - b[1]);
+                scale = (float) Math.min(unit(), Math.min((width - margin * 2) / bw, (height - margin * 2) / bh));
+                viewX = (b[0] + b[2]) / 2 - width / 2.0 / scale;
+                viewY = (b[1] + b[3]) / 2 - height / 2.0 / scale;
+            }
+            paintGraph(g, width, height);
+        } finally {
+            scale = oz;
+            viewX = ox;
+            viewY = oy;
+            selection.addAll(sel);
+            selectedEdge = se;
+            minimapVisible = mm;
         }
-        paintGraph(g, width, height);
-        scale = oz;
-        viewX = ox;
-        viewY = oy;
-        selection.addAll(sel);
-        selectedEdge = se;
-        minimapVisible = mm;
         return img;
     }
 

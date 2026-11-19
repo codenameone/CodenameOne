@@ -185,7 +185,7 @@ class GraphJsonTest {
     }
 
     @Test
-    void aPortValueKeepsItsKindThroughJson() throws IOException {
+    void aPortValueComesBackThroughJsonAsTheJsonKind() throws IOException {
         DefaultGraphModel m = new DefaultGraphModel();
         GraphNode n = m.addNode(new GraphNode("n", "N")
                 .addInput("on", "On", "bool").addInput("count", "Count", "num").addInput("ratio", "Ratio", "num"));

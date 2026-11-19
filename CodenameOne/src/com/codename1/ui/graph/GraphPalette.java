@@ -112,11 +112,17 @@ public class GraphPalette extends Component {
 
     /// Removes an item.
     public void remove(GraphNodeTemplate template) {
-        if (templates.remove(template)) {
-            // an item removed while held is let go of
-            pressed = -1;
-            dragging = false;
-            graph.clearDropPreview();
+        int at = templates.indexOf(template);
+        if (at >= 0) {
+            templates.remove(at);
+            if (at == pressed) {
+                // the item held is let go of
+                pressed = -1;
+                dragging = false;
+                graph.clearDropPreview();
+            } else if (at < pressed) {
+                pressed--;
+            }
             if (graph.getPendingTemplate() == template) { // NOPMD CompareObjectsWithEquals - the armed item itself
                 graph.setPendingTemplate(null);
             }

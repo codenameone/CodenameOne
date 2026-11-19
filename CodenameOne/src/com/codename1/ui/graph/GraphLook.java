@@ -60,7 +60,12 @@ final class GraphLook {
     };
 
     private static final HashMap<String, Style> STYLES = new HashMap<String, Style>();
-    private static final HashMap<String, Font> FONTS = new HashMap<String, Font>();
+    // per UIID, then per pixel size: asked once per node per frame, and an
+    // Integer of a font size is a cached one, so a lookup allocates nothing
+    private static final HashMap<String, HashMap<Integer, Font>> FONTS = new HashMap<String, HashMap<Integer, Font>>();
+    // the corners of a thick segment, filled on every call (the EDT paints alone)
+    private static final int[] LINE_X = new int[4];
+    private static final int[] LINE_Y = new int[4];
     private static int generation = -1;
     private static Boolean darkSeen;
 
@@ -100,11 +105,16 @@ final class GraphLook {
         if (size == Math.round(px)) {
             return base;
         }
-        String key = uiid + ':' + size;
-        Font f = FONTS.get(key);
+        HashMap<Integer, Font> sizes = FONTS.get(uiid);
+        if (sizes == null) {
+            sizes = new HashMap<Integer, Font>();
+            FONTS.put(uiid, sizes);
+        }
+        Integer key = Integer.valueOf(size);
+        Font f = sizes.get(key);
         if (f == null) {
             f = base.derive(size, base.getStyle());
-            FONTS.put(key, f);
+            sizes.put(key, f);
         }
         return f;
     }
@@ -233,8 +243,16 @@ final class GraphLook {
         }
         double nx = -dy / len * width / 2;
         double ny = dx / len * width / 2;
-        int[] xs = {(int) Math.round(x1 + nx), (int) Math.round(x2 + nx), (int) Math.round(x2 - nx), (int) Math.round(x1 - nx)};
-        int[] ys = {(int) Math.round(y1 + ny), (int) Math.round(y2 + ny), (int) Math.round(y2 - ny), (int) Math.round(y1 - ny)};
+        int[] xs = LINE_X;
+        int[] ys = LINE_Y;
+        xs[0] = (int) Math.round(x1 + nx);
+        xs[1] = (int) Math.round(x2 + nx);
+        xs[2] = (int) Math.round(x2 - nx);
+        xs[3] = (int) Math.round(x1 - nx);
+        ys[0] = (int) Math.round(y1 + ny);
+        ys[1] = (int) Math.round(y2 + ny);
+        ys[2] = (int) Math.round(y2 - ny);
+        ys[3] = (int) Math.round(y1 - ny);
         g.fillPolygon(xs, ys, 4);
     }
 
