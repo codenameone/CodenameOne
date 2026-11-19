@@ -195,6 +195,11 @@ final class OdsWriter {
         for (int s = 0; s < book.getSheetCount(); s++) {
             writeSheet(x, book.getSheet(s), s);
         }
+        if (book.getSheetCount() == 0) {
+            // a spreadsheet has at least one table, as the XLSX writer's placeholder sheet
+            x.raw("<table:table table:name=\"Sheet1\"><table:table-column/><table:table-row><table:table-cell/>"
+                    + "</table:table-row></table:table>");
+        }
         String[] names = book.getDefinedNames();
         if (names.length > 0) {
             x.raw("<table:named-expressions>");

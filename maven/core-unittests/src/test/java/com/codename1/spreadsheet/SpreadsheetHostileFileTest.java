@@ -919,6 +919,38 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void roundTwentyFiveLosses() throws IOException {
+        Sheet s = new Workbook().addSheet("S");
+        try {
+            s.setCellFormula("A1", "=1E400");
+            wrong.append("\na literal past the largest double was accepted");
+        } catch (IllegalArgumentException expected) {
+            // Excel refuses it too
+        }
+        // names that left their sheet out follow that sheet's edits
+        Workbook w = Workbook.read(new ByteArrayInputStream(zip("[Content_Types].xml", "<Types/>",
+                "xl/workbook.xml", "<workbook xmlns=\"" + MAIN + "\" xmlns:r=\"" + REL + "\"><sheets><sheet name=\"S\""
+                        + " sheetId=\"1\" r:id=\"rId1\"/></sheets><definedNames>"
+                        + "<definedName name=\"Foo\" localSheetId=\"0\">$A$1</definedName>"
+                        + "<definedName name=\"Glob\">$B$1</definedName></definedNames></workbook>",
+                "xl/_rels/workbook.xml.rels", "<Relationships><Relationship Id=\"rId1\" Type=\"" + REL
+                        + "/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>",
+                "xl/worksheets/sheet1.xml", "<worksheet xmlns=\"" + MAIN + "\"><sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c>"
+                        + "<c r=\"B1\"><v>20</v></c><c r=\"H1\"><f>Foo+Glob</f></c></row></sheetData></worksheet>")),
+                Workbook.Format.XLSX);
+        w.getSheet(0).insertRows(0, 1);
+        same(Double.valueOf(21), w.getSheet(0).getCellValue("H2"), "sheetless names after inserting a row");
+        // a workbook with no sheets writes an OpenDocument file its reader takes
+        Workbook empty = new Workbook();
+        empty.addSheet("Only");
+        empty.removeSheet(0);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        empty.write(out, Workbook.Format.ODS);
+        same(Integer.valueOf(1), Integer.valueOf(Workbook.read(new ByteArrayInputStream(out.toByteArray()),
+                Workbook.Format.ODS).getSheetCount()), "an empty workbook through OpenDocument");
+    }
+
+    @Test
     void roundTwentyTwoLosses() throws IOException {
         // a duplicated sheet name that uses another duplicated sheet name
         Workbook w = Workbook.read(new ByteArrayInputStream(zip("[Content_Types].xml", "<Types/>",

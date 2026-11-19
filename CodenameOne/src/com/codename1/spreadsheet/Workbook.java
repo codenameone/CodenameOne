@@ -291,7 +291,8 @@ public final class Workbook {
     ///
     /// #### Throws
     ///
-    /// - `IOException`: when the stream fails
+    /// - `IOException`: when the stream fails, or when writing XLSX with the limits of
+    ///   [#setExcelLimitsEnforced(boolean)] on and the workbook is past one of them
     public void write(OutputStream out, Format format) throws IOException {
         recalculateStale();
         switch (format) {

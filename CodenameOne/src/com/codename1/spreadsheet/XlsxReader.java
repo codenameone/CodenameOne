@@ -566,14 +566,41 @@ final class XlsxReader {
         }
         for (String[] d : definedNames) {
             Node node = null;
+            String text = d[1];
             try {
                 node = FormulaParser.parse(d[1], false);
+                // a name belongs to no sheet here, so a reference that left its sheet out
+                // gets one: a local name's own sheet, otherwise the first, and then follows
+                // that sheet's edits
+                String home = sheetFor(d.length > 2 ? d[2] : null);
+                if (home != null && FormulaParser.hasSheetlessRef(node)) {
+                    FormulaParser.qualify(node, home);
+                    text = FormulaParser.print(node, false);
+                }
             } catch (FormulaSyntaxException e) {
                 // kept as text and written back; a formula that uses it gives #NAME?
                 node = null;
             }
-            book.defineName(d[0], d[1], node);
+            book.defineName(d[0], text, node);
         }
+    }
+
+    private String sheetFor(String localSheetId) {
+        int i = 0;
+        if (localSheetId != null) {
+            try {
+                i = Integer.parseInt(localSheetId.trim());
+            } catch (NumberFormatException e) {
+                i = 0;
+            }
+        }
+        if (i >= 0 && i < sheetNames.size()) {
+            Sheet s = book.getSheet(sheetNames.get(i));
+            if (s != null) {
+                return s.getName();
+            }
+        }
+        return book.getSheetCount() > 0 ? book.getSheet(0).getName() : null;
     }
 
     private static void count(HashMap<String, Integer> counts, String name) {

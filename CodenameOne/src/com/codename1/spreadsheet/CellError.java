@@ -41,8 +41,8 @@ public final class CellError {
     public static final CellError REF = new CellError("#REF!", 4);
     /// A value of the wrong type, such as text where a number is needed.
     public static final CellError VALUE = new CellError("#VALUE!", 3);
-    /// A formula that depends on its own result. Spreadsheet files have no such value: it is
-    /// written to a file as `#REF!`.
+    /// A formula that depends on its own result. Spreadsheet files have no such value: XLSX
+    /// writes it as `#REF!`, OpenDocument as LibreOffice's `Err:522`, and CSV as `#CIRC!`.
     public static final CellError CIRCULAR = new CellError("#CIRC!", 4);
 
     private static final CellError[] ALL = {DIV0, NA, NAME, NULL, NUM, REF, VALUE, CIRCULAR};

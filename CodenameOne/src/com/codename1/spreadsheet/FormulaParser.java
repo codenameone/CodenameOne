@@ -839,11 +839,18 @@ final class FormulaParser {
         if (text.length() == 0 || ".".equals(text)) {
             throw fail();
         }
+        Double d;
         try {
-            return Double.valueOf(text);
+            d = Double.valueOf(text);
         } catch (NumberFormatException err) {
             throw fail();
         }
+        // Excel refuses a literal past the largest double; kept, it would be written as text
+        // no reader takes for a number
+        if (d.isInfinite()) {
+            throw fail();
+        }
+        return d;
     }
 
     private String string() {
@@ -1247,6 +1254,27 @@ final class FormulaParser {
             }
         }
         return r;
+    }
+
+    /// Gives every reference without a sheet name the one given, in place: a defined name
+    /// read from a file that left its sheet out.
+    static void qualify(Node definition, String sheet) {
+        ArrayList<Node> stack = new ArrayList<Node>();
+        stack.add(definition);
+        while (!stack.isEmpty()) {
+            Node n = stack.remove(stack.size() - 1);
+            if (n == null) {
+                continue;
+            }
+            if (n.kind == Node.REF && n.sheet == null) {
+                n.sheet = sheet;
+            }
+            if (n.args != null) {
+                for (Node a : n.args) {
+                    stack.add(a);
+                }
+            }
+        }
     }
 
     static boolean hasSheetlessRef(Node definition) {
