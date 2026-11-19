@@ -66,6 +66,10 @@ public class CodePureEditor extends PureEditor {
             codeView.setTabSize(parseInt(arg, 4));
             return;
         }
+        if ("setSingleLine".equals(name)) {
+            codeView.setSingleLine("1".equals(arg));
+            return;
+        }
         if ("setCompletionEnabled".equals(name)) {
             codeView.setCompletionEnabled("1".equals(arg));
             return;

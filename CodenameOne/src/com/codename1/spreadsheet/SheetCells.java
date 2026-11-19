@@ -23,11 +23,6 @@
 package com.codename1.spreadsheet;
 
 import com.codename1.ui.Component;
-import com.codename1.ui.TextArea;
-import com.codename1.ui.TextField;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
-import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.table.DataGrid;
 import com.codename1.ui.table.DefaultGridCellEditor;
 import com.codename1.ui.table.DefaultGridCellRenderer;
@@ -103,46 +98,42 @@ final class SheetCells {
                 return super.createEditor(grid, cell);
             }
             String text = sheet.editText(row, column);
-            TextField tf = new TextField(text, "", 20, TextArea.ANY);
-            tf.setUIID("DataGridEditor");
-            tf.putClientProperty(SHOWN, text);
-            Commit commit = new Commit(grid);
-            tf.setDoneListener(commit);
-            tf.addFocusListener(commit);
-            return tf;
+            FormulaEditing.CellEditor ed = new FormulaEditing.CellEditor();
+            ed.setText(text);
+            ed.setCursorPosition(text.length());
+            ed.putClientProperty(SHOWN, text);
+            ed.setEditing(new FormulaEditing(sheet, grid, ed, text, new Commit(grid, true), new Commit(grid, false)));
+            return ed;
         }
 
         @Override
         public Object getEditorValue(Component editor, GridCell cell) {
             Object shown = editor.getClientProperty(SHOWN);
-            if (!(shown instanceof String) || !(editor instanceof TextArea)) {
+            if (!(shown instanceof String) || !(editor instanceof FormulaEditing.CellEditor)) {
                 return super.getEditorValue(editor, cell);
             }
-            String text = ((TextArea) editor).getText();
+            String text = ((FormulaEditing.CellEditor) editor).currentText();
             // the value the cell has is the answer that writes nothing
             return shown.equals(text) ? cell.getValue() : text;
         }
     }
 
-    private static final class Commit implements ActionListener, FocusListener {
+    private static final class Commit implements Runnable {
         private final DataGrid grid;
+        private final boolean commit;
 
-        Commit(DataGrid grid) {
+        Commit(DataGrid grid, boolean commit) {
             this.grid = grid;
+            this.commit = commit;
         }
 
         @Override
-        public void actionPerformed(ActionEvent evt) {
-            grid.commitEdit();
-        }
-
-        @Override
-        public void focusGained(Component cmp) {
-        }
-
-        @Override
-        public void focusLost(Component cmp) {
-            grid.commitEdit();
+        public void run() {
+            if (commit) {
+                grid.commitEdit();
+            } else {
+                grid.cancelEdit();
+            }
         }
     }
 }

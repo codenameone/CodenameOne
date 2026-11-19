@@ -23,6 +23,7 @@
 
 package com.codename1.ui.editor;
 
+import com.codename1.ui.geom.Dimension;
 import com.codename1.util.Bidi;
 import com.codename1.ui.CodeCompletion;
 import com.codename1.ui.CodeDiagnostic;
@@ -131,6 +132,10 @@ public class CodeView extends EditorView {
 
     @Override
     protected void replaceRange(int start, int end, String text, boolean record) {
+        if (singleLine && text != null && (text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0)) {
+            // a pasted line break has no line to start: it becomes a space
+            text = text.replace("\r\n", " ").replace('\r', ' ').replace('\n', ' '); //NOPMD AvoidReassigningParameters - the one text every path below writes
+        }
         int clampedStart = getDocument().clamp(start);
         int clampedEnd = getDocument().clamp(end);
         if (clampedStart > clampedEnd) {
@@ -480,6 +485,14 @@ public class CodeView extends EditorView {
         if (!isEditableState()) {
             return false;
         }
+        if (singleLine) {
+            if ("\n".equals(text) || "\r".equals(text)) {
+                return singleLineKey("enter");
+            }
+            if ("\t".equals(text)) {
+                return singleLineKey("tab");
+            }
+        }
         if (completionVisible && ("\n".equals(text) || "\t".equals(text))) {
             acceptCompletion();
             return true;
@@ -561,6 +574,10 @@ public class CodeView extends EditorView {
 
     @Override
     protected void handleTab(boolean dedent) {
+        if (singleLine) {
+            singleLineKey(dedent ? "backtab" : "tab");
+            return;
+        }
         if (completionVisible && !dedent) {
             acceptCompletion();
             return;
@@ -962,6 +979,9 @@ public class CodeView extends EditorView {
 
     @Override
     public void keyPressed(int keyCode) {
+        if (singleLine && singleLineVertical(Display.getInstance().getGameAction(keyCode))) {
+            return;
+        }
         if (completionVisible && navigateCompletion(Display.getInstance().getGameAction(keyCode))) {
             return;
         }
@@ -970,6 +990,9 @@ public class CodeView extends EditorView {
 
     @Override
     public void keyRepeated(int keyCode) {
+        if (singleLine && singleLineVertical(Display.getInstance().getGameAction(keyCode))) {
+            return;
+        }
         if (completionVisible && navigateCompletion(Display.getInstance().getGameAction(keyCode))) {
             return;
         }
@@ -978,6 +1001,10 @@ public class CodeView extends EditorView {
 
     @Override
     public void keyReleased(int keyCode) {
+        if (singleLine && keyCode == 27) {
+            singleLineKey("escape");
+            return;
+        }
         if (completionVisible) {
             if (keyCode == 27) {
                 hideCompletion();
@@ -1007,6 +1034,20 @@ public class CodeView extends EditorView {
 
     @Override
     public void onKeyCommand(int command, int modifiers) {
+        if (singleLine) {
+            if (command == KEY_UP) {
+                singleLineKey("up");
+                return;
+            }
+            if (command == KEY_DOWN) {
+                singleLineKey("down");
+                return;
+            }
+            if (command == KEY_ESCAPE) {
+                singleLineKey("escape");
+                return;
+            }
+        }
         if (completionVisible) {
             if (command == KEY_UP) {
                 completionIndex = Math.max(0, completionIndex - 1);
@@ -1028,11 +1069,65 @@ public class CodeView extends EditorView {
 
     @Override
     public void onEditorAction(int action) {
+        if (singleLine && action == TextInputConfig.ACTION_DEFAULT) {
+            singleLineKey("enter");
+            return;
+        }
         if (completionVisible && action == TextInputConfig.ACTION_DEFAULT) {
             acceptCompletion();
             return;
         }
         super.onEditorAction(action);
+    }
+
+    // ---- single line ----
+
+    private boolean singleLine;
+
+    /// Sets whether the editor holds one line, as a field in a form or a cell does. Enter,
+    /// Tab, Shift+Tab, Escape and the up and down arrows are then reported to the host as a
+    /// `"key"` event (`enter`, `tab`, `backtab`, `escape`, `up`, `down`) and change nothing
+    /// in the text, line numbers are hidden, and a line break pasted or typed in becomes a
+    /// space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `singleLine`: true for one line
+    public void setSingleLine(boolean singleLine) {
+        this.singleLine = singleLine;
+        if (singleLine) {
+            setShowLineNumbers(false);
+            String text = getDocument().getText();
+            if (text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0) {
+                replaceRange(0, getDocument().length(), text, false);
+            }
+        }
+    }
+
+    /// Whether the editor holds one line.
+    ///
+    /// #### Returns
+    ///
+    /// true for one line
+    public boolean isSingleLine() {
+        return singleLine;
+    }
+
+    private boolean singleLineKey(String key) {
+        if (host() != null) {
+            host().fireEditorEvent("key", key);
+        }
+        return true;
+    }
+
+    private boolean singleLineVertical(int action) {
+        if (action == Display.GAME_UP) {
+            return singleLineKey("up");
+        }
+        if (action == Display.GAME_DOWN) {
+            return singleLineKey("down");
+        }
+        return false;
     }
 
     private static boolean isIdentPart(char c) {
@@ -1048,4 +1143,16 @@ public class CodeView extends EditorView {
         }
         return v;
     }
+
+    /// One line tall in single-line mode, the size of a text field; otherwise the editor's
+    /// usual several lines.
+    @Override
+    protected Dimension calcPreferredSize() {
+        Dimension d = super.calcPreferredSize();
+        if (singleLine) {
+            d.setHeight(getLineHeight() + getStyle().getPaddingTop() + getStyle().getPaddingBottom());
+        }
+        return d;
+    }
+
 }

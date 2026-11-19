@@ -25,7 +25,15 @@ package com.codename1.spreadsheet;
 /// Thrown, explicitly, for formula text this package cannot parse. Such a formula is kept as
 /// text and its cell keeps the value the file stored for it.
 final class FormulaSyntaxException extends RuntimeException {
+    /// Where in the text the formula stopped making sense, or -1 when not at one place.
+    final int position;
+
     FormulaSyntaxException(String message) {
+        this(message, -1);
+    }
+
+    FormulaSyntaxException(String message, int position) {
         super(message);
+        this.position = position;
     }
 }

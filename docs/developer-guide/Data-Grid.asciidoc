@@ -522,6 +522,43 @@ painted in its own number format, which matters for a total in a currency
 format under a column of plain numbers. Sorting, filtering and grouping use the
 column's formatter, which is the format most of its cells have.
 
+==== Editing a formula
+
+A cell is edited in a one-line `CodeEditor`, so a formula is typed with the help
+a spreadsheet gives. Each reference is drawn in its own color, and the cells it
+names are outlined in the grid in the same color. Inside a function call, a hint
+under the field shows the function's arguments with the current one in bold:
+
+.Typing a formula: the references and the cells they name share a color, and the hint marks the argument being typed
+image::img/generated/datagrid-sheet-formula-hint.png["The Summary tab with a formula being typed into the Commission column; D2 and A2 are outlined in the grid in the colors they have in the formula, and a hint under it reads ROUND(number, num_digits) with num_digits in bold",scaledwidth=70%]
+
+Typing the start of a name lists the functions, defined names and sheets that
+begin with it, with a description of the selected one. Up and Down move through
+the list, and Enter or Tab inserts the selection:
+
+.Completing a function name
+image::img/generated/datagrid-sheet-formula-complete.png["A cell holding =ROU with a list of ROUND, ROUNDDOWN and ROUNDUP under it; ROUND is selected and described as rounding a number to a specified number of digits",scaledwidth=70%]
+
+While the caret is where a reference can go, after an operator, a comma or an
+opening parenthesis, tapping a cell inserts its address instead of moving the
+selection. Tapping another cell replaces that reference, and a tap with Shift held
+makes a range from the first. Enter or Tab writes the formula. A formula that
+doesn't parse is marked at the error and isn't written, and Escape leaves the
+cell as it was.
+
+A `FormulaBar` is the field above the sheet: the address of the selected cell
+and its formula, edited with the same help.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-formula-bar,indent=0]
+----
+
+.A formula bar over the Orders sheet
+image::img/generated/datagrid-sheet-formula-bar.png["A bar over the grid reading H5 and fx followed by a formula being edited; the units, price and discount cells of the selected row are outlined in the colors of their references",scaledwidth=70%]
+
+Date, Boolean and choice cells keep their pickers.
+
 Formulas are written the way Excel writes them, in English and with commas
 between arguments, whichever format the file is in. They can use ranges, whole
 rows and columns, other sheets, defined names and array constants. A formula

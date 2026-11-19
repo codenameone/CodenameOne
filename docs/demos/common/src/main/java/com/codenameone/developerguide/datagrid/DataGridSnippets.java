@@ -25,11 +25,13 @@ package com.codenameone.developerguide.datagrid;
 import com.codename1.io.CSVParser;
 import com.codename1.io.CSVWriter;
 import com.codename1.io.Log;
+import com.codename1.spreadsheet.FormulaBar;
 import com.codename1.spreadsheet.Sheet;
 import com.codename1.spreadsheet.Workbook;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
@@ -648,6 +650,18 @@ public final class DataGridSnippets {
         }
         // end::grid-sheet-workbook[]
         return tabs;
+    }
+
+    public static Container formulaBar(Sheet sheet) {
+        // tag::grid-sheet-formula-bar[]
+        sheet.setHeaderRow(true);
+        DataGrid grid = new DataGrid(sheet);
+        grid.setColumns(sheet.createColumns());
+        Container sheetView = new Container(new BorderLayout());
+        sheetView.add(BorderLayout.NORTH, new FormulaBar(sheet, grid));
+        sheetView.add(BorderLayout.CENTER, grid);
+        // end::grid-sheet-formula-bar[]
+        return sheetView;
     }
 
     public static Workbook salesWorkbook() throws IOException {

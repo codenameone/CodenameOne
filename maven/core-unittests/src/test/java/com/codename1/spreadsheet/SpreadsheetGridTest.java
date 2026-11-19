@@ -28,7 +28,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.TextField;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.table.DataGrid;
@@ -78,19 +77,19 @@ class SpreadsheetGridTest extends UITestBase {
         grid.refreshLayout();
     }
 
-    private TextField editor() {
+    private FormulaEditing.CellEditor editor() {
         Form f = Display.getInstance().getCurrent();
         return find(f.getFormLayeredPane(DataGrid.class, true));
     }
 
-    private static TextField find(Container c) {
+    private static FormulaEditing.CellEditor find(Container c) {
         for (int i = 0; i < c.getComponentCount(); i++) {
             Component k = c.getComponentAt(i);
-            if (k instanceof TextField) {
-                return (TextField) k;
+            if (k instanceof FormulaEditing.CellEditor) {
+                return (FormulaEditing.CellEditor) k;
             }
             if (k instanceof Container) {
-                TextField t = find((Container) k);
+                FormulaEditing.CellEditor t = find((Container) k);
                 if (t != null) {
                     return t;
                 }
@@ -101,16 +100,17 @@ class SpreadsheetGridTest extends UITestBase {
 
     private String openAndClose(int row, int column) {
         assertTrue(grid.editCellAt(row, column), "row " + row + " column " + column + " is editable");
-        TextField field = editor();
+        FormulaEditing.CellEditor field = editor();
         assertNotNull(field, "an editor for row " + row + " column " + column);
-        String shown = field.getText();
+        String shown = field.currentText();
         grid.commitEdit();
         return shown;
     }
 
     private void type(int row, int column, String text) {
         assertTrue(grid.editCellAt(row, column));
-        editor().setText(text);
+        // typed before the editor's backend is up: what is typed is what is entered
+        editor().getEditing().setText(text);
         grid.commitEdit();
     }
 

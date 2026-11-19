@@ -100,7 +100,7 @@ final class FormulaParser {
     }
 
     private FormulaSyntaxException fail() {
-        return new FormulaSyntaxException("Cannot parse formula at " + p + ": " + s);
+        return new FormulaSyntaxException("Cannot parse formula at " + p + ": " + s, p);
     }
 
     private void ws() {
