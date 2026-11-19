@@ -77,7 +77,7 @@ public class OrmCheck {
                 generatedRepositories(em, pool.dialect().getName());
                 nativeDatesRoundTripInUtc(em);
                 generatedKeys(em);
-                roundTripsEveryColumn(notes);
+                roundTripsEveryColumn(notes, pool.dialect().getName());
                 updatesAndDeletes(notes);
                 queriesByFieldName(notes, pool.dialect().getName());
                 anExplicitKeyLeavesTheNextGeneratedOneUsable(pool);
@@ -256,7 +256,8 @@ public class OrmCheck {
      * BIGINT rather than a native timestamp whose text format follows the
      * server's time zone, and a blob is BYTEA, BLOB or LONGBLOB.
      */
-    private static void roundTripsEveryColumn(Dao<Note> notes) throws Exception {
+    private static void roundTripsEveryColumn(Dao<Note> notes, String engine) throws Exception {
+        boolean oracle = "oracle".equals(engine);
         Note note = new Note();
         note.title = "first";
         // A QUESTION MARK in a stored value. Every statement goes through the
@@ -328,12 +329,26 @@ public class OrmCheck {
         Note large = new Note();
         large.title = "large";
         large.body = big.toString();
-        notes.insert(large);
-        Note largeBack = notes.findById(Long.valueOf(large.id));
-        check("a string past MySQL's TEXT limit round trips", "70000",
-                String.valueOf(largeBack == null || largeBack.body == null
-                        ? -1 : largeBack.body.length()));
-        notes.delete(large);
+        if(oracle) {
+            // Oracle's string column is VARCHAR2(4000 CHAR): a CLOB would hold
+            // this but could not be compared, ordered or grouped, so the bound
+            // is the documented difference. What must hold is that the row is
+            // REFUSED, never stored cut short.
+            String refused = "stored";
+            try {
+                notes.insert(large);
+            } catch(java.io.IOException expected) {
+                refused = "refused";
+            }
+            check("a string past VARCHAR2's bound is refused, not truncated", "refused", refused);
+        } else {
+            notes.insert(large);
+            Note largeBack = notes.findById(Long.valueOf(large.id));
+            check("a string past MySQL's TEXT limit round trips", "70000",
+                    String.valueOf(largeBack == null || largeBack.body == null
+                            ? -1 : largeBack.body.length()));
+            notes.delete(large);
+        }
 
         // A NUL INSIDE A STRING. SQLite and MySQL store it -- both keep text
         // with a length rather than a terminator -- while PostgreSQL refuses the
@@ -1004,12 +1019,13 @@ public class OrmCheck {
         String engine = pool.dialect().getName();
         boolean mysql = "mysql".equals(engine);
         boolean sqlServer = "sqlserver".equals(engine);
+        boolean oracle = "oracle".equals(engine);
         pool.execute("DROP TABLE IF EXISTS cn1_ignored", null);
         pool.execute("CREATE TABLE cn1_ignored (id "
                 + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
                 // SQL Server's INSERT IGNORE is a property of the index:
                 // IGNORE_DUP_KEY drops a duplicate row with a warning.
-                + ", name " + (mysql ? "VARCHAR(64)" : sqlServer ? "NVARCHAR(64)" : "TEXT")
+                + ", name " + (mysql || oracle ? pool.dialect().varchar(64) : sqlServer ? "NVARCHAR(64)" : "TEXT")
                 + (sqlServer ? " NOT NULL, CONSTRAINT cn1_ignored_name UNIQUE (name) WITH (IGNORE_DUP_KEY = ON))"
                         : " NOT NULL UNIQUE)"), null);
         try {
@@ -1022,6 +1038,9 @@ public class OrmCheck {
             Object[] ignoreArgs = new Object[] {"a"};
             if(sqlServer) {
                 ignore = "INSERT INTO cn1_ignored (name) VALUES (?)";
+            } else if(oracle) {
+                // Oracle's INSERT IGNORE is a hint naming the unique index.
+                ignore = "INSERT /*+ IGNORE_ROW_ON_DUPKEY_INDEX(cn1_ignored(name)) */ INTO cn1_ignored (name) VALUES (?)";
             } else if("postgresql".equals(engine)) {
                 ignore = "INSERT INTO cn1_ignored (name) VALUES (?) ON CONFLICT DO NOTHING";
             } else if(mysql) {
@@ -1045,10 +1064,11 @@ public class OrmCheck {
         String engine = pool.dialect().getName();
         boolean mysql = "mysql".equals(engine);
         boolean sqlServer = "sqlserver".equals(engine);
+        boolean oracle = "oracle".equals(engine);
         pool.execute("DROP TABLE IF EXISTS cn1_upsert", null);
         pool.execute("CREATE TABLE cn1_upsert (id "
                 + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + (mysql ? "VARCHAR(64)" : sqlServer ? "NVARCHAR(64)" : "TEXT")
+                + ", name " + (mysql || oracle ? pool.dialect().varchar(64) : sqlServer ? "NVARCHAR(64)" : "TEXT")
                 + " NOT NULL UNIQUE, hits INTEGER)", null);
         try {
             long first = pool.insert("INSERT INTO cn1_upsert (name, hits) VALUES (?, ?)",
@@ -1064,7 +1084,11 @@ public class OrmCheck {
             // SQL Server has neither form; MERGE is its upsert, HOLDLOCK keeps
             // two of them from both taking the insert branch, and MERGE must end
             // in a semicolon.
-            String upsert = sqlServer
+            String upsert = oracle
+                    ? "MERGE INTO cn1_upsert t USING (SELECT ? AS name, ? AS hits FROM DUAL) s "
+                            + "ON (t.name = s.name) WHEN MATCHED THEN UPDATE SET hits = t.hits + 1 "
+                            + "WHEN NOT MATCHED THEN INSERT (name, hits) VALUES (s.name, s.hits)"
+                    : sqlServer
                     ? "MERGE cn1_upsert WITH (HOLDLOCK) AS t USING (VALUES (?, ?)) AS s (name, hits) "
                             + "ON t.name = s.name WHEN MATCHED THEN UPDATE SET hits = t.hits + 1 "
                             + "WHEN NOT MATCHED THEN INSERT (name, hits) VALUES (s.name, s.hits);"
@@ -1086,7 +1110,7 @@ public class OrmCheck {
             } catch (Exception err) {
                 answered = "refused";
             }
-            boolean returning = pool.dialect().generatedKeysThroughReturning();
+            boolean returning = pool.dialect().upsertKeysThroughReturning();
             check("an upsert answers with the updated row's key, or not at all",
                     returning ? String.valueOf(first) : "refused", answered);
             if(!returning) {

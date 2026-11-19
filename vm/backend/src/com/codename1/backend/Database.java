@@ -457,7 +457,7 @@ public final class Database {
                     + "every one). Use execute() for a multi-row insert, or insert the rows "
                     + "one at a time: [" + sql + "]");
         }
-        if (!dialect.generatedKeysThroughReturning() && dialect.updatesOnConflict(sql)) {
+        if (!dialect.upsertKeysThroughReturning() && dialect.updatesOnConflict(sql)) {
             // AN UPSERT HAS NO GENERATED KEY TO READ on these two. When the
             // UPDATE branch runs, SQLite leaves last_insert_rowid() holding
             // whatever this connection inserted before and MySQL's
@@ -476,7 +476,8 @@ public final class Database {
                     + dialect.getName() + " reports no generated key for the row it "
                     + "updated -- last_insert_rowid() and LAST_INSERT_ID() answer for the "
                     + "CONNECTION, so insert() would return a key belonging to some earlier "
-                    + "row. Use execute() and read the key back with a query: [" + sql + "]");
+                    + "row, and Oracle's MERGE takes no RETURNING. Use execute() and read the "
+                    + "key back with a query: [" + sql + "]");
         }
         if (!dialect.generatedKeysThroughReturning()) {
             // THE ROW COUNT DECIDES. last_insert_rowid() and LAST_INSERT_ID()

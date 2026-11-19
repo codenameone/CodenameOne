@@ -104,6 +104,11 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
         if ("sqlserver".equals(dialect())) {
             return query(SQLSERVER_DESCRIBE, new Object[]{quote(table)}, new int[8]);
         }
+        if ("oracle".equals(dialect())) {
+            // The name as Dialect.quote stores it: upper case.
+            String name = quote(table);
+            return query(ORACLE_DESCRIBE, new Object[]{name.substring(1, name.length() - 1)}, new int[8]);
+        }
         boolean mysql = "mysql".equals(dialect());
         // PostgreSQL: the schema an unqualified name resolves to through the
         // whole search_path, which is the table the ORM's SQL actually reads.
@@ -173,6 +178,31 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
             + " FROM sys.columns c INNER JOIN sys.types t ON t.user_type_id = c.system_type_id"
             + " WHERE c.object_id = OBJECT_ID(?) ORDER BY c.column_id";
 
+    /// Oracle's columns from USER_TAB_COLUMNS, in the schema the session reads.
+    /// The type keeps Oracle's spelling (`number(19)`, `varchar2(255 char)`,
+    /// `timestamp(3)`), lower case; SessionImpl's families read NUMBER by its
+    /// scale. A column with no NOT NULL is reported as not required, and an
+    /// IDENTITY column is generated but takes an explicit value (BY DEFAULT),
+    /// so it is not read only unless it is GENERATED ALWAYS.
+    private static final String ORACLE_DESCRIBE = "SELECT LOWER(c.column_name), CASE"
+            + " WHEN c.data_type IN ('VARCHAR2','NVARCHAR2','CHAR','NCHAR') THEN LOWER(c.data_type) || '(' || c.char_length || ' char)'"
+            + " WHEN c.data_type = 'NUMBER' AND c.data_precision IS NULL AND c.data_scale = 0 THEN 'number(38)'"
+            + " WHEN c.data_type = 'NUMBER' AND c.data_precision IS NULL THEN 'number'"
+            + " WHEN c.data_type = 'NUMBER' AND c.data_scale = 0 THEN 'number(' || c.data_precision || ')'"
+            + " WHEN c.data_type = 'NUMBER' THEN 'number(' || c.data_precision || ',' || c.data_scale || ')'"
+            + " WHEN c.data_type = 'RAW' THEN 'raw(' || c.data_length || ')'"
+            + " ELSE LOWER(c.data_type) END,"
+            + " CASE WHEN c.nullable = 'N' THEN 1 ELSE 0 END,"
+            + " CASE WHEN EXISTS (SELECT 1 FROM user_constraints k INNER JOIN user_cons_columns kc"
+            + " ON kc.constraint_name = k.constraint_name AND kc.table_name = k.table_name"
+            + " WHERE k.constraint_type = 'P' AND k.table_name = c.table_name AND kc.column_name = c.column_name) THEN 1 ELSE 0 END,"
+            + " CASE WHEN c.data_default IS NOT NULL OR c.identity_column = 'YES' OR c.virtual_column = 'YES' THEN 1 ELSE 0 END,"
+            + " c.collation,"
+            + " CASE WHEN c.identity_column = 'YES' THEN 1 ELSE 0 END,"
+            + " CASE WHEN c.virtual_column = 'YES' OR EXISTS (SELECT 1 FROM user_tab_identity_cols i"
+            + " WHERE i.table_name = c.table_name AND i.column_name = c.column_name AND i.generation_type = 'ALWAYS') THEN 1 ELSE 0 END"
+            + " FROM user_tab_cols c WHERE c.table_name = ? AND c.hidden_column = 'NO' ORDER BY c.column_id";
+
     @Override
     public String quote(String name) {
         return dialect.quote(name);
@@ -194,8 +224,8 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
     }
 
     @Override
-    public String insertDefaults(String table) {
-        return dialect.insertDefaults(table);
+    public String insertDefaults(String table, String keyColumn) {
+        return dialect.insertDefaults(table, keyColumn);
     }
 
     @Override
@@ -337,6 +367,20 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
             execute("CREATE SEQUENCE IF NOT EXISTS " + quote(name) + " START WITH 1", new Object[0]);
             return;
         }
+        if ("oracle".equals(dialect.getName())) {
+            // 19c has no IF NOT EXISTS: an anonymous block swallows ORA-00955
+            // ("name is already used"), which is the race-free form too.
+            if (strategy == 2) {
+                execute(oracleIgnoringExisting("CREATE SEQUENCE " + quote(name) + " START WITH 1"), new Object[0]);
+                return;
+            }
+            execute(oracleIgnoringExisting("CREATE TABLE cn1_orm_sequences (sequence_name "
+                    + dialect.assignedKeyColumn(Dialect.TEXT) + ", next_value "
+                    + dialect.columnType(Dialect.BIGINT) + " NOT NULL)"), new Object[0]);
+            execute("MERGE INTO cn1_orm_sequences s USING (SELECT ? AS n FROM DUAL) v ON (s.sequence_name = v.n)"
+                    + " WHEN NOT MATCHED THEN INSERT (sequence_name,next_value) VALUES (v.n,0)", new Object[]{name});
+            return;
+        }
         boolean sqlServer = "sqlserver".equals(dialect.getName());
         if (strategy == 2 && sqlServer) {
             execute("IF OBJECT_ID(?, 'SO') IS NULL EXEC('CREATE SEQUENCE ' + ?  + ' AS BIGINT START WITH 1')",
@@ -355,6 +399,13 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
             sql += " ON CONFLICT (sequence_name) DO NOTHING";
         }
         execute(sql, new Object[]{name});
+    }
+
+    /// A DDL statement run so that ORA-00955, the object already existing,
+    /// is not an error.
+    static String oracleIgnoringExisting(String ddl) {
+        return "BEGIN EXECUTE IMMEDIATE '" + ddl.replace("'", "''")
+                + "'; EXCEPTION WHEN OTHERS THEN IF SQLCODE <> -955 THEN RAISE; END IF; END;";
     }
 
     @Override
@@ -378,6 +429,9 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
         }
         if (strategy == 2 && "sqlserver".equals(dialect.getName())) {
             return query("SELECT NEXT VALUE FOR " + quote(name), new Object[0], new int[]{Dialect.BIGINT}).get(0)[0];
+        }
+        if (strategy == 2 && "oracle".equals(dialect.getName())) {
+            return query("SELECT " + quote(name) + ".NEXTVAL FROM DUAL", new Object[0], new int[]{Dialect.BIGINT}).get(0)[0];
         }
         long max = kind == Dialect.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE;
         if (execute("UPDATE cn1_orm_sequences SET next_value = next_value + 1 WHERE sequence_name = ? AND next_value < ?", new Object[]{name, Long.valueOf(max)}) != 1) {

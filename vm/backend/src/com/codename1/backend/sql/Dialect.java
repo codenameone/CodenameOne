@@ -207,6 +207,13 @@ public abstract class Dialect {
         return false;
     }
 
+    /// Whether an upsert can answer with the key of the row it touched, the
+    /// inserted one or the updated one. Wherever keys come back through
+    /// RETURNING, except Oracle: its upsert is MERGE, which takes no RETURNING.
+    public boolean upsertKeysThroughReturning() {
+        return generatedKeysThroughReturning();
+    }
+
     /// The clause [#generatedKeysThroughReturning] appends to an INSERT to have
     /// it answer with `quotedColumn`.
     ///
@@ -227,6 +234,13 @@ public abstract class Dialect {
     /// at all.
     public String insertDefaults(String quotedTable) {
         return "INSERT INTO " + quotedTable + " DEFAULT VALUES";
+    }
+
+    /// [#insertDefaults(String)] for a table whose generated key is
+    /// `quotedKeyColumn`. Oracle has no `DEFAULT VALUES` and names the column
+    /// it fills: `INSERT INTO t (id) VALUES (DEFAULT)`.
+    public String insertDefaults(String quotedTable, String quotedKeyColumn) {
+        return insertDefaults(quotedTable);
     }
 
     /// A text column of at most `length` characters, for a column that is
@@ -1060,6 +1074,32 @@ public abstract class Dialect {
         @Override
         public String returningClause(String quotedColumn) {
             return " RETURNING " + quotedColumn + " INTO :cn1_key";
+        }
+
+        @Override
+        public String insertDefaults(String quotedTable, String quotedKeyColumn) {
+            return "INSERT INTO " + quotedTable + " (" + quotedKeyColumn + ") VALUES (DEFAULT)";
+        }
+
+        @Override
+        public boolean upsertKeysThroughReturning() {
+            return false;
+        }
+
+        /// MERGE is Oracle's upsert.
+        @Override
+        public boolean updatesOnConflict(String sql) throws IOException {
+            if (super.updatesOnConflict(sql)) {
+                return true;
+            }
+            return word(sql, blanks(sql, 0), "MERGE");
+        }
+
+        /// Oracle refuses an empty ESCAPE, and LIKE without one has no escape
+        /// character at all, which is what the empty ESCAPE asks for elsewhere.
+        @Override
+        public String likeOperator() {
+            return " LIKE ?";
         }
 
         @Override

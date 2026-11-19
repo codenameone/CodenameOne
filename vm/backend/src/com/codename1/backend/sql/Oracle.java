@@ -952,6 +952,12 @@ public final class Oracle {
         if (returned != null) {
             String[] names = binds.returningNames;
             rows.setColumnCount(returned.length);
+            if (rowCount == 0) {
+                // The statement wrote no row -- an ignored duplicate, an UPDATE
+                // that matched nothing -- so there is nothing it returned, as a
+                // PostgreSQL RETURNING that matched no row answers no rows.
+                return;
+            }
             Map row = new LinkedHashMap();
             for (int iter = 0 ; iter < returned.length ; iter++) {
                 String name = names != null && iter < names.length ? names[iter] : "RETURNED" + (iter + 1);

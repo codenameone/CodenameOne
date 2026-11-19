@@ -76,6 +76,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     boolean sqlServer() {
         return "sqlserver".equals(sql.dialect());
     }
+    /// Oracle, which spells every integer NUMBER(p), stores '' as NULL and
+    /// takes no AS before a table alias.
+    boolean oracle() {
+        return "oracle".equals(sql.dialect());
+    }
     /// Whether foreign keys are checked per statement and cannot be deferred to
     /// commit, so a row must be written after the rows it references and a
     /// required cycle cannot be written at all: MySQL and SQL Server.
@@ -88,6 +93,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return "DELETE FROM " + q(table);
         }
         // MariaDB before 11.6 needs the target alias before FROM.
+        if (oracle()) {
+            // Oracle takes no AS before a table alias.
+            return "DELETE FROM " + q(table) + " " + alias;
+        }
         String prefix = "mysql".equals(sql.dialect()) || sqlServer() ? "DELETE " + alias + " FROM " : "DELETE FROM ";
         return prefix + q(table) + " AS " + alias;
     }
@@ -97,7 +106,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // and the table named in the FROM that [#updateFrom] adds.
             return "UPDATE " + alias;
         }
-        return "UPDATE " + q(table) + ("sqlite".equals(sql.dialect()) ? "" : " AS " + alias);
+        return "UPDATE " + q(table) + ("sqlite".equals(sql.dialect()) ? "" : oracle() ? " " + alias : " AS " + alias);
     }
     /// What follows an UPDATE's SET list, before its WHERE: SQL Server's FROM
     /// naming the aliased table, nothing elsewhere.
@@ -128,7 +137,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
     String integralSum(String expression) {
-        return "CAST(" + expression + " AS " + ("mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT") + ")";
+        return "CAST(" + expression + " AS " + integralType() + ")";
+    }
+    /// The 64-bit integer type of a CAST: MySQL's SIGNED, Oracle's NUMBER(19).
+    private String integralType() {
+        return "mysql".equals(sql.dialect()) ? "SIGNED" : oracle() ? "NUMBER(19)" : "BIGINT";
     }
     String functionName(String function) {
         if (!"LENGTH".equals(function)) {
@@ -150,6 +163,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (sqlServer()) {
                 // REAL is single precision here.
                 return "CAST(" + value + " AS FLOAT(53))";
+            }
+            if (oracle()) {
+                return "CAST(" + value + " AS BINARY_DOUBLE)";
             }
             return "mysql".equals(sql.dialect()) ? "(1e0 * " + value + ")" : "CAST(" + value + " AS REAL)";
         }
@@ -195,7 +211,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return expression;
         }
         String length = lengthOf(expression);
-        String textType = "mysql".equals(sql.dialect()) ? "CHAR" : sqlServer() ? "NVARCHAR(20)" : "TEXT";
+        String textType = "mysql".equals(sql.dialect()) ? "CHAR" : sqlServer() ? "NVARCHAR(20)"
+                : oracle() ? "VARCHAR2(20)" : "TEXT";
         return "(CASE WHEN " + length + " > 255 THEN CAST(" + integralOverflow(length)
                 + " AS " + textType + ") ELSE " + expression + " END)";
     }
@@ -218,10 +235,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return "abs(-9223372036854775808)";
         }
         // Depend on the row to avoid rejecting an unused branch during planning.
-        String type = "mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT";
+        String type = integralType();
         String signed = "CAST(" + value + " AS " + type + ")";
-        return "(" + signed + " + CASE WHEN " + signed + " < 0 THEN CAST('-9223372036854775808' AS "
+        String sum = "(" + signed + " + CASE WHEN " + signed + " < 0 THEN CAST('-9223372036854775808' AS "
                 + type + ") ELSE CAST('9223372036854775807' AS " + type + ") END)";
+        // NUMBER arithmetic has 38 digits and does not overflow; narrowing
+        // the sum back to 19 digits is what raises the error (ORA-01438).
+        return oracle() ? "CAST(" + sum + " AS NUMBER(19))" : sum;
     }
     String checkedFloatAssignment(String expression) {
         String value = numericOperand(expression, Attribute.REAL);
@@ -2178,7 +2198,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return false;
         }
         String token = firstTypeToken(type);
-        return "decimal".equals(token) || "numeric".equals(token) || "dec".equals(token) || "fixed".equals(token);
+        return "decimal".equals(token) || "numeric".equals(token) || "dec".equals(token) || "fixed".equals(token)
+                || "number".equals(token);
     }
     /// Whether a floating column keeps only single precision: PostgreSQL's
     /// REAL, FLOAT4 and FLOAT(1..24), and MySQL's FLOAT unless its precision
@@ -2208,7 +2229,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (sqlServer()) {
             return "real".equals(token) || "float".equals(token) && precision >= 1 && precision <= 24;
         }
-        return false;
+        return oracle() && "binary_float".equals(token);
     }
     private boolean integerFits(String found, int kind, long minimum, long maximum) {
         if ("sqlite".equals(sql.dialect())) {
@@ -2295,6 +2316,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (open < 0 || close < 0 || token.indexOf("char") < 0) {
             return Integer.MAX_VALUE;
         }
+        if (oracle()) {
+            // VARCHAR2(255 CHAR): the unit follows the length.
+            int length = leadingNumber(type);
+            return length < 0 ? Integer.MAX_VALUE : length;
+        }
         try {
             return Integer.parseInt(type.substring(open + 1, close).trim());
         } catch (NumberFormatException e) {
@@ -2320,7 +2346,35 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (" bigint int8 bigserial serial8 ".contains(" " + token + " ")) {
             return 8;
         }
+        if ("number".equals(token)) {
+            // Oracle's NUMBER(p) holds p decimal digits: NUMBER(10) every int,
+            // NUMBER(19) every long. Read by the digits the column keeps.
+            int precision = leadingNumber(type);
+            return precision <= 0 ? 0 : precision <= 4 ? 2 : precision <= 10 ? 4 : precision <= 19 ? 8 : 9;
+        }
         return 0;
+    }
+    /// The first run of digits after the opening parenthesis, -1 when none:
+    /// 255 of `VARCHAR2(255 CHAR)`, 19 of `NUMBER(19,0)`.
+    private static int leadingNumber(String type) {
+        int open = type.indexOf('(');
+        if (open < 0) {
+            return -1;
+        }
+        int value = 0;
+        int digits = 0;
+        for (int i = open + 1; i < type.length(); i++) {
+            char c = type.charAt(i);
+            if (c == ' ' && digits == 0) {
+                continue;
+            }
+            if (c < '0' || c > '9' || digits >= 9) {
+                break;
+            }
+            value = value * 10 + (c - '0');
+            digits++;
+        }
+        return digits == 0 ? -1 : value;
     }
     private static String firstTypeToken(String type) {
         String[] tokens = split(asciiLower(type).replace('(', ' '), ' ');
@@ -2357,6 +2411,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         if (" int integer tinyint smallint mediumint bigint int2 int4 int8 serial smallserial bigserial serial2 serial4 serial8 bool boolean ".contains(" " + token + " ")) {
             return 1;
+        }
+        if ("number".equals(token)) {
+            // Oracle: NUMBER(p) and NUMBER(p,0) are integers, a scale makes
+            // a decimal, and a bare NUMBER is a decimal of any precision.
+            int comma = name.indexOf(',');
+            boolean integral = name.indexOf('(') >= 0 && (comma < 0
+                    || name.substring(comma + 1).trim().startsWith("0"));
+            return integral ? 1 : 3;
+        }
+        if ("raw".equals(token)) {
+            return 4;
         }
         if ("sqlite".equals(sql.dialect()) && sqliteIntegerWord(name)) {
             // SQLite gives INTEGER affinity to a declaration containing INT, so
@@ -3725,7 +3790,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             args.add(bound);
         }
         String statement = args.isEmpty()
-                                   ? sql.insertDefaults(q(model.table()))
+                                   ? sql.insertDefaults(q(model.table()), q(attrs[model.idIndex()].column))
                                    : "INSERT INTO " + q(model.table()) + " (" + cols + ") VALUES (" + marks + ")";
         int id = model.idIndex();
         if (attrs[id].generated) {

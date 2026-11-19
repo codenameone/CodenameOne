@@ -96,7 +96,7 @@ public final class SessionSqlAccess implements SqlAccess {
         return columnType(kind) + " PRIMARY KEY NOT NULL";
     }
     @Override
-    public String insertDefaults(String table) {
+    public String insertDefaults(String table, String keyColumn) {
         return "INSERT INTO " + table + " DEFAULT VALUES";
     }
     @Override

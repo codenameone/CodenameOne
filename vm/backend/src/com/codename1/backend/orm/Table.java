@@ -113,7 +113,7 @@ final class Table {
             // column list builds "INSERT INTO t () VALUES ()", which SQLite and
             // PostgreSQL both refuse, so the row could not be created at all --
             // and each engine spells the no-columns insert its own way.
-            this.insertSql = dialect.insertDefaults(quotedTable);
+            this.insertSql = dialect.insertDefaults(quotedTable, quotedColumns[idIndex]);
         } else {
             StringBuilder insert = new StringBuilder("INSERT INTO ");
             insert.append(quotedTable).append(" (");
