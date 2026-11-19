@@ -87,7 +87,7 @@ final class XlsxWriter {
                         throw new IOException("Excel takes formulas of up to " + MAX_FORMULA + " characters: "
                                 + name + "!" + ref(r, c));
                     }
-                    if (formula == null && cell.formulaText == null && cell.value instanceof String
+                    if (formula == null && cell.value instanceof String
                             && ((String) cell.value).length() > MAX_TEXT) {
                         throw new IOException("Excel takes text of up to " + MAX_TEXT + " characters in a cell: "
                                 + name + "!" + ref(r, c));
@@ -207,7 +207,9 @@ final class XlsxWriter {
                     if (cell == null) {
                         continue;
                     }
-                    if (cell.formulaText != null) {
+                    // the same test as writeCell's: an OpenDocument formula that could not be
+                    // read is written as its value, and a text value needs its shared string
+                    if (storedFormula(cell) != null) {
                         formulas = true;
                     } else if (cell.value instanceof String) {
                         stringUses++;

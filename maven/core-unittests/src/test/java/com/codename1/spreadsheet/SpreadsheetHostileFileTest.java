@@ -874,6 +874,33 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void anOpenDocumentFormulaNothingCanRead() throws IOException {
+        Workbook w = survive("an unreadable formula with a text value", ods("<table:table-row><table:table-cell"
+                + " table:formula=\"of:=[.A2]+((\" office:value-type=\"string\"><text:p>hi</text:p></table:table-cell>"
+                + "</table:table-row>"), Workbook.Format.ODS);
+        if (w == null) {
+            wrong.append("\nthe file was refused");
+            return;
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        w.write(out, Workbook.Format.XLSX);
+        same("hi", Workbook.read(new ByteArrayInputStream(out.toByteArray()), Workbook.Format.XLSX).getSheet(0)
+                .getCellValue("A1"), "its value is kept in Excel's file");
+        // and a long value of such a cell is held to Excel's text limit
+        Workbook longer = survive("an unreadable formula with a long text value", ods("<table:table-row><table:table-cell"
+                + " table:formula=\"of:=((\" office:value-type=\"string\"><text:p>" + repeat("a", 32768)
+                + "</text:p></table:table-cell></table:table-row>"), Workbook.Format.ODS);
+        if (longer != null) {
+            try {
+                longer.write(new ByteArrayOutputStream(), Workbook.Format.XLSX);
+                wrong.append("\na long value past Excel's limit was written");
+            } catch (IOException expected) {
+                same(Boolean.TRUE, Boolean.valueOf(expected.getMessage().endsWith("S!A1")), "the cell is named");
+            }
+        }
+    }
+
+    @Test
     void excelLimitsFailFast() throws IOException {
         String[] what = {"name", "text", "formula"};
         for (String limit : what) {
