@@ -69,6 +69,7 @@ jobs:
           scripts/check-since-tags.sh
           scripts/check-since-tags.sh vm/backend/src
           scripts/check-since-tags.sh vm/backend/impl
+          scripts/check-since-tags.sh maven/rive-runtime/src/main/java
 
       - name: Google Play types only in guarded proxies
         if: ${{ !cancelled() }}

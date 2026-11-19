@@ -126,6 +126,12 @@ final class AppSupport {
                 com.codename1.maven.KmpProjectImporter.kmpDir(layout.projectDir()))) {
             addFramework(project, "implementation", version, com.codename1.maven.KmpProjectImporter.COMPOSE_ARTIFACT);
         }
+        // Rive files (src/main/rive) become RiveFile subclasses: the runtime is
+        // not part of the core and ships in the application like any library.
+        if (com.codename1.maven.SvgTranscodeRunner.hasRiveSources(layout.projectDir())) {
+            addFramework(project, "implementation", version,
+                    com.codename1.maven.SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT);
+        }
         addFramework(project, "testImplementation", version, "codenameone-core", "codenameone-javase");
         Configuration framework = resolvable(project, "cn1Framework", "codenameone-core and java-runtime, for local builds");
         framework.setTransitive(false);

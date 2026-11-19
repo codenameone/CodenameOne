@@ -90,6 +90,34 @@ public class SvgTranscodeRunner {
     /** Where {@code .riv} files live, relative to the module root. */
     static final String RIVE_DIR = "src/main/rive";
 
+    /** The artifact that holds the Rive runtime ({@code com.codename1.rive}).
+     *  It is not part of the core: an application with {@code .riv} files
+     *  depends on it, and the generated classes extend its {@code RiveFile}. */
+    public static final String RIVE_RUNTIME_ARTIFACT = "codenameone-rive-runtime";
+
+    /** The class every generated Rive class extends, as a class file path. */
+    public static final String RIVE_FILE_CLASS = "com/codename1/rive/RiveFile.class";
+
+    /** True when {@code moduleDir} has at least one {@code .riv} file to translate. */
+    public static boolean hasRiveSources(File moduleDir) {
+        List<File> out = new ArrayList<File>();
+        collectRive(new File(moduleDir, RIVE_DIR), out);
+        return !out.isEmpty();
+    }
+
+    /** The build failure for a module with {@code .riv} files and no Rive
+     *  runtime on its class path: names the dependency to add. */
+    public static String missingRiveRuntimeMessage(File moduleDir) {
+        return new File(moduleDir, RIVE_DIR) + " holds Rive files, which compile against the Rive runtime, "
+                + "and com.codename1.rive.RiveFile is not on this module's class path. Add this dependency "
+                + "to its pom.xml:\n\n"
+                + "    <dependency>\n"
+                + "        <groupId>com.codenameone</groupId>\n"
+                + "        <artifactId>" + RIVE_RUNTIME_ARTIFACT + "</artifactId>\n"
+                + "        <version>${cn1.version}</version>\n"
+                + "    </dependency>\n";
+    }
+
     static final String[] DEFAULT_SVG_DIRS = {
             "src/main/svg",
             "src/main/lottie",

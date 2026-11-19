@@ -48,6 +48,8 @@ on:
       - 'scripts/hellocodenameone/**'
       # The Rive screenshot tests draw classes this translator generates.
       - 'maven/rive-transcoder/**'
+      - 'maven/rive-runtime/**'
+      - 'maven/rive-schema-gen/**'
       # The screenshots this leg compares are produced by the core renderer and
       # the port's native theme, so a change to either can move them. Without
       # these the leg does not run on the pull request that changes them and the
@@ -84,6 +86,8 @@ on:
       - 'scripts/hellocodenameone/**'
       # The Rive screenshot tests draw classes this translator generates.
       - 'maven/rive-transcoder/**'
+      - 'maven/rive-runtime/**'
+      - 'maven/rive-schema-gen/**'
       # The screenshots this leg compares are produced by the core renderer and
       # the port's native theme, so a change to either can move them. Without
       # these the leg does not run on the pull request that changes them and the
@@ -479,7 +483,7 @@ jobs:
               Write-Host "mvn failed; retrying in $delay s..."
               Start-Sleep -Seconds $delay
             }
-            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock,compose-compat,backend,backend-test -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock,compose-compat,rive-runtime,backend,backend-test -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
             if ($LASTEXITCODE -eq 0) { $ok = $true; break }
           }
           if (-not $ok) { throw "mvn install failed after all retries" }

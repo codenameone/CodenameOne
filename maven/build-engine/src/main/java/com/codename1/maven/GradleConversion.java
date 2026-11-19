@@ -1105,8 +1105,10 @@ public final class GradleConversion {
             "codenameone-unity-compat",
             // Likewise for a project with src/main/kmp,
             "codenameone-compose-compat",
-            // and for one with src/main/flutter.
-            "codenameone-flutter-runtime"));
+            // for one with src/main/flutter,
+            "codenameone-flutter-runtime",
+            // and for one with src/main/rive.
+            "codenameone-rive-runtime"));
 
     /// `build.gradle.kts` lines for the dependencies a module's pom declares
     /// itself, leaving out the framework, which the plugin adds. A dependency of

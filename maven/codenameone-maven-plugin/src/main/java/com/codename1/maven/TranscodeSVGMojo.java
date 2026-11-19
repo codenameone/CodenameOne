@@ -72,8 +72,8 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
  * SVG instance.
  */
 @Mojo(name = "transcode-svg", defaultPhase = LifecyclePhase.GENERATE_SOURCES,
-        requiresDependencyResolution = ResolutionScope.NONE,
-        requiresDependencyCollection = ResolutionScope.NONE)
+        requiresDependencyResolution = ResolutionScope.COMPILE,
+        requiresDependencyCollection = ResolutionScope.COMPILE)
 public class TranscodeSVGMojo extends AbstractCN1Mojo {
 
     @Override
@@ -83,6 +83,10 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         // project whose pom never binds this mojo. See that class.
         // Parameters live on AbstractCN1Mojo so the self-repair and the
         // placeholder diagnostic resolve the same configuration this goal does.
+        // The Rive runtime is a dependency, not part of the core: a module with
+        // .riv files and no runtime would otherwise fail in javac on classes it
+        // never wrote. Resolution is COMPILE so that check can see the class path.
+        requireRiveRuntime();
         try {
             newSvgTranscodeRunner().run();
         } catch (com.codename1.builders.BuildException ex) {

@@ -291,6 +291,21 @@ src/main/rive/
   juice.riv
 ----
 
+The runtime is a library, `codenameone-rive-runtime`, rather than part of the
+core. A project created from the current archetype adds it whenever
+`src/main/rive/` exists, and the Gradle plugin does the same. An older Maven
+project adds it to `common/pom.xml` by hand; the build stops and prints the
+dependency when a `.riv` file is present without it:
+
+[source,xml]
+----
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-rive-runtime</artifactId>
+    <version>${cn1.version}</version>
+</dependency>
+----
+
 `RiveView` plays a file. It runs the artboard's first state machine, or
 its first animation when the artboard has no state machine, from the
 moment it is shown:

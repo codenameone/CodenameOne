@@ -114,7 +114,8 @@ PR CI (`.github/workflows/pr.yml`, Java 8 leg) runs SpotBugs over
 build plugins share), `project-model` (the project-layout API),
 `android-res-compiler` and `android-compat` (the Android compatibility
 runtime), `codenameone-gradle-plugin`, `javac` (the in-tree Java compiler,
-`vm/JavaCompiler`) and `python-transpiler`, plus `python-runtime` in a step of
+`vm/JavaCompiler`), `rive-runtime` (the Rive runtime, which left the core and
+keeps the core's PMD and Checkstyle rule sets) and `python-transpiler`, plus `python-runtime` in a step of
 its own on JDK 17 (it compiles at release 17), then enforces the result in
 `.github/scripts/generate-quality-report.py`. `cil-translator` and
 `unity-compat` (the Unity compatibility translator and runtime) are held to the
@@ -134,7 +135,7 @@ any of them cannot skip it.
   `maven/build-engine/`, `maven/project-model/`,
   `maven/android-res-compiler/`, `maven/android-compat/`,
   `maven/codenameone-gradle-plugin/`, `maven/javac/`,
-  `maven/python-transpiler/`, `maven/python-runtime/`,
+  `maven/python-transpiler/`, `maven/python-runtime/`, `maven/rive-runtime/`,
   `maven/cil-translator/`, `maven/unity-compat/`), scoped to the
   class or method it applies to and with a comment explaining why. Keep the
   generated report at zero rather than tolerating known noise.
@@ -148,7 +149,7 @@ To reproduce the SpotBugs gate locally:
 ```bash
 source tools/env.sh   # JDK 8
 cd maven && mvn -B -DskipTests=true -Pcompile-android \
-  -pl android,ios,project-model,android-res-compiler,android-compat,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,javac -am verify
+  -pl android,ios,project-model,android-res-compiler,android-compat,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,javac,rive-runtime -am verify
 mvn -B -DunitTests -DskipTests=true -pl core-unittests verify
 mvn -B -DskipTests=true -f ../vm/ByteCodeTranslator/pom.xml verify
 ```
@@ -437,7 +438,8 @@ The scope is what a translation actually sees -- `maven/core`, `maven/ios`,
 Android sources ships relocated inside its own classes, and
 `maven/swing-compat` and `maven/javafx-compat`, which are relocated into an
 application with desktop sources the same way. `maven/python-runtime` is in
-scope too: an application with Python sources ships it. **The Android port is not covered**, and adding it back would be a
+scope too: an application with Python sources ships it, and so is
+`maven/rive-runtime`, which an application with `.riv` files ships. **The Android port is not covered**, and adding it back would be a
 mistake: ART implements `CHECKCAST` to spec, so a `catch (Throwable)` around a
 `(NotificationManager) getSystemService(...)` there is live, correct code, and
 `Ports/Android` is never translated. That is the same reason `Ports/CLDC11` is
@@ -636,6 +638,31 @@ Note the related Java trap the gate cannot see, because it is a compile error:
 `\u` followed by anything that is not four hex digits is illegal *anywhere* in a
 Java file, comments included -- javac processes unicode escapes before it parses
 comments. Write "backslash-u" in prose, or double the backslash.
+
+### Rive: a runtime outside the core, a model generated at build time
+
+`.riv` files under `src/main/rive` become `RiveFile` subclasses at build time
+(`maven/rive-transcoder`, through `SvgTranscodeRunner`). The runtime they
+extend is `maven/rive-runtime` (`codenameone-rive-runtime`, packages
+`com.codename1.rive` and `com.codename1.impl.rive`), a dependency an
+application has only when it has Rive files: the archetype's `rive` profile and
+the Gradle plugin add it, and `transcode-svg` fails with the dependency to add
+when neither did. Nothing in the core may reference either package.
+
+- **The object model is generated, never committed.** `maven/rive-schema-gen`
+  reads the pinned rive-runtime headers in
+  `src/main/schema/rive-runtime-generated.zip` (commit in `UPSTREAM.txt`) and
+  writes every `<Name>Base.java`, a placeholder `<Name>.java` for each type
+  with no hand-written class, and the transcoder's `RiveSchema`, into each
+  module's `target/generated-sources`. Giving a type behaviour is adding
+  `<Name>.java` to `maven/rive-runtime/src/main/java`; moving to a newer
+  upstream is replacing the zip.
+- **Hand-written files keep rive-runtime's MIT header** and are listed in
+  `scripts/copyright-header-exclusions.txt`.
+- `build_javadocs.sh` runs the generator itself, because the published client
+  API includes `com.codename1.rive`.
+- The tests stay in `core-unittests` (`com.codename1.rive`), which takes the
+  runtime as a test dependency.
 
 ### Working with Native Code
 
