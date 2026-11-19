@@ -600,6 +600,7 @@ public final class Workbook {
                 }
             }
             nameFormulas.remove(key);
+            odsNameText.remove(key);
         } else {
             if (!FormulaParser.isName(name)) {
                 throw new IllegalArgumentException("Not a name a formula can use: " + name);
@@ -622,8 +623,14 @@ public final class Workbook {
         }
     }
 
+    /// Names whose text is an OpenDocument formula nothing could read, by key. Excel's
+    /// syntax is not that, so an XLSX file leaves them out, as OpenDocument leaves out an
+    /// Excel formula it cannot read.
+    final java.util.HashSet<String> odsNameText = new java.util.HashSet<String>();
+
     void defineName(String name, String text, Node node) {
         String key = FormulaParser.asciiUpper(name);
+        odsNameText.remove(key);
         if (!nameFormulas.containsKey(key)) {
             names.add(name);
         }

@@ -108,7 +108,10 @@ final class XlsxWriter {
     /// What a defined name refers to, as the file holds it.
     private String storedName(String name) {
         Node node = book.definedNameNode(name);
-        return node == null ? book.getDefinedName(name) : FormulaParser.print(node, false);
+        if (node != null) {
+            return FormulaParser.print(node, false);
+        }
+        return book.odsNameText.contains(FormulaParser.asciiUpper(name)) ? null : book.getDefinedName(name);
     }
 
     void write(OutputStream out) throws IOException {
@@ -233,13 +236,20 @@ final class XlsxWriter {
             x.raw("<sheet").attr("name", name).attr("sheetId", i + 1).raw(" r:id=\"rId").raw(i + 1).raw("\"/>");
         }
         x.raw("</sheets>");
-        String[] names = book.getDefinedNames();
-        if (names.length > 0) {
-            x.raw("<definedNames>");
-            for (String nameItem : names) {
-                String text = storedName(nameItem);
-                x.raw("<definedName").attr("name", nameItem).raw(">").text(text, false).raw("</definedName>");
+        boolean namesOpen = false;
+        for (String nameItem : book.getDefinedNames()) {
+            String text = storedName(nameItem);
+            if (text == null) {
+                continue;
             }
+            if (!namesOpen) {
+                // the schema wants at least one name inside, so the element opens on the first
+                x.raw("<definedNames>");
+                namesOpen = true;
+            }
+            x.raw("<definedName").attr("name", nameItem).raw(">").text(text, false).raw("</definedName>");
+        }
+        if (namesOpen) {
             x.raw("</definedNames>");
         }
         if (formulas) {

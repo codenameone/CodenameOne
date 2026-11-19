@@ -874,6 +874,89 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void nestingPastExcelsLimit() throws IOException {
+        // Excel nests 64 deep; deeper is refused as a file error, never a stack overflow
+        StringBuilder deep = new StringBuilder("<row r=\"1\"><c r=\"A1\"><f>");
+        for (int i = 0; i < 2000; i++) {
+            deep.append("IF(1,");
+        }
+        deep.append('1');
+        for (int i = 0; i < 2000; i++) {
+            deep.append(')');
+        }
+        deep.append("</f></c></row>");
+        survive("formulas nested 2000 deep", xlsx(deep.toString(), null), Workbook.Format.XLSX);
+        Workbook w = new Workbook();
+        Sheet sheet = w.addSheet("S");
+        StringBuilder f = new StringBuilder("=");
+        for (int i = 0; i < 60; i++) {
+            f.append("IF(1,");
+        }
+        f.append('7');
+        for (int i = 0; i < 60; i++) {
+            f.append(')');
+        }
+        sheet.setCellFormula("A1", f.toString());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        w.write(out, Workbook.Format.XLSX);
+        same(Double.valueOf(7), Workbook.read(new ByteArrayInputStream(out.toByteArray()), Workbook.Format.XLSX)
+                .getSheet(0).getCellValue("A1"), "60 deep is read back");
+    }
+
+    @Test
+    void roundTripsThatLostSomething() throws IOException {
+        // an OpenDocument name nothing can read stays out of Excel's file
+        byte[] file = zip("mimetype", "application/vnd.oasis.opendocument.spreadsheet", "content.xml",
+                "<office:document-content" + ODS_NS + "><office:body><office:spreadsheet><table:table table:name=\"S\">"
+                        + "<table:table-row><table:table-cell office:value-type=\"float\" office:value=\"1\"/>"
+                        + "</table:table-row></table:table><table:named-expressions><table:named-expression"
+                        + " table:name=\"N\" table:expression=\"of:=[$S.$A$1]+((\"/></table:named-expressions>"
+                        + "</office:spreadsheet></office:body></office:document-content>");
+        Workbook named = survive("an unreadable named expression", file, Workbook.Format.ODS);
+        if (named != null) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            named.write(out, Workbook.Format.XLSX);
+            String[] names = Workbook.read(new ByteArrayInputStream(out.toByteArray()), Workbook.Format.XLSX)
+                    .getDefinedNames();
+            same(Integer.valueOf(0), Integer.valueOf(names.length), "OpenDocument syntax written as an Excel name");
+        }
+        // a fourth section, for text, survives OpenDocument
+        Workbook formats = new Workbook();
+        Sheet f = formats.addSheet("S");
+        f.setValueAt(0, 0, "hi");
+        f.setCellFormat(0, 0, "0;-0;0;\"Note: \"@");
+        same("Note: hi", f.getCellText(0, 0), "the text section");
+        ByteArrayOutputStream ods = new ByteArrayOutputStream();
+        formats.write(ods, Workbook.Format.ODS);
+        Sheet back = Workbook.read(new ByteArrayInputStream(ods.toByteArray()), Workbook.Format.ODS).getSheet(0);
+        same("Note: hi", back.getCellText(0, 0), "the text section after OpenDocument");
+        // the apostrophe CSV puts before text that would run comes off again
+        Workbook csv = new Workbook();
+        csv.addSheet("S").setCellValue(0, 0, "=A1");
+        ByteArrayOutputStream c = new ByteArrayOutputStream();
+        csv.write(c, Workbook.Format.CSV);
+        same("=A1", Workbook.read(new ByteArrayInputStream(c.toByteArray()), Workbook.Format.CSV).getSheet(0)
+                .getCellValue("A1"), "text with an equals sign after CSV");
+        // "=" counts what is empty, "<>" what is not, ="" included; dates end where Excel's do
+        Workbook book = new Workbook();
+        Sheet s = book.addSheet("S");
+        s.setCellValue("A1", Double.valueOf(1));
+        s.setCellValue("A3", "x");
+        s.setCellFormula("A4", "=\"\"");
+        s.setCellValue("A5", Double.valueOf(5));
+        s.setCellFormula("B1", "=COUNTIF(A1:A5,\"=\")");
+        s.setCellFormula("B2", "=COUNTIF(A1:A5,\"<>\")");
+        s.setCellFormula("B3", "=COUNTIF(A1:A5,\"\")");
+        s.setCellFormula("B4", "=EDATE(1,1000000)");
+        s.setCellFormula("B5", "=EOMONTH(1,1000000)");
+        same(Double.valueOf(1), s.getCellValue("B1"), "COUNTIF =");
+        same(Double.valueOf(4), s.getCellValue("B2"), "COUNTIF <>");
+        same(Double.valueOf(2), s.getCellValue("B3"), "COUNTIF of the empty text");
+        same(CellError.NUM, s.getCellValue("B4"), "EDATE past the last day");
+        same(CellError.NUM, s.getCellValue("B5"), "EOMONTH past the last day");
+    }
+
+    @Test
     void anOpenDocumentFormulaNothingCanRead() throws IOException {
         Workbook w = survive("an unreadable formula with a text value", ods("<table:table-row><table:table-cell"
                 + " table:formula=\"of:=[.A2]+((\" office:value-type=\"string\"><text:p>hi</text:p></table:table-cell>"

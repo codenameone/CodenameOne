@@ -144,13 +144,17 @@ final class DateFunctions {
                 int[] f = DateUtil.fields(date(a, 0), d1904);
                 long months = (long) Evaluator.num(a, 1);
                 if ("EOMONTH".equals(name)) {
-                    return d(DateUtil.serial(f[0], f[1] + months + 1, 0, d1904));
+                    double end = DateUtil.serial(f[0], f[1] + months + 1, 0, d1904);
+                    if (end < 0 || end > LAST_DAY) {
+                        throw EvalError.NUM;
+                    }
+                    return d(end);
                 }
                 long index = (long) f[0] * 12 + f[1] - 1 + months;
                 long y = DateUtil.floorDiv(index, 12);
                 int m = (int) (index - y * 12) + 1;
                 double result = DateUtil.serial(y, m, Math.min(f[2], DateUtil.daysInMonth(y, m)), d1904);
-                if (result < 0) {
+                if (result < 0 || result > LAST_DAY) {
                     throw EvalError.NUM;
                 }
                 return d(result);

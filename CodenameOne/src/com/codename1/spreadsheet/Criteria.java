@@ -37,6 +37,8 @@ final class Criteria {
     /// A Double, a Boolean, a String pattern, or null to match empty cells.
     private final Object target;
 
+    private boolean explicitEquals;
+
     Criteria(Object criterion) {
         if (criterion instanceof CellError) {
             throw EvalError.of((CellError) criterion);
@@ -73,6 +75,7 @@ final class Criteria {
             skip = 1;
         }
         op = o;
+        explicitEquals = o == EQ && skip == 1;
         String rest = s.substring(skip);
         if (rest.length() == 0) {
             // "" and "=" match empty cells, "<>" the cells that hold something
@@ -103,8 +106,12 @@ final class Criteria {
             return false;
         }
         if (target == null) {
-            boolean empty = v == null || "".equals(v);
-            return op == NE ? !empty : empty;
+            // "=" is a cell with nothing in it, "<>" one with anything, the empty text of
+            // ="" included; "" alone takes both kinds of empty
+            if (op == NE) {
+                return v != null;
+            }
+            return explicitEquals ? v == null : v == null || "".equals(v);
         }
         if (target instanceof Double) {
             double t = ((Double) target).doubleValue();

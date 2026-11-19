@@ -41,6 +41,7 @@ final class OdsReader {
     private final HashMap<String, String> dataStyles = new HashMap<String, String>();
     /// The sections of a style that maps values to other styles: condition and style name,
     /// in order.
+    private final java.util.HashSet<String> textStyles = new java.util.HashSet<String>();
     private final HashMap<String, ArrayList<String[]>> styleMaps = new HashMap<String, ArrayList<String[]>>();
     private final HashMap<String, String> cellStyles = new HashMap<String, String>();
     private final HashMap<String, Double> columnStyleWidths = new HashMap<String, Double>();
@@ -90,6 +91,7 @@ final class OdsReader {
                 book.defineName(d[0], FormulaParser.display(node), node);
             } catch (FormulaSyntaxException e) {
                 book.defineName(d[0], d[1], null);
+                book.odsNameText.add(FormulaParser.asciiUpper(d[0]));
             }
         }
     }
@@ -243,6 +245,9 @@ final class OdsReader {
                 boolean elapsed = "false".equals(x.attr("number:truncate-on-overflow"));
                 ArrayList<String[]> maps = new ArrayList<String[]>();
                 String code = readDataStyle(x, tag, elapsed, maps);
+                if (name != null && "text-style".equals(tag)) {
+                    textStyles.add(name);
+                }
                 if (name != null && code.length() > 0) {
                     dataStyles.put(name, code);
                     if (!maps.isEmpty()) {
@@ -388,7 +393,9 @@ final class OdsReader {
         }
         ArrayList<String> conditions = new ArrayList<String>();
         ArrayList<String> codes = new ArrayList<String>();
-        for (int i = 0; i < maps.size() && codes.size() < 2; i++) {
+        // a text style sends numbers to three number styles, the sections before its own
+        int most = textStyles.contains(name) ? 3 : 2;
+        for (int i = 0; i < maps.size() && codes.size() < most; i++) {
             String[] m = maps.get(i);
             String code = dataStyles.get(m[1]);
             String condition = m[0];
@@ -403,7 +410,8 @@ final class OdsReader {
         }
         StringBuilder sb = new StringBuilder();
         boolean implicit = codes.size() == 1 ? ">=0".equals(conditions.get(0))
-                : ">0".equals(conditions.get(0)) && "<0".equals(conditions.get(1));
+                : ">0".equals(conditions.get(0)) && "<0".equals(conditions.get(1))
+                        && (codes.size() == 2 || "=0".equals(conditions.get(2)));
         for (int i = 0; i < codes.size(); i++) {
             if (!implicit) {
                 String c = conditions.get(i);

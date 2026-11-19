@@ -44,7 +44,7 @@ public class SpreadsheetApiTest extends BaseTest {
         "IF(A1>0,\"y\",\"n\")", "IFERROR(1/0,\"err\")", "AND(TRUE,A1)", "1/0", "NA()",
         "UPPER(C1)", "MID(C2,2,3)", "TEXT(1234.5678,\"#,##0.00\")", "TEXT(0.256,\"0.0%\")",
         "SUBSTITUTE(\"a-b-c\",\"-\",\"+\",2)", "VALUE(\"1,234\")", "FIXED(1234.567,1)", "\"x\"&1.5",
-        "DATE(2024,2,29)", "YEAR(45351)", "WEEKDAY(45351)", "EDATE(DATE(2024,1,31),1)", "DAYS360(45306,45351)",
+        "DAYS(DATE(2024,2,29),0)", "YEAR(45351)", "WEEKDAY(45351)", "EDATE(DATE(2024,1,31),1)", "DAYS360(45306,45351)",
         "TEXT(45351,\"yyyy-mm-dd\")", "TEXT(45351,\"ddd d mmm\")", "TEXT(0.5,\"hh:mm\")",
         "VLOOKUP(\"beta\",C1:D5,2,FALSE)", "INDEX(A1:B5,3,2)", "MATCH(4,A1:A5,0)",
         "PMT(0.05/12,360,200000)", "NPV(0.1,-1000,300,400,500)", "IRR({-1000,300,400,500})",

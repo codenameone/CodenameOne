@@ -544,8 +544,22 @@ final class CellFormat {
         if (!sectioned) {
             return writeOds(x, name, sections[0], "");
         }
-        StringBuilder maps = new StringBuilder();
         boolean explicit = sections[0].condition != 0;
+        if (sections.length == 4 && count == 3 && !explicit && sections[3].hasText) {
+            // A fourth section is for text. OpenDocument spells that as a text style whose
+            // conditions send a number to the three number styles, as LibreOffice writes it.
+            String[] conditions = {"value()>0", "value()<0", "value()=0"};
+            StringBuilder textMaps = new StringBuilder();
+            for (int i = 0; i < 3; i++) {
+                String sub = name + "P" + i;
+                writeOds(x, sub, sections[i], "");
+                textMaps.append("<style:map style:condition=\"").append(xmlAttr(conditions[i]))
+                        .append("\" style:apply-style-name=\"").append(sub).append("\"/>");
+            }
+            writeOdsText(x, name, sections[3], textMaps.toString());
+            return true;
+        }
+        StringBuilder maps = new StringBuilder();
         for (int i = 0; i < count - 1; i++) {
             String sub = name + "P" + i;
             writeOds(x, sub, sections[i], "");
@@ -565,6 +579,19 @@ final class CellFormat {
                     .append("\" style:apply-style-name=\"").append(sub).append("\"/>");
         }
         return writeOds(x, name, sections[count - 1], maps.toString());
+    }
+
+    private static void writeOdsText(XmlOut x, String name, Section s, String maps) throws java.io.IOException {
+        x.raw("<number:text-style").attr("style:name", name).raw(">");
+        for (int i = 0; i < s.tokens.size(); i++) {
+            Token t = s.tokens.get(i);
+            if (t.kind == TEXT) {
+                x.raw("<number:text-content/>");
+            } else if (t.kind == LITERAL) {
+                x.raw("<number:text>").text(t.text, false).raw("</number:text>");
+            }
+        }
+        x.raw(maps).raw("</number:text-style>");
     }
 
     private static String conditionText(Section s) {
@@ -603,16 +630,7 @@ final class CellFormat {
 
     private boolean writeOds(XmlOut x, String name, Section s, String maps) throws java.io.IOException {
         if (s.hasText && !s.date && s.integerDigits == 0 && s.decimals == 0) {
-            x.raw("<number:text-style").attr("style:name", name).raw(">");
-            for (int i = 0; i < s.tokens.size(); i++) {
-                Token t = s.tokens.get(i);
-                if (t.kind == TEXT) {
-                    x.raw("<number:text-content/>");
-                } else if (t.kind == LITERAL) {
-                    x.raw("<number:text>").text(t.text, false).raw("</number:text>");
-                }
-            }
-            x.raw(maps).raw("</number:text-style>");
+            writeOdsText(x, name, s, maps);
             return true;
         }
         if (s.date) {

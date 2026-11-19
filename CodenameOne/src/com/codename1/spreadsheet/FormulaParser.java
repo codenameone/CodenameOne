@@ -53,7 +53,7 @@ final class FormulaParser {
         this.argSeparator = ods ? ';' : ',';
     }
 
-    static final int MAX_DEPTH = 200;
+    static final int MAX_DEPTH = 64;
     /// Twice the 8,192 characters Excel allows a formula.
     private static final int MAX_LENGTH = 16384;
     private int depth;

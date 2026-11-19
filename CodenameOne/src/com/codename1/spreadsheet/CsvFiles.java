@@ -78,7 +78,10 @@ final class CsvFiles {
                     char first = v.charAt(0);
                     // a formula in a text file is text: calculating what a stranger's file
                     // says to calculate is not what opening it should do
-                    if (text[c] || first == '=' || first == '\'') {
+                    if (first == '\'' && runsAsFormula(v.substring(1))) {
+                        // the apostrophe a writer puts before text that would run as a formula
+                        sheet.store(r, c, v.substring(1));
+                    } else if (text[c] || first == '=' || first == '\'') {
                         sheet.store(r, c, v);
                     } else {
                         sheet.setValueAt(r, c, v);
