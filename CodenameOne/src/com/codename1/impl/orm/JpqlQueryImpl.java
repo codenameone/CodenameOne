@@ -1891,11 +1891,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             return value.predicate ? value.sql : "(" + value.sql + " <> 0)";
         }
         /// A boolean as an operand of a comparison. T-SQL has no boolean values,
-        /// so a predicate cannot be compared with another there; it is turned
-        /// into 1 or 0 first.
+        /// and neither has Oracle before 23ai, so a predicate cannot be compared
+        /// with another there; it is turned into 1 or 0 first.
         private String comparable(Expr value) {
             String predicate = condition(value);
-            return session.sqlServer() ? "(CASE WHEN " + predicate + " THEN 1 ELSE 0 END)" : predicate;
+            return session.sqlServer() || session.oracle()
+                    ? "(CASE WHEN " + predicate + " THEN 1 ELSE 0 END)" : predicate;
         }
         private Expr logical(Expr left, String op, Expr right) {
             return node("(" + condition(left) + " " + op + " " + condition(right) + ")", Attribute.BOOLEAN, left, right);

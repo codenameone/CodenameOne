@@ -80,6 +80,7 @@ public class OrmCheck {
                 roundTripsEveryColumn(notes, pool.dialect().getName());
                 emptyStringInJpql(em, notes);
                 lockedPages(em, notes, pool.dialect().getName());
+                unorderedPagesAndBooleans(em, notes);
                 updatesAndDeletes(notes);
                 queriesByFieldName(notes, pool.dialect().getName());
                 anExplicitKeyLeavesTheNextGeneratedOneUsable(pool);
@@ -258,6 +259,34 @@ public class OrmCheck {
      * BIGINT rather than a native timestamp whose text format follows the
      * server's time zone, and a blob is BYTEA, BLOB or LONGBLOB.
      */
+    /// Paging without an ORDER BY (SQL Server pages only an ordered select)
+    /// and a JPQL boolean compared with a literal and a parameter (neither
+    /// T-SQL nor Oracle before 23ai has a boolean a predicate can equal).
+    private static void unorderedPagesAndBooleans(EntityManager em, Dao<Note> notes) throws Exception {
+        Note a = new Note();
+        a.title = "page-a";
+        a.pinned = true;
+        notes.insert(a);
+        try {
+            Note found = notes.findOne("title = ?", new Object[] {"page-a"});
+            Note first = notes.query().eq("title", "page-a").first();
+            int limited = notes.query().like("title", "page-%").offset(0).limit(1).list().size();
+            com.codename1.orm.session.Session s = em.openSession();
+            try {
+                String jpql = "select n from com.demo.Note n where n.title = 'page-a' and n.pinned = ";
+                int literal = s.createQuery(jpql + "true", Note.class).list().size();
+                int bound = s.createQuery(jpql + ":flag", Note.class).setParameter("flag", Boolean.TRUE).list().size();
+                int none = s.createQuery(jpql + ":flag", Note.class).setParameter("flag", Boolean.FALSE).list().size();
+                check("unordered paging and boolean comparison", "page-a/page-a/1/1/1/0",
+                        found.title + "/" + first.title + "/" + limited + "/" + literal + "/" + bound + "/" + none);
+            } finally {
+                s.close();
+            }
+        } finally {
+            notes.delete(a);
+        }
+    }
+
     /// A locked read with paging, in each engine's order: MySQL takes LIMIT
     /// before FOR UPDATE, SQL Server a table hint, and Oracle, which refuses a
     /// lock on a row-limited query (ORA-02014), locks the page's rows by key
