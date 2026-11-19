@@ -739,7 +739,10 @@ final class OdsReader {
                 }
             } else if ("scientific-number".equals(tag)) {
                 int decimals = x.intAttr("number:decimal-places", 0);
-                repeat(sb, '0', Math.max(1, x.intAttr("number:min-integer-digits", 1)));
+                int minInteger = Math.max(1, x.intAttr("number:min-integer-digits", 1));
+                // an interval of 3 is engineering notation, ##0.0E+0: one place for each step
+                repeat(sb, '#', Math.max(0, x.intAttr("number:exponent-interval", 1) - minInteger));
+                repeat(sb, '0', minInteger);
                 if (decimals > 0) {
                     sb.append('.');
                     repeat(sb, '0', decimals);

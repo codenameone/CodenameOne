@@ -974,7 +974,7 @@ class SpreadsheetHostileFileTest extends UITestBase {
             // Excel refuses it too
         }
         // every section of a format survives OpenDocument: empty ones, dates, text
-        String[] codes = {";;;", ";0", "General;General;;", "General;-General", "General;;", "0;;;", "0;;;@", "0;-0;", "0;-0;;@", "yyyy-mm-dd;-0;0;@", "0;-0;0;\"x\"",
+        String[] codes = {"##0.0E+0", "0.00E+00", ";;;", ";0", "General;General;;", "General;-General", "General;;", "0;;;", "0;;;@", "0;-0;", "0;-0;;@", "yyyy-mm-dd;-0;0;@", "0;-0;0;\"x\"",
             "[>100]0;[<0]0;0;@"};
         Object[] values = {Double.valueOf(5), Double.valueOf(-5), Double.valueOf(0), "tx", Double.valueOf(500),
             Double.valueOf(1234.75), Double.valueOf(-12.5)};

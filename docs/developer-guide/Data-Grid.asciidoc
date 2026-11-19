@@ -615,8 +615,10 @@ for a spreadsheet without those limits. OpenDocument has none of them.
 
 A formula, in any format, can nest up to 64 functions, Excel's own limit, and up
 to 128 levels of parentheses, signs and arguments in all. A deeper formula typed
-in throws `IllegalArgumentException`; in a file, it keeps its formula and the
-value the file stored, and isn't calculated. That limit stays on with
+in throws `IllegalArgumentException`. In a file, it keeps the value the file
+stored and isn't calculated; saved in the same format it keeps its formula too,
+while saved in the other format it's written as that value, since its formula
+can't be translated. That limit stays on with
 `setExcelLimitsEnforced(false)`, because it protects the stack of the device
 that calculates.
 

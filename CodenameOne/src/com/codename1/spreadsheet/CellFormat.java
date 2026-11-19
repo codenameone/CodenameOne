@@ -740,7 +740,13 @@ final class CellFormat {
                 if (s.exponent) {
                     x.raw("<number:scientific-number").attr("number:decimal-places", s.decimals)
                             .attr("number:min-integer-digits", Math.max(1, minInteger))
-                            .attr("number:min-exponent-digits", Math.max(1, exponentDigits)).raw("/>");
+                            .attr("number:min-exponent-digits", Math.max(1, exponentDigits));
+                    if (s.integerDigits > 1) {
+                        // ##0.0E+0: the exponent moves in steps of the integer places, which
+                        // OpenDocument says as an interval
+                        x.attr("number:exponent-interval", s.integerDigits);
+                    }
+                    x.raw("/>");
                 } else if (s.fraction) {
                     x.raw("<number:fraction");
                     if (wholeEnd >= 0) {
