@@ -926,6 +926,9 @@ class SpreadsheetHostileFileTest extends UITestBase {
         same("0      ", CellFormat.format("# ??/??", Double.valueOf(0), false), "no fraction");
         same("2 0/1", CellFormat.format("0 0/0", Double.valueOf(2), false), "a zero placeholder shows the fraction");
         same("-02 1/2", CellFormat.format("00 ?/?", Double.valueOf(-2.5), false), "a padded whole part");
+        same("00 1/2", CellFormat.format("00 0/0", Double.valueOf(0.5), false), "a zero whole part kept by its zeros");
+        same("   1/2", CellFormat.format("?? ?/?", Double.valueOf(0.5), false), "a blank whole part");
+        same("1,234    ", CellFormat.format("#,##0 ?/?", Double.valueOf(1234), false), "a grouped whole part");
     }
 
     @Test
@@ -950,6 +953,22 @@ class SpreadsheetHostileFileTest extends UITestBase {
         } catch (IllegalArgumentException expected) {
             // refused
         }
+        // counts too large to add to a position reach the edge of the grid and no further
+        Sheet o = w.addSheet("O");
+        o.setCellValue("A1", Double.valueOf(1));
+        o.setCellFormula("B1", "=D10");
+        o.addMergedRegion(2, 2, 3, 3);
+        o.removeRows(1, Integer.MAX_VALUE);
+        same(CellError.REF, o.getCellValue(0, 1), "a reference into rows removed to the end");
+        same(Integer.valueOf(0), Integer.valueOf(o.getMergedRegionCount()), "a merge in rows removed to the end");
+        o.setCellFormula("B1", "=D10");
+        o.addMergedRegion(2, 2, 3, 3);
+        o.insertRows(1, Integer.MAX_VALUE);
+        same(CellError.REF, o.getCellValue(0, 1), "a reference pushed off the grid");
+        same(Integer.valueOf(0), Integer.valueOf(o.getMergedRegionCount()), "a merge pushed off the grid");
+        o.setCellFormula("B1", "=Z1");
+        o.removeColumns(2, Integer.MAX_VALUE);
+        same(CellError.REF, o.getCellValue(0, 1), "a reference into columns removed to the end");
         try {
             s.insertColumns(0, 16384);
             wrong.append("\nan insert pushing data past the last column was accepted");

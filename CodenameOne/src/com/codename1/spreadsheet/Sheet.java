@@ -767,9 +767,11 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `count`: how many rows to insert
     public void insertRows(int row, int count) {
-        if (count <= 0 || row < 0) {
+        if (count <= 0 || row < 0 || row > Node.MAX_ROW) {
             return;
         }
+        // no more than reach the edge of the grid, so that no position overflows
+        count = Math.min(count, Node.MAX_ROW + 1 - row);
         if (row < rows.size()) {
             if ((long) rows.size() - 1 + count > Node.MAX_ROW) {
                 // the last row of data would leave the grid, where no reference can reach it
@@ -785,12 +787,16 @@ public final class Sheet extends AbstractTableModel {
         }
         renumber();
         shiftKeys(outlineLevels, row, count);
-        for (int[] m : merges) {
+        for (int i = merges.size() - 1; i >= 0; i--) {
+            int[] m = merges.get(i);
             if (m[0] >= row) {
                 m[0] += count;
             }
             if (m[2] >= row) {
                 m[2] += count;
+            }
+            if (m[2] > Node.MAX_ROW) {
+                merges.remove(i);
             }
         }
         workbook.restructured(this, true, row, count);
@@ -805,9 +811,11 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `count`: how many rows to remove
     public void removeRows(int row, int count) {
-        if (count <= 0 || row < 0) {
+        if (count <= 0 || row < 0 || row > Node.MAX_ROW) {
             return;
         }
+        // no more than reach the edge of the grid, so that no position overflows
+        count = Math.min(count, Node.MAX_ROW + 1 - row);
         for (int i = 0; i < count && row < rows.size(); i++) {
             orphan(rows.remove(row));
         }
@@ -833,9 +841,11 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `count`: how many columns to insert
     public void insertColumns(int column, int count) {
-        if (count <= 0 || column < 0) {
+        if (count <= 0 || column < 0 || column > Node.MAX_COL) {
             return;
         }
+        // no more than reach the edge of the grid, so that no position overflows
+        count = Math.min(count, Node.MAX_COL + 1 - column);
         if (column < usedColumns && (long) usedColumns - 1 + count > Node.MAX_COL) {
             throw new IllegalArgumentException("Inserting " + count + " columns pushes column " + usedColumns
                     + " past the last column of a sheet, " + (Node.MAX_COL + 1));
@@ -855,12 +865,16 @@ public final class Sheet extends AbstractTableModel {
         }
         renumber();
         shiftKeys(columnWidths, column, count);
-        for (int[] m : merges) {
+        for (int i = merges.size() - 1; i >= 0; i--) {
+            int[] m = merges.get(i);
             if (m[1] >= column) {
                 m[1] += count;
             }
             if (m[3] >= column) {
                 m[3] += count;
+            }
+            if (m[3] > Node.MAX_COL) {
+                merges.remove(i);
             }
         }
         workbook.restructured(this, false, column, count);
@@ -874,9 +888,11 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `count`: how many columns to remove
     public void removeColumns(int column, int count) {
-        if (count <= 0 || column < 0) {
+        if (count <= 0 || column < 0 || column > Node.MAX_COL) {
             return;
         }
+        // no more than reach the edge of the grid, so that no position overflows
+        count = Math.min(count, Node.MAX_COL + 1 - column);
         // the cells go only as far as the data, but references move by the whole count
         int n = Math.max(0, Math.min(count, usedColumns - column));
         for (int r = 0; r < rows.size(); r++) {

@@ -1147,6 +1147,21 @@ final class CellFormat {
         }
     }
 
+    /// Digits with a thousands separator every three, when the format asks for one.
+    private static String grouped(String digits, boolean grouping) {
+        if (!grouping || digits.length() <= 3) {
+            return digits;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < digits.length(); i++) {
+            if (i > 0 && (digits.length() - i) % 3 == 0) {
+                sb.append(',');
+            }
+            sb.append(digits.charAt(i));
+        }
+        return sb.toString();
+    }
+
     private static void pad(StringBuilder sb, char mark) {
         if (mark == '?') {
             sb.append(' ');
@@ -1229,9 +1244,11 @@ final class CellFormat {
         }
         boolean zeroShown = bestN == 0 && numeratorMarks.indexOf("0") >= 0;
         if (mixed) {
-            if (whole != 0 || bestN == 0) {
-                // the whole part pads to its placeholders too: 00 shows 2 as 02
-                String digits = Values.general(whole);
+            boolean marked = wholeMarks.indexOf("0") >= 0 || wholeMarks.indexOf("?") >= 0;
+            if (whole != 0 || bestN == 0 || marked) {
+                // the whole part pads to its placeholders too: 00 shows 2 as 02, and 0 shows a
+                // whole part of nothing as 0
+                String digits = whole == 0 && bestN != 0 && wholeMarks.indexOf("0") < 0 ? "" : grouped(Values.general(whole), s.grouping);
                 for (int i = 0; i < wholeMarks.length() - digits.length(); i++) {
                     pad(sb, wholeMarks.charAt(i));
                 }
