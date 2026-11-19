@@ -904,6 +904,37 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void roundTwentyLosses() throws IOException {
+        // a name only a sheet defines is kept; one the workbook also defines takes the workbook's
+        Workbook w = Workbook.read(new ByteArrayInputStream(zip("[Content_Types].xml", "<Types/>",
+                "xl/workbook.xml", "<workbook xmlns=\"" + MAIN + "\" xmlns:r=\"" + REL + "\"><sheets><sheet name=\"S\""
+                        + " sheetId=\"1\" r:id=\"rId1\"/></sheets><definedNames>"
+                        + "<definedName name=\"Loc\" localSheetId=\"0\">S!$B$1</definedName>"
+                        + "<definedName name=\"Both\" localSheetId=\"0\">S!$A$1</definedName>"
+                        + "<definedName name=\"Both\">S!$B$1</definedName></definedNames></workbook>",
+                "xl/_rels/workbook.xml.rels", "<Relationships><Relationship Id=\"rId1\" Type=\"" + REL
+                        + "/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>",
+                "xl/worksheets/sheet1.xml", "<worksheet xmlns=\"" + MAIN + "\"><sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c>"
+                        + "<c r=\"B1\"><v>5</v></c></row></sheetData></worksheet>")), Workbook.Format.XLSX);
+        Sheet s = w.getSheet(0);
+        s.setCellFormula("C1", "=Loc+Both");
+        same(Double.valueOf(10), s.getCellValue("C1"), "a sheet's own name, and the workbook's over a sheet's");
+        // NaN and infinity are #NUM! the moment they are stored, as every file writes them
+        s.setCellValue("D1", Double.valueOf(Double.NaN));
+        same(CellError.NUM, s.getCellValue("D1"), "NaN");
+        s.setCellFormula("E1", "=ISERROR(D1)");
+        same(Boolean.TRUE, s.getCellValue("E1"), "NaN is an error to formulas too");
+        // match and search modes Excel does not know
+        String[] modes = {"XMATCH(2,{1,2,3},3)", "XMATCH(2,{1,2,3},0,0)", "XMATCH(2,{1,2,3},0,7)", "XLOOKUP(2,{1,2,3},{4,5,6},,9)"};
+        for (String f : modes) {
+            s.setCellFormula("F1", "=" + f);
+            same(CellError.VALUE, s.getCellValue("F1"), f);
+        }
+        s.setCellFormula("F1", "=XMATCH(2,{1,2,3},0,-1)");
+        same(Double.valueOf(2), s.getCellValue("F1"), "a search from the end");
+    }
+
+    @Test
     void argumentsCountedAsExcelCountsThem() throws IOException {
         Sheet s = new Workbook().addSheet("S");
         String[] refused = {"=ABS(1,2)", "=ROUND(1)", "=NOT()", "=SUM()", "=NORM.S.DIST(1)", "=FLOOR(2.5)"};

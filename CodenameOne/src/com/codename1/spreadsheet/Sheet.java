@@ -173,7 +173,10 @@ public final class Sheet extends AbstractTableModel {
                 c.format = workbook.formatId(serial == Math.floor(serial) ? "yyyy-mm-dd" : "yyyy-mm-dd hh:mm:ss");
             }
         } else if (value instanceof Double) {
-            c.value = value;
+            double d = ((Double) value).doubleValue();
+            // a spreadsheet has no NaN or infinity: every file writes them as #NUM!, so the
+            // cell holds that error from the start rather than a number that acts as one
+            c.value = Double.isNaN(d) || Double.isInfinite(d) ? CellError.NUM : value;
         } else if (value instanceof Float) {
             // 1.1f widened is 1.100000023841858: the number meant is the one it prints as
             c.value = Double.valueOf(Double.parseDouble(value.toString()));

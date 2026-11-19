@@ -163,7 +163,9 @@ final class LookupFunctions {
                 Object key = ev.scalar(Evaluator.arg(a, 0));
                 Object[] vector = vector(ev, Evaluator.arg(a, 1));
                 int mode = (int) ev.scalarNum(a, 2, 0);
-                int at = find(key, vector, mode == 2 ? 0 : mode, mode == 2, (int) ev.scalarNum(a, 3, 1));
+                int search = (int) ev.scalarNum(a, 3, 1);
+                checkModes(mode, search);
+                int at = find(key, vector, mode == 2 ? 0 : mode, mode == 2, search);
                 if (at < 0) {
                     throw EvalError.NA;
                 }
@@ -214,7 +216,9 @@ final class LookupFunctions {
                 Object[] keys = down ? column(lookup, 0) : lookup[0];
                 Object[][] results = ev.shaped2(Evaluator.arg(a, 2), down, keys.length);
                 int mode = (int) ev.scalarNum(a, 4, 0);
-                int at = find(key, keys, mode == 2 ? 0 : mode, mode == 2, (int) ev.scalarNum(a, 5, 1));
+                int search = (int) ev.scalarNum(a, 5, 1);
+                checkModes(mode, search);
+                int at = find(key, keys, mode == 2 ? 0 : mode, mode == 2, search);
                 if (at < 0) {
                     if (Evaluator.has(a, 3)) {
                         return a[3];
@@ -459,4 +463,13 @@ final class LookupFunctions {
     private static final java.util.HashMap<String, Integer> SWITCH_1 = Functions.switchTable(
             "ROWS", "COLUMNS", "AREAS", "SHEET", "SHEETS", "ADDRESS", "TRANSPOSE", "INDEX",
             "OFFSET", "INDIRECT", "MATCH", "XMATCH", "VLOOKUP", "HLOOKUP", "LOOKUP", "XLOOKUP");
+
+    /// The match modes XMATCH and XLOOKUP know are -1, 0, 1 and 2, and the search modes 1,
+    /// -1, 2 and -2; Excel answers #VALUE! for any other.
+    private static void checkModes(int mode, int search) {
+        if (mode < -1 || mode > 2 || search == 0 || search < -2 || search > 2) {
+            throw EvalError.VALUE;
+        }
+    }
+
 }

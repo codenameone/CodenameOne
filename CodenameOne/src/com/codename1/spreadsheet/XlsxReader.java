@@ -49,6 +49,7 @@ final class XlsxReader {
     private final ArrayList<String> sheetNames = new ArrayList<String>();
     private final ArrayList<String> sheetRelations = new ArrayList<String>();
     private final ArrayList<String[]> definedNames = new ArrayList<String[]>();
+    private final ArrayList<String[]> localNames = new ArrayList<String[]>();
     private String workbookPath;
     private final java.util.HashSet<Cell> isoDates = new java.util.HashSet<Cell>();
 
@@ -139,11 +140,12 @@ final class XlsxReader {
             } else if ("definedName".equals(x.name)) {
                 String name = x.attr("name");
                 // a name with a local sheet shadows the workbook's inside that sheet; there
-                // is one table of names here, and the workbook's own definition wins
+                // is one table of names here, so the workbook's own definition wins, and a
+                // name only a sheet defines becomes a workbook name rather than being lost
                 boolean local = x.attr("localSheetId") != null;
                 String text = x.elementText();
-                if (name != null && !name.startsWith("_xlnm.") && !local) {
-                    definedNames.add(new String[] {name, text});
+                if (name != null && !name.startsWith("_xlnm.")) {
+                    (local ? localNames : definedNames).add(new String[] {name, text});
                 }
             } else if ("externalReferences".equals(x.name) || "extLst".equals(x.name)) {
                 x.skipElement();
@@ -535,6 +537,15 @@ final class XlsxReader {
             parts.remove(path);
             resolve(sheet, formats);
             book.attach(sheet, sheetNames.get(i));
+        }
+        java.util.HashSet<String> seen = new java.util.HashSet<String>();
+        for (String[] d : definedNames) {
+            seen.add(FormulaParser.asciiUpper(d[0]));
+        }
+        for (String[] d : localNames) {
+            if (seen.add(FormulaParser.asciiUpper(d[0]))) {
+                definedNames.add(d);
+            }
         }
         for (String[] d : definedNames) {
             Node node = null;
