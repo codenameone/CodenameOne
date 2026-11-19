@@ -47,7 +47,9 @@ public class TreeNode {
     private boolean sumValid;
     // this node's position among its parent's children
     private int indexInParent;
-    private ChangeListener listener;
+    // listeners on this node; replaced on add and remove, so a notification never allocates
+    // and a listener removed while being told still sees a consistent array
+    private ChangeListener[] listeners;
     // how many times a branch summed its children; read by tests to hold the cache
     int sumComputations;
 
@@ -175,29 +177,58 @@ public class TreeNode {
         return parent == null ? 0 : indexInParent;
     }
 
-    /// Sets the listener told about changes to this node and every node below it; null for
-    /// none. A `HierarchySeries` sets one on its root so changes to the tree animate.
+    /// Adds a listener told about changes to this node and every node below it. Any number of
+    /// listeners can watch one node: each `HierarchySeries` showing a tree adds one to its
+    /// root so changes to the tree animate.
     ///
     /// #### Parameters
     ///
     /// - `l`: the listener
-    public void setChangeListener(ChangeListener l) {
-        listener = l;
+    public void addChangeListener(ChangeListener l) {
+        if (l == null) {
+            return;
+        }
+        int n = listeners == null ? 0 : listeners.length;
+        ChangeListener[] next = new ChangeListener[n + 1];
+        if (n > 0) {
+            System.arraycopy(listeners, 0, next, 0, n);
+        }
+        next[n] = l;
+        listeners = next;
     }
 
-    /// The listener set by `setChangeListener`, or null.
+    /// Removes a listener added by `addChangeListener`; nothing happens if it was not added.
     ///
-    /// #### Returns
+    /// #### Parameters
     ///
-    /// the listener
-    public ChangeListener getChangeListener() {
-        return listener;
+    /// - `l`: the listener
+    public void removeChangeListener(ChangeListener l) {
+        if (listeners == null) {
+            return;
+        }
+        int n = listeners.length;
+        for (int i = 0; i < n; i++) {
+            if (listeners[i] == l) { //NOPMD CompareObjectsWithEquals - the same listener instance is removed
+                if (n == 1) {
+                    listeners = null;
+                    return;
+                }
+                ChangeListener[] next = new ChangeListener[n - 1];
+                System.arraycopy(listeners, 0, next, 0, i);
+                System.arraycopy(listeners, i + 1, next, i, n - i - 1);
+                listeners = next;
+                return;
+            }
+        }
     }
 
     private void changing() {
         for (TreeNode p = this; p != null; p = p.parent) {
-            if (p.listener != null) {
-                p.listener.treeChanging(this);
+            ChangeListener[] ls = p.listeners;
+            if (ls != null) {
+                for (ChangeListener l : ls) {
+                    l.treeChanging(this);
+                }
             }
         }
     }
@@ -208,8 +239,11 @@ public class TreeNode {
             p.sumValid = false;
         }
         for (TreeNode p = this; p != null; p = p.parent) {
-            if (p.listener != null) {
-                p.listener.treeChanged(this);
+            ChangeListener[] ls = p.listeners;
+            if (ls != null) {
+                for (ChangeListener l : ls) {
+                    l.treeChanged(this);
+                }
             }
         }
     }

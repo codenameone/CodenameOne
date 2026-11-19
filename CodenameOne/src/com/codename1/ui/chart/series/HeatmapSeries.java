@@ -38,6 +38,12 @@ import com.codename1.ui.chart.Series;
 /// chart.addSeries(new HeatmapSeries("Visits").setMatrix(values));
 /// ```
 public class HeatmapSeries extends Series {
+    // reused by every paint, so painting allocates nothing per cell
+    private final float[] cellBuf = new float[4];
+    private final int[] visibleRange = new int[4];
+    // cells visited by paint; read by tests to hold a zoomed paint to the visible window
+    int paintedCells;
+
     private double[][] matrix = new double[0][0];
     private double[][] from;
     private ColorScale scale;
@@ -245,11 +251,40 @@ public class HeatmapSeries extends Series {
     }
 
     private float[] cell(ChartContext ctx, int r, int c) {
+        return cell(ctx, r, c, new float[4]);
+    }
+
+    // the cell's screen rectangle written into `out`, so paint reuses one array for every cell
+    private float[] cell(ChartContext ctx, int r, int c, float[] out) {
         float x0 = ctx.screenX(this, c - 0.5, r - 0.5);
         float y0 = ctx.screenY(this, c - 0.5, r - 0.5);
         float x1 = ctx.screenX(this, c + 0.5, r + 0.5);
         float y1 = ctx.screenY(this, c + 0.5, r + 0.5);
-        return new float[]{Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)};
+        out[0] = Math.min(x0, x1);
+        out[1] = Math.min(y0, y1);
+        out[2] = Math.abs(x1 - x0);
+        out[3] = Math.abs(y1 - y0);
+        return out;
+    }
+
+    // the first and last index whose cell, spanning i - 0.5 to i + 0.5, reaches into the visible
+    // range of `a`, clamped to 0..count-1 in double before the cast so no zoom can overflow it;
+    // {0, count - 1} when the axis has no usable range
+    private static void visibleCells(com.codename1.ui.chart.axis.Axis a, int count, int[] out, int at) {
+        out[at] = 0;
+        out[at + 1] = count - 1;
+        if (a == null) {
+            return;
+        }
+        double lo = Math.min(a.getVisibleMin(), a.getVisibleMax());
+        double hi = Math.max(a.getVisibleMin(), a.getVisibleMax());
+        if (!(lo <= hi)) { //NOPMD LogicInversion - also true for NaN
+            return;
+        }
+        double first = Math.max(0, Math.min(count - 1, Math.ceil(lo - 0.5)));
+        double last = Math.max(-1, Math.min(count - 1, Math.floor(hi + 0.5)));
+        out[at] = (int) first;
+        out[at + 1] = (int) last;
     }
 
     @Override
@@ -264,13 +299,21 @@ public class HeatmapSeries extends Series {
         int alpha = g.getAlpha();
         g.setAlpha((int) (alpha * getVisibilityFraction()));
         g.setFont(f);
-        for (int r = 0; r < matrix.length; r++) {
-            for (int c = 0; c < matrix[r].length; c++) {
+        // only the cells within the visible range: a zoomed window of a large matrix paints
+        // the window, not the matrix
+        int[] range = visibleRange;
+        visibleCells(ctx.getXAxis(), getColumns(), range, 0);
+        visibleCells(ctx.getValueAxis(this), matrix.length, range, 2);
+        float[] b = cellBuf;
+        for (int r = range[2]; r <= range[3]; r++) {
+            int cols = Math.min(matrix[r].length - 1, range[1]);
+            for (int c = range[0]; c <= cols; c++) {
+                paintedCells++;
                 double v = shown(ctx, r, c);
                 if (isGap(v)) {
                     continue;
                 }
-                float[] b = cell(ctx, r, c);
+                cell(ctx, r, c, b);
                 int color = cs.colorAt(span > 0 ? (v - e[0]) / span : 0.5);
                 g.setColor(color);
                 int w = Math.max(1, Math.round(b[2]) - gap);
@@ -325,9 +368,31 @@ public class HeatmapSeries extends Series {
     public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
         float ax = x + ctx.getOriginX();
         float ay = y + ctx.getOriginY();
-        for (int r = 0; r < matrix.length; r++) {
-            for (int c = 0; c < matrix[r].length; c++) {
-                float[] b = cell(ctx, r, c);
+        // the grid is affine in (column, row), rotated or not: solve for the cell under the
+        // point rather than testing every cell, then check it and its neighbours exactly
+        double ox = ctx.screenX(this, 0, 0);
+        double oy = ctx.screenY(this, 0, 0);
+        double ux = ctx.screenX(this, 1, 0) - ox;
+        double uy = ctx.screenY(this, 1, 0) - oy;
+        double vx = ctx.screenX(this, 0, 1) - ox;
+        double vy = ctx.screenY(this, 0, 1) - oy;
+        double det = ux * vy - uy * vx;
+        if (!(Math.abs(det) > 0)) { //NOPMD LogicInversion - also true for NaN
+            return null;
+        }
+        double dx = ax - ox;
+        double dy = ay - oy;
+        double fc = (dx * vy - dy * vx) / det;
+        double fr = (ux * dy - uy * dx) / det;
+        if (!(fc > -1.5 && fc < getColumns() + 0.5 && fr > -1.5 && fr < matrix.length + 0.5)) { //NOPMD LogicInversion - also rejects NaN
+            return null;
+        }
+        int c0 = (int) Math.floor(fc + 0.5);
+        int r0 = (int) Math.floor(fr + 0.5);
+        float[] b = new float[4];
+        for (int r = Math.max(0, r0 - 1); r <= r0 + 1 && r < matrix.length; r++) {
+            for (int c = Math.max(0, c0 - 1); c <= c0 + 1 && c < matrix[r].length; c++) {
+                cell(ctx, r, c, b);
                 if (ax >= b[0] && ax <= b[0] + b[2] && ay >= b[1] && ay <= b[1] + b[3] && !isGap(matrix[r][c])) {
                     return getPoint(ctx, cellId(r, c));
                 }

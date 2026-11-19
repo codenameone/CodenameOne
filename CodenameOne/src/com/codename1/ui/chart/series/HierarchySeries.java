@@ -76,13 +76,13 @@ public abstract class HierarchySeries extends Series {
         if (getChart() != null) {
             getChart().beginChange();
         }
-        if (this.root != null && this.root.getChangeListener() == treeListener) { //NOPMD CompareObjectsWithEquals - only our own listener is removed
-            this.root.setChangeListener(null);
+        if (this.root != null) {
+            this.root.removeChangeListener(treeListener);
         }
         this.root = root;
         this.current = root;
         if (root != null) {
-            root.setChangeListener(treeListener);
+            root.addChangeListener(treeListener);
         }
         dataChanged();
         return this;
@@ -99,6 +99,11 @@ public abstract class HierarchySeries extends Series {
 
         @Override
         public void treeChanged(TreeNode node) {
+            // a node zoomed into that was moved out of the tree can no longer be painted or
+            // drilled out of: fall back to the root
+            if (!isUnderRoot(current)) {
+                current = root;
+            }
             dataChanged();
         }
     };

@@ -49,9 +49,19 @@ public final class Squarify {
     public static float[][] layout(double[] values, float x, float y, float w, float h) {
         int n = values.length;
         float[][] out = new float[n][4];
-        double total = 0;
+        // every value is divided by the largest before summing, as a pie scales its sweeps:
+        // siblings near Double.MAX_VALUE would otherwise sum to infinity and every share to 0
+        double max = 0;
         for (int i = 0; i < n; i++) {
-            total += pos(values[i]);
+            max = Math.max(max, pos(values[i]));
+        }
+        double[] key = new double[n];
+        double total = 0;
+        if (max > 0) {
+            for (int i = 0; i < n; i++) {
+                key[i] = pos(values[i]) / max;
+                total += key[i];
+            }
         }
         if (total <= 0 || w <= 0 || h <= 0) {
             for (int i = 0; i < n; i++) {
@@ -64,15 +74,11 @@ public final class Squarify {
         for (int i = 0; i < n; i++) {
             order[i] = i;
         }
-        double[] key = new double[n];
-        for (int i = 0; i < n; i++) {
-            key[i] = pos(values[i]);
-        }
         IndexSort.sort(order, n, key, true);
         double scale = (double) w * h / total;
         double[] area = new double[n];
         for (int i = 0; i < n; i++) {
-            area[i] = pos(values[order[i]]) * scale;
+            area[i] = key[order[i]] * scale;
         }
         double rx = x;
         double ry = y;
@@ -144,7 +150,8 @@ public final class Squarify {
     // NaN and negative values count as nothing; Math.max(0, NaN) is NaN and would poison the sums
     private static double pos(double v) {
         // an infinite value would make every other cell's share 0/inf and every rect NaN, so a
-        // non-finite value counts as 0, as it does on a radar
+        // non-finite value counts as 0, as it does on a radar. A treemap whose branch sum
+        // overflowed passes Double.MAX_VALUE for it instead, so the branch keeps its place
         return !(v > 0) || Double.isInfinite(v) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
     }
 }

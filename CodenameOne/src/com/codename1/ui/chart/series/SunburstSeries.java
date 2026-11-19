@@ -134,10 +134,31 @@ public class SunburstSeries extends HierarchySeries {
         return n.getChildCount() == 0 ? 0 : d + 1;
     }
 
+    // a branch whose children overflowed the sum counts as the largest finite value
+    private static double finiteShare(double v) {
+        if (!(v > 0)) { //NOPMD LogicInversion - also true for NaN
+            return 0;
+        }
+        return Double.isInfinite(v) ? Double.MAX_VALUE : v;
+    }
+
     private void paintRing(ChartContext ctx, TreeNode parent, double start, double sweep, int level, int levels, float ring, boolean labels) {
-        double total = parent.getValue();
-        if (total <= 0 || level > levels) {
+        if (level > levels) {
             return;
+        }
+        // the children's shares are scaled by the largest, as a pie scales its sweeps: values
+        // near Double.MAX_VALUE sum to infinity, which would leave every share 0
+        int count = parent.getChildCount();
+        double max = 0;
+        for (int i = 0; i < count; i++) {
+            max = Math.max(max, finiteShare(parent.getChild(i).getValue()));
+        }
+        if (!(max > 0)) { //NOPMD LogicInversion - also true for NaN
+            return;
+        }
+        double total = 0;
+        for (int i = 0; i < count; i++) {
+            total += finiteShare(parent.getChild(i).getValue()) / max;
         }
         Graphics g = ctx.getGraphics();
         Font f = ctx.getFont();
@@ -145,11 +166,11 @@ public class SunburstSeries extends HierarchySeries {
         float inner = hole + ring * (level - 1);
         float outer = inner + ring - Math.max(1, ctx.mm(0.3f));
         double a = start;
-        for (int i = 0; i < parent.getChildCount(); i++) {
+        for (int i = 0; i < count; i++) {
             TreeNode c = parent.getChild(i);
             // divide first: sweep * value overflows for values near Double.MAX_VALUE, and an
             // infinite or NaN sweep would hand the sector shape a NaN angle
-            double s = sweep * (c.getValue() / total);
+            double s = sweep * (finiteShare(c.getValue()) / max / total);
             if (!(s > 0) || Double.isInfinite(s)) { //NOPMD LogicInversion - also rejects NaN
                 continue;
             }

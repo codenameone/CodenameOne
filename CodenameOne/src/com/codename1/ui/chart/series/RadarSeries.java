@@ -124,6 +124,25 @@ public class RadarSeries extends Series {
         return new String[values.length];
     }
 
+    // the number of spokes of the grid every radar of the chart is drawn on: the shared spoke
+    // names when any series names them, otherwise the longest series. A value past it has no
+    // spoke and is ignored, and a spoke past a series' values is a gap in its polygon
+    private int spokeCount() {
+        if (spokes != null && spokes.length > 0) {
+            return spokes.length;
+        }
+        java.util.ArrayList<Series> rs = radars();
+        int longest = values.length;
+        for (int k = 0; k < rs.size(); k++) {
+            RadarSeries r = (RadarSeries) rs.get(k);
+            if (r.spokes != null && r.spokes.length > 0) {
+                return r.spokes.length;
+            }
+            longest = Math.max(longest, r.values.length);
+        }
+        return longest;
+    }
+
     private java.util.ArrayList<Series> radars() {
         java.util.ArrayList<Series> out = new java.util.ArrayList<Series>();
         Chart c = getChart();
@@ -169,7 +188,7 @@ public class RadarSeries extends Series {
         Font f = ctx.getFont();
         int fh = f.getHeight();
         String[] sp = spokes();
-        int n = Math.max(sp.length, values.length);
+        int n = spokeCount();
         if (n < 3) {
             return;
         }
@@ -182,7 +201,7 @@ public class RadarSeries extends Series {
             if (!(r.getVisibilityFraction() > 0)) { //NOPMD LogicInversion - also rejects NaN
                 continue;
             }
-            for (int i = 0; i < r.values.length; i++) {
+            for (int i = 0; i < r.values.length && i < n; i++) {
                 // the scale is the target's: rings snap to it while the polygons tween, so a grow-in
                 // or a uniform change is not cancelled by a scale that shrinks along with the values
                 double rv = pos(r.values[i]);
@@ -207,7 +226,7 @@ public class RadarSeries extends Series {
             if (!(rr.getVisibilityFraction() > 0)) { //NOPMD LogicInversion - also rejects NaN
                 continue;
             }
-            for (int i = 0; i < rr.values.length; i++) {
+            for (int i = 0; i < rr.values.length && i < n; i++) {
                 double sv = pos(rr.shown(ctx, i));
                 if (sv > shownMax && sv != Double.POSITIVE_INFINITY) {
                     shownMax = sv;
@@ -302,9 +321,12 @@ public class RadarSeries extends Series {
             }
         }
         GeneralPath poly = new GeneralPath();
-        for (int i = 0; i < n; i++) {
-            double v = i < values.length ? shown(ctx, i) : 0;
-            float rr = (float) (r * pos(v) / top);
+        int m = Math.min(n, values.length);
+        if (m == 0) {
+            return;
+        }
+        for (int i = 0; i < m; i++) {
+            float rr = (float) (r * pos(shown(ctx, i)) / top);
             double a = 360.0 * i / n;
             if (i == 0) {
                 poly.moveTo(Shapes.px(cx, rr, a), Shapes.py(cy, rr, a));
@@ -330,10 +352,10 @@ public class RadarSeries extends Series {
 
     @Override
     public ChartPoint getPoint(ChartContext ctx, int i) {
-        if (i < 0 || i >= values.length) {
+        int n = spokeCount();
+        if (i < 0 || i >= values.length || i >= n) {
             return null;
         }
-        int n = Math.max(spokes().length, values.length);
         double a = 360.0 * i / n;
         // the vertex as painted this frame, so a hover mid transition finds what is on screen
         float rr = (float) (lastR * pos(shown(ctx, i)) / lastMax);
@@ -348,6 +370,9 @@ public class RadarSeries extends Series {
         long bestD = (long) radius * radius;
         for (int i = 0; i < values.length; i++) {
             ChartPoint p = getPoint(ctx, i);
+            if (p == null) {
+                break;
+            }
             long dx = p.getScreenX() - x;
             long dy = p.getScreenY() - y;
             if (dx * dx + dy * dy <= bestD) {

@@ -80,7 +80,10 @@ public class TreemapSeries extends HierarchySeries {
         }
         double[] v = new double[n];
         for (int i = 0; i < n; i++) {
-            v[i] = parent.getChild(i).getValue();
+            // a branch whose children overflowed the sum is infinite: it counts as the largest
+            // finite value so it keeps its place, where Squarify would count it as nothing
+            double cv = parent.getChild(i).getValue();
+            v[i] = cv == Double.POSITIVE_INFINITY ? Double.MAX_VALUE : cv;
         }
         float[][] rects = Squarify.layout(v, x, y, w, h);
         Graphics g = ctx.getGraphics();

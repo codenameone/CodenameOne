@@ -542,26 +542,28 @@ public class Chart extends Component {
             repaint();
             return this;
         }
-        if (lastContext == null) {
+        // a series that lays its points out while painting (pie, treemap, sunburst, Sankey)
+        // knows a point only after a paint, and a point just added only after the next one:
+        // such a selection is kept and applied right after the series paint
+        if (lastContext == null || !selectQuietly(s, index)) {
             pendingSelection = s;
             pendingSelectionIndex = index;
-            return this;
         }
-        selectQuietly(s, index);
         repaint();
         return this;
     }
 
-    private void selectQuietly(Series s, int index) {
+    private boolean selectQuietly(Series s, int index) {
         if (s.chart != this || index < 0 || index >= s.getPointCount()) { //NOPMD CompareObjectsWithEquals - identity of the owning chart is intended
-            return;
+            return false;
         }
         ChartPoint p = s.getPoint(lastContext, index);
         if (p == null) {
-            return;
+            return false;
         }
         selected = p;
         announceForAccessibility(describe(s, p));
+        return true;
     }
 
     private String describe(Series s, ChartPoint p) {
@@ -1155,11 +1157,6 @@ public class Chart extends Component {
         ctx.plotH = Math.max(0, plotH);
         ctx.labels = new LabelLayout(plotX, plotY - fh / 2, ctx.plotW, ctx.plotH + fh / 2);
         lastContext = ctx;
-        if (pendingSelection != null) {
-            Series ps = pendingSelection;
-            pendingSelection = null;
-            selectQuietly(ps, pendingSelectionIndex);
-        }
         if (ctx.plotW <= 0 || ctx.plotH <= 0) {
             // the title and legend took the whole component: there is no plot to draw into,
             // but a loading state must still show
@@ -1192,6 +1189,13 @@ public class Chart extends Component {
             }
         }
         g.setClip(clip);
+        // after the series paint, so a layout-driven series has laid out the point; one
+        // attempt only, a point that still does not exist is dropped
+        if (pendingSelection != null) {
+            Series ps = pendingSelection;
+            pendingSelection = null;
+            selectQuietly(ps, pendingSelectionIndex);
+        }
         for (Annotation a : annotations) {
             if (!a.isBehindSeries()) {
                 a.paint(ctx);

@@ -66,6 +66,10 @@ public class SessionTimeAxis extends Axis {
 
     /// Replaces the timestamps.
     ///
+    /// An axis does not know the chart it is on, so the chart is not repainted by this call,
+    /// as with `CategoryAxis.setCategories`: call `repaint()` on the chart, or change the
+    /// series data in the same step, which repaints it.
+    ///
     /// #### Parameters
     ///
     /// - `times`: the timestamp of each bar in milliseconds, ascending
@@ -87,6 +91,10 @@ public class SessionTimeAxis extends Axis {
 
     /// Appends the timestamp of the next bar, for a series that grows with `XYSeries.add(y)`.
     ///
+    /// An axis does not know the chart it is on, so the chart is not repainted by this call,
+    /// as with `CategoryAxis.setCategories`: call `repaint()` on the chart, or change the
+    /// series data in the same step, which repaints it.
+    ///
     /// #### Parameters
     ///
     /// - `time`: the new bar's timestamp in milliseconds, not before the previous one
@@ -107,7 +115,8 @@ public class SessionTimeAxis extends Axis {
 
     /// Keeps only the newest `n` timestamps, dropping the oldest as `addTime` appends, the way
     /// `XYSeries.setMaxPoints(n)` drops the oldest bar. Each dropped timestamp moves
-    /// `getFirstIndex()` up by one, so the remaining bars keep their indices.
+    /// `getFirstIndex()` up by one, so the remaining bars keep their indices. Like `setTimes`,
+    /// this does not repaint the chart.
     ///
     /// #### Parameters
     ///
@@ -181,8 +190,12 @@ public class SessionTimeAxis extends Axis {
         if (n == 0) {
             return new double[0];
         }
-        int lo = Math.max(0, (int) Math.ceil(getVisibleMin()) - firstIndex);
-        int hi = Math.min(n - 1, (int) Math.floor(getVisibleMax()) - firstIndex);
+        // clamped in double before the cast: a range zoomed or panned far past the data would
+        // saturate the int cast and overflow on subtracting firstIndex, leaving no ticks
+        double vlo = Math.ceil(getVisibleMin()) - firstIndex;
+        double vhi = Math.floor(getVisibleMax()) - firstIndex;
+        int lo = vlo > 0 ? (int) Math.min(n, vlo) : 0;
+        int hi = vhi < n - 1 ? (int) Math.max(-1, vhi) : n - 1;
         if (hi < lo) {
             return new double[0];
         }

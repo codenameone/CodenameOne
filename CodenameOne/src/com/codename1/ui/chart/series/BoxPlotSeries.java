@@ -45,7 +45,16 @@ public class BoxPlotSeries extends XYSeries {
     private final double[] paintBuf = new double[4];
     // outliers of boxes built from samples, as {x, outlier...} rows; keyed by x so a slide cannot
     // pair a box with another box's outliers
-    private final java.util.ArrayList<double[]> outliers = new java.util.ArrayList<double[]>();
+    // pair a box with another box's outliers. One row per x, so removing one is a lookup
+    private final java.util.HashMap<Double, double[]> outliers = new java.util.HashMap<Double, double[]>();
+    // each x to its box index, built once after a change that moves boxes and kept up to date by
+    // appends and replacements, so adding boxes in any order is linear overall
+    private final java.util.HashMap<Double, Integer> boxByX = new java.util.HashMap<Double, Integer>();
+    private boolean boxByXValid;
+    // set around an append or replacement that keeps every other box where it is
+    private boolean keepBoxIndex;
+    // boxes indexed while rebuilding boxByX; read by tests to hold building to linear work
+    int boxIndexBuilds;
     // each box's outlier row, or null; rebuilt once after a change rather than searched per box
     // on every paint
     private double[][] outliersByBox;
@@ -150,7 +159,7 @@ public class BoxPlotSeries extends XYSeries {
                     row[k++] = v;
                 }
             }
-            outliers.add(row);
+            outliers.put(key(x), row);
             outliersByBox = null;
         }
         putBox(x, quantile(s, 0.5), new double[]{wMin, q1, q3, wMax});
@@ -161,17 +170,54 @@ public class BoxPlotSeries extends XYSeries {
     // drawing over it.
     private void putBox(double x, double median, double[] v) {
         int old = boxIndex(x);
-        if (old >= 0) {
-            replaceRow(old, median, v);
-        } else {
-            addRow(x, median, v);
+        boolean valid = boxByXValid;
+        keepBoxIndex = true;
+        try {
+            if (old >= 0) {
+                replaceRow(old, median, v);
+            } else {
+                int before = size();
+                addRow(x, median, v);
+                // a slide that dropped the oldest box moved every index: rebuild on the next lookup
+                if (valid && size() == before + 1) {
+                    boxByX.put(key(x), Integer.valueOf(size() - 1));
+                } else {
+                    boxByXValid = false;
+                }
+            }
+        } finally {
+            keepBoxIndex = false;
         }
     }
 
-    // the box at exactly x: a binary search while the boxes are ascending; a non-finite x, which
-    // that search never answers, falls back to the scan
+    // 0.0 and -0.0 are the same x, as == has it
+    private static Double key(double x) {
+        return Double.valueOf(x == 0 ? 0.0 : x);
+    }
+
+    // the box at exactly x, or -1: a hash lookup, so unsorted boxes cost no scan; NaN is never
+    // equal to an x, as == has it
     private int boxIndex(double x) {
-        return isGap(x) ? scanIndexOfX(x) : indexOfX(x);
+        if (Double.isNaN(x)) {
+            return -1;
+        }
+        if (!boxByXValid) {
+            boxByX.clear();
+            int n = size();
+            for (int i = 0; i < n; i++) {
+                boxIndexBuilds++;
+                double bx = getX(i);
+                if (!Double.isNaN(bx)) {
+                    Double k = key(bx);
+                    if (!boxByX.containsKey(k)) {
+                        boxByX.put(k, Integer.valueOf(i));
+                    }
+                }
+            }
+            boxByXValid = true;
+        }
+        Integer i = boxByX.get(key(x));
+        return i == null ? -1 : i.intValue();
     }
 
     // box i's outlier row, {x, outlier...}, or null when it has none
@@ -179,11 +225,16 @@ public class BoxPlotSeries extends XYSeries {
         double[][] byBox = outliersByBox;
         if (byBox == null || byBox.length != size()) {
             byBox = new double[size()][];
-            for (int k = 0; k < outliers.size(); k++) {
+            // the outliers of a box no longer in the series, such as one a slide dropped, are
+            // forgotten here, once per change
+            java.util.Iterator<double[]> it = outliers.values().iterator();
+            while (it.hasNext()) {
                 outlierRowVisits++;
-                double[] row = outliers.get(k);
+                double[] row = it.next();
                 int b = boxIndex(row[0]);
-                if (b >= 0 && byBox[b] == null) {
+                if (b < 0) {
+                    it.remove();
+                } else if (byBox[b] == null) {
                     byBox[b] = row;
                 }
             }
@@ -254,21 +305,17 @@ public class BoxPlotSeries extends XYSeries {
     }
 
     private void removeOutliers(double x) {
-        for (int k = outliers.size() - 1; k >= 0; k--) {
-            if (outliers.get(k)[0] == x) {
-                outliers.remove(k);
-            }
+        if (outliers.remove(key(x)) != null) {
+            outliersByBox = null;
         }
-        outliersByBox = null;
     }
 
-    /// Forgets the outliers of boxes that are no longer in the series, such as one a slide dropped.
+    /// Forgets the outliers of boxes that are no longer in the series, such as one a slide
+    /// dropped; they are dropped when the outliers are next read.
     @Override
     protected void dataChanged() {
-        for (int k = outliers.size() - 1; k >= 0; k--) {
-            if (indexOfX(outliers.get(k)[0]) < 0) {
-                outliers.remove(k);
-            }
+        if (!keepBoxIndex) {
+            boxByXValid = false;
         }
         outliersByBox = null;
         super.dataChanged();

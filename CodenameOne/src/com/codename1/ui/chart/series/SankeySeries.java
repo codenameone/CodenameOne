@@ -32,6 +32,7 @@ import com.codename1.ui.chart.layout.SankeyLayout;
 import com.codename1.ui.chart.layout.Shapes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /// A sankey diagram: flows between stages drawn as bands whose thickness is the flow's value.
 ///
@@ -43,6 +44,8 @@ import java.util.ArrayList;
 /// ```
 public class SankeySeries extends Series {
     private final ArrayList<String> nodeNames = new ArrayList<String>();
+    // name to index, so adding links is linear rather than a scan of every name per link
+    private final HashMap<String, Integer> nodeIndex = new HashMap<String, Integer>();
     private final ArrayList<int[]> links = new ArrayList<int[]>();
     private final ArrayList<double[]> linkValues = new ArrayList<double[]>();
     private float linkAlpha = 0.35f;
@@ -108,6 +111,7 @@ public class SankeySeries extends Series {
             getChart().beginChange();
         }
         nodeNames.clear();
+        nodeIndex.clear();
         links.clear();
         linkValues.clear();
         dataChanged();
@@ -130,11 +134,13 @@ public class SankeySeries extends Series {
     }
 
     private int node(String name) {
-        int i = nodeNames.indexOf(name);
-        if (i < 0) {
-            nodeNames.add(name);
-            i = nodeNames.size() - 1;
+        Integer known = nodeIndex.get(name);
+        if (known != null) {
+            return known.intValue();
         }
+        nodeNames.add(name);
+        int i = nodeNames.size() - 1;
+        nodeIndex.put(name, Integer.valueOf(i));
         return i;
     }
 
@@ -268,10 +274,20 @@ public class SankeySeries extends Series {
         return nodeNames.size() + links.size();
     }
 
+    // the cached layout, or null while it was built for other nodes or links than there are
+    // now: a node or link added since the last paint has no place until the next one
+    private SankeyLayout current() {
+        SankeyLayout lay = last;
+        if (lay == null || lay.getNodeCount() != nodeNames.size() || lay.getLinkCount() != links.size()) {
+            return null;
+        }
+        return lay;
+    }
+
     /// Points `0..nodeCount-1` are nodes, the rest are links.
     @Override
     public ChartPoint getPoint(ChartContext ctx, int index) {
-        SankeyLayout lay = last;
+        SankeyLayout lay = current();
         if (lay == null || index < 0) {
             return null;
         }
@@ -316,7 +332,7 @@ public class SankeySeries extends Series {
 
     @Override
     public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
-        SankeyLayout lay = last;
+        SankeyLayout lay = current();
         if (lay == null) {
             return null;
         }

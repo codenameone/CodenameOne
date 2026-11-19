@@ -46,6 +46,8 @@ public final class SankeyLayout {
     // the nodes of each column in node order
     private int[] colStart;
     private int[] colNodes;
+    // links examined while assigning columns; package-private so a test can count the work
+    int columnSteps;
 
     /// Computes a layout.
     ///
@@ -88,18 +90,39 @@ public final class SankeyLayout {
         inStart = g[0];
         inLinks = g[1];
         back = findBackLinks(n, dst, outStart, outLinks, m);
-        // longest path from a source over the forward links; back links close a cycle and would
-        // otherwise push its nodes right until the pass bound
-        for (int pass = 0; pass < n; pass++) {
-            boolean changed = false;
-            for (int l = 0; l < m; l++) {
-                if (!back[l] && src[l] != dst[l] && column[dst[l]] < column[src[l]] + 1 && column[src[l]] + 1 < n) {
-                    column[dst[l]] = column[src[l]] + 1;
-                    changed = true;
-                }
+        // longest path from a source over the forward links, in topological order (Kahn), so
+        // linear in nodes and links; back links close a cycle and are left out, which leaves a
+        // directed acyclic graph
+        int[] indeg = new int[n];
+        for (int l = 0; l < m; l++) {
+            if (!back[l] && src[l] != dst[l]) {
+                indeg[dst[l]]++;
             }
-            if (!changed) {
-                break;
+        }
+        int[] queue = new int[n];
+        int qEnd = 0;
+        for (int i = 0; i < n; i++) {
+            if (indeg[i] == 0) {
+                queue[qEnd++] = i;
+            }
+        }
+        for (int qi = 0; qi < qEnd; qi++) {
+            int u = queue[qi];
+            for (int k = outStart[u]; k < outStart[u + 1]; k++) {
+                int l = outLinks[k];
+                columnSteps++;
+                if (back[l] || src[l] == dst[l]) {
+                    continue;
+                }
+                int v = dst[l];
+                if (column[v] < column[u] + 1) {
+                    column[v] = column[u] + 1;
+                }
+                indeg[v]--;
+                if (indeg[v] == 0) {
+                    queue[qEnd] = v;
+                    qEnd++;
+                }
             }
         }
         int maxCol = 0;
@@ -273,6 +296,16 @@ public final class SankeyLayout {
             items[fill[key[i]]++] = i;
         }
         return new int[][]{start, items};
+    }
+
+    /// The number of nodes this layout was computed for.
+    public int getNodeCount() {
+        return column.length;
+    }
+
+    /// The number of links this layout was computed for.
+    public int getLinkCount() {
+        return linkW.length;
     }
 
     /// The number of columns.
