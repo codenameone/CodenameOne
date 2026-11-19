@@ -58,6 +58,8 @@ public abstract class XYSeries extends Series {
     private int[] fromMap;
     private String stackGroup;
     private int maxPoints;
+    // how many times the slot map has been rebuilt; read by tests to hold trimming to one rebuild
+    int slotMapRebuilds;
     /// Extra values per point (open/high/low, a range start, quartiles), parallel to `ys`.
     double[][] aux;
     // per channel and point: true when the value was given explicitly, false when it came from
@@ -230,7 +232,13 @@ public abstract class XYSeries extends Series {
 
     // records that current index i is gone, so later indices map one slot further on
     private void dropFromSlot(int i) {
-        if (fromY == null) {
+        dropFromSlots(i, 1);
+    }
+
+    // records that the n current indices from start on are gone, building the shifted map once
+    // so trimming many rows stays linear rather than copying the map once per row
+    private void dropFromSlots(int start, int n) {
+        if (fromY == null || n <= 0) {
             return;
         }
         int[] m = fromMap;
@@ -241,14 +249,13 @@ public abstract class XYSeries extends Series {
             }
         }
         int len = Math.min(m.length, count);
-        int[] next = new int[Math.max(0, len - 1)];
-        if (i > 0) {
-            System.arraycopy(m, 0, next, 0, Math.min(i, next.length));
-        }
-        if (i + 1 < len) {
-            System.arraycopy(m, i + 1, next, i, len - i - 1);
-        }
+        int s0 = Math.min(Math.max(0, start), len);
+        int end = Math.min(len, s0 + n);
+        int[] next = new int[len - (end - s0)];
+        System.arraycopy(m, 0, next, 0, s0);
+        System.arraycopy(m, end, next, s0, len - end);
         fromMap = next;
+        slotMapRebuilds++;
     }
 
     private void slide() {
@@ -369,9 +376,7 @@ public abstract class XYSeries extends Series {
             int drop = count - n;
             // the dropped rows leave their slots exactly as slide() does, so an unsorted series
             // still tweens each remaining point from its own old value
-            for (int d = 0; d < drop; d++) {
-                dropFromSlot(0);
-            }
+            dropFromSlots(0, drop);
             System.arraycopy(xs, drop, xs, 0, n);
             System.arraycopy(ys, drop, ys, 0, n);
             if (aux != null) {

@@ -127,6 +127,18 @@ public abstract class Axis {
     }
 
     /// Pins the bounds instead of deriving them from the data; pass null to restore automatic.
+    /// Bounds given in the wrong order are taken as a range, and two equal bounds are widened
+    /// by a pad on each side so the axis is never empty. A single bound pinned at the very end
+    /// of the double range gives way by that pad when the free side has no room left.
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: the low end, or null to derive it from the data
+    /// - `max`: the high end, or null to derive it from the data
+    ///
+    /// #### Returns
+    ///
+    /// this axis
     public Axis setRange(Double min, Double max) {
         this.fixedMin = min;
         this.fixedMax = max;
@@ -224,14 +236,21 @@ public abstract class Axis {
             }
             // near Double.MAX_VALUE the pad overflows a side to infinity: that side stays on
             // the value and the other side takes the pad, so the range stays finite and non-empty.
-            // A fixed bound is never moved: with the other side fixed the overflowed side only
-            // comes back to the largest finite value.
+            // A fixed bound keeps its value while the free side can make room: the overflowed
+            // side comes back to the largest finite value, and only when that leaves nothing
+            // does the fixed bound give way. Two equal fixed bounds are widened by the pad too.
             if (Double.isInfinite(max)) {
                 if (fixedMin == null) {
                     max = anchor;
                     min = anchor - pad;
                 } else {
                     max = Double.MAX_VALUE;
+                    if (!(max > min)) { //NOPMD LogicInversion - also true for NaN
+                        // the fixed minimum is Double.MAX_VALUE itself: the free side has no room
+                        // above it, so the fixed bound gives way by the pad -- the only way left
+                        // to keep the range non-empty
+                        min = max - flatPad(max);
+                    }
                 }
             } else if (Double.isInfinite(min)) {
                 if (fixedMax == null) {
@@ -239,6 +258,10 @@ public abstract class Axis {
                     max = anchor + pad;
                 } else {
                     min = -Double.MAX_VALUE;
+                    if (!(max > min)) { //NOPMD LogicInversion - also true for NaN
+                        // mirror of the case above: the fixed maximum is -Double.MAX_VALUE
+                        max = min + flatPad(min);
+                    }
                 }
             }
         }

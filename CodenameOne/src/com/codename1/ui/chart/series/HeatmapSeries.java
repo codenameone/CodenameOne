@@ -193,6 +193,18 @@ public class HeatmapSeries extends Series {
         return c == 0 ? null : new double[]{-0.5, c - 0.5};
     }
 
+    // the columns are the points along x: a category axis with no labels counts those at or
+    // below maxX, so a matrix wider than its reach still gives bands for the columns within it
+    @Override
+    public double[] getXBoundsWithin(double maxX) {
+        int c = getColumns();
+        if (c == 0 || !(maxX >= 0)) { //NOPMD LogicInversion - NaN counts no column
+            return null;
+        }
+        double last = Math.min(c - 1, Math.floor(maxX));
+        return new double[]{-0.5, last + 0.5};
+    }
+
     @Override
     public double[] getYBounds() {
         return matrix.length == 0 ? null : new double[]{-0.5, matrix.length - 0.5};

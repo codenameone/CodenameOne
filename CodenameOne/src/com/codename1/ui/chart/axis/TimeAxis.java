@@ -71,7 +71,9 @@ public class TimeAxis extends Axis {
     /// One hour each side of a single timestamp, rather than 10% of its epoch milliseconds.
     @Override
     protected double flatPad(double anchor) {
-        return 3600000;
+        // an hour, or a relative step at a magnitude where an hour is below one ulp and would
+        // leave the range flat
+        return Math.max(3600000, Math.abs(anchor) * 1e-12);
     }
 
     @Override

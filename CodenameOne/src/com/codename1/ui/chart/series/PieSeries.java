@@ -150,6 +150,21 @@ public class PieSeries extends CategoricalSeries {
     // slices near Double.MAX_VALUE neither overflow the total nor answer NaN. Negative when the
     // slice has no share to print.
     private double percentOf(int i) {
+        double v = values[i];
+        if (pctMaxPart <= 0 || !(v >= 0) || Double.isInfinite(v)) { //NOPMD LogicInversion - NaN is no share
+            return -1;
+        }
+        return v / pctMaxPart / pctScaledTotal * 100;
+    }
+
+    // the largest finite value and the total of the values scaled by it, taken once per paint so
+    // each label's percentage is a division rather than two passes over every slice
+    private double pctMaxPart;
+    private double pctScaledTotal;
+    // how many times the slices were scanned for that base; read by tests to hold it to one per paint
+    int percentBaseScans;
+
+    private void computePercentBase() {
         int n = size();
         double maxPart = 0;
         for (int k = 0; k < n; k++) {
@@ -158,18 +173,18 @@ public class PieSeries extends CategoricalSeries {
                 maxPart = v;
             }
         }
-        double v = values[i];
-        if (maxPart <= 0 || !(v >= 0) || Double.isInfinite(v)) { //NOPMD LogicInversion - NaN is no share
-            return -1;
-        }
         double scaledTotal = 0;
-        for (int k = 0; k < n; k++) {
-            double w = values[k];
-            if (w > 0 && w < Double.POSITIVE_INFINITY) {
-                scaledTotal += w / maxPart;
+        if (maxPart > 0) {
+            for (int k = 0; k < n; k++) {
+                double w = values[k];
+                if (w > 0 && w < Double.POSITIVE_INFINITY) {
+                    scaledTotal += w / maxPart;
+                }
             }
         }
-        return v / maxPart / scaledTotal * 100;
+        pctMaxPart = maxPart;
+        pctScaledTotal = scaledTotal;
+        percentBaseScans++;
     }
 
     private String labelText(int i) {
@@ -188,6 +203,7 @@ public class PieSeries extends CategoricalSeries {
         int fh = f.getHeight();
         int gap = ctx.mm(1.5f);
         int n = size();
+        computePercentBase();
         float cx = ctx.getPlotX() + ctx.getPlotWidth() / 2f;
         float cy = ctx.getPlotY() + ctx.getPlotHeight() / 2f;
         int minDim = Math.min(ctx.getPlotWidth(), ctx.getPlotHeight());
