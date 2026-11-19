@@ -51,6 +51,10 @@ workflows() {
 }
 
 # A transient API error must not abandon a capture whose runs are fine.
+# The job's own timeout is 60 minutes: the lookup below must end well before
+# it, however long the retries ahead of it took, to reach its error path.
+SCRIPT_START=$(date +%s)
+
 gh_retry() {
   local i
   for i in 1 2 3 4 5; do
@@ -104,6 +108,7 @@ dispatch() {
   # against ONE generous deadline: a slow listing costs time, never the capture,
   # and never holds up finding the others. CN1SS_FIND_RUN_MINUTES overrides it.
   deadline=$(( $(date +%s) + ${CN1SS_FIND_RUN_MINUTES:-40} * 60 ))
+  [ "$deadline" -le $((SCRIPT_START + 50 * 60)) ] || deadline=$((SCRIPT_START + 50 * 60))
   local -a ids=()
   local pass=0 err_file
   err_file="$(mktemp)"
