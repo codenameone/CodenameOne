@@ -103,6 +103,12 @@ final class BackendTestSupport {
         if (url.regionMatches(true, 0, "mysql:", 0, 6) || url.regionMatches(true, 0, "mariadb:", 0, 8)) {
             return "mysql";
         }
+        if (url.regionMatches(true, 0, "sqlserver:", 0, 10) || url.regionMatches(true, 0, "mssql:", 0, 6)) {
+            return "sqlserver";
+        }
+        if (url.regionMatches(true, 0, "oracle:", 0, 7)) {
+            return "oracle";
+        }
         return "sqlite";
     }
 

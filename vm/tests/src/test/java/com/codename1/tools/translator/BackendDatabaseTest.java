@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * that is what this does, on the translated binary AND on the local Java SE arm.
  *
  * SQLite always runs; it needs nothing installed. PostgreSQL and MySQL run when
- * CN1_DBCHECK_POSTGRES / CN1_DBCHECK_MYSQL name a server (CI supplies both as
+ * CN1_DBCHECK_POSTGRES / _MYSQL / _SQLSERVER / _ORACLE name a server (CI supplies both as
  * service containers). Their absence is a skip on a developer machine, and a
  * FAILURE where the backend is required, so a CI runner that quietly lost its
  * database cannot report green.
@@ -71,8 +71,10 @@ class BackendDatabaseTest {
         urls.add(":memory:");
         addIfSet(urls, "CN1_DBCHECK_POSTGRES");
         addIfSet(urls, "CN1_DBCHECK_MYSQL");
+        addIfSet(urls, "CN1_DBCHECK_SQLSERVER");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE");
         if (urls.size() == 1 && BackendTestSupport.isRequired()) {
-            fail("CN1_DBCHECK_POSTGRES and CN1_DBCHECK_MYSQL are unset, so only SQLite "
+            fail("No CN1_DBCHECK_POSTGRES, _MYSQL, _SQLSERVER or _ORACLE is set, so only SQLite "
                     + "was exercised; the server engines are the ones with a wire "
                     + "protocol to get wrong");
         }

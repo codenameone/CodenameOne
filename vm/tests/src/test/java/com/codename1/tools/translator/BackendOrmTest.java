@@ -53,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * is the class a developer's project gets.
  *
  * <p>SQLite always runs; it needs nothing installed. PostgreSQL and MySQL run
- * when CN1_DBCHECK_POSTGRES / CN1_DBCHECK_MYSQL name a server -- the same
+ * when CN1_DBCHECK_POSTGRES / _MYSQL / _SQLSERVER / _ORACLE name a server -- the same
  * variables the database test uses, since CI supplies both as service containers.
  * Their absence is a skip on a developer machine and a FAILURE where the backend
  * is required, so a runner that quietly lost its database cannot report green.
@@ -75,6 +75,8 @@ class BackendOrmTest {
         urls.add(":memory:");
         addIfSet(urls, "CN1_DBCHECK_POSTGRES");
         addIfSet(urls, "CN1_DBCHECK_MYSQL");
+        addIfSet(urls, "CN1_DBCHECK_SQLSERVER");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE");
         // MariaDB is its own arm, not a spelling of the MySQL one: the two do
         // not share a case-sensitive NO PAD collation, so Database.open reads
         // the handshake banner and picks Dialect.MARIADB or Dialect.MYSQL from
@@ -82,7 +84,7 @@ class BackendOrmTest {
         // getting it wrong is an unknown-collation error on every CREATE TABLE.
         addIfSet(urls, "CN1_DBCHECK_MARIADB");
         if (urls.size() == 1 && BackendTestSupport.isRequired()) {
-            fail("CN1_DBCHECK_POSTGRES and CN1_DBCHECK_MYSQL are unset, so only SQLite "
+            fail("No CN1_DBCHECK_POSTGRES, _MYSQL, _SQLSERVER or _ORACLE is set, so only SQLite "
                     + "was exercised; the engines whose schema and generated keys differ "
                     + "most from it are the ones the ORM has to prove itself on");
         }

@@ -363,9 +363,49 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 30
+
+      sqlserver:
+        # 2017, the oldest release the backend supports; the samples' jobs run
+        # 2022. The image creates no database of its own, so the tests use
+        # master.
+        image: mcr.microsoft.com/mssql/server:2017-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: Cn1-Secret-9x
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Cn1-Secret-9x -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+
+      oracle:
+        # Oracle Free. 19c, the oldest release supported, is not pullable
+        # without an Oracle account.
+        image: gvenzl/oracle-free:23-slim
+        env:
+          ORACLE_PASSWORD: cn1secret
+          APP_USER: cn1
+          APP_USER_PASSWORD: cn1secret
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 40
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      # Migrations serialise on DBMS_LOCK, which an ordinary user may not call.
+      - name: Let the Oracle test user take migration locks
+        run: |
+          docker exec -i "${{ job.services.oracle.id }}" sqlplus -s -L sys/cn1secret@FREEPDB1 as sysdba <<'SQL'
+          WHENEVER SQLERROR EXIT FAILURE
+          GRANT EXECUTE ON SYS.DBMS_LOCK TO cn1;
+          SQL
 
       # The backend's MySQL client REFUSES to complete caching_sha2_password's
       # full exchange on an unencrypted connection, because that exchange sends
@@ -519,6 +559,8 @@ jobs:
           # no case-sensitive NO PAD collation in common, so picking the wrong
           # one is an unknown-collation error on every CREATE TABLE.
           CN1_DBCHECK_MARIADB: mysql://cn1:cn1secret@127.0.0.1:3307/cn1?sslmode=disable
+          CN1_DBCHECK_SQLSERVER: sqlserver://sa:Cn1-Secret-9x@127.0.0.1:1433/master?sslmode=disable
+          CN1_DBCHECK_ORACLE: oracle://cn1:cn1secret@127.0.0.1:1521/FREEPDB1
           # WITHOUT THIS THE BACKEND TESTS CAN SKIP AND THE JOB STAYS GREEN.
           # BackendTestSupport.skipOrFail turns a backend build failure into a
           # JUnit assumption abort, because a developer machine with no C

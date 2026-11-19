@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * requires the translated binary and the JVM to print the SAME history against every engine --
  * and every engine to print the same history as every other.
  *
- * SQLite always runs. PostgreSQL and MySQL run when CN1_DBCHECK_POSTGRES / CN1_DBCHECK_MYSQL
+ * SQLite always runs. PostgreSQL and MySQL run when CN1_DBCHECK_POSTGRES / _MYSQL / _SQLSERVER / _ORACLE
  * name a server, the same variables BackendDatabaseTest reads; their absence is a skip on a
  * developer machine and a FAILURE where the backend is required.
  */
@@ -70,8 +70,10 @@ class BackendMigrationTest {
         urls.add(":memory:");
         addIfSet(urls, "CN1_DBCHECK_POSTGRES");
         addIfSet(urls, "CN1_DBCHECK_MYSQL");
+        addIfSet(urls, "CN1_DBCHECK_SQLSERVER");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE");
         if (urls.size() == 1 && BackendTestSupport.isRequired()) {
-            fail("CN1_DBCHECK_POSTGRES and CN1_DBCHECK_MYSQL are unset, so only SQLite "
+            fail("No CN1_DBCHECK_POSTGRES, _MYSQL, _SQLSERVER or _ORACLE is set, so only SQLite "
                     + "was exercised; the session lock and the failed-migration marker are "
                     + "server-engine behaviour");
         }
