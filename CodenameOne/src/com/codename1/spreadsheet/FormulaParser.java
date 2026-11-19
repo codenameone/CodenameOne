@@ -275,7 +275,7 @@ final class FormulaParser {
                 return left;
             }
             char c = s.charAt(p);
-            if (!isLetter(c) && c != '$' && c != '\'' && c != '(') {
+            if (!isLetter(c) && !(c >= '0' && c <= '9') && c != '$' && c != '\'' && c != '(') {
                 p = save;
                 return left;
             }
@@ -1210,6 +1210,22 @@ final class FormulaParser {
     /// relative references follow, absolute ones stay. This is how a shared formula and a
     /// filled-down formula are derived from the one that was written.
     static Node shift(Node n, int dr, int dc) {
+        return shift(n, dr, dc, false);
+    }
+
+    /// A defined name as it reads from a cell: Excel keeps a name's relative references as
+    /// if written in A1 and moves them to the cell that uses the name, wrapping around the
+    /// edges of the grid, so a reference to the row above is stored as the last row.
+    static Node fromCell(Node definition, int row, int col) {
+        return row == 0 && col == 0 ? definition : shift(definition, row, col, true);
+    }
+
+    private static int wrap(int v, int size) {
+        int m = v % size;
+        return m < 0 ? m + size : m;
+    }
+
+    private static Node shift(Node n, int dr, int dc, boolean wrap) {
         if (n.kind == Node.REF) {
             Node m = n.copyRef();
             if (!n.wholeCol) {
@@ -1228,6 +1244,23 @@ final class FormulaParser {
                     m.c2 += dc;
                 }
             }
+            if (wrap) {
+                m.r1 = wrap(m.r1, Node.MAX_ROW + 1);
+                m.r2 = wrap(m.r2, Node.MAX_ROW + 1);
+                m.c1 = wrap(m.c1, Node.MAX_COL + 1);
+                m.c2 = wrap(m.c2, Node.MAX_COL + 1);
+                if (m.r1 > m.r2) {
+                    int t = m.r1;
+                    m.r1 = m.r2;
+                    m.r2 = t;
+                }
+                if (m.c1 > m.c2) {
+                    int t = m.c1;
+                    m.c1 = m.c2;
+                    m.c2 = t;
+                }
+                return m;
+            }
             if (m.r1 < 0 || m.c1 < 0 || m.r2 > Node.MAX_ROW || m.c2 > Node.MAX_COL || m.r2 < 0 || m.c2 < 0
                     || m.r1 > Node.MAX_ROW || m.c1 > Node.MAX_COL) {
                 return new Node(Node.ERR, CellError.REF);
@@ -1240,15 +1273,15 @@ final class FormulaParser {
         if (n.kind == Node.BINARY) {
             // a chain of operators is walked and not recursed into: see Node.spine
             Node[] spine = Node.spine(n);
-            Node left = shift(spine[0].args[0], dr, dc);
+            Node left = shift(spine[0].args[0], dr, dc, wrap);
             for (Node link : spine) {
-                left = new Node(Node.BINARY, link.value, left, shift(link.args[1], dr, dc));
+                left = new Node(Node.BINARY, link.value, left, shift(link.args[1], dr, dc, wrap));
             }
             return left;
         }
         Node[] args = new Node[n.args.length];
         for (int i = 0; i < args.length; i++) {
-            args[i] = shift(n.args[i], dr, dc);
+            args[i] = shift(n.args[i], dr, dc, wrap);
         }
         Node m = new Node(n.kind, n.value, args);
         m.array = n.array;

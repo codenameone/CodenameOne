@@ -88,6 +88,12 @@ final class OdsReader {
         for (String[] d : names) {
             try {
                 Node node = FormulaParser.parse(d[1], true);
+                // OpenDocument keeps a name's relative references relative to its base cell;
+                // here, as in Excel, they are relative to A1
+                Node base = d[2] == null ? null : baseCell(d[2]);
+                if (base != null) {
+                    node = FormulaParser.fromCell(node, -base.r1, -base.c1);
+                }
                 book.defineName(d[0], FormulaParser.display(node), node);
             } catch (FormulaSyntaxException e) {
                 book.defineName(d[0], d[1], null);
@@ -264,19 +270,28 @@ final class OdsReader {
                 String name = x.attr("table:name");
                 String address = x.attr("table:cell-range-address");
                 if (name != null && address != null) {
-                    names.add(new String[] {name, "[" + address + "]"});
+                    names.add(new String[] {name, "[" + address + "]", x.attr("table:base-cell-address")});
                 }
             } else if ("named-expression".equals(tag)) {
                 String name = x.attr("table:name");
                 String expression = x.attr("table:expression");
                 if (name != null && expression != null) {
-                    names.add(new String[] {name, stripFormulaPrefix(expression)});
+                    names.add(new String[] {name, stripFormulaPrefix(expression), x.attr("table:base-cell-address")});
                 }
             } else if ("shapes".equals(tag) || "forms".equals(tag) || "content-validations".equals(tag)
                     || "tracked-changes".equals(tag) || "database-ranges".equals(tag)
                     || "data-pilot-tables".equals(tag) || "annotation".equals(tag)) {
                 x.skipElement();
             }
+        }
+    }
+
+    private static Node baseCell(String address) {
+        try {
+            Node n = FormulaParser.parse("[" + address + "]", true);
+            return n.kind == Node.REF ? n : null;
+        } catch (FormulaSyntaxException e) {
+            return null;
         }
     }
 

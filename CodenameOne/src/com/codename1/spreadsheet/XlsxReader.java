@@ -597,6 +597,9 @@ final class XlsxReader {
                 }
                 Node root = new Node(Node.PAREN, null, c.formula);
                 boolean changed = false;
+                // a name may use another, and one may use itself: stop after as many as a
+                // name chain is followed when calculating
+                int budget = 32;
                 stack.add(root);
                 while (!stack.isEmpty()) {
                     Node n = stack.remove(stack.size() - 1);
@@ -609,10 +612,13 @@ final class XlsxReader {
                             continue;
                         }
                         String text = a.kind == Node.NAME ? names.get(FormulaParser.asciiUpper(a.name())) : null;
-                        Node definition = text == null ? null : parseOrNull(text);
+                        Node definition = text == null || budget <= 0 ? null : parseOrNull(text);
                         if (definition != null) {
-                            n.args[j] = new Node(Node.PAREN, null, definition);
+                            budget--;
+                            Node inlined = new Node(Node.PAREN, null, FormulaParser.fromCell(definition, c.row, c.col));
+                            n.args[j] = inlined;
                             changed = true;
+                            stack.add(inlined);
                         } else {
                             stack.add(a);
                         }

@@ -182,7 +182,8 @@ public final class Sheet extends AbstractTableModel {
             double d = Double.parseDouble(value.toString());
             c.value = Double.isNaN(d) || Double.isInfinite(d) ? CellError.NUM : Double.valueOf(d);
         } else if (value instanceof Number) {
-            c.value = Double.valueOf(((Number) value).doubleValue());
+            double d = ((Number) value).doubleValue();
+            c.value = Double.isNaN(d) || Double.isInfinite(d) ? CellError.NUM : Double.valueOf(d);
         } else if (value instanceof Boolean || value instanceof String || value instanceof CellError) {
             c.value = value;
         } else {

@@ -967,7 +967,7 @@ public final class Workbook {
     private Ref[] references(Cell c) {
         if (c.refs == null) {
             ArrayList<Ref> out = new ArrayList<Ref>();
-            collect(c.formula, c.sheet, out, 0);
+            collect(c.formula, c.sheet, c.row, c.col, out, 0);
             Ref[] refs = new Ref[out.size()];
             out.toArray(refs);
             c.refs = refs;
@@ -975,7 +975,7 @@ public final class Workbook {
         return c.refs;
     }
 
-    private void collect(Node n, Sheet home, ArrayList<Ref> out, int depth) {
+    private void collect(Node n, Sheet home, int row, int col, ArrayList<Ref> out, int depth) {
         // depth counts every level, names' formulas included, as evaluation does: past
         // Evaluator.MAX_EVAL_DEPTH the formula is #NUM! and reads nothing more
         if (n == null || depth > Evaluator.MAX_EVAL_DEPTH) {
@@ -996,21 +996,22 @@ public final class Workbook {
             return;
         }
         if (n.kind == Node.NAME) {
-            collect(definedNameNode(n.name()), home, out, depth + 1);
+            Node definition = definedNameNode(n.name());
+            collect(definition == null ? null : FormulaParser.fromCell(definition, row, col), home, row, col, out, depth + 1);
             return;
         }
         if (n.kind == Node.BINARY) {
             // a chain of operators is walked and not recursed into: see Node.spine
             Node[] spine = Node.spine(n);
-            collect(spine[0].args[0], home, out, depth + 1);
+            collect(spine[0].args[0], home, row, col, out, depth + 1);
             for (Node link : spine) {
-                collect(link.args[1], home, out, depth + 1);
+                collect(link.args[1], home, row, col, out, depth + 1);
             }
             return;
         }
         if (n.args != null) {
             for (int i = 0; i < n.args.length; i++) {
-                collect(n.args[i], home, out, depth + 1);
+                collect(n.args[i], home, row, col, out, depth + 1);
             }
         }
     }

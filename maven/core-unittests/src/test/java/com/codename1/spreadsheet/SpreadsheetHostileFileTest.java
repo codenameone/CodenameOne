@@ -904,6 +904,53 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void roundTwentyTwoLosses() throws IOException {
+        // a duplicated sheet name that uses another duplicated sheet name
+        Workbook w = Workbook.read(new ByteArrayInputStream(zip("[Content_Types].xml", "<Types/>",
+                "xl/workbook.xml", "<workbook xmlns=\"" + MAIN + "\" xmlns:r=\"" + REL + "\"><sheets>"
+                        + "<sheet name=\"A\" sheetId=\"1\" r:id=\"rId1\"/><sheet name=\"B\" sheetId=\"2\" r:id=\"rId2\"/></sheets>"
+                        + "<definedNames><definedName name=\"X\" localSheetId=\"0\">A!$A$1</definedName>"
+                        + "<definedName name=\"X\" localSheetId=\"1\">B!$A$1</definedName>"
+                        + "<definedName name=\"Y\" localSheetId=\"0\">X*2</definedName>"
+                        + "<definedName name=\"Y\" localSheetId=\"1\">X*3</definedName></definedNames></workbook>",
+                "xl/_rels/workbook.xml.rels", "<Relationships><Relationship Id=\"rId1\" Type=\"" + REL
+                        + "/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"" + REL
+                        + "/worksheet\" Target=\"worksheets/sheet2.xml\"/></Relationships>",
+                "xl/worksheets/sheet1.xml", "<worksheet xmlns=\"" + MAIN + "\"><sheetData><row r=\"1\"><c r=\"A1\"><v>100</v></c><c r=\"B1\"><f>SUM(X,Y)</f></c></row></sheetData></worksheet>",
+                "xl/worksheets/sheet2.xml", "<worksheet xmlns=\"" + MAIN + "\"><sheetData><row r=\"1\"><c r=\"A1\"><v>2</v></c><c r=\"B1\"><f>SUM(X,Y)</f></c></row></sheetData></worksheet>")), Workbook.Format.XLSX);
+        w.getSheet(0).setCellValue("A1", Double.valueOf(100));
+        same(Double.valueOf(300), w.getSheet(0).getCellValue("B1"), "X and Y of the first sheet");
+        same(Double.valueOf(8), w.getSheet(1).getCellValue("B1"), "X and Y of the second sheet");
+        // a relative reference in a name moves to the cell that uses it, wrapping at the edge
+        Sheet s = new Workbook().addSheet("A");
+        s.getWorkbook().setDefinedName("Rel", "=A!$A1");
+        s.getWorkbook().setDefinedName("Above", "=A!$A1048576");
+        for (int r = 0; r < 3; r++) {
+            s.setCellValue(r, 0, Double.valueOf(r + 1));
+            s.setCellFormula(r, 1, "=Rel");
+        }
+        same(Double.valueOf(2), s.getCellValue("B2"), "R from row 2");
+        s.setCellFormula("C3", "=Above");
+        same(Double.valueOf(2), s.getCellValue("C3"), "the row above");
+        s.setCellValue("A2", Double.valueOf(20));
+        same(Double.valueOf(20), s.getCellValue("B2"), "recalculated through the moved reference");
+        // an intersection with a row range on its right
+        s.setCellFormula("D1", "=SUM(A1:A3 2:2)");
+        same(Double.valueOf(20), s.getCellValue("D1"), "row range on the right of an intersection");
+        s.setCellValue("E1", new java.math.BigDecimal("1e400"));
+        same(CellError.NUM, s.getCellValue("E1"), "a number past a double");
+        // OpenDocument: a relative name is relative to its base cell, here B2, so from B1 it is A1
+        Workbook o = Workbook.read(new ByteArrayInputStream(ods("<table:table-row><table:table-cell office:value-type=\"float\""
+                + " office:value=\"5\"/><table:table-cell table:formula=\"of:=N\"/></table:table-row><table:table-row>"
+                + "<table:table-cell office:value-type=\"float\" office:value=\"6\"/></table:table-row></table:table>"
+                + "<table:named-expressions><table:named-range table:name=\"N\" table:cell-range-address=\"$S.$A2\""
+                + " table:base-cell-address=\"$S.$B$2\"/></table:named-expressions><table:table table:name=\"T\">")),
+                Workbook.Format.ODS);
+        o.getSheet(0).setCellValue("A2", Double.valueOf(7));
+        same(Double.valueOf(5), o.getSheet(0).getCellValue("B1"), "an OpenDocument name relative to its base cell");
+    }
+
+    @Test
     void roundTwentyOneLosses() throws IOException {
         // two sheets each define Q: each sheet's formulas keep their own meaning
         Workbook w = Workbook.read(new ByteArrayInputStream(zip("[Content_Types].xml", "<Types/>",

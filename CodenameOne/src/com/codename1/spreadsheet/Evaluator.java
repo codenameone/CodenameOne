@@ -218,7 +218,7 @@ final class Evaluator {
         }
         nameDepth++;
         try {
-            return eval(definition);
+            return eval(FormulaParser.fromCell(definition, row, col));
         } finally {
             nameDepth--;
         }
