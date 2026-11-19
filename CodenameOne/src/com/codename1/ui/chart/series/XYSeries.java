@@ -768,7 +768,7 @@ public abstract class XYSeries extends Series {
                 if (stackGroup.equals(xo.stackGroup) && xo.isSecondaryAxis() == isSecondaryAxis()) {
                     int j = i < xo.count && xo.xs[i] == x ? i : xo.indexOfX(x);
                     if (j >= 0 && !isGap(xo.ys[j]) && (xo.ys[j] < 0) == negative) {
-                        double v = xo.animatedY(ctx, j);
+                        double v = xo.paintedAtStart(ctx, j);
                         if (!isGap(v)) {
                             sum += v;
                         }
@@ -777,6 +777,28 @@ public abstract class XYSeries extends Series {
             }
         }
         return sum;
+    }
+
+    // what point i of this layer draws at the start of the transition about to run: the value
+    // snapshotted by the chart's beginChange when there is one. The last context still carries
+    // the previous transition's progress, which applied to the new snapshot answers neither the
+    // old frame nor the new one
+    private double paintedAtStart(ChartContext ctx, int i) {
+        int j = fromSlot(i);
+        if (fromPainted != null && j >= 0 && j < fromPainted.length) {
+            return fromPainted[j];
+        }
+        return animatedY(ctx, i);
+    }
+
+    /// True for a series whose base is its own data (a range bar's start, a waterfall's running
+    /// total) rather than a stack: it is drawn from that base but is no layer of a stack.
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    protected boolean hasOwnBase() {
+        return false;
     }
 
     @Override
@@ -873,7 +895,7 @@ public abstract class XYSeries extends Series {
                 continue;
             }
             // a mark that keeps its own values is drawn at them, never lifted by the stack
-            double b = consumesStackBase() ? getBase(i) : 0;
+            double b = consumesStackBase() || hasOwnBase() ? getBase(i) : 0;
             if (isGap(b)) {
                 continue;
             }
@@ -884,8 +906,9 @@ public abstract class XYSeries extends Series {
         if (!any) {
             return null;
         }
-        if (stackGroup == null) {
-            // a lone series should not drag the axis to 0 unless the chart asks for it
+        if (stackGroup == null || (!consumesStackBase() && !hasOwnBase())) {
+            // a lone series should not drag the axis to 0 unless the chart asks for it, and a
+            // mark in a stack group that is no layer of it is drawn at its own values
             min = Double.MAX_VALUE;
             max = -Double.MAX_VALUE;
             for (int i = 0; i < count; i++) {
@@ -1029,7 +1052,7 @@ public abstract class XYSeries extends Series {
 
     // where point i is drawn in this frame, so a hover finds what is on screen mid transition
     private double paintedTop(ChartContext ctx, int i) {
-        if (!consumesStackBase()) {
+        if (!consumesStackBase() && !hasOwnBase()) {
             return animatedY(ctx, i);
         }
         return animatedBase(ctx, i) + animatedY(ctx, i);

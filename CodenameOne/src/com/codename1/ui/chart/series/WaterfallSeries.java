@@ -152,6 +152,18 @@ public class WaterfallSeries extends BarSeries {
     }
 
     @Override
+    protected boolean consumesStackBase() {
+        // the base is this series' own data, so it is no layer of a stack: it lifts nothing
+        // and never rests on the painted stack when it enters
+        return false;
+    }
+
+    @Override
+    protected boolean hasOwnBase() {
+        return true;
+    }
+
+    @Override
     protected double targetBase(int i) {
         // the base is this series' own data, not a stack, so the tween settles on it
         return getBase(i);

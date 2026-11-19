@@ -183,7 +183,8 @@ public class RadarSeries extends Series {
                 continue;
             }
             for (int i = 0; i < r.values.length; i++) {
-                double rv = pos(r.values[i]);
+                // the scale follows the polygons as drawn, so rings and vertices tween together
+                double rv = pos(r.shown(ctx, i));
                 if (rv > 0) {
                     max = Math.max(max, rv);
                 }
@@ -315,7 +316,8 @@ public class RadarSeries extends Series {
         }
         int n = Math.max(spokes().length, values.length);
         double a = 360.0 * i / n;
-        float rr = (float) (lastR * pos(values[i]) / lastMax);
+        // the vertex as painted this frame, so a hover mid transition finds what is on screen
+        float rr = (float) (lastR * pos(shown(ctx, i)) / lastMax);
         String[] sp = spokes();
         return new ChartPoint(this, i, i, values[i], Math.round(Shapes.px(lastCx, rr, a)) - ctx.getOriginX(),
                 Math.round(Shapes.py(lastCy, rr, a)) - ctx.getOriginY(), i < sp.length ? sp[i] : null);

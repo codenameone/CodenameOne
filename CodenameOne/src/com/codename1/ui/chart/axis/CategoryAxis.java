@@ -70,7 +70,9 @@ public class CategoryAxis extends Axis {
     @Override
     public void setDataBounds(double min, double max) {
         // series may pad their extent by half a band (bars do), so count by floor, not round
-        int n = !categories.isEmpty() ? categories.size() : (int) Math.floor(max + 1e-9) + 1;
+        // and a point past the last label still gets its band rather than falling off the axis
+        int fromData = max > 0 && max < Integer.MAX_VALUE - 1 ? (int) Math.floor(max + 1e-9) + 1 : 1;
+        int n = Math.max(categories.size(), fromData);
         super.setDataBounds(-0.5, n - 0.5);
     }
 

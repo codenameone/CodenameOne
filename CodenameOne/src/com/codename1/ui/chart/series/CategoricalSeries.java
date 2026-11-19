@@ -237,7 +237,8 @@ public abstract class CategoricalSeries extends Series {
     public double getTotal() {
         double s = 0;
         for (int i = 0; i < values.length; i++) {
-            if (!hidden[i] && values[i] > 0) {
+            // the same parts displayValue draws: an infinite part would make every share 0%
+            if (!hidden[i] && values[i] > 0 && values[i] < Double.POSITIVE_INFINITY) {
                 s += values[i];
             }
         }

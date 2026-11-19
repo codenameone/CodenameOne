@@ -224,9 +224,9 @@ public class Sparkline extends Component {
         // finite values can overflow to infinity (-MAX_VALUE to MAX_VALUE), the halves cannot
         double span = max * 0.5 - min * 0.5;
         if (!(span > 0)) { //NOPMD LogicInversion - a flat series, or no usable span
-            // a flat series draws through the middle
-            span = 0.5;
-            max += 0.5;
+            // a flat series draws through the middle; yAt places it there directly, since
+            // widening max by a constant is lost to precision on large values (1e17 + 0.5)
+            span = 0;
         }
         int c = color != null ? color.intValue() : theme().getSeriesColor(0);
         boolean aa = g.isAntiAliased();
@@ -235,13 +235,13 @@ public class Sparkline extends Component {
         int alpha = g.getAlpha();
         if (type == BARS) {
             float bw = w / (float) n;
-            int zero = y + (int) Math.round(max * 0.5 / span * h);
+            int zero = (int) Math.round(yAt(y, h, max, 0, span));
             for (int i = 0; i < n; i++) {
                 double v = values[i];
                 if (gap(v)) {
                     continue;
                 }
-                int vy = y + (int) Math.round((max * 0.5 - v * 0.5) / span * h);
+                int vy = (int) Math.round(yAt(y, h, max, v, span));
                 int bx = x + Math.round(i * bw + bw * 0.1f);
                 int bwi = Math.max(1, Math.round(bw * 0.8f));
                 g.setColor(v < 0 ? theme().getNegativeColor() : c);
@@ -267,7 +267,7 @@ public class Sparkline extends Component {
                     continue;
                 }
                 float px = x + (n == 1 ? w / 2f : i * w / (float) (n - 1));
-                float py = (float) (y + (max * 0.5 - v * 0.5) / span * h);
+                float py = (float) yAt(y, h, max, v, span);
                 if (!started) {
                     line.moveTo(px, py);
                     area.moveTo(px, y + h);
@@ -323,9 +323,18 @@ public class Sparkline extends Component {
         return v != v || Double.isInfinite(v);
     }
 
+    // the screen y of v: (max - v) / (max - min) of the height, on halves so the span cannot
+    // overflow; a span of 0 (a flat series) is the middle
+    private static double yAt(int y, int h, double max, double v, double span) {
+        if (!(span > 0)) { //NOPMD LogicInversion - a flat series, or no usable span
+            return y + h / 2.0;
+        }
+        return y + (max * 0.5 - v * 0.5) / span * h;
+    }
+
     private static void dot(Graphics g, int x, int y, int w, int h, int n, int i, double v, double max, double span, int color, int d) {
         float px = x + (n == 1 ? w / 2f : i * w / (float) (n - 1));
-        float py = (float) (y + (max * 0.5 - v * 0.5) / span * h);
+        float py = (float) yAt(y, h, max, v, span);
         g.setColor(color);
         g.fillArc(Math.round(px - d / 2f), Math.round(py - d / 2f), d, d, 0, 360);
     }

@@ -346,9 +346,14 @@ public class HeatmapSeries extends Series {
     @Override
     public void collectTableRows(java.util.List<String[]> rows) {
         com.codename1.ui.chart.Chart ch = getChart();
+        // the row labels come from the axis this series is drawn against, as in formatTooltip
+        com.codename1.ui.chart.axis.Axis rowAxis = null;
+        if (ch != null) {
+            rowAxis = isSecondaryAxis() && ch.getSecondaryYAxis() != null ? ch.getSecondaryYAxis() : ch.getYAxis();
+        }
         for (int r = 0; r < matrix.length; r++) {
             for (int c = 0; c < matrix[r].length; c++) {
-                String item = ch == null ? r + ", " + c : ch.getYAxis().format(r, 0) + ", " + ch.getXAxis().format(c, 0);
+                String item = rowAxis == null ? r + ", " + c : rowAxis.format(r, 0) + ", " + ch.getXAxis().format(c, 0);
                 rows.add(new String[]{getName(), item, formatValue(null, matrix[r][c])});
             }
         }
