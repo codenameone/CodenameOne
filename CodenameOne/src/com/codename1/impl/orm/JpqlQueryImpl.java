@@ -261,15 +261,20 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (value instanceof Iterable || value instanceof Object[]) {
                         throw new IllegalArgumentException("Collection parameter requires IN: " + parameter.name);
                     }
-                    Integer slot = reused == null ? null : reused.get(parameter.name);
+                    Object converted = parameter.convert(value);
+                    // Each occurrence converts for its own context, so only an
+                    // occurrence that converts to the same value shares a name.
+                    String key = reused == null || converted == null ? null
+                            : ":" + parameter.name + ":" + converted.getClass().getName() + ":" + converted;
+                    Integer slot = key == null ? null : reused.get(key);
                     if (slot != null) {
                         statement.setLength(statement.length() - 1);
                         statement.append("@p").append(slot.intValue());
                         continue;
                     }
-                    values.add(parameter.convert(value));
-                    if (reused != null) {
-                        reused.put(parameter.name, Integer.valueOf(values.size()));
+                    values.add(converted);
+                    if (key != null) {
+                        reused.put(key, Integer.valueOf(values.size()));
                     }
                 }
             } else {
