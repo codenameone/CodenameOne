@@ -598,6 +598,21 @@ final class Placeholders {
         int blocks = 0;
         int cases = 0;
         int length = sql.length();
+        int start = skipBlanks(sql, from, nestedComments, backslashEscapes, hashComments,
+                dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+        // A PL/SQL block that opens with DECLARE: its declarations end in
+        // semicolons before the BEGIN, so the DECLARE opens the block and that
+        // BEGIN does not open another. T-SQL's DECLARE names an @variable and is
+        // a statement of its own.
+        boolean declared = false;
+        if (isWord(sql, start, "declare")) {
+            int name = skipBlanks(sql, start + 7, nestedComments, backslashEscapes, hashComments,
+                    dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
+            if (name < length && sql.charAt(name) != '@') {
+                declared = true;
+                blocks++;
+            }
+        }
         while (at < length) {
             int next = skip(sql, at, nestedComments, backslashEscapes, hashComments,
                     dollarQuotedStrings, dashCommentNeedsSpace, bracketIdentifiers, executableComments);
@@ -608,6 +623,11 @@ final class Placeholders {
             char c = sql.charAt(at);
             if (c == ';' && blocks == 0) {
                 return at;
+            }
+            if (declared && isWord(sql, at, "begin")) {
+                declared = false;
+                at += 5;
+                continue;
             }
             if (isWord(sql, at, "begin")) {
                 // ONLY A BLOCK BEGIN COUNTS. "BEGIN;" and "BEGIN TRANSACTION;"

@@ -65,6 +65,7 @@ public final class HistoryTable {
     private final boolean mysql;
     private final boolean postgres;
     private final boolean sqlServer;
+    private final boolean oracle;
 
     /// Binds a table name to a target.
     public HistoryTable(MigrationTarget target, String table) {
@@ -75,6 +76,7 @@ public final class HistoryTable {
         mysql = "mysql".equals(dialect);
         postgres = "postgresql".equals(dialect);
         sqlServer = "sqlserver".equals(dialect);
+        oracle = "oracle".equals(dialect);
         quoted = quote(table);
     }
 
@@ -103,6 +105,16 @@ public final class HistoryTable {
     }
 
     private String quote(String name) {
+        if (oracle) {
+            // Upper case, which is the name Oracle gives an unquoted one, so
+            // SQL naming the table without quotes reaches it.
+            StringBuilder upper = new StringBuilder(name.length() + 2).append('"');
+            for (int i = 0; i < name.length(); i++) {
+                char c = name.charAt(i);
+                upper.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+            }
+            return upper.append('"').toString();
+        }
         return mysql ? "`" + name + "`" : "\"" + name + "\"";
     }
 
@@ -129,6 +141,10 @@ public final class HistoryTable {
         } else if (sqlServer) {
             timestamp = "DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()";
             bool = "BIT";
+        } else if (oracle) {
+            // Oracle wants the DEFAULT before the constraint.
+            timestamp = "TIMESTAMP(3) DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL";
+            bool = "NUMBER(1)";
         } else {
             timestamp = "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now'))";
             bool = "BOOLEAN";
@@ -136,7 +152,9 @@ public final class HistoryTable {
         target.execute("CREATE TABLE " + quoted + " ("
                 + quote("installed_rank") + " INT NOT NULL PRIMARY KEY, "
                 + quote("version") + " VARCHAR(50), "
-                + quote("description") + " VARCHAR(200) NOT NULL, "
+                // Oracle stores '' as NULL, and a migration may have an empty
+                // description; read() answers "" for a NULL one.
+                + quote("description") + " VARCHAR(200)" + (oracle ? "" : " NOT NULL") + ", "
                 + quote("type") + " VARCHAR(20) NOT NULL, "
                 + quote("script") + " VARCHAR(1000) NOT NULL, "
                 + quote("checksum") + " INT, "
@@ -150,9 +168,9 @@ public final class HistoryTable {
 
     /// Reads every row in the order it was written.
     public List<Row> read() throws IOException {
-        String text = mysql ? "CHAR" : sqlServer ? "NVARCHAR(30)" : "TEXT";
-        // BIT is a number on SQL Server, not a truth value a CASE can test.
-        String succeeded = quote("success") + (sqlServer ? " = 1" : "");
+        String text = mysql ? "CHAR" : sqlServer ? "NVARCHAR(30)" : oracle ? "VARCHAR2(30)" : "TEXT";
+        // BIT and NUMBER(1) are numbers, not truth values a CASE can test.
+        String succeeded = quote("success") + (sqlServer || oracle ? " = 1" : "");
         List<String[]> raw = target.query("SELECT " + quote("installed_rank") + ", " + quote("version") + ", "
                 + quote("description") + ", " + quote("type") + ", " + quote("script") + ", " + quote("checksum")
                 + ", CAST(" + quote("installed_on") + " AS " + text + "), " + quote("execution_time")
@@ -210,7 +228,8 @@ public final class HistoryTable {
 
     /// Deletes every row marked failed.
     public void deleteFailed() throws IOException {
-        target.execute("DELETE FROM " + quoted + " WHERE NOT " + quote("success"), null);
+        target.execute("DELETE FROM " + quoted + " WHERE "
+                + (sqlServer || oracle ? quote("success") + " = 0" : "NOT " + quote("success")), null);
     }
 
     /// Rewrites the checksum and description of one row.

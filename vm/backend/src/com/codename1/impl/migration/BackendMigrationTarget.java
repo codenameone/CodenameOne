@@ -45,6 +45,7 @@ public final class BackendMigrationTarget implements MigrationTarget {
     private final boolean mysql;
     private final boolean postgres;
     private final boolean sqlServer;
+    private final boolean oracle;
     private Database db;
     private final boolean supplied;
     /// A transaction a script opened for itself, which the connection does not track.
@@ -61,6 +62,7 @@ public final class BackendMigrationTarget implements MigrationTarget {
         this.mysql = "mysql".equals(dialect.getName());
         this.postgres = "postgresql".equals(dialect.getName());
         this.sqlServer = "sqlserver".equals(dialect.getName());
+        this.oracle = "oracle".equals(dialect.getName());
     }
 
     /// Migrates through a connection the caller owns.
@@ -75,6 +77,7 @@ public final class BackendMigrationTarget implements MigrationTarget {
         this.mysql = "mysql".equals(dialect.getName());
         this.postgres = "postgresql".equals(dialect.getName());
         this.sqlServer = "sqlserver".equals(dialect.getName());
+        this.oracle = "oracle".equals(dialect.getName());
     }
 
     private Database db() throws IOException {
@@ -150,6 +153,10 @@ public final class BackendMigrationTarget implements MigrationTarget {
         } else if (sqlServer) {
             sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = SCHEMA_NAME() "
                     + "AND table_type = '" + (views ? "VIEW" : "BASE TABLE") + "'";
+        } else if (oracle) {
+            // The names exactly as stored: unquoted DDL stores them upper case.
+            sql = views ? "SELECT view_name FROM user_views"
+                    : "SELECT table_name FROM user_tables WHERE dropped = 'NO' AND nested = 'NO'";
         } else {
             sql = "SELECT name FROM sqlite_master WHERE type = '" + (views ? "view" : "table") + "'";
         }
@@ -169,7 +176,9 @@ public final class BackendMigrationTarget implements MigrationTarget {
             // back in another case than it was created with.
             // SQL Server's catalog compares names under the database's
             // collation, which is case insensitive unless it was made otherwise.
-            if (mysql || sqlServer ? name.equalsIgnoreCase(table) : name.equals(table)) {
+            // Oracle stores an unquoted name upper case, so a script's
+            // "CREATE TABLE users" is the table "users" names.
+            if (mysql || sqlServer || oracle ? name.equalsIgnoreCase(table) : name.equals(table)) {
                 return true;
             }
         }
@@ -179,7 +188,7 @@ public final class BackendMigrationTarget implements MigrationTarget {
     @Override
     public boolean hasUserObjects() throws IOException {
         for (String name : names(false)) {
-            if (!HistoryTable.isFrameworkOwned(name)) {
+            if (!HistoryTable.isFrameworkOwned(oracle ? asciiLower(name) : name)) {
                 return true;
             }
         }
@@ -188,7 +197,8 @@ public final class BackendMigrationTarget implements MigrationTarget {
 
     @Override
     public boolean supportsDdlTransactions() {
-        return !mysql;
+        // Oracle, like MySQL, commits around every DDL statement.
+        return !mysql && !oracle;
     }
 
     @Override
@@ -251,6 +261,28 @@ public final class BackendMigrationTarget implements MigrationTarget {
                     + (attempts * 1000) + " SELECT CASE WHEN @granted >= 0 THEN 1 ELSE 0 END AS granted", null);
             return answeredOne(rows);
         }
+        if (oracle) {
+            // DBMS_LOCK, held by the session (release_on_commit FALSE), so a
+            // dead process releases it. It needs EXECUTE ON SYS.DBMS_LOCK,
+            // which Oracle does not grant by default. 0 is granted, 4 already
+            // held by this session.
+            // One second per attempt, as on PostgreSQL: a single long wait
+            // would outlast the connection's socket timeout.
+            for (int i = 0; i < attempts; i++) {
+                try {
+                    db().execute("BEGIN IF DBMS_LOCK.REQUEST(" + oracleLockId(name) + ", DBMS_LOCK.X_MODE, 1, FALSE)"
+                            + " NOT IN (0, 4) THEN RAISE_APPLICATION_ERROR(-20001, 'migration lock busy'); END IF; END;",
+                            new Object[0]);
+                    return true;
+                } catch (IOException busy) {
+                    if (busy.getMessage() == null || busy.getMessage().indexOf("ORA-20001") < 0) {
+                        throw new IOException("Taking the migration lock needs EXECUTE ON SYS.DBMS_LOCK: "
+                                + busy.getMessage(), busy);
+                    }
+                }
+            }
+            return false;
+        }
         if (postgres) {
             String key = String.valueOf(lockKey(name));
             for (int i = 0; i < attempts; i++) {
@@ -275,6 +307,9 @@ public final class BackendMigrationTarget implements MigrationTarget {
             query("SELECT RELEASE_LOCK('" + name + "')", null);
         } else if (postgres) {
             query("SELECT pg_advisory_unlock(" + lockKey(name) + ")", null);
+        } else if (oracle) {
+            db.execute("DECLARE r INTEGER; BEGIN r := DBMS_LOCK.RELEASE(" + oracleLockId(name) + "); END;",
+                    new Object[0]);
         } else if (sqlServer) {
             db.execute("EXEC sp_releaseapplock @Resource = N'" + literal(name) + "', @LockOwner = 'Session'",
                     new Object[0]);
@@ -291,15 +326,30 @@ public final class BackendMigrationTarget implements MigrationTarget {
         return (0x434E314DL << 32) | (MigrationChecksum.of(name) & 0xFFFFFFFFL);
     }
 
+    /// A DBMS_LOCK id for the name, inside the range applications may use
+    /// (0 to 1073741823).
+    private static long oracleLockId(String name) {
+        return MigrationChecksum.of(name) & 0x3FFFFFFFL;
+    }
+
+    private static String asciiLower(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return out.toString();
+    }
+
     private static boolean answeredOne(List<String[]> rows) {
         return !rows.isEmpty() && rows.get(0).length > 0 && HistoryTable.truthy(rows.get(0)[0]);
     }
 
     @Override
     public String currentUser() throws IOException {
-        if (mysql || postgres || sqlServer) {
+        if (mysql || postgres || sqlServer || oracle) {
             List<String[]> rows = query(mysql ? "SELECT CURRENT_USER()" : sqlServer ? "SELECT SUSER_SNAME()"
-                    : "SELECT current_user", null);
+                    : oracle ? "SELECT USER FROM DUAL" : "SELECT current_user", null);
             if (!rows.isEmpty() && rows.get(0).length > 0 && rows.get(0)[0] != null) {
                 return rows.get(0)[0];
             }
@@ -330,6 +380,19 @@ public final class BackendMigrationTarget implements MigrationTarget {
                     db().execute("ALTER TABLE " + dialect.quote(row[0]) + " DROP CONSTRAINT "
                             + dialect.quote(row[1]), none);
                 }
+            }
+            if (oracle) {
+                // Names exactly as stored, so quoted by hand: Dialect.quote
+                // upper-cases. CASCADE CONSTRAINTS takes the foreign keys
+                // that point in; PURGE skips the recycle bin.
+                for (String name : names(true)) {
+                    db().execute("DROP VIEW \"" + name.replace("\"", "\"\"") + "\"", none);
+                }
+                for (String name : names(false)) {
+                    db().execute("DROP TABLE \"" + name.replace("\"", "\"\"") + "\" CASCADE CONSTRAINTS PURGE",
+                            none);
+                }
+                return;
             }
             for (String name : names(true)) {
                 db().execute("DROP VIEW IF EXISTS " + dialect.quote(name) + (postgres ? " CASCADE" : ""), none);
