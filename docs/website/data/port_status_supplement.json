@@ -542,6 +542,34 @@
           ]
         }
       ]
+    },
+    {
+      "test": "AndroidCompatTallDialogScreenshotTest",
+      "reason": "The tall dialog baseline is a phone-sized AlertDialog whose content is taller than the screen, checking that its buttons stay on screen. The watch form factor lays dialogs out differently and has no comparable phone dialog to capture.",
+      "platform_support": "Android compatibility dialogs work on watchOS; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the dialog and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-dialog-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "PdfViewerScreenshotTest",
+      "reason": "The PDF viewer baseline is a full page of a document. A watch face is too small to show a page legibly, so the capture there would only record how the page fails to fit.",
+      "platform_support": "The PDF viewer compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the document and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "pdf-viewer-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
     }
   ],
   "features": [
