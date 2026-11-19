@@ -58,10 +58,11 @@ differences can't be hidden:
 * Oracle stores an empty string as NULL. The mapping handles this for a
   required text field. On Oracle the column is created nullable, the session
   refuses `null` itself, and a NULL read back becomes `""`. A JPQL comparison
-  with the literal `''` becomes `IS NULL` or `IS NOT NULL`. Three things it
-  can't cover:
+  with the literal `''` becomes `IS NULL` or `IS NOT NULL`, and a comparison
+  with a text parameter matches NULL to NULL, so a bound `""` finds the empty
+  string. On Oracle a `null` parameter therefore compares the same as `""`.
+  Two things it can't cover:
 ** A nullable text field can't tell `""` from `null`, and reads back `null`.
-** A parameter bound to `""` reaches Oracle as NULL, so `= :p` matches nothing.
 ** A schema written by hand must declare required text columns nullable, as the
    Oracle migrations of the samples do.
 * Oracle commits around every DDL statement, as MySQL does, so a migration

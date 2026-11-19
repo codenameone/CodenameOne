@@ -1037,6 +1037,26 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         return node("(" + column.sql + ("=".equals(op) ? " IS NULL)" : " IS NOT NULL)"),
                                 Attribute.BOOLEAN, column);
                     }
+                    // A bound "" reaches Oracle as NULL too, so a text parameter
+                    // compares null-aware: "" matches the '' Oracle keeps as
+                    // NULL. On Oracle a null and an empty parameter are therefore
+                    // the same value, as they are in VARCHAR2 itself. Each
+                    // repeated marker binds the same value again (bind rendering
+                    // handles every occurrence separately).
+                    // A parameter's own kind is only known from the side it is
+                    // compared with, so the text side decides.
+                    if (left.entity == null && right.entity == null
+                            && !left.temporal && !right.temporal
+                            && (left.kind == Attribute.TEXT && right.parameter != null
+                                || right.kind == Attribute.TEXT && left.parameter != null)) {
+                        String l = left.sql;
+                        String r = right.sql;
+                        String sql = "=".equals(op)
+                                ? "(" + l + " = " + r + " OR (" + l + " IS NULL AND " + r + " IS NULL))"
+                                : "(" + l + " <> " + r + " OR (" + l + " IS NULL AND " + r + " IS NOT NULL) OR ("
+                                        + l + " IS NOT NULL AND " + r + " IS NULL))";
+                        return node(sql, Attribute.BOOLEAN, left, right);
+                    }
                 }
                 return binary(left, op, right, Attribute.BOOLEAN);
             }

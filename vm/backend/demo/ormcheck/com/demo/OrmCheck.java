@@ -270,6 +270,14 @@ public class OrmCheck {
             int nonEmpty = s.createQuery("select n.id from com.demo.Note n where n.title <> '' and n.id = "
                     + blank.id).list().size();
             check("JPQL = '' finds the empty string, <> '' does not", "1/0", empty + "/" + nonEmpty);
+            int boundEmpty = s.createQuery("select n.id from com.demo.Note n where n.title = :t and n.id = "
+                    + blank.id).setParameter("t", "").list().size();
+            int boundOther = s.createQuery("select n.id from com.demo.Note n where n.title <> :t and n.id = "
+                    + blank.id).setParameter("t", "x").list().size();
+            int boundSame = s.createQuery("select n.id from com.demo.Note n where n.title <> :t and n.id = "
+                    + blank.id).setParameter("t", "").list().size();
+            check("a bound \"\" matches the empty string, = and <>", "1/1/0",
+                    boundEmpty + "/" + boundOther + "/" + boundSame);
         } finally {
             s.close();
             notes.delete(blank);
