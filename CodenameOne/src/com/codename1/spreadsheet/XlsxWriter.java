@@ -40,6 +40,9 @@ final class XlsxWriter {
     private static final String PACKAGE_REL = "http://schemas.openxmlformats.org/package/2006/relationships";
     private static final int FIRST_CUSTOM_FORMAT = 164;
 
+    private static final int MAX_SHEET_NAME = 31;
+    private static final int MAX_FORMULA = 8192;
+    private static final int MAX_TEXT = 32767;
     private final Workbook book;
     private final ArrayList<String> strings = new ArrayList<String>();
     private final HashMap<String, Integer> stringIndex = new HashMap<String, Integer>();
@@ -50,14 +53,45 @@ final class XlsxWriter {
         this.book = book;
     }
 
-    void write(OutputStream out) throws IOException {
+    /// Excel's limits, checked before anything is written. Excel repairs a file past one by
+    /// dropping or cutting what is over it, so the caller hears of it here instead; shortening
+    /// a name behind the caller's back would also leave every formula naming it pointing at
+    /// nothing. `Workbook.setExcelLimitsEnforced(false)` writes the file as it is.
+    private void checkLimits() throws IOException {
         for (int i = 0; i < book.getSheetCount(); i++) {
-            String name = book.getSheet(i).getName();
-            if (name.length() > 31) {
-                // Excel repairs a file with a longer name by dropping it. Renaming the sheet
-                // here instead would leave every formula that names it pointing at nothing.
-                throw new IOException("Excel takes sheet names of up to 31 characters: " + name);
+            Sheet sheet = book.getSheet(i);
+            String name = sheet.getName();
+            if (name.length() > MAX_SHEET_NAME) {
+                throw new IOException("Excel takes sheet names of up to " + MAX_SHEET_NAME + " characters: " + name);
             }
+            int rows = sheet.usedRows();
+            for (int r = 0; r < rows; r++) {
+                Cell[] cells = sheet.rowCells(r);
+                if (cells == null) {
+                    continue;
+                }
+                for (int c = 0; c < cells.length; c++) {
+                    Cell cell = cells[c];
+                    if (cell == null) {
+                        continue;
+                    }
+                    if (cell.formulaText != null && cell.formulaText.length() + 1 > MAX_FORMULA) {
+                        throw new IOException("Excel takes formulas of up to " + MAX_FORMULA + " characters: "
+                                + name + "!" + ref(r, c));
+                    }
+                    if (cell.formulaText == null && cell.value instanceof String
+                            && ((String) cell.value).length() > MAX_TEXT) {
+                        throw new IOException("Excel takes text of up to " + MAX_TEXT + " characters in a cell: "
+                                + name + "!" + ref(r, c));
+                    }
+                }
+            }
+        }
+    }
+
+    void write(OutputStream out) throws IOException {
+        if (book.isExcelLimitsEnforced()) {
+            checkLimits();
         }
         collectStrings();
         ZipArchiveOutputStream zip = new ZipArchiveOutputStream(out);

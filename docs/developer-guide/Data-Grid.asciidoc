@@ -605,6 +605,13 @@ outline levels and defined names between reading and writing. It doesn't keep
 charts, images, fonts, colors or conditional formatting, and it doesn't read the
 older binary `.xls` format or a file protected with a password.
 
+Writing XLSX fails fast on what Excel can't open unchanged: a sheet name longer
+than 31 characters, a formula longer than 8,192 or a cell of text longer than
+32,767. The write throws `IOException` naming the sheet or the cell, because
+Excel would otherwise open the file only by repairing it and dropping or cutting
+what's over the limit. `setExcelLimitsEnforced(false)` writes the file unchanged,
+for a spreadsheet without those limits. OpenDocument has none of them.
+
 ==== Separated text
 
 Text has no types, so reading CSV guesses them: a cell that reads as a number, a

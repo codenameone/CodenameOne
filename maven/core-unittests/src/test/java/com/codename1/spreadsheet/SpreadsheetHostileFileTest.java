@@ -748,6 +748,8 @@ class SpreadsheetHostileFileTest extends UITestBase {
             public void run() {
                 try {
                     Workbook w = new Workbook();
+                    // a chain this long is past Excel's formula limit; it is written to test the writers
+                    w.setExcelLimitsEnforced(false);
                     Sheet s = w.addSheet("S");
                     s.setCellValue("A1", Double.valueOf(1));
                     s.setCellFormula("B1", chain.toString());
@@ -869,6 +871,41 @@ class SpreadsheetHostileFileTest extends UITestBase {
         val("B", "TEXTAFTER(\"\u0130a-B\",\"-\",1,1)");
         val("x", "TEXTAFTER(\"aBcx\",\"bc\",1,1)");
         val("aB", "TEXTBEFORE(\"aBcx\",\"CX\",-1,1)");
+    }
+
+    @Test
+    void excelLimitsFailFast() throws IOException {
+        String[] what = {"name", "text", "formula"};
+        for (String limit : what) {
+            Workbook w = new Workbook();
+            Sheet s = w.addSheet("name".equals(limit) ? repeat("n", 32) : "S");
+            if ("text".equals(limit)) {
+                s.setCellValue("B3", repeat("t", 32768));
+            } else if ("formula".equals(limit)) {
+                s.setCellFormula("B3", "=" + repeat("1+", 4096) + "1");
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try {
+                w.write(out, Workbook.Format.XLSX);
+                wrong.append("\nthe ").append(limit).append(" over Excel's limit was written");
+            } catch (IOException expected) {
+                if (!"name".equals(limit)) {
+                    same(Boolean.TRUE, Boolean.valueOf(expected.getMessage().endsWith("S!B3")), "the cell is named");
+                }
+            }
+            w.setExcelLimitsEnforced(false);
+            w.write(out, Workbook.Format.XLSX);
+            Workbook back = Workbook.read(new ByteArrayInputStream(out.toByteArray()), Workbook.Format.XLSX);
+            same(s.getName(), back.getSheet(0).getName(), "with the limits off, the " + limit + " is written as it is");
+            // OpenDocument has none of these limits
+            w.setExcelLimitsEnforced(true);
+            w.write(new ByteArrayOutputStream(), Workbook.Format.ODS);
+        }
+        // at the limits exactly, everything is written
+        Workbook w = new Workbook();
+        Sheet s = w.addSheet(repeat("n", 31));
+        s.setCellValue("A1", repeat("t", 32767));
+        w.write(new ByteArrayOutputStream(), Workbook.Format.XLSX);
     }
 
     @Test

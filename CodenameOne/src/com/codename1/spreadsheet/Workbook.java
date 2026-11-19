@@ -170,6 +170,7 @@ public final class Workbook {
     private static long cellLimit = 1000000L;
     private long allocatedCells;
     private boolean loading;
+    private boolean excelLimitsEnforced = true;
 
     /// Creates a workbook with no sheets.
     public Workbook() {
@@ -382,7 +383,7 @@ public final class Workbook {
     ///
     /// - `name`: the name of the sheet, which formulas on other sheets use to refer to it.
     ///   Excel takes names of up to 31 characters, and writing a workbook with a longer one as
-    ///   XLSX throws `IOException`
+    ///   XLSX throws `IOException` unless [#setExcelLimitsEnforced(boolean)] turns that off
     ///
     /// #### Returns
     ///
@@ -521,6 +522,28 @@ public final class Workbook {
 
     int indexOf(Sheet s) {
         return sheets.indexOf(s);
+    }
+
+    /// Whether writing XLSX refuses what Excel cannot open as it is.
+    ///
+    /// #### Returns
+    ///
+    /// true, the default, when a write past Excel's limits throws
+    public boolean isExcelLimitsEnforced() {
+        return excelLimitsEnforced;
+    }
+
+    /// Sets whether writing XLSX refuses what Excel cannot open as it is: a sheet name over 31
+    /// characters, a formula over 8,192 or a text over 32,767. By default such a write throws
+    /// `IOException` naming the sheet or the cell, because Excel opens such a file only by
+    /// repairing it, and drops or cuts what is over the limit. With false the file is written
+    /// as it is, which suits a file meant for a spreadsheet that has no such limits.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enforced`: false to write past the limits
+    public void setExcelLimitsEnforced(boolean enforced) {
+        excelLimitsEnforced = enforced;
     }
 
     /// Whether day numbers count from 1904, as files from old Macintosh versions of Excel
