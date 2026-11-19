@@ -2157,12 +2157,24 @@ class CleanTargetIntegrationTest {
         // The Compose screens added about 1,600 more (the Compose runtime and
         // kotlinx.coroutines), and a healthy build then ran past 45 minutes at
         // 7,024 of 7,025 steps.
+        // The Rive screens added about 700 more, and an x64 build that was still
+        // compiling (step 7,586 of 7,737) was killed by the old fixed 80-minute
+        // deadline.
         // This is a guard against a hang, not a performance budget: the perf
-        // gate is what judges speed.
+        // gate is what judges speed. So it judges progress, not total time --
+        // ninja prints a line per translation unit, and a build whose output
+        // has not grown for BUILD_STALL_MINUTES is the hang. A fixed total
+        // deadline failed healthy builds every time the suite grew. The overall
+        // cap only backstops a build that keeps printing without finishing,
+        // and stays under the job's own timeout so the test reports it.
         ProcessBuilder builder = new ProcessBuilder("cmake", "--build", buildDir.toString());
         builder.directory(workingDir.toFile());
-        return runCommand(builder, 80, java.util.concurrent.TimeUnit.MINUTES);
+        return runCommand(builder, BUILD_CAP_MINUTES, java.util.concurrent.TimeUnit.MINUTES,
+                BUILD_STALL_MINUTES * 60_000L);
     }
+
+    private static final long BUILD_STALL_MINUTES = 15;
+    private static final long BUILD_CAP_MINUTES = 125;
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);
@@ -2171,6 +2183,13 @@ class CleanTargetIntegrationTest {
     }
 
     static String runCommand(ProcessBuilder builder, long timeout, java.util.concurrent.TimeUnit unit) throws Exception {
+        return runCommand(builder, timeout, unit, 0);
+    }
+
+    /// Runs a command to completion. `stallMillis` above zero also stops it, as
+    /// a hang, once its output has not grown for that long.
+    static String runCommand(ProcessBuilder builder, long timeout, java.util.concurrent.TimeUnit unit,
+            long stallMillis) throws Exception {
         Path workingDir = builder.directory().toPath();
         Path log = Files.createTempFile(workingDir, "command-", ".log");
         String command = String.join(" ", builder.command());
@@ -2185,7 +2204,33 @@ class CleanTargetIntegrationTest {
             // None of these commands receives input. Supply EOF instead of keeping
             // a child that reads stdin waiting for the test runner indefinitely.
             process.getOutputStream().close();
-            boolean finished = process.waitFor(timeout, unit);
+            boolean finished;
+            String stalled = null;
+            if (stallMillis <= 0) {
+                finished = process.waitFor(timeout, unit);
+            } else {
+                long deadline = System.currentTimeMillis() + unit.toMillis(timeout);
+                long lastSize = -1;
+                long lastGrowth = System.currentTimeMillis();
+                while (true) {
+                    finished = process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS);
+                    if (finished) {
+                        break;
+                    }
+                    long now = System.currentTimeMillis();
+                    long size = Files.size(log);
+                    if (size != lastSize) {
+                        lastSize = size;
+                        lastGrowth = now;
+                    } else if (now - lastGrowth >= stallMillis) {
+                        stalled = "no output for " + (stallMillis / 60_000L) + " minutes";
+                        break;
+                    }
+                    if (now >= deadline) {
+                        break;
+                    }
+                }
+            }
             if (!finished) {
                 process.destroyForcibly();
                 process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
@@ -2193,7 +2238,8 @@ class CleanTargetIntegrationTest {
             String output = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
             String diagnostic = "Command: " + command + "\nFull output: " + log
                     + "\nOutput (tail):\n" + tailOf(output) + sourceRootSummary(workingDir);
-            assertTrue(finished, "Command timed out after " + timeout + " " + unit + "\n" + diagnostic);
+            assertTrue(finished, (stalled != null ? "Command hung (" + stalled + ")"
+                    : "Command timed out after " + timeout + " " + unit) + "\n" + diagnostic);
             assertEquals(0, process.exitValue(), diagnostic);
             succeeded = true;
             return output;
