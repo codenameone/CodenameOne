@@ -45,6 +45,13 @@ final class Evaluator {
     int col;
     private boolean arrayFormula;
     private int argDepth;
+    /// Whether the formula being evaluated took a range or an array element by element where
+    /// one value is wanted: Excel without dynamic arrays reads such a formula as an array
+    /// formula only when the file says so, so the writers mark it as one and Excel shows what
+    /// this evaluator calculated.
+    private boolean spread;
+    /// What spread was for the last formula evaluate finished.
+    boolean lastSpread;
     private int nameDepth;
     boolean skipSubtotals;
     private final ArrayList<String> letNames = new ArrayList<String>();
@@ -61,6 +68,8 @@ final class Evaluator {
         int savedCol = col;
         boolean savedArray = arrayFormula;
         int savedDepth = argDepth;
+        boolean savedSpread = spread;
+        spread = false;
         int savedLets = letNames.size();
         sheet = inSheet;
         row = inRow;
@@ -77,6 +86,8 @@ final class Evaluator {
             col = savedCol;
             arrayFormula = savedArray;
             argDepth = savedDepth;
+            lastSpread = spread;
+            spread = savedSpread;
             while (letNames.size() > savedLets) {
                 letNames.remove(letNames.size() - 1);
                 letValues.remove(letValues.size() - 1);
@@ -96,6 +107,7 @@ final class Evaluator {
             }
         } else if (v instanceof Object[][]) {
             Object[][] m = (Object[][]) v;
+            spread = true;
             v = m.length == 0 || m[0].length == 0 ? null : m[0][0];
         }
         if (v == null || v == MISSING) {
@@ -312,6 +324,7 @@ final class Evaluator {
         if (!arrayA && !arrayB) {
             return apply(op, a, b);
         }
+        spread = true;
         Object[][] x = arrayA ? (Object[][]) a : null;
         Object[][] y = arrayB ? (Object[][]) b : null;
         int rows = Math.max(x == null ? 1 : x.length, y == null ? 1 : y.length);
@@ -498,14 +511,7 @@ final class Evaluator {
             return CellError.NAME;
         }
         Node[] a = n.args;
-        // the conditionals pass their arguments through: a range in IF(A1:A3<0,...) at the top
-        // of a formula meets the formula's row, as it would without the IF around it
-        boolean through = (info & Functions.CATEGORY) == Functions.SPECIAL && Functions.index(SWITCH_1, name) >= 0
-                && Functions.index(SWITCH_1, name) <= 5;
-        int depthBefore = argDepth;
-        if (!through) {
-            argDepth++;
-        }
+        argDepth++;
         try {
             if ((info & Functions.CATEGORY) == Functions.SPECIAL) {
                 return special(name, a);
@@ -521,7 +527,7 @@ final class Evaluator {
         } catch (EvalError e) {
             return e.error; //NOPMD UnnecessaryLocalBeforeReturn - the caught error carries the value
         } finally {
-            argDepth = depthBefore;
+            argDepth--;
         }
     }
 
@@ -535,15 +541,12 @@ final class Evaluator {
             Object v = args[i];
             if (v instanceof Ref) {
                 Ref r = (Ref) v;
-                // a range straight in a formula's own function call is the cell in the
-                // formula's row or column, as Excel reads ABS(A1:A3) in a file without
-                // dynamic arrays, the way the operators intersect at the top level
-                v = r.isSingleCell() ? value(r.sheet, r.r1, r.c1)
-                        : argDepth == 1 && !arrayFormula ? intersectImplicitly(r) : (Object) matrix(r);
+                v = r.isSingleCell() ? value(r.sheet, r.r1, r.c1) : (Object) matrix(r);
                 args[i] = v;
             }
             if (v instanceof Object[][]) {
                 Object[][] m = (Object[][]) v;
+                spread = true;
                 rows = Math.max(rows, m.length);
                 cols = Math.max(cols, width(m));
             }
@@ -747,6 +750,7 @@ final class Evaluator {
         Object cond = operand(eval(a[0]));
         if (cond instanceof Object[][]) {
             Object[][] m = (Object[][]) cond;
+            spread = true;
             Object yes = operand(eval(a[1]));
             Object no = a.length > 2 ? operand(eval(a[2])) : Boolean.FALSE;
             // A row of conditions against columns of values is a table of both, as the
@@ -803,15 +807,15 @@ final class Evaluator {
 
     /// One value out of whatever an argument evaluated to: the cell of a single cell
     /// reference, the first element of an array or a range.
+    /// Notes that the formula took an array where one value is wanted.
+    void spreads() {
+        spread = true;
+    }
+
     Object scalar(Object v) {
         if (v instanceof Ref) {
             Ref r = (Ref) v;
-            if (r.r1 == r.r2 && r.c1 == r.c2 && r.next == null && r.lastSheet == null) {
-                return value(r.sheet, r.r1, r.c1);
-            }
-            // a range where one value is wanted is the cell in the formula's own row or
-            // column, as Excel reads ABS(A1:A3) in a file without dynamic arrays: @A1:A3
-            return arrayFormula ? value(r.sheet, r.r1, r.c1) : intersectImplicitly(r);
+            return value(r.sheet, r.r1, r.c1);
         }
         if (v instanceof Object[][]) {
             Object[][] m = (Object[][]) v;

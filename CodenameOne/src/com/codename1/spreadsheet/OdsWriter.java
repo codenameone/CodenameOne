@@ -339,6 +339,19 @@ final class OdsWriter {
         return 0;
     }
 
+    /// The part of a second, as a point and up to nine digits with the trailing zeros dropped.
+    private static void nanoDigits(StringBuilder sb, long nanos) {
+        if (nanos <= 0) {
+            return;
+        }
+        String digits = String.valueOf(1000000000L + nanos).substring(1);
+        int end = digits.length();
+        while (digits.charAt(end - 1) == '0') {
+            end--;
+        }
+        sb.append('.').append(digits.substring(0, end));
+    }
+
     private static void two(StringBuilder sb, long v) {
         if (v < 10) {
             sb.append('0');
@@ -367,6 +380,11 @@ final class OdsWriter {
         spans(x, region);
         if (cell.formula != null) {
             x.attr("table:formula", "of:=" + FormulaParser.print(cell.formula, true));
+            if ((cell.arrayFormula || cell.spreads) && region == null) {
+                // a one-cell matrix: LibreOffice then calculates the formula over arrays, as
+                // this evaluator did, instead of meeting each range at the formula's row
+                x.raw(" table:number-matrix-columns-spanned=\"1\" table:number-matrix-rows-spanned=\"1\"");
+            }
         } else if (cell.formulaText != null && cell.odsSyntax) {
             x.attr("table:formula", "of:=" + cell.formulaText);
         }
@@ -375,22 +393,28 @@ final class OdsWriter {
         if (v instanceof Double) {
             double d = ((Double) v).doubleValue();
             // past Excel's last day a date has no four-digit year, and the number is kept instead
-            if (format.isDate() && d >= 0 && d <= DateFunctions.LAST_DAY) {
+            // a serial before day 1 is no date of the 1900 calendar, so outside a time-only
+            // format it stays a number under its date style
+            if (format.isDate() && d >= 0 && d <= DateFunctions.LAST_DAY && (d >= 1 || format.isTimeOnly())) {
                 StringBuilder sb = new StringBuilder();
-                long seconds = (long) Math.floor((d - Math.floor(d)) * 86400 + 0.5);
+                // nanoseconds, so a time reads back as the number it was, not whole seconds
+                long nanos = (long) Math.floor((d - Math.floor(d)) * 86400.0E9 + 0.5);
                 double day = Math.floor(d);
-                if (seconds >= 86400) {
-                    seconds = 0;
+                if (nanos >= 86400000000000L) {
+                    nanos = 0;
                     day += 1;
                 }
+                long seconds = nanos / 1000000000L;
                 if (format.isTimeOnly()) {
-                    long total = (long) Math.floor(d * 86400 + 0.5);
+                    long totalNanos = (long) Math.floor(d * 86400.0E9 + 0.5);
+                    long total = totalNanos / 1000000000L;
                     sb.append("PT");
                     two(sb, total / 3600);
                     sb.append('H');
                     two(sb, total / 60 % 60);
                     sb.append('M');
                     two(sb, total % 60);
+                    nanoDigits(sb, totalNanos % 1000000000L);
                     sb.append('S');
                     x.raw(" office:value-type=\"time\"").attr("office:time-value", sb.toString());
                 } else {
@@ -403,13 +427,14 @@ final class OdsWriter {
                     two(sb, f[1]);
                     sb.append('-');
                     two(sb, f[2]);
-                    if (seconds != 0) {
+                    if (nanos != 0) {
                         sb.append('T');
                         two(sb, seconds / 3600);
                         sb.append(':');
                         two(sb, seconds / 60 % 60);
                         sb.append(':');
                         two(sb, seconds % 60);
+                        nanoDigits(sb, nanos % 1000000000L);
                     }
                     x.raw(" office:value-type=\"date\"").attr("office:date-value", sb.toString());
                 }

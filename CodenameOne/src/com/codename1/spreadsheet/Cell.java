@@ -47,6 +47,9 @@ final class Cell {
     boolean alwaysDirty;
     /// Written in the file as an array formula: evaluated without implicit intersection.
     boolean arrayFormula;
+    /// The last calculation took an array where one value is wanted; written as an array
+    /// formula so Excel calculates it the same way.
+    boolean spreads;
     // the format came from a typed formula such as =TODAY(), and goes when the formula does
     boolean autoFormat;
     // calls a function this package does not have: the value its file stored stands until

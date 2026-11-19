@@ -936,12 +936,45 @@ class SpreadsheetHostileFileTest extends UITestBase {
         for (int r = 0; r < 3; r++) {
             scal.setCellValue(r, 0, Double.valueOf(-(r + 1)));
         }
-        scal.setCellFormula(1, 2, "=ABS(A1:A3)");
-        same(Double.valueOf(2), scal.getCellValue(1, 2), "a range where one value is wanted: the formula's own row");
-        scal.setCellFormula(1, 3, "=IF(A1:A3<-1,\"y\",\"n\")");
-        same("y", scal.getCellValue(1, 3), "the comparison of the formula's own row");
-        scal.setCellFormula(5, 2, "=ABS(A1:A3)");
-        same(CellError.VALUE, scal.getCellValue(5, 2), "no cell of the range in the formula's row");
+        // a range where one value is wanted is taken whole, as Excel 365 does, and the formula
+        // is written as an array formula so Excel without dynamic arrays calculates the same
+        scal.setCellFormula(1, 2, "=SUM(ABS(A1:A3))");
+        same(Double.valueOf(6), scal.getCellValue(1, 2), "a range taken whole");
+        scal.setCellFormula(1, 3, "=SUM(A1:A3)");
+        ByteArrayOutputStream aout = new ByteArrayOutputStream();
+        scal.getWorkbook().write(aout, Workbook.Format.XLSX);
+        String sheetXml = new String(unzip(aout.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8");
+        if (sheetXml.indexOf("<f t=\"array\" ref=\"C2\">") < 0 || sheetXml.indexOf("<f t=\"array\" ref=\"D2\">") >= 0) {
+            wrong.append("\nonly the formula taking a range whole is an array formula: ").append(sheetXml);
+        }
+        ByteArrayOutputStream oout = new ByteArrayOutputStream();
+        scal.getWorkbook().write(oout, Workbook.Format.ODS);
+        if (new String(unzip(oout.toByteArray(), "content.xml"), "UTF-8").indexOf("number-matrix-columns-spanned") < 0) {
+            wrong.append("\nthe ODS cell is no matrix formula");
+        }
+        scal.setCellFormula(1, 9, "=VALUE(Z9)");
+        same(Double.valueOf(0), scal.getCellValue(1, 9), "VALUE of a blank cell");
+        Workbook tw = new Workbook();
+        Sheet ts = tw.addSheet("T");
+        ts.setCellValue(0, 0, Double.valueOf(0.2598929522439878));
+        ts.setCellFormat(0, 0, "hh:mm:ss");
+        ts.setCellValue(1, 0, Double.valueOf(45000.2598929522439878));
+        ts.setCellFormat(1, 0, "yyyy-mm-dd hh:mm");
+        ts.setCellValue(2, 0, Double.valueOf(0.3));
+        ts.setCellFormat(2, 0, "yyyy-mm-dd");
+        ByteArrayOutputStream tout = new ByteArrayOutputStream();
+        tw.write(tout, Workbook.Format.ODS);
+        Sheet back = Workbook.read(new ByteArrayInputStream(tout.toByteArray()), Workbook.Format.ODS).getSheet(0);
+        double[] wants = {0.2598929522439878, 45000.2598929522439878, 0.3};
+        for (int r = 0; r < 3; r++) {
+            Object v = back.getCellValue(r, 0);
+            Object was = ts.getCellValue(r, 0);
+            if (v == null || !v.getClass().equals(was.getClass()) || v instanceof Double
+                    && Math.abs(((Double) v).doubleValue() - wants[r]) > 1e-9 || v instanceof java.util.Date
+                    && Math.abs(((java.util.Date) v).getTime() - ((java.util.Date) was).getTime()) > 1) {
+                wrong.append("\nODS time row ").append(r).append(" read back as ").append(v);
+            }
+        }
         try {
             scal.setColumnWidth(0, Double.POSITIVE_INFINITY);
             wrong.append("\nan infinite column width was accepted");

@@ -926,6 +926,7 @@ public final class Workbook {
                 v = c.value;
             } else {
                 v = evaluator.evaluate(c.formula, c.sheet, c.row, c.col, c.arrayFormula);
+                c.spreads = evaluator.lastSpread;
             }
             int last = visiting.size() - 1;
             if (last >= 0 && visiting.get(last) == c) { //NOPMD CompareObjectsWithEquals - a cell is an identity

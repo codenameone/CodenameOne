@@ -80,6 +80,7 @@ final class LogicFunctions {
             return one(name, CellError.VALUE);
         }
         if (arg instanceof Object[][] || arg instanceof Ref && !((Ref) arg).isSingleCell()) {
+            ev.spreads();
             Object[][] m = ev.matrix(arg);
             Object[][] out = new Object[m.length][Evaluator.width(m)];
             for (int r = 0; r < m.length; r++) {

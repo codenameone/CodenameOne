@@ -428,7 +428,7 @@ final class XlsxWriter {
         }
         x.raw(">");
         if (formula != null) {
-            if (cell.arrayFormula) {
+            if (cell.arrayFormula || cell.spreads) {
                 x.raw("<f t=\"array\"").attr("ref", ref(row, col)).raw(">");
             } else {
                 x.raw("<f>");

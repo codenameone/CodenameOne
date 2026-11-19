@@ -214,6 +214,10 @@ final class TextFunctions {
                 if (v instanceof Double) {
                     return v;
                 }
+                if (v == null) {
+                    // a blank cell is 0 to VALUE, as to every other number
+                    return Double.valueOf(0);
+                }
                 if (!(v instanceof String)) {
                     throw EvalError.VALUE;
                 }
