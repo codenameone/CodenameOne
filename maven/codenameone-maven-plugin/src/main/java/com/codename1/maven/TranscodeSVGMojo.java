@@ -72,8 +72,8 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
  * SVG instance.
  */
 @Mojo(name = "transcode-svg", defaultPhase = LifecyclePhase.GENERATE_SOURCES,
-        requiresDependencyResolution = ResolutionScope.COMPILE,
-        requiresDependencyCollection = ResolutionScope.COMPILE)
+        requiresDependencyResolution = ResolutionScope.NONE,
+        requiresDependencyCollection = ResolutionScope.NONE)
 public class TranscodeSVGMojo extends AbstractCN1Mojo {
 
     @Override
