@@ -269,18 +269,24 @@ public class UndoHistory {
             this.name = name;
         }
 
+        // the list's cast kept out of the try blocks below: ParparVM does
+        // not check a cast, so none may sit where a catch could take it
+        private UndoableEdit at(int i) {
+            return edits.get(i);
+        }
+
         @Override
         public void undo() {
             int i = edits.size() - 1;
             try {
                 for (; i >= 0; i--) {
-                    edits.get(i).undo();
+                    at(i).undo();
                 }
             } catch (RuntimeException err) {
                 // the step stays in the history whole: what was taken back of
                 // it is made again, so a later undo starts from all of it
                 for (int k = i + 1; k < edits.size(); k++) {
-                    edits.get(k).redo();
+                    at(k).redo();
                 }
                 throw err;
             }
@@ -291,11 +297,11 @@ public class UndoHistory {
             int i = 0;
             try {
                 for (; i < edits.size(); i++) {
-                    edits.get(i).redo();
+                    at(i).redo();
                 }
             } catch (RuntimeException err) {
                 for (int k = i - 1; k >= 0; k--) {
-                    edits.get(k).undo();
+                    at(k).undo();
                 }
                 throw err;
             }
