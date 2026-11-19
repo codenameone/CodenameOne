@@ -66,7 +66,7 @@ dispatch() {
   local targets=("$@")
   [ "${#targets[@]}" -gt 0 ] || targets=("${WORKFLOWS[@]}")
   : > "$runs_file"
-  local -a sinces=() seens=()
+  local -a sinces=() seens=() dead=()
   for wf in "${targets[@]}"; do
     # A capture of an earlier head of this branch is rendering code that is
     # gone; its harvest would be skipped anyway (the branch moved).
@@ -79,14 +79,20 @@ dispatch() {
     # A minute early: the runner's clock is not GitHub's. Runs that already
     # existed are excluded by id instead.
     since="$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)"
-    seen="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
-              --event workflow_dispatch --limit 20 --json databaseId --jq '[.[].databaseId] | join(",")')"
+    # Retried, and never fatal: under set -e one transient error here would
+    # end the step with workflows already dispatched and not yet recorded.
+    seen="$(gh_retry gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
+              --event workflow_dispatch --limit 20 --json databaseId --jq '[.[].databaseId] | join(",")')" || seen=""
     # DISPATCH_TOKEN (the push token): GitHub starts no workflow_run for a
     # run github.token started, and golden-harvest.yml is a workflow_run.
     if ! { [ -n "${DISPATCH_TOKEN:-}" ] &&
            GH_TOKEN="$DISPATCH_TOKEN" gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"; }; then
       echo "::warning::could not dispatch $wf with CN1SS_GH_TOKEN (unset, lacking Actions: write, or a transient error); dispatching with github.token, so the harvest will not start by itself: run Golden harvest by hand with head_ref=$ref once the capture completes"
-      gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"
+      if ! gh_retry gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"; then
+        # no run will ever appear: waiting for one would outlast the job
+        log "could not dispatch $wf"
+        dead[${#sinces[@]}]=1
+      fi
     fi
     sinces+=("$since")
     seens+=("$seen")
@@ -105,6 +111,7 @@ dispatch() {
     missing=0
     for i in "${!targets[@]}"; do
       [ -n "${ids[$i]:-}" ] && continue
+      [ -n "${dead[$i]:-}" ] && continue
       wf="${targets[$i]}"
       id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
               --event workflow_dispatch --limit 20 --json databaseId,createdAt \
@@ -121,6 +128,8 @@ dispatch() {
       if [ -n "$id" ]; then
         ids[$i]="$id"
         log "$wf -> run $id"
+        # recorded at once, so a step that dies later still cancels it
+        printf '%s %s\n' "$wf" "$id" >> "$runs_file"
       else
         missing=$((missing + 1))
       fi
@@ -131,18 +140,14 @@ dispatch() {
         [ -n "${ids[$i]:-}" ] || log "no run of ${targets[$i]} appeared after dispatch"
       done
       [ -s "$err_file" ] && log "last listing error: $(tr '\n' ' ' < "$err_file")"
-      # Record what did start, so the failure step cancels those runs.
-      for i in "${!targets[@]}"; do
-        [ -n "${ids[$i]:-}" ] && printf '%s %s\n' "${targets[$i]}" "${ids[$i]}" >> "$runs_file"
-      done
+      # what did start is already in the runs file, for the failure step
       return 1
     fi
     pass=$((pass + 1))
     sleep 20
   done
-  for i in "${!targets[@]}"; do
-    printf '%s %s\n' "${targets[$i]}" "${ids[$i]}" >> "$runs_file"
-  done
+  # what started is recorded; a workflow that never did fails the step
+  [ "${#dead[@]}" -eq 0 ]
 }
 
 case "${1:-}" in
