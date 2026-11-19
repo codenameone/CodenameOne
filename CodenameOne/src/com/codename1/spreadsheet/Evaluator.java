@@ -360,6 +360,10 @@ final class Evaluator {
         }
         if (arg instanceof Ref) {
             Ref r = (Ref) arg;
+            // Excel answers #VALUE! when the results are not as long as the keys
+            if ((down ? r.rows() : r.cols()) != count) {
+                throw EvalError.VALUE;
+            }
             return down ? shaped(r, count, Math.min(r.cols(), Math.max(1, r.clip().cols())))
                     : shaped(r, Math.min(r.rows(), Math.max(1, r.clip().rows())), count);
         }

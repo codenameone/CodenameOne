@@ -179,7 +179,8 @@ public final class Sheet extends AbstractTableModel {
             c.value = Double.isNaN(d) || Double.isInfinite(d) ? CellError.NUM : value;
         } else if (value instanceof Float) {
             // 1.1f widened is 1.100000023841858: the number meant is the one it prints as
-            c.value = Double.valueOf(Double.parseDouble(value.toString()));
+            double d = Double.parseDouble(value.toString());
+            c.value = Double.isNaN(d) || Double.isInfinite(d) ? CellError.NUM : Double.valueOf(d);
         } else if (value instanceof Number) {
             c.value = Double.valueOf(((Number) value).doubleValue());
         } else if (value instanceof Boolean || value instanceof String || value instanceof CellError) {

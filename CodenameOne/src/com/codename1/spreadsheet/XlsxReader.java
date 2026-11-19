@@ -139,13 +139,18 @@ final class XlsxReader {
                 sheetRelations.add(id);
             } else if ("definedName".equals(x.name)) {
                 String name = x.attr("name");
-                // a name with a local sheet shadows the workbook's inside that sheet; there
-                // is one table of names here, so the workbook's own definition wins, and a
-                // name only a sheet defines becomes a workbook name rather than being lost
+                // there is one table of names here: a name only one sheet defines becomes a
+                // workbook name, and one defined more than once (by two sheets, or by a sheet
+                // and the workbook) is written into its own sheet's formulas as what it refers
+                // to, so no formula silently takes another sheet's meaning
                 boolean local = x.attr("localSheetId") != null;
                 String text = x.elementText();
                 if (name != null && !name.startsWith("_xlnm.")) {
-                    (local ? localNames : definedNames).add(new String[] {name, text});
+                    if (local) {
+                        localNames.add(new String[] {name, text, x.attr("localSheetId")});
+                    } else {
+                        definedNames.add(new String[] {name, text});
+                    }
                 }
             } else if ("externalReferences".equals(x.name) || "extLst".equals(x.name)) {
                 x.skipElement();
@@ -523,6 +528,13 @@ final class XlsxReader {
         int slash = workbookPath.lastIndexOf('/');
         String dir = slash < 0 ? "" : workbookPath.substring(0, slash + 1);
         HashMap<String, String> rels = relations.get(dir + "_rels/" + workbookPath.substring(slash + 1) + ".rels");
+        HashMap<String, Integer> definitions = new HashMap<String, Integer>();
+        for (String[] d : definedNames) {
+            count(definitions, d[0]);
+        }
+        for (String[] d : localNames) {
+            count(definitions, d[0]);
+        }
         for (int i = 0; i < sheetNames.size(); i++) {
             String target = rels == null ? null : rels.get(sheetRelations.get(i));
             if (target == null) {
@@ -535,15 +547,20 @@ final class XlsxReader {
                 continue;
             }
             parts.remove(path);
+            HashMap<String, String> inline = new HashMap<String, String>();
+            for (String[] d : localNames) {
+                if (String.valueOf(i).equals(d[2]) && definitions.get(FormulaParser.asciiUpper(d[0])).intValue() > 1) {
+                    inline.put(FormulaParser.asciiUpper(d[0]), d[1]);
+                }
+            }
+            if (!inline.isEmpty()) {
+                inlineNames(sheet, inline);
+            }
             resolve(sheet, formats);
             book.attach(sheet, sheetNames.get(i));
         }
-        java.util.HashSet<String> seen = new java.util.HashSet<String>();
-        for (String[] d : definedNames) {
-            seen.add(FormulaParser.asciiUpper(d[0]));
-        }
         for (String[] d : localNames) {
-            if (seen.add(FormulaParser.asciiUpper(d[0]))) {
+            if (definitions.get(FormulaParser.asciiUpper(d[0])).intValue() == 1) {
                 definedNames.add(d);
             }
         }
@@ -556,6 +573,64 @@ final class XlsxReader {
                 node = null;
             }
             book.defineName(d[0], d[1], node);
+        }
+    }
+
+    private static void count(HashMap<String, Integer> counts, String name) {
+        String key = FormulaParser.asciiUpper(name);
+        Integer n = counts.get(key);
+        counts.put(key, Integer.valueOf(n == null ? 1 : n.intValue() + 1));
+    }
+
+    /// Replaces each use of a sheet's own names in its formulas with what the name refers
+    /// to, in parentheses. Walks with a stack: a formula can be a long chain.
+    private static void inlineNames(Sheet sheet, HashMap<String, String> names) {
+        ArrayList<Node> stack = new ArrayList<Node>();
+        for (int r = 0; r < sheet.usedRows(); r++) {
+            Cell[] row = sheet.rowCells(r);
+            if (row == null) {
+                continue;
+            }
+            for (Cell c : row) {
+                if (c == null || c.formula == null) {
+                    continue;
+                }
+                Node root = new Node(Node.PAREN, null, c.formula);
+                boolean changed = false;
+                stack.add(root);
+                while (!stack.isEmpty()) {
+                    Node n = stack.remove(stack.size() - 1);
+                    if (n.args == null) {
+                        continue;
+                    }
+                    for (int j = 0; j < n.args.length; j++) {
+                        Node a = n.args[j];
+                        if (a == null) {
+                            continue;
+                        }
+                        String text = a.kind == Node.NAME ? names.get(FormulaParser.asciiUpper(a.name())) : null;
+                        Node definition = text == null ? null : parseOrNull(text);
+                        if (definition != null) {
+                            n.args[j] = new Node(Node.PAREN, null, definition);
+                            changed = true;
+                        } else {
+                            stack.add(a);
+                        }
+                    }
+                }
+                if (changed) {
+                    c.formula = root.args[0];
+                    c.formulaText = FormulaParser.display(c.formula);
+                }
+            }
+        }
+    }
+
+    private static Node parseOrNull(String text) {
+        try {
+            return FormulaParser.parse(text, false);
+        } catch (FormulaSyntaxException e) {
+            return null;
         }
     }
 

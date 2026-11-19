@@ -904,6 +904,40 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void roundTwentyOneLosses() throws IOException {
+        // two sheets each define Q: each sheet's formulas keep their own meaning
+        Workbook w = Workbook.read(new ByteArrayInputStream(zip("[Content_Types].xml", "<Types/>",
+                "xl/workbook.xml", "<workbook xmlns=\"" + MAIN + "\" xmlns:r=\"" + REL + "\"><sheets>"
+                        + "<sheet name=\"S1\" sheetId=\"1\" r:id=\"rId1\"/><sheet name=\"S2\" sheetId=\"2\" r:id=\"rId2\"/></sheets>"
+                        + "<definedNames><definedName name=\"Q\" localSheetId=\"0\">S1!$A$1</definedName>"
+                        + "<definedName name=\"Q\" localSheetId=\"1\">S2!$A$1</definedName></definedNames></workbook>",
+                "xl/_rels/workbook.xml.rels", "<Relationships><Relationship Id=\"rId1\" Type=\"" + REL
+                        + "/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"" + REL
+                        + "/worksheet\" Target=\"worksheets/sheet2.xml\"/></Relationships>",
+                "xl/worksheets/sheet1.xml", "<worksheet xmlns=\"" + MAIN + "\"><sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c><c r=\"B1\"><f>Q*10</f></c></row></sheetData></worksheet>",
+                "xl/worksheets/sheet2.xml", "<worksheet xmlns=\"" + MAIN + "\"><sheetData><row r=\"1\"><c r=\"A1\"><v>2</v></c><c r=\"B1\"><f>Q*10</f></c></row></sheetData></worksheet>")), Workbook.Format.XLSX);
+        w.getSheet(0).setCellValue("A1", Double.valueOf(3));
+        w.getSheet(1).setCellValue("A1", Double.valueOf(4));
+        same(Double.valueOf(30), w.getSheet(0).getCellValue("B1"), "the first sheet's Q");
+        same(Double.valueOf(40), w.getSheet(1).getCellValue("B1"), "the second sheet's Q");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        w.write(out, Workbook.Format.XLSX);
+        Workbook back = Workbook.read(new ByteArrayInputStream(out.toByteArray()), Workbook.Format.XLSX);
+        same(Double.valueOf(40), back.getSheet(1).getCellValue("B1"), "the second sheet's Q, saved");
+        Sheet s = back.getSheet(0);
+        s.setCellValue("C1", Float.valueOf(Float.NaN));
+        same(CellError.NUM, s.getCellValue("C1"), "a float NaN");
+        for (int r = 0; r < 5; r++) {
+            s.setCellValue(r, 4, Double.valueOf(r * 10));
+            s.setCellValue(r, 5, "v" + r);
+        }
+        s.setCellFormula("G1", "=XLOOKUP(40,E1:E5,F1:F4)");
+        same(CellError.VALUE, s.getCellValue("G1"), "results shorter than the keys");
+        s.setCellFormula("G1", "=XLOOKUP(40,E1:E5,F1:F5)");
+        same("v4", s.getCellValue("G1"), "results as long as the keys");
+    }
+
+    @Test
     void roundTwentyLosses() throws IOException {
         // a name only a sheet defines is kept; one the workbook also defines takes the workbook's
         Workbook w = Workbook.read(new ByteArrayInputStream(zip("[Content_Types].xml", "<Types/>",
