@@ -35,6 +35,9 @@ on:
       - 'vm/backend/src/com/codename1/backend/search/**'
       # The SQL clients the full-text search steps run over.
       - 'vm/backend/src/com/codename1/backend/sql/**'
+      - 'vm/backend/src/com/codename1/backend/Database.java'
+      - 'vm/backend/src/com/codename1/impl/orm/**'
+      - 'vm/backend/impl/javase/com/codename1/backend/sql/**'
       - 'vm/backend/engines/**'
       - 'maven/backend/src/test/java/com/codename1/backend/document/**'
       - 'maven/backend/src/test/java/com/codename1/backend/dynamo/**'

@@ -20,6 +20,12 @@ BEGIN
   FOR s IN (SELECT sequence_name FROM user_sequences WHERE sequence_name NOT LIKE 'ISEQ$$%') LOOP
     EXECUTE IMMEDIATE 'DROP SEQUENCE "' || s.sequence_name || '"';
   END LOOP;
+  -- Whatever else a migration may create: code, types and synonyms.
+  FOR o IN (SELECT object_name, object_type FROM user_objects
+            WHERE object_type IN ('PROCEDURE','FUNCTION','PACKAGE','TYPE','SYNONYM','TRIGGER')) LOOP
+    EXECUTE IMMEDIATE 'DROP ' || o.object_type || ' "' || o.object_name || '"'
+        || CASE WHEN o.object_type = 'TYPE' THEN ' FORCE' ELSE '' END;
+  END LOOP;
 END;
 /
 SQL

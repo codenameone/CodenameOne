@@ -10,7 +10,7 @@
 #   postgres://user:password@host:port/db?sslmode=disable
 #   mysql://user:password@host:port/db?sslmode=disable
 #   sqlserver://user:password@host:port/db?sslmode=disable
-#   oracle://user:password@host:port/service
+#   oracle://user:password@host:port/service?sslmode=disable
 #
 # The schema is emptied with psql or mysql, whichever the URL needs, so that
 # client has to be installed. CN1_TEST_DATABASE_RESET replaces that with a
@@ -72,7 +72,7 @@ reset_schema() {
       psql "$URL" -q -v ON_ERROR_STOP=1 \
           -c "DROP SCHEMA IF EXISTS public CASCADE" -c "CREATE SCHEMA public" >/dev/null
       ;;
-    mysql://*)
+    mysql://*|mariadb://*)
       # mysql takes no URL: mysql://user:password@host:port/db?options. Parsed
       # as the backend's Database.Url does -- bracketed IPv6 hosts, percent
       # escapes decoded, 3306 when the port is absent -- so the reset empties
