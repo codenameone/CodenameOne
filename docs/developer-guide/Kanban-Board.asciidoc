@@ -44,14 +44,14 @@ A column title is dragged the same way to move the column. The mark at the
 end of a title folds the column to a strip that shows only its count, and a tap
 on the strip opens it again.
 
-=== Limits and swimlanes
+=== Limits and swim lanes
 
 A column with `setWipLimit` shows its count against the limit, and is marked
 when it holds more. By default that's only a warning. A model with
 `setEnforceWipLimits(true)` refuses the card that would go past the limit, and
 the board shows the refusal while the card is still held over the column.
 
-Add `KanbanLane` objects to the model and the board is split into swimlanes,
+Adding `KanbanLane` objects to the model splits the board into swim lanes,
 one row of cells for each. A lane has a title bar across the board, and a tap
 on it folds the lane. A card belongs to a lane through `setLaneId`, and
 dragging it into another lane changes that.
@@ -61,7 +61,7 @@ dragging it into another lane changes that.
 include::../demos/common/src/main/java/com/codenameone/developerguide/kanban/KanbanSnippets.java[tag=kanban-lanes,indent=0]
 ----
 
-.Two swimlanes, a column over its limit and a folded column
+.Two swim lanes, a column over its limit and a folded column
 image::img/generated/kanban-lanes.png["A board split into two rows titled App and Server. The Doing column shows its count, 2/1, in red, and the Done column is folded to a narrow strip",scaledwidth=70%]
 
 === Adding and editing cards
@@ -151,7 +151,7 @@ The board is styled through these UIIDs, which the native themes define:
 |`KanbanCard` |A card, its border and its text
 |`KanbanCardSelected` |The outline of the selected card
 |`KanbanCardTag` |The tags, the badge and the description
-|`KanbanLane` |The title bar of a swimlane
+|`KanbanLane` |The title bar of a swim lane
 |`KanbanAddCard` |The row that adds a card
 |`KanbanDropSlot` |The place a held card would land
 |===
