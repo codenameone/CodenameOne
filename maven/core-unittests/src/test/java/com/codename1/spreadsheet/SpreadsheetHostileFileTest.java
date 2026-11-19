@@ -901,6 +901,25 @@ class SpreadsheetHostileFileTest extends UITestBase {
             w.setExcelLimitsEnforced(true);
             w.write(new ByteArrayOutputStream(), Workbook.Format.ODS);
         }
+        // what a defined name refers to is a formula too
+        Workbook named = new Workbook();
+        named.addSheet("S");
+        named.setDefinedName("big", "=" + repeat("1+", 4600) + "1");
+        try {
+            named.write(new ByteArrayOutputStream(), Workbook.Format.XLSX);
+            wrong.append("\na defined name over Excel's limit was written");
+        } catch (IOException expected) {
+            same(Boolean.TRUE, Boolean.valueOf(expected.getMessage().endsWith("big")), "the name is named");
+        }
+        // and a formula is measured as the file holds it, with the prefixes of newer functions
+        Workbook prefixed = new Workbook();
+        prefixed.addSheet("S").setCellFormula("A1", "=" + repeat("IFS(1,1)+", 900) + "1");
+        try {
+            prefixed.write(new ByteArrayOutputStream(), Workbook.Format.XLSX);
+            wrong.append("\na formula over the limit once prefixed was written");
+        } catch (IOException expected) {
+            same(Boolean.TRUE, Boolean.valueOf(expected.getMessage().endsWith("S!A1")), "the prefixed formula is named");
+        }
         // at the limits exactly, everything is written
         Workbook w = new Workbook();
         Sheet s = w.addSheet(repeat("n", 31));

@@ -534,7 +534,8 @@ public final class Workbook {
     }
 
     /// Sets whether writing XLSX refuses what Excel cannot open as it is: a sheet name over 31
-    /// characters, a formula over 8,192 or a text over 32,767. By default such a write throws
+    /// characters, a formula or what a defined name refers to over 8,192 (counted as the file holds
+    /// it, with the prefixes newer functions take) or a text over 32,767. By default such a write throws
     /// `IOException` naming the sheet or the cell, because Excel opens such a file only by
     /// repairing it, and drops or cuts what is over the limit. With false the file is written
     /// as it is, which suits a file meant for a spreadsheet that has no such limits.

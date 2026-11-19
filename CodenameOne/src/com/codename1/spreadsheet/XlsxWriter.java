@@ -58,6 +58,12 @@ final class XlsxWriter {
     /// a name behind the caller's back would also leave every formula naming it pointing at
     /// nothing. `Workbook.setExcelLimitsEnforced(false)` writes the file as it is.
     private void checkLimits() throws IOException {
+        for (String name : book.getDefinedNames()) {
+            String text = storedName(name);
+            if (text != null && text.length() + 1 > MAX_FORMULA) {
+                throw new IOException("Excel takes formulas of up to " + MAX_FORMULA + " characters: the name " + name);
+            }
+        }
         for (int i = 0; i < book.getSheetCount(); i++) {
             Sheet sheet = book.getSheet(i);
             String name = sheet.getName();
@@ -75,11 +81,13 @@ final class XlsxWriter {
                     if (cell == null) {
                         continue;
                     }
-                    if (cell.formulaText != null && cell.formulaText.length() + 1 > MAX_FORMULA) {
+                    // measured as written, prefixes included: the stricter of the two lengths
+                    String formula = storedFormula(cell);
+                    if (formula != null && formula.length() + 1 > MAX_FORMULA) {
                         throw new IOException("Excel takes formulas of up to " + MAX_FORMULA + " characters: "
                                 + name + "!" + ref(r, c));
                     }
-                    if (cell.formulaText == null && cell.value instanceof String
+                    if (formula == null && cell.formulaText == null && cell.value instanceof String
                             && ((String) cell.value).length() > MAX_TEXT) {
                         throw new IOException("Excel takes text of up to " + MAX_TEXT + " characters in a cell: "
                                 + name + "!" + ref(r, c));
@@ -87,6 +95,20 @@ final class XlsxWriter {
                 }
             }
         }
+    }
+
+    /// A formula as the file holds it, with the prefixes newer functions take; null for none.
+    private static String storedFormula(Cell cell) {
+        if (cell.formula != null) {
+            return FormulaParser.print(cell.formula, false);
+        }
+        return cell.formulaText != null && !cell.odsSyntax ? cell.formulaText : null;
+    }
+
+    /// What a defined name refers to, as the file holds it.
+    private String storedName(String name) {
+        Node node = book.definedNameNode(name);
+        return node == null ? book.getDefinedName(name) : FormulaParser.print(node, false);
     }
 
     void write(OutputStream out) throws IOException {
@@ -213,8 +235,7 @@ final class XlsxWriter {
         if (names.length > 0) {
             x.raw("<definedNames>");
             for (String nameItem : names) {
-                Node node = book.definedNameNode(nameItem);
-                String text = node == null ? book.getDefinedName(nameItem) : FormulaParser.print(node, false);
+                String text = storedName(nameItem);
                 x.raw("<definedName").attr("name", nameItem).raw(">").text(text, false).raw("</definedName>");
             }
             x.raw("</definedNames>");
@@ -371,12 +392,7 @@ final class XlsxWriter {
 
     private void writeCell(XmlOut x, Cell cell, int row, int col, int styleBase) throws IOException {
         Object v = cell.value;
-        String formula = null;
-        if (cell.formula != null) {
-            formula = FormulaParser.print(cell.formula, false);
-        } else if (cell.formulaText != null && !cell.odsSyntax) {
-            formula = cell.formulaText;
-        }
+        String formula = storedFormula(cell);
         int style = styleBase + cell.format;
         if (v == null && formula == null && style == 0) {
             return;
