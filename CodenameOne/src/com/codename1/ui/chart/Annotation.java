@@ -152,10 +152,15 @@ public final class Annotation {
             // NaN normalizes to NaN, which every comparison above lets through to the plot's bottom edge
             return null;
         }
+        if (axis instanceof com.codename1.ui.chart.axis.LogAxis && Math.max(from, to) <= 0) {
+            // a log axis clamps zero and below to an edge-hugging 1e-300 instead of answering NaN,
+            // so a line (or a band) lying wholly at or below zero is off the axis and skipped
+            return null;
+        }
         double n0 = axis.toNormalized(from);
         double n1 = axis.toNormalized(to);
         if (Double.isNaN(n0) || Double.isNaN(n1)) {
-            // a value a log axis cannot place (zero or below) has no position on the plot
+            // a custom axis may answer NaN for a value it cannot place: no position on the plot
             return null;
         }
         if (n1 < 0 || n0 > 1) {

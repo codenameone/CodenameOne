@@ -152,6 +152,12 @@ public class WaterfallSeries extends BarSeries {
     }
 
     @Override
+    protected double targetBase(int i) {
+        // the base is this series' own data, not a stack, so the tween settles on it
+        return getBase(i);
+    }
+
+    @Override
     public double[] getYBounds() {
         double min = 0;
         double max = 0;

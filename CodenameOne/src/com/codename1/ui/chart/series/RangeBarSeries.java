@@ -120,6 +120,12 @@ public class RangeBarSeries extends BarSeries {
     }
 
     @Override
+    protected double targetBase(int i) {
+        // the base is this series' own data, not a stack, so the tween settles on it
+        return getBase(i);
+    }
+
+    @Override
     public double[] getYBounds() {
         double min = Double.MAX_VALUE;
         double max = -Double.MAX_VALUE;

@@ -363,11 +363,12 @@ public class BarSeries extends XYSeries {
         int ax = x + ctx.getOriginX();
         int ay = y + ctx.getOriginY();
         for (int i = r[0]; i <= r[1]; i++) {
-            double v = getY(i);
+            // the rect as painted this frame, so a tap mid transition hits the bar it sees
+            double v = animatedY(ctx, i);
             if (isGap(v)) {
                 continue;
             }
-            float[] b = barRect(ctx, i, getBase(i), v, slot, bandPx);
+            float[] b = barRect(ctx, i, animatedBase(ctx, i), v, slot, bandPx);
             float minExtent = radius / 2f;
             float bx = b[0];
             float by = b[1];

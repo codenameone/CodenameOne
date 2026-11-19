@@ -435,7 +435,8 @@ public abstract class XYSeries extends Series {
             if (o == this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
                 break;
             }
-            if (o instanceof XYSeries) {
+            if (o instanceof XYSeries && ((XYSeries) o).consumesStackBase()) {
+                // a mark that keeps its own values (scatter) is not a layer and lifts nothing
                 XYSeries xo = (XYSeries) o;
                 // a series fading in or out carries its layers by the fraction it is shown, so
                 // the stack above it slides with the fade instead of snapping at its start
@@ -731,9 +732,51 @@ public abstract class XYSeries extends Series {
         // tweened from the base as painted when the change began to the settled one, with the
         // same progress as the layers below (animatedY), so a fade, a removed layer or a new
         // group all slide instead of snapping
-        double target = stackGroup == null ? getBase(i) : stackBase(true, i);
+        double target = targetBase(i);
         int j = fromSlot(i);
         return j < 0 || j >= fromBase.length ? target : lerp(fromBase[j], target, t);
+    }
+
+    /// The base point `i` settles on once the running transition ends: the stack of the earlier
+    /// layers weighted by the fraction each ends at, or [#getBase(int)] outside a stack group.
+    /// A series whose base is its own data (a range bar's start, a waterfall's running total)
+    /// overrides this to answer that, so the tween ends exactly where the settled value is.
+    ///
+    /// - `i`: the point index
+    ///
+    /// #### Returns
+    ///
+    /// the settled base
+    protected double targetBase(int i) {
+        return stackGroup == null ? getBase(i) : stackBase(true, i);
+    }
+
+    // the stack under point i as painted in the current frame: each earlier layer's drawn value
+    private double paintedStackBase(ChartContext ctx, int i) {
+        double x = xs[i];
+        if (stackGroup == null || isGap(x)) {
+            return getBase(i);
+        }
+        boolean negative = ys[i] < 0;
+        double sum = 0;
+        for (Series o : getChart().getSeries()) {
+            if (o == this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+                break;
+            }
+            if (o instanceof XYSeries && ((XYSeries) o).consumesStackBase()) {
+                XYSeries xo = (XYSeries) o;
+                if (stackGroup.equals(xo.stackGroup) && xo.isSecondaryAxis() == isSecondaryAxis()) {
+                    int j = i < xo.count && xo.xs[i] == x ? i : xo.indexOfX(x);
+                    if (j >= 0 && !isGap(xo.ys[j]) && (xo.ys[j] < 0) == negative) {
+                        double v = xo.animatedY(ctx, j);
+                        if (!isGap(v)) {
+                            sum += v;
+                        }
+                    }
+                }
+            }
+        }
+        return sum;
     }
 
     @Override
@@ -785,8 +828,18 @@ public abstract class XYSeries extends Series {
         fromY = new double[count];
         fromX = null;
         fromAux = null;
-        // the whole stack grows out of zero together
-        fromBase = new double[count];
+        // the chart's first entry grows the whole stack out of zero together; a series added
+        // to a chart already shown rests on the lower layers as painted and only its own value
+        // grows from zero, so it never dips into the stack below it
+        double[] fb = new double[count];
+        Chart c = getChart();
+        ChartContext ctx = c == null ? null : c.getLastContext();
+        if (ctx != null && stackGroup != null && consumesStackBase()) {
+            for (int i = 0; i < count; i++) {
+                fb[i] = paintedStackBase(ctx, i);
+            }
+        }
+        fromBase = fb;
         fromPainted = consumesStackBase() ? new double[count] : null;
     }
 
@@ -819,7 +872,8 @@ public abstract class XYSeries extends Series {
             if (isGap(v)) {
                 continue;
             }
-            double b = getBase(i);
+            // a mark that keeps its own values is drawn at them, never lifted by the stack
+            double b = consumesStackBase() ? getBase(i) : 0;
             if (isGap(b)) {
                 continue;
             }
