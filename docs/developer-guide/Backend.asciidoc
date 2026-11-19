@@ -326,7 +326,7 @@ there is nothing next to the binary.
   profiles, which changes two defaults and nothing else.
 
 | `cn1.datasource.url`
-| A SQLite path, or a `postgres://` or `mysql://` URL -- of the one engine
+| A SQLite path, or a `postgres://`, `mysql://`, `sqlserver://` or `oracle://` URL -- of the one engine
   the build names in `cn1.backend.database`. Also read from `DATABASE_URL`. On a development profile an unset value means an in-memory
   SQLite database; on any other profile it's an error, because a service that
   writes into a database inside its own process, with nothing saying so, loses

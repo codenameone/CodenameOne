@@ -75,6 +75,9 @@ public final class SqlSearchEngine implements SearchEngine {
     /// search on SQL Server needs a catalog the administrator creates, which an
     /// application cannot assume.
     private static final int SQLSERVER = 3;
+    /// Matched the same way, with the body folded by LOWER, because Oracle's
+    /// LIKE compares case.
+    private static final int ORACLE = 4;
 
     /// An engine over `data`, creating its table if needed. `ownsData` closes the
     /// data source along with the engine.
@@ -88,6 +91,8 @@ public final class SqlSearchEngine implements SearchEngine {
             kind = MYSQL;
         } else if (Dialect.SQLSERVER.equals(d)) {
             kind = SQLSERVER;
+        } else if (Dialect.ORACLE.equals(d)) {
+            kind = ORACLE;
         } else {
             kind = SQLITE;
         }
@@ -113,6 +118,11 @@ public final class SqlSearchEngine implements SearchEngine {
             data.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (idx NVARCHAR(191) NOT NULL, "
                     + "id NVARCHAR(191) NOT NULL, body NVARCHAR(MAX) NOT NULL, doc NVARCHAR(MAX) NOT NULL, "
                     + "PRIMARY KEY (idx, id))", null);
+        } else if (kind == ORACLE) {
+            // body and doc may be NULL: Oracle stores an empty text as NULL.
+            data.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (idx VARCHAR2(200 CHAR) NOT NULL, "
+                    + "id VARCHAR2(191 CHAR) NOT NULL, body CLOB, doc CLOB, "
+                    + "PRIMARY KEY (idx, id))", null);
         } else {
             data.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (idx TEXT NOT NULL, "
                     + "id TEXT NOT NULL, body TEXT NOT NULL, doc TEXT NOT NULL, "
@@ -136,6 +146,11 @@ public final class SqlSearchEngine implements SearchEngine {
                 ? "MERGE " + TABLE + " WITH (HOLDLOCK) AS t USING (VALUES (?, ?, ?, ?)) AS s (idx, id, body, doc) "
                         + "ON t.idx = s.idx AND t.id = s.id WHEN MATCHED THEN UPDATE SET body = s.body, doc = s.doc "
                         + "WHEN NOT MATCHED THEN INSERT (idx, id, body, doc) VALUES (s.idx, s.id, s.body, s.doc);"
+                : kind == ORACLE
+                ? "MERGE INTO " + TABLE + " t USING (SELECT ? AS idx, ? AS id, TO_CLOB(?) AS body, "
+                        + "TO_CLOB(?) AS doc FROM DUAL) s ON (t.idx = s.idx AND t.id = s.id) "
+                        + "WHEN MATCHED THEN UPDATE SET t.body = s.body, t.doc = s.doc "
+                        + "WHEN NOT MATCHED THEN INSERT (idx, id, body, doc) VALUES (s.idx, s.id, s.body, s.doc)"
                 : "INSERT INTO " + TABLE + " (idx, id, body, doc) VALUES (?, ?, ?, ?) "
                 + (kind == MYSQL
                 ? "ON DUPLICATE KEY UPDATE body = VALUES(body), doc = VALUES(doc)"
@@ -285,7 +300,9 @@ public final class SqlSearchEngine implements SearchEngine {
             // LIKE folds ASCII only, so a word with any other letter would miss
             // its own capitalised form; such words are checked in memory alone.
             if (isAscii(t)) {
-                sql.append(" AND body LIKE ? ESCAPE '\\'");
+                // The words are folded already (see terms).
+                sql.append(kind == ORACLE ? " AND LOWER(body) LIKE ? ESCAPE '\\'"
+                        : " AND body LIKE ? ESCAPE '\\'");
                 params[n++] = "%" + likeEscape(t) + "%";
             }
         }
@@ -308,7 +325,8 @@ public final class SqlSearchEngine implements SearchEngine {
         List matched = new ArrayList();
         for (int i = 0; i < rows.size() && i < MAX_CANDIDATES; i++) {
             Map row = (Map) rows.get(i);
-            if (!checked.isEmpty() && !hasWords(String.valueOf(row.get("body")), checked)) {
+            String body = row.get("body") == null ? "" : String.valueOf(row.get("body"));
+            if (!checked.isEmpty() && !hasWords(body, checked)) {
                 continue;
             }
             Map doc = Json.parseObject(String.valueOf(row.get("doc")));
@@ -320,12 +338,12 @@ public final class SqlSearchEngine implements SearchEngine {
             }
             Object s = row.get("score");
             double score = s instanceof Number ? ((Number) s).doubleValue()
-                    : occurrences(fold(String.valueOf(row.get("body"))), terms);
+                    : occurrences(fold(body), terms);
             matched.add(new SearchHit(String.valueOf(row.get("id")), score, doc, null));
         }
         if (q.getSortField() != null) {
             sortHits(matched, q.getSortField(), q.isSortAscending());
-        } else if ((kind == SQLITE || kind == SQLSERVER) && !terms.isEmpty()) {
+        } else if ((kind == SQLITE || kind == SQLSERVER || kind == ORACLE) && !terms.isEmpty()) {
             sortByScore(matched);
         }
         Map facets = new LinkedHashMap();
@@ -344,7 +362,7 @@ public final class SqlSearchEngine implements SearchEngine {
     /// on SQLite, whose `LIKE` also matches inside a longer word, and on MySQL
     /// the words InnoDB leaves out of its index.
     private List checkedTerms(List terms) {
-        if (kind == SQLITE || kind == SQLSERVER) {
+        if (kind == SQLITE || kind == SQLSERVER || kind == ORACLE) {
             return terms;
         }
         List out = new ArrayList();

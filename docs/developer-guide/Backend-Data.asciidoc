@@ -2,8 +2,8 @@
 == Backend data access and transactions
 
 A server's data lives in a database, and this chapter is about reaching it: the
-connection pool, which speaks to SQLite, PostgreSQL and MySQL with one dialect of
-SQL, the object mapping the build generates daos from, and the transactions that
+connection pool, which speaks to SQLite, PostgreSQL, MySQL, SQL Server and
+Oracle with one dialect of SQL, the object mapping the build generates daos from, and the transactions that
 make several statements one unit of work. The last of those gets the most room,
 because declarative transactions are where a Spring developer's intuitions are
 most likely to be almost right.
@@ -15,7 +15,7 @@ conditional aggregates over managed sessions, see
 === Talking to a database
 
 The server opens a connection pool from `cn1.datasource.url` -- a SQLite path or
-a PostgreSQL or MySQL URL -- and injects it as a `DataSource` into any bean that
+a PostgreSQL, MySQL, SQL Server or Oracle URL -- and injects it as a `DataSource` into any bean that
 asks for one. It returns rows as the same Java types whichever engine answered:
 
 [source,java,role=cn1-no-try]
@@ -24,7 +24,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/D
 ----
 
 There is no JDBC driver involved. SQLite is linked into the binary, and the
-PostgreSQL and MySQL clients speak their wire protocols directly, and a
+server clients speak their wire protocols directly, and a
 `mariadb://` URL is served by the same client. MySQL 8.0 and MariaDB 10.4 and
 newer are supported: a string key needs a case-sensitive NO PAD collation, so
 `"A"` and `"a"` are two keys and `"token "` keeps its space, and the two server
@@ -35,6 +35,40 @@ is still correct.
 MariaDB 10.3 works too. It has the same collation, which MariaDB added in 10.2.2,
 but it reached its upstream end of life in 2023 and isn't among the versions the
 tests run against, so 10.4 is the oldest release that's verified.
+
+==== SQL Server and Oracle
+
+A SQL Server URL is `sqlserver://user:password@host:1433/database` (`mssql://`
+is accepted too), for SQL Server 2017 and newer and for Azure SQL Database. A
+user written `DOMAIN\user` signs in as that Windows account over NTLMv2; any
+other name is a SQL login. Kerberos and Microsoft Entra ID sign-in aren't
+supported. The password crosses the network only inside TLS, so a server
+without TLS is refused unless the URL says `sslmode=disable`.
+
+An Oracle URL is `oracle://user:password@host:1521/service`, where the path is
+the service name, for Oracle Database 19c and newer. The password never crosses
+the network: the sign-in proves it with keys derived from it. With `sslmode`
+`require`, `verify-full` or `verify-ca` the connection uses TLS, which Oracle
+serves on a listener port of its own, usually 2484. Native Network Encryption,
+wallets and connection descriptors aren't supported.
+
+The portable statements, the object mapping and migrations work on both. Two
+differences can't be hidden:
+
+* Oracle stores an empty string as NULL. A `NOT NULL` text column refuses
+  `""` there, and a nullable one reads `""` back as `null`. The runtime's own
+  tables account for this; an application's schema has to as well.
+* Oracle commits around every DDL statement, as MySQL does, so a migration
+  that fails part way leaves what it created. The migration records the
+  failure and refuses to run again until `repair()` is called.
+
+Migrations take a lock while they run. On Oracle that lock is `DBMS_LOCK`, which
+the database user needs permission to call:
+
+[source,sql]
+----
+GRANT EXECUTE ON SYS.DBMS_LOCK TO app_user;
+----
 
 ==== One engine for each application
 
@@ -47,7 +81,8 @@ A server is built for one database engine, and the build names it:
 </properties>
 ----
 
-The value is `sqlite`, `postgres` or `mysql`, and `mysql` covers MariaDB. A
+The value is `sqlite`, `postgres`, `mysql`, `sqlserver` or `oracle`, and
+`mysql` covers MariaDB. A
 Gradle project sets the same key in the backend's `gradle.properties`. `sqlite`
 means the server talks to no database server at all.
 
