@@ -87,9 +87,16 @@ public final class Shapes {
     /// a closed path
     public static GeneralPath sector(float cx, float cy, float outer, float inner, double start, double sweep) {
         GeneralPath p = new GeneralPath();
-        int steps = Math.max(2, (int) Math.ceil(Math.abs(sweep) / 4));
+        // a non-finite sweep would ask for Integer.MAX_VALUE steps and hang the EDT; past a
+        // full turn a sector looks the same, so the sweep is clamped to one turn either way
+        double sw = sweep;
+        if (!(Math.abs(sw) <= 360)) { //NOPMD LogicInversion - NaN fails every comparison
+            sw = sw < -360 ? -360 : sw > 360 ? 360 : 0;
+        }
+        double st = Math.abs(start) < 1e9 ? start : 0;
+        int steps = Math.max(2, Math.min(360 / 4 + 1, (int) Math.ceil(Math.abs(sw) / 4)));
         for (int i = 0; i <= steps; i++) {
-            double a = start + sweep * i / steps;
+            double a = st + sw * i / steps;
             if (i == 0) {
                 p.moveTo(px(cx, outer, a), py(cy, outer, a));
             } else {
@@ -100,7 +107,7 @@ public final class Shapes {
             p.lineTo(cx, cy);
         } else {
             for (int i = steps; i >= 0; i--) {
-                double a = start + sweep * i / steps;
+                double a = st + sw * i / steps;
                 p.lineTo(px(cx, inner, a), py(cy, inner, a));
             }
         }

@@ -123,7 +123,8 @@ public final class ChartContext {
 
     /// The value axis a series is measured against.
     public Axis getValueAxis(Series s) {
-        return s.isSecondaryAxis() && chart.getSecondaryYAxis() != null ? chart.getSecondaryYAxis() : chart.getYAxis();
+        Axis second = chart.effectiveSecondaryAxis();
+        return s.isSecondaryAxis() && second != null ? second : chart.getYAxis();
     }
 
     /// The x of a data point in the parent's paint coordinates (see `getPlotX()`).

@@ -51,6 +51,11 @@ public abstract class XYSeries extends Series {
     // for a series that rests on a stack base, its value as painted (visibility weighted) where
     // the last transition started, per fromY slot, so the layer and the base above it tween alike
     private double[] fromPainted;
+
+    // the fromY slot of each current index when points were removed or slid off after the
+    // transition was captured; null means index i is still slot i. Only read when the slots are
+    // matched by index (unsorted data), where a shift would otherwise mix neighbours' values.
+    private int[] fromMap;
     private String stackGroup;
     private int maxPoints;
     /// Extra values per point (open/high/low, a range start, quartiles), parallel to `ys`.
@@ -181,6 +186,7 @@ public abstract class XYSeries extends Series {
     /// Removes the point at `i`, closing the gap it leaves.
     void removeRow(int i) {
         begin();
+        dropFromSlot(i);
         int tail = count - i - 1;
         System.arraycopy(xs, i + 1, xs, i, tail);
         System.arraycopy(ys, i + 1, ys, i, tail);
@@ -222,8 +228,32 @@ public abstract class XYSeries extends Series {
         }
     }
 
+    // records that current index i is gone, so later indices map one slot further on
+    private void dropFromSlot(int i) {
+        if (fromY == null) {
+            return;
+        }
+        int[] m = fromMap;
+        if (m == null) {
+            m = new int[count];
+            for (int k = 0; k < count; k++) {
+                m[k] = k < fromY.length ? k : -1;
+            }
+        }
+        int len = Math.min(m.length, count);
+        int[] next = new int[Math.max(0, len - 1)];
+        if (i > 0) {
+            System.arraycopy(m, 0, next, 0, Math.min(i, next.length));
+        }
+        if (i + 1 < len) {
+            System.arraycopy(m, i + 1, next, i, len - i - 1);
+        }
+        fromMap = next;
+    }
+
     private void slide() {
         if (maxPoints > 0 && count >= maxPoints) {
+            dropFromSlot(0);
             System.arraycopy(xs, 1, xs, 0, count - 1);
             System.arraycopy(ys, 1, ys, 0, count - 1);
             if (aux != null) {
@@ -633,6 +663,9 @@ public abstract class XYSeries extends Series {
             return -1;
         }
         if (fromX == null || !isAscending()) {
+            if (fromMap != null) {
+                return i < fromMap.length ? fromMap[i] : -1;
+            }
             return i < fromY.length ? i : -1;
         }
         int n = fromX.length;
@@ -834,6 +867,7 @@ public abstract class XYSeries extends Series {
         fromAux = fa;
         fromBase = fb;
         fromPainted = fp;
+        fromMap = null;
     }
 
     @Override
@@ -843,6 +877,7 @@ public abstract class XYSeries extends Series {
         fromAux = null;
         fromBase = null;
         fromPainted = null;
+        fromMap = null;
     }
 
     @Override
@@ -850,6 +885,7 @@ public abstract class XYSeries extends Series {
         fromY = new double[count];
         fromX = null;
         fromAux = null;
+        fromMap = null;
         // the chart's first entry grows the whole stack out of zero together; a series added
         // to a chart already shown rests on the lower layers as painted and only its own value
         // grows from zero, so it never dips into the stack below it

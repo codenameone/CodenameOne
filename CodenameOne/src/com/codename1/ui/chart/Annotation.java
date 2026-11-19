@@ -145,7 +145,7 @@ public final class Annotation {
         boolean horizontalLine = valueKind != ctx.isRotated();
         com.codename1.ui.chart.axis.Axis axis = ctx.getXAxis();
         if (valueKind) {
-            com.codename1.ui.chart.axis.Axis second = ctx.getChart().getSecondaryYAxis();
+            com.codename1.ui.chart.axis.Axis second = ctx.getChart().effectiveSecondaryAxis();
             axis = secondaryAxis && second != null ? second : ctx.getChart().getYAxis();
         }
         if (!finite(from) || !finite(to)) {

@@ -197,22 +197,10 @@ public class RadarSeries extends Series {
             }
         }
         maxLabel = Math.min(maxLabel, ctx.getPlotWidth() / 4);
-        double[] ticks = Ticks.linear(0, max <= 0 ? 1 : max, 5);
-        double step = ticks.length > 1 ? ticks[1] - ticks[0] : max;
-        if (!(step > 0) || step == Double.POSITIVE_INFINITY) { //NOPMD LogicInversion - also catches NaN
-            // the ring loops below step by this; 0 or NaN would never end them
-            step = 1;
-        }
-        double top = ticks.length > 0 ? ticks[ticks.length - 1] : 1;
-        if (top < max) {
-            top += step;
-        }
-        if (!(top > 0) || top == Double.POSITIVE_INFINITY) { //NOPMD LogicInversion - also catches NaN
-            top = 1;
-        }
         // While values shrink the polygons are still painted at the old, larger values; the scale
         // must hold them or a polygon is drawn far outside the rings. Growth keeps the target's
-        // scale (shown values are below it), so a grow-in is not cancelled.
+        // scale (shown values are below it), so a grow-in is not cancelled. The outer ring is
+        // the nice value above whichever is larger, so a shrinking chart still has round rings.
         double shownMax = 0;
         for (int k = 0; k < rs.size(); k++) {
             RadarSeries rr = (RadarSeries) rs.get(k);
@@ -226,7 +214,20 @@ public class RadarSeries extends Series {
                 }
             }
         }
-        top = Math.max(top, shownMax);
+        max = Math.max(max, shownMax);
+        double[] ticks = Ticks.linear(0, max <= 0 ? 1 : max, 5);
+        double step = ticks.length > 1 ? ticks[1] - ticks[0] : max;
+        if (!(step > 0) || step == Double.POSITIVE_INFINITY) { //NOPMD LogicInversion - also catches NaN
+            // the ring loops below step by this; 0 or NaN would never end them
+            step = 1;
+        }
+        double top = ticks.length > 0 ? ticks[ticks.length - 1] : 1;
+        if (top < max) {
+            top += step;
+        }
+        if (!(top > 0) || top == Double.POSITIVE_INFINITY) { //NOPMD LogicInversion - also catches NaN
+            top = 1;
+        }
         // the ring loops below stop at RINGS whatever the arithmetic says, so no scale can hang the EDT
         if (top / step > MAX_RINGS) {
             step = top / MAX_RINGS;

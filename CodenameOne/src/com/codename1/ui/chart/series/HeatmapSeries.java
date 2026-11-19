@@ -349,7 +349,7 @@ public class HeatmapSeries extends Series {
         // the row labels come from the axis this series is drawn against, as in formatTooltip
         com.codename1.ui.chart.axis.Axis rowAxis = null;
         if (ch != null) {
-            rowAxis = isSecondaryAxis() && ch.getSecondaryYAxis() != null ? ch.getSecondaryYAxis() : ch.getYAxis();
+            rowAxis = isSecondaryAxis() && !ch.isRotated() && ch.getSecondaryYAxis() != null ? ch.getSecondaryYAxis() : ch.getYAxis();
         }
         for (int r = 0; r < matrix.length; r++) {
             for (int c = 0; c < matrix[r].length; c++) {

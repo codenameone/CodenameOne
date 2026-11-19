@@ -309,6 +309,10 @@ public class Chart extends Component {
     }
 
     /// Adds a right hand value axis for series with `setSecondaryAxis(true)`.
+    ///
+    /// A rotated chart (`setRotated(true)`) has no room for a second horizontal value axis,
+    /// so while it is rotated the secondary axis is neither laid out nor painted and its series
+    /// and annotations are measured against the primary value axis instead.
     public Chart setSecondaryYAxis(Axis a) {
         secondaryYAxis = a;
         if (a != null) {
@@ -901,6 +905,13 @@ public class Chart extends Component {
         return new Dimension(mm(60), mm(45));
     }
 
+    // the secondary value axis series are measured against: none while rotated, where only the
+    // primary value axis is laid out, so secondary series share it rather than map to an axis
+    // nobody can see
+    Axis effectiveSecondaryAxis() {
+        return rotated ? null : secondaryYAxis;
+    }
+
     private Axis[] valueAxes() {
         if (secondaryYAxis != null) {
             return new Axis[]{yAxis, secondaryYAxis};
@@ -948,7 +959,7 @@ public class Chart extends Component {
                 xmax = Math.max(xmax, xb[1]);
             }
             if (yb != null && finite(yb[0]) && finite(yb[1])) {
-                int k = s.isSecondaryAxis() && secondaryYAxis != null ? 1 : 0;
+                int k = s.isSecondaryAxis() && effectiveSecondaryAxis() != null ? 1 : 0;
                 ymin[k] = Math.min(ymin[k], yb[0]);
                 ymax[k] = Math.max(ymax[k], yb[1]);
             }
@@ -957,7 +968,7 @@ public class Chart extends Component {
             if (!a.isOnValueAxis()) {
                 continue;
             }
-            int k = a.isSecondaryAxis() && secondaryYAxis != null ? 1 : 0;
+            int k = a.isSecondaryAxis() && effectiveSecondaryAxis() != null ? 1 : 0;
             // each end counts on its own: a band to infinity widens the axis to its finite end
             // only, never to infinity
             double v = a.getValueExtent();
@@ -2526,7 +2537,12 @@ public class Chart extends Component {
     @Override
     public void keyReleased(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
-        if (tooltipMode != TOOLTIP_NONE && lastContext != null && stepSelection(game)) {
+        // rotated, up and down step along the series and left and right would move between
+        // series; while the horizontal value axis is zoomed, left and right pan it instead, as
+        // they pan the zoomed horizontal axis of an upright chart, or it could never be panned
+        boolean panFirst = rotated && zoomEnabled && lastContext != null && hasCartesian()
+                && (game == Display.GAME_LEFT || game == Display.GAME_RIGHT) && horizontalAxis().isZoomed();
+        if (!panFirst && tooltipMode != TOOLTIP_NONE && lastContext != null && stepSelection(game)) {
             return;
         }
         if (zoomEnabled && hasCartesian() && lastContext != null) {

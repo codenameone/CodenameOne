@@ -222,6 +222,15 @@ public abstract class Axis {
                 min -= pad;
                 max += pad;
             }
+            // near Double.MAX_VALUE the pad overflows a side to infinity: that side stays on
+            // the value and the other side takes the pad, so the range stays finite and non-empty
+            if (Double.isInfinite(max)) {
+                max = anchor;
+                min = anchor - pad;
+            } else if (Double.isInfinite(min)) {
+                min = anchor;
+                max = anchor + pad;
+            }
         }
         double[] adj = adjustBounds(min, max);
         dataMin = adj[0];

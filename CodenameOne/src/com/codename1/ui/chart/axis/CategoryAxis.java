@@ -71,16 +71,26 @@ public class CategoryAxis extends Axis {
     // how many bands past the labels a data point may add before it is taken as an outlier
     private static final int MAX_EXTRA_BANDS = 10000;
 
+    // the most bands an axis with no category labels takes from its data
+    private static final int MAX_DATA_BANDS = 1 << 20;
+
     @Override
     public void setDataBounds(double min, double max) {
         // series may pad their extent by half a band (bars do), so count by floor, not round.
         // A point a little past the labels gets its band rather than falling off the axis; one
         // further than MAX_EXTRA_BANDS past them (1e9, infinity, NaN) is an outlier and is ignored,
         // so a single bad value cannot squeeze the real categories into slivers.
+        // With no labels at all the data alone says how many bands there are, so 20000 points
+        // get 20000 bands, capped at MAX_DATA_BANDS against a runaway value.
         int fromData = 1;
         double last = Math.floor(max + 1e-9) + 1;
-        if (last > 0 && last <= categories.size() + MAX_EXTRA_BANDS) {
-            fromData = (int) last;
+        double limit = categories.isEmpty() ? MAX_DATA_BANDS : categories.size() + MAX_EXTRA_BANDS;
+        if (last > 0 && last < Double.POSITIVE_INFINITY) {
+            if (last <= limit) {
+                fromData = (int) last;
+            } else if (categories.isEmpty()) {
+                fromData = MAX_DATA_BANDS;
+            }
         }
         int n = Math.max(categories.size(), fromData);
         super.setDataBounds(-0.5, n - 0.5);

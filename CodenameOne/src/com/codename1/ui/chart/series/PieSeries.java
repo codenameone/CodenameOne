@@ -182,7 +182,24 @@ public class PieSeries extends CategoricalSeries {
             }
         }
         r = Math.max(4, r);
-        double total = displayTotal(ctx);
+        // Shares are taken of values scaled by the largest one, so two slices near
+        // Double.MAX_VALUE neither overflow the total to infinity nor give an infinite sweep.
+        double maxPart = 0;
+        for (int i = 0; i < n; i++) {
+            double v = displayValue(ctx, i);
+            if (v > maxPart && v < Double.POSITIVE_INFINITY) {
+                maxPart = v;
+            }
+        }
+        double total = 0;
+        if (maxPart > 0) {
+            for (int i = 0; i < n; i++) {
+                double v = displayValue(ctx, i);
+                if (v > 0 && v < Double.POSITIVE_INFINITY) {
+                    total += v / maxPart;
+                }
+            }
+        }
         double sweepScale = isEntering(ctx) ? ctx.getProgress() : 1;
         ChartPoint sel = getChart() == null ? null : getChart().getSelection();
         int selIndex = sel != null && sel.getSeries() == this ? sel.getIndex() : -1; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
@@ -197,7 +214,10 @@ public class PieSeries extends CategoricalSeries {
         g.setAlpha((int) (alpha * getVisibilityFraction()));
         for (int i = 0; i < n; i++) {
             double v = displayValue(ctx, i);
-            double sweep = total > 0 ? 360 * v / total * sweepScale : 0;
+            double sweep = total > 0 && v > 0 && v < Double.POSITIVE_INFINITY ? 360 * (v / maxPart / total) * sweepScale : 0;
+            if (!(sweep >= 0 && sweep <= 360)) { //NOPMD LogicInversion - NaN and infinite sweeps draw as nothing
+                sweep = 0;
+            }
             lastStart[i] = a;
             lastSweep[i] = sweep;
             if (sweep > 0.05) {
