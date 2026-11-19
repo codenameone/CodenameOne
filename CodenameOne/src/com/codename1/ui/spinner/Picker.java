@@ -1152,6 +1152,9 @@ public class Picker extends Button {
         // popup and the modal picker are: never an operating system window.
         dlg.setNativeWindowMode(false);
         dlg.setDialogUIID("PickerMaterialDialog");
+        // A calendar or a clock face cannot wrap: the theme's cap on the width
+        // of an alert would cut it off instead. Dialog reads this when it packs.
+        dlg.putClientProperty("$PACKED_NO_WIDTH_CAP", Boolean.TRUE);
         dlg.getTitleArea().setHidden(true);
         dlg.getTitleComponent().setHidden(true);
         // Closed by its two buttons and by Back, each of which says whether the

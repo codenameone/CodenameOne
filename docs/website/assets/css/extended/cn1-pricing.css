@@ -356,6 +356,42 @@ body.dark .cn1-price-card--featured .cn1-price-card__cta:hover {
   color: #07102a;
 }
 
+.cn1-pricing-corporate {
+  display: grid;
+  grid-template-columns: 1.4fr 0.6fr;
+  gap: 44px;
+  align-items: center;
+  margin: 20px 0 0;
+  padding: 34px;
+  border: 1px solid var(--cn1-border);
+  border-radius: var(--cn1-radius-lg);
+  background: var(--cn1-surface-soft);
+}
+
+.cn1-pricing-corporate h2 {
+  margin: 8px 0 12px;
+  color: var(--cn1-text);
+  font-size: clamp(26px, 3.5vw, 36px);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.cn1-pricing-corporate p,
+.cn1-pricing-corporate li {
+  color: var(--cn1-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.cn1-pricing-corporate ul {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+.cn1-pricing-corporate__price .cn1-price-card__fit {
+  min-height: 0;
+}
+
 .cn1-pricing-risk {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -447,7 +483,8 @@ body.dark .cn1-price-card--featured .cn1-price-card__cta:hover {
 }
 
 @media (max-width: 980px) {
-  .cn1-pricing-license {
+  .cn1-pricing-license,
+  .cn1-pricing-corporate {
     grid-template-columns: 1fr;
   }
 
