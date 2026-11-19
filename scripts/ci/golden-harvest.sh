@@ -36,8 +36,10 @@ list() {
   : > "$runs_file"
   # A capture (golden-capture.yml) dispatches the workflows one after another
   # over a few minutes. A workflow without a run may still be coming until the
-  # capture status says dispatching is complete. Harvesting is incremental:
-  # every completed run can contribute images even while other legs are live.
+  # capture status says dispatching is complete. Outside a capture every
+  # completed run is collected as it finishes; in one, the yml commits only
+  # once every leg is done, since its push restarts the capture and the
+  # restart cancels the legs still rendering.
   # A cancelled capture contributes no run unless the cancelled run itself
   # has a capture artifact; completed runs are still harvested regardless of
   # the state of other legs. (A screenshot workflow dispatched by hand at a PR
@@ -94,7 +96,7 @@ list() {
   if [ "$pending" = 0 ] && [ -s "$runs_file" ]; then
     echo "ready=1" >> "${GITHUB_OUTPUT:-/dev/null}"
   else
-    log "some screenshot runs at $sha are still pending; collecting completed runs now"
+    log "some screenshot runs at $sha are still pending"
     echo "ready=0" >> "${GITHUB_OUTPUT:-/dev/null}"
   fi
 }
