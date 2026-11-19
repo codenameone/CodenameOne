@@ -35,6 +35,10 @@ import java.util.Map;
 /// Saves a board as JSON and reads it back.
 ///
 /// ```java
+/// DefaultKanbanModel model = new DefaultKanbanModel();
+/// model.addColumn(new KanbanColumn("todo", "To do"));
+/// KanbanBoard board = new KanbanBoard(model);
+///
 /// String json = KanbanJson.toJson(board.getModel());
 /// Storage.getInstance().writeObject("board", json);
 /// // later

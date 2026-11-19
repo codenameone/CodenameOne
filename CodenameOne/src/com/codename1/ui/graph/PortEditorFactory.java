@@ -30,6 +30,7 @@ import com.codename1.ui.Component;
 /// typed while nothing is connected to it, as node editors do.
 ///
 /// ```java
+/// NodeGraph graph = new NodeGraph();
 /// graph.setPortEditorFactory((g, node, port) -> {
 ///     if (!"number".equals(port.getType())) {
 ///         return null;

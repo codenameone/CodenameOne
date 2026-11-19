@@ -226,8 +226,9 @@ public class GraphSnippets {
         return graph;
     }
 
-    public Container palette(NodeGraph graph) {
+    public Container palette() {
         // tag::graph-palette[]
+        NodeGraph graph = new NodeGraph();
         GraphPalette palette = new GraphPalette(graph);
         palette.add(new GraphNodeTemplate("Step").setShape(GraphShapes.RECT));
         palette.add(new GraphNodeTemplate("Decision")
@@ -245,8 +246,9 @@ public class GraphSnippets {
         return editor;
     }
 
-    public void saveAndLoad(NodeGraph graph) {
+    public void saveAndLoad() {
         // tag::graph-json[]
+        NodeGraph graph = new NodeGraph();
         Preferences.set("diagram", GraphJson.toJson(graph.getModel()));
 
         String saved = Preferences.get("diagram", null);
@@ -260,8 +262,9 @@ public class GraphSnippets {
         // end::graph-json[]
     }
 
-    public Container undoAndClipboard(final NodeGraph graph) {
+    public Container undoAndClipboard() {
         // tag::graph-undo[]
+        final NodeGraph graph = new NodeGraph();
         // every edit goes into the application's history; one button serves
         // the graph and any other component that records into it
         UndoHistory history = UndoHistory.getGlobal();
@@ -280,8 +283,9 @@ public class GraphSnippets {
         return BoxLayout.encloseX(undo, redo, copy, paste, duplicate);
     }
 
-    public void portValues(final NodeGraph graph) {
+    public void portValues() {
         // tag::graph-port-values[]
+        NodeGraph graph = new NodeGraph();
         graph.setPortEditorFactory(new PortEditorFactory() {
             @Override
             public Component createEditor(final NodeGraph g, GraphNode node, final GraphPort port) {

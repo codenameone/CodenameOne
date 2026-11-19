@@ -38,10 +38,14 @@ import java.util.List;
 /// onto it: the shapes of a flow chart, or the node types of a node editor.
 ///
 /// ```java
+/// Form form = new Form("Diagram", new BorderLayout());
+/// NodeGraph graph = new NodeGraph();
+/// form.add(BorderLayout.CENTER, graph);
 /// GraphPalette palette = new GraphPalette(graph);
 /// palette.add(new GraphNodeTemplate("Step").setShape(GraphShapes.RECT));
 /// palette.add(new GraphNodeTemplate("Decision").setShape(GraphShapes.DECISION));
 /// form.add(BorderLayout.WEST, palette);
+/// form.show();
 /// ```
 ///
 /// Dragging an item over the graph and letting go adds a node there. Tapping

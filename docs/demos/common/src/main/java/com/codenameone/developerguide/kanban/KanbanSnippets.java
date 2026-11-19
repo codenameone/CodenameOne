@@ -86,8 +86,9 @@ public class KanbanSnippets {
         return board;
     }
 
-    public void listening(KanbanBoard board) {
+    public void listening() {
         // tag::kanban-veto[]
+        KanbanBoard board = new KanbanBoard(new DefaultKanbanModel());
         board.addKanbanListener(new KanbanAdapter() {
             @Override
             public boolean cardMoving(KanbanBoard b, KanbanCard card, KanbanColumn column,
@@ -109,8 +110,9 @@ public class KanbanSnippets {
         // end::kanban-veto[]
     }
 
-    public void undoAndSave(KanbanBoard board) {
+    public void undoAndSave() {
         // tag::kanban-undo[]
+        KanbanBoard board = new KanbanBoard(new DefaultKanbanModel());
         // later, from a button or a menu: the last change in the application
         UndoHistory.getGlobal().undo();
 
@@ -126,8 +128,12 @@ public class KanbanSnippets {
         // end::kanban-undo[]
     }
 
-    public void lookOfTheCards(KanbanBoard board) {
+    public void lookOfTheCards() {
         // tag::kanban-cards[]
+        DefaultKanbanModel model = new DefaultKanbanModel();
+        model.addColumn(new KanbanColumn("todo", "To do"));
+        model.addCard("todo", new KanbanCard("c2", "Crash on start"));
+        KanbanBoard board = new KanbanBoard(model);
         DefaultKanbanCardRenderer renderer = new DefaultKanbanCardRenderer();
         renderer.setAccent("bug", 0xd93025);
         renderer.setTagColor("ui", 0x34a853);

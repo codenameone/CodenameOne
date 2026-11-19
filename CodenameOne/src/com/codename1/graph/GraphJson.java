@@ -37,6 +37,10 @@ import java.util.Set;
 /// Writes a graph as JSON and reads it back, to save a diagram or send it.
 ///
 /// ```java
+/// DefaultGraphModel model = new DefaultGraphModel();
+/// model.addNode(new GraphNode("a", "Start", 20, 20, 100, 50));
+/// NodeGraph graph = new NodeGraph(model);
+///
 /// String saved = GraphJson.toJson(model);
 /// Storage.getInstance().writeObject("diagram", saved);
 /// // later

@@ -42,6 +42,7 @@ import com.codename1.ui.geom.GeneralPath;
 ///     public void detail(GeneralPath p, float x, float y, float w, float h) {
 ///     }
 /// });
+/// GraphNode node = new GraphNode("t", "Warning", 20, 20, 120, 90);
 /// node.setShape("triangle");
 /// ```
 public interface GraphShape {

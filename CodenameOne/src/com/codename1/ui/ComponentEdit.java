@@ -38,7 +38,17 @@ import com.codename1.util.UndoableEdit;
 /// recording its own edits wraps them the same way:
 ///
 /// ```java
-/// UndoHistory.getGlobal().record(new ComponentEdit(field, edit));
+/// TextField field = new TextField("Draft");
+/// field.setText("Final");
+/// UndoHistory.getGlobal().record(new ComponentEdit(field, new UndoableEdit() {
+///     public void undo() {
+///         field.setText("Draft");
+///     }
+///
+///     public void redo() {
+///         field.setText("Final");
+///     }
+/// }));
 /// ```
 public class ComponentEdit extends UndoableEdit {
     private final Component component;

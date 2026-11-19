@@ -34,6 +34,7 @@ import java.util.List;
 /// back the last change wherever it was made:
 ///
 /// ```java
+/// Button undoButton = new Button("Undo");
 /// UndoHistory history = UndoHistory.getGlobal();
 /// undoButton.addActionListener(e -> history.undo());
 /// history.addListener(h -> undoButton.setEnabled(h.canUndo()));

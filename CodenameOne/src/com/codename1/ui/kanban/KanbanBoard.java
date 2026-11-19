@@ -65,8 +65,10 @@ import java.util.Map;
 /// model.addColumn(new KanbanColumn("done", "Done"));
 /// model.addCard("todo", new KanbanCard("c1", "Write the release notes").addTag("docs"));
 ///
+/// Form form = new Form("Board", new BorderLayout());
 /// KanbanBoard board = new KanbanBoard(model);
 /// form.add(BorderLayout.CENTER, board);
+/// form.show();
 /// ```
 ///
 /// The whole board scrolls as one surface, both ways, under column titles
