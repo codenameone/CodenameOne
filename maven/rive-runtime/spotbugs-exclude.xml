@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- The core's project-wide policies (maven/core-unittests/spotbugs-exclude.xml),
+         which applied to this code while it lived in CodenameOne/src. -->
+    <!-- Unconfirmed casts fail fast; core policy. -->
+    <Match>
+        <Bug pattern="BC_UNCONFIRMED_CAST"/>
+    </Match>
+    <Match>
+        <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
+    </Match>
+    <!-- Static state is touched on the EDT only; core policy. -->
+    <Match>
+        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+    </Match>
+    <!-- Null over empty arrays on the device; core policy. -->
+    <Match>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+    <!-- Client-side performance over defensive copies; core policy. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <!-- Core policy. -->
+    <Match>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+    <!-- Core policy: done throughout Codename One. -->
+    <Match>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+    </Match>
+    <!-- Rive runtime objects initialise in two phases, as rive-runtime does:
+         the generated class constructs them, then Artboard.initialize runs
+         onAddedDirty/onAddedClean, which resolve ids into fields read
+         later (constraint targets, nested artboards, layout nodes). Pooled
+         per-frame records follow the same rule: a GpuRiveRenderer op is
+         filled when it is recorded and a state machine layer's state when it
+         first advances, and neither is read before that. Moved here with the
+         runtime from maven/core-unittests/spotbugs-exclude.xml. -->
+    <Match>
+        <Package name="com.codename1.impl.rive"/>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
+    </Match>
+</FindBugsFilter>
