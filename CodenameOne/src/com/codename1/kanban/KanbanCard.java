@@ -118,7 +118,8 @@ public class KanbanCard {
     }
 
     /// Sets the column. For a model's own use: a card of a model is moved
-    /// with `KanbanModel.moveCard`.
+    /// with `KanbanModel.moveCard`, and setting this on a card a model holds
+    /// leaves the model filing it under the column it had.
     public void setColumnId(String columnId) {
         this.columnId = columnId;
     }

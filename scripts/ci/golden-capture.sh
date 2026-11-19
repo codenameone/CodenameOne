@@ -79,14 +79,17 @@ dispatch() {
     # A minute early: the runner's clock is not GitHub's. Runs that already
     # existed are excluded by id instead.
     since="$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)"
-    seen="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
-              --event workflow_dispatch --limit 20 --json databaseId --jq '[.[].databaseId] | join(",")')"
+    # Retried, and never fatal: under set -e one transient error here would
+    # end the step with workflows already dispatched and not yet recorded.
+    seen="$(gh_retry gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
+              --event workflow_dispatch --limit 20 --json databaseId --jq '[.[].databaseId] | join(",")')" || seen=""
     # DISPATCH_TOKEN (the push token): GitHub starts no workflow_run for a
     # run github.token started, and golden-harvest.yml is a workflow_run.
     if ! { [ -n "${DISPATCH_TOKEN:-}" ] &&
            GH_TOKEN="$DISPATCH_TOKEN" gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"; }; then
       echo "::warning::could not dispatch $wf with CN1SS_GH_TOKEN (unset, lacking Actions: write, or a transient error); dispatching with github.token, so the harvest will not start by itself: run Golden harvest by hand with head_ref=$ref once the capture completes"
-      gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"
+      gh_retry gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests" ||
+        log "could not dispatch $wf; it will be reported as not started"
     fi
     sinces+=("$since")
     seens+=("$seen")
@@ -121,6 +124,8 @@ dispatch() {
       if [ -n "$id" ]; then
         ids[$i]="$id"
         log "$wf -> run $id"
+        # recorded at once, so a step that dies later still cancels it
+        printf '%s %s\n' "$wf" "$id" >> "$runs_file"
       else
         missing=$((missing + 1))
       fi
@@ -131,17 +136,11 @@ dispatch() {
         [ -n "${ids[$i]:-}" ] || log "no run of ${targets[$i]} appeared after dispatch"
       done
       [ -s "$err_file" ] && log "last listing error: $(tr '\n' ' ' < "$err_file")"
-      # Record what did start, so the failure step cancels those runs.
-      for i in "${!targets[@]}"; do
-        [ -n "${ids[$i]:-}" ] && printf '%s %s\n' "${targets[$i]}" "${ids[$i]}" >> "$runs_file"
-      done
+      # what did start is already in the runs file, for the failure step
       return 1
     fi
     pass=$((pass + 1))
     sleep 20
-  done
-  for i in "${!targets[@]}"; do
-    printf '%s %s\n' "${targets[$i]}" "${ids[$i]}" >> "$runs_file"
   done
 }
 

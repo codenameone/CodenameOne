@@ -143,7 +143,8 @@ public class LayeredArrangement implements GraphArrangement {
         }
         // the nodes in no lane keep their own arrangement, moved past the
         // last lane so that none of them lands in a lane's band
-        double laneEnd = 0;
+        // from the lanes themselves, which may lie at negative coordinates
+        double laneEnd = -Double.MAX_VALUE;
         double freeStart = 0;
         boolean anyFree = false;
         for (int i = 0; i < n; i++) {

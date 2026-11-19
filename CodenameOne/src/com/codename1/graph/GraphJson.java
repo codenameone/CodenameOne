@@ -275,7 +275,10 @@ public final class GraphJson {
     }
 
     /// Reads the tree `toMap` built, as a JSON parser returns it. Nothing is
-    /// added to the model unless the whole tree can be.
+    /// added to the model unless the whole tree can be: an id taken twice, or
+    /// an edge between nodes that are nowhere, refuses all of it. A node's
+    /// group and an edge's ports are taken as written, since a group or a
+    /// port may be added later.
     ///
     /// #### Throws
     ///

@@ -73,13 +73,17 @@ the row. With `setInlineEditing(false)`, a double tap tells the listeners the
 card was opened instead, which is where an application shows its own details
 form.
 
-With a keyboard, Delete removes the selected card, Enter opens it, and with
-Control or Command, C, X, V and D copy, cut, paste and duplicate it. A phone
+With a keyboard, Delete or Backspace removes the selected card, Enter opens
+it, and with Control or Command, C, X, V and D copy, cut, paste and duplicate
+it, while Z undoes and Shift-Z or Y redoes. A phone
 has no such keys, so the same commands are methods of the board, ready for a
 menu or a toolbar: `copySelection`, `cutSelection`, `paste`,
 `duplicateSelection`, `undo` and `redo`.
-`setEditingEnabled(false)` makes the board read-only. Columns and lanes still
-fold.
+`setEditingEnabled(false)` makes the board read-only, undo and redo included.
+Columns and lanes still fold, and a fold made then is not a step to undo.
+
+The board takes its colors from the `Kanban*` UIIDs of the theme, not from
+its own style, so it is restyled through the theme.
 
 === Listening and refusing
 

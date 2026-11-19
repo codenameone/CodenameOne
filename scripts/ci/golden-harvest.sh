@@ -201,7 +201,8 @@ redo-dropped() {
     done
     [ "$dropped" = 1 ] || continue
     log "$wf run $id: GitHub dropped a job before it got a runner; re-running its failed jobs (attempt $((attempt + 1)))"
-    GH_TOKEN="${RERUN_TOKEN:-$GH_TOKEN}" gh run rerun "$id" --repo "$GITHUB_REPOSITORY" --failed
+    GH_TOKEN="${RERUN_TOKEN:-$GH_TOKEN}" gh run rerun "$id" --repo "$GITHUB_REPOSITORY" --failed ||
+      echo "::warning::could not re-run the dropped jobs of run $id; moving on" >&2
     n=$((n + 1))
   done < "$runs_file"
   echo "$n"

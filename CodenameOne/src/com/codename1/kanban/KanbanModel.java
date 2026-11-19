@@ -74,7 +74,9 @@ public interface KanbanModel {
     boolean renameCard(KanbanCard card, String title);
 
     /// Moves a card to an index among the cards of a cell, which may be the
-    /// cell it is in. The index counts the cell without the card.
+    /// cell it is in. The index counts the cell without the card. A null
+    /// lane is the whole column: the index counts every lane's cards, and the
+    /// card keeps the lane it names.
     boolean moveCard(KanbanCard card, KanbanColumn column, KanbanLane lane, int index);
 
     /// Moves a column to an index among the columns, counted without it.

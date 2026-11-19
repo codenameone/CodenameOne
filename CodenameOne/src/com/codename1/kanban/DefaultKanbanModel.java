@@ -43,6 +43,8 @@ import java.util.Map;
 public class DefaultKanbanModel extends AbstractKanbanModel {
     private final List<KanbanColumn> columns = new ArrayList<KanbanColumn>();
     private final List<KanbanLane> lanes = new ArrayList<KanbanLane>();
+    private final List<KanbanColumn> columnsView = Collections.unmodifiableList(columns);
+    private final List<KanbanLane> lanesView = Collections.unmodifiableList(lanes);
     // per column id, its cards in order, of every lane together
     private final Map<String, List<KanbanCard>> byColumn = new HashMap<String, List<KanbanCard>>();
     private final Map<String, KanbanCard> cards = new HashMap<String, KanbanCard>();
@@ -51,12 +53,13 @@ public class DefaultKanbanModel extends AbstractKanbanModel {
 
     @Override
     public List<KanbanColumn> getColumns() {
-        return columns;
+        // read only: a column added here would bypass the index addColumn keeps
+        return columnsView;
     }
 
     @Override
     public List<KanbanLane> getLanes() {
-        return lanes;
+        return lanesView;
     }
 
     /// True when a card that would take a column past its limit is refused.

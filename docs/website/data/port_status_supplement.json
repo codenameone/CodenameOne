@@ -114,7 +114,7 @@
     },
     {
       "test": "KanbanBoardThemeScreenshotTest",
-      "reason": "The Kanban baseline is three columns in two swimlanes. A watch face shows a strip of one column, which checks nothing of the board.",
+      "reason": "The Kanban baseline is three columns in two swimlanes and a folded one. A watch face shows a strip of one column, which checks nothing of the board.",
       "platform_support": "The KanbanBoard component compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
       "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
       "reason_codes": [

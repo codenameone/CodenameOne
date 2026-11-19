@@ -93,6 +93,13 @@ public class GraphPalette extends Component {
     /// Removes an item.
     public void remove(GraphNodeTemplate template) {
         if (templates.remove(template)) {
+            // an item removed while held is let go of
+            pressed = -1;
+            dragging = false;
+            graph.clearDropPreview();
+            if (graph.getPendingTemplate() == template) { // NOPMD CompareObjectsWithEquals - the armed item itself
+                graph.setPendingTemplate(null);
+            }
             setShouldCalcPreferredSize(true);
             repaint();
         }
@@ -259,6 +266,9 @@ public class GraphPalette extends Component {
                 return;
             }
             dragging = true;
+        }
+        if (pressed >= templates.size()) {
+            return;
         }
         graph.showDropPreview(templates.get(pressed), x, y);
     }

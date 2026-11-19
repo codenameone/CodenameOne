@@ -230,6 +230,26 @@ class NodeGraphEditingTest extends UITestBase {
     }
 
     @FormTest
+    void aLaneTheModelKeepsInPlaceKeepsItsMembers() {
+        DefaultGraphModel m = new DefaultGraphModel() {
+            @Override
+            public boolean resizeGroup(GraphGroup group, double x, double y, double width, double height) {
+                return false;
+            }
+        };
+        GraphGroup lane = m.addGroup(GraphGroup.lane("ops", "Operations", true, 0, 120, 400, 140));
+        GraphNode a = new GraphNode("a", "A", 60, 160, 100, 50);
+        a.setGroupId("ops");
+        m.addNode(a);
+        NodeGraph g = show(m);
+        drag(g, 10, 180, 10, 230);
+        assertEquals(120, lane.getY(), 0.5);
+        assertEquals(160, a.getY(), 0.5);
+        assertEquals("ops", a.getGroupId());
+        assertFalse(history.canUndo());
+    }
+
+    @FormTest
     void aLaneEdgeResizesIt() {
         DefaultGraphModel m = new DefaultGraphModel();
         GraphGroup lane = m.addGroup(GraphGroup.lane("l", "Lane", false, 20, 20, 200, 200));

@@ -535,7 +535,8 @@ public class KanbanBoard extends ScrollSurface {
     /// false when there is no history or nothing to undo
     public boolean undo() {
         endEdit(true);
-        return undoHistory != null && undoHistory.undo();
+        // a read-only board changes nothing, and nothing in the middle of a drag
+        return editable && dragCard == null && dragColumn == null && undoHistory != null && undoHistory.undo();
     }
 
     /// Makes the last undone edit again.
@@ -545,7 +546,7 @@ public class KanbanBoard extends ScrollSurface {
     /// false when there is no history or nothing to redo
     public boolean redo() {
         endEdit(true);
-        return undoHistory != null && undoHistory.redo();
+        return editable && dragCard == null && dragColumn == null && undoHistory != null && undoHistory.redo();
     }
 
     private void record(UndoableEdit edit) {
@@ -586,8 +587,9 @@ public class KanbanBoard extends ScrollSurface {
             return false;
         }
         KanbanEdits.Place to = placeOf(card);
-        // a model of your own may have put it where the board cannot find it
-        if (to != null) {
+        // a model of your own may have put it where the board cannot find it,
+        // and a card that ended where it was leaves no step to undo
+        if (to != null && (to.column != from.column || to.lane != from.lane || to.index != from.index)) { // NOPMD CompareObjectsWithEquals - the model's own objects
             record(new KanbanEdits.Move(model, card, from, to, fromLaneId));
         }
         for (int i = 0; i < listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself
@@ -803,7 +805,10 @@ public class KanbanBoard extends ScrollSurface {
         boolean to = !column.isCollapsed();
         endEdit(true);
         if (model.setCollapsed(column, to)) {
-            record(new KanbanEdits.Fold(model, column, null, to));
+            // folding is open on a read-only board, where nothing is undone
+            if (editable) {
+                record(new KanbanEdits.Fold(model, column, null, to));
+            }
             for (int i = 0; i < listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself
                 listeners.get(i).columnToggled(this, column);
             }
@@ -814,7 +819,10 @@ public class KanbanBoard extends ScrollSurface {
         boolean to = !lane.isCollapsed();
         endEdit(true);
         if (model.setLaneCollapsed(lane, to)) {
-            record(new KanbanEdits.Fold(model, null, lane, to));
+            // folding is open on a read-only board, where nothing is undone
+            if (editable) {
+                record(new KanbanEdits.Fold(model, null, lane, to));
+            }
             for (int i = 0; i < listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself
                 listeners.get(i).laneToggled(this, lane);
             }
@@ -845,7 +853,7 @@ public class KanbanBoard extends ScrollSurface {
     /// added by `addCard` when editing ends with a title in it.
     public void startAddCard(KanbanColumn column, KanbanLane lane) {
         endEdit(true);
-        if (!editable || column == null || column.isCollapsed()) {
+        if (!editable || column == null || column.isCollapsed() || lane != null && lane.isCollapsed()) {
             return;
         }
         editColumn = column;
@@ -1693,20 +1701,51 @@ public class KanbanBoard extends ScrollSurface {
         ensureLayout();
         int w = Math.max(1, contentW);
         int h = Math.max(1, headerH + contentH);
-        Image img = Image.createImage(w, h, 0xffffffff);
-        Graphics g = img.getGraphics();
+        float ratio = Math.min(1, Math.min(maxWidth / (float) w, maxHeight / (float) h));
+        int tw = Math.max(1, Math.round(w * ratio));
+        int th = Math.max(1, Math.round(h * ratio));
         KanbanCard sel = selected;
         selected = null;
-        g.setClip(0, 0, w, headerH);
-        paintHeader(g, 0, 0);
-        g.setClip(0, headerH, w, h - headerH);
-        paintBoard(g, 0, headerH);
-        selected = sel;
-        if (w <= maxWidth && h <= maxHeight) {
-            return img;
+        try {
+            if (ratio >= 1) {
+                Image img = Image.createImage(w, h, 0xffffffff);
+                paintBand(img.getGraphics(), w, 0, h);
+                return img;
+            }
+            // a long board is painted a band at a time and each band scaled
+            // into the result, so memory follows the band and not the board
+            Image out = Image.createImage(tw, th, 0xffffffff);
+            Graphics og = out.getGraphics();
+            int band = Math.max(1, Math.min(h, 1024));
+            Image strip = Image.createImage(w, band, 0xffffffff);
+            Graphics sg = strip.getGraphics();
+            for (int y0 = 0; y0 < h; y0 += band) {
+                int bh = Math.min(band, h - y0);
+                sg.setClip(0, 0, w, band);
+                sg.setColor(0xffffff);
+                sg.fillRect(0, 0, w, band);
+                paintBand(sg, w, y0, bh);
+                int ty = Math.round(y0 * ratio);
+                int tb = Math.max(1, Math.round((y0 + bh) * ratio) - ty);
+                og.drawImage(bh == band ? strip : strip.subImage(0, 0, w, bh, true), 0, ty, tw, tb);
+            }
+            return out;
+        } finally {
+            selected = sel;
         }
-        float ratio = Math.min(maxWidth / (float) w, maxHeight / (float) h);
-        return img.scaled(Math.max(1, Math.round(w * ratio)), Math.max(1, Math.round(h * ratio)));
+    }
+
+    // Paints rows y0 to y0 + bh of the whole picture into g, at its top.
+    private void paintBand(Graphics g, int w, int y0, int bh) {
+        if (y0 < headerH) {
+            g.setClip(0, 0, w, Math.min(bh, headerH - y0));
+            paintHeader(g, 0, -y0);
+        }
+        int top = Math.max(0, headerH - y0);
+        if (top < bh) {
+            g.setClip(0, top, w, bh - top);
+            paintBoard(g, 0, headerH - y0);
+        }
     }
 
     /// Where the field a title is typed in goes, in the board's own

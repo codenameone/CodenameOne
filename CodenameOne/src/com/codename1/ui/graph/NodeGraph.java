@@ -224,10 +224,14 @@ public class NodeGraph extends Container {
     private int previewX;
     private int previewY;
     private PortEditorFactory portEditorFactory;
-    private final Map<String, Component> portEditors = new HashMap<String, Component>();
+    // keyed by the port object, which has no equals of its own: a string key
+    // would be built for every input port on every frame
+    private final Map<GraphPort, Component> portEditors = new HashMap<GraphPort, Component>();
     // the ports the factory had no editor for, with the value each had then:
     // it is asked again only once that value changes
-    private final Map<String, Object> declinedPorts = new HashMap<String, Object>();
+    private final Map<GraphPort, Object> declinedPorts = new HashMap<GraphPort, Object>();
+    // the node of each port in declinedPorts, to forget it with its node
+    private final Map<GraphPort, String> declinedNodes = new HashMap<GraphPort, String>();
     // stands for a null value in declinedPorts
     private static final Object NO_VALUE = new Object();
     private GraphJson.UserDataCodec userDataCodec;
@@ -301,6 +305,7 @@ public class NodeGraph extends Container {
         components.clear();
         portEditors.clear();
         declinedPorts.clear();
+        declinedNodes.clear();
         layer.removeAll();
         viewSet = false;
         modelChanged();
@@ -332,26 +337,27 @@ public class NodeGraph extends Container {
             }
         }
         if (!declinedPorts.isEmpty()) {
-            List<String> gone = new ArrayList<String>();
-            for (String key : declinedPorts.keySet()) {
-                if (model.getNode(key.substring(0, key.indexOf('\n'))) == null) {
-                    gone.add(key);
+            List<GraphPort> gone = new ArrayList<GraphPort>();
+            for (Map.Entry<GraphPort, String> en : declinedNodes.entrySet()) {
+                if (model.getNode(en.getValue()) == null) {
+                    gone.add(en.getKey());
                 }
             }
-            for (String key : gone) {
+            for (GraphPort key : gone) {
                 declinedPorts.remove(key);
+                declinedNodes.remove(key);
             }
         }
         if (!portEditors.isEmpty()) {
-            List<String> gone = new ArrayList<String>();
-            for (Map.Entry<String, Component> en : portEditors.entrySet()) {
+            List<GraphPort> gone = new ArrayList<GraphPort>();
+            for (Map.Entry<GraphPort, Component> en : portEditors.entrySet()) {
                 Component c = en.getValue();
                 String id = c == null ? null : (String) c.getClientProperty("cn1$graphNode");
                 if (id != null && model.getNode(id) == null) {
                     gone.add(en.getKey());
                 }
             }
-            for (String key : gone) {
+            for (GraphPort key : gone) {
                 Component c = portEditors.remove(key);
                 if (c != null && c.getParent() != null) {
                     layer.removeComponent(c);
@@ -729,7 +735,7 @@ public class NodeGraph extends Container {
             }
         }
         if (!goneNodes.isEmpty() || !goneEdges.isEmpty()) {
-            record(new GraphEdits.Presence(model, goneNodes, goneEdges, true, "Delete", nodesBefore, edgesBefore));
+            record(new GraphEdits.Presence(model, goneNodes, goneEdges, true, deleteStepName, nodesBefore, edgesBefore));
         }
         selection.clear();
         selectedEdge = null;
@@ -1401,9 +1407,17 @@ public class NodeGraph extends Container {
         if (!editable || !copySelection()) {
             return false;
         }
-        deleteSelection();
+        deleteStepName = "Cut";
+        try {
+            deleteSelection();
+        } finally {
+            deleteStepName = "Delete";
+        }
         return true;
     }
+
+    // what undo calls the removal deleteSelection records
+    private String deleteStepName = "Delete";
 
     /// Adds the nodes on the clipboard, each time a step further from where
     /// they were copied, and selects them.
@@ -1461,6 +1475,9 @@ public class NodeGraph extends Container {
         return createNode(template, screenToWorldX(sx), screenToWorldY(sy));
     }
 
+    // reused on every frame of a palette drag
+    private final GeneralPath previewPath = new GeneralPath();
+
     private void paintPreview(Graphics g, int color) {
         GraphNodeTemplate t = previewTemplate;
         int w = worldToScreenLength(t.getWidth());
@@ -1472,7 +1489,8 @@ public class NodeGraph extends Container {
         g.setAlpha(a * 70 / 255);
         GraphShape shape = GraphShapeRegistry.get(t.getShape());
         if (shape != null && g.isShapeSupported()) {
-            GeneralPath p = new GeneralPath();
+            GeneralPath p = previewPath;
+            p.reset();
             shape.outline(p, x, y, w, h);
             g.fillShape(p);
         } else {
@@ -1493,6 +1511,7 @@ public class NodeGraph extends Container {
         }
         portEditors.clear();
         declinedPorts.clear();
+        declinedNodes.clear();
         portEditorFactory = factory;
         syncComponents();
     }
@@ -1504,7 +1523,8 @@ public class NodeGraph extends Container {
 
     /// The editor made for a port, or null when none was made yet.
     public Component getPortEditor(GraphNode node, GraphPort port) {
-        return portEditors.get(node.getId() + "\n" + port.getId());
+        Component c = portEditors.get(port);
+        return c != null && node.getId().equals(c.getClientProperty("cn1$graphNode")) ? c : null;
     }
 
     /// Sets the value an input port uses while nothing is connected to it,
@@ -1542,7 +1562,7 @@ public class NodeGraph extends Container {
             boolean onScreen = show && isNodeVisible(n) && x < w && y < h && x + nw > 0 && y + nh > 0;
             for (int k = 0; k < ins.size(); k++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator
                 GraphPort p = ins.get(k);
-                String key = n.getId() + "\n" + p.getId();
+                GraphPort key = p;
                 Component c = portEditors.get(key);
                 if (onScreen && !isPortConnected(n, p)) {
                     Object v = p.getValue() == null ? NO_VALUE : p.getValue();
@@ -1552,8 +1572,10 @@ public class NodeGraph extends Container {
                         c = portEditorFactory.createEditor(this, n, p);
                         if (c == null) {
                             declinedPorts.put(key, v);
+                            declinedNodes.put(key, n.getId());
                         } else {
                             declinedPorts.remove(key);
+                            declinedNodes.remove(key);
                             portEditors.put(key, c);
                             c.putClientProperty("cn1$graphNode", n.getId());
                             c.putClientProperty("cn1$graphPort", p.getId());
@@ -2880,14 +2902,21 @@ public class NodeGraph extends Container {
         boolean moved = false;
         GraphGroup lane = movingLane;
         movingLane = null;
+        boolean laneRefused = false;
         if (lane != null) {
             double[] to = {lane.getX(), lane.getY(), lane.getWidth(), lane.getHeight()};
             lane.setBounds(laneFrom[0], laneFrom[1], laneFrom[2], laneFrom[3]);
-            if ((to[0] != laneFrom[0] || to[1] != laneFrom[1]) && model.resizeGroup(lane, to[0], to[1], to[2], to[3])) {
-                record(new GraphEdits.LaneBounds(model, lane, laneFrom, to));
-                moved = true;
+            if (to[0] != laneFrom[0] || to[1] != laneFrom[1]) {
+                if (model.resizeGroup(lane, to[0], to[1], to[2], to[3])) {
+                    record(new GraphEdits.LaneBounds(model, lane, laneFrom, to));
+                    moved = true;
+                } else {
+                    // the lane stayed, so its members stay in it
+                    laneRefused = true;
+                }
             }
         }
+        List<GraphNode> wentNodes = new ArrayList<GraphNode>();
         for (int i = 0; i < moving.size(); i++) {
             GraphNode n = moving.get(i);
             double nx = n.getX();
@@ -2898,6 +2927,9 @@ public class NodeGraph extends Container {
                 continue;
             }
             n.setPosition(ox, oy);
+            if (laneRefused) {
+                continue;
+            }
             boolean ok = true;
             for (int l = 0; l < listeners.size() && ok; l++) {
                 ok = listeners.get(l).nodeMoving(this, n, nx, ny);
@@ -2905,6 +2937,7 @@ public class NodeGraph extends Container {
             if (ok && model.moveNode(n, nx, ny)) {
                 n.setPosition(nx, ny);
                 moved = true;
+                wentNodes.add(n);
                 record(new GraphEdits.Move(model, n, ox, oy, nx, ny));
                 if (lane == null) {
                     joinLane(n);
@@ -2912,21 +2945,38 @@ public class NodeGraph extends Container {
                 for (int l = 0; l < listeners.size(); l++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator
                     listeners.get(l).nodeMoved(this, n);
                 }
+            } else if (lane != null && moved) {
+                // the lane went without this member: it is no longer inside
+                joinLane(n);
             }
         }
-        if (moved) {
-            if (!unrouted.isEmpty()) {
-                record(new GraphEdits.Routes(this, new ArrayList<GraphEdge>(unrouted),
-                        new ArrayList<double[]>(unroutedRoutes), null));
+        // a route stays wrong only at a node that moved; the others keep theirs
+        List<GraphEdge> lost = new ArrayList<GraphEdge>();
+        List<double[]> lostRoutes = new ArrayList<double[]>();
+        for (int i = 0; i < unrouted.size(); i++) {
+            GraphEdge e = unrouted.get(i);
+            if (lane != null && moved || touchesAny(e, wentNodes)) {
+                lost.add(e);
+                lostRoutes.add(unroutedRoutes.get(i));
+            } else {
+                e.setRoute(unroutedRoutes.get(i));
             }
-        } else {
-            // refused, or put back where it was: the routes still fit
-            for (int i = 0; i < unrouted.size(); i++) {
-                unrouted.get(i).setRoute(unroutedRoutes.get(i));
-            }
+        }
+        if (!lost.isEmpty()) {
+            record(new GraphEdits.Routes(this, lost, lostRoutes, null));
         }
         unrouted.clear();
         unroutedRoutes.clear();
+    }
+
+    private static boolean touchesAny(GraphEdge e, List<GraphNode> nodes) {
+        for (int i = 0; i < nodes.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed, no iterator
+            String id = nodes.get(i).getId();
+            if (id.equals(e.getSourceId()) || id.equals(e.getTargetId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void finishConnect() {

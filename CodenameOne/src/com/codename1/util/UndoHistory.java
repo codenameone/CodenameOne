@@ -152,12 +152,20 @@ public class UndoHistory {
         }
         UndoableEdit e = done.remove(done.size() - 1);
         replaying = true;
+        boolean ok = false;
         try {
             e.undo();
+            ok = true;
         } finally {
             replaying = false;
+            // an edit that threw stays where it was, so it is not lost
+            if (ok) {
+                undone.add(e);
+            } else {
+                done.add(e);
+            }
         }
-        undone.add(e);
+        // only after success: a failed edit left both stacks as they were
         fireChanged();
         return true;
     }
@@ -173,12 +181,18 @@ public class UndoHistory {
         }
         UndoableEdit e = undone.remove(undone.size() - 1);
         replaying = true;
+        boolean ok = false;
         try {
             e.redo();
+            ok = true;
         } finally {
             replaying = false;
+            if (ok) {
+                done.add(e);
+            } else {
+                undone.add(e);
+            }
         }
-        done.add(e);
         fireChanged();
         return true;
     }
@@ -241,8 +255,8 @@ public class UndoHistory {
     private void fireChanged() {
         // a copy: a listener may add or remove listeners while it is told
         UndoHistoryListener[] all = listeners.toArray(new UndoHistoryListener[listeners.size()]);
-        for (int i = 0; i < all.length; i++) {
-            all[i].historyChanged(this);
+        for (UndoHistoryListener l : all) {
+            l.historyChanged(this);
         }
     }
 

@@ -111,6 +111,9 @@ public interface GraphModel {
     /// - `index`: where in `getNodes` it goes, which is its painting order;
     ///   negative, or past the end, for the end. Undoing a removal puts a
     ///   node back where it was.
+    ///
+    /// A view's undo of a delete puts nodes back through this method, so a
+    /// model that refuses it cannot have its deletes undone.
     boolean insertNode(GraphNode node, int index);
 
     /// Adds an edge as it is, without the checks `connect` makes: pasting and

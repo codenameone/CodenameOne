@@ -40,7 +40,6 @@ public class DefaultGraphModel extends AbstractGraphModel {
     private final Map<String, GraphEdge> edgeIndex = new HashMap<String, GraphEdge>();
     private ConnectionValidator validator = new ConnectionValidator();
     private int edgeCounter;
-    private int nodeCounter;
 
     @Override
     public List<GraphNode> getNodes() {
@@ -278,22 +277,6 @@ public class DefaultGraphModel extends AbstractGraphModel {
         }
         fireChanged();
         return true;
-    }
-
-    /// An id no node of this model has, starting with `prefix`.
-    public String newNodeId(String prefix) {
-        String p = prefix == null ? "n" : prefix;
-        String id;
-        do {
-            nodeCounter++;
-            id = p + nodeCounter;
-        } while (nodeIndex.containsKey(id));
-        return id;
-    }
-
-    /// An id no edge of this model has.
-    public String newEdgeId() {
-        return nextEdgeId();
     }
 
     private String nextEdgeId() {

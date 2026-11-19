@@ -160,4 +160,37 @@ class UndoHistoryTest {
         assertFalse(h.canRedo());
         assertEquals(6, events[0]);
     }
+
+    @Test
+    void anEditThatThrowsStaysInTheHistory() {
+        UndoHistory h = new UndoHistory();
+        final int[] calls = new int[1];
+        h.record(new UndoableEdit() {
+            @Override
+            public void undo() {
+                calls[0]++;
+                if (calls[0] == 1) {
+                    throw new IllegalStateException("model refused");
+                }
+            }
+
+            @Override
+            public void redo() {
+            }
+
+            @Override
+            public String getName() {
+                return "Flaky";
+            }
+        });
+        try {
+            h.undo();
+        } catch (IllegalStateException expected) {
+            // the edit's own failure reaches the caller
+        }
+        assertEquals("Flaky", h.getUndoName());
+        assertFalse(h.canRedo());
+        assertTrue(h.undo());
+        assertEquals("Flaky", h.getRedoName());
+    }
 }

@@ -429,4 +429,52 @@ class KanbanBoardTest extends UITestBase {
         assertTrue(b.redo());
         assertSame(model.getColumn("todo"), model.getColumns().get(2));
     }
+
+    @FormTest
+    void undoPutsACardBackIntoAColumnThatFilledUpSince() {
+        KanbanBoard b = show(false);
+        model.setEnforceWipLimits(true);
+        KanbanCard a = model.getCard("a");
+        model.getColumn("todo").setWipLimit(3);
+        assertTrue(b.moveCard(a, model.getColumn("done"), null, 0));
+        // the column took another card outside the history
+        model.addCard("todo", new KanbanCard("z", "Z"));
+        assertTrue(b.undo());
+        assertEquals("todo", a.getColumnId());
+        assertTrue(model.isEnforceWipLimits());
+        assertTrue(b.redo());
+        assertEquals("done", a.getColumnId());
+    }
+
+    @FormTest
+    void aReadOnlyBoardUndoesNothing() {
+        KanbanBoard b = show(false);
+        KanbanCard a = model.getCard("a");
+        assertTrue(b.moveCard(a, model.getColumn("done"), null, 0));
+        b.setEditingEnabled(false);
+        assertFalse(b.undo());
+        assertEquals("done", a.getColumnId());
+        b.setEditingEnabled(true);
+        assertTrue(b.undo());
+        assertEquals("todo", a.getColumnId());
+    }
+
+    @FormTest
+    void aLongBoardMakesASmallImage() {
+        KanbanBoard b = show(false);
+        for (int i = 0; i < 400; i++) {
+            model.addCard("todo", new KanbanCard("long" + i, "Card " + i));
+        }
+        Image img = b.toImage(120, 120);
+        assertTrue(img.getWidth() <= 120 && img.getHeight() <= 120);
+        assertTrue(img.getHeight() >= 100);
+    }
+
+    @FormTest
+    void aMoveThatEndsWhereItStartedIsNoStep() {
+        KanbanBoard b = show(false);
+        KanbanCard a = model.getCard("a");
+        assertTrue(b.moveCard(a, model.getColumn("todo"), null, 0));
+        assertFalse(history.canUndo());
+    }
 }

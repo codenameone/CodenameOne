@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.kanban;
 
+import com.codename1.kanban.DefaultKanbanModel;
 import com.codename1.kanban.KanbanCard;
 import com.codename1.kanban.KanbanColumn;
 import com.codename1.kanban.KanbanLane;
@@ -32,6 +33,43 @@ import com.codename1.util.UndoableEdit;
 /// through the model, so a listening board repaints.
 final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - a holder of the edit classes
     private KanbanEdits() {
+    }
+
+    // A step puts back a state the board was in. A limit enforced by the
+    // default model would refuse that when the column filled up since, and
+    // the history would count a step that moved nothing; the limit is set
+    // aside while the step replays. A model of your own that refuses a
+    // replayed change leaves the step without effect.
+    static boolean suspendLimits(KanbanModel model) {
+        if (model instanceof DefaultKanbanModel && ((DefaultKanbanModel) model).isEnforceWipLimits()) {
+            ((DefaultKanbanModel) model).setEnforceWipLimits(false);
+            return true;
+        }
+        return false;
+    }
+
+    static void resumeLimits(KanbanModel model, boolean suspended) {
+        if (suspended) {
+            ((DefaultKanbanModel) model).setEnforceWipLimits(true);
+        }
+    }
+
+    static boolean move(KanbanModel model, KanbanCard card, Place p) {
+        boolean s = suspendLimits(model);
+        try {
+            return model.moveCard(card, p.column, p.lane, p.index);
+        } finally {
+            resumeLimits(model, s);
+        }
+    }
+
+    static boolean insert(KanbanModel model, KanbanCard card, Place p) {
+        boolean s = suspendLimits(model);
+        try {
+            return model.insertCard(card, p.column, p.lane, p.index);
+        } finally {
+            resumeLimits(model, s);
+        }
     }
 
     /// Where a card is: its cell and its index in it.
@@ -67,7 +105,7 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
         public void undo() {
             // a card naming no lane is shown in the first one; moved back there
             // it names none again, as before
-            if (model.moveCard(card, from.column, from.lane, from.index)
+            if (move(model, card, from)
                     && (fromLaneId == null || model.getLane(fromLaneId) == null)) {
                 card.setLaneId(fromLaneId);
             }
@@ -75,7 +113,7 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
 
         @Override
         public void redo() {
-            model.moveCard(card, to.column, to.lane, to.index);
+            move(model, card, to);
         }
 
         @Override
@@ -114,7 +152,7 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
         // a card naming no lane is shown in the first one; put back there it
         // names none again, as before
         private void put() {
-            if (model.insertCard(card, at.column, at.lane, at.index)
+            if (insert(model, card, at)
                     && (laneId == null || model.getLane(laneId) == null)) {
                 card.setLaneId(laneId);
             }

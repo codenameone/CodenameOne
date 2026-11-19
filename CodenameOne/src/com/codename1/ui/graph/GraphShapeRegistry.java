@@ -41,9 +41,14 @@ public final class GraphShapeRegistry {
     private static final Map<String, GraphShape> SHAPES = new HashMap<String, GraphShape>();
     // per shape name, the outlines built so far at the origin, each with its size
     private static final Map<String, List<Sized>> PATHS = new HashMap<String, List<Sized>>();
+    // a size past those kept is built here: evicting one on every miss would
+    // rebuild an outline per edge end per frame once a diagram has more sizes
+    private static final GeneralPath SPARE = new GeneralPath();
+    // the built-in rectangle, whose outline is its bounds and needs no path
+    private static final GraphShape PLAIN = new Builtin(0);
 
     static {
-        SHAPES.put(GraphShapes.RECT, new Builtin(0));
+        SHAPES.put(GraphShapes.RECT, PLAIN);
         SHAPES.put(GraphShapes.ROUNDED, new Builtin(1));
         SHAPES.put(GraphShapes.TERMINATOR, new Builtin(2));
         SHAPES.put(GraphShapes.DECISION, new Builtin(3));
@@ -82,7 +87,7 @@ public final class GraphShapeRegistry {
     /// and edges ask for the same few sizes again and again.
     private static GeneralPath path(String name, float w, float h) {
         GraphShape shape = SHAPES.get(name);
-        if (shape == null) {
+        if (shape == null || shape == PLAIN) { // NOPMD CompareObjectsWithEquals - the built-in instance is meant
             return null;
         }
         List<Sized> kept = PATHS.get(name);
@@ -98,7 +103,9 @@ public final class GraphShapeRegistry {
             }
         }
         if (n >= KEPT_PER_SHAPE) {
-            kept.remove(0);
+            SPARE.reset();
+            shape.outline(SPARE, 0, 0, w, h);
+            return SPARE;
         }
         GeneralPath p = new GeneralPath();
         shape.outline(p, 0, 0, w, h);
