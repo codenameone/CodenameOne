@@ -366,8 +366,10 @@ public final class SecuritySchema {
         return column.substring(0, column.length() - suffix.length());
     }
 
+    /// Not null except on Oracle, which stores '' as NULL: there the
+    /// stores read NULL back as "" (SecuritySupport.storedText).
     private static String text(Dialect d) {
-        return d.columnType(Dialect.TEXT) + " NOT NULL";
+        return d.columnType(Dialect.TEXT) + ("oracle".equals(d.getName()) ? "" : " NOT NULL");
     }
 
     private static String flag(Dialect d) {

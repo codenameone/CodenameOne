@@ -597,6 +597,11 @@ public final class Scheduler {
             sql = "SELECT CAST(ROUND(UNIX_TIMESTAMP(NOW(3)) * 1000) AS SIGNED) AS db_now";
         } else if ("sqlserver".equals(name)) {
             sql = "SELECT DATEDIFF_BIG(MILLISECOND, '1970-01-01', SYSUTCDATETIME()) AS db_now";
+        } else if ("oracle".equals(name)) {
+            // Subtracting two timestamps gives an INTERVAL DAY(9) TO SECOND.
+            sql = "SELECT CAST(ROUND((EXTRACT(DAY FROM d) * 86400 + EXTRACT(HOUR FROM d) * 3600"
+                    + " + EXTRACT(MINUTE FROM d) * 60 + EXTRACT(SECOND FROM d)) * 1000) AS NUMBER(19)) AS db_now"
+                    + " FROM (SELECT SYS_EXTRACT_UTC(SYSTIMESTAMP) - TIMESTAMP '1970-01-01 00:00:00' AS d FROM DUAL)";
         } else {
             // SQLite runs in this process: its clock is this host's anyway.
             return System.currentTimeMillis();

@@ -52,8 +52,8 @@ class BackendEnginesTest {
 
     @Test void anUnknownEngineFailsNamingWhatWasWritten() {
         BuildExecutionException error = assertThrows(BuildExecutionException.class,
-                () -> BackendEngines.require(" oracle ", true));
-        assertTrue(error.getMessage().contains(BackendEngines.PROPERTY + "=oracle"), error.getMessage());
+                () -> BackendEngines.require(" db2 ", true));
+        assertTrue(error.getMessage().contains(BackendEngines.PROPERTY + "=db2"), error.getMessage());
     }
 
     @Test void namesAndAliasesAnswerTheCanonicalSpelling() throws Exception {
@@ -65,6 +65,7 @@ class BackendEnginesTest {
         assertEquals("mysql", BackendEngines.require("MariaDB", true));
         assertEquals("sqlserver", BackendEngines.require("sqlserver", true));
         assertEquals("sqlserver", BackendEngines.require("MSSQL", true));
+        assertEquals("oracle", BackendEngines.require("Oracle", true));
     }
 
     @Test void sqliteAloneWithSqliteOffIsNoDatabaseAtAll() throws Exception {
@@ -86,7 +87,7 @@ class BackendEnginesTest {
     }
 
     private static void assertSelected(Path sources, String engine, String directory) throws Exception {
-        for (String each : new String[] {"none", "postgres", "mysql", "sqlserver"}) {
+        for (String each : new String[] {"none", "postgres", "mysql", "sqlserver", "oracle"}) {
             write(sources.resolve(BackendEngines.ENGINES_DIR).resolve(each).resolve(ENGINE_FILE), each);
         }
         write(sources.resolve(BackendEngines.ENGINES_DIR).resolve("postgres")

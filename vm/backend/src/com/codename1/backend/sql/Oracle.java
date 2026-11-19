@@ -262,7 +262,6 @@ public final class Oracle {
         String name;
         int type;
         int csfrm;
-        int precision;
         int scale;
         long bufferSize;
     }
@@ -353,7 +352,7 @@ public final class Oracle {
     private String[] connectPacket(String descriptor) throws IOException {
         byte[] text = Wire.utf8(descriptor);
         for (int attempt = 0 ; attempt < 3 ; attempt++) {
-            Buf out = new Buf();
+            Buf out = new Buf(); // NOPMD CloseResource - an in-memory buffer
             out.u16(319);               // version
             out.u16(300);               // lowest version accepted
             out.u16(1);                 // service options: none
@@ -481,7 +480,7 @@ public final class Oracle {
     // ---------------- protocol and data types ----------------
 
     private void negotiate() throws IOException {
-        Buf protocol = new Buf();
+        Buf protocol = new Buf(); // NOPMD CloseResource - an in-memory buffer
         protocol.write(MSG_PROTOCOL);
         protocol.write(6);              // protocol version 8.1 and later
         protocol.write(0);              // array terminator
@@ -500,8 +499,9 @@ public final class Oracle {
         }
         u8();                           // server version
         u8();
-        while (u8() != 0) {
-            // the server's banner
+        int banner = u8();
+        while (banner != 0) {                // the server's banner
+            banner = u8();
         }
         int charset = u8() | (u8() << 8);
         u8();                           // server flags
@@ -525,7 +525,7 @@ public final class Oracle {
             charset = CHARSET_UTF8;
         }
 
-        Buf types = new Buf();
+        Buf types = new Buf(); // NOPMD CloseResource - an in-memory buffer
         types.write(MSG_DATA_TYPES);
         types.write(CHARSET_UTF8 & 0xff);
         types.write(CHARSET_UTF8 >> 8);
@@ -595,7 +595,7 @@ public final class Oracle {
 
     private void login(String user, String password) throws IOException {
         byte[] name = Wire.utf8(user);
-        Buf first = new Buf();
+        Buf first = new Buf(); // NOPMD CloseResource - an in-memory buffer
         function(first, FUNC_AUTH_PHASE_ONE);
         first.write(1);                 // has a user
         first.ub4(name.length);
@@ -670,7 +670,7 @@ public final class Oracle {
         String encryptedPassword = hex(encryptPadded(combined,
                 concat(Crypto.randomBytes(16), secret)));
 
-        Buf second = new Buf();
+        Buf second = new Buf(); // NOPMD CloseResource - an in-memory buffer
         function(second, FUNC_AUTH_PHASE_TWO);
         second.write(1);
         second.ub4(name.length);
@@ -791,6 +791,7 @@ public final class Oracle {
             return statement(sql, values, rows);
         } catch (OracleError err) {
             IOException failure = classify(err.number, err.getMessage() + " [" + sql + "]");
+            failure.initCause(err);
             throw failure;
         } catch (Refusal err) {
             throw err;
@@ -861,7 +862,7 @@ public final class Oracle {
         outTypes = binds.outCount > 0 ? new int[binds.outCount] : null;
         returned = null;
 
-        Buf out = new Buf();
+        Buf out = new Buf(); // NOPMD CloseResource - an in-memory buffer
         closeCursorsPiggyback(out);
         int options = EXEC_PARSE | EXEC_EXECUTE;
         if (query) {
@@ -941,7 +942,7 @@ public final class Oracle {
             readExecute(read);
         }
         while (moreRows && cursorId != 0) {
-            Buf fetch = new Buf();
+            Buf fetch = new Buf(); // NOPMD CloseResource - an in-memory buffer
             function(fetch, FUNC_FETCH);
             fetch.ub4(cursorId);
             fetch.ub4(PREFETCH);
@@ -991,8 +992,8 @@ public final class Oracle {
         if (anyKind) {
             rows.setColumnTypes(kinds);
         }
-        for (int iter = 0 ; iter < read.size() ; iter++) {
-            Object[] values = (Object[]) read.get(iter);
+        for (Object each : read) {
+            Object[] values = (Object[]) each;
             Map row = new LinkedHashMap();
             for (int column = 0 ; column < columns.length ; column++) {
                 row.put(columns[column].name, values[column]);
@@ -1019,8 +1020,8 @@ public final class Oracle {
     }
 
     private static boolean hasLob(Column[] columns) {
-        for (int iter = 0 ; iter < columns.length ; iter++) {
-            if (columns[iter].type == TYPE_CLOB || columns[iter].type == TYPE_BLOB) {
+        for (Column column : columns) {
+            if (column.type == TYPE_CLOB || column.type == TYPE_BLOB) {
                 return true;
             }
         }
@@ -1028,13 +1029,12 @@ public final class Oracle {
     }
 
     private void defineLobsAsLongs() throws IOException {
-        Buf out = new Buf();
+        Buf out = new Buf(); // NOPMD CloseResource - an in-memory buffer
         function(out, FUNC_EXECUTE);
         executeHeader(out, EXEC_DEFINE | EXEC_NOT_PLSQL, cursorId, 0, PREFETCH, 0,
                 columns.length);
         al8i4(out, true, PREFETCH);
-        for (int iter = 0 ; iter < columns.length ; iter++) {
-            Column column = columns[iter];
+        for (Column column : columns) {
             if (column.type == TYPE_CLOB) {
                 column.type = TYPE_LONG;
             } else if (column.type == TYPE_BLOB) {
@@ -1151,8 +1151,8 @@ public final class Oracle {
         }
         out.write(1);
         out.ub4(cursorsToClose.size());
-        for (int iter = 0 ; iter < cursorsToClose.size() ; iter++) {
-            out.ub4(((Integer) cursorsToClose.get(iter)).intValue());
+        for (Object cursor : cursorsToClose) {
+            out.ub4(((Integer) cursor).intValue());
         }
         cursorsToClose.clear();
     }
@@ -1288,7 +1288,7 @@ public final class Oracle {
             Column column = new Column();
             column.type = u8();
             u8();                               // flags
-            column.precision = (byte) u8();
+            u8();                               // precision; scale is what decides
             column.scale = u8();
             column.bufferSize = ub();
             ub();                               // largest array elements
@@ -1826,7 +1826,7 @@ public final class Oracle {
 
     /// The values to bind, one per placeholder in the order they appear.
     static final class Binds {
-        Object[] values;
+        Object[] values = new Object[0];
         int outCount;
         String[] returningNames;
 
@@ -1836,8 +1836,8 @@ public final class Oracle {
             int into = returningInto(sql);
             List values = new ArrayList();
             int highest = 0;
-            for (int iter = 0 ; iter < markers.size() ; iter++) {
-                int[] marker = (int[]) markers.get(iter);
+            for (Object each : markers) {
+                int[] marker = (int[]) each;
                 if (into >= 0 && marker[0] > into) {
                     values.add(Out.INSTANCE);
                     binds.outCount++;
@@ -1849,7 +1849,7 @@ public final class Oracle {
                             + "bound by number: [" + sql + "]");
                 }
                 if (number > params.length) {
-                    throw new IOException("The statement names :" + number + " and "
+                    throw new Refusal("The statement names :" + number + " and "
                             + params.length + " value" + (params.length == 1 ? " was" : "s were")
                             + " supplied: [" + sql + "]");
                 }
@@ -1932,8 +1932,7 @@ public final class Oracle {
         if (returning < 0) {
             return -1;
         }
-        int into = nextWord(upper, "INTO", returning);
-        return into;
+        return nextWord(upper, "INTO", returning);
     }
 
     private static String[] returningNames(String sql, int into) {
@@ -2221,8 +2220,8 @@ public final class Oracle {
             }
         }
         long bits = 0;
-        for (int iter = 0 ; iter < copy.length ; iter++) {
-            bits = (bits << 8) | (copy[iter] & 0xff);
+        for (byte each : copy) {
+            bits = (bits << 8) | (each & 0xff);
         }
         if (copy.length == 4) {
             return Float.intBitsToFloat((int) bits);
@@ -2502,8 +2501,8 @@ public final class Oracle {
 
     static String hex(byte[] data) {
         StringBuilder out = new StringBuilder(data.length * 2);
-        for (int iter = 0 ; iter < data.length ; iter++) {
-            int b = data[iter] & 0xff;
+        for (byte each : data) {
+            int b = each & 0xff;
             out.append("0123456789ABCDEF".charAt(b >> 4)).append("0123456789ABCDEF".charAt(b & 15));
         }
         return out.toString();

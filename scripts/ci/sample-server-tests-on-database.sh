@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Runs a full-stack sample's server tests against a real PostgreSQL or MySQL
-# database.
+# Runs a full-stack sample's server tests against a real PostgreSQL, MySQL,
+# SQL Server or Oracle database.
 #
 #   scripts/ci/sample-server-tests-on-database.sh <sample-dir> [mvn args...]
 #
@@ -9,11 +9,14 @@
 #
 #   postgres://user:password@host:port/db?sslmode=disable
 #   mysql://user:password@host:port/db?sslmode=disable
+#   sqlserver://user:password@host:port/db?sslmode=disable
+#   oracle://user:password@host:port/service
 #
 # The schema is emptied with psql or mysql, whichever the URL needs, so that
 # client has to be installed. CN1_TEST_DATABASE_RESET replaces that with a
 # command of your own -- a `podman exec` into the database container, say, on
-# a machine without the client.
+# a machine without the client. SQL Server and Oracle have no client this
+# script drives, so for them CN1_TEST_DATABASE_RESET is required.
 #
 # The samples' own test runs use an in-memory SQLite database, and SQLite takes
 # any declared column type for any value. A mapping that disagrees with its
@@ -34,7 +37,7 @@ set -euo pipefail
 
 SAMPLE="${1:?usage: $0 <sample-dir> [mvn args...]}"
 shift
-URL="${CN1_TEST_DATABASE_URL:?set CN1_TEST_DATABASE_URL to a postgres:// or mysql:// URL}"
+URL="${CN1_TEST_DATABASE_URL:?set CN1_TEST_DATABASE_URL to a postgres://, mysql://, sqlserver:// or oracle:// URL}"
 MVN="${MVN:-mvn}"
 
 # A backend is built for ONE database engine (cn1.backend.database), and the JVM
@@ -44,7 +47,17 @@ MVN="${MVN:-mvn}"
 case "$URL" in
   postgres://*|postgresql://*) ENGINE=postgres ;;
   mysql://*|mariadb://*) ENGINE=mysql ;;
-  *) echo "CN1_TEST_DATABASE_URL names no server engine: it is a postgres:// or mysql:// URL" >&2; exit 2 ;;
+  sqlserver://*|mssql://*) ENGINE=sqlserver ;;
+  oracle://*) ENGINE=oracle ;;
+  *) echo "CN1_TEST_DATABASE_URL names no server engine: it is a postgres://, mysql://, sqlserver:// or oracle:// URL" >&2; exit 2 ;;
+esac
+case "$ENGINE" in
+  sqlserver|oracle)
+    if [ -z "${CN1_TEST_DATABASE_RESET:-}" ]; then
+      echo "CN1_TEST_DATABASE_RESET is required for $ENGINE: a command that empties the schema" >&2
+      exit 2
+    fi
+    ;;
 esac
 
 log() { echo "[database-tests] $*" >&2; }

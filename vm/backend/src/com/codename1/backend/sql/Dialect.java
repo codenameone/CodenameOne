@@ -683,6 +683,28 @@ public abstract class Dialect {
             sql.substring(at, end), sql.substring(end)};
     }
 
+    /// "ALTER TABLE t ADD COLUMN c ..." without the COLUMN, which SQL Server
+    /// and Oracle do not accept; null for any other statement.
+    static String addColumn(String sql) {
+        int at = blanks(sql, 0);
+        if (!word(sql, at, "ALTER")) {
+            return null;
+        }
+        at = blanks(sql, at + 5);
+        if (!word(sql, at, "TABLE")) {
+            return null;
+        }
+        at = blanks(sql, nameEnd(sql, blanks(sql, at + 5)));
+        if (!word(sql, at, "ADD")) {
+            return null;
+        }
+        int column = blanks(sql, at + 3);
+        if (!word(sql, column, "COLUMN")) {
+            return null;
+        }
+        return sql.substring(0, at + 3) + sql.substring(column + 6);
+    }
+
     static int blanks(String sql, int from) {
         int at = from;
         while (at < sql.length() && sql.charAt(at) <= ' ') {
@@ -1004,28 +1026,6 @@ public abstract class Dialect {
                     + parts[1] + rest;
         }
 
-        /// "ALTER TABLE t ADD COLUMN c ..." without the COLUMN, which SQL Server
-        /// does not accept; null for any other statement.
-        private static String addColumn(String sql) {
-            int at = blanks(sql, 0);
-            if (!word(sql, at, "ALTER")) {
-                return null;
-            }
-            at = blanks(sql, at + 5);
-            if (!word(sql, at, "TABLE")) {
-                return null;
-            }
-            at = blanks(sql, nameEnd(sql, blanks(sql, at + 5)));
-            if (!word(sql, at, "ADD")) {
-                return null;
-            }
-            int column = blanks(sql, at + 3);
-            if (!word(sql, column, "COLUMN")) {
-                return null;
-            }
-            return sql.substring(0, at + 3) + sql.substring(column + 6);
-        }
-
         private static String unquoted(String name) {
             if (name.length() >= 2 && name.charAt(0) == '[') {
                 return name.substring(1, name.length() - 1).replace("]]", "]");
@@ -1052,6 +1052,30 @@ public abstract class Dialect {
         @Override
         public String varchar(int length) {
             return "VARCHAR2(" + length + " CHAR)";
+        }
+
+        /// Oracle before 23ai has no IF [NOT] EXISTS, so the statement runs
+        /// without it in a block that ignores the one error the clause would
+        /// have avoided: ORA-00955 (or ORA-01408, an index on the same columns)
+        /// for a CREATE, ORA-00942 for a DROP.
+        @Override
+        String conditionalDdl(String sql) {
+            String added = addColumn(sql);
+            if (added != null) {
+                return added;
+            }
+            String[] parts = conditionalParts(sql);
+            if (parts == null) {
+                return sql;
+            }
+            boolean create = parts[0].startsWith("CREATE");
+            String plain = parts[0] + " " + parts[1] + parts[2];
+            if (!create && "DROP TABLE".equals(parts[0])) {
+                plain += " CASCADE CONSTRAINTS";
+            }
+            return "BEGIN EXECUTE IMMEDIATE '" + plain.replace("'", "''")
+                    + "'; EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN ("
+                    + (create ? "-955, -1408" : "-942") + ") THEN RAISE; END IF; END;";
         }
 
         /// Upper case inside the quotes, because Oracle folds an UNQUOTED name to

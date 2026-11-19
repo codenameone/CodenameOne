@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security.oauth2.server.authorization;
 
+import com.codename1.impl.backend.security.SecuritySupport;
+
 import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
@@ -169,18 +171,18 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
     }
 
     private static RegisteredClient decode(Map row) throws IOException {
-        RegisteredClient.Builder b = RegisteredClient.withId(String.valueOf(row.get("id")))
-                .clientId(String.valueOf(row.get("client_id")))
-                .clientSecret(String.valueOf(row.get("client_secret")))
-                .clientName(String.valueOf(row.get("client_name")));
+        RegisteredClient.Builder b = RegisteredClient.withId(SecuritySupport.storedText(row.get("id")))
+                .clientId(SecuritySupport.storedText(row.get("client_id")))
+                .clientSecret(SecuritySupport.storedText(row.get("client_secret")))
+                .clientName(SecuritySupport.storedText(row.get("client_name")));
         for (String method : OAuth2Parameters.scopes(String.valueOf(
                 row.get("authentication_methods")))) {
             b.clientAuthenticationMethod(new ClientAuthenticationMethod(method));
         }
-        for (String grant : OAuth2Parameters.scopes(String.valueOf(row.get("grant_types")))) {
+        for (String grant : OAuth2Parameters.scopes(SecuritySupport.storedText(row.get("grant_types")))) {
             b.authorizationGrantType(new AuthorizationGrantType(grant));
         }
-        String uris = String.valueOf(row.get("redirect_uris"));
+        String uris = SecuritySupport.storedText(row.get("redirect_uris"));
         int start = 0;
         while (start < uris.length()) {
             int end = uris.indexOf('\n', start);
@@ -190,10 +192,10 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
             }
             start = end + 1;
         }
-        for (String scope : OAuth2Parameters.scopes(String.valueOf(row.get("scopes")))) {
+        for (String scope : OAuth2Parameters.scopes(SecuritySupport.storedText(row.get("scopes")))) {
             b.scope(scope);
         }
-        Map settings = Json.parseObject(String.valueOf(row.get("settings")));
+        Map settings = Json.parseObject(SecuritySupport.storedText(row.get("settings")));
         b.clientSettings(ClientSettings.builder().requireProofKey(flag(settings, "requireProofKey")).build());
         TokenSettings.Builder t = TokenSettings.builder();
         t.authorizationCodeTimeToLive(seconds(settings, "authorizationCodeTimeToLive", 300));

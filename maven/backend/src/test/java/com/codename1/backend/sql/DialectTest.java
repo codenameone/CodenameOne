@@ -558,8 +558,23 @@ class DialectTest {
     void sqlServerQuotesWithBracketsAndOracleWithQuotes() {
         assertEquals("[order]", Dialect.SQLSERVER.quote("order"));
         assertEquals("[a]]b]", Dialect.SQLSERVER.quote("a]b"));
-        assertEquals("\"order\"", Dialect.ORACLE.quote("order"));
+        // Upper case: the name Oracle gives the unquoted `order`.
+        assertEquals("\"ORDER\"", Dialect.ORACLE.quote("order"));
+        assertEquals("\"A\"\"B\"", Dialect.ORACLE.quote("a\"b"));
         assertThrows(IllegalArgumentException.class, () -> Dialect.SQLSERVER.quote(""));
+    }
+
+    @Test
+    void oracleSpellsTheConditionalFormsAsBlocks() {
+        assertEquals("ALTER TABLE t ADD c NUMBER(19)",
+                Dialect.ORACLE.conditionalDdl("ALTER TABLE t ADD COLUMN c NUMBER(19)"));
+        assertEquals("BEGIN EXECUTE IMMEDIATE 'CREATE TABLE t (a VARCHAR2(5 CHAR) DEFAULT ''x'')'; "
+                + "EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-955, -1408) THEN RAISE; END IF; END;",
+                Dialect.ORACLE.conditionalDdl("CREATE TABLE IF NOT EXISTS t (a VARCHAR2(5 CHAR) DEFAULT 'x')"));
+        assertEquals("BEGIN EXECUTE IMMEDIATE 'DROP TABLE t CASCADE CONSTRAINTS'; "
+                + "EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-942) THEN RAISE; END IF; END;",
+                Dialect.ORACLE.conditionalDdl("DROP TABLE IF EXISTS t"));
+        assertEquals("SELECT 1 FROM DUAL", Dialect.ORACLE.conditionalDdl("SELECT 1 FROM DUAL"));
     }
 
     @Test

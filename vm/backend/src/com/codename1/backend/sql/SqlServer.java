@@ -333,8 +333,8 @@ public final class SqlServer {
         ByteArrayOutputStream out = new ByteArrayOutputStream(256);
         int fixed = 94;
         int variable = negotiate.length;
-        for (int iter = 0 ; iter < fields.length ; iter++) {
-            variable += fields[iter].length;
+        for (byte[] field : fields) {
+            variable += field.length;
         }
         le32(out, fixed + variable);
         le32(out, 0x74000004);          // TDS 7.4
@@ -366,8 +366,8 @@ public final class SqlServer {
         le16(out, offset);              // new password
         le16(out, 0);
         le32(out, 0);                   // long SSPI length
-        for (int iter = 0 ; iter < fields.length ; iter++) {
-            out.write(fields[iter], 0, fields[iter].length);
+        for (byte[] field : fields) {
+            out.write(field, 0, field.length);
         }
         out.write(negotiate, 0, negotiate.length);
         send(PACKET_LOGIN, out.toByteArray(), out.size());
@@ -1437,8 +1437,8 @@ public final class SqlServer {
             return Wire.fromUtf8(data);
         }
         StringBuilder out = new StringBuilder(data.length);
-        for (int iter = 0 ; iter < data.length ; iter++) {
-            out.append((char) (data[iter] & 0xff));
+        for (byte each : data) {
+            out.append((char) (each & 0xff));
         }
         return out.toString();
     }

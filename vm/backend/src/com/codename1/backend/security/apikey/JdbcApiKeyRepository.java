@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security.apikey;
 
+import com.codename1.impl.backend.security.SecuritySupport;
+
 import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.security.Clock;
@@ -59,7 +61,7 @@ public final class JdbcApiKeyRepository implements ApiKeyRepository {
 
     private static ApiKey read(Map row) {
         List<String> scopes = new ArrayList<String>();
-        String joined = String.valueOf(row.get("scopes"));
+        String joined = SecuritySupport.storedText(row.get("scopes"));
         int start = 0;
         while (start < joined.length()) {
             int space = joined.indexOf(' ', start);
@@ -70,9 +72,9 @@ public final class JdbcApiKeyRepository implements ApiKeyRepository {
             start = end + 1;
         }
         Object revoked = row.get("revoked");
-        return new ApiKey(String.valueOf(row.get("id")), String.valueOf(row.get("owner")), scopes,
-                String.valueOf(row.get("key_hash")), String.valueOf(row.get("prefix")),
-                String.valueOf(row.get("last_four")),
+        return new ApiKey(SecuritySupport.storedText(row.get("id")), SecuritySupport.storedText(row.get("owner")), scopes,
+                SecuritySupport.storedText(row.get("key_hash")), SecuritySupport.storedText(row.get("prefix")),
+                SecuritySupport.storedText(row.get("last_four")),
                 revoked instanceof Number && ((Number) revoked).longValue() != 0);
     }
 
