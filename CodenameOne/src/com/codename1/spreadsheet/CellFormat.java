@@ -1147,6 +1147,35 @@ final class CellFormat {
         }
     }
 
+    /// The digits of a whole number, written out however large it is: 1E20 is a 1 and twenty
+    /// zeros. Past the 17 digits a double holds, the rest are zeros, as Excel shows them.
+    private static String wholeDigits(double whole) {
+        if (whole < 9.2E18) {
+            return Long.toString((long) whole);
+        }
+        String s = Double.toString(whole);
+        int e = s.indexOf('E');
+        if (e < 0) {
+            return s;
+        }
+        int exponent = Integer.parseInt(s.substring(e + 1));
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < e; i++) {
+            char c = s.charAt(i);
+            if (c != '.') {
+                sb.append(c);
+            }
+        }
+        // the mantissa is one digit before the point, the rest after it
+        while (sb.length() < exponent + 1) {
+            sb.append('0');
+        }
+        if (sb.length() > exponent + 1) {
+            sb.setLength(exponent + 1);
+        }
+        return sb.toString();
+    }
+
     /// Digits with a thousands separator every three, when the format asks for one.
     private static String grouped(String digits, boolean grouping) {
         if (!grouping || digits.length() <= 3) {
@@ -1248,11 +1277,26 @@ final class CellFormat {
             if (whole != 0 || bestN == 0 || marked) {
                 // the whole part pads to its placeholders too: 00 shows 2 as 02, and 0 shows a
                 // whole part of nothing as 0
-                String digits = whole == 0 && bestN != 0 && wholeMarks.indexOf("0") < 0 ? "" : grouped(Values.general(whole), s.grouping);
+                // every digit of the whole part, never an exponent: a fraction format shows 1E15
+                // in full, as Excel does
+                String digits = whole == 0 && bestN != 0 && wholeMarks.indexOf("0") < 0 ? ""
+                        : wholeDigits(whole);
+                StringBuilder padded = new StringBuilder();
+                int blanks = 0;
                 for (int i = 0; i < wholeMarks.length() - digits.length(); i++) {
-                    pad(sb, wholeMarks.charAt(i));
+                    char mark = wholeMarks.charAt(i);
+                    if (mark == '0') {
+                        padded.append('0');
+                    } else if (mark == '?') {
+                        blanks++;
+                    }
                 }
-                sb.append(digits);
+                padded.append(digits);
+                for (int i = 0; i < blanks; i++) {
+                    sb.append(' ');
+                }
+                // the zeros the placeholders add are grouped with the digits: 0,000 shows 5 as 0,005
+                sb.append(grouped(padded.toString(), s.grouping));
             }
             if (bestN == 0 && !zeroShown) {
                 // no fraction to show: blanks where it would be keep the column lined up

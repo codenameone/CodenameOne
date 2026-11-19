@@ -786,7 +786,7 @@ public final class Sheet extends AbstractTableModel {
             rows.addAll(row, empty);
         }
         renumber();
-        shiftKeys(outlineLevels, row, count);
+        shiftKeys(outlineLevels, row, count, Node.MAX_ROW);
         for (int i = merges.size() - 1; i >= 0; i--) {
             int[] m = merges.get(i);
             if (m[0] >= row) {
@@ -820,7 +820,7 @@ public final class Sheet extends AbstractTableModel {
             orphan(rows.remove(row));
         }
         renumber();
-        shiftKeys(outlineLevels, row, -count);
+        shiftKeys(outlineLevels, row, -count, Node.MAX_ROW);
         for (int i = merges.size() - 1; i >= 0; i--) {
             int[] m = merges.get(i);
             if (m[0] >= row && m[2] < row + count) {
@@ -864,7 +864,7 @@ public final class Sheet extends AbstractTableModel {
             usedColumns += count;
         }
         renumber();
-        shiftKeys(columnWidths, column, count);
+        shiftKeys(columnWidths, column, count, Node.MAX_COL);
         for (int i = merges.size() - 1; i >= 0; i--) {
             int[] m = merges.get(i);
             if (m[1] >= column) {
@@ -911,7 +911,7 @@ public final class Sheet extends AbstractTableModel {
         }
         usedColumns -= n;
         renumber();
-        shiftKeys(columnWidths, column, -count);
+        shiftKeys(columnWidths, column, -count, Node.MAX_COL);
         for (int i = merges.size() - 1; i >= 0; i--) {
             int[] m = merges.get(i);
             if (m[1] >= column && m[3] < column + count) {
@@ -950,7 +950,7 @@ public final class Sheet extends AbstractTableModel {
     }
 
     /// Moves the entries of a map keyed by row or column to where the rows or columns went.
-    private static <T> void shiftKeys(HashMap<Integer, T> map, int at, int delta) {
+    private static <T> void shiftKeys(HashMap<Integer, T> map, int at, int delta, int max) {
         if (map.isEmpty()) {
             return;
         }
@@ -959,7 +959,8 @@ public final class Sheet extends AbstractTableModel {
             int k = e.getKey().intValue();
             if (k < at) {
                 moved.put(e.getKey(), e.getValue());
-            } else if (delta > 0 || k >= at - delta) {
+            } else if ((delta > 0 || k >= at - delta) && (long) k + delta <= max) {
+                // a key pushed past the edge of the grid leaves it, as a merge does
                 moved.put(Integer.valueOf(k + delta), e.getValue());
             }
         }

@@ -929,6 +929,9 @@ class SpreadsheetHostileFileTest extends UITestBase {
         same("00 1/2", CellFormat.format("00 0/0", Double.valueOf(0.5), false), "a zero whole part kept by its zeros");
         same("   1/2", CellFormat.format("?? ?/?", Double.valueOf(0.5), false), "a blank whole part");
         same("1,234    ", CellFormat.format("#,##0 ?/?", Double.valueOf(1234), false), "a grouped whole part");
+        same("0,005 1/2", CellFormat.format("0,000 ?/?", Double.valueOf(5.5), false), "zeros grouped with the digits");
+        same("1,000,000,000,000,000 1/2", CellFormat.format("#,##0 ?/?", Double.valueOf(1e15 + 0.5), false),
+                "a large whole part in full");
     }
 
     @Test
@@ -966,6 +969,28 @@ class SpreadsheetHostileFileTest extends UITestBase {
         o.insertRows(1, Integer.MAX_VALUE);
         same(CellError.REF, o.getCellValue(0, 1), "a reference pushed off the grid");
         same(Integer.valueOf(0), Integer.valueOf(o.getMergedRegionCount()), "a merge pushed off the grid");
+        // widths and outline levels pushed off the grid leave it too, or the file is invalid
+        Sheet edge = w.addSheet("E");
+        edge.setColumnWidth(16000, 20);
+        edge.setRowOutlineLevel(1048000, 1);
+        edge.insertColumns(10, 1000);
+        edge.insertRows(10, 1000);
+        same(Integer.valueOf(0), Integer.valueOf(edge.getRowOutlineLevel(1048575)), "no outline level past the grid");
+        try {
+            ByteArrayOutputStream x = new ByteArrayOutputStream();
+            w.write(x, Workbook.Format.XLSX);
+            StringBuilder all = new StringBuilder();
+            java.util.zip.ZipInputStream z = new java.util.zip.ZipInputStream(new ByteArrayInputStream(x.toByteArray()));
+            byte[] buf = new byte[4096];
+            for (java.util.zip.ZipEntry en = z.getNextEntry(); en != null; en = z.getNextEntry()) {
+                for (int n = z.read(buf); n > 0; n = z.read(buf)) {
+                    all.append(new String(buf, 0, n, "ISO-8859-1"));
+                }
+            }
+            same(Boolean.FALSE, Boolean.valueOf(all.indexOf("min=\"17001\"") >= 0), "no column past the grid in the file");
+        } catch (IOException e) {
+            wrong.append('\n').append(e);
+        }
         o.setCellFormula("B1", "=Z1");
         o.removeColumns(2, Integer.MAX_VALUE);
         same(CellError.REF, o.getCellValue(0, 1), "a reference into columns removed to the end");
