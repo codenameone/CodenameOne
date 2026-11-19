@@ -922,6 +922,20 @@ class SpreadsheetHostileFileTest extends UITestBase {
         same(CellError.VALUE, s.getCellValue("E1"), "SUMPRODUCT over sheets");
         s.setCellFormula("E2", "=COUNTIF(M:Q!A1,\">0\")");
         same(CellError.VALUE, s.getCellValue("E2"), "COUNTIF over sheets");
+        // the IS functions answer for a union or a span of sheets, never return an error
+        s.setCellFormula("E3", "=ISERROR(M:Q!A1)");
+        same(Boolean.TRUE, s.getCellValue("E3"), "ISERROR over sheets");
+        s.setCellFormula("E4", "=ISNUMBER((M!A1,Q!A1))");
+        same(Boolean.FALSE, s.getCellValue("E4"), "ISNUMBER of a union");
+        // functions that take several areas walk all of them
+        s.setCellFormula("E5", "=OR((M!A1,Q!A1))");
+        same(Boolean.TRUE, s.getCellValue("E5"), "OR of a union");
+        s.setCellFormula("E6", "=AND(M:Q!A1)");
+        same(Boolean.TRUE, s.getCellValue("E6"), "AND over sheets");
+        s.setCellFormula("E7", "=CONCAT((M!A1,Q!A1))");
+        same("57", s.getCellValue("E7"), "CONCAT of a union");
+        s.setCellFormula("E8", "=TEXTJOIN(\",\",TRUE,M:Q!A1)");
+        same("5,7", s.getCellValue("E8"), "TEXTJOIN over sheets");
     }
 
     @Test

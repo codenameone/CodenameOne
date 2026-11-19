@@ -235,10 +235,11 @@ final class TextFunctions {
             case 27: { // CONCAT
                 StringBuilder sb = new StringBuilder();
                 for (Object argItem : a) {
-                    Object[][] m = ev.matrix(argItem);
-                    for (Object[] line : m) {
-                        for (Object value : line) {
-                            append(sb, value);
+                    for (Object[][] m : ev.areas(argItem)) {
+                        for (Object[] line : m) {
+                            for (Object value : line) {
+                                append(sb, value);
+                            }
                         }
                     }
                 }
@@ -253,29 +254,30 @@ final class TextFunctions {
                 StringBuilder sb = new StringBuilder();
                 int joined = 0;
                 for (int i = 2; i < a.length; i++) {
-                    Object[][] m = ev.matrix(a[i]);
-                    for (Object[] line : m) {
-                        for (Object v : line) {
-                            if (v instanceof CellError) {
-                                return v;
-                            }
-                            String s = v == null ? "" : Values.text(v);
-                            if (ignoreEmpty && s.length() == 0) {
-                                continue;
-                            }
-                            if (joined > 0) {
-                                int count = delimiters.length * Evaluator.width(delimiters);
-                                if (count > 0) {
-                                    int k = (joined - 1) % count;
-                                    int w = Evaluator.width(delimiters);
-                                    Object delimiter = delimiters[k / w][k % w];
-                                    sb.append(delimiter == null ? "" : Values.text(delimiter));
+                    for (Object[][] m : ev.areas(a[i])) {
+                        for (Object[] line : m) {
+                            for (Object v : line) {
+                                if (v instanceof CellError) {
+                                    return v;
                                 }
-                            }
-                            sb.append(s);
-                            joined++;
-                            if (sb.length() > MAX_TEXT) {
-                                throw EvalError.VALUE;
+                                String s = v == null ? "" : Values.text(v);
+                                if (ignoreEmpty && s.length() == 0) {
+                                    continue;
+                                }
+                                if (joined > 0) {
+                                    int count = delimiters.length * Evaluator.width(delimiters);
+                                    if (count > 0) {
+                                        int k = (joined - 1) % count;
+                                        int w = Evaluator.width(delimiters);
+                                        Object delimiter = delimiters[k / w][k % w];
+                                        sb.append(delimiter == null ? "" : Values.text(delimiter));
+                                    }
+                                }
+                                sb.append(s);
+                                joined++;
+                                if (sb.length() > MAX_TEXT) {
+                                    throw EvalError.VALUE;
+                                }
                             }
                         }
                     }

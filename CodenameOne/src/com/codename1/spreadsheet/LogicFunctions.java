@@ -74,6 +74,11 @@ final class LogicFunctions {
         }
         // The rest answer for one value, and for every value of an array or a range.
         Object arg = Evaluator.arg(a, 0);
+        if (arg instanceof Ref && (((Ref) arg).next != null || ((Ref) arg).lastSheet != null)) {
+            // a union or a span of sheets has no single value: the IS functions answer for
+            // #VALUE!, never return it, so a guard such as IF(ISERROR(x), ...) keeps working
+            return one(name, CellError.VALUE);
+        }
         if (arg instanceof Object[][] || arg instanceof Ref && !((Ref) arg).isSingleCell()) {
             Object[][] m = ev.matrix(arg);
             Object[][] out = new Object[m.length][Evaluator.width(m)];
@@ -129,16 +134,17 @@ final class LogicFunctions {
         int total = 0;
         for (Object arg : a) {
             if (arg instanceof Ref || arg instanceof Object[][]) {
-                Object[][] m = ev.matrix(arg);
-                for (Object[] line : m) {
-                    for (Object v : line) {
-                        if (v instanceof CellError) {
-                            return v;
-                        }
-                        if (v instanceof Boolean || v instanceof Double) {
-                            total++;
-                            if (Values.bool(v)) {
-                                trues++;
+                for (Object[][] m : ev.areas(arg)) {
+                    for (Object[] line : m) {
+                        for (Object v : line) {
+                            if (v instanceof CellError) {
+                                return v;
+                            }
+                            if (v instanceof Boolean || v instanceof Double) {
+                                total++;
+                                if (Values.bool(v)) {
+                                    trues++;
+                                }
                             }
                         }
                     }
