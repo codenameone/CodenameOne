@@ -827,8 +827,6 @@ final class Evaluator {
 
     // ------------------------------------------------------------------ helpers for functions
 
-    /// One value out of whatever an argument evaluated to: the cell of a single cell
-    /// reference, the first element of an array or a range.
     /// IFS (3), SWITCH (4) or CHOOSE (5) answered once per element when one of the values
     /// it decides on is an array, as Excel 365 answers: every argument is evaluated, and an
     /// argument that is an array gives each position its own element.
@@ -960,6 +958,9 @@ final class Evaluator {
         return false;
     }
 
+    /// One value out of whatever an argument evaluated to: the cell of a single cell
+    /// reference, the first element of an array or a range. An argument of several values
+    /// where the function wants one has the call made once per element instead.
     Object scalar(Object v) {
         if (v instanceof Ref) {
             Ref r = (Ref) v;

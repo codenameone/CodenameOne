@@ -1054,6 +1054,25 @@ class SpreadsheetHostileFileTest extends UITestBase {
         if (new String(unzip(co.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8").indexOf("ref=\"A1:A3\"") >= 0) {
             wrong.append("\nrows inserted through an array leave its old span");
         }
+        for (int k = 0; k < 2; k++) {
+            try {
+                if (k == 0) {
+                    cs.setRowOutlineLevel(Node.MAX_ROW + 1, 1);
+                } else {
+                    cs.setColumnWidth(Node.MAX_COL + 1, 5);
+                }
+                wrong.append("\na row or column past the sheet was accepted");
+            } catch (IllegalArgumentException expected) {
+                // Excel refuses the file it would make
+            }
+        }
+        byte[] badRow = rewriteSheet(cout.toByteArray(), "<row r=\"1\"", "<row r=\"99999999999\"");
+        try {
+            Workbook.read(new ByteArrayInputStream(badRow), Workbook.Format.XLSX);
+            wrong.append("\na row number past the sheet was read");
+        } catch (IOException expected) {
+            // a damaged file
+        }
         Workbook leap = new Workbook();
         Sheet ls = leap.addSheet("D");
         ls.setCellValue(0, 0, Double.valueOf(60));

@@ -196,6 +196,7 @@ public final class Workbook {
             }
             anchor.arrayRows = rows;
             anchor.arrayCols = cols;
+            boolean missing = false;
             for (int r = 0; r < rows; r++) {
                 for (int c = 0; c < cols; c++) {
                     if (r == 0 && c == 0) {
@@ -204,6 +205,23 @@ public final class Workbook {
                     Cell member = sheet.ensure(at[0] + r, at[1] + c);
                     if (member.formula == null) {
                         member.arrayAnchor = anchor;
+                        missing |= member.value == null;
+                        if (anchor.state != Cell.CLEAN) {
+                            member.state = Cell.DIRTY;
+                        }
+                    }
+                }
+            }
+            if (missing) {
+                // a file that stored the anchor's value but not the cells it fills: calculated
+                // when asked for, so those cells show the result rather than nothing
+                anchor.state = Cell.DIRTY;
+                for (int r = 0; r < rows; r++) {
+                    for (int c = 0; c < cols; c++) {
+                        Cell member = r == 0 && c == 0 ? null : sheet.cell(at[0] + r, at[1] + c);
+                        if (member != null && member.arrayAnchor == anchor) { //NOPMD CompareObjectsWithEquals - a cell is an identity
+                            member.state = Cell.DIRTY;
+                        }
                     }
                 }
             }

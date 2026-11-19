@@ -258,7 +258,17 @@ final class XlsxReader {
             }
             String tag = x.name;
             if ("row".equals(tag)) {
-                row = x.intAttr("r", row + 2) - 1;
+                String r = x.attr("r");
+                if (r == null) {
+                    row++;
+                } else {
+                    // a row number that is no number, or past the last row, is a damaged file:
+                    // never a row guessed from the one before it
+                    if (!isDigits(r) || r.length() > 8 || Integer.parseInt(r) < 1 || Integer.parseInt(r) > Node.MAX_ROW + 1) {
+                        throw new IllegalArgumentException("No such row: " + r);
+                    }
+                    row = Integer.parseInt(r) - 1;
+                }
                 col = -1;
                 int level = x.intAttr("outlineLevel", 0);
                 if (level > 0) {
@@ -346,6 +356,15 @@ final class XlsxReader {
     }
 
     /// `B2:D7` as first row, first column, last row, last column; null for anything else.
+    private static boolean isDigits(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) < '0' || s.charAt(i) > '9') {
+                return false;
+            }
+        }
+        return s.length() > 0;
+    }
+
     static int[] range(String ref) {
         if (ref == null) {
             return null;

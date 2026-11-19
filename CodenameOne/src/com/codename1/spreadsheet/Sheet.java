@@ -1188,10 +1188,13 @@ public final class Sheet extends AbstractTableModel {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: for a width that is not a number or is infinite, which
-    ///   no file can hold
+    ///   no file can hold, or a column outside the sheet
     public void setColumnWidth(int column, double characters) {
         if (Double.isNaN(characters) || Double.isInfinite(characters)) {
             throw new IllegalArgumentException("Not a column width: " + characters);
+        }
+        if (column < 0 || column > Node.MAX_COL) {
+            throw new IllegalArgumentException("No such column: " + column);
         }
         if (characters > 0) {
             columnWidths.put(Integer.valueOf(column), Double.valueOf(characters));
@@ -1222,7 +1225,14 @@ public final class Sheet extends AbstractTableModel {
     /// - `row`: the row of the sheet
     ///
     /// - `level`: the level, 0 to 7
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a row outside the sheet
     public void setRowOutlineLevel(int row, int level) {
+        if (row < 0 || row > Node.MAX_ROW) {
+            throw new IllegalArgumentException("No such row: " + row);
+        }
         if (level > 0) {
             outlineLevels.put(Integer.valueOf(row), Integer.valueOf(Math.min(level, 7)));
         } else {
