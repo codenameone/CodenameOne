@@ -185,6 +185,17 @@ jobs:
           if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
           ninja --version
 
+      # The runner image's MSVC STL (14.52) static_asserts "expected Clang 22
+      # or newer" (STL1000) while the image's own LLVM is 20, which failed every
+      # C++ unit of the native suite (cn1_windows_browser.cpp first) on x64.
+      # The image pairs the two, not us, so take Microsoft's documented escape
+      # hatch for that check; CMake seeds CMAKE_CXX_FLAGS from CXXFLAGS in the
+      # configure the tests spawn. Drop it once the image's clang catches up.
+      - name: Allow the image's clang with its newer STL
+        shell: pwsh
+        run: |
+          "CXXFLAGS=/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Verify LLVM / Ninja toolchain
         shell: pwsh
         run: |
