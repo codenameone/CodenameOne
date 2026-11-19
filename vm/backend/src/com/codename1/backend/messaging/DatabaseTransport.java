@@ -93,11 +93,11 @@ final class DatabaseTransport extends PollingTransport {
         Dialect d = db.dialect();
         db.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (id "
                 + d.generatedKeyColumn(Dialect.BIGINT)
-                + ", destination VARCHAR(255) NOT NULL, msg_key VARCHAR(255), headers "
+                + ", destination " + d.varchar(255) + " NOT NULL, msg_key " + d.varchar(255) + ", headers "
                 + d.columnType(Dialect.TEXT) + ", payload " + d.columnType(Dialect.TEXT)
                 + ", attempt " + d.columnType(Dialect.INTEGER) + " NOT NULL"
                 + ", available_at " + d.columnType(Dialect.BIGINT) + " NOT NULL"
-                + ", claim VARCHAR(64))", new Object[0]);
+                + ", claim " + d.varchar(64) + ")", new Object[0]);
         try {
             db.execute("CREATE INDEX cn1_messages_ready ON " + TABLE
                     + " (destination, available_at)", new Object[0]);

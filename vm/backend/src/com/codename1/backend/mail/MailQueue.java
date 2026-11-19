@@ -145,13 +145,13 @@ final class MailQueue {
         String number = d.columnType(Dialect.INTEGER);
         db.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (id "
                 + d.generatedKeyColumn(Dialect.BIGINT)
-                + ", mail_from VARCHAR(320) NOT NULL, recipients " + text + " NOT NULL, mime "
+                + ", mail_from " + d.varchar(320) + " NOT NULL, recipients " + text + " NOT NULL, mime "
                 + text + " NOT NULL, attempt " + number + " NOT NULL, next_attempt " + big
-                + " NOT NULL, last_error VARCHAR(500))", new Object[0]);
+                + " NOT NULL, last_error " + d.varchar(500) + ")", new Object[0]);
         db.execute("CREATE TABLE IF NOT EXISTS " + DEAD + " (id "
                 + d.generatedKeyColumn(Dialect.BIGINT)
-                + ", mail_from VARCHAR(320) NOT NULL, recipients " + text + " NOT NULL, mime "
-                + text + " NOT NULL, attempts " + number + " NOT NULL, error VARCHAR(500), died_at "
+                + ", mail_from " + d.varchar(320) + " NOT NULL, recipients " + text + " NOT NULL, mime "
+                + text + " NOT NULL, attempts " + number + " NOT NULL, error " + d.varchar(500) + ", died_at "
                 + big + " NOT NULL)", new Object[0]);
         synchronized (this) {
             created = true;

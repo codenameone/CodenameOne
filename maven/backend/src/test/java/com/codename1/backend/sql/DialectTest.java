@@ -606,4 +606,21 @@ class DialectTest {
                 Dialect.ORACLE.assignedKeyColumn(Dialect.TEXT));
         assertEquals("VARCHAR2(4000 CHAR)", Dialect.ORACLE.columnType(Dialect.TEXT));
     }
+
+    @Test
+    void sqlServerAddsAColumnWithoutTheColumnKeywordAndBoundsTextAsUnicode() throws Exception {
+        assertEquals("ALTER TABLE t ADD window_end BIGINT",
+                Dialect.SQLSERVER.bind("ALTER TABLE t ADD COLUMN window_end BIGINT", 0));
+        assertEquals("ALTER TABLE [t] ADD x INT",
+                Dialect.SQLSERVER.bind("ALTER TABLE [t] ADD COLUMN x INT", 0));
+        // Only the ADD COLUMN form is rewritten.
+        assertEquals("ALTER TABLE t DROP COLUMN x",
+                Dialect.SQLSERVER.bind("ALTER TABLE t DROP COLUMN x", 0));
+        assertEquals("ALTER TABLE t ADD COLUMN x INT",
+                Dialect.POSTGRES.bind("ALTER TABLE t ADD COLUMN x INT", 0));
+        assertEquals("VARCHAR(64)", Dialect.POSTGRES.varchar(64));
+        assertEquals("VARCHAR(64)", Dialect.MYSQL.varchar(64));
+        assertEquals("NVARCHAR(64) COLLATE Latin1_General_100_BIN2", Dialect.SQLSERVER.varchar(64));
+        assertEquals("VARCHAR2(64 CHAR)", Dialect.ORACLE.varchar(64));
+    }
 }

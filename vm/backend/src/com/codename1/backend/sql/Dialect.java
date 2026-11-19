@@ -219,6 +219,13 @@ public abstract class Dialect {
         return "INSERT INTO " + quotedTable + " DEFAULT VALUES";
     }
 
+    /// A text column of at most `length` characters, for a column that is
+    /// indexed or bounded: VARCHAR(n) on most engines, NVARCHAR(n) on SQL
+    /// Server, whose VARCHAR is not Unicode, and VARCHAR2(n CHAR) on Oracle.
+    public String varchar(int length) {
+        return "VARCHAR(" + length + ")";
+    }
+
     /// `count` rows starting at `offset`, or an empty string when both
     /// are unbounded. All three accept LIMIT n OFFSET m; MySQL needs a limit before
     /// it will accept an offset at all, so an offset-only request is given the
@@ -858,6 +865,11 @@ public abstract class Dialect {
         }
 
         @Override
+        public String varchar(int length) {
+            return "NVARCHAR(" + length + ") COLLATE " + TEXT_COLLATION;
+        }
+
+        @Override
         public String generatedKeyColumn(int kind) {
             return (kind == INTEGER ? "INT" : "BIGINT") + " IDENTITY(1,1) NOT NULL PRIMARY KEY";
         }
@@ -1011,6 +1023,11 @@ public abstract class Dialect {
         @Override
         public String getName() {
             return "oracle";
+        }
+
+        @Override
+        public String varchar(int length) {
+            return "VARCHAR2(" + length + " CHAR)";
         }
 
         @Override
