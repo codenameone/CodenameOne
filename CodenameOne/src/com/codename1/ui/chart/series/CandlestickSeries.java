@@ -307,6 +307,18 @@ public class CandlestickSeries extends XYSeries {
             if (!isGap(h)) {
                 max = Math.max(max, h);
             }
+            if (style == HEIKIN_ASHI) {
+                // the averaged candle can reach past the raw high and low, and it is what is drawn
+                double[] v = row(i);
+                if (!isGap(v[1])) {
+                    max = Math.max(max, v[1]);
+                    min = Math.min(min, v[1]);
+                }
+                if (!isGap(v[2])) {
+                    min = Math.min(min, v[2]);
+                    max = Math.max(max, v[2]);
+                }
+            }
         }
         return min > max ? null : new double[]{min, max};
     }
@@ -355,15 +367,11 @@ public class CandlestickSeries extends XYSeries {
             // one candle (updateLast, a slide) leaves the rest still; only a first appearance grows.
             // A Heikin-Ashi row is derived from every earlier candle, so it takes the raw candle's
             // animated offset per price rather than being re-derived (and reallocated) each frame
-            double c = getClose(i);
-            double ac = animatedY(ctx, i);
-            double ao = animatedAux(ctx, OPEN, i);
-            double ah = animatedAux(ctx, HIGH, i);
-            double al = animatedAux(ctx, LOW, i);
-            double o = ha ? v[0] + ao - getOpen(i) : ao;
-            double h = ha ? v[1] + ah - getHigh(i) : ah;
-            double l = ha ? v[2] + al - getLow(i) : al;
-            double cl = ha ? v[3] + ac - c : ac;
+            double[] pr = paintedRow(ctx, i, v, ha);
+            double o = pr[0];
+            double h = pr[1];
+            double l = pr[2];
+            double cl = pr[3];
             boolean rising = v[3] >= v[0];
             g.setColor(rising ? up(ctx) : down(ctx));
             double x = getX(i);
@@ -387,6 +395,24 @@ public class CandlestickSeries extends XYSeries {
         g.setAlpha(alpha);
     }
 
+    // the row as painted this frame: each price at its animated value. A Heikin-Ashi row is derived
+    // from every earlier candle, so it takes the raw candle's animated offset per price rather than
+    // being re-derived (and reallocated) each frame
+    private double[] paintedRow(ChartContext ctx, int i, double[] v, boolean ha) {
+        double[] out = paintBuf;
+        double ac = animatedY(ctx, i);
+        double ao = animatedAux(ctx, OPEN, i);
+        double ah = animatedAux(ctx, HIGH, i);
+        double al = animatedAux(ctx, LOW, i);
+        out[0] = ha ? v[0] + ao - getOpen(i) : ao;
+        out[1] = ha ? v[1] + ah - getHigh(i) : ah;
+        out[2] = ha ? v[2] + al - getLow(i) : al;
+        out[3] = ha ? v[3] + ac - getClose(i) : ac;
+        return out;
+    }
+
+    private final double[] paintBuf = new double[4];
+
     // a value's pixel along the value axis: y normally, x when rotated
     private float pos(ChartContext ctx, double x, double v, boolean rot) {
         return rot ? ctx.screenX(this, x, v) : ctx.screenY(this, x, v);
@@ -408,11 +434,13 @@ public class CandlestickSeries extends XYSeries {
         int ax = x + ctx.getOriginX();
         int ay = y + ctx.getOriginY();
         for (int i = r[0]; i <= r[1]; i++) {
-            // the drawn row: Heikin-Ashi candles span their averaged high and low, not the raw ones
-            double[] v = row(i);
-            if (isGap(i, v)) {
+            // the drawn row: Heikin-Ashi candles span their averaged high and low, not the raw ones,
+            // and mid transition each price is where it is painted, not where it is going
+            double[] raw = row(i);
+            if (isGap(i, raw)) {
                 continue;
             }
+            double[] v = paintedRow(ctx, i, raw, style == HEIKIN_ASHI);
             boolean rot = ctx.isRotated();
             float cx = rot ? ctx.screenY(this, getX(i), v[3]) : ctx.screenX(this, getX(i), v[3]);
             if (Math.abs((rot ? ay : ax) - cx) > Math.max(slot / 2, radius / 2f)) {

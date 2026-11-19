@@ -94,7 +94,7 @@ public class HistogramSeries extends BarSeries {
         }
         for (double v : samples) {
             if (!isGap(v)) {
-                int b = (int) ((v * 0.5 - min * 0.5) / half * 0.5);
+                int b = (int) ((v * 0.5 - min * 0.5) / half);
                 y[Math.min(bins - 1, Math.max(0, b))]++;
             }
         }

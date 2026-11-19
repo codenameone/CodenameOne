@@ -67,11 +67,16 @@ public class CategoryAxis extends Axis {
         return i >= 0 && i < categories.size() ? categories.get(i) : "";
     }
 
+    // the most bands a data point past the last label can open
+    private static final int MAX_BANDS = 1 << 20;
+
     @Override
     public void setDataBounds(double min, double max) {
         // series may pad their extent by half a band (bars do), so count by floor, not round
         // and a point past the last label still gets its band rather than falling off the axis
-        int fromData = max > 0 && max < Integer.MAX_VALUE - 1 ? (int) Math.floor(max + 1e-9) + 1 : 1;
+        // A point far past the labels is capped at MAX_BANDS, by the same rule however far it is
+        // (infinity included), rather than counted up to a huge value or dropped below some size
+        int fromData = max > 0 ? (int) Math.min(MAX_BANDS, Math.floor(max + 1e-9) + 1) : 1;
         int n = Math.max(categories.size(), fromData);
         super.setDataBounds(-0.5, n - 0.5);
     }

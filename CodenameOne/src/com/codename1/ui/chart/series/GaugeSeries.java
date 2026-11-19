@@ -234,7 +234,9 @@ public class GaugeSeries extends Series {
         float th = r * thickness;
         double start = -sweep / 2;
         int alpha = g.getAlpha();
-        g.setAlpha((int) (alpha * getVisibilityFraction()));
+        // everything below draws at the faded alpha; only the final restore goes back to `alpha`
+        int faded = (int) (alpha * getVisibilityFraction());
+        g.setAlpha(faded);
         g.setColor(ctx.getTheme().getGridColor());
         g.fillShape(Shapes.sector(cx, cy, r, r - th, start, sweep));
         double v = shown(ctx);
@@ -245,14 +247,14 @@ public class GaugeSeries extends Series {
                 for (int i = 0; i < bands.size(); i++) {
                     double[] b = bands.get(i);
                     g.setColor((int) b[2]);
-                    g.setAlpha((int) (alpha * 0.25f));
+                    g.setAlpha((int) (faded * 0.25f));
                     double a0 = angleOf(Math.max(min, b[0]));
                     double a1 = angleOf(Math.min(max, b[1]));
                     if (a1 > a0) {
                         g.fillShape(Shapes.sector(cx, cy, r, r - th, a0, a1 - a0));
                     }
                 }
-                g.setAlpha(alpha);
+                g.setAlpha(faded);
             }
             if (hasValue) {
                 g.setColor(colorFor(v));

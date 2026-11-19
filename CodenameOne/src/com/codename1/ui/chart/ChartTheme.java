@@ -194,7 +194,8 @@ public class ChartTheme {
 
     /// The colour assigned to the series at `index`, cycling through the palette.
     public int getSeriesColor(int index) {
-        return palette[Math.abs(index) % palette.length];
+        // Math.abs(Integer.MIN_VALUE) is negative; a floor modulo is never
+        return palette[(index % palette.length + palette.length) % palette.length];
     }
 
     /// Replaces the series palette.

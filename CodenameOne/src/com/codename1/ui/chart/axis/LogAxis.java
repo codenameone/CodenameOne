@@ -54,6 +54,10 @@ public class LogAxis extends Axis {
         // free end is rounded out to a whole decade
         double lo = isMinFixed() ? min : MathUtil.pow(10, Math.floor(lg(min)));
         double hi = isMaxFixed() ? max : MathUtil.pow(10, Math.ceil(lg(max)));
+        // the next decade past 1e308 is infinite; the data bound is then kept
+        if (Double.isInfinite(hi) || Double.isNaN(hi)) {
+            hi = max;
+        }
         if (hi <= lo) {
             hi = lo * 10;
         }

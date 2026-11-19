@@ -27,6 +27,7 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.chart.ChartContext;
 import com.codename1.ui.chart.layout.LabelLayout;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.PathIterator;
 
 /// A line, spline, step or area series.
 ///
@@ -218,7 +219,7 @@ public class LineSeries extends XYSeries {
                     p.reset();
                     appendLine(p, px, py, start, i, true);
                     if (dashed) {
-                        drawDashed(g, px, py, start, i, w, ctx.mm(2));
+                        drawDashed(g, ctx, p, w, ctx.mm(2));
                     } else {
                         g.drawShape(p, stroke);
                     }
@@ -247,6 +248,19 @@ public class LineSeries extends XYSeries {
     private boolean[] bufGap = new boolean[0];
     private Stroke stroke;
     private final GeneralPath path = new GeneralPath();
+    private static final int CURVE_STEPS = 12;
+    private final GeneralPath dashes = new GeneralPath();
+    private final float[] segCoords = new float[6];
+    private Stroke dashStroke;
+    private double dashLen;
+    private double dashLeft;
+    private boolean dashOn;
+    private double clipX0;
+    private double clipY0;
+    private double clipX1;
+    private double clipY1;
+    private final double[] clipP = new double[4];
+    private final double[] clipQ = new double[4];
     // whether the chart being painted is rotated, so a spline takes its tangents along the category
     private boolean splineRotated;
 
@@ -390,33 +404,137 @@ public class LineSeries extends XYSeries {
         return t;
     }
 
-    private void drawDashed(Graphics g, float[] px, float[] py, int from, int to, float w, int dash) {
-        Stroke s = new Stroke(w, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 4);
+    // Dashes the line's own path (`line`, built by appendLine, so a step or spline dashes along
+    // what the solid stroke would draw). Stroke has no dash pattern, so the dashes are walked here:
+    // every segment is first clipped to the plot (plus the line width), which bounds the length the
+    // loop walks whatever the data, and the arithmetic is double so a long segment keeps advancing.
+    // All dashes go into one reused path and are drawn with a single call.
+    private void drawDashed(Graphics g, ChartContext ctx, GeneralPath line, float w, int dash) {
+        if (dashStroke == null || dashStroke.getLineWidth() != w) {
+            dashStroke = new Stroke(w, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 4);
+        }
         // a dash of 0 would make every step 0 and never advance along the segment
-        int d = Math.max(1, dash);
-        boolean on = true;
-        float left = d;
-        for (int i = from; i < to; i++) {
-            float x0 = px[i];
-            float y0 = py[i];
-            float dx = px[i + 1] - x0;
-            float dy = py[i + 1] - y0;
-            float len = (float) Math.sqrt(dx * dx + dy * dy);
-            float pos = 0;
-            while (pos < len) {
-                float step = Math.min(left, len - pos);
-                if (on) {
-                    GeneralPath p = new GeneralPath();
-                    p.moveTo(x0 + dx * pos / len, y0 + dy * pos / len);
-                    p.lineTo(x0 + dx * (pos + step) / len, y0 + dy * (pos + step) / len);
-                    g.drawShape(p, s);
+        dashLen = Math.max(1, dash);
+        dashOn = true;
+        dashLeft = dashLen;
+        dashes.reset();
+        clipX0 = ctx.getPlotX() - w;
+        clipY0 = ctx.getPlotY() - w;
+        clipX1 = ctx.getPlotX() + ctx.getPlotWidth() + w;
+        clipY1 = ctx.getPlotY() + ctx.getPlotHeight() + w;
+        PathIterator it = line.getPathIterator();
+        double cx = 0;
+        double cy = 0;
+        float[] c = segCoords;
+        while (!it.isDone()) {
+            int type = it.currentSegment(c);
+            if (type == PathIterator.SEG_MOVETO) {
+                cx = c[0];
+                cy = c[1];
+            } else if (type == PathIterator.SEG_LINETO) {
+                dashSegment(cx, cy, c[0], c[1]);
+                cx = c[0];
+                cy = c[1];
+            } else if (type == PathIterator.SEG_QUADTO || type == PathIterator.SEG_CUBICTO) {
+                boolean cubic = type == PathIterator.SEG_CUBICTO;
+                double ex = cubic ? c[4] : c[2];
+                double ey = cubic ? c[5] : c[3];
+                double sx = cx;
+                double sy = cy;
+                for (int k = 1; k <= CURVE_STEPS; k++) {
+                    double t = (double) k / CURVE_STEPS;
+                    double u = 1 - t;
+                    double nx;
+                    double ny;
+                    if (cubic) {
+                        nx = u * u * u * cx + 3 * u * u * t * c[0] + 3 * u * t * t * c[2] + t * t * t * ex;
+                        ny = u * u * u * cy + 3 * u * u * t * c[1] + 3 * u * t * t * c[3] + t * t * t * ey;
+                    } else {
+                        nx = u * u * cx + 2 * u * t * c[0] + t * t * ex;
+                        ny = u * u * cy + 2 * u * t * c[1] + t * t * ey;
+                    }
+                    dashSegment(sx, sy, nx, ny);
+                    sx = nx;
+                    sy = ny;
                 }
-                pos += step;
-                left -= step;
-                if (left <= 0) {
-                    on = !on;
-                    left = d;
+                cx = ex;
+                cy = ey;
+            }
+            it.next();
+        }
+        g.drawShape(dashes, dashStroke);
+    }
+
+    // Clips (x0,y0)-(x1,y1) to the plot (Liang-Barsky) and dashes the visible part; the parts
+    // outside only advance the dash phase, modulo one on/off period, so no loop walks them.
+    private void dashSegment(double x0, double y0, double x1, double y1) {
+        double dx = x1 - x0;
+        double dy = y1 - y0;
+        double len = Math.sqrt(dx * dx + dy * dy);
+        if (!(len > 0) || Double.isInfinite(len)) { //NOPMD LogicInversion - also rejects NaN
+            return;
+        }
+        double t0 = 0;
+        double t1 = 1;
+        double[] p = clipP;
+        double[] q = clipQ;
+        p[0] = -dx;
+        p[1] = dx;
+        p[2] = -dy;
+        p[3] = dy;
+        q[0] = x0 - clipX0;
+        q[1] = clipX1 - x0;
+        q[2] = y0 - clipY0;
+        q[3] = clipY1 - y0;
+        for (int k = 0; k < 4; k++) {
+            if (p[k] == 0) { //NOPMD - exact zero: the segment is parallel to this edge
+                if (q[k] < 0) {
+                    advanceDash(len);
+                    return;
                 }
+            } else {
+                double r = q[k] / p[k];
+                if (p[k] < 0) {
+                    t0 = Math.max(t0, r);
+                } else {
+                    t1 = Math.min(t1, r);
+                }
+            }
+        }
+        if (t0 >= t1) {
+            advanceDash(len);
+            return;
+        }
+        advanceDash(t0 * len);
+        double ux = dx / len;
+        double uy = dy / len;
+        double pos = t0 * len;
+        double end = t1 * len;
+        while (pos < end) {
+            double step = Math.min(dashLeft, end - pos);
+            if (dashOn) {
+                dashes.moveTo((float) (x0 + ux * pos), (float) (y0 + uy * pos));
+                dashes.lineTo((float) (x0 + ux * (pos + step)), (float) (y0 + uy * (pos + step)));
+            }
+            pos += step;
+            dashLeft -= step;
+            if (dashLeft <= 0) {
+                dashOn = !dashOn;
+                dashLeft = dashLen;
+            }
+        }
+        advanceDash((1 - t1) * len);
+    }
+
+    private void advanceDash(double skip) {
+        double rest = skip % (2 * dashLen);
+        while (rest > 0) {
+            double step = Math.min(dashLeft, rest);
+            rest -= step;
+            dashLeft -= step;
+            if (dashLeft <= 0) {
+                dashOn = !dashOn;
+                dashLeft = dashLen;
             }
         }
     }

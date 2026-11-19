@@ -183,8 +183,9 @@ public class RadarSeries extends Series {
                 continue;
             }
             for (int i = 0; i < r.values.length; i++) {
-                // the scale follows the polygons as drawn, so rings and vertices tween together
-                double rv = pos(r.shown(ctx, i));
+                // the scale is the target's: rings snap to it while the polygons tween, so a grow-in
+                // or a uniform change is not cancelled by a scale that shrinks along with the values
+                double rv = pos(r.values[i]);
                 if (rv > 0) {
                     max = Math.max(max, rv);
                 }

@@ -2925,7 +2925,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             int tx = g.translateX;
             int ty = g.translateY;
             drawCalls.add(new Object[]{op, Integer.valueOf(a + tx), Integer.valueOf(b + ty),
-                    Integer.valueOf(translateEnd ? c + tx : c), Integer.valueOf(translateEnd ? d + ty : d)});
+                    Integer.valueOf(translateEnd ? c + tx : c), Integer.valueOf(translateEnd ? d + ty : d),
+                    Integer.valueOf(g.alpha)});
         }
     }
 

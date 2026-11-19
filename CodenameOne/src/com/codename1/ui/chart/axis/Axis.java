@@ -255,6 +255,13 @@ public abstract class Axis {
         double step = Ticks.niceStep((max - min) / 5);
         double lo = fixedMin != null ? min : Math.floor(min / step) * step;
         double hi = fixedMax != null ? max : Math.ceil(max / step) * step;
+        // rounding out near the end of the double range can overflow; the data bound is then kept
+        if (Double.isInfinite(lo) || Double.isNaN(lo)) {
+            lo = min;
+        }
+        if (Double.isInfinite(hi) || Double.isNaN(hi)) {
+            hi = max;
+        }
         return new double[]{lo, hi};
     }
 
