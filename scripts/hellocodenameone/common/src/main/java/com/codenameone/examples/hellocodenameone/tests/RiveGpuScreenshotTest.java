@@ -50,7 +50,7 @@ public class RiveGpuScreenshotTest extends BaseTest {
         framesBefore = GpuRiveRenderer.getTotalFramesDrawn();
         RiveView view = new RiveView(new JellyfishTestRive());
         view.pause();
-        view.advance(0.5f);
+        step(view, 0.5f);
         form.add(BorderLayout.CENTER, view);
         form.show();
         return true;
@@ -83,5 +83,20 @@ public class RiveGpuScreenshotTest extends BaseTest {
                 }
             }
         });
+    }
+
+    /// Steps a fresh view to `seconds` the way playback does, a frame at a
+    /// time. A state machine starts in Entry: its first advance only enters
+    /// the first state, at that animation's time 0, so one call of `seconds`
+    /// would show the first frame however large `seconds` is (rive-runtime
+    /// behaves the same; a player starts with small steps).
+    private static void step(RiveView view, float seconds) {
+        view.advance(0f);
+        float left = seconds;
+        while (left > 0f) {
+            float dt = Math.min(left, 1f / 60f);
+            view.advance(dt);
+            left -= dt;
+        }
     }
 }

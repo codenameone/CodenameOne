@@ -65,14 +65,14 @@ public class RiveFeaturesScreenshotTest extends BaseTest {
 
         light.pause();
         light.setBoolean("On", true);
-        light.advance(1f);
+        step(light, 1f);
         form.add(cell("state machine bool", light));
 
         RiveView trigger = new RiveView(new StateMachineTriggersRive());
 
         trigger.pause();
         trigger.fireTrigger("Trigger 1");
-        trigger.advance(0.5f);
+        step(trigger, 0.5f);
         form.add(cell("trigger", trigger));
 
         form.add(cell("text", still(new HelloWorldRive(), 0f)));
@@ -82,7 +82,7 @@ public class RiveFeaturesScreenshotTest extends BaseTest {
 
         bound.pause();
         bound.setViewModelNumber("num", 50f);
-        bound.advance(0.5f);
+        step(bound, 0.5f);
         form.add(cell("data binding", bound));
 
         form.add(cell("path effects", still(new StackedPathEffectsRive(), 0.5f)));
@@ -95,7 +95,7 @@ public class RiveFeaturesScreenshotTest extends BaseTest {
     private static RiveView still(RiveFile file, float seconds) {
         RiveView v = new RiveView(file);
         v.pause();
-        v.advance(seconds);
+        step(v, seconds);
         return v;
     }
 
@@ -104,5 +104,20 @@ public class RiveFeaturesScreenshotTest extends BaseTest {
         c.add(BorderLayout.CENTER, view);
         c.add(BorderLayout.SOUTH, new Label(name));
         return c;
+    }
+
+    /// Steps a fresh view to `seconds` the way playback does, a frame at a
+    /// time. A state machine starts in Entry: its first advance only enters
+    /// the first state, at that animation's time 0, so one call of `seconds`
+    /// would show the first frame however large `seconds` is (rive-runtime
+    /// behaves the same; a player starts with small steps).
+    private static void step(RiveView view, float seconds) {
+        view.advance(0f);
+        float left = seconds;
+        while (left > 0f) {
+            float dt = Math.min(left, 1f / 60f);
+            view.advance(dt);
+            left -= dt;
+        }
     }
 }
