@@ -28,14 +28,26 @@ package com.codename1.util;
 /// called first. Both methods must leave the edited object exactly as it was
 /// before, or after, the original change: a history replays them in order and
 /// each relies on the state the previous one left.
-public interface UndoableEdit {
+///
+/// This is a class rather than an interface so that later capabilities can be
+/// added here with a default that keeps every existing edit working.
+public abstract class UndoableEdit {
     /// Takes the change back.
-    void undo();
+    public abstract void undo();
 
     /// Makes the change again, after `undo`.
-    void redo();
+    public abstract void redo();
 
     /// A short name for the change, such as "Move" or "Delete", for an "Undo
-    /// Move" menu item. May be null.
-    String getName();
+    /// Move" menu item. Null by default.
+    public String getName() {
+        return null;
+    }
+
+    /// False once what this edit changes can no longer take it, for instance
+    /// after the component it was made in was given another document. A
+    /// history passes over such an edit and forgets it. True by default.
+    public boolean isAlive() {
+        return true;
+    }
 }

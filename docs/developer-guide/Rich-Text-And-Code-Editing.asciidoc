@@ -176,6 +176,12 @@ the document and doesn't turn the swipe into a selection. On desktop, mouse drag
 double-click selects a word, triple-click selects a line, and the mouse wheel or trackpad scrolls the
 document. Standard command/control shortcuts handle copy, cut, paste, select all, undo, and redo.
 
+Each step of typing, deleting, pasting or formatting goes into the application's history,
+`UndoHistory.getGlobal()`, which `NodeGraph` and `KanbanBoard` share. A run of typing is one step. The
+undo shortcut and `performUndo()` take back the last change in the application, wherever it was made,
+and an undone step brings its editor back into focus. `setUndoHistory` gives an editor a history of its
+own, or keeps its steps in the editor alone with null.
+
 Hebrew, Arabic, and mixed left-to-right/right-to-left lines use Unicode bidirectional layout. Glyph
 painting, hit testing, caret movement, and selection rectangles share the same visual runs. Set the
 component's RTL flag to choose the paragraph base direction.

@@ -247,10 +247,17 @@ port values included. A node's user data is written through a
 include::../demos/common/src/main/java/com/codenameone/developerguide/graph/GraphSnippets.java[tag=graph-json,indent=0]
 ----
 
-Give the graph an `UndoHistory` and every edit the user makes can be undone:
-a move, a connection, a deletion, a resize or a paste. One gesture is one
-step, so deleting five selected nodes and their edges is undone together.
-Changes the application makes to the model directly aren't recorded.
+Every edit the user makes can be undone: a move, a connection, a deletion, a
+resize or a paste. One gesture is one step, so deleting five selected nodes
+and their edges is undone together. Changes the application makes to the
+model directly aren't recorded.
+
+The steps go into the application's history, `UndoHistory.getGlobal()`,
+which the Kanban board and the rich text and code editors share. A single
+Undo button takes back the last change wherever it was made, and brings the
+component it was made in back into view. `setUndoHistory` gives the graph a
+history of its own, or turns undo off with null. Showing another model drops
+that model's steps and keeps the rest.
 
 [source,java]
 ----

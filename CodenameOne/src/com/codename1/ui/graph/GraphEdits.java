@@ -39,7 +39,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     }
 
     /// A node went from one place to another.
-    static final class Move implements UndoableEdit {
+    static final class Move extends UndoableEdit {
         private final GraphModel model;
         private final GraphNode node;
         private final double fromX;
@@ -73,7 +73,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     }
 
     /// Edges lost the routes an arrangement gave them when a node moved.
-    static final class Routes implements UndoableEdit {
+    static final class Routes extends UndoableEdit {
         private final NodeGraph graph;
         private final List<GraphEdge> edges;
         private final List<double[]> before;
@@ -112,7 +112,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     }
 
     /// A node took a new size, and with a leading or top corner a new place.
-    static final class Resize implements UndoableEdit {
+    static final class Resize extends UndoableEdit {
         private final GraphModel model;
         private final GraphNode node;
         private final double[] from;
@@ -147,7 +147,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     }
 
     /// Nodes and edges were added, or with `removal` taken out.
-    static final class Presence implements UndoableEdit {
+    static final class Presence extends UndoableEdit {
         private final GraphModel model;
         private final List<GraphNode> nodes;
         private final List<GraphEdge> edges;
@@ -242,7 +242,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     }
 
     /// A node was given another label.
-    static final class Rename implements UndoableEdit {
+    static final class Rename extends UndoableEdit {
         private final GraphModel model;
         private final GraphNode node;
         private final String from;
@@ -272,7 +272,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     }
 
     /// A group was collapsed or expanded.
-    static final class Collapse implements UndoableEdit {
+    static final class Collapse extends UndoableEdit {
         private final GraphModel model;
         private final GraphGroup group;
         private final boolean to;
@@ -300,7 +300,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     }
 
     /// A node went into another lane or group.
-    static final class Membership implements UndoableEdit {
+    static final class Membership extends UndoableEdit {
         private final GraphModel model;
         private final GraphNode node;
         private final String from;
@@ -330,7 +330,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     }
 
     /// A lane was moved or resized.
-    static final class LaneBounds implements UndoableEdit {
+    static final class LaneBounds extends UndoableEdit {
         private final GraphModel model;
         private final GraphGroup lane;
         private final double[] from;
@@ -360,7 +360,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     }
 
     /// An input port's own value changed.
-    static final class PortValue implements UndoableEdit {
+    static final class PortValue extends UndoableEdit {
         private final GraphModel model;
         private final GraphPort port;
         private final Object from;
@@ -392,7 +392,7 @@ final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - 
     /// An arrangement placed every node. Like the arrangement itself, this
     /// is not offered to the model as a user's move: nodes a model refuses to
     /// move are placed directly.
-    static final class Arrange implements UndoableEdit {
+    static final class Arrange extends UndoableEdit {
         private final GraphModel model;
         private final List<GraphNode> nodes;
         private final double[] from;

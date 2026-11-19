@@ -28,16 +28,19 @@ import java.util.List;
 /// The edits a user made, in order, so they can be undone and redone.
 ///
 /// A history knows nothing about what is edited. A component that supports
-/// undo records an `UndoableEdit` for every change the user makes through it,
-/// and one history can be shared by several components so that a single
-/// "Undo" takes back the last change wherever it was made:
+/// undo records an `UndoableEdit` for every change the user makes through it.
+/// Every such component records into the application's history,
+/// `getGlobal()`, unless it is given another one, so a single "Undo" takes
+/// back the last change wherever it was made:
 ///
 /// ```java
-/// UndoHistory history = new UndoHistory();
-/// graph.setUndoHistory(history);
-/// board.setUndoHistory(history);
+/// UndoHistory history = UndoHistory.getGlobal();
 /// undoButton.addActionListener(e -> history.undo());
+/// history.addListener(h -> undoButton.setEnabled(h.canUndo()));
 /// ```
+///
+/// A component given its own history, or null to record nothing, keeps its
+/// edits out of the application's.
 ///
 /// Edits recorded between `beginCompound` and `endCompound` are one step:
 /// dragging five selected nodes is a single "Move".
@@ -56,6 +59,13 @@ public class UndoHistory {
     private Compound open;
     private int depth;
     private boolean replaying;
+    private static final UndoHistory GLOBAL = new UndoHistory();
+
+    /// The application's history, which every component that supports undo
+    /// records into unless it is given another.
+    public static UndoHistory getGlobal() {
+        return GLOBAL;
+    }
 
     /// Records an edit that was just made.
     ///
@@ -123,22 +133,24 @@ public class UndoHistory {
 
     /// True when there is an edit to take back.
     public boolean canUndo() {
-        return !done.isEmpty();
+        return top(done) != null;
     }
 
     /// True when an undone edit can be made again.
     public boolean canRedo() {
-        return !undone.isEmpty();
+        return top(undone) != null;
     }
 
     /// The name of the edit `undo` would take back, or null.
     public String getUndoName() {
-        return done.isEmpty() ? null : done.get(done.size() - 1).getName();
+        UndoableEdit e = top(done);
+        return e == null ? null : e.getName();
     }
 
     /// The name of the edit `redo` would make again, or null.
     public String getRedoName() {
-        return undone.isEmpty() ? null : undone.get(undone.size() - 1).getName();
+        UndoableEdit e = top(undone);
+        return e == null ? null : e.getName();
     }
 
     /// Takes back the last edit.
@@ -147,7 +159,13 @@ public class UndoHistory {
     ///
     /// false when there was nothing to undo
     public boolean undo() {
-        if (done.isEmpty() || replaying || depth > 0) {
+        if (replaying || depth > 0) {
+            return false;
+        }
+        if (dropDeadTop(done) && done.isEmpty()) {
+            fireChanged();
+        }
+        if (done.isEmpty()) {
             return false;
         }
         UndoableEdit e = done.remove(done.size() - 1);
@@ -176,7 +194,13 @@ public class UndoHistory {
     ///
     /// false when there was nothing to redo
     public boolean redo() {
-        if (undone.isEmpty() || replaying || depth > 0) {
+        if (replaying || depth > 0) {
+            return false;
+        }
+        if (dropDeadTop(undone) && undone.isEmpty()) {
+            fireChanged();
+        }
+        if (undone.isEmpty()) {
             return false;
         }
         UndoableEdit e = undone.remove(undone.size() - 1);
@@ -212,6 +236,54 @@ public class UndoHistory {
         fireChanged();
     }
 
+    /// Forgets every edit that is no longer alive (`UndoableEdit.isAlive`). A
+    /// component calls this when it drops what its edits change, such as on
+    /// being given another document, so the rest of the history stays.
+    public void discardDead() {
+        boolean dropped = false;
+        for (int i = done.size() - 1; i >= 0; i--) {
+            if (!done.get(i).isAlive()) {
+                done.remove(i);
+                dropped = true;
+            }
+        }
+        for (int i = undone.size() - 1; i >= 0; i--) {
+            if (!undone.get(i).isAlive()) {
+                undone.remove(i);
+                dropped = true;
+            }
+        }
+        if (dropped) {
+            fireChanged();
+        }
+    }
+
+    /// True when `edit` is the step `undo` would take back next, and no
+    /// compound is open. A component uses it to extend its own last edit, such
+    /// as a run of typing, only while nothing was recorded after it.
+    public boolean isLastEdit(UndoableEdit edit) {
+        return edit != null && open == null && !done.isEmpty() && done.get(done.size() - 1) == edit; //NOPMD CompareObjectsWithEquals - that very edit
+    }
+
+    private static UndoableEdit top(List<UndoableEdit> stack) {
+        for (int i = stack.size() - 1; i >= 0; i--) {
+            UndoableEdit e = stack.get(i);
+            if (e.isAlive()) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    private static boolean dropDeadTop(List<UndoableEdit> stack) {
+        boolean dropped = false;
+        while (!stack.isEmpty() && !stack.get(stack.size() - 1).isAlive()) {
+            stack.remove(stack.size() - 1);
+            dropped = true;
+        }
+        return dropped;
+    }
+
     /// How many steps are kept; older ones are dropped. 100 by default.
     public int getLimit() {
         return limit;
@@ -232,12 +304,22 @@ public class UndoHistory {
 
     /// The number of steps that can be undone.
     public int getUndoCount() {
-        return done.size();
+        return countAlive(done);
     }
 
     /// The number of steps that can be redone.
     public int getRedoCount() {
-        return undone.size();
+        return countAlive(undone);
+    }
+
+    private static int countAlive(List<UndoableEdit> stack) {
+        int n = 0;
+        for (UndoableEdit e : stack) {
+            if (e.isAlive()) {
+                n++;
+            }
+        }
+        return n;
     }
 
     /// Adds a listener told whenever what can be undone or redone changes.
@@ -261,7 +343,7 @@ public class UndoHistory {
     }
 
     /// Several edits that undo in reverse and redo in order.
-    private static final class Compound implements UndoableEdit {
+    private static final class Compound extends UndoableEdit {
         private final String name;
         private final List<UndoableEdit> edits = new ArrayList<UndoableEdit>();
 
@@ -280,13 +362,18 @@ public class UndoHistory {
             int i = edits.size() - 1;
             try {
                 for (; i >= 0; i--) {
-                    at(i).undo();
+                    // a part whose target is gone is passed over, as a step is
+                    if (at(i).isAlive()) {
+                        at(i).undo();
+                    }
                 }
             } catch (RuntimeException err) {
                 // the step stays in the history whole: what was taken back of
                 // it is made again, so a later undo starts from all of it
                 for (int k = i + 1; k < edits.size(); k++) {
-                    at(k).redo();
+                    if (at(k).isAlive()) {
+                        at(k).redo();
+                    }
                 }
                 throw err;
             }
@@ -297,11 +384,15 @@ public class UndoHistory {
             int i = 0;
             try {
                 for (; i < edits.size(); i++) {
-                    at(i).redo();
+                    if (at(i).isAlive()) {
+                        at(i).redo();
+                    }
                 }
             } catch (RuntimeException err) {
                 for (int k = i - 1; k >= 0; k--) {
-                    at(k).undo();
+                    if (at(k).isAlive()) {
+                        at(k).undo();
+                    }
                 }
                 throw err;
             }
@@ -313,6 +404,16 @@ public class UndoHistory {
                 return name;
             }
             return edits.isEmpty() ? null : edits.get(0).getName();
+        }
+
+        @Override
+        public boolean isAlive() {
+            for (UndoableEdit e : edits) {
+                if (e.isAlive()) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

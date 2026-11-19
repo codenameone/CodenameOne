@@ -111,9 +111,8 @@ public class KanbanSnippets {
 
     public void undoAndSave(KanbanBoard board) {
         // tag::kanban-undo[]
-        board.setUndoHistory(new UndoHistory());
-        // later, from a button or a menu
-        board.undo();
+        // later, from a button or a menu: the last change in the application
+        UndoHistory.getGlobal().undo();
 
         Preferences.set("board", KanbanJson.toJson(board.getModel()));
         String saved = Preferences.get("board", null);

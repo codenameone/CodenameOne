@@ -27,12 +27,13 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// The history's order, its compounds and what it ignores.
 class UndoHistoryTest {
     /// Appends a letter, and takes it back.
-    private static final class Append implements UndoableEdit {
+    private static final class Append extends UndoableEdit {
         private final StringBuilder text;
         private final char c;
         private final UndoHistory reenter;
@@ -189,5 +190,112 @@ class UndoHistoryTest {
         assertFalse(h.canRedo());
         assertTrue(h.undo());
         assertEquals("Flaky", h.getRedoName());
+    }
+
+    /// Counts what is done to it; can be made to expire.
+    private static final class Mark extends UndoableEdit {
+        boolean alive = true;
+        int undos;
+        int redos;
+
+        @Override
+        public void undo() {
+            undos++;
+        }
+
+        @Override
+        public void redo() {
+            redos++;
+        }
+
+        @Override
+        public boolean isAlive() {
+            return alive;
+        }
+    }
+
+    @Test
+    void anExpiredEditIsPassedOverAndForgotten() {
+        UndoHistory h = new UndoHistory();
+        Mark a = new Mark();
+        Mark b = new Mark();
+        h.record(a);
+        h.record(b);
+        b.alive = false;
+        assertEquals(1, h.getUndoCount());
+        assertTrue(h.undo());
+        assertEquals(0, b.undos);
+        assertEquals(1, a.undos);
+        a.alive = false;
+        assertFalse(h.canRedo());
+        assertFalse(h.redo());
+        assertEquals(0, a.redos);
+    }
+
+    @Test
+    void discardingTheDeadKeepsTheLiving() {
+        UndoHistory h = new UndoHistory();
+        Mark a = new Mark();
+        Mark b = new Mark();
+        Mark c = new Mark();
+        h.record(a);
+        h.record(b);
+        h.record(c);
+        final int[] told = new int[1];
+        h.addListener(new UndoHistoryListener() {
+            public void historyChanged(UndoHistory history) {
+                told[0]++;
+            }
+        });
+        b.alive = false;
+        h.discardDead();
+        assertEquals(1, told[0]);
+        assertEquals(2, h.getUndoCount());
+        h.undo();
+        h.undo();
+        assertEquals(1, c.undos);
+        assertEquals(1, a.undos);
+        assertEquals(0, b.undos);
+        int before = told[0];
+        h.discardDead();
+        assertEquals(before, told[0], "nothing dead, nothing told");
+    }
+
+    @Test
+    void onlyTheNewestStepIsTheLastEdit() {
+        UndoHistory h = new UndoHistory();
+        Mark a = new Mark();
+        Mark b = new Mark();
+        h.record(a);
+        assertTrue(h.isLastEdit(a));
+        h.record(b);
+        assertFalse(h.isLastEdit(a));
+        h.beginCompound("Group");
+        assertFalse(h.isLastEdit(b), "a step is being built over it");
+        h.endCompound();
+        assertFalse(h.isLastEdit(null));
+    }
+
+    @Test
+    void aStepWhosePartsAllExpiredIsDead() {
+        UndoHistory h = new UndoHistory();
+        Mark a = new Mark();
+        Mark b = new Mark();
+        h.beginCompound("Both");
+        h.record(a);
+        h.record(b);
+        h.endCompound();
+        a.alive = false;
+        assertTrue(h.canUndo());
+        h.undo();
+        assertEquals(0, a.undos);
+        assertEquals(1, b.undos);
+        b.alive = false;
+        assertFalse(h.canRedo());
+    }
+
+    @Test
+    void theApplicationsHistoryIsOne() {
+        assertSame(UndoHistory.getGlobal(), UndoHistory.getGlobal());
     }
 }

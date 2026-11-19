@@ -24,6 +24,9 @@
 package com.codename1.ui.editor;
 
 import com.codename1.util.Bidi;
+import com.codename1.util.UndoHistory;
+import com.codename1.util.UndoableEdit;
+import com.codename1.ui.ComponentEdit;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.ClipboardContent;
@@ -52,6 +55,11 @@ public class EditorView extends Component implements TextInputClient, TextInputC
     private final boolean codeMode;
     private EditorDocument doc = new EditorDocument();
     private final UndoManager undo = new UndoManager();
+    private UndoHistory undoHistory = UndoHistory.getGlobal();
+    // the step last put in the history, which typing may still extend
+    private UndoableEdit lastStep;
+    // replaced whenever the document is: steps of an earlier one expire
+    private Object undoSession = new Object();
 
     private int caret;
     private int anchor = -1;
@@ -89,6 +97,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
     ///
     /// - `codeMode`: true for a code editor (autocorrect and autocapitalize disabled)
     public EditorView(EditorHost host, boolean codeMode) {
+        undo.owner = this;
         this.host = host;
         this.codeMode = codeMode;
         setFocusable(true);
@@ -127,9 +136,69 @@ public class EditorView extends Component implements TextInputClient, TextInputC
         return doc;
     }
 
-    /// Returns the undo manager.
+    /// Returns the undo manager, which keeps this editor's own steps. Undo
+    /// through `performUndo` or the history, not through the manager: the
+    /// history holds one step for each of the manager's.
     public UndoManager getUndoManager() {
         return undo;
+    }
+
+    /// The history this editor's steps are recorded in, or null.
+    public UndoHistory getUndoHistory() {
+        return undoHistory;
+    }
+
+    /// Records each step of typing, deleting, pasting or formatting in a
+    /// history, so a single "Undo" anywhere in the application takes back the
+    /// last change wherever it was made. The application's history,
+    /// `UndoHistory.getGlobal()`, by default; null keeps the steps in this
+    /// editor alone. A run of typing is one step.
+    public void setUndoHistory(UndoHistory undoHistory) {
+        this.undoHistory = undoHistory;
+        lastStep = null;
+    }
+
+    boolean canExtendUndoStep() {
+        return undoHistory == null || undoHistory.isLastEdit(lastStep);
+    }
+
+    void undoStepAdded() {
+        if (undoHistory == null || undoHistory.isReplaying()) {
+            return;
+        }
+        lastStep = new ComponentEdit(this, new TextStep(this, undoSession));
+        undoHistory.record(lastStep);
+    }
+
+    /// One of the undo manager's steps, as the history sees it.
+    private static final class TextStep extends UndoableEdit {
+        private final EditorView view;
+        private final Object session;
+
+        TextStep(EditorView view, Object session) {
+            this.view = view;
+            this.session = session;
+        }
+
+        @Override
+        public void undo() {
+            view.undoLocal();
+        }
+
+        @Override
+        public void redo() {
+            view.redoLocal();
+        }
+
+        @Override
+        public String getName() {
+            return "Typing";
+        }
+
+        @Override
+        public boolean isAlive() {
+            return view.undoSession == session;
+        }
     }
 
     /// Returns the current caret offset.
@@ -165,6 +234,13 @@ public class EditorView extends Component implements TextInputClient, TextInputC
         composingStart = -1;
         composingEnd = -1;
         undo.clear();
+        // the steps of the text that was replaced go; the rest of a shared
+        // history stays
+        undoSession = new Object();
+        lastStep = null;
+        if (undoHistory != null) {
+            undoHistory.discardDead();
+        }
         scrollY = 0;
         scrollX = 0;
         documentEdited(0);
@@ -2202,8 +2278,27 @@ public class EditorView extends Component implements TextInputClient, TextInputC
         }
     }
 
-    /// Undoes the last edit.
+    /// Undoes the last edit: through the history when there is one, so the
+    /// last change anywhere it serves is taken back, as an application's
+    /// "Undo" button would.
     public void performUndo() {
+        if (undoHistory != null) {
+            undoHistory.undo();
+        } else {
+            undoLocal();
+        }
+    }
+
+    /// Redoes the last undone edit, through the history when there is one.
+    public void performRedo() {
+        if (undoHistory != null) {
+            undoHistory.redo();
+        } else {
+            redoLocal();
+        }
+    }
+
+    void undoLocal() {
         UndoManager.Edit edit = undo.undoEdit(doc);
         if (edit != null) {
             caret = doc.clamp(edit.start + edit.removed.length());
@@ -2215,8 +2310,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
         }
     }
 
-    /// Redoes the last undone edit.
-    public void performRedo() {
+    void redoLocal() {
         UndoManager.Edit edit = undo.redoEdit(doc);
         if (edit != null) {
             caret = doc.clamp(edit.start + edit.inserted.length());

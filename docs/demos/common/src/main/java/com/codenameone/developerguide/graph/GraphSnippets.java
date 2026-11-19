@@ -262,10 +262,12 @@ public class GraphSnippets {
 
     public Container undoAndClipboard(final NodeGraph graph) {
         // tag::graph-undo[]
-        graph.setUndoHistory(new UndoHistory());
-
+        // every edit goes into the application's history; one button serves
+        // the graph and any other component that records into it
+        UndoHistory history = UndoHistory.getGlobal();
         Button undo = new Button("Undo");
         undo.addActionListener(e -> graph.undo());
+        history.addListener(h -> undo.setEnabled(h.canUndo()));
         Button redo = new Button("Redo");
         redo.addActionListener(e -> graph.redo());
         Button copy = new Button("Copy");

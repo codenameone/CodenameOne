@@ -86,7 +86,7 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
     }
 
     /// A card went from one place to another.
-    static final class Move implements UndoableEdit {
+    static final class Move extends UndoableEdit {
         private final KanbanModel model;
         private final KanbanCard card;
         private final Place from;
@@ -123,7 +123,7 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
     }
 
     /// A card was added, or with `removal` taken out.
-    static final class Presence implements UndoableEdit {
+    static final class Presence extends UndoableEdit {
         private final KanbanModel model;
         private final KanbanCard card;
         private final Place at;
@@ -174,7 +174,7 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
     }
 
     /// A card was given another title.
-    static final class Rename implements UndoableEdit {
+    static final class Rename extends UndoableEdit {
         private final KanbanModel model;
         private final KanbanCard card;
         private final String from;
@@ -204,7 +204,7 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
     }
 
     /// A column went to another index.
-    static final class ColumnMove implements UndoableEdit {
+    static final class ColumnMove extends UndoableEdit {
         private final KanbanModel model;
         private final KanbanColumn column;
         private final int from;
@@ -234,7 +234,7 @@ final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass -
     }
 
     /// A column or a lane was folded or unfolded.
-    static final class Fold implements UndoableEdit {
+    static final class Fold extends UndoableEdit {
         private final KanbanModel model;
         private final KanbanColumn column;
         private final KanbanLane lane;

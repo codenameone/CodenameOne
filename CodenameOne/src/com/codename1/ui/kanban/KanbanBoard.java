@@ -31,6 +31,7 @@ import com.codename1.kanban.KanbanJson;
 import com.codename1.kanban.KanbanLane;
 import com.codename1.kanban.KanbanModel;
 import com.codename1.ui.Component;
+import com.codename1.ui.ComponentEdit;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -111,7 +112,7 @@ public class KanbanBoard extends ScrollSurface {
     private KanbanCardRenderer renderer = new DefaultKanbanCardRenderer();
     private KanbanCardFactory cardFactory;
     private final Map<String, Component> components = new HashMap<String, Component>();
-    private UndoHistory undoHistory;
+    private UndoHistory undoHistory = UndoHistory.getGlobal();
     private KanbanJson.UserDataCodec userDataCodec;
     private KanbanCard selected;
     private boolean editable = true;
@@ -219,12 +220,13 @@ public class KanbanBoard extends ScrollSurface {
         if (this.model != null) {
             this.model.removeChangeListener(modelListener);
         }
-        // its steps would edit a model that is no longer shown
-        if (undoHistory != null) {
-            undoHistory.clear();
-        }
         this.model = model;
         model.addChangeListener(modelListener);
+        // its steps would edit a model that is no longer shown; the rest of a
+        // shared history stays
+        if (undoHistory != null) {
+            undoHistory.discardDead();
+        }
         selected = null;
         components.clear();
         modelChanged();
@@ -522,8 +524,9 @@ public class KanbanBoard extends ScrollSurface {
     }
 
     /// Records every edit the user makes in a history, so it can be undone.
-    /// One history may serve several components. Null, the default, records
-    /// nothing. Changes the application makes to the model directly are not
+    /// The application's history, `UndoHistory.getGlobal()`, by default; null
+    /// records nothing. An undone or redone step brings the board back into
+    /// view (`ComponentEdit`). Changes the application makes to the model directly are not
     /// recorded.
     public void setUndoHistory(UndoHistory undoHistory) {
         this.undoHistory = undoHistory;
@@ -554,7 +557,25 @@ public class KanbanBoard extends ScrollSurface {
 
     private void record(UndoableEdit edit) {
         if (undoHistory != null) {
-            undoHistory.record(edit);
+            undoHistory.record(new ModelEdit(this, model, edit));
+        }
+    }
+
+    /// An edit of the model that was shown when it was made: it expires once
+    /// the board is given another model.
+    private static final class ModelEdit extends ComponentEdit {
+        private final KanbanBoard board;
+        private final KanbanModel madeIn;
+
+        ModelEdit(KanbanBoard board, KanbanModel madeIn, UndoableEdit edit) {
+            super(board, edit);
+            this.board = board;
+            this.madeIn = madeIn;
+        }
+
+        @Override
+        public boolean isAlive() {
+            return board.model == madeIn && super.isAlive();
         }
     }
 

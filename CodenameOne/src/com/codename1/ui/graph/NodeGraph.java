@@ -35,6 +35,7 @@ import com.codename1.graph.arrange.ForceArrangement;
 import com.codename1.graph.arrange.GraphArrangement;
 import com.codename1.graph.arrange.ArrangementResult;
 import com.codename1.ui.Component;
+import com.codename1.ui.ComponentEdit;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -221,7 +222,7 @@ public class NodeGraph extends Container {
     private boolean liveRunning;
 
     // editing extras
-    private UndoHistory undoHistory;
+    private UndoHistory undoHistory = UndoHistory.getGlobal();
     private boolean resizable;
     private GraphNodeTemplate pendingTemplate;
     private GraphNodeTemplate previewTemplate;
@@ -298,12 +299,13 @@ public class NodeGraph extends Container {
         animTo = null;
         animFrom = null;
         pendingTemplate = null;
-        // its steps would edit a model that is no longer shown
-        if (undoHistory != null) {
-            undoHistory.clear();
-        }
         this.model = model == null ? new DefaultGraphModel() : model;
         this.model.addChangeListener(modelListener);
+        // its steps would edit a model that is no longer shown; the rest of a
+        // shared history stays
+        if (undoHistory != null) {
+            undoHistory.discardDead();
+        }
         selection.clear();
         selectedEdge = null;
         components.clear();
@@ -894,8 +896,9 @@ public class NodeGraph extends Container {
     }
 
     /// Records every edit the user makes in a history, so it can be undone.
-    /// One history may serve several components. Null, the default, records
-    /// nothing.
+    /// The application's history, `UndoHistory.getGlobal()`, by default; null
+    /// records nothing. An undone or redone step brings the graph back into
+    /// view (`ComponentEdit`).
     ///
     /// What is recorded is what the user did through this view: moving,
     /// resizing, connecting, removing, renaming, adding, pasting, collapsing
@@ -942,7 +945,25 @@ public class NodeGraph extends Container {
 
     private void record(UndoableEdit edit) {
         if (undoHistory != null) {
-            undoHistory.record(edit);
+            undoHistory.record(new ModelEdit(this, model, edit));
+        }
+    }
+
+    /// An edit of the model that was shown when it was made: it expires once
+    /// the graph is given another model.
+    private static final class ModelEdit extends ComponentEdit {
+        private final NodeGraph graph;
+        private final GraphModel madeIn;
+
+        ModelEdit(NodeGraph graph, GraphModel madeIn, UndoableEdit edit) {
+            super(graph, edit);
+            this.graph = graph;
+            this.madeIn = madeIn;
+        }
+
+        @Override
+        public boolean isAlive() {
+            return graph.model == madeIn && super.isAlive();
         }
     }
 
