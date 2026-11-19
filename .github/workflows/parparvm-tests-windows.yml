@@ -723,8 +723,10 @@ jobs:
     # the performance verdict. Requiring success let an x64 perf regression skip the
     # whole arm64 leg, its screenshots and its own perf gate included. An x64 failure
     # before the upload still fails here, at the download, with its own message.
+    # Not in a golden capture: the x64 leg's rendering is the golden
+    # (golden-capture.sh), and this leg is held to it by the normal run.
     if: >-
-      needs.golden-plan.outputs.run == 'true' && (
+      needs.golden-plan.outputs.run == 'true' && inputs.cn1ss_capture == '' && (
       !cancelled() && needs.windows-port-screenshot.result != 'skipped' &&
       (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
       )
