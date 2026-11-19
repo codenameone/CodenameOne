@@ -312,6 +312,8 @@ class SpreadsheetHostileFileTest extends UITestBase {
                 s.setCellValue(row, 0, Double.valueOf(1234.5));
                 try {
                     s.setCellFormat(row, 0, code);
+                } catch (IllegalArgumentException refused) {
+                    // a code no file can hold: more than four sections, or something left open
                 } catch (Throwable t) { //NOPMD AvoidCatchingThrowable - no format may throw
                     wrong.append("\nsetting the format ").append(code).append(" threw ").append(t);
                 }
@@ -535,9 +537,12 @@ class SpreadsheetHostileFileTest extends UITestBase {
         sheet.addMergedRegion(3, 2, 1, 0);
         int[] merged = sheet.getMergedRegion(0);
         same("1,0,3,2", merged[0] + "," + merged[1] + "," + merged[2] + "," + merged[3], "a merge given backwards");
-        sheet.setFrozenPanes(-3, 99999);
-        same(Integer.valueOf(0), Integer.valueOf(sheet.getFrozenRows()), "frozen rows");
-        same(Boolean.TRUE, Boolean.valueOf(sheet.getFrozenColumns() <= 16383), "frozen columns stay on the sheet");
+        try {
+            sheet.setFrozenPanes(-3, 99999);
+            wrong.append("\na frozen pane outside the sheet was accepted");
+        } catch (IllegalArgumentException expected) {
+            // a pane the file formats cannot hold
+        }
         // names that define each other have no value
         book.setDefinedName("first", "second+1");
         book.setDefinedName("second", "first+1");
@@ -1073,6 +1078,58 @@ class SpreadsheetHostileFileTest extends UITestBase {
         } catch (IOException expected) {
             // a damaged file
         }
+        String[][] refused = {
+            {"<row r=\"1\"", "<row r=\"1\" outlineLevel=\"9\""},
+            {"<sheetData>", "<cols><col min=\"5\" max=\"2\" width=\"3\"/></cols><sheetData>"},
+            {"<sheetData>", "<cols><col min=\"1\" max=\"1\" width=\"wide\" customWidth=\"1\"/></cols><sheetData>"},
+        };
+        for (int k = 0; k < refused.length; k++) {
+            try {
+                Workbook.read(new ByteArrayInputStream(rewriteSheet(cout.toByteArray(), refused[k][0], refused[k][1])), Workbook.Format.XLSX);
+                wrong.append("\na damaged attribute was read: " + refused[k][1]);
+            } catch (IOException expected) {
+                // a damaged file
+            }
+        }
+        Sheet api = new Workbook().addSheet("A");
+        try {
+            api.setRowOutlineLevel(0, 9);
+            wrong.append("\nan outline level past 7 was accepted");
+        } catch (IllegalArgumentException expected) {
+            // the formats hold seven
+        }
+        try {
+            api.insertRows(-1, 1);
+            wrong.append("\na negative row was inserted");
+        } catch (IllegalArgumentException expected) {
+            // no such row
+        }
+        try {
+            api.setCellFormat(0, 0, "0;0;0;0;0");
+            wrong.append("\na format of five sections was accepted");
+        } catch (IllegalArgumentException expected) {
+            // Excel refuses it
+        }
+        for (int m = 0; m < 4100; m++) {
+            api.addMergedRegion(2 * m, 1, 2 * m + 1, 2);
+        }
+        try {
+            api.addMergedRegion(8198, 1, 8199, 2);
+            wrong.append("\na merge over the 4100th was accepted");
+        } catch (IllegalArgumentException expected) {
+            // one cell, one merge
+        }
+        api.setCellFormula(0, 3, "SUM(SORTBY({1;2;3},{1;2;3},0))");
+        same(CellError.VALUE, api.getCellValue(0, 3), "SORTBY with an order that is neither 1 nor -1");
+        api.setCellFormula(1, 3, "SUM(UNIQUE(SEQUENCE(200000)))+ROWS(UNIQUE({1;1;2}))");
+        same(Double.valueOf(20000100000.0 + 2), api.getCellValue(1, 3), "UNIQUE of many rows");
+        Sheet el = new Workbook().addSheet("E");
+        el.setCellValue(0, 0, Double.valueOf(1));
+        el.setCellFormat(0, 0, "[ss]");
+        ByteArrayOutputStream eo2 = new ByteArrayOutputStream();
+        el.getWorkbook().write(eo2, Workbook.Format.ODS);
+        same("86400", Workbook.read(new ByteArrayInputStream(eo2.toByteArray()), Workbook.Format.ODS).getSheet(0).getCellText(0, 0),
+                "elapsed seconds through ODS");
         Workbook leap = new Workbook();
         Sheet ls = leap.addSheet("D");
         ls.setCellValue(0, 0, Double.valueOf(60));

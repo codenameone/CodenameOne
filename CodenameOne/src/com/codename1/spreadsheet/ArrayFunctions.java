@@ -203,7 +203,11 @@ final class ArrayFunctions {
                         throw EvalError.VALUE;
                     }
                     keys[k] = by;
-                    directions[k] = (int) ev.scalarNum(a, 2 + 2 * k, 1);
+                    double direction = ev.scalarNum(a, 2 + 2 * k, 1);
+                    if (direction != 1 && direction != -1) {
+                        throw EvalError.VALUE;
+                    }
+                    directions[k] = (int) direction;
                 }
                 Object[][] source = byCol ? transpose(m) : m;
                 Object[][] out = sorted(source, keys, directions);
@@ -215,18 +219,46 @@ final class ArrayFunctions {
                 boolean once = Evaluator.has(a, 2) && Values.bool(ev.scalar(a[2]));
                 Object[][] source = byCol ? transpose(m) : m;
                 ArrayList<Integer> picked = new ArrayList<Integer>();
-                for (int i = 0; i < source.length; i++) {
-                    int same = 0;
-                    boolean earlier = false;
-                    for (int j = 0; j < source.length; j++) {
-                        if (sameRow(source[i], source[j])) {
-                            same++;
-                            if (j < i) {
-                                earlier = true;
+                // rows sorted so that equal ones meet, then compared within each run of rows the
+                // sort calls equal: n log n rather than every row against every other
+                int width = source.length == 0 ? 0 : source[0].length;
+                Object[][][] keys = new Object[width][][];
+                int[] directions = new int[width];
+                for (int k = 0; k < width; k++) {
+                    keys[k] = column(source, k);
+                    directions[k] = 1;
+                }
+                Integer[] order = new Integer[source.length];
+                for (int i = 0; i < order.length; i++) {
+                    order[i] = Integer.valueOf(i);
+                }
+                sort(order, keys, directions);
+                int[] firstOf = new int[source.length];
+                int[] copies = new int[source.length];
+                int run = 0;
+                while (run < order.length) {
+                    int end = run + 1;
+                    while (end < order.length && compareRows(order[run].intValue(), order[end].intValue(), keys, directions) == 0) {
+                        end++;
+                    }
+                    for (int p = run; p < end; p++) {
+                        int i = order[p].intValue();
+                        firstOf[i] = i;
+                        for (int q = run; q < end; q++) {
+                            int j = order[q].intValue();
+                            if (j < firstOf[i] && sameRow(source[i], source[j])) {
+                                firstOf[i] = j;
                             }
                         }
                     }
-                    if (!earlier && (!once || same == 1)) {
+                    for (int p = run; p < end; p++) {
+                        int i = order[p].intValue();
+                        copies[firstOf[i]]++;
+                    }
+                    run = end;
+                }
+                for (int i = 0; i < source.length; i++) {
+                    if (firstOf[i] == i && (!once || copies[i] == 1)) {
                         picked.add(Integer.valueOf(i));
                     }
                 }

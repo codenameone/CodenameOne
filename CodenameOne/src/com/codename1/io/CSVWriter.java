@@ -68,6 +68,9 @@ public class CSVWriter {
     ///
     /// - `separatorChar`: the separator, a tab for tab separated values
     public CSVWriter(char separatorChar) {
+        if (separatorChar == '\n' || separatorChar == '\r' || separatorChar == '"') {
+            throw new IllegalArgumentException("A separator no reader could tell from a line ending or a quote");
+        }
         this.separatorChar = separatorChar;
     }
 
@@ -95,6 +98,9 @@ public class CSVWriter {
     ///
     /// - `quoteChar`: the quote character, a double quote by default
     public void setQuoteChar(char quoteChar) {
+        if (quoteChar == separatorChar || quoteChar == '\n' || quoteChar == '\r') {
+            throw new IllegalArgumentException("A quote no reader could tell from the separator or a line ending");
+        }
         this.quoteChar = quoteChar;
     }
 
@@ -114,7 +120,7 @@ public class CSVWriter {
     ///
     /// - `lineEnding`: the line ending
     public void setLineEnding(String lineEnding) {
-        if (lineEnding == null) {
+        if (!"\r\n".equals(lineEnding) && !"\n".equals(lineEnding) && !"\r".equals(lineEnding)) {
             throw new IllegalArgumentException("A line ending is needed; \"\\n\" and \"\\r\\n\" are the usual ones");
         }
         this.lineEnding = lineEnding;

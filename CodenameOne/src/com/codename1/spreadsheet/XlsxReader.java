@@ -270,7 +270,7 @@ final class XlsxReader {
                     row = Integer.parseInt(r) - 1;
                 }
                 col = -1;
-                int level = x.intAttr("outlineLevel", 0);
+                int level = x.count("outlineLevel", 0, 0, 7);
                 if (level > 0) {
                     sheet.setRowOutlineLevel(row, level);
                 }
@@ -308,34 +308,35 @@ final class XlsxReader {
             } else if ("col".equals(tag)) {
                 // what Excel writes for "every column from here on" runs to the last column;
                 // anything past it is not a column, and each column set is counted
-                int min = Math.max(0, x.intAttr("min", 1) - 1);
-                int max = Math.min(x.intAttr("max", min + 1) - 1, Node.MAX_COL);
-                if (min <= max) {
-                    book.allocated(max - min + 1);
+                int min = x.count("min", 1, 1, Node.MAX_COL + 1) - 1;
+                int max = x.count("max", min + 1, 1, Node.MAX_COL + 1) - 1;
+                if (min > max) {
+                    throw new IllegalArgumentException("a column set that ends before it starts");
                 }
+                book.allocated(max - min + 1);
                 String width = x.attr("width");
                 if (width != null && (x.boolAttr("customWidth") || x.attr("customWidth") == null)) {
+                    double w;
                     try {
-                        double w = Double.parseDouble(width);
-                        if (Double.isNaN(w) || Double.isInfinite(w)) {
-                            w = 0;
-                        }
-                        for (int c = min; c <= max; c++) {
-                            sheet.setColumnWidth(c, w);
-                        }
+                        w = Double.parseDouble(width);
                     } catch (NumberFormatException err) {
-                        // no width then
+                        throw new IllegalArgumentException("Not a column width: " + width); //NOPMD PreserveStackTrace - the message names the attribute, the parse error adds nothing
+                    }
+                    for (int c = min; c <= max; c++) {
+                        sheet.setColumnWidth(c, w);
                     }
                 }
             } else if ("mergeCell".equals(tag)) {
                 int[] r = range(x.attr("ref"));
-                if (r != null) {
-                    sheet.loadMergedRegion(r[0], r[1], r[2], r[3]);
+                if (r == null || r[0] > r[2] || r[1] > r[3]) {
+                    throw new IllegalArgumentException("Not a merged range: " + x.attr("ref"));
                 }
+                // one over another merge is repaired on opening by Excel; dropped here too
+                sheet.loadMergedRegion(r[0], r[1], r[2], r[3]);
             } else if ("pane".equals(tag)) {
                 String state = x.attr("state");
                 if ("frozen".equals(state) || "frozenSplit".equals(state)) {
-                    sheet.setFrozenPanes(doubleAttr(x, "ySplit"), doubleAttr(x, "xSplit"));
+                    sheet.setFrozenPanes(split(x, "ySplit", Node.MAX_ROW), split(x, "xSplit", Node.MAX_COL));
                 }
             } else if ("extLst".equals(tag) || "conditionalFormatting".equals(tag) || "dataValidations".equals(tag)) {
                 x.skipElement();
@@ -343,19 +344,24 @@ final class XlsxReader {
         }
     }
 
-    private static int doubleAttr(XmlScanner x, String name) {
+    private static int split(XmlScanner x, String name, int max) {
         String v = x.attr(name);
         if (v == null) {
             return 0;
         }
+        double d;
         try {
-            return (int) Double.parseDouble(v);
+            d = Double.parseDouble(v);
         } catch (NumberFormatException e) {
-            return 0;
+            throw new IllegalArgumentException("Not a split: " + v); //NOPMD PreserveStackTrace - the message names the attribute, the parse error adds nothing
         }
+        // a frozen split counts whole rows or columns
+        if (!(d >= 0 && d <= max) || d != Math.floor(d)) {
+            throw new IllegalArgumentException("Not a split: " + v);
+        }
+        return (int) d;
     }
 
-    /// `B2:D7` as first row, first column, last row, last column; null for anything else.
     private static boolean isDigits(String s) {
         for (int i = 0; i < s.length(); i++) {
             if (s.charAt(i) < '0' || s.charAt(i) > '9') {
@@ -365,6 +371,7 @@ final class XlsxReader {
         return s.length() > 0;
     }
 
+    /// `B2:D7` as first row, first column, last row, last column; null for anything else.
     static int[] range(String ref) {
         if (ref == null) {
             return null;
@@ -396,7 +403,7 @@ final class XlsxReader {
 
     private void readCell(Sheet sheet, XmlScanner x, int row, int col, HashMap<Integer, Node> sharedFormulas,
             HashMap<Integer, int[]> sharedOrigins, StringBuilder sb) throws IOException {
-        int style = x.intAttr("s", 0);
+        int style = x.count("s", 0, 0, Integer.MAX_VALUE);
         String t = x.attr("t");
         int type = T_NUMBER;
         if (t != null) {
@@ -433,7 +440,7 @@ final class XlsxReader {
                 raw = readRichText(x, sb, "is");
             } else if ("f".equals(x.name)) {
                 String kind = x.attr("t");
-                int si = x.intAttr("si", -1);
+                int si = x.count("si", -1, 0, Integer.MAX_VALUE);
                 arrayRef = x.attr("ref");
                 String text = x.elementText();
                 if ("dataTable".equals(kind)) {
@@ -445,9 +452,9 @@ final class XlsxReader {
                     Integer key = Integer.valueOf(si);
                     if (text.length() > 0) {
                         formula = text;
+                        sharedOrigins.put(key, new int[] {row, col});
                         try {
                             sharedFormulas.put(key, FormulaParser.parse(text, false));
-                            sharedOrigins.put(key, new int[] {row, col});
                         } catch (FormulaSyntaxException err) {
                             // the cells that share it keep the values the file has for them
                             sharedFormulas.remove(key);
@@ -455,6 +462,7 @@ final class XlsxReader {
                     } else {
                         Node master = sharedFormulas.get(key);
                         int[] origin = sharedOrigins.get(key);
+                        // a share of a formula no cell defines keeps the value the file has
                         if (master != null && origin != null) {
                             sharedNode = FormulaParser.shift(master, row - origin[0], col - origin[1]);
                         } else {
@@ -518,7 +526,10 @@ final class XlsxReader {
                 sheet.loadFormula(row, col, sharedNode, value, hasValue, false);
             } else {
                 sheet.loadFormula(row, col, formula, false, value, hasValue, array);
-                int[] span = array ? range(arrayRef) : null;
+                int[] span = array && arrayRef != null ? range(arrayRef) : null;
+                if (array && arrayRef != null && (span == null || span[0] > span[2] || span[1] > span[3])) {
+                    throw new IllegalArgumentException("Not an array range: " + arrayRef);
+                }
                 if (span != null && span[0] == row && span[1] == col) {
                     book.arraySpan(sheet, row, col, span[2] - span[0] + 1, span[3] - span[1] + 1);
                 }
@@ -619,7 +630,10 @@ final class XlsxReader {
             try {
                 i = Integer.parseInt(localSheetId.trim());
             } catch (NumberFormatException e) {
-                i = 0;
+                i = -1;
+            }
+            if (i < 0 || i >= sheetNames.size()) {
+                throw new IllegalArgumentException("A name local to a sheet the file does not have: " + localSheetId);
             }
         }
         if (i >= 0 && i < sheetNames.size()) {

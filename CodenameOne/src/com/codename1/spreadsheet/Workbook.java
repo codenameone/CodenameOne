@@ -476,7 +476,8 @@ public final class Workbook {
                 sheet.store(r + 1, c, grid.getValueAt(r, columns[c]));
             }
             if (tree) {
-                sheet.setRowOutlineLevel(r + 1, grid.getDepth(r));
+                // the file formats hold seven levels; a deeper tree keeps the deepest of them
+                sheet.setRowOutlineLevel(r + 1, Math.min(7, grid.getDepth(r)));
             }
         }
         sheet.setHeaderRow(true);
@@ -740,6 +741,9 @@ public final class Workbook {
     /// - `IllegalArgumentException`: when the formula cannot be read, or has a reference
     ///   that does not name its sheet
     public void setDefinedName(String name, String formula) {
+        if (name == null) {
+            throw new IllegalArgumentException("A defined name needs a name");
+        }
         String key = FormulaParser.asciiUpper(name);
         if (formula == null) {
             if (nameNodes.remove(key) != null || nameFormulas.remove(key) != null) {

@@ -536,6 +536,7 @@ public final class Sheet extends AbstractTableModel {
     /// - `format`: a format code in Excel's syntax, such as `0.0%` or `d mmm yyyy`; null for
     ///   none
     public void setCellFormat(int row, int column, String format) {
+        CellFormat.check(format);
         Cell c = ensure(row, column);
         c.format = workbook.formatId(format);
         c.autoFormat = false;
@@ -841,8 +842,15 @@ public final class Sheet extends AbstractTableModel {
     /// - `row`: the row of the sheet the first new row becomes
     ///
     /// - `count`: how many rows to insert
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a row outside the sheet or a negative count
     public void insertRows(int row, int count) {
-        if (count <= 0 || row < 0 || row > Node.MAX_ROW) {
+        if (count < 0 || row < 0 || row > Node.MAX_ROW) {
+            throw new IllegalArgumentException("Not a row of the sheet, or a negative count: " + row + ", " + count);
+        }
+        if (count == 0) {
             return;
         }
         dissolveCrossed(true, row, count, true);
@@ -886,8 +894,15 @@ public final class Sheet extends AbstractTableModel {
     /// - `row`: the first row of the sheet to remove
     ///
     /// - `count`: how many rows to remove
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a row outside the sheet or a negative count
     public void removeRows(int row, int count) {
-        if (count <= 0 || row < 0 || row > Node.MAX_ROW) {
+        if (count < 0 || row < 0 || row > Node.MAX_ROW) {
+            throw new IllegalArgumentException("Not a row of the sheet, or a negative count: " + row + ", " + count);
+        }
+        if (count == 0) {
             return;
         }
         dissolveCrossed(true, row, count, false);
@@ -917,8 +932,15 @@ public final class Sheet extends AbstractTableModel {
     /// - `column`: the column the first new column becomes
     ///
     /// - `count`: how many columns to insert
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a column outside the sheet or a negative count
     public void insertColumns(int column, int count) {
-        if (count <= 0 || column < 0 || column > Node.MAX_COL) {
+        if (count < 0 || column < 0 || column > Node.MAX_COL) {
+            throw new IllegalArgumentException("Not a column of the sheet, or a negative count: " + column + ", " + count);
+        }
+        if (count == 0) {
             return;
         }
         dissolveCrossed(false, column, count, true);
@@ -965,8 +987,15 @@ public final class Sheet extends AbstractTableModel {
     /// - `column`: the first column to remove
     ///
     /// - `count`: how many columns to remove
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a column outside the sheet or a negative count
     public void removeColumns(int column, int count) {
-        if (count <= 0 || column < 0 || column > Node.MAX_COL) {
+        if (count < 0 || column < 0 || column > Node.MAX_COL) {
+            throw new IllegalArgumentException("Not a column of the sheet, or a negative count: " + column + ", " + count);
+        }
+        if (count == 0) {
             return;
         }
         dissolveCrossed(false, column, count, false);
@@ -1228,13 +1257,17 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: for a row outside the sheet
+    /// - `IllegalArgumentException`: for a row outside the sheet, or a level outside 0 to 7,
+    ///   the levels the file formats hold
     public void setRowOutlineLevel(int row, int level) {
         if (row < 0 || row > Node.MAX_ROW) {
             throw new IllegalArgumentException("No such row: " + row);
         }
+        if (level < 0 || level > 7) {
+            throw new IllegalArgumentException("Not an outline level, 0 to 7: " + level);
+        }
         if (level > 0) {
-            outlineLevels.put(Integer.valueOf(row), Integer.valueOf(Math.min(level, 7)));
+            outlineLevels.put(Integer.valueOf(row), Integer.valueOf(level));
         } else {
             outlineLevels.remove(Integer.valueOf(row));
         }
@@ -1284,9 +1317,17 @@ public final class Sheet extends AbstractTableModel {
     /// - `rows`: the count of rows at the top
     ///
     /// - `columns`: the count of columns at the left
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a negative count, or one that leaves no row or column
+    ///   of the sheet to scroll
     public void setFrozenPanes(int rows, int columns) {
-        frozenRows = Math.max(0, Math.min(rows, Node.MAX_ROW));
-        frozenColumns = Math.max(0, Math.min(columns, Node.MAX_COL));
+        if (rows < 0 || rows > Node.MAX_ROW || columns < 0 || columns > Node.MAX_COL) {
+            throw new IllegalArgumentException("Not a frozen pane of the sheet: " + rows + " rows, " + columns + " columns");
+        }
+        frozenRows = rows;
+        frozenColumns = columns;
     }
 
     /// Merges a rectangle of cells into one, as the file formats record it. The value shown
@@ -1302,7 +1343,7 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `lastColumn`: the right column
     public void addMergedRegion(int firstRow, int firstColumn, int lastRow, int lastColumn) {
-        if (!loadMergedRegion(firstRow, firstColumn, lastRow, lastColumn)) {
+        if (!mergeRegion(firstRow, firstColumn, lastRow, lastColumn, Integer.MAX_VALUE)) {
             throw new IllegalArgumentException("Not a rectangle of the sheet, or over a merge it has: rows " + firstRow + " to " + lastRow
                     + ", columns " + firstColumn + " to " + lastColumn);
         }
@@ -1311,6 +1352,11 @@ public final class Sheet extends AbstractTableModel {
     /// Records a merge a file names. Corners given the wrong way around are put right; a
     /// rectangle that leaves the sheet is not recorded, and false is the answer.
     boolean loadMergedRegion(int firstRow, int firstColumn, int lastRow, int lastColumn) {
+        // a file with merges by the hundred thousand is not compared pair by pair
+        return mergeRegion(firstRow, firstColumn, lastRow, lastColumn, 4096);
+    }
+
+    private boolean mergeRegion(int firstRow, int firstColumn, int lastRow, int lastColumn, int compareLimit) {
         int r1 = Math.min(firstRow, lastRow);
         int r2 = Math.max(firstRow, lastRow);
         int c1 = Math.min(firstColumn, lastColumn);
@@ -1318,9 +1364,8 @@ public final class Sheet extends AbstractTableModel {
         if (r1 < 0 || c1 < 0 || r2 > Node.MAX_ROW || c2 > Node.MAX_COL) {
             return false;
         }
-        // a cell is in one merge; a file with two over one cell is repaired on opening. A
-        // file with merges by the hundred thousand is not compared pair by pair.
-        int compared = Math.min(merges.size(), 4096);
+        // a cell is in one merge; a file with two over one cell is repaired on opening
+        int compared = Math.min(merges.size(), compareLimit);
         for (int i = 0; i < compared; i++) {
             int[] m = merges.get(i);
             if (r1 <= m[2] && r2 >= m[0] && c1 <= m[3] && c2 >= m[1]) {

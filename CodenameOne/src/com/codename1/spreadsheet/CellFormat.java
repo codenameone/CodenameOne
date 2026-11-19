@@ -83,6 +83,41 @@ final class CellFormat {
 
     static final int MAX_CODE = 1024;
     private final String code;
+    /// Refuses a format code no file can hold: more than four sections, or a quote, a
+    /// bracket or an escape left open.
+    static void check(String code) {
+        if (code == null) {
+            return;
+        }
+        int sections = 1;
+        int i = 0;
+        while (i < code.length()) {
+            char ch = code.charAt(i);
+            if (ch == '"' || ch == '[') {
+                int end = code.indexOf(ch == '"' ? '"' : ']', i + 1);
+                if (end < 0) {
+                    throw new IllegalArgumentException("A format code with " + ch + " left open: " + code);
+                }
+                i = end + 1;
+                continue;
+            }
+            if (ch == '\\' || ch == '_' || ch == '*') {
+                if (i + 1 >= code.length()) {
+                    throw new IllegalArgumentException("A format code ending in " + ch + ": " + code);
+                }
+                i += 2;
+                continue;
+            }
+            if (ch == ';') {
+                sections++;
+            }
+            i++;
+        }
+        if (sections > 4) {
+            throw new IllegalArgumentException("A format code of more than four sections: " + code);
+        }
+    }
+
     private final Section[] sections;
 
     CellFormat(String code) {
@@ -814,6 +849,8 @@ final class CellFormat {
                         break;
                     case 'M':
                         part = "number:month";
+                        // OpenDocument has no month initial: mmmmm is written as the month's
+                        // whole name, the nearest the format holds, and reads back as mmmm
                         textual = len > 2;
                         len = len > 2 ? len - 2 : len;
                         break;

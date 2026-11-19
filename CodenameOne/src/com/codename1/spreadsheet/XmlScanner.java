@@ -439,6 +439,38 @@ final class XmlScanner {
         }
     }
 
+    /// A whole number attribute that becomes an index, a size or a count: a value that is no
+    /// number, or outside `min` to `max`, is a damaged file, never a guess.
+    int count(String attribute, int fallback, int min, int max) {
+        String v = attr(attribute);
+        if (v == null) {
+            return fallback;
+        }
+        long n = 0;
+        String t = v.trim();
+        boolean negative = t.startsWith("-");
+        int start = negative || t.startsWith("+") ? 1 : 0;
+        if (start == t.length()) {
+            throw new IllegalArgumentException("Not a number for " + attribute + ": " + v);
+        }
+        for (int i = start; i < t.length(); i++) {
+            char d = t.charAt(i);
+            if (d < '0' || d > '9') {
+                throw new IllegalArgumentException("Not a number for " + attribute + ": " + v);
+            }
+            if (n <= Integer.MAX_VALUE) {
+                n = n * 10 + (d - '0');
+            }
+        }
+        if (negative) {
+            n = -n;
+        }
+        if (n < min || n > max) {
+            throw new IllegalArgumentException("Out of range for " + attribute + ": " + v);
+        }
+        return (int) n;
+    }
+
     boolean boolAttr(String attribute) {
         String v = attr(attribute);
         return "1".equals(v) || "true".equals(v);

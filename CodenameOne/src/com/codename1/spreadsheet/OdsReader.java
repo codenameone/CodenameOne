@@ -138,6 +138,9 @@ final class OdsReader {
                     } else if ("VerticalSplitPosition".equals(name)) {
                         pane[0] = v;
                     }
+                    if (pane[0] < 0 || pane[0] > Node.MAX_ROW || pane[1] < 0 || pane[1] > Node.MAX_COL) {
+                        throw new IllegalArgumentException("a split outside the sheet: " + value);
+                    }
                 }
             } else if (e == XmlScanner.END) {
                 if (table != null && depth == tableDepth) {
@@ -210,10 +213,10 @@ final class OdsReader {
                 columnDefaults.clear();
             } else if ("table-column".equals(tag)) {
                 if (sheet != null) {
-                    int n = Math.max(1, x.intAttr("table:number-columns-repeated", 1));
+                    int n = x.count("table:number-columns-repeated", 1, 1, Integer.MAX_VALUE);
                     Double width = columnStyleWidths.get(x.attr("table:style-name"));
                     if (width != null) {
-                        for (int c = declaredColumn; c < declaredColumn + n && c < declaredColumn + 256; c++) {
+                        for (int c = declaredColumn; c < declaredColumn + n && c <= Node.MAX_COL; c++) {
                             sheet.setColumnWidth(c, width.doubleValue());
                         }
                     }
@@ -364,7 +367,7 @@ final class OdsReader {
             int grouped = Math.min(rowRepeat, 4096);
             book.allocated(grouped);
             for (int i = 0; i < grouped; i++) {
-                sheet.setRowOutlineLevel(row + i, groupDepth);
+                sheet.setRowOutlineLevel(row + i, Math.min(7, groupDepth));
             }
         }
         row = (int) Math.min((long) row + rowRepeat, (long) Node.MAX_ROW + 1);
@@ -471,8 +474,14 @@ final class OdsReader {
         }
     }
 
+    /// The column after a run of cells. Empty cells repeated past the last column are what
+    /// LibreOffice writes to the end of a row; the count stops there and never wraps.
+    private static int advance(int col, int repeat) {
+        return (int) Math.min((long) col + repeat, (long) Node.MAX_COL + 1);
+    }
+
     private void readCell(XmlScanner x, boolean covered) throws IOException {
-        int repeat = Math.max(1, x.intAttr("table:number-columns-repeated", 1));
+        int repeat = x.count("table:number-columns-repeated", 1, 1, Integer.MAX_VALUE);
         String type = x.attr("office:value-type");
         String number = x.attr("office:value");
         String date = x.attr("office:date-value");
@@ -482,11 +491,11 @@ final class OdsReader {
         String formula = x.attr("table:formula");
         String style = x.attr("table:style-name");
         boolean error = "error".equals(x.attr("calcext:value-type"));
-        int spanColumns = x.intAttr("table:number-columns-spanned", 1);
-        int spanRows = x.intAttr("table:number-rows-spanned", 1);
+        int spanColumns = x.count("table:number-columns-spanned", 1, 1, Node.MAX_COL + 1);
+        int spanRows = x.count("table:number-rows-spanned", 1, 1, Node.MAX_ROW + 1);
         boolean array = x.attr("table:number-matrix-columns-spanned") != null;
-        int matrixColumns = x.intAttr("table:number-matrix-columns-spanned", 1);
-        int matrixRows = x.intAttr("table:number-matrix-rows-spanned", 1);
+        int matrixColumns = x.count("table:number-matrix-columns-spanned", 1, 1, Node.MAX_COL + 1);
+        int matrixRows = x.count("table:number-matrix-rows-spanned", 1, 1, Node.MAX_ROW + 1);
         String end = covered ? "covered-table-cell" : "table-cell";
 
         text.setLength(0);
@@ -514,7 +523,7 @@ final class OdsReader {
                 inParagraph = true;
             } else if (inParagraph) {
                 if ("s".equals(x.name)) {
-                    int n = Math.min(x.intAttr("text:c", 1), XmlScanner.MAX_TEXT - text.length());
+                    int n = x.count("text:c", 1, 0, XmlScanner.MAX_TEXT - text.length());
                     if (n > 0) {
                         // Spaces the file asks for take memory it never sent: two bytes each,
                         // and a cell is counted as about seventy.
@@ -531,7 +540,7 @@ final class OdsReader {
             }
         }
         if (covered) {
-            col += repeat;
+            col = advance(col, repeat);
             return;
         }
 
@@ -584,10 +593,17 @@ final class OdsReader {
             formulaText = stripFormulaPrefix(formula);
         }
         if (spanColumns > 1 || spanRows > 1) {
+            if ((long) row + spanRows - 1 > Node.MAX_ROW || (long) col + spanColumns - 1 > Node.MAX_COL) {
+                throw new IllegalArgumentException("a merge runs past the edge of the sheet");
+            }
+            // a merge over another is repaired on opening by Excel; it is dropped here too
             sheet.loadMergedRegion(row, col, row + spanRows - 1, col + spanColumns - 1);
         }
+        if (array && ((long) row + matrixRows - 1 > Node.MAX_ROW || (long) col + matrixColumns - 1 > Node.MAX_COL)) {
+            throw new IllegalArgumentException("an array formula runs past the edge of the sheet");
+        }
         if (value == null && formulaText == null) {
-            col += repeat;
+            col = advance(col, repeat);
             return;
         }
         int format = pendingFormat(style, col, value instanceof Double ? fallbackFormat : null);
@@ -617,7 +633,7 @@ final class OdsReader {
                 sheet.storeFormat(row, c, format);
             }
         }
-        col += repeat;
+        col = advance(col, repeat);
     }
 
     private static Object parseDouble(String s) {
@@ -714,9 +730,9 @@ final class OdsReader {
                 // and writes decimal-places for every fixed format, 0 included
                 sb.append("General");
             } else if ("number".equals(tag)) {
-                int decimals = x.intAttr("number:decimal-places", 0);
-                int minDecimals = Math.min(decimals, x.intAttr("number:min-decimal-places", decimals));
-                int minInteger = x.intAttr("number:min-integer-digits", 1);
+                int decimals = x.count("number:decimal-places", 0, 0, 1024);
+                int minDecimals = Math.min(decimals, x.count("number:min-decimal-places", decimals, 0, 1024));
+                int minInteger = x.count("number:min-integer-digits", 1, 0, 1024);
                 boolean grouping = x.boolAttr("number:grouping");
                 double factor = x.doubleAttr("number:display-factor", 1);
                 StringBuilder whole = new StringBuilder();
@@ -758,8 +774,8 @@ final class OdsReader {
                     factor /= 1000;
                 }
             } else if ("scientific-number".equals(tag)) {
-                int decimals = x.intAttr("number:decimal-places", 0);
-                int minInteger = Math.max(1, x.intAttr("number:min-integer-digits", 1));
+                int decimals = x.count("number:decimal-places", 0, 0, 1024);
+                int minInteger = Math.max(1, x.count("number:min-integer-digits", 1, 0, 1024));
                 // an interval of 3 is engineering notation, ##0.0E+0: one place for each step
                 repeat(sb, '#', Math.max(0, x.intAttr("number:exponent-interval", 1) - minInteger));
                 repeat(sb, '0', minInteger);
@@ -803,10 +819,13 @@ final class OdsReader {
                     sb.append(longStyle ? "hh" : "h");
                 }
             } else if ("minutes".equals(tag)) {
-                sb.append(longStyle ? "mm" : "m");
+                // truncate-on-overflow="false" belongs to the first unit, whichever it is
+                sb.append(elapsedPending ? (longStyle ? "[mm]" : "[m]") : (longStyle ? "mm" : "m"));
+                elapsedPending = false;
             } else if ("seconds".equals(tag)) {
-                sb.append(longStyle ? "ss" : "s");
-                int decimals = x.intAttr("number:decimal-places", 0);
+                sb.append(elapsedPending ? (longStyle ? "[ss]" : "[s]") : (longStyle ? "ss" : "s"));
+                elapsedPending = false;
+                int decimals = x.count("number:decimal-places", 0, 0, 1024);
                 if (decimals > 0) {
                     sb.append('.');
                     repeat(sb, '0', decimals);
