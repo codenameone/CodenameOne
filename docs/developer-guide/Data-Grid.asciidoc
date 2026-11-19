@@ -626,13 +626,19 @@ can't be translated. That limit stays on with
 `setExcelLimitsEnforced(false)`, because it protects the stack of the device
 that calculates.
 
+Each function takes the number of arguments Excel lets it take, so `ROUND(A1)`
+and `ABS(1,2)` are refused the same way: thrown when typed, kept as their stored
+value when read. OpenDocument allows a few calls Excel doesn't, such as `ROUND`
+with one argument; read from an `.ods` file, such a formula keeps its value
+rather than reaching an `.xlsx` file that Excel would refuse.
+
 ==== Separated text
 
 Text has no types, so reading CSV guesses them: a cell that reads as a number, a
-date or a logical value becomes one, cell by cell. Numbers are the exception,
-because a column of postal codes or part numbers would otherwise lose the zeros
-at the start of `00420`: where any cell of a column would lose digits as a
-number, the whole column stays text. The separator is detected from the first
+date or a logical value becomes one, cell by cell. A column of postal codes or
+part numbers is the exception, because it would otherwise lose the zeros at the
+start of `00420`: where any cell of a column would lose digits as a number, every
+cell of that column stays text, logical values and dates included. The separator is detected from the first
 lines when the file uses a semicolon, a tab or a bar instead of a comma.
 
 A cell that starts with `=` stays text when it's read from CSV. A file from

@@ -251,4 +251,97 @@ final class Functions {
         }
         return XLFN.indexOf(key) >= 0 ? "_xlfn." : "";
     }
+
+    /// How many arguments each function takes, as Excel accepts them when a formula is typed:
+    /// `NAME:least:most`. A formula that gives a function too few or too many cannot be
+    /// entered in Excel, so it is refused here too, rather than calculated with defaults that
+    /// Excel never applies and then written to a file Excel rejects.
+    private static final String ARITY = " "
+            + "ABS:1:1 ACOS:1:1 ACOSH:1:1 ACOT:1:1 ACOTH:1:1 ADDRESS:2:5 AGGREGATE:3:255 AND:1:255 "
+            + "ARABIC:1:1 AREAS:1:1 ASIN:1:1 ASINH:1:1 ATAN:1:1 ATAN2:2:2 ATANH:1:1 AVEDEV:1:255 "
+            + "AVERAGE:1:255 AVERAGEA:1:255 AVERAGEIF:2:3 AVERAGEIFS:3:255 BASE:2:3 BETA.DIST:4:6 "
+            + "BETA.INV:3:5 BETADIST:3:5 BETAINV:3:5 BIN2DEC:1:1 BIN2HEX:1:2 BIN2OCT:1:2 "
+            + "BINOM.DIST:4:4 BINOM.DIST.RANGE:3:4 BINOM.INV:3:3 BINOMDIST:4:4 BITAND:2:2 "
+            + "BITLSHIFT:2:2 BITOR:2:2 BITRSHIFT:2:2 BITXOR:2:2 CEILING:2:2 CEILING.MATH:1:3 "
+            + "CEILING.PRECISE:1:2 CHAR:1:1 CHIDIST:2:2 CHIINV:2:2 CHISQ.DIST:3:3 CHISQ.DIST.RT:2:2 "
+            + "CHISQ.INV:2:2 CHISQ.INV.RT:2:2 CHISQ.TEST:2:2 CHITEST:2:2 CHOOSE:2:255 CHOOSECOLS:2:255 "
+            + "CHOOSEROWS:2:255 CLEAN:1:1 CODE:1:1 COLUMN:0:1 COLUMNS:1:1 COMBIN:2:2 COMBINA:2:2 "
+            + "CONCAT:1:254 CONCATENATE:1:255 CONFIDENCE:3:3 CONFIDENCE.NORM:3:3 CONFIDENCE.T:3:3 "
+            + "CONVERT:3:3 CORREL:2:2 COS:1:1 COSH:1:1 COT:1:1 COTH:1:1 COUNT:1:255 COUNTA:1:255 "
+            + "COUNTBLANK:1:1 COUNTIF:2:2 COUNTIFS:2:254 COVAR:2:2 COVARIANCE.P:2:2 COVARIANCE.S:2:2 "
+            + "CRITBINOM:3:3 CSC:1:1 CSCH:1:1 CUMIPMT:6:6 CUMPRINC:6:6 DATE:3:3 DATEDIF:3:3 "
+            + "DATEVALUE:1:1 DAVERAGE:3:3 DAY:1:1 DAYS:2:2 DAYS360:2:3 DB:4:5 DCOUNT:3:3 DCOUNTA:3:3 "
+            + "DDB:4:5 DEC2BIN:1:2 DEC2HEX:1:2 DEC2OCT:1:2 DECIMAL:2:2 DEGREES:1:1 DELTA:1:2 "
+            + "DEVSQ:1:255 DGET:3:3 DMAX:3:3 DMIN:3:3 DOLLAR:1:2 DOLLARDE:2:2 DOLLARFR:2:2 "
+            + "DPRODUCT:3:3 DROP:2:3 DSTDEV:3:3 DSTDEVP:3:3 DSUM:3:3 DVAR:3:3 DVARP:3:3 EDATE:2:2 "
+            + "EFFECT:2:2 EOMONTH:2:2 ERF:1:2 ERF.PRECISE:1:1 ERFC:1:1 ERFC.PRECISE:1:1 ERROR.TYPE:1:1 "
+            + "EVEN:1:1 EXACT:2:2 EXP:1:1 EXPAND:2:4 EXPON.DIST:3:3 EXPONDIST:3:3 F.DIST:4:4 "
+            + "F.DIST.RT:3:3 F.INV:3:3 F.INV.RT:3:3 F.TEST:2:2 FACT:1:1 FACTDOUBLE:1:1 FALSE:0:0 "
+            + "FDIST:3:3 FILTER:2:3 FIND:2:3 FINV:3:3 FISHER:1:1 FISHERINV:1:1 FIXED:1:3 FLOOR:2:2 "
+            + "FLOOR.MATH:1:3 FLOOR.PRECISE:1:2 FORECAST:3:3 FORECAST.LINEAR:3:3 FORMULATEXT:1:1 "
+            + "FREQUENCY:2:2 FTEST:2:2 FV:3:5 FVSCHEDULE:2:2 GAMMA:1:1 GAMMA.DIST:4:4 GAMMA.INV:3:3 "
+            + "GAMMADIST:4:4 GAMMAINV:3:3 GAMMALN:1:1 GAMMALN.PRECISE:1:1 GAUSS:1:1 GCD:1:255 "
+            + "GEOMEAN:1:255 GESTEP:1:2 HARMEAN:1:255 HEX2BIN:1:2 HEX2DEC:1:1 HEX2OCT:1:2 HLOOKUP:3:4 "
+            + "HOUR:1:1 HSTACK:1:254 HYPGEOM.DIST:5:5 HYPGEOMDIST:4:4 IF:2:3 IFERROR:2:2 IFNA:2:2 "
+            + "IFS:2:254 INDEX:2:4 INDIRECT:1:2 INT:1:1 INTERCEPT:2:2 IPMT:4:6 IRR:1:2 ISBLANK:1:1 "
+            + "ISERR:1:1 ISERROR:1:1 ISEVEN:1:1 ISFORMULA:1:1 ISLOGICAL:1:1 ISNA:1:1 ISNONTEXT:1:1 "
+            + "ISNUMBER:1:1 ISO.CEILING:1:2 ISODD:1:1 ISOWEEKNUM:1:1 ISPMT:4:4 ISREF:1:1 ISTEXT:1:1 "
+            + "KURT:1:255 LARGE:2:2 LCM:1:255 LEFT:1:2 LEN:1:1 LET:3:253 LN:1:1 LOG:1:2 LOG10:1:1 "
+            + "LOGINV:3:3 LOGNORM.DIST:4:4 LOGNORM.INV:3:3 LOGNORMDIST:3:3 LOOKUP:2:3 LOWER:1:1 "
+            + "MATCH:2:3 MAX:1:255 MAXA:1:255 MAXIFS:3:255 MDETERM:1:1 MEDIAN:1:255 MID:3:3 MIN:1:255 "
+            + "MINA:1:255 MINIFS:3:255 MINUTE:1:1 MINVERSE:1:1 MIRR:3:3 MMULT:2:2 MOD:2:2 MODE:1:255 "
+            + "MODE.MULT:1:255 MODE.SNGL:1:255 MONTH:1:1 MROUND:2:2 MULTINOMIAL:1:255 MUNIT:1:1 N:1:1 "
+            + "NA:0:0 NEGBINOM.DIST:4:4 NEGBINOMDIST:3:3 NETWORKDAYS:2:3 NETWORKDAYS.INTL:2:4 "
+            + "NOMINAL:2:2 NORM.DIST:4:4 NORM.INV:3:3 NORM.S.DIST:2:2 NORM.S.INV:1:1 NORMDIST:4:4 "
+            + "NORMINV:3:3 NORMSDIST:1:1 NORMSINV:1:1 NOT:1:1 NOW:0:0 NPER:3:5 NPV:2:255 "
+            + "NUMBERVALUE:1:3 OCT2BIN:1:2 OCT2DEC:1:1 OCT2HEX:1:2 ODD:1:1 OFFSET:3:5 OR:1:255 "
+            + "PDURATION:3:3 PEARSON:2:2 PERCENTILE:2:2 PERCENTILE.EXC:2:2 PERCENTILE.INC:2:2 "
+            + "PERCENTRANK:2:3 PERCENTRANK.EXC:2:3 PERCENTRANK.INC:2:3 PERMUT:2:2 PERMUTATIONA:2:2 "
+            + "PHI:1:1 PI:0:0 PMT:3:5 POISSON:3:3 POISSON.DIST:3:3 POWER:2:2 PPMT:4:6 PRODUCT:1:255 "
+            + "PROPER:1:1 PV:3:5 QUARTILE:2:2 QUARTILE.EXC:2:2 QUARTILE.INC:2:2 QUOTIENT:2:2 "
+            + "RADIANS:1:1 RAND:0:0 RANDARRAY:0:5 RANDBETWEEN:2:2 RANK:2:3 RANK.AVG:2:3 RANK.EQ:2:3 "
+            + "RATE:3:6 REPLACE:4:4 REPT:2:2 RIGHT:1:2 ROMAN:1:2 ROUND:2:2 ROUNDDOWN:2:2 ROUNDUP:2:2 "
+            + "ROW:0:1 ROWS:1:1 RRI:3:3 RSQ:2:2 SEARCH:2:3 SEC:1:1 SECH:1:1 SECOND:1:1 SEQUENCE:1:4 "
+            + "SERIESSUM:4:4 SHEET:0:1 SHEETS:0:1 SIGN:1:1 SIN:1:1 SINH:1:1 SKEW:1:255 SKEW.P:1:255 "
+            + "SLN:3:3 SLOPE:2:2 SMALL:2:2 SORT:1:4 SORTBY:2:255 SQRT:1:1 SQRTPI:1:1 STANDARDIZE:3:3 "
+            + "STDEV:1:255 STDEV.P:1:255 STDEV.S:1:255 STDEVA:1:255 STDEVP:1:255 STDEVPA:1:255 "
+            + "STEYX:2:2 SUBSTITUTE:3:4 SUBTOTAL:2:255 SUM:1:255 SUMIF:2:3 SUMIFS:3:255 "
+            + "SUMPRODUCT:1:255 SUMSQ:1:255 SUMX2MY2:2:2 SUMX2PY2:2:2 SUMXMY2:2:2 SWITCH:3:254 SYD:4:4 "
+            + "T:1:1 T.DIST:3:3 T.DIST.2T:2:2 T.DIST.RT:2:2 T.INV:2:2 T.INV.2T:2:2 T.TEST:4:4 TAKE:2:3 "
+            + "TAN:1:1 TANH:1:1 TDIST:3:3 TEXT:2:2 TEXTAFTER:2:6 TEXTBEFORE:2:6 TEXTJOIN:3:255 "
+            + "TIME:3:3 TIMEVALUE:1:1 TINV:2:2 TOCOL:1:3 TODAY:0:0 TOROW:1:3 TRANSPOSE:1:1 TRIM:1:1 "
+            + "TRIMMEAN:2:2 TRUE:0:0 TRUNC:1:2 TTEST:4:4 TYPE:1:1 UNICHAR:1:1 UNICODE:1:1 UNIQUE:1:3 "
+            + "UPPER:1:1 VALUE:1:1 VAR:1:255 VAR.P:1:255 VAR.S:1:255 VARA:1:255 VARP:1:255 VARPA:1:255 "
+            + "VDB:5:7 VLOOKUP:3:4 VSTACK:1:254 WEEKDAY:1:2 WEEKNUM:1:2 WEIBULL:4:4 WEIBULL.DIST:4:4 "
+            + "WORKDAY:2:3 WORKDAY.INTL:2:4 WRAPCOLS:2:3 WRAPROWS:2:3 XIRR:2:3 XLOOKUP:3:6 XMATCH:2:4 "
+            + "XNPV:3:3 XOR:1:254 YEAR:1:1 YEARFRAC:2:3 Z.TEST:2:3 ZTEST:2:3 ";
+
+    private static final HashMap<String, int[]> ARITIES = arities();
+
+    /// The least and the most arguments a function takes, or null for a name this
+    /// implementation does not know.
+    static int[] arity(String name) {
+        return ARITIES.get(name);
+    }
+
+    private static HashMap<String, int[]> arities() {
+        HashMap<String, int[]> t = new HashMap<String, int[]>();
+        int at = 0;
+        while (at < ARITY.length()) {
+            int end = ARITY.indexOf(' ', at);
+            if (end < 0) {
+                end = ARITY.length();
+            }
+            if (end > at) {
+                String entry = ARITY.substring(at, end);
+                int a = entry.indexOf(':');
+                int b = entry.indexOf(':', a + 1);
+                t.put(entry.substring(0, a), new int[] {Integer.parseInt(entry.substring(a + 1, b)),
+                        Integer.parseInt(entry.substring(b + 1))});
+            }
+            at = end + 1;
+        }
+        return t;
+    }
+
 }

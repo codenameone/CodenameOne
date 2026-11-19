@@ -697,7 +697,7 @@ final class FormulaParser {
         ArrayList<Node> args = new ArrayList<Node>();
         ws();
         if (eat(')')) {
-            return new Node(Node.FUNC, name, new Node[0]);
+            return counted(name, new Node[0]);
         }
         for (;;) {
             ws();
@@ -714,7 +714,18 @@ final class FormulaParser {
         }
         Node[] array = new Node[args.size()];
         args.toArray(array);
-        return new Node(Node.FUNC, name, array);
+        return counted(name, array);
+    }
+
+    /// A call, once its arguments are counted against what the function takes. A name this
+    /// implementation does not know is left to evaluate to `#NAME?`.
+    private Node counted(String name, Node[] args) {
+        int[] range = Functions.arity(name);
+        if (range != null && (args.length < range[0] || args.length > range[1])) {
+            throw new FormulaSyntaxException(name + " takes " + (range[0] == range[1] ? String.valueOf(range[0])
+                    : range[0] + " to " + range[1]) + " arguments, not " + args.length + ": " + s);
+        }
+        return new Node(Node.FUNC, name, args);
     }
 
     /// Function names are upper case in the tree, without the prefixes the files put on names

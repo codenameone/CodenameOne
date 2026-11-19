@@ -904,6 +904,34 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void argumentsCountedAsExcelCountsThem() throws IOException {
+        Sheet s = new Workbook().addSheet("S");
+        String[] refused = {"=ABS(1,2)", "=ROUND(1)", "=NOT()", "=SUM()", "=NORM.S.DIST(1)", "=FLOOR(2.5)"};
+        for (String f : refused) {
+            try {
+                s.setCellFormula("A1", f);
+                wrong.append('\n').append(f).append(" was accepted");
+            } catch (IllegalArgumentException expected) {
+                // Excel does not let it be typed either
+            }
+        }
+        s.setCellFormula("A1", "=ROUND(2.567,1)+ABS(-1)");
+        same(Double.valueOf(3.6), s.getCellValue("A1"), "counts that fit");
+        // read from a file, the formula is unreadable and keeps the value the file stored
+        Workbook w = Workbook.read(new ByteArrayInputStream(xlsx("<row r=\"1\"><c r=\"A1\"><f>ABS(1,2)</f><v>7</v></c></row>",
+                null)), Workbook.Format.XLSX);
+        same(Double.valueOf(7), w.getSheet(0).getCellValue(0, 0), "the stored value of a formula with too many arguments");
+        // OpenDocument allows ROUND with one argument; Excel does not, so it stays a value
+        Workbook o = Workbook.read(new ByteArrayInputStream(ods("<table:table-row><table:table-cell table:formula=\"of:=ROUND(2.5)\""
+                + " office:value-type=\"float\" office:value=\"3\"/></table:table-row>")), Workbook.Format.ODS);
+        same(Double.valueOf(3), o.getSheet(0).getCellValue(0, 0), "an OpenDocument call Excel would refuse");
+        ByteArrayOutputStream x = new ByteArrayOutputStream();
+        o.write(x, Workbook.Format.XLSX);
+        same(null, Workbook.read(new ByteArrayInputStream(x.toByteArray()), Workbook.Format.XLSX).getSheet(0).getFormulaAt(0, 0),
+                "written to xlsx as its value");
+    }
+
+    @Test
     void settingsWithAStrayEndTag() throws IOException {
         // an end tag before any sheet's settings once read the split modes of no sheet
         Workbook w = Workbook.read(new ByteArrayInputStream(zip("mimetype", "application/vnd.oasis.opendocument.spreadsheet",

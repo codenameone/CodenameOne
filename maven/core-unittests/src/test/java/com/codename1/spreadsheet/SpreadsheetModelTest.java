@@ -382,6 +382,10 @@ class SpreadsheetModelTest extends UITestBase {
             // No number of arguments may do worse than answer an error: a formula is text
             // from a file, and a function must not index past the arguments it was given.
             boolean known = false;
+            // every function has its number of arguments, and a count outside it is refused
+            // when the formula is read, before anything evaluates it
+            int[] range = Functions.arity(names[i]);
+            assertNotNull(range, names[i] + " has no number of arguments");
             String[] samples = {"A1", "\"x\"", "A1:A3", "{1,2;3,4}", "TRUE", "-1"};
             for (int args = 0; args < 7; args++) {
                 for (int kind = 0; kind < samples.length; kind++) {
@@ -389,7 +393,17 @@ class SpreadsheetModelTest extends UITestBase {
                     for (int a = 0; a < args; a++) {
                         f.append(a == 0 ? "" : ",").append(samples[(kind + a) % samples.length]);
                     }
-                    s.setCellFormula("B1", f.append(')').toString());
+                    f.append(')');
+                    if (args < range[0] || args > range[1]) {
+                        try {
+                            s.setCellFormula("B1", f.toString());
+                            unknown.append('\n').append(f).append(" was accepted");
+                        } catch (IllegalArgumentException expected) {
+                            // refused, as Excel refuses it
+                        }
+                        continue;
+                    }
+                    s.setCellFormula("B1", f.toString());
                     assertNotNull(s.getCellFormula(0, 1));
                     try {
                         known |= s.getCellValue("B1") != CellError.NAME;
