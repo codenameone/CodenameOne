@@ -278,7 +278,7 @@ public class SankeySeries extends Series {
     // now: a node or link added since the last paint has no place until the next one
     private SankeyLayout current() {
         SankeyLayout lay = last;
-        if (lay == null || lay.getNodeCount() != nodeNames.size() || lay.getLinkCount() != links.size()) {
+        if (lay == null || layoutDirty || lay.getNodeCount() != nodeNames.size() || lay.getLinkCount() != links.size()) {
             return null;
         }
         return lay;

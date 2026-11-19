@@ -59,6 +59,7 @@ public class SunburstSeries extends HierarchySeries {
     public void paint(ChartContext ctx) {
         nodes.clear();
         cells.clear();
+        getCurrent();
         crumb = null;
         if (current == null) {
             return;

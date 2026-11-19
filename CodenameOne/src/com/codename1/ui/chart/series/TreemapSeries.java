@@ -52,6 +52,7 @@ public class TreemapSeries extends HierarchySeries {
     public void paint(ChartContext ctx) {
         nodes.clear();
         cells.clear();
+        getCurrent();
         if (current == null) {
             return;
         }

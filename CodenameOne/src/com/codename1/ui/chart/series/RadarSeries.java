@@ -111,41 +111,45 @@ public class RadarSeries extends Series {
         return this;
     }
 
+    private static final String[] NO_NAMES = new String[0];
+
+    // the spoke names every radar of the chart labels its points with: the same source as
+    // spokeCount, so a point's label always belongs to the spoke it sits on
     private String[] spokes() {
-        if (spokes != null && spokes.length > 0) {
-            return spokes;
+        RadarSeries src = spokeSource(radars());
+        if (src.spokes != null && src.spokes.length > 0) {
+            return src.spokes;
         }
-        for (Series s : radars()) {
-            RadarSeries r = (RadarSeries) s;
-            if (r.spokes != null && r.spokes.length > 0) {
-                return r.spokes;
-            }
-        }
-        return new String[values.length];
+        return NO_NAMES;
     }
 
     // the number of spokes of the grid every radar of the chart is drawn on, one number for the
-    // whole chart: the grid owner's (the first radar painted at all, which draws the grid) spoke
-    // names, else any series' names, else the longest series. A value past it has no spoke and
-    // is ignored, and a series with fewer values than spokes is an open line over those it has
+    // whole chart: the spoke source's names, else the longest series. A value past it has no
+    // spoke and is ignored, and a series with fewer values than spokes is an open line over
+    // those it has
     private int spokeCount() {
         java.util.ArrayList<Series> rs = radars();
-        RadarSeries owner = gridOwner(rs);
-        if (owner == null) {
-            owner = this;
-        }
-        if (owner.spokes != null && owner.spokes.length > 0) {
-            return owner.spokes.length;
+        RadarSeries src = spokeSource(rs);
+        if (src.spokes != null && src.spokes.length > 0) {
+            return src.spokes.length;
         }
         int longest = values.length;
         for (int k = 0; k < rs.size(); k++) {
-            RadarSeries r = (RadarSeries) rs.get(k);
-            if (r.spokes != null && r.spokes.length > 0) {
-                return r.spokes.length;
-            }
-            longest = Math.max(longest, r.values.length);
+            longest = Math.max(longest, ((RadarSeries) rs.get(k)).values.length);
         }
         return longest;
+    }
+
+    // where the spokes come from: the first radar of the chart (by order, not visibility, so
+    // hiding or fading a series never changes the grid) that names its spokes, else the first
+    private static RadarSeries spokeSource(java.util.ArrayList<Series> rs) {
+        for (int k = 0; k < rs.size(); k++) {
+            RadarSeries r = (RadarSeries) rs.get(k);
+            if (r.spokes != null && r.spokes.length > 0) {
+                return r;
+            }
+        }
+        return (RadarSeries) rs.get(0);
     }
 
     // the radar that draws the grid: the first one painted at all. A hidden first radar is never

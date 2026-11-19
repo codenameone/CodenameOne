@@ -257,4 +257,10 @@ public class ScatterSeries extends XYSeries {
         // only on a chart of nothing but scatter
         return -1;
     }
+
+    @Override
+    public int getSelectablePointCount() {
+        // not aligned for the shared tooltip, but every point can still be selected
+        return size();
+    }
 }

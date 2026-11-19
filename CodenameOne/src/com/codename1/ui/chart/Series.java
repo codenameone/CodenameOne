@@ -210,6 +210,19 @@ public abstract class Series {
         return -1;
     }
 
+    /// The number of points `Chart.setSelection` and arrow-key stepping can reach by index.
+    /// The same as `getPointCount()`, except for a series whose points are not index aligned
+    /// with other series (scatter), which still has its own points to select.
+    public int getSelectablePointCount() {
+        return getPointCount();
+    }
+
+    /// True when `getPointCount()` counts points a paint laid out (treemap, sunburst, Sankey)
+    /// rather than the model's points, so an index past it may exist after the next paint.
+    protected boolean isPointCountFromLayout() {
+        return false;
+    }
+
     /// The point at `index` for a shared tooltip, or null.
     public ChartPoint getPoint(ChartContext ctx, int index) {
         return null;
@@ -321,6 +334,19 @@ public abstract class Series {
     /// true if the tap was consumed
     public boolean handleTap(ChartPoint p) {
         return false;
+    }
+
+    /// Called by the chart when this series is added to it, and again when the chart comes
+    /// back on screen (its `initComponent`); a series may be told more than once. A series
+    /// that listens to a model outliving it (a `TreeNode` tree) registers here, so the model
+    /// does not keep a discarded chart reachable: a chart taken off screen, or a series
+    /// removed from its chart, stops listening.
+    protected void attached() {
+    }
+
+    /// Called by the chart when this series is removed from it, or the chart leaves the screen
+    /// (its `deinitialize`); a series may be told more than once. Undoes `attached()`.
+    protected void detached() {
     }
 
     /// Tells the chart this series' data changed, which animates the new values in.

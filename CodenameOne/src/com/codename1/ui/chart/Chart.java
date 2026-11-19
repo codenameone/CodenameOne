@@ -188,6 +188,7 @@ public class Chart extends Component {
         series.add(s);
         legendHits.clear();
         s.visibility = s.isVisible() ? 1 : 0;
+        s.attached();
         if (isInitialized()) {
             s.captureEntryStart();
         }
@@ -206,6 +207,7 @@ public class Chart extends Component {
         beginChange();
         series.remove(s);
         s.chart = null;
+        s.detached();
         // the removed series no longer gets the finished transition's cleanup; drop its
         // snapshot now so a re-add does not replay it
         s.transitionEnded();
@@ -228,6 +230,7 @@ public class Chart extends Component {
         for (Series s : series) {
             s.chart = null;
             s.transitionEnded();
+            s.detached();
         }
         series.clear();
         legendHits.clear();
@@ -542,28 +545,36 @@ public class Chart extends Component {
             repaint();
             return this;
         }
-        // a series that lays its points out while painting (pie, treemap, sunburst, Sankey)
-        // knows a point only after a paint, and a point just added only after the next one:
-        // such a selection is kept and applied right after the series paint
-        // an index the series can never have (or a series of another chart) is ignored, as
-        // before; anything else replaces the old point even when it must wait for a paint
-        if (lastContext != null && (s.chart != this || index < 0 || index >= s.getPointCount())) { //NOPMD CompareObjectsWithEquals - identity of the owning chart is intended
+        // One rule for every series type. A series of another chart or a negative index is
+        // ignored and the old selection kept. An index past the points of a series that is
+        // showing and whose point count is its model's (not a paint layout's) is ignored too.
+        // Otherwise the point is selected now when the series is showing and has it; if not,
+        // the old point is cleared (leaving it highlighted would show a selection the caller
+        // just replaced) and the new one waits for a paint in which the series is painted
+        // and visible. That paint gets exactly one attempt, so a selection never waits forever.
+        if (s.chart != this || index < 0) { //NOPMD CompareObjectsWithEquals - identity of the owning chart is intended
             repaint();
             return this;
         }
-        if (lastContext == null || !selectQuietly(s, index)) {
-            // leaving the old point selected (with its highlight and tooltip) while the new one
-            // waits would show a selection the caller just replaced
+        boolean showing = lastContext != null && s.isVisible() && s.visibility > 0;
+        if (showing && !s.isPointCountFromLayout() && index >= s.getSelectablePointCount()) {
+            repaint();
+            return this;
+        }
+        if (!showing || !selectQuietly(s, index)) {
             selected = null;
             pendingSelection = s;
             pendingSelectionIndex = index;
+        } else {
+            pendingSelection = null;
         }
         repaint();
         return this;
     }
 
     private boolean selectQuietly(Series s, int index) {
-        if (s.chart != this || index < 0 || index >= s.getPointCount()) { //NOPMD CompareObjectsWithEquals - identity of the owning chart is intended
+        // a hidden series is never selected or announced, whatever its getPoint answers
+        if (s.chart != this || !s.isVisible() || index < 0 || index >= s.getSelectablePointCount()) { //NOPMD CompareObjectsWithEquals - identity of the owning chart is intended
             return false;
         }
         ChartPoint p = s.getPoint(lastContext, index);
@@ -818,6 +829,9 @@ public class Chart extends Component {
     @Override
     protected void initComponent() {
         super.initComponent();
+        for (Series s : series) {
+            s.attached();
+        }
         if (!themeSet) {
             // follow the style: the theme may have changed since the last time we showed
             theme = ChartTheme.fromStyle(getStyle()).applyUIIDs(getUIManager());
@@ -880,6 +894,9 @@ public class Chart extends Component {
         // the release of a drag in progress will not come back to this chart
         brushing = false;
         brushMoved = false;
+        for (Series s : series) {
+            s.detached();
+        }
         super.deinitialize();
     }
 
@@ -1201,7 +1218,7 @@ public class Chart extends Component {
         // after the series paint, so a layout-driven series has laid out the point. A series
         // not painted this time (hidden or faded out) keeps its selection waiting until it is;
         // one that painted gets one attempt, and a point that still does not exist is dropped
-        if (pendingSelection != null && pendingSelection.visibility > 0) {
+        if (pendingSelection != null && pendingSelection.isVisible() && pendingSelection.visibility > 0) {
             Series ps = pendingSelection;
             pendingSelection = null;
             selectQuietly(ps, pendingSelectionIndex);
@@ -2654,7 +2671,7 @@ public class Chart extends Component {
         }
         List<Series> visible = new ArrayList<Series>();
         for (Series s : series) {
-            if (s.isVisible() && s.getPointCount() > 0) {
+            if (s.isVisible() && s.getSelectablePointCount() > 0) {
                 visible.add(s);
             }
         }
@@ -2666,7 +2683,7 @@ public class Chart extends Component {
         int index = selected != null && s == selected.getSeries() ? selected.getIndex() : -dir; //NOPMD CompareObjectsWithEquals - identity of the same series is intended
         if (selected != null && across) {
             s = visible.get((visible.indexOf(s) + dir + visible.size()) % visible.size());
-            index = Math.min(selected.getIndex(), s.getPointCount() - 1) - dir;
+            index = Math.min(selected.getIndex(), s.getSelectablePointCount() - 1) - dir;
             dir = dir > 0 ? 1 : -1;
             if (index + dir < 0) {
                 index = -dir;
@@ -2675,7 +2692,7 @@ public class Chart extends Component {
         ChartPoint next = null;
         // a gap (a NaN y) is skipped, whether stepping along a series or onto another one
         XYSeries gaps = s instanceof XYSeries ? (XYSeries) s : null;
-        for (int i = index + dir; i >= 0 && i < s.getPointCount(); i += dir) {
+        for (int i = index + dir; i >= 0 && i < s.getSelectablePointCount(); i += dir) {
             if (gaps != null && gaps.isGapAt(i)) {
                 continue;
             }

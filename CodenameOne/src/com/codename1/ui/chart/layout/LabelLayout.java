@@ -48,6 +48,25 @@ public final class LabelLayout {
     private int boundsH;
     private int gap = 2;
 
+    // A uniform grid over the bounds: each cell lists the boxes that touch it, so `fits`
+    // compares a box only with its neighbours instead of every box placed so far. The arrays
+    // grow once and are reused by every later frame; a new frame invalidates every cell by
+    // bumping `generation` rather than clearing them.
+    private int cellSize = 1;
+    private int cols;
+    private int rows;
+    private int[] cellHead = new int[0];
+    private int[] cellGen = new int[0];
+    private int generation;
+    private int[] entryRect = new int[64];
+    private int[] entryNext = new int[64];
+    private int entries;
+    // per box, the query that last compared it, so a box in several cells is compared once
+    private int[] seenBy = new int[16];
+    private int query;
+    // box comparisons made by fits, for tests that hold the work linear
+    int comparisons;
+
     /// Creates a layout confined to a rectangle.
     ///
     /// #### Parameters
@@ -70,6 +89,23 @@ public final class LabelLayout {
         boundsW = w;
         boundsH = h;
         count = 0;
+        entries = 0;
+        generation++;
+        cellSize = Math.max(16, Math.max(w, h) / 64 + 1);
+        cols = Math.max(1, w / cellSize + 1);
+        rows = Math.max(1, h / cellSize + 1);
+        if (cols * rows > cellHead.length) {
+            cellHead = new int[cols * rows];
+            cellGen = new int[cols * rows];
+        }
+    }
+
+    private int colOf(int x) {
+        return Math.max(0, Math.min(cols - 1, (x - boundsX) / cellSize));
+    }
+
+    private int rowOf(int y) {
+        return Math.max(0, Math.min(rows - 1, (y - boundsY) / cellSize));
     }
 
     /// The minimum clearance kept between labels, in pixels.
@@ -180,11 +216,30 @@ public final class LabelLayout {
         if (x < boundsX || y < boundsY || x + w > boundsX + boundsW || y + h > boundsY + boundsH) {
             return false;
         }
-        for (int i = 0; i < count; i++) {
-            int o = i * 4;
-            if (x < rects[o] + rects[o + 2] + gap && x + w + gap > rects[o]
-                    && y < rects[o + 1] + rects[o + 3] + gap && y + h + gap > rects[o + 1]) {
-                return false;
+        query++;
+        int c1 = colOf(x - gap);
+        int c2 = colOf(x + w + gap);
+        int r1 = rowOf(y - gap);
+        int r2 = rowOf(y + h + gap);
+        for (int r = r1; r <= r2; r++) {
+            for (int c = c1; c <= c2; c++) {
+                int cell = r * cols + c;
+                if (cellGen[cell] != generation) {
+                    continue;
+                }
+                for (int e = cellHead[cell]; e >= 0; e = entryNext[e]) {
+                    int i = entryRect[e];
+                    if (seenBy[i] == query) {
+                        continue;
+                    }
+                    seenBy[i] = query;
+                    comparisons++;
+                    int o = i * 4;
+                    if (x < rects[o] + rects[o + 2] + gap && x + w + gap > rects[o]
+                            && y < rects[o + 1] + rects[o + 3] + gap && y + h + gap > rects[o + 1]) {
+                        return false;
+                    }
+                }
             }
         }
         return true;
@@ -201,7 +256,36 @@ public final class LabelLayout {
         rects[o + 1] = y;
         rects[o + 2] = w;
         rects[o + 3] = h;
+        if (count >= seenBy.length) {
+            int[] n = new int[seenBy.length * 2];
+            System.arraycopy(seenBy, 0, n, 0, seenBy.length);
+            seenBy = n;
+        }
+        seenBy[count] = query;
+        int c2 = colOf(x + w);
+        int r2 = rowOf(y + h);
+        for (int r = rowOf(y); r <= r2; r++) {
+            for (int c = colOf(x); c <= c2; c++) {
+                link(r * cols + c, count);
+            }
+        }
         count++;
+    }
+
+    private void link(int cell, int box) {
+        if (entries >= entryRect.length) {
+            int[] a = new int[entryRect.length * 2];
+            System.arraycopy(entryRect, 0, a, 0, entries);
+            entryRect = a;
+            int[] b = new int[entryNext.length * 2];
+            System.arraycopy(entryNext, 0, b, 0, entries);
+            entryNext = b;
+        }
+        entryRect[entries] = box;
+        entryNext[entries] = cellGen[cell] == generation ? cellHead[cell] : -1;
+        cellHead[cell] = entries;
+        cellGen[cell] = generation;
+        entries++;
     }
 
     /// Shortens text with a trailing ellipsis until it fits `maxWidth`.

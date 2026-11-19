@@ -290,7 +290,7 @@ public class BarSeries extends XYSeries {
                 after = true;
                 continue;
             }
-            if (after && s instanceof BarSeries && s.isVisible() && getStackGroup().equals(((BarSeries) s).getStackGroup())) {
+            if (after && counts(s) && getStackGroup().equals(((BarSeries) s).getStackGroup())) {
                 return false;
             }
         }

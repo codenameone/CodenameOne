@@ -80,8 +80,7 @@ public class WaterfallSeries extends BarSeries {
             y[i] = deltas[i];
         }
         // the bases and totals are filled in by dataChanged, which every change goes through
-        baseOffset = prefixRun(y, total, keptFrom(n));
-        setRows(null, y, new double[][]{base, total});
+        applyRows(null, y, base, total, prefixRun(y, total, keptFrom(n)));
         return this;
     }
 
@@ -96,8 +95,7 @@ public class WaterfallSeries extends BarSeries {
         for (int i = 0; i < n; i++) {
             total[i] = isTotal(i) ? 1 : 0;
         }
-        baseOffset = prefixRun(y, total, keptFrom(n));
-        setRows(x, y, new double[][]{base, total});
+        applyRows(x, y, base, total, prefixRun(y, total, keptFrom(n)));
         return this;
     }
 
@@ -125,6 +123,23 @@ public class WaterfallSeries extends BarSeries {
             }
         }
         super.dataChanged();
+    }
+
+    // setRows rejects bad data (mismatched lengths, a null array) by throwing, and the series
+    // then keeps its old rows: the offset of those rows must survive too. setRows runs
+    // dataChanged, which reads the offset, so it is set first and put back on failure.
+    private void applyRows(double[] x, double[] y, double[] base, double[] total, double offset) {
+        double old = baseOffset;
+        baseOffset = offset;
+        boolean done = false;
+        try {
+            setRows(x, y, new double[][]{base, total});
+            done = true;
+        } finally {
+            if (!done) {
+                baseOffset = old;
+            }
+        }
     }
 
     // the running total the first `n` rows add up to, starting from zero

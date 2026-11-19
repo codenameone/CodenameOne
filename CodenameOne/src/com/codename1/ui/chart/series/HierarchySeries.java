@@ -76,16 +76,46 @@ public abstract class HierarchySeries extends Series {
         if (getChart() != null) {
             getChart().beginChange();
         }
-        if (this.root != null) {
+        if (attached && this.root != null) {
             this.root.removeChangeListener(treeListener);
         }
         this.root = root;
         this.current = root;
-        if (root != null) {
+        if (attached && root != null) {
             root.addChangeListener(treeListener);
         }
         dataChanged();
         return this;
+    }
+
+    // the tree is listened to only while this series is in a chart that is not off screen, so
+    // a tree that outlives the chart does not keep the chart (and this series) reachable
+    private boolean attached;
+
+    @Override
+    protected void attached() {
+        if (attached) {
+            return;
+        }
+        attached = true;
+        if (root != null) {
+            root.addChangeListener(treeListener);
+            // edits made while detached were not seen: a drilled-in node may have left the tree
+            if (!isUnderRoot(current)) {
+                current = root;
+            }
+        }
+    }
+
+    @Override
+    protected void detached() {
+        if (!attached) {
+            return;
+        }
+        attached = false;
+        if (root != null) {
+            root.removeChangeListener(treeListener);
+        }
     }
 
     // a change to a node of the tree animates like any other data change
@@ -115,6 +145,11 @@ public abstract class HierarchySeries extends Series {
 
     /// The node currently zoomed into.
     public TreeNode getCurrent() {
+        // a series out of a chart does not listen to its tree, so a node zoomed into may have
+        // been moved out since: checked here, and by every paint, rather than by a listener
+        if (current != null && !isUnderRoot(current)) {
+            current = root;
+        }
         return current;
     }
 
@@ -338,6 +373,11 @@ public abstract class HierarchySeries extends Series {
             }
         }
         return null;
+    }
+
+    @Override
+    protected boolean isPointCountFromLayout() {
+        return true;
     }
 
     @Override
