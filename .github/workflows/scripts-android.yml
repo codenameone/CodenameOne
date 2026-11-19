@@ -360,7 +360,7 @@ jobs:
           disk-size: 2048M
           script: |
             ${{ matrix.emulator_setup || 'true' }}
-            ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+            CN1SS_EMULATOR_SETUP="${{ matrix.emulator_setup }}" ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       # After the emulator, deliberately: the instrumentation suite runs against
       # the APK the primary build produced, and this rewrites that project in
       # place. It is the end-to-end half of the API 37 coverage -- the offline

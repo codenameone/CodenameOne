@@ -189,6 +189,19 @@ ra_log "Capturing device logcat to $TEST_LOG"
 LOGCAT_PID=$!
 sleep 2
 
+# The emulator setup (gesture navigation on the AOSP leg) ran before this
+# script, a minute or more of Gradle configuration ago. It was observed applied
+# and then gone by the time the suite ran: every screenshot of that run carried
+# the 3-button bar over its bottom 48px and failed against the goldens. Applied
+# again here, right before the suite starts, and the leg fails if it will not.
+if [ -n "${CN1SS_EMULATOR_SETUP:-}" ]; then
+  ra_log "Re-applying emulator setup before the suite: $CN1SS_EMULATOR_SETUP"
+  if ! "$CN1SS_EMULATOR_SETUP"; then
+    ra_log "FATAL: emulator setup failed before the suite"
+    exit 1
+  fi
+fi
+
 GRADLEW="./gradlew"
 GRADLE_CMD=("$GRADLEW" --stacktrace --info --warning-mode all --no-daemon connectedDebugAndroidTest)
 GRADLE_LOG="$ARTIFACTS_DIR/connectedDebugAndroidTest-gradle.log"
