@@ -44,6 +44,10 @@ public final class GraphShapeRegistry {
     // a size past those kept is built here: evicting one on every miss would
     // rebuild an outline per edge end per frame once a diagram has more sizes
     private static final GeneralPath SPARE = new GeneralPath();
+    // counts lookups; an outline unused for STALE of them, such as a size a
+    // resize drag passed through, gives its place to the size now asked for
+    private static long tick;
+    private static final long STALE = 4096;
     // the built-in rectangle, whose outline is its bounds and needs no path
     private static final GraphShape PLAIN = new Builtin(0);
 
@@ -95,21 +99,33 @@ public final class GraphShapeRegistry {
             kept = new ArrayList<Sized>();
             PATHS.put(name, kept);
         }
+        tick++;
         int n = kept.size();
+        int oldest = -1;
         for (int i = 0; i < n; i++) {
             Sized s = kept.get(i);
             if (s.w == w && s.h == h) {
+                s.used = tick;
                 return s.path;
+            }
+            if (oldest < 0 || s.used < kept.get(oldest).used) {
+                oldest = i;
             }
         }
         if (n >= KEPT_PER_SHAPE) {
-            SPARE.reset();
-            shape.outline(SPARE, 0, 0, w, h);
-            return SPARE;
+            if (tick - kept.get(oldest).used < STALE) {
+                // every kept size is in use: this one is built and let go
+                SPARE.reset();
+                shape.outline(SPARE, 0, 0, w, h);
+                return SPARE;
+            }
+            kept.remove(oldest);
         }
         GeneralPath p = new GeneralPath();
         shape.outline(p, 0, 0, w, h);
-        kept.add(new Sized(w, h, p));
+        Sized added = new Sized(w, h, p);
+        added.used = tick;
+        kept.add(added);
         return p;
     }
 
@@ -156,6 +172,7 @@ public final class GraphShapeRegistry {
         final float w;
         final float h;
         final GeneralPath path;
+        long used;
 
         Sized(float w, float h, GeneralPath path) {
             this.w = w;

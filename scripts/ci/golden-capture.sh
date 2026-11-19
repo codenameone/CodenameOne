@@ -66,7 +66,7 @@ dispatch() {
   local targets=("$@")
   [ "${#targets[@]}" -gt 0 ] || targets=("${WORKFLOWS[@]}")
   : > "$runs_file"
-  local -a sinces=() seens=()
+  local -a sinces=() seens=() dead=()
   for wf in "${targets[@]}"; do
     # A capture of an earlier head of this branch is rendering code that is
     # gone; its harvest would be skipped anyway (the branch moved).
@@ -88,8 +88,11 @@ dispatch() {
     if ! { [ -n "${DISPATCH_TOKEN:-}" ] &&
            GH_TOKEN="$DISPATCH_TOKEN" gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"; }; then
       echo "::warning::could not dispatch $wf with CN1SS_GH_TOKEN (unset, lacking Actions: write, or a transient error); dispatching with github.token, so the harvest will not start by itself: run Golden harvest by hand with head_ref=$ref once the capture completes"
-      gh_retry gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests" ||
-        log "could not dispatch $wf; it will be reported as not started"
+      if ! gh_retry gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"; then
+        # no run will ever appear: waiting for one would outlast the job
+        log "could not dispatch $wf"
+        dead[${#sinces[@]}]=1
+      fi
     fi
     sinces+=("$since")
     seens+=("$seen")
@@ -108,6 +111,7 @@ dispatch() {
     missing=0
     for i in "${!targets[@]}"; do
       [ -n "${ids[$i]:-}" ] && continue
+      [ -n "${dead[$i]:-}" ] && continue
       wf="${targets[$i]}"
       id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
               --event workflow_dispatch --limit 20 --json databaseId,createdAt \
@@ -142,6 +146,8 @@ dispatch() {
     pass=$((pass + 1))
     sleep 20
   done
+  # what started is recorded; a workflow that never did fails the step
+  [ "${#dead[@]}" -eq 0 ]
 }
 
 case "${1:-}" in

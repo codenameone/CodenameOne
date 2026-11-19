@@ -101,7 +101,10 @@ public class DefaultKanbanCardRenderer implements KanbanCardRenderer {
                 && (desc == null ? w.description == null : desc.equals(w.description))) {
             return w;
         }
-        if (wrapped.size() > 500) {
+        // a bound only against cards that come and go: a board's own cards
+        // fit, as clearing on every layout of a large board would re-wrap
+        // every card it measures
+        if (wrapped.size() > 4096) {
             wrapped.clear();
         }
         w = new Wrapped();

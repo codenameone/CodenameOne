@@ -169,7 +169,11 @@ Whatever did arrive is committed; the next push captures only what is still miss
 
 [Run]($run) at \`${sha:0:12}\`"
   id="$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate \
-          --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | startswith("<!-- golden-capture -->")) | .id' 2>/dev/null | tail -1)" || id=""
+          --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | startswith("<!-- golden-capture -->")) | .id' 2>/dev/null | tail -1)" || {
+    # comments that cannot be listed may still hold ours: posting would add a second
+    echo "::warning::could not list the comments of #$pr; the Golden capture comment is not updated" >&2
+    return 0
+  }
   if [ -n "$id" ]; then
     gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
   else

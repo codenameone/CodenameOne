@@ -66,13 +66,33 @@ public class GraphPalette extends Component {
         this.graph = graph;
         setUIID("NodeGraphPalette");
         setFocusable(false);
-        graph.addGraphListener(new GraphAdapter() {
-            @Override
-            public void nodeCreated(NodeGraph g, GraphNode node) {
-                // the armed item was used
-                repaint();
-            }
-        });
+    }
+
+    // the armed item was used: listened to only while the palette is shown,
+    // so a palette that is thrown away is not kept alive by the graph
+    private final GraphAdapter used = new GraphAdapter() {
+        @Override
+        public void nodeCreated(NodeGraph g, GraphNode node) {
+            repaint();
+        }
+    };
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        graph.addGraphListener(used);
+    }
+
+    @Override
+    protected void deinitialize() {
+        graph.removeGraphListener(used);
+        // a drag the form took away mid-gesture is let go of
+        if (pressed >= 0) {
+            pressed = -1;
+            dragging = false;
+            graph.clearDropPreview();
+        }
+        super.deinitialize();
     }
 
     /// The graph the items are added to.

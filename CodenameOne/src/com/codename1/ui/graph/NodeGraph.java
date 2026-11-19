@@ -339,7 +339,7 @@ public class NodeGraph extends Container {
         if (!declinedPorts.isEmpty()) {
             List<GraphPort> gone = new ArrayList<GraphPort>();
             for (Map.Entry<GraphPort, String> en : declinedNodes.entrySet()) {
-                if (model.getNode(en.getValue()) == null) {
+                if (!hasPort(en.getValue(), en.getKey())) {
                     gone.add(en.getKey());
                 }
             }
@@ -352,8 +352,9 @@ public class NodeGraph extends Container {
             List<GraphPort> gone = new ArrayList<GraphPort>();
             for (Map.Entry<GraphPort, Component> en : portEditors.entrySet()) {
                 Component c = en.getValue();
-                String id = c == null ? null : (String) c.getClientProperty("cn1$graphNode");
-                if (id != null && model.getNode(id) == null) {
+                Object id = c == null ? null : c.getClientProperty("cn1$graphNode");
+                // gone with its node, or the node's port was replaced by another
+                if (id instanceof String && !hasPort((String) id, en.getKey())) {
                     gone.add(en.getKey());
                 }
             }
@@ -903,7 +904,8 @@ public class NodeGraph extends Container {
     ///
     /// false when there is no history or nothing to undo
     public boolean undo() {
-        if (undoHistory == null) {
+        // a read-only graph changes nothing
+        if (undoHistory == null || !editable) {
             return false;
         }
         // what is held would be let go from where it no longer is
@@ -919,7 +921,8 @@ public class NodeGraph extends Container {
     ///
     /// false when there is no history or nothing to redo
     public boolean redo() {
-        if (undoHistory == null) {
+        // a read-only graph changes nothing
+        if (undoHistory == null || !editable) {
             return false;
         }
         // what is held would be let go from where it no longer is
@@ -2969,6 +2972,12 @@ public class NodeGraph extends Container {
         unroutedRoutes.clear();
     }
 
+    // true while the node with this id is in the model and still has this port
+    private boolean hasPort(String nodeId, GraphPort port) {
+        GraphNode n = model.getNode(nodeId);
+        return n != null && n.getInputs().contains(port);
+    }
+
     private static boolean touchesAny(GraphEdge e, List<GraphNode> nodes) {
         for (int i = 0; i < nodes.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed, no iterator
             String id = nodes.get(i).getId();
@@ -3089,7 +3098,10 @@ public class NodeGraph extends Container {
             }
             if (model.setCollapsed(pressGroup, !pressGroup.isCollapsed())) {
                 groupsDirty = true;
-                record(new GraphEdits.Collapse(model, pressGroup, pressGroup.isCollapsed()));
+                // folding is open on a read-only graph, where nothing is undone
+                if (editable) {
+                    record(new GraphEdits.Collapse(model, pressGroup, pressGroup.isCollapsed()));
+                }
                 for (int l = 0; l < listeners.size(); l++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator
                     listeners.get(l).groupToggled(this, pressGroup);
                 }

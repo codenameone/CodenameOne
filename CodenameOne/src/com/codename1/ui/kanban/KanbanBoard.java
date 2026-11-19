@@ -390,6 +390,7 @@ public class KanbanBoard extends ScrollSurface {
     /// Where scrolling across the board rests nearest to `x`: the start of a
     /// column, or the end of the board.
     private int snapTarget(int x) {
+        ensureLayout();
         int max = getMaxOffsetX();
         int best = Math.max(0, Math.min(x, max));
         int dist = Integer.MAX_VALUE;
@@ -711,7 +712,7 @@ public class KanbanBoard extends ScrollSurface {
         if (!model.removeCard(card)) {
             return false;
         }
-        record(new KanbanEdits.Presence(model, card, at, true, "Remove card"));
+        record(new KanbanEdits.Presence(model, card, at, true, removalName));
         for (int i = 0; i < listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself
             listeners.get(i).cardRemoved(this, card);
         }
@@ -761,8 +762,19 @@ public class KanbanBoard extends ScrollSurface {
     /// false when no card is selected or it could not be removed
     public boolean cutSelection() {
         KanbanCard card = selected;
-        return editable && copySelection() && removeCard(card);
+        if (!editable || !copySelection()) {
+            return false;
+        }
+        removalName = "Cut";
+        try {
+            return removeCard(card);
+        } finally {
+            removalName = "Remove card";
+        }
     }
+
+    // what undo calls the removal removeCard records
+    private String removalName = "Remove card";
 
     /// Adds the card on the clipboard under the selected card, or at the
     /// end of the first column when none is selected.
@@ -1230,6 +1242,8 @@ public class KanbanBoard extends ScrollSurface {
     }
 
     private void dragTo(int x, int y) {
+        // hit tests below read the cells, which a model change may have left stale
+        ensureLayout();
         dragX = x;
         dragY = y;
         int cx = x + getOffsetX();
@@ -1297,6 +1311,12 @@ public class KanbanBoard extends ScrollSurface {
         dragCard = null;
         int[] from = dragFrom;
         dragFrom = null;
+        // a card added above the held one since the drag began moved its origin
+        ensureLayout();
+        int[] now = locate(card);
+        if (now != null) {
+            from = now;
+        }
         int gx = dragX + getOffsetX() - grabX;
         int gy = dragY - headerH + getOffsetY() - grabY;
         boolean elsewhere = dropCol != from[1] || dropLane != from[0] || dropIndex != from[2];

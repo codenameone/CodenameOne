@@ -271,16 +271,33 @@ public class UndoHistory {
 
         @Override
         public void undo() {
-            for (int i = edits.size() - 1; i >= 0; i--) {
-                edits.get(i).undo();
+            int i = edits.size() - 1;
+            try {
+                for (; i >= 0; i--) {
+                    edits.get(i).undo();
+                }
+            } catch (RuntimeException err) {
+                // the step stays in the history whole: what was taken back of
+                // it is made again, so a later undo starts from all of it
+                for (int k = i + 1; k < edits.size(); k++) {
+                    edits.get(k).redo();
+                }
+                throw err;
             }
         }
 
         @Override
         public void redo() {
-            int n = edits.size();
-            for (int i = 0; i < n; i++) {
-                edits.get(i).redo();
+            int i = 0;
+            try {
+                for (; i < edits.size(); i++) {
+                    edits.get(i).redo();
+                }
+            } catch (RuntimeException err) {
+                for (int k = i - 1; k >= 0; k--) {
+                    edits.get(k).undo();
+                }
+                throw err;
             }
         }
 

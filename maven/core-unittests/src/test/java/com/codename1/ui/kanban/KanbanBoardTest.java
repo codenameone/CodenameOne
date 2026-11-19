@@ -465,9 +465,26 @@ class KanbanBoardTest extends UITestBase {
         for (int i = 0; i < 400; i++) {
             model.addCard("todo", new KanbanCard("long" + i, "Card " + i));
         }
+        final java.util.Set<String> painted = new java.util.HashSet<String>();
+        final DefaultKanbanCardRenderer plain = new DefaultKanbanCardRenderer();
+        b.setCardRenderer(new KanbanCardRenderer() {
+            @Override
+            public int getCardHeight(KanbanBoard board, KanbanCard card, int width) {
+                return plain.getCardHeight(board, card, width);
+            }
+
+            @Override
+            public void paintCard(com.codename1.ui.Graphics g, KanbanBoard board, KanbanCard card, int x, int y,
+                                  int w, int h, boolean selected, float lift) {
+                painted.add(card.getId());
+            }
+        });
         Image img = b.toImage(120, 120);
         assertTrue(img.getWidth() <= 120 && img.getHeight() <= 120);
         assertTrue(img.getHeight() >= 100);
+        // the board is taller than a band: the last card is in a later one
+        assertTrue(painted.contains("long0"));
+        assertTrue(painted.contains("long399"));
     }
 
     @FormTest
