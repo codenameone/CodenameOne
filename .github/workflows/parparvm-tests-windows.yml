@@ -117,6 +117,16 @@ env:
   # BytecodeMethod.appendMethodC. Not in the size or perf benchmarks, whose
   # binaries should be the ones customers get.
   CN1_CULL_TRAP: '1'
+  # The windows-latest image ships MSVC STL headers (14.52) that refuse any
+  # clang older than 22 with "error STL1000: Unexpected compiler version", while
+  # the clang-cl on PATH is the image's older standalone LLVM. Every C++ native
+  # failed to compile. This is Microsoft's documented switch for that check;
+  # the cmake the tests fork inherits it, and the generated CMakeLists never sets
+  # the base CMAKE_C_FLAGS/CMAKE_CXX_FLAGS, so it reaches every compile. The
+  # cross-build workflows compile on Linux against pinned xwin headers and do
+  # not need it.
+  CFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+  CXXFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
 
 jobs:
   # First, so a PR whose new screenshot tests have no goldens yet runs nothing
