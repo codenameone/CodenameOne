@@ -150,40 +150,24 @@ public class PieSeries extends CategoricalSeries {
     // slices near Double.MAX_VALUE neither overflow the total nor answer NaN. Negative when the
     // slice has no share to print.
     private double percentOf(int i) {
-        double v = values[i];
-        if (pctMaxPart <= 0 || !(v >= 0) || Double.isInfinite(v)) { //NOPMD LogicInversion - NaN is no share
-            return -1;
-        }
-        return v / pctMaxPart / pctScaledTotal * 100;
+        return percentOf(i, pctMaxPart, pctScaledTotal);
     }
 
-    // the largest finite value and the total of the values scaled by it, taken once per paint so
-    // each label's percentage is a division rather than two passes over every slice
+    // the base of every label's percentage, taken once per paint so each label is a division
+    // rather than two passes over every slice
     private double pctMaxPart;
     private double pctScaledTotal;
     // how many times the slices were scanned for that base; read by tests to hold it to one per paint
     int percentBaseScans;
 
+    // the smallest sweep, in degrees, that gets an outside label
+    private static final double OUTSIDE_LABEL_SWEEP = 0.5;
+    // outside labels formatted and measured for the pie's radius; read by tests
+    int labelMeasures;
+
     private void computePercentBase() {
-        int n = size();
-        double maxPart = 0;
-        for (int k = 0; k < n; k++) {
-            double v = values[k];
-            if (v > maxPart && v < Double.POSITIVE_INFINITY) {
-                maxPart = v;
-            }
-        }
-        double scaledTotal = 0;
-        if (maxPart > 0) {
-            for (int k = 0; k < n; k++) {
-                double w = values[k];
-                if (w > 0 && w < Double.POSITIVE_INFINITY) {
-                    scaledTotal += w / maxPart;
-                }
-            }
-        }
-        pctMaxPart = maxPart;
-        pctScaledTotal = scaledTotal;
+        pctMaxPart = largestShown();
+        pctScaledTotal = scaledShownTotal(pctMaxPart);
         percentBaseScans++;
     }
 
@@ -208,22 +192,6 @@ public class PieSeries extends CategoricalSeries {
         float cy = ctx.getPlotY() + ctx.getPlotHeight() / 2f;
         int minDim = Math.min(ctx.getPlotWidth(), ctx.getPlotHeight());
         float r = minDim / 2f - ctx.mm(1);
-        boolean outside = labelMode == LABELS_OUTSIDE;
-        int maxLabel = 0;
-        if (outside) {
-            for (int i = 0; i < n; i++) {
-                maxLabel = Math.max(maxLabel, f.stringWidth(labelText(i)));
-            }
-            maxLabel = Math.min(maxLabel, (int) (ctx.getPlotWidth() * 0.3f));
-            float rr = Math.min(ctx.getPlotHeight() / 2f - fh, ctx.getPlotWidth() / 2f - maxLabel - gap * 3);
-            if (rr < minDim * 0.22f) {
-                // too cramped for outside labels: give the pie the room and rely on legend/tooltip
-                outside = false;
-            } else {
-                r = rr;
-            }
-        }
-        r = Math.max(4, r);
         // Shares are taken of values scaled by the largest one, so two slices near
         // Double.MAX_VALUE neither overflow the total to infinity nor give an infinite sweep.
         double maxPart = 0;
@@ -242,6 +210,27 @@ public class PieSeries extends CategoricalSeries {
                 }
             }
         }
+        boolean outside = labelMode == LABELS_OUTSIDE;
+        int maxLabel = 0;
+        if (outside) {
+            for (int i = 0; i < n; i++) {
+                // only a slice paintOutsideLabels can label is worth formatting and measuring
+                double v = displayValue(ctx, i);
+                if (total > 0 && v > 0 && v < Double.POSITIVE_INFINITY && 360 * (v / maxPart / total) > OUTSIDE_LABEL_SWEEP) {
+                    labelMeasures++;
+                    maxLabel = Math.max(maxLabel, f.stringWidth(labelText(i)));
+                }
+            }
+            maxLabel = Math.min(maxLabel, (int) (ctx.getPlotWidth() * 0.3f));
+            float rr = Math.min(ctx.getPlotHeight() / 2f - fh, ctx.getPlotWidth() / 2f - maxLabel - gap * 3);
+            if (rr < minDim * 0.22f) {
+                // too cramped for outside labels: give the pie the room and rely on legend/tooltip
+                outside = false;
+            } else {
+                r = rr;
+            }
+        }
+        r = Math.max(4, r);
         double sweepScale = isEntering(ctx) ? ctx.getProgress() : 1;
         ChartPoint sel = getChart() == null ? null : getChart().getSelection();
         int selIndex = sel != null && sel.getSeries() == this ? sel.getIndex() : -1; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
@@ -336,7 +325,7 @@ public class PieSeries extends CategoricalSeries {
             int m = 0;
             for (int i = 0; i < n; i++) {
                 double sweep = lastSweep[i];
-                if (sweep <= 0.5) {
+                if (sweep <= OUTSIDE_LABEL_SWEEP) {
                     continue;
                 }
                 double mid = lastStart[i] + sweep / 2;

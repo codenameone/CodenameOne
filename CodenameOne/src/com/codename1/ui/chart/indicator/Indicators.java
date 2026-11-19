@@ -55,26 +55,34 @@ public final class Indicators {
     public static double[] sma(double[] v, int period) {
         checkPeriod(period);
         double[] out = new double[v.length];
+        // a running sum with Neumaier compensation: a huge value entering and leaving the window
+        // must not take the small values summed beside it along, so the bits each addition
+        // rounds away are kept in comp and added back
         double sum = 0;
+        double comp = 0;
         // gap (non-finite) values in the window; while there is one the average is NaN, and it recovers once the
         // gap leaves the window because the gap was never added to the sum
         int gaps = 0;
         for (int i = 0; i < v.length; i++) {
             double x = v[i];
             if (!gap(x)) {
-                sum += x;
+                double t = sum + x;
+                comp += Math.abs(sum) >= Math.abs(x) ? (sum - t) + x : (x - t) + sum;
+                sum = t;
             } else {
                 gaps++;
             }
             if (i >= period) {
                 double old = v[i - period];
                 if (!gap(old)) {
-                    sum -= old;
+                    double t = sum - old;
+                    comp += Math.abs(sum) >= Math.abs(old) ? (sum - t) - old : (-old - t) + sum;
+                    sum = t;
                 } else {
                     gaps--;
                 }
             }
-            out[i] = i >= period - 1 && gaps == 0 ? sum / period : Double.NaN;
+            out[i] = i >= period - 1 && gaps == 0 ? (sum + comp) / period : Double.NaN;
         }
         return out;
     }

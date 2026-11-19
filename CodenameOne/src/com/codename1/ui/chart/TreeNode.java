@@ -42,6 +42,32 @@ public class TreeNode {
     private Integer color;
     private TreeNode parent;
     private final List<TreeNode> children = new ArrayList<TreeNode>();
+    // a branch's sum, kept until a change below it; a leaf never reads these
+    private double sum;
+    private boolean sumValid;
+    // this node's position among its parent's children
+    private int indexInParent;
+    private ChangeListener listener;
+    // how many times a branch summed its children; read by tests to hold the cache
+    int sumComputations;
+
+    /// Told about every change to the tree under the node it is set on: `setValue` and `add`
+    /// on that node or any node below it.
+    public interface ChangeListener {
+        /// Called before a change, while the tree still holds the old values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `node`: the node about to change
+        void treeChanging(TreeNode node);
+
+        /// Called after a change.
+        ///
+        /// #### Parameters
+        ///
+        /// - `node`: the node that changed
+        void treeChanged(TreeNode node);
+    }
 
     /// Creates a branch.
     ///
@@ -79,13 +105,26 @@ public class TreeNode {
                 throw new IllegalArgumentException("a node cannot be added under itself or its own descendant");
             }
         }
-        if (child.parent != null) {
+        TreeNode old = child.parent;
+        if (old != null) {
+            old.changing();
+        }
+        changing();
+        if (old != null) {
             // a node lives in one place: moving it out of its old parent keeps that parent's
             // sum and the hierarchy a tree
-            child.parent.children.remove(child);
+            int at = child.indexInParent;
+            old.children.remove(at);
+            for (int i = at; i < old.children.size(); i++) {
+                old.children.get(i).indexInParent = i;
+            }
+            child.parent = null;
+            old.changed();
         }
         child.parent = this;
+        child.indexInParent = children.size();
         children.add(child);
+        changed();
         return child;
     }
 
@@ -99,11 +138,16 @@ public class TreeNode {
         if (children.isEmpty()) {
             return value > 0 && value < Double.POSITIVE_INFINITY ? value : 0; // NaN, infinities and negatives count as nothing
         }
-        double s = 0;
-        for (TreeNode c : children) {
-            s += c.getValue();
+        if (!sumValid) {
+            double s = 0;
+            for (TreeNode c : children) {
+                s += c.getValue();
+            }
+            sum = s;
+            sumValid = true;
+            sumComputations++;
         }
-        return s;
+        return sum;
     }
 
     /// Changes a leaf's value.
@@ -116,8 +160,58 @@ public class TreeNode {
     ///
     /// this node
     public TreeNode setValue(double v) {
+        changing();
         value = v;
+        changed();
         return this;
+    }
+
+    /// This node's position among its parent's children, or 0 for a node without a parent.
+    ///
+    /// #### Returns
+    ///
+    /// the child index
+    public int getIndexInParent() {
+        return parent == null ? 0 : indexInParent;
+    }
+
+    /// Sets the listener told about changes to this node and every node below it; null for
+    /// none. A `HierarchySeries` sets one on its root so changes to the tree animate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void setChangeListener(ChangeListener l) {
+        listener = l;
+    }
+
+    /// The listener set by `setChangeListener`, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the listener
+    public ChangeListener getChangeListener() {
+        return listener;
+    }
+
+    private void changing() {
+        for (TreeNode p = this; p != null; p = p.parent) {
+            if (p.listener != null) {
+                p.listener.treeChanging(this);
+            }
+        }
+    }
+
+    // drops the cached sums on the way up, then tells every listener on the chain
+    private void changed() {
+        for (TreeNode p = this; p != null; p = p.parent) {
+            p.sumValid = false;
+        }
+        for (TreeNode p = this; p != null; p = p.parent) {
+            if (p.listener != null) {
+                p.listener.treeChanged(this);
+            }
+        }
     }
 
     /// The colour fixed for this node, or null to derive it from the palette.

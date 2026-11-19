@@ -76,11 +76,32 @@ public abstract class HierarchySeries extends Series {
         if (getChart() != null) {
             getChart().beginChange();
         }
+        if (this.root != null && this.root.getChangeListener() == treeListener) { //NOPMD CompareObjectsWithEquals - only our own listener is removed
+            this.root.setChangeListener(null);
+        }
         this.root = root;
         this.current = root;
+        if (root != null) {
+            root.setChangeListener(treeListener);
+        }
         dataChanged();
         return this;
     }
+
+    // a change to a node of the tree animates like any other data change
+    private final TreeNode.ChangeListener treeListener = new TreeNode.ChangeListener() {
+        @Override
+        public void treeChanging(TreeNode node) {
+            if (getChart() != null) {
+                getChart().beginChange();
+            }
+        }
+
+        @Override
+        public void treeChanged(TreeNode node) {
+            dataChanged();
+        }
+    };
 
     /// The root node.
     public TreeNode getRoot() {
@@ -229,17 +250,8 @@ public abstract class HierarchySeries extends Series {
         if (branch.getColor() != null) {
             base = branch.getColor().intValue();
         } else {
-            TreeNode p = branch.getParent();
-            int idx = 0;
-            if (p != null) {
-                for (int i = 0; i < p.getChildCount(); i++) {
-                    if (p.getChild(i) == branch) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
-                        idx = i;
-                        break;
-                    }
-                }
-            }
-            base = ctx.getTheme().getSeriesColor(idx);
+            // the branch's own cached position, not a search of its parent's children
+            base = ctx.getTheme().getSeriesColor(branch.getIndexInParent());
         }
         return ctx.getTheme().tint(base, depth * 0.22f);
     }

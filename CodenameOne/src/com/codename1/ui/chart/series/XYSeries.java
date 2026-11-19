@@ -108,7 +108,8 @@ public abstract class XYSeries extends Series {
             }
         }
         begin();
-        count = y.length;
+        int off = keptFrom(y.length);
+        count = y.length - off;
         int cap = Math.max(16, count);
         xs = new double[cap];
         ys = new double[cap];
@@ -117,10 +118,11 @@ public abstract class XYSeries extends Series {
             explicit[k] = new boolean[cap];
         }
         for (int i = 0; i < count; i++) {
-            xs[i] = x == null ? i : x[i];
-            ys[i] = y[i];
+            int src = i + off;
+            xs[i] = x == null ? src : x[src];
+            ys[i] = y[src];
             for (int k = 0; k < aux.length; k++) {
-                aux[k][i] = channels[k][i];
+                aux[k][i] = channels[k][src];
                 explicit[k][i] = true;
             }
         }
@@ -258,6 +260,12 @@ public abstract class XYSeries extends Series {
         slotMapRebuilds++;
     }
 
+    // the first row of `n` that new data keeps: with setMaxPoints only the newest rows stay, as
+    // they would had the rows arrived one at a time through add()
+    private int keptFrom(int n) {
+        return maxPoints > 0 && n > maxPoints ? n - maxPoints : 0;
+    }
+
     private void slide() {
         if (maxPoints > 0 && count >= maxPoints) {
             dropFromSlot(0);
@@ -291,18 +299,19 @@ public abstract class XYSeries extends Series {
             throw new IllegalArgumentException("x has " + x.length + " values for " + y.length + " y values");
         }
         begin();
-        count = y.length;
+        int off = keptFrom(y.length);
+        count = y.length - off;
         xs = new double[Math.max(16, count)];
         ys = new double[Math.max(16, count)];
         for (int i = 0; i < count; i++) {
-            xs[i] = x == null ? i : x[i];
-            ys[i] = y[i];
+            xs[i] = x == null ? i + off : x[i + off];
+            ys[i] = y[i + off];
         }
         if (aux != null) {
             for (int k = 0; k < aux.length; k++) {
                 double[] na = new double[xs.length];
                 for (int i = 0; i < count; i++) {
-                    na[i] = auxDefault(k, y[i]);
+                    na[i] = auxDefault(k, ys[i]);
                 }
                 aux[k] = na;
                 explicit[k] = new boolean[xs.length];

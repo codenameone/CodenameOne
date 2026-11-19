@@ -28,6 +28,8 @@ import com.codename1.ui.chart.ChartContext;
 import com.codename1.ui.chart.ChartPoint;
 import com.codename1.ui.chart.Series;
 
+import java.util.HashMap;
+
 /// Base of series made of named parts that fill the plot: pie slices, funnel stages.
 ///
 /// Each part gets its own legend entry and colour from the theme palette, and can be hidden on
@@ -72,40 +74,77 @@ public abstract class CategoricalSeries extends Series {
         boolean[] oldHidden = hidden;
         this.labels = new String[n];
         this.values = new double[n];
-        boolean[] h = new boolean[n];
         for (int i = 0; i < n; i++) {
             this.labels[i] = labels != null && i < labels.length ? labels[i] : String.valueOf(i + 1);
             this.values[i] = values[i];
-            h[i] = wasHidden(oldLabels, oldHidden, this.labels, i);
         }
-        hidden = h;
+        hidden = carryHidden(oldLabels, oldHidden, this.labels);
         dataChanged();
         return this;
     }
 
+    // counts the lookups carryHidden makes, so a test can hold it linear
+    int hiddenLookups;
+
     // a part hidden from the legend stays hidden when new data still names it, wherever it moved.
     // Labels may repeat, so the k-th part of a name takes the state of the k-th old part of that
-    // name; an unlabelled part keeps its index's state
-    private static boolean wasHidden(String[] oldLabels, boolean[] oldHidden, String[] labels, int i) {
-        String label = labels[i];
-        if (oldLabels == null || label == null) {
-            return i < oldHidden.length && oldHidden[i];
-        }
-        int occurrence = 0;
-        for (int k = 0; k < i; k++) {
-            if (label.equals(labels[k])) {
-                occurrence++;
+    // name; an unlabelled part keeps its index's state. Linear: each old index is chained to the
+    // next old index of the same name, and a cursor per name walks that chain
+    private boolean[] carryHidden(String[] oldLabels, boolean[] oldHidden, String[] labels) {
+        int n = labels.length;
+        boolean[] h = new boolean[n];
+        boolean any = false;
+        for (boolean b : oldHidden) {
+            if (b) {
+                any = true;
+                break;
             }
         }
-        for (int k = 0; k < oldLabels.length && k < oldHidden.length; k++) {
-            if (label.equals(oldLabels[k])) {
-                if (occurrence == 0) {
-                    return oldHidden[k];
+        if (!any) {
+            return h;
+        }
+        if (oldLabels == null) {
+            for (int i = 0; i < n && i < oldHidden.length; i++) {
+                h[i] = oldHidden[i];
+            }
+            return h;
+        }
+        int m = Math.min(oldLabels.length, oldHidden.length);
+        int[] next = new int[m];
+        HashMap<String, Integer> cursor = new HashMap<String, Integer>();
+        HashMap<String, Integer> tail = new HashMap<String, Integer>();
+        for (int k = 0; k < m; k++) {
+            next[k] = -1;
+            String l = oldLabels[k];
+            if (l == null) {
+                continue;
+            }
+            hiddenLookups++;
+            Integer t = tail.get(l);
+            if (t == null) {
+                cursor.put(l, Integer.valueOf(k));
+            } else {
+                next[t.intValue()] = k;
+            }
+            tail.put(l, Integer.valueOf(k));
+        }
+        for (int i = 0; i < n; i++) {
+            String l = labels[i];
+            if (l == null) {
+                h[i] = i < oldHidden.length && oldHidden[i];
+                continue;
+            }
+            hiddenLookups++;
+            Integer c = cursor.get(l);
+            if (c != null) {
+                int k = c.intValue();
+                if (k >= 0) {
+                    h[i] = oldHidden[k];
+                    cursor.put(l, Integer.valueOf(next[k]));
                 }
-                occurrence--;
             }
         }
-        return false;
+        return h;
     }
 
     /// Changes the value of one part, animated.
@@ -245,6 +284,73 @@ public abstract class CategoricalSeries extends Series {
         return s;
     }
 
+    // A share is taken of values scaled by the largest shown one, so parts near Double.MAX_VALUE
+    // neither overflow the total nor answer NaN. One rule for every percentage this series
+    // prints, so a slice label and its tooltip always agree.
+    private boolean countsForShare(int i) {
+        double v = values[i];
+        return !hidden[i] && v > 0 && v < Double.POSITIVE_INFINITY;
+    }
+
+    /// The largest value a percentage is taken of: shown, positive and finite; 0 when none.
+    ///
+    /// #### Returns
+    ///
+    /// the largest shown value
+    protected double largestShown() {
+        double maxPart = 0;
+        for (int k = 0; k < values.length; k++) {
+            if (countsForShare(k) && values[k] > maxPart) {
+                maxPart = values[k];
+            }
+        }
+        return maxPart;
+    }
+
+    /// The total of the shown values, each divided by `maxPart`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxPart`: the value of `largestShown()`
+    ///
+    /// #### Returns
+    ///
+    /// the scaled total
+    protected double scaledShownTotal(double maxPart) {
+        double t = 0;
+        if (maxPart > 0) {
+            for (int k = 0; k < values.length; k++) {
+                if (countsForShare(k)) {
+                    t += values[k] / maxPart;
+                }
+            }
+        }
+        return t;
+    }
+
+    /// The percentage part `i` is of the shown parts, given the base from `largestShown()` and
+    /// `scaledShownTotal()`; negative when the part has no share to print (hidden, NaN,
+    /// negative or infinite).
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the part index
+    ///
+    /// - `maxPart`: the largest shown value
+    ///
+    /// - `scaledTotal`: the total scaled by `maxPart`
+    ///
+    /// #### Returns
+    ///
+    /// the percentage, or a negative number
+    protected double percentOf(int i, double maxPart, double scaledTotal) {
+        double v = values[i];
+        if (maxPart <= 0 || scaledTotal <= 0 || hidden[i] || !(v >= 0) || Double.isInfinite(v)) { //NOPMD LogicInversion - NaN is no share
+            return -1;
+        }
+        return v / maxPart / scaledTotal * 100;
+    }
+
     @Override
     protected void captureTransitionStart() {
         ChartContext ctx = getChart() == null ? null : getChart().getLastContext();
@@ -298,8 +404,8 @@ public abstract class CategoricalSeries extends Series {
     @Override
     public String formatTooltip(ChartContext ctx, ChartPoint p) {
         int i = p.getIndex();
-        double total = getTotal();
-        String pct = total > 0 ? " (" + com.codename1.ui.chart.axis.Axis.formatNumber(values[i] * 100 / total, 1) + "%)" : "";
+        double share = percentOf(i, largestShown(), scaledShownTotal(largestShown()));
+        String pct = share >= 0 ? " (" + com.codename1.ui.chart.axis.Axis.formatNumber(share, 1) + "%)" : "";
         return labels[i] + ": " + formatValue(ctx, values[i]) + pct;
     }
 

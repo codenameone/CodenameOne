@@ -46,6 +46,11 @@ public class BoxPlotSeries extends XYSeries {
     // outliers of boxes built from samples, as {x, outlier...} rows; keyed by x so a slide cannot
     // pair a box with another box's outliers
     private final java.util.ArrayList<double[]> outliers = new java.util.ArrayList<double[]>();
+    // each box's outlier row, or null; rebuilt once after a change rather than searched per box
+    // on every paint
+    private double[][] outliersByBox;
+    // outlier rows visited to find boxes' outliers; read by tests to hold it to one pass per change
+    int outlierRowVisits;
 
     /// Creates an empty series.
     ///
@@ -113,7 +118,7 @@ public class BoxPlotSeries extends XYSeries {
         if (s.length == 0) {
             // nothing measurable at x: whatever box and outliers an earlier call left there are stale
             removeOutliers(x);
-            int old = scanIndexOfX(x);
+            int old = boxIndex(x);
             if (old >= 0) {
                 removeRow(old);
             }
@@ -146,6 +151,7 @@ public class BoxPlotSeries extends XYSeries {
                 }
             }
             outliers.add(row);
+            outliersByBox = null;
         }
         putBox(x, quantile(s, 0.5), new double[]{wMin, q1, q3, wMax});
         return this;
@@ -154,12 +160,36 @@ public class BoxPlotSeries extends XYSeries {
     // One box per x: a second box for an x already present replaces the first instead of
     // drawing over it.
     private void putBox(double x, double median, double[] v) {
-        int old = scanIndexOfX(x);
+        int old = boxIndex(x);
         if (old >= 0) {
             replaceRow(old, median, v);
         } else {
             addRow(x, median, v);
         }
+    }
+
+    // the box at exactly x: a binary search while the boxes are ascending; a non-finite x, which
+    // that search never answers, falls back to the scan
+    private int boxIndex(double x) {
+        return isGap(x) ? scanIndexOfX(x) : indexOfX(x);
+    }
+
+    // box i's outlier row, {x, outlier...}, or null when it has none
+    private double[] outlierRow(int i) {
+        double[][] byBox = outliersByBox;
+        if (byBox == null || byBox.length != size()) {
+            byBox = new double[size()][];
+            for (int k = 0; k < outliers.size(); k++) {
+                outlierRowVisits++;
+                double[] row = outliers.get(k);
+                int b = boxIndex(row[0]);
+                if (b >= 0 && byBox[b] == null) {
+                    byBox[b] = row;
+                }
+            }
+            outliersByBox = byBox;
+        }
+        return i < byBox.length ? byBox[i] : null;
     }
 
     // A box with any NaN or infinite statistic is a gap: it is neither drawn nor counted in the bounds.
@@ -188,16 +218,13 @@ public class BoxPlotSeries extends XYSeries {
     ///
     /// a new array, empty when there are none
     public double[] getOutliers(int i) {
-        double x = getX(i);
-        for (int k = 0; k < outliers.size(); k++) {
-            double[] row = outliers.get(k);
-            if (row[0] == x) {
-                double[] o = new double[row.length - 1];
-                System.arraycopy(row, 1, o, 0, o.length);
-                return o;
-            }
+        double[] row = outlierRow(i);
+        if (row == null) {
+            return new double[0];
         }
-        return new double[0];
+        double[] o = new double[row.length - 1];
+        System.arraycopy(row, 1, o, 0, o.length);
+        return o;
     }
 
     /// The lower whisker of box `i`.
@@ -232,6 +259,7 @@ public class BoxPlotSeries extends XYSeries {
                 outliers.remove(k);
             }
         }
+        outliersByBox = null;
     }
 
     /// Forgets the outliers of boxes that are no longer in the series, such as one a slide dropped.
@@ -242,6 +270,7 @@ public class BoxPlotSeries extends XYSeries {
                 outliers.remove(k);
             }
         }
+        outliersByBox = null;
         super.dataChanged();
     }
 
@@ -307,7 +336,9 @@ public class BoxPlotSeries extends XYSeries {
             if (!isGap(hi)) {
                 max = Math.max(max, hi);
             }
-            for (double o : getOutliers(i)) {
+            double[] row = outlierRow(i);
+            for (int k = 1; row != null && k < row.length; k++) {
+                double o = row[k];
                 if (!isGap(o)) {
                     min = Math.min(min, o);
                     max = Math.max(max, o);
@@ -367,8 +398,9 @@ public class BoxPlotSeries extends XYSeries {
             rect(g, rot, c - half, pMed - 1, half * 2, Math.max(2, ctx.mm(0.4f)));
             if (t >= 1) {
                 int d = Math.max(3, ctx.mm(1));
-                for (double o : getOutliers(i)) {
-                    float po = pos(ctx, i, o, rot);
+                double[] row = outlierRow(i);
+                for (int k = 1; row != null && k < row.length; k++) {
+                    float po = pos(ctx, i, row[k], rot);
                     int cx = Math.round(rot ? po : c);
                     int cy = Math.round(rot ? c : po);
                     g.drawArc(cx - d / 2, cy - d / 2, d, d, 0, 360);

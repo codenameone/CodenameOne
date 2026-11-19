@@ -1282,17 +1282,22 @@ public class Chart extends Component {
         int cy = y;
         int usedW = 0;
         int rowH = Math.max(fh, sw);
-        if (paint && !vertical) {
-            // centre each row: measure rows first
-            cx = x + (w - rowWidth(f, sw, itemGap, maxItemW, w, 0)) / 2;
-        }
         int entryIndex = 0;
         int total = 0;
         int limit = Integer.MAX_VALUE;
+        for (Series s : series) {
+            total += s.getLegendEntryCount();
+        }
+        // a horizontal legend takes at most about a third of the height; what does not fit is
+        // summed up in a final "+N" entry on its last row, as the vertical legend does
+        int maxRows = Math.max(1, (maxH * 35 / 100 + rowGap) / (rowH + rowGap));
+        int moreW = f.stringWidth("+" + total) + itemGap;
+        int row = 0;
+        if (paint && !vertical) {
+            // centre each row: measure rows first
+            cx = x + (w - rowWidth(f, sw, itemGap, maxItemW, w, 0, maxRows == 1, total, moreW)) / 2;
+        }
         if (vertical) {
-            for (Series s : series) {
-                total += s.getLegendEntryCount();
-            }
             int capacity = Math.max(1, (maxH + rowGap) / (rowH + rowGap));
             if (total > capacity) {
                 limit = capacity - 1;
@@ -1311,9 +1316,20 @@ public class Chart extends Component {
                 }
                 name = LabelLayout.ellipsize(f, name, maxItemW - sw - mm(1));
                 int iw = sw + mm(1) + f.stringWidth(name);
+                if (!vertical && row == maxRows - 1 && cx > x
+                        && cx + iw + (entryIndex < total - 1 ? moreW : 0) > x + w) {
+                    limit = entryIndex;
+                    break entries;
+                }
                 if (!vertical && cx + iw > x + w && cx > x) {
                     cy += rowH + rowGap;
-                    cx = paint ? x + (w - rowWidth(f, sw, itemGap, maxItemW, w, entryIndex)) / 2 : x;
+                    row++;
+                    cx = paint ? x + (w - rowWidth(f, sw, itemGap, maxItemW, w, entryIndex, row == maxRows - 1,
+                            total, moreW)) / 2 : x;
+                    if (row == maxRows - 1 && entryIndex < total - 1 && cx + iw + moreW > x + w) {
+                        limit = entryIndex;
+                        break entries;
+                    }
                 }
                 if (paint) {
                     boolean on = s.isLegendEntryVisible(i);
@@ -1350,30 +1366,50 @@ public class Chart extends Component {
             }
             usedW = Math.max(usedW, sw + mm(1) + iw);
             cy += rowH + rowGap;
+        } else if (limit < total) {
+            String more = "+" + (total - limit);
+            int iw = f.stringWidth(more);
+            if (paint) {
+                g.setColor(getTheme().getLegendTextColor());
+                g.drawString(more, rtl ? 2 * x + w - cx - iw : cx, cy + (rowH - fh) / 2);
+            }
+            usedW = Math.max(usedW, cx + iw - x);
         }
         int usedH = vertical ? cy - y : cy - y + rowH;
         return new int[]{usedW, usedH};
     }
 
-    private int rowWidth(Font f, int sw, int itemGap, int maxItemW, int w, int startEntry) {
+    // the width of the legend row that starts at entry `startEntry`, found by skipping whole
+    // series rather than rescanning every entry before it. The last row stops where the paint
+    // loop stops and makes room for the "+N" entry.
+    private int rowWidth(Font f, int sw, int itemGap, int maxItemW, int w, int startEntry, boolean lastRow,
+            int total, int moreW) {
         int idx = 0;
         int rw = 0;
         for (Series s : series) {
             int n = s.getLegendEntryCount();
-            for (int i = 0; i < n; i++, idx++) {
-                if (idx < startEntry) {
-                    continue;
-                }
+            if (idx + n <= startEntry) {
+                idx += n;
+                continue;
+            }
+            for (int i = Math.max(0, startEntry - idx); i < n; i++) {
+                int entry = idx + i;
+                legendRowMeasures++;
                 String name = LabelLayout.ellipsize(f, s.getLegendEntryName(i), maxItemW - sw - mm(1));
                 int iw = sw + mm(1) + f.stringWidth(name);
-                if (rw > 0 && rw + itemGap + iw > w) {
-                    return rw;
+                int need = lastRow && entry < total - 1 ? iw + moreW : iw;
+                if (rw > 0 && rw + itemGap + need > w) {
+                    return lastRow ? rw + moreW : rw;
                 }
                 rw += (rw > 0 ? itemGap : 0) + iw;
             }
+            idx += n;
         }
         return rw;
     }
+
+    // legend entries measured to centre rows; read by tests to hold it linear
+    int legendRowMeasures;
 
     /// Tick values with their final label text and the thickness the axis needs.
     static final class AxisLabels {

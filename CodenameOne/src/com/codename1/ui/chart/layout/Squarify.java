@@ -64,13 +64,11 @@ public final class Squarify {
         for (int i = 0; i < n; i++) {
             order[i] = i;
         }
-        for (int a = 1; a < n; a++) {
-            for (int b = a; b > 0 && pos(values[order[b]]) > pos(values[order[b - 1]]); b--) {
-                int t = order[b];
-                order[b] = order[b - 1];
-                order[b - 1] = t;
-            }
+        double[] key = new double[n];
+        for (int i = 0; i < n; i++) {
+            key[i] = pos(values[i]);
         }
+        IndexSort.sort(order, n, key, true);
         double scale = (double) w * h / total;
         double[] area = new double[n];
         for (int i = 0; i < n; i++) {
@@ -85,15 +83,23 @@ public final class Squarify {
             double side = Math.min(rw, rh);
             int end = start;
             double sum = area[start];
-            double worst = worst(area, start, end, sum, side);
+            // the row's largest and smallest areas, kept as it grows rather than rescanned
+            double rowMax = area[start];
+            double rowMin = area[start];
+            double worst = worst(rowMax, rowMin, sum, side);
             while (end + 1 < n) {
-                double s2 = sum + area[end + 1];
-                double w2 = worst(area, start, end + 1, s2, side);
+                double next = area[end + 1];
+                double s2 = sum + next;
+                double max2 = Math.max(rowMax, next);
+                double min2 = Math.min(rowMin, next);
+                double w2 = worst(max2, min2, s2, side);
                 if (w2 > worst) {
                     break;
                 }
                 end++;
                 sum = s2;
+                rowMax = max2;
+                rowMin = min2;
                 worst = w2;
             }
             // lay the row along the short side
@@ -123,15 +129,9 @@ public final class Squarify {
         return out;
     }
 
-    private static double worst(double[] area, int from, int to, double sum, double side) {
+    private static double worst(double max, double min, double sum, double side) {
         if (sum <= 0 || side <= 0) {
             return Double.MAX_VALUE;
-        }
-        double max = 0;
-        double min = Double.MAX_VALUE;
-        for (int i = from; i <= to; i++) {
-            max = Math.max(max, area[i]);
-            min = Math.min(min, area[i]);
         }
         if (min <= 0) {
             return Double.MAX_VALUE;

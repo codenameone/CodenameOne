@@ -38,6 +38,14 @@ public final class SankeyLayout {
     private float[] linkW;
     private int columns;
     private boolean[] back;
+    // each node's incoming and outgoing links in link order, grouped once per layout
+    private int[] inStart;
+    private int[] inLinks;
+    private int[] outStart;
+    private int[] outLinks;
+    // the nodes of each column in node order
+    private int[] colStart;
+    private int[] colNodes;
 
     /// Computes a layout.
     ///
@@ -73,7 +81,13 @@ public final class SankeyLayout {
             }
         }
         column = new int[n];
-        back = findBackLinks(n, src, dst);
+        int[][] g = group(n, src);
+        outStart = g[0];
+        outLinks = g[1];
+        g = group(n, dst);
+        inStart = g[0];
+        inLinks = g[1];
+        back = findBackLinks(n, dst, outStart, outLinks, m);
         // longest path from a source over the forward links; back links close a cycle and would
         // otherwise push its nodes right until the pass bound
         for (int pass = 0; pass < n; pass++) {
@@ -114,18 +128,28 @@ public final class SankeyLayout {
         for (int i = 0; i < n; i++) {
             nv[i] = Math.max(in[i], out[i]);
         }
+        g = group(columns, column);
+        colStart = g[0];
+        colNodes = g[1];
+        // the gaps between nodes take at most half the height: a column of many nodes shrinks
+        // its padding, down to nothing, rather than leaving no room and a zero scale for the
+        // nodes and links themselves
+        float pad = Math.max(0, nodePad);
+        for (int c = 0; c < columns; c++) {
+            int count = colStart[c + 1] - colStart[c];
+            if (count > 1 && pad * (count - 1) > h / 2) {
+                pad = Math.max(0, h / 2 / (count - 1));
+            }
+        }
         double ky = Double.MAX_VALUE;
         for (int c = 0; c < columns; c++) {
             double sum = 0;
-            int count = 0;
-            for (int i = 0; i < n; i++) {
-                if (column[i] == c) {
-                    sum += nv[i];
-                    count++;
-                }
+            for (int k = colStart[c]; k < colStart[c + 1]; k++) {
+                sum += nv[colNodes[k]];
             }
+            int count = colStart[c + 1] - colStart[c];
             if (sum > 0) {
-                ky = Math.min(ky, (h - nodePad * Math.max(0, count - 1)) / sum);
+                ky = Math.min(ky, (h - pad * Math.max(0, count - 1)) / sum);
             }
         }
         if (ky == Double.MAX_VALUE || ky < 0) {
@@ -137,22 +161,21 @@ public final class SankeyLayout {
         float colStep = columns > 1 ? (w - nodeWidth) / (columns - 1) : 0;
         for (int c = 0; c < columns; c++) {
             float cy = y;
-            for (int i = 0; i < n; i++) {
-                if (column[i] == c) {
-                    nodeX[i] = x + c * colStep;
-                    nodeH[i] = (float) Math.max(1, nv[i] * ky);
-                    nodeY[i] = cy;
-                    cy += nodeH[i] + nodePad;
-                }
+            for (int k = colStart[c]; k < colStart[c + 1]; k++) {
+                int i = colNodes[k];
+                nodeX[i] = x + c * colStep;
+                nodeH[i] = (float) Math.max(1, nv[i] * ky);
+                nodeY[i] = cy;
+                cy += nodeH[i] + pad;
             }
         }
         float alpha = 1;
         for (int iter = 0; iter < 8; iter++) {
             alpha *= 0.99f;
             relax(src, dst, value, n, true, alpha);
-            resolve(n, y, h, nodePad);
+            resolve(y, h, pad);
             relax(src, dst, value, n, false, alpha);
-            resolve(n, y, h, nodePad);
+            resolve(y, h, pad);
         }
         linkSy = new float[m];
         linkTy = new float[m];
@@ -163,19 +186,19 @@ public final class SankeyLayout {
         // order links by the far end's position so ribbons do not cross at their ends
         float[] outOff = new float[n];
         float[] inOff = new float[n];
-        Integer[] order = new Integer[m];
+        int[] order = new int[m];
         for (int l = 0; l < m; l++) {
-            order[l] = Integer.valueOf(l);
+            order[l] = l;
         }
         sortBy(order, dst);
         for (int k = 0; k < m; k++) {
-            int l = order[k].intValue();
+            int l = order[k];
             linkSy[l] = nodeY[src[l]] + outOff[src[l]];
             outOff[src[l]] += linkW[l];
         }
         sortBy(order, src);
         for (int k = 0; k < m; k++) {
-            int l = order[k].intValue();
+            int l = order[k];
             linkTy[l] = nodeY[dst[l]] + inOff[dst[l]];
             inOff[dst[l]] += linkW[l];
         }
@@ -196,11 +219,11 @@ public final class SankeyLayout {
     }
 
     // depth first search from every node in order; a link to a node still on the stack is a back link
-    private static boolean[] findBackLinks(int n, int[] src, int[] dst) {
-        int m = src.length;
+    private static boolean[] findBackLinks(int n, int[] dst, int[] outStart, int[] outLinks, int m) {
         boolean[] back = new boolean[m];
         int[] state = new int[n];
         int[] stack = new int[n];
+        // the position in outLinks of each node's next unexplored link
         int[] next = new int[n];
         for (int root = 0; root < n; root++) {
             if (state[root] != 0) {
@@ -208,31 +231,48 @@ public final class SankeyLayout {
             }
             int top = 0;
             stack[0] = root;
-            next[root] = 0;
+            next[root] = outStart[root];
             state[root] = 1;
             while (top >= 0) {
                 int u = stack[top];
-                int l = next[u];
-                while (l < m && src[l] != u) {
-                    l++;
-                }
-                if (l >= m) {
+                int p = next[u];
+                if (p >= outStart[u + 1]) {
                     state[u] = 2;
                     top--;
                     continue;
                 }
-                next[u] = l + 1;
+                next[u] = p + 1;
+                int l = outLinks[p];
                 int v = dst[l];
                 if (state[v] == 1) {
                     back[l] = true;
                 } else if (state[v] == 0) {
                     state[v] = 1;
-                    next[v] = 0;
+                    next[v] = outStart[v];
                     stack[++top] = v;
                 }
             }
         }
         return back;
+    }
+
+    // groups the indices 0..key.length-1 by their key, each group in index order: returns
+    // {start, items} where group g is items[start[g]] .. items[start[g + 1] - 1]
+    private static int[][] group(int groups, int[] key) {
+        int[] start = new int[groups + 1];
+        for (int k : key) {
+            start[k + 1]++;
+        }
+        for (int g = 0; g < groups; g++) {
+            start[g + 1] += start[g];
+        }
+        int[] fill = new int[groups];
+        System.arraycopy(start, 0, fill, 0, groups);
+        int[] items = new int[key.length];
+        for (int i = 0; i < key.length; i++) {
+            items[fill[key[i]]++] = i;
+        }
+        return new int[][]{start, items};
     }
 
     /// The number of columns.
@@ -275,24 +315,24 @@ public final class SankeyLayout {
         return linkW[l];
     }
 
-    private void sortBy(Integer[] order, int[] end) {
-        for (int a = 1; a < order.length; a++) {
-            for (int b = a; b > 0 && nodeY[end[order[b].intValue()]] < nodeY[end[order[b - 1].intValue()]]; b--) {
-                Integer t = order[b];
-                order[b] = order[b - 1];
-                order[b - 1] = t;
-            }
+    private void sortBy(int[] order, int[] end) {
+        double[] key = new double[end.length];
+        for (int l = 0; l < end.length; l++) {
+            key[l] = nodeY[end[l]];
         }
+        IndexSort.sort(order, order.length, key, false);
     }
 
     private void relax(int[] src, int[] dst, double[] value, int n, boolean forward, float alpha) {
+        int[] start = forward ? inStart : outStart;
+        int[] links = forward ? inLinks : outLinks;
         for (int i = 0; i < n; i++) {
             double sum = 0;
             double wsum = 0;
-            for (int l = 0; l < src.length; l++) {
-                int me = forward ? dst[l] : src[l];
+            for (int p = start[i]; p < start[i + 1]; p++) {
+                int l = links[p];
                 int other = forward ? src[l] : dst[l];
-                if (me != i || other == i) {
+                if (other == i) {
                     continue;
                 }
                 double v = pos(value[l]);
@@ -306,22 +346,16 @@ public final class SankeyLayout {
         }
     }
 
-    private void resolve(int n, float y, float h, float pad) {
+    private void resolve(float y, float h, float pad) {
+        int[] idx = new int[colNodes.length];
+        double[] key = new double[nodeY.length];
+        for (int i = 0; i < key.length; i++) {
+            key[i] = nodeY[i];
+        }
         for (int c = 0; c < columns; c++) {
-            int count = 0;
-            int[] idx = new int[n];
-            for (int i = 0; i < n; i++) {
-                if (column[i] == c) {
-                    idx[count++] = i;
-                }
-            }
-            for (int a = 1; a < count; a++) {
-                for (int b = a; b > 0 && nodeY[idx[b]] < nodeY[idx[b - 1]]; b--) {
-                    int t = idx[b];
-                    idx[b] = idx[b - 1];
-                    idx[b - 1] = t;
-                }
-            }
+            int count = colStart[c + 1] - colStart[c];
+            System.arraycopy(colNodes, colStart[c], idx, 0, count);
+            IndexSort.sort(idx, count, key, false);
             float cur = y;
             for (int k = 0; k < count; k++) {
                 int i = idx[k];
