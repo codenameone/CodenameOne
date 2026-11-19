@@ -213,7 +213,7 @@ public abstract class Axis {
         if (!(max > min)) { //NOPMD LogicInversion - the negated comparison is also true for NaN
             // a fixed bound beyond the data keeps its side; only the free side moves
             double anchor = fixedMin != null ? min : max;
-            double pad = anchor == 0 ? 1 : Math.abs(anchor) * 0.1;
+            double pad = flatPad(anchor);
             if (fixedMin != null && fixedMax == null) {
                 max = min + pad;
             } else if (fixedMax != null && fixedMin == null) {
@@ -223,13 +223,23 @@ public abstract class Axis {
                 max += pad;
             }
             // near Double.MAX_VALUE the pad overflows a side to infinity: that side stays on
-            // the value and the other side takes the pad, so the range stays finite and non-empty
+            // the value and the other side takes the pad, so the range stays finite and non-empty.
+            // A fixed bound is never moved: with the other side fixed the overflowed side only
+            // comes back to the largest finite value.
             if (Double.isInfinite(max)) {
-                max = anchor;
-                min = anchor - pad;
+                if (fixedMin == null) {
+                    max = anchor;
+                    min = anchor - pad;
+                } else {
+                    max = Double.MAX_VALUE;
+                }
             } else if (Double.isInfinite(min)) {
-                min = anchor;
-                max = anchor + pad;
+                if (fixedMax == null) {
+                    min = anchor;
+                    max = anchor + pad;
+                } else {
+                    min = -Double.MAX_VALUE;
+                }
             }
         }
         double[] adj = adjustBounds(min, max);
@@ -243,6 +253,20 @@ public abstract class Axis {
             // so it cannot be left hanging past the data
             clampViewport();
         }
+    }
+
+    /// How far a range with a single value is padded on each side; 10% of the value, or 1 at
+    /// zero. A time axis overrides it, since 10% of an epoch timestamp is years.
+    ///
+    /// #### Parameters
+    ///
+    /// - `anchor`: the single value
+    ///
+    /// #### Returns
+    ///
+    /// the pad, positive
+    protected double flatPad(double anchor) {
+        return anchor == 0 ? 1 : Math.abs(anchor) * 0.1;
     }
 
     /// Lets a subclass pad or round the automatic bounds; the default rounds a numeric range

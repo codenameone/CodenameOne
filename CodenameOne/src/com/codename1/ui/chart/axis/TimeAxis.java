@@ -68,6 +68,12 @@ public class TimeAxis extends Axis {
         setGridVisible(true);
     }
 
+    /// One hour each side of a single timestamp, rather than 10% of its epoch milliseconds.
+    @Override
+    protected double flatPad(double anchor) {
+        return 3600000;
+    }
+
     @Override
     protected double[] adjustBounds(double min, double max) {
         return new double[]{min, max};

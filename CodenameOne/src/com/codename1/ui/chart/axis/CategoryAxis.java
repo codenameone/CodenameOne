@@ -81,19 +81,26 @@ public class CategoryAxis extends Axis {
         // further than MAX_EXTRA_BANDS past them (1e9, infinity, NaN) is an outlier and is ignored,
         // so a single bad value cannot squeeze the real categories into slivers.
         // With no labels at all the data alone says how many bands there are, so 20000 points
-        // get 20000 bands, capped at MAX_DATA_BANDS against a runaway value.
+        // get 20000 bands; a max needing more than MAX_DATA_BANDS (or not finite) is an outlier
+        // and is ignored the same way, never clamped to the cap. The chart passes the largest x
+        // within getDataLimit() instead when one point is that far out.
         int fromData = 1;
         double last = Math.floor(max + 1e-9) + 1;
-        double limit = categories.isEmpty() ? MAX_DATA_BANDS : categories.size() + MAX_EXTRA_BANDS;
-        if (last > 0 && last < Double.POSITIVE_INFINITY) {
-            if (last <= limit) {
-                fromData = (int) last;
-            } else if (categories.isEmpty()) {
-                fromData = MAX_DATA_BANDS;
-            }
+        if (last > 0 && last <= getDataLimit() + 1) {
+            fromData = (int) last;
         }
         int n = Math.max(categories.size(), fromData);
         super.setDataBounds(-0.5, n - 0.5);
+    }
+
+    /// The largest x a data point may have and still open its own band; a point further out is
+    /// an outlier the axis ignores.
+    ///
+    /// #### Returns
+    ///
+    /// the largest x that counts
+    public double getDataLimit() {
+        return (categories.isEmpty() ? MAX_DATA_BANDS : categories.size() + MAX_EXTRA_BANDS) - 1;
     }
 
     @Override

@@ -986,6 +986,23 @@ public class Chart extends Component {
             xmin = 0;
             xmax = 1;
         }
+        if (xAxis instanceof CategoryAxis && xmax > ((CategoryAxis) xAxis).getDataLimit()) {
+            // a far outlier is ignored by the axis; the bands come from the points within reach
+            double limit = ((CategoryAxis) xAxis).getDataLimit();
+            double within = -Double.MAX_VALUE;
+            for (Series s : series) {
+                if (!s.isCartesian() || !s.isVisible()) {
+                    continue;
+                }
+                double[] xb = s.getXBoundsWithin(limit);
+                if (xb != null && finite(xb[1])) {
+                    within = Math.max(within, xb[1]);
+                }
+            }
+            if (within > -Double.MAX_VALUE) {
+                xmax = within;
+            }
+        }
         xAxis.setDataBounds(xmin, xmax);
         Axis[] va = valueAxes();
         for (int i = 0; i < va.length; i++) {

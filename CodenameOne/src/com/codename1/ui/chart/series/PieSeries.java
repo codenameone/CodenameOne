@@ -146,9 +146,35 @@ public class PieSeries extends CategoricalSeries {
         return this;
     }
 
+    // Percentage of slice i, taken like the sweep: of values scaled by the largest finite one, so
+    // slices near Double.MAX_VALUE neither overflow the total nor answer NaN. Negative when the
+    // slice has no share to print.
+    private double percentOf(int i) {
+        int n = size();
+        double maxPart = 0;
+        for (int k = 0; k < n; k++) {
+            double v = values[k];
+            if (v > maxPart && v < Double.POSITIVE_INFINITY) {
+                maxPart = v;
+            }
+        }
+        double v = values[i];
+        if (maxPart <= 0 || !(v >= 0) || Double.isInfinite(v)) { //NOPMD LogicInversion - NaN is no share
+            return -1;
+        }
+        double scaledTotal = 0;
+        for (int k = 0; k < n; k++) {
+            double w = values[k];
+            if (w > 0 && w < Double.POSITIVE_INFINITY) {
+                scaledTotal += w / maxPart;
+            }
+        }
+        return v / maxPart / scaledTotal * 100;
+    }
+
     private String labelText(int i) {
-        double total = getTotal();
-        String pct = total > 0 ? Axis.formatNumber(values[i] * 100 / total, values[i] * 100 / total < 10 ? 1 : 0) + "%" : "";
+        double p = percentOf(i);
+        String pct = p >= 0 ? Axis.formatNumber(p, p < 10 ? 1 : 0) + "%" : "";
         if (labelMode == LABELS_INSIDE) {
             return pct;
         }
@@ -260,11 +286,11 @@ public class PieSeries extends CategoricalSeries {
         }
         for (int i = 0; i < size(); i++) {
             double sweep = lastSweep[i];
-            double total = getTotal();
-            if (sweep <= 0 || total <= 0) {
+            double p = percentOf(i);
+            if (sweep <= 0 || p < 0) {
                 continue;
             }
-            String t = Axis.formatNumber(values[i] * 100 / total, 0) + "%";
+            String t = Axis.formatNumber(p, 0) + "%";
             int w = f.stringWidth(t);
             double mid = lastStart[i] + sweep / 2;
             // the arc length at the label radius must hold the text

@@ -66,9 +66,9 @@ public class GaugeSeries extends Series {
     /// - `max`: the end of the scale
     public GaugeSeries(String name, double min, double max) {
         super(name);
-        this.min = min;
-        this.max = max;
-        this.value = min;
+        this.min = Math.min(min, max);
+        this.max = Math.max(min, max);
+        this.value = this.min;
     }
 
     @Override
@@ -99,7 +99,8 @@ public class GaugeSeries extends Series {
         return value;
     }
 
-    /// Changes the scale.
+    /// Changes the scale. Ends given in the wrong order are swapped, so `setRange(100, 0)` is
+    /// the scale from 0 to 100.
     ///
     /// #### Parameters
     ///
@@ -111,10 +112,28 @@ public class GaugeSeries extends Series {
     ///
     /// this series
     public GaugeSeries setRange(double min, double max) {
-        this.min = min;
-        this.max = max;
+        this.min = Math.min(min, max);
+        this.max = Math.max(min, max);
         repaintChart();
         return this;
+    }
+
+    /// The start of the scale.
+    ///
+    /// #### Returns
+    ///
+    /// the smaller end
+    public double getRangeMin() {
+        return min;
+    }
+
+    /// The end of the scale.
+    ///
+    /// #### Returns
+    ///
+    /// the larger end
+    public double getRangeMax() {
+        return max;
     }
 
     /// Adds a coloured zone to the scale.

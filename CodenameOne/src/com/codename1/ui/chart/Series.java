@@ -159,6 +159,21 @@ public abstract class Series {
         return null;
     }
 
+    /// The extent along x of the data at or below `maxX`, `{min, max}`, or null when none is.
+    /// A category axis with no labels asks for this to leave a far outlier out of its bands.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxX`: the largest x that counts
+    ///
+    /// #### Returns
+    ///
+    /// the bounds of the points that count, or null
+    public double[] getXBoundsWithin(double maxX) {
+        double[] b = getXBounds();
+        return b != null && b[1] <= maxX ? b : null;
+    }
+
     /// The extent of the data along y, `{min, max}`, or null when empty or not cartesian.
     public double[] getYBounds() {
         return null;

@@ -367,6 +367,11 @@ public abstract class XYSeries extends Series {
             // trim now rather than on the next add, so the limit holds from the moment it is set
             begin();
             int drop = count - n;
+            // the dropped rows leave their slots exactly as slide() does, so an unsorted series
+            // still tweens each remaining point from its own old value
+            for (int d = 0; d < drop; d++) {
+                dropFromSlot(0);
+            }
             System.arraycopy(xs, drop, xs, 0, n);
             System.arraycopy(ys, drop, ys, 0, n);
             if (aux != null) {
@@ -912,6 +917,21 @@ public abstract class XYSeries extends Series {
             double x = xs[i];
             // one NaN x would turn the whole min/max into NaN and drop the series from the axis
             if (isGap(x)) {
+                continue;
+            }
+            min = Math.min(min, x);
+            max = Math.max(max, x);
+        }
+        return min > max ? null : new double[]{min, max};
+    }
+
+    @Override
+    public double[] getXBoundsWithin(double maxX) {
+        double min = Double.MAX_VALUE;
+        double max = -Double.MAX_VALUE;
+        for (int i = 0; i < count; i++) {
+            double x = xs[i];
+            if (isGap(x) || x > maxX) {
                 continue;
             }
             min = Math.min(min, x);
