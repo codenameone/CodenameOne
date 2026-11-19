@@ -56,6 +56,10 @@ public class RiveFeaturesScreenshotTest extends BaseTest {
     @Override
     public boolean runTest() {
         Form form = createForm("Rive features", new GridLayout(4, 2), "RiveFeatures");
+        // Not scrollable: the grid then divides the screen into eight cells.
+        // Scrolling, each row took a view's preferred (artboard) height and
+        // only the first row was on screen.
+        form.setScrollable(false);
 
         RiveView light = new RiveView(new LightSwitchRive());
 

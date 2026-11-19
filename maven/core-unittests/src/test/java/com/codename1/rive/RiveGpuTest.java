@@ -59,6 +59,8 @@ class RiveGpuTest extends UITestBase {
         final List<RenderState.BlendMode> blends = new ArrayList<RenderState.BlendMode>();
         int created;
         int clears;
+        int lastTextureWidth;
+        int lastTextureHeight;
         float[] viewProjection;
 
         public GpuCapabilities getCapabilities() {
@@ -71,6 +73,8 @@ class RiveGpuTest extends UITestBase {
 
         public Texture createTexture(int width, int height, int[] argb) {
             assertEquals(width * height, argb.length);
+            lastTextureWidth = width;
+            lastTextureHeight = height;
             return add(new Texture(width, height));
         }
 
@@ -207,6 +211,28 @@ class RiveGpuTest extends UITestBase {
         int created = d.created;
         r.dispose(d);
         return created;
+    }
+
+    @Test
+    void aLongPathIsBoundedByAllOfItsPoints() {
+        // pointCount counts floats; reading it as a point count ran past the
+        // array on any path longer than half of it and threw out of draw(),
+        // which dropped the rest of the frame on the GPU path
+        RivePath p = new RivePath();
+        p.moveTo(1, 1);
+        for (int i = 1; i < 40; i++) {
+            p.lineTo(1 + i * 1.5f, 1 + i * 1.5f);
+        }
+        Device d = new Device();
+        GpuRiveRenderer r = new GpuRiveRenderer();
+        r.beginFrame(64, 64, new Mat2D());
+        r.drawPath(p, new RivePaint());
+        r.endFrame(0);
+        r.render(d);
+        assertTrue(d.created > 0, "the layer was uploaded");
+        assertTrue(d.lastTextureWidth >= 59 && d.lastTextureHeight >= 59,
+                "the crop covers the far end of the path: " + d.lastTextureWidth + "x" + d.lastTextureHeight);
+        r.dispose(d);
     }
 
     @Test

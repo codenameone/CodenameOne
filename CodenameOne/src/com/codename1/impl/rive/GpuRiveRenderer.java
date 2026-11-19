@@ -346,7 +346,8 @@ public class GpuRiveRenderer implements RiveRenderer {
     private void markPath(RivePath path, RivePaint paint) {
         float[] v = matrix.v;
         float[] p = path.points;
-        int n = path.pointCount;
+        // pointCount counts floats, two per point
+        int n = path.pointCount / 2;
         if (n == 0) {
             return;
         }
