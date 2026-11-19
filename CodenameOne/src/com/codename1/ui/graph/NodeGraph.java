@@ -225,6 +225,9 @@ public class NodeGraph extends Container {
     private int previewY;
     private PortEditorFactory portEditorFactory;
     private final Map<String, Component> portEditors = new HashMap<String, Component>();
+    // the ports the factory had no editor for, with the value each had then:
+    // it is asked again only once that value changes
+    private final Map<String, Object> declinedPorts = new HashMap<String, Object>();
     private GraphJson.UserDataCodec userDataCodec;
     private int pasteCount;
 
@@ -295,6 +298,7 @@ public class NodeGraph extends Container {
         selectedEdge = null;
         components.clear();
         portEditors.clear();
+        declinedPorts.clear();
         layer.removeAll();
         viewSet = false;
         modelChanged();
@@ -323,6 +327,17 @@ public class NodeGraph extends Container {
                 if (c != null && c.getParent() != null) {
                     layer.removeComponent(c);
                 }
+            }
+        }
+        if (!declinedPorts.isEmpty()) {
+            List<String> gone = new ArrayList<String>();
+            for (String key : declinedPorts.keySet()) {
+                if (model.getNode(key.substring(0, key.indexOf('\n'))) == null) {
+                    gone.add(key);
+                }
+            }
+            for (String key : gone) {
+                declinedPorts.remove(key);
             }
         }
         if (!portEditors.isEmpty()) {
@@ -1475,6 +1490,7 @@ public class NodeGraph extends Container {
             }
         }
         portEditors.clear();
+        declinedPorts.clear();
         portEditorFactory = factory;
         syncComponents();
     }
@@ -1527,11 +1543,15 @@ public class NodeGraph extends Container {
                 String key = n.getId() + "\n" + p.getId();
                 Component c = portEditors.get(key);
                 if (onScreen && !isPortConnected(n, p)) {
-                    if (c == null) {
-                        // a factory that had no editor for a port is asked again:
-                        // its answer may depend on the value
+                    Object v = p.getValue() == null ? declinedPorts : p.getValue();
+                    if (c == null && !v.equals(declinedPorts.get(key))) {
+                        // a factory that had no editor for a port is asked again
+                        // once its value changes: the answer may depend on it
                         c = portEditorFactory.createEditor(this, n, p);
-                        if (c != null) {
+                        if (c == null) {
+                            declinedPorts.put(key, v);
+                        } else {
+                            declinedPorts.remove(key);
                             portEditors.put(key, c);
                             c.putClientProperty("cn1$graphNode", n.getId());
                             c.putClientProperty("cn1$graphPort", p.getId());

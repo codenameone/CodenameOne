@@ -302,8 +302,9 @@ public class KanbanBoard extends ScrollSurface {
     /// The height, in pixels, the component of a card takes at the bottom of
     /// it; 0 for a card without one.
     public int getCardComponentHeight(KanbanCard card) {
+        // a layout under way has already cleared the flag
         if (dirty) {
-            syncComponents();
+            ensureLayout();
         }
         Component c = components.get(card.getId());
         return c == null ? 0 : c.getPreferredH() + KanbanLook.mm(1.5f);

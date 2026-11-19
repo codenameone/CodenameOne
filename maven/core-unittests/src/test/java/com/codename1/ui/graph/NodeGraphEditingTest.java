@@ -519,4 +519,81 @@ class NodeGraphEditingTest extends UITestBase {
         assertSame(route, e.getRoute());
         assertFalse(history.canUndo());
     }
+
+    @FormTest
+    void aListenerThatThrowsLeavesNoStepOpen() {
+        DefaultGraphModel m = twoBoxes();
+        NodeGraph g = show(m);
+        final boolean[] thrown = new boolean[1];
+        g.addGraphListener(new GraphAdapter() {
+            @Override
+            public void nodeMoved(NodeGraph graph, GraphNode node) {
+                if (!thrown[0]) {
+                    thrown[0] = true;
+                    throw new IllegalStateException("listener failure");
+                }
+            }
+        });
+        try {
+            drag(g, 60, 40, 160, 140);
+        } catch (IllegalStateException expected) {
+            // the listener's own failure reaches the caller
+        }
+        assertTrue(thrown[0]);
+        assertFalse(history.isCompoundOpen());
+        GraphNode b = m.getNode("b");
+        double bx = b.getX();
+        drag(g, 300, 40, 300, 140);
+        assertTrue(b.getY() > 20);
+        assertTrue(g.undo());
+        assertEquals(bx, b.getX(), 0);
+        assertEquals(20, b.getY(), 0);
+    }
+
+    @FormTest
+    void undoWhileANodeIsHeldPutsItBackFirst() {
+        DefaultGraphModel m = twoBoxes();
+        NodeGraph g = show(m);
+        GraphNode a = m.getNode("a");
+        GraphNode b = m.getNode("b");
+        m.moveNode(b, 260, 200);
+        drag(g, 300, 220, 300, 260);
+        assertTrue(history.canUndo());
+        Component c = g.canvas();
+        int ax = c.getAbsoluteX();
+        int ay = c.getAbsoluteY();
+        c.pointerPressed(ax + 60, ay + 40);
+        c.pointerDragged(ax + 90, ay + 70);
+        c.pointerDragged(ax + 160, ay + 140);
+        g.undo();
+        c.pointerReleased(ax + 160, ay + 140);
+        // what was held went back, and the release recorded nothing from it
+        assertEquals(20, a.getX(), 0);
+        assertEquals(20, a.getY(), 0);
+    }
+
+    @FormTest
+    void aFactoryWithNoEditorIsAskedAgainOnlyWhenTheValueChanges() {
+        DefaultGraphModel m = new DefaultGraphModel();
+        GraphNode n = m.addNode(new GraphNode("n", "N", 20, 20, 160, 80).addInput("in", "In", "num"));
+        NodeGraph g = show(m);
+        final int[] asked = new int[1];
+        g.setPortEditorFactory(new PortEditorFactory() {
+            @Override
+            public Component createEditor(NodeGraph graph, GraphNode node, GraphPort port) {
+                asked[0]++;
+                return port.getValue() == null ? null : new Label(String.valueOf(port.getValue()));
+            }
+        });
+        int first = asked[0];
+        assertTrue(first >= 1);
+        for (int i = 0; i < 5; i++) {
+            m.moveNode(n, 20 + i, 20);
+            g.getParent().revalidate();
+        }
+        assertEquals(first, asked[0]);
+        g.setPortValue(n.getPort("in"), Integer.valueOf(4));
+        g.getParent().revalidate();
+        assertNotNull(g.getPortEditor(n, n.getPort("in")));
+    }
 }
