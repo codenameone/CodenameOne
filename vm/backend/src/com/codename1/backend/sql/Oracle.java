@@ -1534,7 +1534,8 @@ public final class Oracle {
     /// A NUMBER's digits as the value a caller receives: a Long for a whole
     /// number a long holds, otherwise the exact text.
     static Object number(String digits) {
-        if (digits.indexOf('.') < 0 && digits.indexOf('E') < 0 && digits.length() <= 19) {
+        if (digits.indexOf('.') < 0 && digits.indexOf('E') < 0 && digits.length() <= 20) {
+            // 20 is nineteen digits and a sign; parseLong refuses what overflows.
             try {
                 return Long.valueOf(Long.parseLong(digits));
             } catch (NumberFormatException err) {
