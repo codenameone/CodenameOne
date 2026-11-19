@@ -334,7 +334,8 @@ public final class Workbook {
             }
         }
         sheet.setHeaderRow(true);
-        sheet.setFrozenPanes(1, grid.getFrozenColumns());
+        // the grid freezes no more columns than it shows, and neither does the file
+        sheet.setFrozenPanes(1, Math.min(grid.getFrozenColumns(), columns.length));
         return book;
     }
 

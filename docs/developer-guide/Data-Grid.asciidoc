@@ -613,6 +613,13 @@ Excel would otherwise open the file only by repairing it and dropping or cutting
 what's over the limit. `setExcelLimitsEnforced(false)` writes the file unchanged,
 for a spreadsheet without those limits. OpenDocument has none of them.
 
+A formula, in any format, can nest up to 64 functions, Excel's own limit, and up
+to 128 levels of parentheses, signs and arguments in all. A deeper formula typed
+in throws `IllegalArgumentException`; in a file, it keeps its formula and the
+value the file stored, and isn't calculated. That limit stays on with
+`setExcelLimitsEnforced(false)`, because it protects the stack of the device
+that calculates.
+
 ==== Separated text
 
 Text has no types, so reading CSV guesses them: a cell that reads as a number, a

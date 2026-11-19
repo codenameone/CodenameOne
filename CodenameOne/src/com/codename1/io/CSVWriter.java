@@ -30,8 +30,9 @@ import java.io.Writer;
 
 /// Writes rows of values as CSV, the counterpart of `CSVParser`.
 ///
-/// A value is quoted when it has to be: when it contains the separator, the quote character
-/// or a line break, or begins or ends with a space. The quote character inside a quoted value
+/// A value is quoted when it has to be: when it contains the separator or any other common
+/// one (comma, semicolon, tab, bar), so a reader that detects the separator can't split it,
+/// the quote character or a line break, or begins or ends with a space. The quote character inside a quoted value
 /// is written twice.
 ///
 /// ```java
@@ -347,7 +348,10 @@ public class CSVWriter {
         }
         for (int i = 0; i < len; i++) {
             char c = value.charAt(i);
-            if (c == separatorChar || c == quoteChar || c == '\n' || c == '\r') {
+            // every character a reader might take for the separator is quoted, not only this
+            // writer's: a reader that detects the separator would otherwise split the cell
+            if (c == separatorChar || c == quoteChar || c == '\n' || c == '\r'
+                    || c == ',' || c == ';' || c == '\t' || c == '|') {
                 return true;
             }
         }

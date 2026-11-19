@@ -419,7 +419,7 @@ class SpreadsheetHostileFileTest extends UITestBase {
         sheet.setCellFormat(0, 7, "0");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         book.write(out, Workbook.Format.CSV);
-        same("'=1+1,-5,\"-1,234.50\",+972 54 000 0000,-,'-2+cmd|' /C calc'!A0,'@SUM(1),999999999999999",
+        same("'=1+1,-5,\"-1,234.50\",+972 54 000 0000,-,\"'-2+cmd|' /C calc'!A0\",'@SUM(1),999999999999999",
                 new String(out.toByteArray(), "UTF-8").trim(), "a sheet as CSV");
 
         out = new ByteArrayOutputStream();
@@ -974,9 +974,10 @@ class SpreadsheetHostileFileTest extends UITestBase {
             // Excel refuses it too
         }
         // every section of a format survives OpenDocument: empty ones, dates, text
-        String[] codes = {";;;", ";0", "General;General;;", "0;;;", "0;;;@", "0;-0;", "0;-0;;@", "yyyy-mm-dd;-0;0;@", "0;-0;0;\"x\"",
+        String[] codes = {";;;", ";0", "General;General;;", "General;-General", "General;;", "0;;;", "0;;;@", "0;-0;", "0;-0;;@", "yyyy-mm-dd;-0;0;@", "0;-0;0;\"x\"",
             "[>100]0;[<0]0;0;@"};
-        Object[] values = {Double.valueOf(5), Double.valueOf(-5), Double.valueOf(0), "tx", Double.valueOf(500)};
+        Object[] values = {Double.valueOf(5), Double.valueOf(-5), Double.valueOf(0), "tx", Double.valueOf(500),
+            Double.valueOf(1234.75), Double.valueOf(-12.5)};
         Workbook formats = new Workbook();
         Sheet f = formats.addSheet("S");
         for (int r = 0; r < codes.length; r++) {
@@ -996,7 +997,8 @@ class SpreadsheetHostileFileTest extends UITestBase {
         // text that starts with an apostrophe keeps it through CSV
         Workbook csv = new Workbook();
         Sheet cs = csv.addSheet("S");
-        String[] texts = {"'=x", "'+1+2", "'@b", "'plain", "=y", "''=z"};
+        String[] texts = {"'=x", "'+1+2", "'@b", "'plain", "=y", "''=z", "a\tb", "a;b", "note: a|b", "c|d",
+            "\t=1"};
         for (int i = 0; i < texts.length; i++) {
             cs.setCellValue(i, 0, texts[i]);
         }

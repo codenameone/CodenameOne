@@ -128,7 +128,8 @@ class SpreadsheetModelTest extends UITestBase {
         book.write(out, Workbook.Format.TSV);
         String tsv = new String(out.toByteArray(), "UTF-8");
         assertTrue(tsv.startsWith("name\tzip\tqty\tprice\twhen\tok"), tsv);
-        assertTrue(tsv.indexOf("Smith, J\t00420\t3\t2.5\t2024-03-15\tTRUE") > 0, tsv);
+        // a comma is quoted in TSV too: a reader that detects the separator could pick it
+        assertTrue(tsv.indexOf("\"Smith, J\"\t00420\t3\t2.5\t2024-03-15\tTRUE") > 0, tsv);
 
         Workbook semi = csv("a;b\n1,5;x\n", Workbook.Format.CSV);
         assertEquals("x", semi.getSheet(0).getCellValue("B2"));

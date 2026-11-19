@@ -687,10 +687,11 @@ final class OdsReader {
             } else if ("currency-symbol".equals(tag)) {
                 literal(sb, x.elementText(), "$");
             } else if ("number".equals(tag) && x.attr("number:decimal-places") == null
-                    && x.attr("number:min-integer-digits") == null && !x.boolAttr("number:grouping")
+                    && !x.boolAttr("number:grouping")
                     && x.attr("number:display-factor") == null && x.attr("number:min-decimal-places") == null) {
-                // a number with nothing said about its digits is General, as LibreOffice reads it
-                // and as CellFormat writes a General section
+                // a number with nothing said about its decimals is General: LibreOffice writes
+                // General so (min-integer-digits="1" and no decimal-places), as CellFormat does,
+                // and writes decimal-places for every fixed format, 0 included
                 sb.append("General");
             } else if ("number".equals(tag)) {
                 int decimals = x.intAttr("number:decimal-places", 0);
