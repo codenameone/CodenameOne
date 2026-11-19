@@ -274,11 +274,13 @@ public final class GraphJson {
         readMap(root, into, codec);
     }
 
-    /// Reads the tree `toMap` built, as a JSON parser returns it. Nothing is
-    /// added to the model unless the whole tree can be: an id taken twice, or
-    /// an edge between nodes that are nowhere, refuses all of it. A node's
-    /// group and an edge's ports are taken as written, since a group or a
-    /// port may be added later.
+    /// Reads the tree `toMap` built, as a JSON parser returns it. The whole
+    /// tree is checked before anything is added: an id taken twice, or an edge
+    /// between nodes that are nowhere, refuses all of it. Each addition then
+    /// tells the model's listeners as it is made. A node's group and an edge's
+    /// ports are taken as written, since a group or a port may be added later.
+    /// A port value comes back as JSON has it: a string, a boolean, a `Long`
+    /// for a whole number and a `Double` for any other.
     ///
     /// #### Throws
     ///

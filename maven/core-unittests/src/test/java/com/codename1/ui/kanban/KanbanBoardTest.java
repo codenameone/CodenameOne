@@ -287,6 +287,13 @@ class KanbanBoardTest extends UITestBase {
         assertTrue(b.getCardBounds(model.getCard("a"))[3] > plain);
         Image img = b.toImage(300, 300);
         assertTrue(img.getWidth() <= 300 && img.getHeight() <= 300);
+        // something was drawn: not every pixel is the first one's colour
+        int[] px = img.getRGB();
+        boolean drawn = false;
+        for (int i = 1; i < px.length && !drawn; i++) {
+            drawn = px[i] != px[0];
+        }
+        assertTrue(drawn, "the board image is blank");
     }
 
     @FormTest

@@ -50,6 +50,7 @@ public class DefaultKanbanCardRenderer implements KanbanCardRenderer {
         String description;
         int width;
         Font font;
+        Font small;
         List<String> titleRows;
         List<String> descriptionRows;
     }
@@ -93,10 +94,11 @@ public class DefaultKanbanCardRenderer implements KanbanCardRenderer {
 
     private Wrapped rows(KanbanCard card, int width) {
         Font f = KanbanLook.style("KanbanCard").getFont();
+        Font small = KanbanLook.style("KanbanCardTag").getFont();
         Wrapped w = wrapped.get(card.getId());
         String title = card.getTitle();
         String desc = card.getDescription();
-        if (w != null && w.width == width && w.font == f // NOPMD CompareObjectsWithEquals - the theme's font itself
+        if (w != null && w.width == width && w.font == f && w.small == small // NOPMD CompareObjectsWithEquals - the theme's fonts themselves
                 && (title == null ? w.title == null : title.equals(w.title))
                 && (desc == null ? w.description == null : desc.equals(w.description))) {
             return w;
@@ -112,8 +114,9 @@ public class DefaultKanbanCardRenderer implements KanbanCardRenderer {
         w.description = desc;
         w.width = width;
         w.font = f;
+        w.small = small;
         w.titleRows = KanbanLook.wrap(title, f, width, titleLines);
-        w.descriptionRows = KanbanLook.wrap(desc, KanbanLook.style("KanbanCardTag").getFont(), width,
+        w.descriptionRows = KanbanLook.wrap(desc, small, width,
                 descriptionLines);
         wrapped.put(card.getId(), w);
         return w;

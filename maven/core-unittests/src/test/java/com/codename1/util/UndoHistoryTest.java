@@ -183,11 +183,8 @@ class UndoHistoryTest {
                 return "Flaky";
             }
         });
-        try {
-            h.undo();
-        } catch (IllegalStateException expected) {
-            // the edit's own failure reaches the caller
-        }
+        // the edit's own failure reaches the caller
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> h.undo());
         assertEquals("Flaky", h.getUndoName());
         assertFalse(h.canRedo());
         assertTrue(h.undo());
