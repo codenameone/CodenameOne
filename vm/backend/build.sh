@@ -16,7 +16,7 @@
 # Environment knobs:
 #   CN1_BACKEND_DEMO             demo source dir (default demo/petstore)
 #   CN1_BACKEND_DATABASE         the one server engine compiled in: sqlite (default,
-#                                none), postgres, mysql or sqlserver
+#                                none), postgres, mysql, sqlserver or oracle
 #   CN1_BACKEND_CFLAGS           extra clang flags
 #   CN1_BACKEND_TRANSLATOR_OPTS  extra -D properties for the translator JVM
 set -e
@@ -197,7 +197,8 @@ case "${CN1_BACKEND_DATABASE:-sqlite}" in
     postgres|postgresql) ENGINE=postgres ;;
     mysql|mariadb) ENGINE=mysql ;;
     sqlserver|mssql) ENGINE=sqlserver ;;
-    *) echo "build.sh: CN1_BACKEND_DATABASE must be sqlite, postgres, mysql or sqlserver, not '$CN1_BACKEND_DATABASE'" >&2; exit 2 ;;
+    oracle) ENGINE=oracle ;;
+    *) echo "build.sh: CN1_BACKEND_DATABASE must be sqlite, postgres, mysql, sqlserver or oracle, not '$CN1_BACKEND_DATABASE'" >&2; exit 2 ;;
 esac
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" ${GEN:+-cp "$GEN"} -source 1.8 -target 1.8 \
     -d "$WORK/classes" $(find src impl/parparvm "engines/$ENGINE" $COMMON "$DEMO" -name '*.java') "${SHARED[@]}"

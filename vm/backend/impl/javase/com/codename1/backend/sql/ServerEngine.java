@@ -47,6 +47,7 @@ public final class ServerEngine {
     private final Postgres postgres;
     private final MySql mysql;
     private final SqlServer sqlServer;
+    private Oracle oracle;
 
     private ServerEngine(Postgres postgres, MySql mysql, SqlServer sqlServer) {
         this.postgres = postgres;
@@ -97,10 +98,19 @@ public final class ServerEngine {
             return new ServerEngine(null, null, SqlServer.connect(host, port, database, user,
                     password, sslMode, caFile, timeoutMillis, socketTimeoutMillis));
         }
+        if (Engines.ORACLE.equals(engine)) {
+            ServerEngine session = new ServerEngine(null, null, null);
+            session.oracle = Oracle.connect(host, port, database, user, password, sslMode,
+                    caFile, timeoutMillis, socketTimeoutMillis);
+            return session;
+        }
         throw new IOException("No client for " + engine);
     }
 
     public Dialect dialect() {
+        if (oracle != null) {
+            return Dialect.ORACLE;
+        }
         if (postgres != null) {
             return Dialect.POSTGRES;
         }
@@ -111,6 +121,9 @@ public final class ServerEngine {
     }
 
     public int execute(String sql, Object[] params) throws IOException {
+        if (oracle != null) {
+            return oracle.execute(sql, params);
+        }
         if (sqlServer != null) {
             return sqlServer.execute(sql, params);
         }
@@ -118,6 +131,9 @@ public final class ServerEngine {
     }
 
     public List query(String sql, Object[] params) throws IOException {
+        if (oracle != null) {
+            return oracle.query(sql, params);
+        }
         if (sqlServer != null) {
             return sqlServer.query(sql, params);
         }
@@ -125,6 +141,10 @@ public final class ServerEngine {
     }
 
     public void close() {
+        if (oracle != null) {
+            oracle.close();
+            return;
+        }
         if (sqlServer != null) {
             sqlServer.close();
         } else if (postgres != null) {
@@ -135,6 +155,9 @@ public final class ServerEngine {
     }
 
     public boolean isClosed() {
+        if (oracle != null) {
+            return oracle.isClosed();
+        }
         if (sqlServer != null) {
             return sqlServer.isClosed();
         }
@@ -148,6 +171,10 @@ public final class ServerEngine {
     }
 
     public void begin() throws IOException {
+        if (oracle != null) {
+            oracle.begin();
+            return;
+        }
         if (sqlServer != null) {
             sqlServer.begin();
         } else if (postgres != null) {
@@ -158,6 +185,10 @@ public final class ServerEngine {
     }
 
     public void beginReadOnly() throws IOException {
+        if (oracle != null) {
+            oracle.beginReadOnly();
+            return;
+        }
         if (sqlServer != null) {
             sqlServer.beginReadOnly();
         } else if (postgres != null) {
@@ -168,6 +199,10 @@ public final class ServerEngine {
     }
 
     public void begin(boolean readOnly, Isolation isolation) throws IOException {
+        if (oracle != null) {
+            oracle.begin(readOnly, isolation);
+            return;
+        }
         if (sqlServer != null) {
             sqlServer.begin(readOnly, isolation);
         } else if (postgres != null) {
@@ -178,6 +213,10 @@ public final class ServerEngine {
     }
 
     public void commit() throws IOException {
+        if (oracle != null) {
+            oracle.commit();
+            return;
+        }
         if (sqlServer != null) {
             sqlServer.commit();
         } else if (postgres != null) {
@@ -188,6 +227,10 @@ public final class ServerEngine {
     }
 
     public void rollback() throws IOException {
+        if (oracle != null) {
+            oracle.rollback();
+            return;
+        }
         if (sqlServer != null) {
             sqlServer.rollback();
         } else if (postgres != null) {
@@ -198,6 +241,10 @@ public final class ServerEngine {
     }
 
     public void savepoint(String verb, String name) throws IOException {
+        if (oracle != null) {
+            oracle.savepoint(verb, name);
+            return;
+        }
         if (sqlServer != null) {
             sqlServer.savepoint(verb, name);
         } else if (postgres != null) {
@@ -208,6 +255,9 @@ public final class ServerEngine {
     }
 
     public long lastInsertId() {
+        if (oracle != null) {
+            return oracle.lastInsertId();
+        }
         if (sqlServer != null) {
             return sqlServer.lastInsertId();
         }

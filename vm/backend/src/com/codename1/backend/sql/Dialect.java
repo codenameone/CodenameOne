@@ -207,6 +207,16 @@ public abstract class Dialect {
         return false;
     }
 
+    /// The clause [#generatedKeysThroughReturning] appends to an INSERT to have
+    /// it answer with `quotedColumn`.
+    ///
+    /// PostgreSQL's RETURNING makes the INSERT return a row. Oracle's
+    /// `RETURNING ... INTO` writes the value into a bind variable instead, which
+    /// the Oracle client hands back as the one row of the result.
+    public String returningClause(String quotedColumn) {
+        return " RETURNING " + quotedColumn;
+    }
+
     /// An INSERT that supplies NO columns, for the entity whose only persisted
     /// field is a key the database generates.
     ///
@@ -1030,9 +1040,26 @@ public abstract class Dialect {
             return "VARCHAR2(" + length + " CHAR)";
         }
 
+        /// Upper case inside the quotes, because Oracle folds an UNQUOTED name to
+        /// upper case: `"USERS"` is the table a hand-written `SELECT * FROM users`
+        /// reads, where `"users"` would be a different table that only quoted
+        /// SQL could reach. The client folds an all-upper-case column label back
+        /// to lower case, so rows are keyed the way they are on PostgreSQL.
         @Override
         public String quote(String identifier) {
-            return quoteWith(identifier, '"');
+            return quoteWith(asciiUpper(identifier), '"');
+        }
+
+        /// Oracle returns the key through `RETURNING ... INTO`; there is no
+        /// connection-wide last id to ask for afterwards.
+        @Override
+        public boolean generatedKeysThroughReturning() {
+            return true;
+        }
+
+        @Override
+        public String returningClause(String quotedColumn) {
+            return " RETURNING " + quotedColumn + " INTO :cn1_key";
         }
 
         @Override
@@ -1085,6 +1112,20 @@ public abstract class Dialect {
         String parameterMarker() {
             return ":";
         }
+    }
+
+    /// ASCII-only upper case: `toUpperCase()` follows the default locale, and
+    /// under Turkish an `i` becomes a dotted capital I that names another table.
+    static String asciiUpper(String text) {
+        if (text == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        for (int iter = 0 ; iter < text.length() ; iter++) {
+            char c = text.charAt(iter);
+            out.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+        }
+        return out.toString();
     }
 
     static String quoteWith(String identifier, char quote) {

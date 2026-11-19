@@ -559,7 +559,7 @@ public final class Database {
     /// terminator still terminates and the comment still explains.
     private String withReturning(String sql, String idColumn) throws IOException {
         int end = dialect.endOfStatement(sql);
-        return sql.substring(0, end) + " RETURNING " + dialect.quote(idColumn)
+        return sql.substring(0, end) + dialect.returningClause(dialect.quote(idColumn))
                 + sql.substring(end);
     }
 
