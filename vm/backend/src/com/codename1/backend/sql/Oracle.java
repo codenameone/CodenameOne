@@ -160,13 +160,16 @@ public final class Oracle {
     /// The field version this client speaks, Oracle's 23 with its first
     /// extension. The server answers with its own and the lower one is used.
     private static final int FIELD_VERSION = 24;
+    // Named for the release each number belongs to in python-oracledb's
+    // constants.pxi; the gates below compare against these values, so a
+    // label must follow its number, never the other way round.
     private static final int FIELD_VERSION_12_2 = 8;
     private static final int FIELD_VERSION_12_2_EXT1 = 9;
-    private static final int FIELD_VERSION_18_1_EXT_1 = 14;
-    private static final int FIELD_VERSION_19_1 = 17;
-    private static final int FIELD_VERSION_21_1 = 20;
-    private static final int FIELD_VERSION_23_1 = 18;
-    private static final int FIELD_VERSION_23_1_EXT_1 = 24;
+    private static final int FIELD_VERSION_20_1 = 14;
+    private static final int FIELD_VERSION_23_1 = 17;
+    private static final int FIELD_VERSION_23_1_EXT_3 = 20;
+    private static final int FIELD_VERSION_23_1_EXT_1 = 18;
+    private static final int FIELD_VERSION_23_4 = 24;
 
     /// The data types this client declares it reads, as triples of type,
     /// converted type and representation, from data_types.pyx.
@@ -1201,7 +1204,7 @@ public final class Oracle {
         out.write(MSG_PIGGYBACK);
         out.write(FUNC_CLOSE_CURSORS);
         out.write(nextSequence());
-        if (fieldVersion >= FIELD_VERSION_23_1) {
+        if (fieldVersion >= FIELD_VERSION_23_1_EXT_1) {
             out.ub8(0);                 // token number
         }
         out.write(1);
@@ -1376,7 +1379,7 @@ public final class Oracle {
             }
             ub();                               // position
             ub();                               // uds flags
-            if (fieldVersion >= FIELD_VERSION_19_1) {
+            if (fieldVersion >= FIELD_VERSION_23_1) {
                 if (ub() > 0) {
                     text();                     // domain schema
                 }
@@ -1384,7 +1387,7 @@ public final class Oracle {
                     text();                     // domain name
                 }
             }
-            if (fieldVersion >= FIELD_VERSION_21_1) {
+            if (fieldVersion >= FIELD_VERSION_23_1_EXT_3) {
                 long annotations = ub();
                 if (annotations > 0) {
                     u8();
@@ -1401,7 +1404,7 @@ public final class Oracle {
                     ub();
                 }
             }
-            if (fieldVersion >= FIELD_VERSION_23_1_EXT_1) {
+            if (fieldVersion >= FIELD_VERSION_23_4) {
                 ub();                           // vector dimensions
                 u8();                           // vector format
                 u8();                           // vector flags
@@ -1638,7 +1641,7 @@ public final class Oracle {
         }
         long number = ub();
         rowCount = ub();
-        if (fieldVersion >= FIELD_VERSION_18_1_EXT_1) {
+        if (fieldVersion >= FIELD_VERSION_20_1) {
             ub();                               // sql type
             ub();                               // server checksum
         }
@@ -2372,7 +2375,7 @@ public final class Oracle {
         out.write(MSG_FUNCTION);
         out.write(code);
         out.write(nextSequence());
-        if (fieldVersion >= FIELD_VERSION_23_1) {
+        if (fieldVersion >= FIELD_VERSION_23_1_EXT_1) {
             out.ub8(0);                         // token number
         }
     }
