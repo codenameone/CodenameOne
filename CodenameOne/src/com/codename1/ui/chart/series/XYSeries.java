@@ -375,6 +375,10 @@ public abstract class XYSeries extends Series {
         }
         double sum = 0;
         double x = xs[i];
+        if (isGap(x)) {
+            // a point with no x has no column to stack on; its value is a gap anyway
+            return 0;
+        }
         // positives stack up from zero and negatives down from it, so mixed signs never overlap.
         // The same index is checked first, so the usual aligned stack costs one look per series.
         boolean negative = ys[i] < 0;
@@ -488,7 +492,22 @@ public abstract class XYSeries extends Series {
         return -1;
     }
 
+    // the index whose x equals `x`, or -1; never a gap slot. Binary search only over ascending
+    // data: an unordered series (or one with a non-finite x, which isAscending() rejects) would
+    // send the search astray, and a NaN x compares neither less nor greater than anything, so
+    // the search would answer that slot for every query
     int indexOfX(double x) {
+        if (isGap(x)) {
+            return -1;
+        }
+        if (!isAscending()) {
+            for (int i = 0; i < count; i++) {
+                if (xs[i] == x) {
+                    return i;
+                }
+            }
+            return -1;
+        }
         int lo = 0;
         int hi = count - 1;
         while (lo <= hi) {
@@ -568,12 +587,12 @@ public abstract class XYSeries extends Series {
     public double animatedAux(ChartContext ctx, int channel, int i) {
         double t = ctx == null ? 1 : ctx.getProgress();
         double target = aux[channel][i];
-        if (fromY == null || t >= 1 || target != target) {
+        if (fromY == null || t >= 1 || isGap(target)) {
             return target;
         }
         double y = ys[i];
         double off = target - y;
-        if (off != off) {
+        if (isGap(off)) {
             return target;
         }
         double ay = animatedY(ctx, i);
@@ -581,7 +600,7 @@ public abstract class XYSeries extends Series {
         double from = 0;
         if (fromAux != null && j >= 0 && j < fromAux[channel].length) {
             double f = fromAux[channel][j];
-            if (f == f) {
+            if (!isGap(f)) {
                 from = f;
             }
         }

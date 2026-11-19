@@ -56,19 +56,19 @@ public final class Indicators {
         checkPeriod(period);
         double[] out = new double[v.length];
         double sum = 0;
-        // NaN values in the window; while there is one the average is NaN, and it recovers once the
+        // gap (non-finite) values in the window; while there is one the average is NaN, and it recovers once the
         // gap leaves the window because the gap was never added to the sum
         int gaps = 0;
         for (int i = 0; i < v.length; i++) {
             double x = v[i];
-            if (x == x) {
+            if (!gap(x)) {
                 sum += x;
             } else {
                 gaps++;
             }
             if (i >= period) {
                 double old = v[i - period];
-                if (old == old) {
+                if (!gap(old)) {
                     sum -= old;
                 } else {
                     gaps--;
@@ -99,8 +99,8 @@ public final class Indicators {
         int seen = 0;
         for (int i = 0; i < v.length; i++) {
             double x = v[i];
-            if (x != x) {
-                // a gap is NaN like every other indicator's; the average resumes from where it was
+            if (gap(x)) {
+                // a gap (NaN or infinite) is NaN like every other indicator's; the average resumes from where it was
                 out[i] = Double.NaN;
                 continue;
             }
@@ -138,7 +138,7 @@ public final class Indicators {
         double[] up = new double[v.length];
         double[] lo = new double[v.length];
         for (int i = 0; i < v.length; i++) {
-            if (mid[i] != mid[i]) {
+            if (gap(mid[i])) {
                 up[i] = Double.NaN;
                 lo[i] = Double.NaN;
                 continue;
@@ -176,7 +176,7 @@ public final class Indicators {
         int valid = 0;
         for (int i = 0; i < v.length; i++) {
             double ch = i == 0 ? Double.NaN : v[i] - v[i - 1];
-            if (ch != ch) {
+            if (gap(ch)) {
                 out[i] = Double.NaN;
                 valid = 0;
                 gain = 0;
@@ -234,7 +234,7 @@ public final class Indicators {
         int first = -1;
         for (int i = 0; i < v.length; i++) {
             m[i] = f[i] - s[i];
-            if (first < 0 && m[i] == m[i]) {
+            if (first < 0 && !gap(m[i])) {
                 first = i;
             }
         }
@@ -293,6 +293,12 @@ public final class Indicators {
         LineSeries s = new LineSeries(name);
         s.setData(x, values);
         return s;
+    }
+
+    /// True for a value that is a gap: NaN or infinite. An infinity added to a running sum would
+    /// poison every later output, so it is skipped exactly as NaN is.
+    private static boolean gap(double v) {
+        return v != v || Double.isInfinite(v);
     }
 
     private static void checkPeriod(int period) {

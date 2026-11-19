@@ -289,6 +289,7 @@ public class PieSeries extends CategoricalSeries {
             // one pixel more than the label layout's own gap so resolved labels are never rejected
             float[] y = resolve(idx, want, m, fh + 3, top, bottom);
             for (int k = 0; k < m; k++) {
+                // NaN here is resolve()'s own "label rejected" marker, not data: NaN-only is right
                 if (y[k] != y[k]) {
                     continue;
                 }

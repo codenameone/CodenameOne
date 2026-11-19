@@ -116,7 +116,12 @@ public final class Downsample {
                     continue;
                 }
                 double area = Math.abs((ax - avgX) * (y[j] - ay) - (ax - xAt(x, j)) * (avgY - ay));
-                // a NaN area (an overflow) still picks a point rather than none
+                if (area != area) {
+                    // an overflow (infinity minus infinity); counted as the smallest area, so it
+                    // still picks a point rather than none but never wins over a real extreme -
+                    // as `best` a NaN would fail every later comparison and keep this point
+                    area = -1;
+                }
                 if (area > best || pick < 0) {
                     best = area;
                     pick = j;

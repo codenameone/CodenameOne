@@ -305,7 +305,15 @@ public abstract class Axis {
     /// - `max`: the visible maximum to restore
     ///
     /// - `zoomed`: the zoom flag to restore
+    ///
+    /// This is an internal hook for `Chart` (which lives in another package, so it has to be
+    /// public); applications zoom with `setViewport` and `resetViewport`. A range that is not
+    /// finite, or whose minimum exceeds its maximum, is ignored, so it can never put an axis
+    /// into a state no other method allows.
     public void restoreViewport(double min, double max, boolean zoomed) {
+        if (min != min || max != max || Double.isInfinite(min) || Double.isInfinite(max) || min > max) {
+            return;
+        }
         visibleMin = min;
         visibleMax = max;
         viewportSet = zoomed;
@@ -456,7 +464,7 @@ public abstract class Axis {
     ///
     /// the localized text
     public static String formatNumber(double value, int decimals) {
-        if (value != value) {
+        if (value != value || Double.isInfinite(value)) {
             return "";
         }
         if (decimals <= 0) {

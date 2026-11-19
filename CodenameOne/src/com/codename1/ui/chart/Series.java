@@ -323,12 +323,14 @@ public abstract class Series {
         return v != v || Double.isInfinite(v);
     }
 
-    /// Interpolates for transitions; a NaN start means the value appears without a tween.
+    /// Interpolates for transitions; a start that is a gap (NaN or infinite) means the value
+    /// appears without a tween, since every in-between value of an infinite start is NaN or
+    /// infinite and the point would vanish for the whole transition.
     protected static double lerp(double a, double b, double t) {
-        if (a != a) {
+        if (isGap(a)) {
             return b;
         }
-        if (b != b) {
+        if (isGap(b)) {
             return b;
         }
         return a + (b - a) * t;

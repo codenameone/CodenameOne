@@ -1157,10 +1157,14 @@ public class Chart extends Component {
         if (cartesian && xl != null) {
             paintAxes(g, ctx, xl, yl, y2l, font, gap);
         }
-        if (brushing && brushMoved) {
-            paintBrush(g, ctx);
+        // the brush rectangle, the tooltip and its crosshair are pointer state, not the chart: an
+        // export shows the chart, never where the pointer happened to be when it was taken
+        if (!exporting) {
+            if (brushing && brushMoved) {
+                paintBrush(g, ctx);
+            }
+            paintTooltip(g, ctx, font);
         }
-        paintTooltip(g, ctx, font);
         if (loadingText != null) {
             paintLoading(g, font, x, y, w, h);
         }

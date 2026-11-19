@@ -194,8 +194,9 @@ public class GaugeSeries extends Series {
 
     private double shown(ChartContext ctx) {
         double t = ctx.getProgress();
-        double target = Math.max(min, Math.min(max, value));
-        if (t >= 1 || from != from) {
+        // an infinite reading is no reading, like NaN: clamping it would show a full gauge
+        double target = isGap(value) ? Double.NaN : Math.max(min, Math.min(max, value));
+        if (t >= 1 || isGap(from)) {
             return target;
         }
         return lerp(from, target, t);
@@ -238,7 +239,7 @@ public class GaugeSeries extends Series {
         g.fillShape(Shapes.sector(cx, cy, r, r - th, start, sweep));
         double v = shown(ctx);
         // NaN is "no reading": the track and bands are drawn, the value arc and needle are not
-        boolean hasValue = v == v;
+        boolean hasValue = !isGap(v);
         if (bands.isEmpty() || !needle) {
             if (!bands.isEmpty()) {
                 for (int i = 0; i < bands.size(); i++) {

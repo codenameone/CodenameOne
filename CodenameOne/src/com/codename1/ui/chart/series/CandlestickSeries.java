@@ -234,7 +234,7 @@ public class CandlestickSeries extends XYSeries {
             double hc = (o + h + l + c) / 4;
             double prev = i == 0 ? Double.NaN : (out[0][i - 1] + out[3][i - 1]) / 2;
             // after a gap the average starts over, so one missing period does not blank the rest
-            double ho = prev == prev ? prev : (o + c) / 2;
+            double ho = isGap(prev) ? (o + c) / 2 : prev;
             out[0][i] = ho;
             out[1][i] = Math.max(h, Math.max(ho, hc));
             out[2][i] = Math.min(l, Math.min(ho, hc));
@@ -301,9 +301,10 @@ public class CandlestickSeries extends XYSeries {
         return new double[]{b[0] - half, b[1] + half};
     }
 
-    // a candle missing any price is not drawn: a NaN would map to pixel 0
-    private static boolean isGap(double[] v) {
-        return v[0] != v[0] || v[1] != v[1] || v[2] != v[2] || v[3] != v[3];
+    // a candle missing any price, or its x, is not drawn: a NaN would map to pixel 0 and an
+    // infinity to a coordinate millions of pixels off screen
+    private boolean isGap(int i, double[] v) {
+        return isGap(getX(i)) || isGap(v[0]) || isGap(v[1]) || isGap(v[2]) || isGap(v[3]);
     }
 
     private int up(ChartContext ctx) {
@@ -327,7 +328,7 @@ public class CandlestickSeries extends XYSeries {
         boolean ha = style == HEIKIN_ASHI;
         for (int i = r[0]; i <= r[1]; i++) {
             double[] v = row(i);
-            if (isGap(v)) {
+            if (isGap(i, v)) {
                 continue;
             }
             // each candle moves from where it was when the last transition started, so a change to
@@ -389,7 +390,7 @@ public class CandlestickSeries extends XYSeries {
         for (int i = r[0]; i <= r[1]; i++) {
             // the drawn row: Heikin-Ashi candles span their averaged high and low, not the raw ones
             double[] v = row(i);
-            if (isGap(v)) {
+            if (isGap(i, v)) {
                 continue;
             }
             boolean rot = ctx.isRotated();

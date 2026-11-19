@@ -130,7 +130,7 @@ public class ScatterSeries extends XYSeries {
 
     private int diameter(ChartContext ctx, int i, double maxSize) {
         double s = aux[0][i];
-        if (!bubbles || !(maxSize > 0) || s != s) { //NOPMD LogicInversion - also true for a NaN max
+        if (!bubbles || !(maxSize > 0) || isGap(s)) { //NOPMD LogicInversion - also true for a NaN max
             return Math.max(3, ctx.mm(pointMm));
         }
         double f = Math.sqrt(Math.max(0, s) / maxSize);
@@ -142,8 +142,9 @@ public class ScatterSeries extends XYSeries {
         if (bubbles) {
             double[] sz = aux[0];
             for (int i = 0; i < count; i++) {
-                // a NaN size is a plain dot; Math.max would carry it into every bubble
-                if (sz[i] > m) {
+                // a NaN or infinite size is a plain dot; Math.max would carry a NaN into every
+                // bubble, and an infinite maximum would shrink every other bubble to a dot
+                if (!isGap(sz[i]) && sz[i] > m) {
                     m = sz[i];
                 }
             }
