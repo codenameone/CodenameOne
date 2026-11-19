@@ -531,8 +531,10 @@ final class XlsxReader {
         if (hasFormula) {
             if (sharedNode != null) {
                 sheet.loadFormula(row, col, sharedNode, value, hasValue, false);
+                sheet.cell(row, col).implicit = true;
             } else {
                 sheet.loadFormula(row, col, formula, false, value, hasValue, array);
+                sheet.cell(row, col).implicit = !array;
                 int[] span = array && arrayRef != null ? range(arrayRef) : null;
                 if (array && arrayRef != null && (span == null || span[0] > span[2] || span[1] > span[3])) {
                     throw new IllegalArgumentException("Not an array range: " + arrayRef);

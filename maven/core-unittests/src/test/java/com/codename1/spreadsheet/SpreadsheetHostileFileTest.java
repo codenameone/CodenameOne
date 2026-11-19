@@ -984,12 +984,17 @@ class SpreadsheetHostileFileTest extends UITestBase {
         if (sheetXml.indexOf("<f t=\"array\" ref=\"C2\">") < 0 || sheetXml.indexOf("<f t=\"array\" ref=\"D2\">") >= 0) {
             wrong.append("\nonly the formula taking a range whole is an array formula: ").append(sheetXml);
         }
-        // read back and written again without a calculation, it is still an array formula
+        // read back with the mark, it keeps it; a file that stores the formula without the mark
+        // was saved by an application that intersects, and Excel opens it that way, so it is
+        // not given one
         ByteArrayOutputStream again = new ByteArrayOutputStream();
+        Workbook.read(new ByteArrayInputStream(aout.toByteArray()), Workbook.Format.XLSX).write(again, Workbook.Format.XLSX);
+        ByteArrayOutputStream plain = new ByteArrayOutputStream();
         Workbook.read(new ByteArrayInputStream(stripArray(aout.toByteArray())), Workbook.Format.XLSX)
-                .write(again, Workbook.Format.XLSX);
-        if (new String(unzip(again.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8").indexOf("<f t=\"array\" ref=\"C2\">") < 0) {
-            wrong.append("\na formula read from a file lost its array mark");
+                .write(plain, Workbook.Format.XLSX);
+        if (new String(unzip(again.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8").indexOf("<f t=\"array\" ref=\"C2\">") < 0
+                || new String(unzip(plain.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8").indexOf("t=\"array\"") >= 0) {
+            wrong.append("\na formula read from a file changed its array mark");
         }
         scal.addMergedRegion(1, 2, 2, 2);
         ByteArrayOutputStream oout = new ByteArrayOutputStream();
@@ -1131,6 +1136,42 @@ class SpreadsheetHostileFileTest extends UITestBase {
         el.getWorkbook().write(eo2, Workbook.Format.ODS);
         same("86400", Workbook.read(new ByteArrayInputStream(eo2.toByteArray()), Workbook.Format.ODS).getSheet(0).getCellText(0, 0),
                 "elapsed seconds through ODS");
+        // blanks are elements of a range taken whole, however little of the sheet is used
+        Sheet bl = new Workbook().addSheet("B");
+        bl.setCellValue(0, 0, Double.valueOf(2));
+        bl.setCellFormula(0, 1, "SUMPRODUCT(--(A1:A100=0))");
+        same(Double.valueOf(99), bl.getCellValue(0, 1), "blanks counted by SUMPRODUCT");
+        bl.setCellFormula(0, 2, "ROWS(A1:A100*1)");
+        same(Double.valueOf(100), bl.getCellValue(0, 2), "the size of arithmetic on a range");
+        // @ meets a range at the formula's row; an XLSX formula without the array mark too
+        Sheet at = new Workbook().addSheet("A");
+        at.setCellValue(0, 0, Double.valueOf(-1));
+        at.setCellValue(1, 0, Double.valueOf(-2));
+        at.setCellValue(2, 0, Double.valueOf(-4));
+        at.setCellFormula(1, 1, "SUM(ABS(@A1:A3))");
+        same(Double.valueOf(2), at.getCellValue(1, 1), "@ inside a function");
+        at.setCellFormula(1, 2, "SUM(ABS(A1:A3))");
+        ByteArrayOutputStream ao = new ByteArrayOutputStream();
+        at.getWorkbook().write(ao, Workbook.Format.XLSX);
+        Sheet atBack = Workbook.read(new ByteArrayInputStream(ao.toByteArray()), Workbook.Format.XLSX).getSheet(0);
+        same(Double.valueOf(2), atBack.getCellValue(1, 1), "@ through XLSX");
+        same(Double.valueOf(7), atBack.getCellValue(1, 2), "a range taken whole through XLSX");
+        byte[] legacy = rewriteSheet(ao.toByteArray(), "t=\"array\" ref=\"C2\"", "");
+        Sheet old = Workbook.read(new ByteArrayInputStream(legacy), Workbook.Format.XLSX).getSheet(0);
+        old.getWorkbook().recalculate();
+        same(Double.valueOf(2), old.getCellValue(1, 2), "an XLSX formula without the array mark");
+        // a span of sheets shrinks when a sheet that ends it is removed
+        Workbook three = new Workbook();
+        three.addSheet("S1").setCellValue(0, 0, Double.valueOf(1));
+        three.addSheet("S2").setCellValue(0, 0, Double.valueOf(2));
+        Sheet s3 = three.addSheet("S3");
+        s3.setCellValue(0, 0, Double.valueOf(4));
+        s3.setCellFormula(1, 0, "SUM(S2:S3!A1)");
+        three.removeSheet(1);
+        same(Double.valueOf(4), s3.getCellValue(1, 0), "a span that lost its first sheet");
+        Sheet tm = new Workbook().addSheet("T");
+        tm.setValueAt(0, 0, "36:30");
+        same("36:30:00", tm.getCellText(0, 0), "a time past a day");
         Workbook leap = new Workbook();
         Sheet ls = leap.addSheet("D");
         ls.setCellValue(0, 0, Double.valueOf(60));

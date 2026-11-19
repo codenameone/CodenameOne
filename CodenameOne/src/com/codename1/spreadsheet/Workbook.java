@@ -279,7 +279,7 @@ public final class Workbook {
             return false;
         }
         if (!c.spreadsKnown) {
-            evaluator.evaluate(c.formula, c.sheet, c.row, c.col, c.arrayFormula);
+            evaluator.evaluate(c.formula, c.sheet, c.row, c.col, c.arrayFormula, c.implicit);
             c.spreads = evaluator.lastSpread;
             c.spreadsKnown = true;
         }
@@ -564,16 +564,76 @@ public final class Workbook {
         return s;
     }
 
-    /// Removes a sheet. Formulas that refer to it evaluate to `#REF!` from then on.
+    /// Removes a sheet. Formulas that refer to it evaluate to `#REF!` from then on, except a
+    /// reference across a span of sheets that it ends, as `Jan:Mar!B2`: the span shrinks to
+    /// the sheets that remain, as in Excel.
     ///
     /// #### Parameters
     ///
     /// - `index`: the position of the sheet
     public void removeSheet(int index) {
+        String gone = sheets.get(index).getName();
+        String before = index > 0 ? sheets.get(index - 1).getName() : null;
+        String after = index + 1 < sheets.size() ? sheets.get(index + 1).getName() : null;
+        for (Sheet each : sheets) {
+            for (int r = 0; r < each.usedRows(); r++) {
+                Cell[] cells = each.rowCells(r);
+                if (cells == null) {
+                    continue;
+                }
+                for (Cell c : cells) {
+                    if (c != null && c.formula != null && shrinkSpans(c.formula, gone, before, after, 0)) {
+                        c.formulaText = FormulaParser.display(c.formula);
+                    }
+                }
+            }
+        }
+        for (Node n : nameNodes.values()) {
+            shrinkSpans(n, gone, before, after, 0);
+        }
         sheets.remove(index);
         structureChanged();
         // what was read from the sheet is an error now, and nothing else would say so
         recalculate();
+    }
+
+    private boolean shrinkSpans(Node n, String gone, String before, String after, int depth) {
+        if (n == null || depth > FormulaParser.MAX_DEPTH * 2) {
+            return false;
+        }
+        boolean changed = false;
+        if (n.sheet != null && n.sheet2 != null && !n.sheet.equalsIgnoreCase(n.sheet2)) {
+            int first = indexOfName(n.sheet);
+            int last = indexOfName(n.sheet2);
+            if (first >= 0 && last >= 0) {
+                boolean forward = first <= last;
+                if (n.sheet.equalsIgnoreCase(gone)) {
+                    n.sheet = forward ? after : before;
+                    changed = true;
+                } else if (n.sheet2.equalsIgnoreCase(gone)) {
+                    n.sheet2 = forward ? before : after;
+                    changed = true;
+                }
+                if (changed && n.sheet != null && n.sheet.equalsIgnoreCase(n.sheet2)) {
+                    n.sheet2 = null;
+                }
+            }
+        }
+        if (n.args != null) {
+            for (Node a : n.args) {
+                changed |= shrinkSpans(a, gone, before, after, depth + 1);
+            }
+        }
+        return changed;
+    }
+
+    private int indexOfName(String name) {
+        for (int i = 0; i < sheets.size(); i++) {
+            if (sheets.get(i).getName().equalsIgnoreCase(name)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /// The number of sheets.
@@ -1058,7 +1118,7 @@ public final class Workbook {
             } else if (c.formula == null) {
                 v = c.value;
             } else {
-                v = evaluator.evaluate(c.formula, c.sheet, c.row, c.col, c.arrayFormula);
+                v = evaluator.evaluate(c.formula, c.sheet, c.row, c.col, c.arrayFormula, c.implicit);
                 c.spreads = evaluator.lastSpread;
                 c.spreadsKnown = true;
                 if (c.arrayRows * c.arrayCols > 1 && c.arrayFormula) {

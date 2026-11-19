@@ -47,6 +47,9 @@ final class Cell {
     boolean alwaysDirty;
     /// Written in the file as an array formula: evaluated without implicit intersection.
     boolean arrayFormula;
+    /// A formula an XLSX file stored without the array mark: Excel opens it with an @ where a
+    /// function wanting one value is given a range, so the range is met at the cell's row.
+    boolean implicit;
     /// The last calculation took an array where one value is wanted; written as an array
     /// formula so Excel calculates it the same way.
     boolean spreads;

@@ -587,7 +587,11 @@ A few things work differently from Excel:
   the cell in the formula's own row instead, so the writers save such a
   formula as an array formula, so they calculate it over the whole range
   too. A range that's the whole formula, as in `=A1:A3`, is still the cell in
-  the formula's own row.
+  the formula's own row, and so is a range after `@`, as in `=SUM(@A1:A3)`.
+  A formula an `.xlsx` file stores without the array mark was saved by one of
+  those older applications, and Excel opens it with an `@` wherever a function
+  wanting one value is given a range. It's read the same way, so it answers
+  what Excel shows for that file.
 * Text is read as a date when it's written `2026-01-12` or names its month,
   as in `12-Jan-2026`. A date of digits and slashes isn't: `1/2/2026` is a
   different day in different countries.

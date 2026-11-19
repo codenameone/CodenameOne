@@ -57,6 +57,10 @@ final class TextFunctions {
                 if (code < 1 || code > ("CHAR".equals(name) ? 255 : 0x10ffff)) {
                     throw EvalError.VALUE;
                 }
+                if (code >= 0xd800 && code <= 0xdfff && !"CHAR".equals(name)) {
+                    // half of a pair is no character: Excel answers #N/A
+                    throw EvalError.NA;
+                }
                 StringBuilder sb = new StringBuilder();
                 if (code > 0xffff) {
                     int v = code - 0x10000;
@@ -73,7 +77,8 @@ final class TextFunctions {
                     throw EvalError.VALUE;
                 }
                 char c = s.charAt(0);
-                if (c >= 0xd800 && c < 0xdc00 && s.length() > 1 && "UNICODE".equals(name)) {
+                if (c >= 0xd800 && c < 0xdc00 && s.length() > 1 && "UNICODE".equals(name)
+                        && s.charAt(1) >= 0xdc00 && s.charAt(1) <= 0xdfff) {
                     return d(0x10000 + ((c - 0xd800) << 10) + (s.charAt(1) - 0xdc00));
                 }
                 return d(c);

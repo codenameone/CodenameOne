@@ -254,6 +254,7 @@ public final class Sheet extends AbstractTableModel {
         c.odsSyntax = false;
         c.alwaysDirty = false;
         c.arrayFormula = false;
+        c.implicit = false;
         c.spreadsKnown = false;
         c.arrayAnchor = null;
         c.arrayRows = 1;
@@ -627,7 +628,8 @@ public final class Sheet extends AbstractTableModel {
         if (trimmed.endsWith("%")) {
             format = trimmed.indexOf('.') < 0 ? "0%" : "0.00%";
         } else if (date || time) {
-            format = date ? time ? "yyyy-mm-dd hh:mm:ss" : "yyyy-mm-dd" : "hh:mm:ss";
+            // a time past a day, as 36:30, is shown as hours elapsed, as Excel shows it
+            format = date ? time ? "yyyy-mm-dd hh:mm:ss" : "yyyy-mm-dd" : d >= 1 ? "[h]:mm:ss" : "hh:mm:ss";
             if (date && workbook.isDate1904()) {
                 d -= 1462;
             }

@@ -209,10 +209,12 @@ final class Functions {
     /// What a file writes in front of a function name.
     /// Functions OpenDocument renamed with `LEGACY.` when it gave their plain name to the
     /// newer function, where Excel kept the old name and gave the new function a dotted one.
-    private static final String ODS_LEGACY = " CHIDIST CHIINV FDIST FINV NORMSDIST NORMSINV TDIST ";
+    private static final String ODS_LEGACY = " CHIDIST CHIINV CHITEST FDIST FINV NORMSDIST NORMSINV TDIST ";
     /// The newer functions that took those names, as OpenDocument and as Excel call them.
     private static final String[] ODS_RENAMED = {
-        "FDIST", "F.DIST", "FINV", "F.INV", "CHISQDIST", "CHISQ.DIST", "CHISQINV", "CHISQ.INV"
+        "FDIST", "F.DIST", "FINV", "F.INV", "CHISQDIST", "CHISQ.DIST", "CHISQINV", "CHISQ.INV",
+        // and two OpenDocument names apart from Excel's
+        "FORMULA", "FORMULATEXT", "SKEWP", "SKEW.P"
     };
 
     /// The name used in the trees, Excel's, of a function as an OpenDocument formula names it.

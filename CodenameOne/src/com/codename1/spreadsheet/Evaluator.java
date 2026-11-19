@@ -65,6 +65,19 @@ final class Evaluator {
     }
 
     /// Evaluates a formula as the content of a cell and answers the one scalar the cell shows.
+    Object evaluate(Node formula, Sheet inSheet, int inRow, int inCol, boolean asArrayFormula, boolean intersects) {
+        boolean savedImplicit = implicit;
+        implicit = intersects;
+        try {
+            return evaluate(formula, inSheet, inRow, inCol, asArrayFormula);
+        } finally {
+            implicit = savedImplicit;
+        }
+    }
+
+    /// Set while a formula read from an XLSX file without the array mark is evaluated.
+    private boolean implicit;
+
     Object evaluate(Node formula, Sheet inSheet, int inRow, int inCol, boolean asArrayFormula) {
         Sheet savedSheet = sheet;
         int savedRow = row;
@@ -131,6 +144,19 @@ final class Evaluator {
         return v;
     }
 
+    /// What @ answers: a range of several cells is met at the formula's own row or column,
+    /// and an array gives its first element, as Excel takes them.
+    private Object single(Object v) {
+        if (v instanceof Ref && !((Ref) v).isSingleCell()) {
+            return intersectImplicitly((Ref) v);
+        }
+        if (v instanceof Object[][]) {
+            Object[][] m = (Object[][]) v;
+            return m.length == 0 || m[0].length == 0 ? null : m[0][0];
+        }
+        return v;
+    }
+
     private Object intersectImplicitly(Ref r) {
         if (r.next == null && r.lastSheet == null) {
             if (r.c1 == r.c2 && row >= r.r1 && row <= r.r2) {
@@ -191,6 +217,9 @@ final class Evaluator {
             case Node.ARRAY:
                 return n.array;
             case Node.UNARY:
+                if ("@".equals(n.value)) {
+                    return single(eval(n.args[0]));
+                }
                 Object u = operand(eval(n.args[0]));
                 return "-".equals(n.value) ? lift('n', u, null) : u;
             case Node.PERCENT:
@@ -550,7 +579,8 @@ final class Evaluator {
             Object v = args[i];
             if (v instanceof Ref) {
                 Ref r = (Ref) v;
-                v = r.isSingleCell() ? value(r.sheet, r.r1, r.c1) : (Object) matrix(r);
+                v = r.isSingleCell() ? value(r.sheet, r.r1, r.c1)
+                        : implicit && !arrayFormula && r.next == null && r.lastSheet == null ? intersectImplicitly(r) : (Object) matrix(r);
                 args[i] = v;
             }
             if (v instanceof Object[][]) {
@@ -965,6 +995,9 @@ final class Evaluator {
         if (v instanceof Ref) {
             Ref r = (Ref) v;
             if (!r.isSingleCell() && r.next == null && r.lastSheet == null && isArgument(v)) {
+                if (implicit && !arrayFormula) {
+                    return intersectImplicitly(r);
+                }
                 throw EvalError.LIFT;
             }
             return value(r.sheet, r.r1, r.c1);
@@ -997,8 +1030,7 @@ final class Evaluator {
         return out;
     }
 
-    /// The values of an argument as rows and columns. A range is cut down to the rows and
-    /// columns that hold data first.
+    /// The values of an argument as rows and columns, a range at its full size.
     Object[][] matrix(Object v) {
         if (v instanceof Object[][]) {
             return (Object[][]) v;
@@ -1011,14 +1043,27 @@ final class Evaluator {
                 // (SUM, COUNT and the like) walk them themselves
                 throw EvalError.VALUE;
             }
+            // Every cell of the range is an element, empty ones included: SUMPRODUCT(--(A1:A100=0))
+            // counts all hundred, however much of the sheet holds data. Rows past the last one
+            // with data share one row of empty cells, which nothing writes into.
             Ref r = whole.clip();
-            int rows = r.rows();
-            int cols = r.cols();
-            Object[][] out = new Object[rows][cols];
+            int rows = whole.rows();
+            int cols = whole.cols();
+            Object[][] out = new Object[rows][];
+            Object[] empty = null;
             for (int i = 0; i < rows; i++) {
-                for (int j = 0; j < cols; j++) {
-                    out[i][j] = value(r.sheet, r.r1 + i, r.c1 + j);
+                if (whole.r1 + i > r.r2) {
+                    if (empty == null) {
+                        empty = new Object[cols];
+                    }
+                    out[i] = empty;
+                    continue;
                 }
+                Object[] line = new Object[cols];
+                for (int j = 0; j < cols && whole.c1 + j <= r.c2; j++) {
+                    line[j] = value(r.sheet, whole.r1 + i, whole.c1 + j);
+                }
+                out[i] = line;
             }
             return out;
         }

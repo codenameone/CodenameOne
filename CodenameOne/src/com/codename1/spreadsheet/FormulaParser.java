@@ -240,9 +240,9 @@ final class FormulaParser {
                 return new Node(Node.UNARY, c == '-' ? "-" : "+", unary());
             }
             if (c == '@') {
-                // implicit intersection: with one value per cell there is nothing to pick
+                // implicit intersection: the cell of a range in the formula's own row or column
                 p++;
-                return unary();
+                return new Node(Node.UNARY, "@", unary());
             }
         }
         return intersection();
@@ -720,6 +720,10 @@ final class FormulaParser {
     /// A call, once its arguments are counted against what the function takes. A name this
     /// implementation does not know is left to evaluate to `#NAME?`.
     private Node counted(String name, Node[] args) {
+        if ("SINGLE".equals(name) && args.length == 1) {
+            // what Excel writes into a file for the @ typed in a formula
+            return new Node(Node.UNARY, "@", args[0]);
+        }
         int[] range = Functions.arity(name);
         if (range != null && (args.length < range[0] || args.length > range[1])) {
             throw new FormulaSyntaxException(name + " takes " + (range[0] == range[1] ? String.valueOf(range[0])
@@ -1015,6 +1019,17 @@ final class FormulaParser {
                 }
                 break;
             case Node.UNARY:
+                if ("@".equals(n.name()) && (ods || prefixes)) {
+                    if (ods) {
+                        // LibreOffice intersects a range in a formula of one cell by itself
+                        print(sb, n.args[0], ods, prefixes);
+                    } else {
+                        sb.append("_xlfn.SINGLE(");
+                        print(sb, n.args[0], ods, prefixes);
+                        sb.append(')');
+                    }
+                    break;
+                }
                 sb.append(n.name());
                 print(sb, n.args[0], ods, prefixes);
                 break;
