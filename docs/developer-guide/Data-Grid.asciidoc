@@ -597,8 +597,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/D
 ----
 
 The depth of a row in a tree grid becomes its outline level, and the grid's
-frozen columns stay frozen. `Workbook.fromModel` copies a `TableModel` without a
-grid.
+frozen columns stay frozen. A grouped grid is copied as it's shown, too: each
+group row becomes a row with the group's key and its aggregates as plain values,
+and the rows of a collapsed group are left out. A total over such a column counts
+the aggregates as well. `Workbook.fromModel` copies a `TableModel` without a
+grid, and so copies the data alone.
 
 A workbook also keeps number formats, column widths, frozen panes, merged cells,
 outline levels and defined names between reading and writing. It doesn't keep

@@ -1227,11 +1227,24 @@ final class CellFormat {
         if (negative && (whole != 0 || bestN != 0)) {
             sb.append('-');
         }
+        boolean zeroShown = bestN == 0 && numeratorMarks.indexOf("0") >= 0;
         if (mixed) {
             if (whole != 0 || bestN == 0) {
-                sb.append(Values.general(whole));
+                // the whole part pads to its placeholders too: 00 shows 2 as 02
+                String digits = Values.general(whole);
+                for (int i = 0; i < wholeMarks.length() - digits.length(); i++) {
+                    pad(sb, wholeMarks.charAt(i));
+                }
+                sb.append(digits);
             }
-            if (bestN != 0) {
+            if (bestN == 0 && !zeroShown) {
+                // no fraction to show: blanks where it would be keep the column lined up
+                int width = 1 + numeratorMarks.length() + 1 + (fixedDenominator > 0 ? 0 : denominatorMarks.length());
+                for (int i = 0; i < width; i++) {
+                    sb.append(' ');
+                }
+            }
+            if (bestN != 0 || zeroShown) {
                 if (sb.length() > 0 && sb.charAt(sb.length() - 1) != '-') {
                     sb.append(' ');
                 }

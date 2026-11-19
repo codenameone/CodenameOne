@@ -770,8 +770,18 @@ public final class Sheet extends AbstractTableModel {
         if (count <= 0 || row < 0) {
             return;
         }
-        for (int i = 0; i < count && row <= rows.size(); i++) {
-            rows.add(row, null);
+        if (row < rows.size()) {
+            if ((long) rows.size() - 1 + count > Node.MAX_ROW) {
+                // the last row of data would leave the grid, where no reference can reach it
+                throw new IllegalArgumentException("Inserting " + count + " rows pushes row " + rows.size()
+                        + " past the last row of a sheet, " + (Node.MAX_ROW + 1));
+            }
+            // one move of the rows under the insertion, however many rows go in
+            ArrayList<Cell[]> empty = new ArrayList<Cell[]>(count);
+            for (int i = 0; i < count; i++) {
+                empty.add(null);
+            }
+            rows.addAll(row, empty);
         }
         renumber();
         shiftKeys(outlineLevels, row, count);
@@ -826,6 +836,10 @@ public final class Sheet extends AbstractTableModel {
         if (count <= 0 || column < 0) {
             return;
         }
+        if (column < usedColumns && (long) usedColumns - 1 + count > Node.MAX_COL) {
+            throw new IllegalArgumentException("Inserting " + count + " columns pushes column " + usedColumns
+                    + " past the last column of a sheet, " + (Node.MAX_COL + 1));
+        }
         for (int r = 0; r < rows.size(); r++) {
             Cell[] cells = rows.get(r);
             if (cells == null || cells.length <= column) {
@@ -860,10 +874,11 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// - `count`: how many columns to remove
     public void removeColumns(int column, int count) {
-        if (count <= 0 || column < 0 || column >= usedColumns) {
+        if (count <= 0 || column < 0) {
             return;
         }
-        int n = Math.min(count, usedColumns - column);
+        // the cells go only as far as the data, but references move by the whole count
+        int n = Math.max(0, Math.min(count, usedColumns - column));
         for (int r = 0; r < rows.size(); r++) {
             Cell[] cells = rows.get(r);
             if (cells == null || cells.length <= column) {
@@ -880,17 +895,17 @@ public final class Sheet extends AbstractTableModel {
         }
         usedColumns -= n;
         renumber();
-        shiftKeys(columnWidths, column, -n);
+        shiftKeys(columnWidths, column, -count);
         for (int i = merges.size() - 1; i >= 0; i--) {
             int[] m = merges.get(i);
-            if (m[1] >= column && m[3] < column + n) {
+            if (m[1] >= column && m[3] < column + count) {
                 merges.remove(i);
                 continue;
             }
-            m[1] = m[1] >= column + n ? m[1] - n : Math.min(m[1], column);
-            m[3] = m[3] >= column + n ? m[3] - n : Math.min(m[3], column - 1);
+            m[1] = m[1] >= column + count ? m[1] - count : Math.min(m[1], column);
+            m[3] = m[3] >= column + count ? m[3] - count : Math.min(m[3], column - 1);
         }
-        workbook.restructured(this, false, column, -n);
+        workbook.restructured(this, false, column, -count);
     }
 
     private static void orphan(Cell[] cells) {

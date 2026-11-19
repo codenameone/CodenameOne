@@ -922,6 +922,40 @@ class SpreadsheetHostileFileTest extends UITestBase {
         same(" 1/2 ", CellFormat.format("??/??", Double.valueOf(0.5), false), "??/??");
         same("3  1/10", CellFormat.format("0 ??/??", Double.valueOf(3.1), false), "0 ??/??");
         same("1/4", CellFormat.format("#/#", Double.valueOf(0.25), false), "#/#");
+        same("2   ", CellFormat.format("# ?/8", Double.valueOf(2), false), "no fraction, fixed denominator");
+        same("0      ", CellFormat.format("# ??/??", Double.valueOf(0), false), "no fraction");
+        same("2 0/1", CellFormat.format("0 0/0", Double.valueOf(2), false), "a zero placeholder shows the fraction");
+        same("-02 1/2", CellFormat.format("00 ?/?", Double.valueOf(-2.5), false), "a padded whole part");
+    }
+
+    @Test
+    void insertingAndRemovingPastTheData() {
+        Workbook w = new Workbook();
+        Sheet s = w.addSheet("S");
+        s.setCellValue("B1", Double.valueOf(1));
+        s.setCellFormula("A1", "=H1");
+        s.setCellFormula("A2", "=E1");
+        // the cells end at B, but a reference past them still follows the removal
+        s.removeColumns(3, 1);
+        same("=G1", s.getFormulaAt(0, 0), "a reference past the data moves left");
+        s.removeColumns(2, 10);
+        same(CellError.REF, s.getCellValue(1, 0), "a reference into removed empty columns");
+        // inserting a million rows is one move, and pushing data off the grid is refused
+        long start = System.currentTimeMillis();
+        s.insertRows(0, 1000000);
+        same(Boolean.TRUE, Boolean.valueOf(System.currentTimeMillis() - start < 20000), "a large insert finishes");
+        try {
+            s.insertRows(0, 100000);
+            wrong.append("\nan insert pushing data past the last row was accepted");
+        } catch (IllegalArgumentException expected) {
+            // refused
+        }
+        try {
+            s.insertColumns(0, 16384);
+            wrong.append("\nan insert pushing data past the last column was accepted");
+        } catch (IllegalArgumentException expected) {
+            // refused
+        }
     }
 
     @Test

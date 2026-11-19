@@ -319,6 +319,11 @@ public final class Workbook {
     /// never the text the grid formats them to. The depth of a row of a tree grid becomes its
     /// outline level, and the grid's frozen columns stay frozen.
     ///
+    /// A grouped grid is copied as it is shown: each group row becomes a row holding the
+    /// group's key and its aggregates as plain values, and the rows of a collapsed group are
+    /// not in the file. A total over a column of the result counts those aggregates as well;
+    /// copy the model with [#fromModel] for the data alone.
+    ///
     /// #### Parameters
     ///
     /// - `grid`: the grid to copy
