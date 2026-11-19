@@ -535,29 +535,38 @@ final class CellFormat {
         if (isGeneral() || sections[0].tokens.isEmpty()) {
             return false;
         }
-        // the number sections; a fourth is for text, which a number style has no place for
+        // the number sections; a fourth is for text. A section may be empty (the "hide"
+        // idiom, 0;;;) or a date; OpenDocument maps a value to any data style.
         int count = Math.min(sections.length, 3);
-        boolean sectioned = count >= 2 && !sections[0].date;
-        for (int i = 0; sectioned && i < count; i++) {
-            sectioned = !sections[i].tokens.isEmpty() && !sections[i].date;
-        }
-        if (!sectioned) {
-            return writeOds(x, name, sections[0], "");
-        }
         boolean explicit = sections[0].condition != 0;
-        if (sections.length == 4 && count == 3 && !explicit && sections[3].hasText) {
+        if (sections.length == 4) {
             // A fourth section is for text. OpenDocument spells that as a text style whose
-            // conditions send a number to the three number styles, as LibreOffice writes it.
-            String[] conditions = {"value()>0", "value()<0", "value()=0"};
+            // conditions send a number to the number styles, as LibreOffice writes it. The
+            // third section takes every number the first two did not, which two maps say.
             StringBuilder textMaps = new StringBuilder();
             for (int i = 0; i < 3; i++) {
                 String sub = name + "P" + i;
                 writeOds(x, sub, sections[i], "");
-                textMaps.append("<style:map style:condition=\"").append(xmlAttr(conditions[i]))
-                        .append("\" style:apply-style-name=\"").append(sub).append("\"/>");
+                String[] conditions;
+                if (i == 2) {
+                    conditions = explicit ? new String[] {"value()>=0", "value()<0"} : new String[] {"value()=0"};
+                } else if (sections[i].condition != 0) {
+                    conditions = new String[] {conditionText(sections[i])};
+                } else if (explicit) {
+                    conditions = new String[] {"value()<0"};
+                } else {
+                    conditions = new String[] {i == 0 ? "value()>0" : "value()<0"};
+                }
+                for (String condition : conditions) {
+                    textMaps.append("<style:map style:condition=\"").append(xmlAttr(condition))
+                            .append("\" style:apply-style-name=\"").append(sub).append("\"/>");
+                }
             }
             writeOdsText(x, name, sections[3], textMaps.toString());
             return true;
+        }
+        if (count < 2) {
+            return writeOds(x, name, sections[0], "");
         }
         StringBuilder maps = new StringBuilder();
         for (int i = 0; i < count - 1; i++) {
@@ -634,7 +643,7 @@ final class CellFormat {
             return true;
         }
         if (s.date) {
-            writeOdsDate(x, name, s);
+            writeOdsDate(x, name, s, maps);
             return true;
         }
         String tag = s.percents > 0 ? "number:percentage-style" : "number:number-style";
@@ -771,7 +780,7 @@ final class CellFormat {
         return true;
     }
 
-    private void writeOdsDate(XmlOut x, String name, Section s) throws java.io.IOException {
+    private void writeOdsDate(XmlOut x, String name, Section s, String maps) throws java.io.IOException {
         boolean elapsed = false;
         for (int i = 0; i < s.tokens.size(); i++) {
             elapsed |= s.tokens.get(i).kind == ELAPSED;
@@ -829,7 +838,7 @@ final class CellFormat {
                 x.raw("<number:text>").text(t.kind == POINT ? "." : t.text, false).raw("</number:text>");
             }
         }
-        x.raw("</").raw(tag).raw(">");
+        x.raw(maps).raw("</").raw(tag).raw(">");
     }
 
     private Section pick(double v) {

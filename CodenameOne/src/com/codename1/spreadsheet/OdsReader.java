@@ -248,7 +248,8 @@ final class OdsReader {
                 if (name != null && "text-style".equals(tag)) {
                     textStyles.add(name);
                 }
-                if (name != null && code.length() > 0) {
+                // an empty style is kept too: a section of a format that shows nothing
+                if (name != null) {
                     dataStyles.put(name, code);
                     if (!maps.isEmpty()) {
                         styleMaps.put(name, maps);
@@ -413,7 +414,8 @@ final class OdsReader {
                 : ">0".equals(conditions.get(0)) && "<0".equals(conditions.get(1))
                         && (codes.size() == 2 || "=0".equals(conditions.get(2)));
         for (int i = 0; i < codes.size(); i++) {
-            if (!implicit) {
+            // a third section is what is left, which Excel's code spells with no condition
+            if (!implicit && i < 2) {
                 String c = conditions.get(i);
                 sb.append('[').append(c.startsWith("!=") ? "<>" + c.substring(2) : c).append(']');
             }

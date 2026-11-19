@@ -363,7 +363,8 @@ final class OdsWriter {
         CellFormat format = book.format(cell.format);
         if (v instanceof Double) {
             double d = ((Double) v).doubleValue();
-            if (format.isDate() && d >= 0) {
+            // past Excel's last day a date has no four-digit year, and the number is kept instead
+            if (format.isDate() && d >= 0 && d <= DateFunctions.LAST_DAY) {
                 StringBuilder sb = new StringBuilder();
                 long seconds = (long) Math.floor((d - Math.floor(d)) * 86400 + 0.5);
                 double day = Math.floor(d);

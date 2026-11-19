@@ -904,6 +904,99 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void roundEightLosses() throws Exception {
+        // names nested in names are held to one depth, on a small stack too
+        final StringBuilder failure = new StringBuilder();
+        Thread t = new Thread(null, new Runnable() {
+            public void run() {
+                try {
+                    Workbook w = new Workbook();
+                    Sheet s = w.addSheet("S");
+                    for (int i = 1; i <= 32; i++) {
+                        StringBuilder f = new StringBuilder("=");
+                        for (int k = 0; k < 60; k++) {
+                            f.append("ABS(");
+                        }
+                        f.append(i == 1 ? "1" : "NM_" + (i - 1) + "+1");
+                        for (int k = 0; k < 60; k++) {
+                            f.append(')');
+                        }
+                        w.setDefinedName("NM_" + i, f.toString());
+                    }
+                    s.setCellFormula("A1", "=NM_32");
+                    w.recalculate();
+                    if (!CellError.NUM.equals(s.getCellValue("A1"))) {
+                        failure.append("names nested past the limit gave ").append(s.getCellValue("A1"));
+                    }
+                } catch (Throwable err) {
+                    failure.append(err);
+                }
+            }
+        }, "small", 512 * 1024);
+        t.start();
+        t.join(60000);
+        same(Boolean.FALSE, Boolean.valueOf(t.isAlive()), "the nested names finished");
+        same("", failure.toString(), "nested names");
+        // 64 functions nested is Excel's limit, and parentheses are not functions
+        Sheet s = new Workbook().addSheet("S");
+        s.setCellFormula("A1", "=" + repeat("ABS(", 64) + "-1" + repeat(")", 64));
+        same(Double.valueOf(1), s.getCellValue("A1"), "64 nested functions");
+        s.setCellFormula("A2", "=" + repeat("ABS((", 40) + "-1" + repeat("))", 40));
+        same(Double.valueOf(1), s.getCellValue("A2"), "40 functions with their own parentheses");
+        try {
+            s.setCellFormula("A3", "=" + repeat("ABS(", 65) + "1" + repeat(")", 65));
+            wrong.append("\n65 nested functions were taken");
+        } catch (IllegalArgumentException expected) {
+            // Excel refuses it too
+        }
+        // every section of a format survives OpenDocument: empty ones, dates, text
+        String[] codes = {"0;;;", "0;;;@", "0;-0;", "0;-0;;@", "yyyy-mm-dd;-0;0;@", "0;-0;0;\"x\"",
+            "[>100]0;[<0]0;0;@"};
+        Object[] values = {Double.valueOf(5), Double.valueOf(-5), Double.valueOf(0), "tx", Double.valueOf(500)};
+        Workbook formats = new Workbook();
+        Sheet f = formats.addSheet("S");
+        for (int r = 0; r < codes.length; r++) {
+            for (int c = 0; c < values.length; c++) {
+                f.setCellValue(r, c, values[c]);
+                f.setCellFormat(r, c, codes[r]);
+            }
+        }
+        ByteArrayOutputStream ods = new ByteArrayOutputStream();
+        formats.write(ods, Workbook.Format.ODS);
+        Sheet back = Workbook.read(new ByteArrayInputStream(ods.toByteArray()), Workbook.Format.ODS).getSheet(0);
+        for (int r = 0; r < codes.length; r++) {
+            for (int c = 0; c < values.length; c++) {
+                same(f.getCellText(r, c), back.getCellText(r, c), codes[r] + " showing " + values[c]);
+            }
+        }
+        // text that starts with an apostrophe keeps it through CSV
+        Workbook csv = new Workbook();
+        Sheet cs = csv.addSheet("S");
+        String[] texts = {"'=x", "'+1+2", "'@b", "'plain", "=y", "''=z"};
+        for (int i = 0; i < texts.length; i++) {
+            cs.setCellValue(i, 0, texts[i]);
+        }
+        ByteArrayOutputStream c = new ByteArrayOutputStream();
+        csv.write(c, Workbook.Format.CSV);
+        Sheet csvBack = Workbook.read(new ByteArrayInputStream(c.toByteArray()), Workbook.Format.CSV).getSheet(0);
+        for (int i = 0; i < texts.length; i++) {
+            same(texts[i], csvBack.getCellValue(i, 0), "text after CSV");
+        }
+        // a date past year 9999 keeps its number in OpenDocument and CSV
+        Workbook late = new Workbook();
+        Sheet ls = late.addSheet("S");
+        ls.setCellValue(0, 0, Double.valueOf(3000000));
+        ls.setCellFormat(0, 0, "yyyy-mm-dd");
+        ByteArrayOutputStream lo = new ByteArrayOutputStream();
+        late.write(lo, Workbook.Format.ODS);
+        Sheet lateBack = Workbook.read(new ByteArrayInputStream(lo.toByteArray()), Workbook.Format.ODS).getSheet(0);
+        same(ls.getCellValue(0, 0), lateBack.getCellValue(0, 0), "a late date after OpenDocument");
+        ByteArrayOutputStream lc = new ByteArrayOutputStream();
+        late.write(lc, Workbook.Format.CSV);
+        same("3000000", new String(lc.toByteArray(), "UTF-8").trim(), "a late date in CSV");
+    }
+
+    @Test
     void roundTripsThatLostSomething() throws IOException {
         // an OpenDocument name nothing can read stays out of Excel's file
         byte[] file = zip("mimetype", "application/vnd.oasis.opendocument.spreadsheet", "content.xml",

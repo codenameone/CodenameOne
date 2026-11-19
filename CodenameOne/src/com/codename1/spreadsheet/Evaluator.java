@@ -132,7 +132,27 @@ final class Evaluator {
     /// The most characters the texts of one array result hold together.
     static final long MAX_ARRAY_TEXT = 4L * 1024 * 1024;
 
+    /// How deep evaluation may go, defined names included. One formula is held to
+    /// FormulaParser.MAX_DEPTH, but names chain formulas into each other, and a file could
+    /// nest them past any stack; past this the result is #NUM!, Excel's error for a
+    /// calculation it cannot finish.
+    static final int MAX_EVAL_DEPTH = FormulaParser.MAX_DEPTH + 32;
+
+    private int evalDepth;
+
     Object eval(Node n) {
+        if (evalDepth >= MAX_EVAL_DEPTH) {
+            return CellError.NUM;
+        }
+        evalDepth++;
+        try {
+            return evalNode(n);
+        } finally {
+            evalDepth--;
+        }
+    }
+
+    private Object evalNode(Node n) {
         switch (n.kind) {
             case Node.NUM:
             case Node.STR:

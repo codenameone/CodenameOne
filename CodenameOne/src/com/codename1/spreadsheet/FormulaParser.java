@@ -53,7 +53,15 @@ final class FormulaParser {
         this.argSeparator = ods ? ';' : ',';
     }
 
-    static final int MAX_DEPTH = 64;
+    /// Levels of nesting a formula may have: parentheses, arguments and signs each count.
+    /// Excel's own limit is on functions (MAX_FUNCTIONS); this one is what a small stack
+    /// can parse and evaluate, and room enough for 64 functions with their parentheses.
+    static final int MAX_DEPTH = 128;
+
+    /// Functions nested in each other, Excel's limit.
+    static final int MAX_FUNCTIONS = 64;
+
+    private int functions;
     /// Twice the 8,192 characters Excel allows a formula.
     private static final int MAX_LENGTH = 16384;
     private int depth;
@@ -673,6 +681,19 @@ final class FormulaParser {
         if (ods) {
             name = Functions.fromOds(name);
         }
+        functions++;
+        if (functions > MAX_FUNCTIONS) {
+            functions--;
+            throw fail();
+        }
+        try {
+            return functionArgs(name);
+        } finally {
+            functions--;
+        }
+    }
+
+    private Node functionArgs(String name) {
         ArrayList<Node> args = new ArrayList<Node>();
         ws();
         if (eat(')')) {

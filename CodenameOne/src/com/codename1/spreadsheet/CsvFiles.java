@@ -78,7 +78,7 @@ final class CsvFiles {
                     char first = v.charAt(0);
                     // a formula in a text file is text: calculating what a stranger's file
                     // says to calculate is not what opening it should do
-                    if (first == '\'' && runsAsFormula(v.substring(1))) {
+                    if (first == '\'' && guarded(v.substring(1))) {
                         // the apostrophe a writer puts before text that would run as a formula
                         sheet.store(r, c, v.substring(1));
                     } else if (text[c] || first == '=' || first == '\'') {
@@ -111,6 +111,16 @@ final class CsvFiles {
             }
         }
         return v.charAt(from) == '0' || n - from > 15;
+    }
+
+    /// Text the writer puts an apostrophe before, and the reader takes it off again: text
+    /// that would run as a formula, or that starts with apostrophes before such text.
+    private static boolean guarded(String text) {
+        int i = 0;
+        while (i < text.length() && text.charAt(i) == '\'') {
+            i++;
+        }
+        return runsAsFormula(text.substring(i));
     }
 
     private static boolean runsAsFormula(String text) {
@@ -150,14 +160,17 @@ final class CsvFiles {
                 String shown = sheet.getCellText(r, c);
                 Object value = sheet.getCellValue(r, c);
                 if (shown.length() > 0 && shown.charAt(0) == '#' && shown.replace('#', ' ').trim().length() == 0
-                        && value instanceof Double) {
+                        && (value instanceof Double || value instanceof java.util.Date)) {
                     // ######## is a date the format cannot show; the file keeps the number instead
-                    shown = Values.general(((Double) value).doubleValue());
+                    shown = Values.general(value instanceof Double ? ((Double) value).doubleValue()
+                            : sheet.getWorkbook().toSerial((java.util.Date) value));
                 }
                 // Text that a spreadsheet opening this file would run as a formula is written
                 // with the apostrophe that says it is text. Only text: a number is a number,
                 // and -5 must stay one.
-                data[r][c] = value instanceof String && runsAsFormula(shown) ? "'" + shown : shown;
+                // Text that already starts with that apostrophe gets another, or reading the
+                // file back would take the first one off.
+                data[r][c] = value instanceof String && guarded(shown) ? "'" + shown : shown;
             }
         }
         writer.write(out, data);

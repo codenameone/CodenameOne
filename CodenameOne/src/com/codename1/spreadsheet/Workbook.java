@@ -955,7 +955,9 @@ public final class Workbook {
     }
 
     private void collect(Node n, Sheet home, ArrayList<Ref> out, int depth) {
-        if (n == null) {
+        // depth counts every level, names' formulas included, as evaluation does: past
+        // Evaluator.MAX_EVAL_DEPTH the formula is #NUM! and reads nothing more
+        if (n == null || depth > Evaluator.MAX_EVAL_DEPTH) {
             return;
         }
         if (n.kind == Node.REF) {
@@ -973,23 +975,21 @@ public final class Workbook {
             return;
         }
         if (n.kind == Node.NAME) {
-            if (depth < 16) {
-                collect(definedNameNode(n.name()), home, out, depth + 1);
-            }
+            collect(definedNameNode(n.name()), home, out, depth + 1);
             return;
         }
         if (n.kind == Node.BINARY) {
             // a chain of operators is walked and not recursed into: see Node.spine
             Node[] spine = Node.spine(n);
-            collect(spine[0].args[0], home, out, depth);
+            collect(spine[0].args[0], home, out, depth + 1);
             for (Node link : spine) {
-                collect(link.args[1], home, out, depth);
+                collect(link.args[1], home, out, depth + 1);
             }
             return;
         }
         if (n.args != null) {
             for (int i = 0; i < n.args.length; i++) {
-                collect(n.args[i], home, out, depth);
+                collect(n.args[i], home, out, depth + 1);
             }
         }
     }
@@ -998,12 +998,13 @@ public final class Workbook {
     /// function whose result moves by itself, or one that reads cells it does not name.
     boolean isVolatile(Node node, int depth) {
         Node n = node;
-        if (n == null) {
+        // every level counts, names' formulas included, as in collect
+        if (n == null || depth > Evaluator.MAX_EVAL_DEPTH) {
             return false;
         }
         // down the left of a chain of operators in a loop: see Node.spine
         while (n.kind == Node.BINARY) {
-            if (isVolatile(n.args[1], depth)) {
+            if (isVolatile(n.args[1], depth + 1)) {
                 return true;
             }
             n = n.args[0];
@@ -1014,12 +1015,12 @@ public final class Workbook {
                 return true;
             }
         }
-        if (n.kind == Node.NAME && depth < 16 && isVolatile(definedNameNode(n.name()), depth + 1)) {
+        if (n.kind == Node.NAME && isVolatile(definedNameNode(n.name()), depth + 1)) {
             return true;
         }
         if (n.args != null) {
             for (int i = 0; i < n.args.length; i++) {
-                if (isVolatile(n.args[i], depth)) {
+                if (isVolatile(n.args[i], depth + 1)) {
                     return true;
                 }
             }
