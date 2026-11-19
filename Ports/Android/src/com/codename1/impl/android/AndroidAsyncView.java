@@ -1144,6 +1144,20 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         }
 
         @Override
+        public void clearRect(final int x, final int y, final int width, final int height) {
+            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.clearRect(x, y, width, height);
+                }
+
+                public String toString() {
+                    return "clearRect";
+                }
+            });
+        }
+
+        @Override
         public void fillRect(final int x, final int y, final int width, final int height) {
             if (alpha == 0) {
                 return;

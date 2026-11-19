@@ -2137,6 +2137,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void clearRect(Object graphics, int x, int y, int width, int height) {
+        LinuxNative.clearRect(peer(graphics), x, y, width, height);
+    }
+
+    @Override
     public void drawRect(Object graphics, int x, int y, int width, int height) {
         LinuxNative.drawRect(peer(graphics), x, y, width, height);
     }
