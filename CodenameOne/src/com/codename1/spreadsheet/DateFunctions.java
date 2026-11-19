@@ -51,7 +51,7 @@ final class DateFunctions {
     }
 
     private static final int DAYS_TO_1904 = 1462;
-    private static final double LAST_DAY = 2958465;
+    static final double LAST_DAY = 2958465;
 
     /// Text that names a day is read in the 1900 numbering; a workbook that counts from 1904
     /// has to have it in its own, or `YEAR("2024-03-15")` answers 2028. Only the date

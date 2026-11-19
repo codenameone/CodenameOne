@@ -72,6 +72,10 @@ final class OdsReader {
         if (!content) {
             throw new IOException("Not an OpenDocument spreadsheet: the archive has no content.xml");
         }
+        if (book.getSheetCount() == 0) {
+            // a text document or a drawing has a content.xml too
+            throw new IOException("Not an OpenDocument spreadsheet: it has no tables");
+        }
         resolveFormats();
         for (int i = 0; i < book.getSheetCount(); i++) {
             Sheet sheet = book.getSheet(i);

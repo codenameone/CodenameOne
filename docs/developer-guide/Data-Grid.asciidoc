@@ -608,9 +608,9 @@ older binary `.xls` format or a file protected with a password.
 ==== Separated text
 
 Text has no types, so reading CSV guesses them: a cell that reads as a number, a
-date or a logical value becomes one. The guess is made for a whole column,
+date or a logical value becomes one, cell by cell. Numbers are the exception,
 because a column of postal codes or part numbers would otherwise lose the zeros
-at the start of `00420`. Where any cell of a column would lose digits as a
+at the start of `00420`: where any cell of a column would lose digits as a
 number, the whole column stays text. The separator is detected from the first
 lines when the file uses a semicolon, a tab or a bar instead of a comma.
 

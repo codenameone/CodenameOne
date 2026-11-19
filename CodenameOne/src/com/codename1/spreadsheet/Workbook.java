@@ -381,8 +381,8 @@ public final class Workbook {
     /// #### Parameters
     ///
     /// - `name`: the name of the sheet, which formulas on other sheets use to refer to it.
-    ///   Excel opens no file with a sheet name over 31 characters or named `History`, so keep
-    ///   to that for a workbook that is written as XLSX
+    ///   Excel takes names of up to 31 characters, and writing a workbook with a longer one as
+    ///   XLSX throws `IOException`
     ///
     /// #### Returns
     ///

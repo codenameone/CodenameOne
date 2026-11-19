@@ -906,8 +906,9 @@ final class CellFormat {
         }
         Section s = pick(v);
         if (s.date) {
-            if (v < 0) {
-                // what a column too narrow for its date shows, and a negative date always
+            if (v < 0 || v >= DateFunctions.LAST_DAY + 1 - (date1904 ? 1462 : 0)) {
+                // what a column too narrow for its date shows, and a date before the first
+                // day or after 9999-12-31 always
                 return "########";
             }
             return formatDate(s, v, date1904);
