@@ -792,11 +792,23 @@ public final class Oracle {
         } catch (OracleError err) {
             IOException failure = classify(err.number, err.getMessage() + " [" + sql + "]");
             throw failure;
+        } catch (Refusal err) {
+            throw err;
         } catch (IOException err) {
             // Half a request sent or half an answer read: nothing that follows
             // on this connection can be trusted to be the answer to its question.
             close();
             throw err;
+        }
+    }
+
+    /// A statement refused before anything was sent, which leaves the
+    /// session as it was.
+    private static final class Refusal extends IOException {
+        private static final long serialVersionUID = 1L;
+
+        Refusal(String message) {
+            super(message);
         }
     }
 
@@ -1833,7 +1845,7 @@ public final class Oracle {
                 }
                 int number = marker[1];
                 if (number < 1) {
-                    throw new IOException("Oracle parameters are written :1, :2 and so on, "
+                    throw new Refusal("Oracle parameters are written :1, :2 and so on, "
                             + "bound by number: [" + sql + "]");
                 }
                 if (number > params.length) {
@@ -1847,7 +1859,7 @@ public final class Oracle {
                 values.add(params[number - 1]);
             }
             if (highest < params.length) {
-                throw new IOException("The statement does not use :" + params.length + " and "
+                throw new Refusal("The statement does not use :" + params.length + " and "
                         + params.length + " value" + (params.length == 1 ? " was" : "s were")
                         + " supplied: [" + sql + "]");
             }
