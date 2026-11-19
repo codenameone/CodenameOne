@@ -63,9 +63,6 @@ final class GraphLook {
     // per UIID, then per pixel size: asked once per node per frame, and an
     // Integer of a font size is a cached one, so a lookup allocates nothing
     private static final HashMap<String, HashMap<Integer, Font>> FONTS = new HashMap<String, HashMap<Integer, Font>>();
-    // the corners of a thick segment, filled on every call (the EDT paints alone)
-    private static final int[] LINE_X = new int[4];
-    private static final int[] LINE_Y = new int[4];
     private static int generation = -1;
     private static Boolean darkSeen;
 
@@ -243,8 +240,10 @@ final class GraphLook {
         }
         double nx = -dy / len * width / 2;
         double ny = dx / len * width / 2;
-        int[] xs = LINE_X;
-        int[] ys = LINE_Y;
+        // new arrays per call, never shared scratch: Android's async view
+        // queues the arrays it is given and draws them after paint returns
+        int[] xs = new int[4];
+        int[] ys = new int[4];
         xs[0] = (int) Math.round(x1 + nx);
         xs[1] = (int) Math.round(x2 + nx);
         xs[2] = (int) Math.round(x2 - nx);
