@@ -171,9 +171,11 @@ fi
 log "Ensuring Maven is available"
 if [ -z "${MAVEN_HOME:-}" ] || ! [ -x "$MAVEN_HOME/bin/mvn" ]; then
   mvn_archive="$DOWNLOAD_DIR/$(basename "$MAVEN_URL")"
-  if [ -f "$mvn_archive" ]; then
+  # A cached archive is held to the same digest as a fresh one; a bad copy is re-downloaded.
+  if [ -f "$mvn_archive" ] && sha512_matches "$mvn_archive" "$MAVEN_SHA512"; then
     log "Using cached Maven archive $(basename "$mvn_archive")"
   else
+    rm -f "$mvn_archive"
     mvn_got=""
     for mvn_url in $MAVEN_MIRROR_URLS; do
       log "Downloading Maven from $mvn_url"
