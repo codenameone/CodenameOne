@@ -31,7 +31,8 @@ final class ArrayFunctions {
             + " TAKE TOCOL TOROW UNIQUE VSTACK WRAPCOLS WRAPROWS";
 
     /// The most cells a generated array may have.
-    private static final int MAX_CELLS = 1 << 20;
+    /// The most elements an array holds, generated or read from a range: one column of a sheet.
+    static final int MAX_CELLS = 1 << 20;
 
     private ArrayFunctions() {
     }

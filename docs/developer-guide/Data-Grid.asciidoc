@@ -592,6 +592,11 @@ A few things work differently from Excel:
   those older applications, and Excel opens it with an `@` wherever a function
   wanting one value is given a range. It's read the same way, so it answers
   what Excel shows for that file.
+* An array holds at most 1,048,576 values, one whole column. Arithmetic or a
+  comparison over a range larger than that, as in `=SUMPRODUCT(--(A:XFD=0))`,
+  answers `#NUM!` rather than taking the memory. Functions that read a range
+  without making an array of it, such as `SUM`, `COUNTIF` and `INDEX`, have no
+  such limit.
 * Text is read as a date when it's written `2026-01-12` or names its month,
   as in `12-Jan-2026`. A date of digits and slashes isn't: `1/2/2026` is a
   different day in different countries.

@@ -349,7 +349,7 @@ final class Evaluator {
             if (argDepth == 0 && !arrayFormula) {
                 return intersectImplicitly(r);
             }
-            return matrix(r);
+            return elementsOf(r);
         }
         return v == MISSING ? null : v;
     }
@@ -367,7 +367,7 @@ final class Evaluator {
         Object[][] y = arrayB ? (Object[][]) b : null;
         int rows = Math.max(x == null ? 1 : x.length, y == null ? 1 : y.length);
         int cols = Math.max(x == null ? 1 : width(x), y == null ? 1 : width(y));
-        Object[][] out = new Object[rows][cols];
+        Object[][] out = elements(rows, cols);
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
                 out[r][c] = apply(op, x == null ? a : element(x, r, c), y == null ? b : element(y, r, c));
@@ -389,7 +389,7 @@ final class Evaluator {
     Object[][] shaped(Object arg, int rows, int cols) {
         if (arg instanceof Ref) {
             Ref r = (Ref) arg;
-            Object[][] out = new Object[rows][cols];
+            Object[][] out = elements(rows, cols);
             for (int i = 0; i < rows; i++) {
                 for (int j = 0; j < cols; j++) {
                     out[i][j] = value(r.sheet, r.r1 + i, r.c1 + j);
@@ -580,7 +580,7 @@ final class Evaluator {
             if (v instanceof Ref) {
                 Ref r = (Ref) v;
                 v = r.isSingleCell() ? value(r.sheet, r.r1, r.c1)
-                        : implicit && !arrayFormula && r.next == null && r.lastSheet == null ? intersectImplicitly(r) : (Object) matrix(r);
+                        : implicit && !arrayFormula && r.next == null && r.lastSheet == null ? intersectImplicitly(r) : (Object) elementsOf(r);
                 args[i] = v;
             }
             if (v instanceof Object[][]) {
@@ -593,7 +593,7 @@ final class Evaluator {
         if (rows == 0) {
             return callScalar(info, name, args);
         }
-        Object[][] out = new Object[rows][cols];
+        Object[][] out = elements(rows, cols);
         Object[] scalars = new Object[args.length];
         // Each element of REPT over a million-cell array may be the longest text there is;
         // what the whole array holds is capped as a cell's text is.
@@ -817,7 +817,7 @@ final class Evaluator {
                 rows = Math.max(rows, ((Object[][]) no).length);
                 cols = Math.max(cols, width((Object[][]) no));
             }
-            Object[][] out = new Object[rows][cols];
+            Object[][] out = elements(rows, cols);
             for (int r = 0; r < rows; r++) {
                 for (int c = 0; c < cols; c++) {
                     Object e = element(m, r, c);
@@ -873,7 +873,7 @@ final class Evaluator {
                 cols = Math.max(cols, width(m));
             }
         }
-        Object[][] out = new Object[rows][cols];
+        Object[][] out = elements(rows, cols);
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
                 out[r][c] = decide(kind, v, r, c);
@@ -950,8 +950,8 @@ final class Evaluator {
         }
         spread = true;
         int at = liftArg;
-        Object[][] m = matrix(args[at]);
-        Object[][] out = new Object[m.length][width(m)];
+        Object[][] m = elementsOf(args[at]);
+        Object[][] out = elements(m.length, width(m));
         for (int r = 0; r < m.length; r++) {
             for (int c = 0; c < out[r].length; c++) {
                 Object[] one = new Object[args.length];
@@ -1031,7 +1031,28 @@ final class Evaluator {
     }
 
     /// The values of an argument as rows and columns, a range at its full size.
+    /// A new array of the given size, refused with `#NUM!` past the most elements an array
+    /// holds: arithmetic over every cell of a sheet would otherwise allocate a value per cell.
+    static Object[][] elements(int rows, int cols) {
+        if ((long) rows * cols > ArrayFunctions.MAX_CELLS) {
+            throw EvalError.NUM;
+        }
+        return new Object[rows][cols];
+    }
+
     Object[][] matrix(Object v) {
+        return matrix(v, false);
+    }
+
+    /// The elements of an operand of arithmetic or of a function applied element by element:
+    /// every cell of a range, empty ones included, so `SUMPRODUCT(--(A1:A100=0))` counts all
+    /// hundred however much of the sheet holds data. A function that reads a range, as
+    /// `COUNTIF` or `INDEX` does, takes `matrix`, cut down to the cells that hold data.
+    Object[][] elementsOf(Object v) {
+        return matrix(v, true);
+    }
+
+    private Object[][] matrix(Object v, boolean full) {
         if (v instanceof Object[][]) {
             return (Object[][]) v;
         }
@@ -1043,16 +1064,19 @@ final class Evaluator {
                 // (SUM, COUNT and the like) walk them themselves
                 throw EvalError.VALUE;
             }
-            // Every cell of the range is an element, empty ones included: SUMPRODUCT(--(A1:A100=0))
-            // counts all hundred, however much of the sheet holds data. Rows past the last one
-            // with data share one row of empty cells, which nothing writes into.
             Ref r = whole.clip();
-            int rows = whole.rows();
-            int cols = whole.cols();
+            Ref shape = full ? whole : r;
+            int rows = shape.rows();
+            int cols = shape.cols();
+            if (full && (long) rows * cols > ArrayFunctions.MAX_CELLS) {
+                // a whole column is an array; the whole sheet would be a value per cell
+                throw EvalError.NUM;
+            }
+            // Rows past the data share one row of empty cells, which nothing writes into.
             Object[][] out = new Object[rows][];
             Object[] empty = null;
             for (int i = 0; i < rows; i++) {
-                if (whole.r1 + i > r.r2) {
+                if (shape.r1 + i > r.r2) {
                     if (empty == null) {
                         empty = new Object[cols];
                     }
@@ -1060,8 +1084,8 @@ final class Evaluator {
                     continue;
                 }
                 Object[] line = new Object[cols];
-                for (int j = 0; j < cols && whole.c1 + j <= r.c2; j++) {
-                    line[j] = value(r.sheet, whole.r1 + i, whole.c1 + j);
+                for (int j = 0; j < cols && shape.c1 + j <= r.c2; j++) {
+                    line[j] = value(r.sheet, shape.r1 + i, shape.c1 + j);
                 }
                 out[i] = line;
             }

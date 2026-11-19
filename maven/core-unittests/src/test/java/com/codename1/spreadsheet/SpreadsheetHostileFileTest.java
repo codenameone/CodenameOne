@@ -1169,6 +1169,51 @@ class SpreadsheetHostileFileTest extends UITestBase {
         s3.setCellFormula(1, 0, "SUM(S2:S3!A1)");
         three.removeSheet(1);
         same(Double.valueOf(4), s3.getCellValue(1, 0), "a span that lost its first sheet");
+        // an array of the whole sheet is refused, not allocated
+        bl.setCellFormula(1, 1, "SUMPRODUCT(--(A:XFD=0))");
+        same(CellError.NUM, bl.getCellValue(1, 1), "an array of every cell of a sheet");
+        bl.setCellFormula(1, 2, "ROWS(A:A+0)");
+        same(Double.valueOf(1048576), bl.getCellValue(1, 2), "an array of a whole column");
+        // the empty cells of a whole column are counted, past the rows that hold data too
+        Workbook cb = new Workbook();
+        Sheet blankSrc = cb.addSheet("C");
+        Sheet blankOut = cb.addSheet("O");
+        blankSrc.setCellValue(0, 0, Double.valueOf(1));
+        blankSrc.setCellValue(2, 0, Double.valueOf(0));
+        blankSrc.setCellValue(1, 1, "x");
+        blankOut.setCellFormula(0, 0, "COUNTIF(C!A:A,\"\")");
+        same(Double.valueOf(1048574), blankOut.getCellValue(0, 0), "COUNTIF of the empty cells of a column");
+        blankOut.setCellFormula(1, 0, "COUNTIF(C!A:A,0)");
+        same(Double.valueOf(1), blankOut.getCellValue(1, 0), "COUNTIF of zero leaves the empty cells out");
+        blankOut.setCellFormula(2, 0, "COUNTIFS(C!A:A,\"\",C!B:B,\"\")");
+        same(Double.valueOf(1048573), blankOut.getCellValue(2, 0), "COUNTIFS of empty cells in two columns");
+        blankOut.setCellFormula(3, 0, "COUNTIF(C!A:XFD,1)");
+        same(Double.valueOf(1), blankOut.getCellValue(3, 0), "COUNTIF over the whole sheet");
+        // half of a surrogate pair is no character
+        bl.setCellFormula(2, 1, "UNICHAR(55357)");
+        same(CellError.NA, bl.getCellValue(2, 1), "UNICHAR of half a pair");
+        bl.setCellFormula(2, 2, "UNICODE(UNICHAR(128512))");
+        same(Double.valueOf(128512), bl.getCellValue(2, 2), "UNICODE of a pair");
+        // OpenDocument names three functions apart from Excel, both ways
+        Sheet od = new Workbook().addSheet("O");
+        od.setCellValue(0, 0, Double.valueOf(1));
+        od.setCellValue(1, 0, Double.valueOf(2));
+        od.setCellValue(2, 0, Double.valueOf(9));
+        od.setCellFormula(0, 1, "FORMULATEXT(B2)");
+        od.setCellFormula(1, 1, "SKEW.P(A1:A3)");
+        od.setCellFormula(2, 1, "CHITEST(A1:A2,A2:A3)");
+        ByteArrayOutputStream oo = new ByteArrayOutputStream();
+        od.getWorkbook().write(oo, Workbook.Format.ODS);
+        String content = new String(unzip(oo.toByteArray(), "content.xml"), "UTF-8");
+        for (String name : new String[] {"of:=FORMULA(", "of:=SKEWP(", "of:=LEGACY.CHITEST("}) {
+            if (content.indexOf(name) < 0) {
+                wrong.append("\nODS does not name ").append(name);
+            }
+        }
+        Sheet odBack = Workbook.read(new ByteArrayInputStream(oo.toByteArray()), Workbook.Format.ODS).getSheet(0);
+        same("=FORMULATEXT(B2)", odBack.getCellFormula(0, 1), "FORMULA read back");
+        same("=SKEW.P(A1:A3)", odBack.getCellFormula(1, 1), "SKEWP read back");
+        same("=CHITEST(A1:A2,A2:A3)", odBack.getCellFormula(2, 1), "LEGACY.CHITEST read back");
         Sheet tm = new Workbook().addSheet("T");
         tm.setValueAt(0, 0, "36:30");
         same("36:30:00", tm.getCellText(0, 0), "a time past a day");

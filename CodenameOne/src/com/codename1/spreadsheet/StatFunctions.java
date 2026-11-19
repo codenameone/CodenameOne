@@ -557,10 +557,10 @@ final class StatFunctions {
             }
             case 62: { // COUNTIF
                 boolean[][] mask = Criteria.mask(ev, a, 0, 2);
-                return d(countTrue(mask));
+                return d(countTrue(mask) + Criteria.blanksBeyondData(ev, a, 0, 2));
             }
             case 63: // COUNTIFS
-                return d(countTrue(Criteria.mask(ev, a, 0, a.length)));
+                return d(countTrue(Criteria.mask(ev, a, 0, a.length)) + Criteria.blanksBeyondData(ev, a, 0, a.length));
             case 64: { // AVERAGEIF
                 if (a.length < 2) {
                     throw EvalError.VALUE;

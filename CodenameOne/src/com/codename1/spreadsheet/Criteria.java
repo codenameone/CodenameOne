@@ -212,6 +212,29 @@ final class Criteria {
         return p == pn;
     }
 
+    /// The cells of the ranges past the rows and columns that hold data, when an empty cell
+    /// passes every condition: `COUNTIF(A:A, "")` counts the empty cells of the whole column,
+    /// as Excel does, though the mask covers only the cells that hold data. 0 otherwise.
+    static double blanksBeyondData(Evaluator ev, Object[] args, int from, int to) {
+        long full = -1;
+        long filled = -1;
+        for (int i = from; i + 1 < to; i += 2) {
+            if (!(args[i] instanceof Ref) || !new Criteria(ev.scalar(args[i + 1])).matches(null)) {
+                return 0;
+            }
+            Ref whole = (Ref) args[i];
+            Ref data = whole.clip();
+            long w = (long) whole.rows() * whole.cols();
+            long d = (long) data.rows() * data.cols();
+            if (full >= 0 && (w != full || d != filled)) {
+                return 0;
+            }
+            full = w;
+            filled = d;
+        }
+        return full < 0 ? 0 : full - filled;
+    }
+
     /// The cells that pass every condition of a list of range and criterion pairs, as rows
     /// and columns of the first range. Throws `#VALUE!` when the ranges differ in shape.
     static boolean[][] mask(Evaluator ev, Object[] args, int from, int to) {
