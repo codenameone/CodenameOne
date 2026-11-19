@@ -821,6 +821,32 @@ class SpreadsheetHostileFileTest extends UITestBase {
         same("1E-320", ts.getCellText(0, 0), "a subnormal number in General");
         same("4.9E-324", Values.general(Double.MIN_VALUE), "the smallest number in General");
         same("1.5E-301", Values.general(1.5e-301), "a number just past the scaling");
+        same("1E-300", Values.general(9.999999999999999E-301), "a mantissa that rounds up to ten");
+        // the codes of built-in formats 5 to 8 are written in full: those ids are currency in en-US
+        Workbook money = new Workbook();
+        Sheet ms = money.addSheet("S");
+        ms.setCellValue("A1", Double.valueOf(-1234.5));
+        ms.setCellFormat(0, 0, "#,##0;[Red]-#,##0");
+        try {
+            ByteArrayOutputStream x = new ByteArrayOutputStream();
+            money.write(x, Workbook.Format.XLSX);
+            same("#,##0;[Red]-#,##0", Workbook.read(new ByteArrayInputStream(x.toByteArray()), Workbook.Format.XLSX)
+                    .getSheet(0).getCellFormat(0, 0), "a plain format is not written as a built-in id");
+            java.util.zip.ZipInputStream z = new java.util.zip.ZipInputStream(new ByteArrayInputStream(x.toByteArray()));
+            for (java.util.zip.ZipEntry en = z.getNextEntry(); en != null; en = z.getNextEntry()) {
+                if ("xl/styles.xml".equals(en.getName())) {
+                    ByteArrayOutputStream st = new ByteArrayOutputStream();
+                    byte[] buf = new byte[4096];
+                    for (int n = z.read(buf); n > 0; n = z.read(buf)) {
+                        st.write(buf, 0, n);
+                    }
+                    same(Boolean.TRUE, Boolean.valueOf(new String(st.toByteArray(), "UTF-8").contains("formatCode=\"#,##0;[Red]-#,##0\"")),
+                            "the code is in the styles");
+                }
+            }
+        } catch (IOException e) {
+            wrong.append('\n').append(e);
+        }
         same("9999-12-31", CellFormat.format("yyyy-mm-dd", Double.valueOf(2958465), false), "the last day");
         same("########", CellFormat.format("yyyy-mm-dd", Double.valueOf(2958466), false), "the day after the last");
         // a date the format cannot show keeps its number in a text file

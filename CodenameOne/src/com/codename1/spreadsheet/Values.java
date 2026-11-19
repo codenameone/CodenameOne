@@ -420,7 +420,15 @@ final class Values {
             String text = Double.toString(d);
             int e = text.indexOf('E');
             if (e > 0) {
-                return general(Double.parseDouble(text.substring(0, e))) + text.substring(e);
+                double mantissa = Double.parseDouble(text.substring(0, e));
+                int exponent = Integer.parseInt(text.substring(e + 1));
+                String digits = general(mantissa);
+                if (Math.abs(Double.parseDouble(digits)) >= 10) {
+                    // 9.999999999999999 rounds to 10 in fifteen digits
+                    digits = general(mantissa / 10);
+                    exponent++;
+                }
+                return digits + "E" + exponent;
             }
         }
         if (d == 0) {

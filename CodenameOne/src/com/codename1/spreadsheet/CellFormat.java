@@ -206,7 +206,9 @@ final class CellFormat {
     static int builtinId(String code) {
         for (int i = 0; i < 50; i++) {
             String b = builtin(i);
-            if (b != null && b.equals(code) && (i < 37 || i > 40)) {
+            // 5 to 8 and 37 to 40 are the locale's: in en-US 5 to 8 are currency, so the codes
+            // they are read as here are written out in full and keep their meaning
+            if (b != null && b.equals(code) && (i < 5 || i > 8) && (i < 37 || i > 40)) {
                 return i;
             }
         }
