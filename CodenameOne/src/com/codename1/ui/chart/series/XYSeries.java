@@ -42,7 +42,6 @@ public abstract class XYSeries extends Series {
     private double[] fromY;
     // the x of each fromY slot, so a transition matches old values to new ones by x; null matches by index
     private double[] fromX;
-    private double[] fromBase;
     // each extra channel's offset from its point's value where the last transition started, per
     // fromY slot; null on entry, so a first appearance grows out of the point's own value
     private double[][] fromAux;
@@ -282,34 +281,9 @@ public abstract class XYSeries extends Series {
             throw new IndexOutOfBoundsException("Index " + index + " of a series of " + count + " points");
         }
         begin();
-        double old = ys[index];
         ys[index] = y;
-        valueSet(index, old, y);
         dataChanged();
         return this;
-    }
-
-    /// Called by `set` after the value of point `index` changed, before the transition starts,
-    /// so the extra channels can follow it. By default a channel that still holds the value
-    /// `auxDefault` derived from the old y (so it was never given one of its own) is derived
-    /// again from the new y; a channel that was set explicitly is left alone.
-    ///
-    /// #### Parameters
-    ///
-    /// - `index`: the point
-    ///
-    /// - `oldY`: its previous value
-    ///
-    /// - `y`: its new value
-    protected void valueSet(int index, double oldY, double y) {
-        if (aux == null) {
-            return;
-        }
-        for (int k = 0; k < aux.length; k++) {
-            if (Double.compare(aux[k][index], auxDefault(k, oldY)) == 0) {
-                aux[k][index] = auxDefault(k, y);
-            }
-        }
     }
 
     /// Removes every point.
@@ -398,6 +372,12 @@ public abstract class XYSeries extends Series {
     /// The base this series' point `i` rests on: 0, or the stacked sum of the earlier series
     /// in its group.
     public double getBase(int i) {
+        return stackBase(null, i);
+    }
+
+    // the sum of the earlier layers under point i: settled values weighted by their shown
+    // fraction for a null ctx, else each layer's value as painted in this frame
+    private double stackBase(ChartContext ctx, int i) {
         if (stackGroup == null || getChart() == null) {
             return 0;
         }
@@ -428,7 +408,7 @@ public abstract class XYSeries extends Series {
                     if (j >= 0) {
                         double v = xo.ys[j];
                         if (!isGap(v) && (v < 0) == negative) {
-                            sum += v * frac;
+                            sum += ctx == null ? v * frac : xo.animatedY(ctx, j);
                         }
                     }
                 }
@@ -562,6 +542,20 @@ public abstract class XYSeries extends Series {
     /// The y shown at `i` in the current frame: the value interpolated from where the last
     /// transition started.
     public double animatedY(ChartContext ctx, int i) {
+        double v = rawAnimatedY(ctx, i);
+        if (ctx != null && stackGroup != null) {
+            // a stack layer fading in or out is drawn at the fraction it is shown, and the layers
+            // above rest on exactly that (animatedBase), so the stack never gaps or overlaps
+            float f = getVisibilityFraction();
+            if (f >= 0 && f < 1) {
+                v *= f;
+            }
+        }
+        return v;
+    }
+
+    // the interpolated value without the visibility weighting of a fading stack layer
+    private double rawAnimatedY(ChartContext ctx, int i) {
         double t = ctx == null ? 1 : ctx.getProgress();
         double target = ys[i];
         if (fromY == null || t >= 1) {
@@ -571,7 +565,7 @@ public abstract class XYSeries extends Series {
         return j < 0 ? target : lerp(fromY[j], target, t);
     }
 
-    // the slot of fromY/fromBase that point i animates from, or -1 for none. Matched by x when the
+    // the slot of fromY that point i animates from, or -1 for none. Matched by x when the
     // old and new data are both ascending, so a point that slid one place left (setMaxPoints) keeps
     // its own old value instead of taking its neighbour's; a new x starts from the old point just
     // before it, so an appended point grows out of the previous last point instead of snapping in.
@@ -625,12 +619,22 @@ public abstract class XYSeries extends Series {
         if (fromY == null || t >= 1 || isGap(target)) {
             return target;
         }
+        if (!isAuxRelative(channel)) {
+            // an absolute channel (a bubble size) has no relation to y: a matched point tweens
+            // its own old value, a new point grows from zero
+            int j = fromSlot(i);
+            if (j < 0 || fromX != null && fromX[j] != xs[i]) { //NOPMD CompareDoubles - exact x match intended
+                return lerp(0, target, t);
+            }
+            double f = fromAux == null || j >= fromAux[channel].length ? Double.NaN : fromAux[channel][j];
+            return isGap(f) ? target : lerp(f, target, t);
+        }
         double y = ys[i];
         double off = target - y;
         if (isGap(off)) {
             return target;
         }
-        double ay = animatedY(ctx, i);
+        double ay = rawAnimatedY(ctx, i);
         int j = fromSlot(i);
         double from = 0;
         if (fromAux != null && j >= 0 && j < fromAux[channel].length) {
@@ -642,32 +646,46 @@ public abstract class XYSeries extends Series {
         return ay + lerp(from, off, t);
     }
 
+    /// True when extra channel `channel` is a value on the y scale (a high, a low, a quartile)
+    /// and so animates as an offset from the point's value; false for a channel of its own
+    /// scale, such as a bubble size, which animates by itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channel`: the extra channel
+    ///
+    /// #### Returns
+    ///
+    /// true by default
+    protected boolean isAuxRelative(int channel) {
+        return true;
+    }
+
     /// The stacked base shown at `i` in the current frame.
     public double animatedBase(ChartContext ctx, int i) {
-        double target = getBase(i);
         double t = ctx == null ? 1 : ctx.getProgress();
-        if (fromBase == null || fromY == null || t >= 1) {
-            return target;
+        if (t >= 1) {
+            return getBase(i);
         }
-        int j = fromSlot(i);
-        return j < 0 || j >= fromBase.length ? target : lerp(fromBase[j], target, t);
+        // computed from the layers below as they are painted this frame, never tweened from a
+        // snapshot toward a target that is itself moving
+        return stackBase(ctx, i);
     }
 
     @Override
     protected void captureTransitionStart() {
         ChartContext ctx = getChart() == null ? null : getChart().getLastContext();
         double[] fy = new double[count];
-        double[] fb = new double[count];
         for (int i = 0; i < count; i++) {
-            fy[i] = animatedY(ctx, i);
-            fb[i] = animatedBase(ctx, i);
+            fy[i] = rawAnimatedY(ctx, i);
         }
         double[][] fa = null;
         if (aux != null) {
             fa = new double[aux.length][count];
             for (int k = 0; k < aux.length; k++) {
                 for (int i = 0; i < count; i++) {
-                    fa[k][i] = animatedAux(ctx, k, i) - fy[i];
+                    double a = animatedAux(ctx, k, i);
+                    fa[k][i] = isAuxRelative(k) ? a - fy[i] : a;
                 }
             }
         }
@@ -677,7 +695,6 @@ public abstract class XYSeries extends Series {
             System.arraycopy(xs, 0, fx, 0, count);
         }
         fromY = fy;
-        fromBase = fb;
         fromX = fx;
         fromAux = fa;
     }
@@ -686,7 +703,6 @@ public abstract class XYSeries extends Series {
     protected void transitionEnded() {
         fromY = null;
         fromX = null;
-        fromBase = null;
         fromAux = null;
     }
 
@@ -695,10 +711,6 @@ public abstract class XYSeries extends Series {
         fromY = new double[count];
         fromX = null;
         fromAux = null;
-        fromBase = new double[count];
-        for (int i = 0; i < count; i++) {
-            fromBase[i] = getBase(i);
-        }
     }
 
     @Override
@@ -912,6 +924,10 @@ public abstract class XYSeries extends Series {
     public void collectTableRows(List<String[]> rows) {
         Chart c = getChart();
         for (int i = 0; i < count; i++) {
+            if (isGapAt(i)) {
+                // a gap has no value to read out; a row of NaN would be noise
+                continue;
+            }
             String item = c == null ? com.codename1.ui.chart.axis.Axis.formatNumber(xs[i], 2) : c.getXAxis().format(xs[i], 0);
             rows.add(new String[]{getName(), item, tableValue(i)});
         }

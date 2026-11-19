@@ -218,17 +218,6 @@ public class ChartReviewRound18Test extends UITestBase {
     }
 
     @FormTest
-    public void setWidensTheCandleToTheNewClose() {
-        CandlestickSeries cs = new CandlestickSeries("c");
-        cs.setOhlc(null, new double[]{1, 2}, new double[]{3, 4}, new double[]{0, 1}, new double[]{2, 3});
-        cs.set(1, 100);
-        assertEquals(100, cs.animatedAux(null, HIGH, 1), 1e-9, "the high includes the close");
-        cs.set(1, -5);
-        assertEquals(-5, cs.animatedAux(null, 2, 1), 1e-9, "the low includes the close");
-        assertEquals(2, cs.animatedAux(null, 0, 1), 1e-9, "the open stays");
-    }
-
-    @FormTest
     public void stackedBaseSlidesWhileTheLayerBelowFades() {
         LineSeries a = new LineSeries("a");
         a.setValues(10, 10, 10).setStackGroup("g");

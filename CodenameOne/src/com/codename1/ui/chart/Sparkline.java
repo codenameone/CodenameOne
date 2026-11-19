@@ -220,10 +220,12 @@ public class Sparkline extends Component {
             min = Math.min(0, min);
             max = Math.max(0, max);
         }
-        double span = max - min;
-        if (span == 0) {
+        // every position is (max - v) / (max - min), computed on halves: the full span of two
+        // finite values can overflow to infinity (-MAX_VALUE to MAX_VALUE), the halves cannot
+        double span = max * 0.5 - min * 0.5;
+        if (!(span > 0)) { //NOPMD LogicInversion - a flat series, or no usable span
             // a flat series draws through the middle
-            span = 1;
+            span = 0.5;
             max += 0.5;
         }
         int c = color != null ? color.intValue() : theme().getSeriesColor(0);
@@ -233,13 +235,13 @@ public class Sparkline extends Component {
         int alpha = g.getAlpha();
         if (type == BARS) {
             float bw = w / (float) n;
-            int zero = y + (int) Math.round((max - 0) / span * h);
+            int zero = y + (int) Math.round(max * 0.5 / span * h);
             for (int i = 0; i < n; i++) {
                 double v = values[i];
                 if (gap(v)) {
                     continue;
                 }
-                int vy = y + (int) Math.round((max - v) / span * h);
+                int vy = y + (int) Math.round((max * 0.5 - v * 0.5) / span * h);
                 int bx = x + Math.round(i * bw + bw * 0.1f);
                 int bwi = Math.max(1, Math.round(bw * 0.8f));
                 g.setColor(v < 0 ? theme().getNegativeColor() : c);
@@ -265,7 +267,7 @@ public class Sparkline extends Component {
                     continue;
                 }
                 float px = x + (n == 1 ? w / 2f : i * w / (float) (n - 1));
-                float py = (float) (y + (max - v) / span * h);
+                float py = (float) (y + (max * 0.5 - v * 0.5) / span * h);
                 if (!started) {
                     line.moveTo(px, py);
                     area.moveTo(px, y + h);
@@ -291,6 +293,13 @@ public class Sparkline extends Component {
                 g.setAlpha(alpha);
             }
             g.drawShape(line, new Stroke(Math.max(1, CN.convertToPixels(0.35f)), Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 1));
+            // a point with gaps on both sides is a run of one, which the line draws as nothing
+            int lone = Math.max(1, Math.round(Math.max(1, CN.convertToPixels(0.35f)) * 2f));
+            for (int i = 0; i < n; i++) {
+                if (!gap(values[i]) && (i == 0 || gap(values[i - 1])) && (i == n - 1 || gap(values[i + 1]))) {
+                    dot(g, x, y, w, h, n, i, values[i], max, span, c, lone);
+                }
+            }
             if (showExtremes) {
                 dot(g, x, y, w, h, n, iMax, values[iMax], max, span, theme().getPositiveColor(), dot);
                 dot(g, x, y, w, h, n, iMin, values[iMin], max, span, theme().getNegativeColor(), dot);
@@ -316,7 +325,7 @@ public class Sparkline extends Component {
 
     private static void dot(Graphics g, int x, int y, int w, int h, int n, int i, double v, double max, double span, int color, int d) {
         float px = x + (n == 1 ? w / 2f : i * w / (float) (n - 1));
-        float py = (float) (y + (max - v) / span * h);
+        float py = (float) (y + (max * 0.5 - v * 0.5) / span * h);
         g.setColor(color);
         g.fillArc(Math.round(px - d / 2f), Math.round(py - d / 2f), d, d, 0, 360);
     }

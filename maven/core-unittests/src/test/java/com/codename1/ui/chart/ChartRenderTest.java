@@ -67,10 +67,15 @@ public class ChartRenderTest extends UITestBase {
             // no legend, and the companion spans the same data, so hiding the series changes
             // neither the axes nor a legend entry: what disappears is what the series painted
             c.setLegendPosition(Chart.LEGEND_NONE);
+            // the bounds of the whole chart with everything shown: a stacked layer hidden lowers
+            // the layers above it, and the companion must keep the axes where they were
+            companion.xb = union(all, true);
+            companion.yb = union(all, false);
             for (Series s : all) {
-                companion.mirror = s;
                 int shown = fills(c);
                 s.setVisible(false);
+                // reset per render, so the assertion speaks for the render with the series hidden
+                companion.painted = false;
                 int hidden = fills(c);
                 s.setVisible(true);
                 assertTrue(companion.painted, "the companion keeps the chart non-empty");
@@ -81,12 +86,30 @@ public class ChartRenderTest extends UITestBase {
         return c;
     }
 
+    private static double[] union(Series[] all, boolean x) {
+        double[] u = null;
+        for (Series s : all) {
+            double[] b = x ? s.getXBounds() : s.getYBounds();
+            if (b == null) {
+                continue;
+            }
+            if (u == null) {
+                u = new double[]{b[0], b[1]};
+            } else {
+                u[0] = Math.min(u[0], b[0]);
+                u[1] = Math.max(u[1], b[1]);
+            }
+        }
+        return u;
+    }
+
     // paints one rectangle in every frame, so hiding the series under test leaves a chart that is
     // still drawing data; a series whose paint does nothing then fails the comparison above
     private static final class Companion extends Series {
         private final boolean cartesian;
         boolean painted;
-        Series mirror;
+        double[] xb;
+        double[] yb;
 
         Companion(boolean cartesian) {
             super("companion");
@@ -100,12 +123,12 @@ public class ChartRenderTest extends UITestBase {
 
         @Override
         public double[] getXBounds() {
-            return mirror == null ? null : mirror.getXBounds();
+            return xb;
         }
 
         @Override
         public double[] getYBounds() {
-            return mirror == null ? null : mirror.getYBounds();
+            return yb;
         }
 
         @Override

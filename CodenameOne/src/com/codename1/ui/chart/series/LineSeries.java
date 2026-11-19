@@ -426,7 +426,10 @@ public class LineSeries extends XYSeries {
         // the category extent, so the work stays bounded by the plot rather than by the data
         int extent = Math.max(1, ctx.isRotated() ? ctx.getPlotHeight() : ctx.getPlotWidth());
         int step = Math.max(1, (r[1] - r[0] + extent) / extent);
-        for (int i = r[0]; i <= r[1]; i += step) {
+        // anchored to the data index rather than to the first visible point, so a pan keeps
+        // labelling the same points instead of a different subset every frame
+        int start = (r[0] + step - 1) / step * step;
+        for (int i = start; i <= r[1]; i += step) {
             double v = ys[i];
             if (isGap(v) || isGap(xs[i])) {
                 continue;

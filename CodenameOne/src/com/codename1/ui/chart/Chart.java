@@ -205,6 +205,9 @@ public class Chart extends Component {
         beginChange();
         series.remove(s);
         s.chart = null;
+        // the removed series no longer gets the finished transition's cleanup; drop its
+        // snapshot now so a re-add does not replay it
+        s.transitionEnded();
         dropPointsOf(s);
         // the legend hit boxes hold series indices, which no longer line up until the next paint
         legendHits.clear();
@@ -219,15 +222,20 @@ public class Chart extends Component {
 
     /// Removes every series.
     public Chart clearSeries() {
+        // the same as removing each one: snapshot, drop each snapshot, then transition
+        beginChange();
         for (Series s : series) {
             s.chart = null;
+            s.transitionEnded();
         }
         series.clear();
         legendHits.clear();
         pendingSelection = null;
         selected = null;
         hover = null;
-        repaint();
+        if (!inBatch) {
+            startTransition();
+        }
         return this;
     }
 
@@ -1513,9 +1521,11 @@ public class Chart extends Component {
         int anchorX;
         int anchorY;
         if (tooltipMode == TOOLTIP_SHARED && sharedX == sharedX && hasCartesian()) {
+            boolean skipScatter = hasAlignedXYSeries();
             for (Series s : series) {
-                // scatter points are not aligned by x with other series (see its getPointCount)
-                if (s.isVisible() && s instanceof XYSeries && !(s instanceof ScatterSeries)) {
+                // scatter points are not aligned by x with other series (see its getPointCount),
+                // so they get rows only on a chart of nothing but scatter
+                if (s.isVisible() && s instanceof XYSeries && !(skipScatter && s instanceof ScatterSeries)) {
                     int i = indexAtX((XYSeries) s, sharedX);
                     ChartPoint cp = i < 0 ? null : s.getPoint(ctx, i);
                     if (cp != null) {
@@ -1641,7 +1651,8 @@ public class Chart extends Component {
     // ------------------------------------------------------------------ accessibility
 
     /// The chart's data as rows of `{series, item, value}`, in series order. Hidden series are
-    /// included: the table is the complete data, not what happens to be on screen.
+    /// included: the table is the complete data, not what happens to be on screen. A gap has no
+    /// value and no row.
     ///
     /// #### Returns
     ///
@@ -1700,9 +1711,15 @@ public class Chart extends Component {
         }
         for (int i = 0; i < series.size(); i++) {
             Series s = series.get(i);
+            if (!s.isVisible()) {
+                // the summary describes the picture; a series hidden from it is not read out
+                continue;
+            }
             sb.append(s.getName() == null ? "Series " + (i + 1) : s.getName()).append(": ");
             double[] yb = valueRange(s);
-            if (yb != null) {
+            if (yb == null && s instanceof XYSeries) {
+                sb.append("no values");
+            } else if (yb != null) {
                 // an x/y series is summarized from its numbers; formatting every point of a long
                 // series on each accessibility query would be wasted work
                 sb.append(((XYSeries) s).size()).append(" values from ").append(s.formatValue(null, yb[0]))
@@ -1776,6 +1793,17 @@ public class Chart extends Component {
     /// The x value of the data point nearest the pointer along the category direction, over
     /// every visible series, or NaN. Series sampled at different x values each take part, so a
     /// point of a longer or offset series is reachable too.
+    // true when a visible x series other than scatter exists; scatter is then left out of the
+    // shared tooltip, and a chart of scatter alone still gets one
+    private boolean hasAlignedXYSeries() {
+        for (Series s : series) {
+            if (s.isVisible() && s instanceof XYSeries && !(s instanceof ScatterSeries)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private double nearestSharedX(int relX, int relY) {
         ChartContext ctx = lastContext;
         if (ctx == null || ctx.plotW <= 0 || ctx.plotH <= 0) {
@@ -1791,8 +1819,9 @@ public class Chart extends Component {
         double target = xAxis.fromNormalized(n);
         double bestX = Double.NaN;
         int bestD = Integer.MAX_VALUE;
+        boolean skipScatter = hasAlignedXYSeries();
         for (Series candidate : series) {
-            if (!candidate.isVisible() || !(candidate instanceof XYSeries) || candidate instanceof ScatterSeries) {
+            if (!candidate.isVisible() || !(candidate instanceof XYSeries) || skipScatter && candidate instanceof ScatterSeries) {
                 continue;
             }
             XYSeries xs = (XYSeries) candidate;

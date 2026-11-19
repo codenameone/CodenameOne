@@ -110,6 +110,11 @@ public class ScatterSeries extends XYSeries {
     }
 
     @Override
+    protected boolean isAuxRelative(int channel) {
+        return false;
+    }
+
+    @Override
     protected double auxDefault(int channel, double y) {
         return Double.NaN;
     }
@@ -136,7 +141,8 @@ public class ScatterSeries extends XYSeries {
         if (!bubbles || !(maxSize > 0) || isGap(s)) { //NOPMD LogicInversion - also true for a NaN max
             return Math.max(3, ctx.mm(pointMm));
         }
-        double f = Math.sqrt(Math.max(0, s) / maxSize);
+        // clamped: a size mid-transition can exceed the settled maximum
+        double f = Math.min(1, Math.sqrt(Math.max(0, s) / maxSize));
         return Math.max(3, (int) (ctx.mm(maxBubbleMm) * f));
     }
 
@@ -244,7 +250,8 @@ public class ScatterSeries extends XYSeries {
 
     @Override
     public int getPointCount() {
-        // points are not index aligned with other series, so no shared tooltip row
+        // points are not index aligned with other series; the shared tooltip gives them rows
+        // only on a chart of nothing but scatter
         return -1;
     }
 }

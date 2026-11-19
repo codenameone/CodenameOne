@@ -130,24 +130,21 @@ public class CandlestickSeries extends XYSeries {
         if (i < 0) {
             return this;
         }
-        // set() snapshots the screen before valueSet() widens the wick, so the wick tweens too
+        // snapshot before anything changes, so the widened wick tweens with the body; only a
+        // live tick widens high and low, set() writes the close alone
+        if (getChart() != null) {
+            getChart().beginChange();
+        }
+        if (!isGap(price)) {
+            if (!(aux[HIGH][i] >= price)) { //NOPMD LogicInversion - also true for a NaN high
+                aux[HIGH][i] = price;
+            }
+            if (!(aux[LOW][i] <= price)) { //NOPMD LogicInversion - also true for a NaN low
+                aux[LOW][i] = price;
+            }
+        }
         set(i, price);
         return this;
-    }
-
-    /// A new close widens the candle's high and low to include it; the open stays, being the
-    /// price the period started at.
-    @Override
-    protected void valueSet(int index, double oldY, double y) {
-        if (isGap(y)) {
-            return;
-        }
-        if (!(aux[HIGH][index] >= y)) { //NOPMD LogicInversion - also true for a NaN high
-            aux[HIGH][index] = y;
-        }
-        if (!(aux[LOW][index] <= y)) { //NOPMD LogicInversion - also true for a NaN low
-            aux[LOW][index] = y;
-        }
     }
 
     /// Chooses candles, OHLC bars or Heikin-Ashi candles.
