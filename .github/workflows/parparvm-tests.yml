@@ -5,6 +5,7 @@ on:
     paths:
       - 'scripts/ci/retry.sh'
       - '.github/workflows/parparvm-tests.yml'
+      - 'scripts/ci/start-sqlserver-strict.sh'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
       # GpuBlendContractTest reads each GPU backend's blend factors out of its
@@ -106,6 +107,7 @@ on:
     paths:
       - 'scripts/ci/retry.sh'
       - '.github/workflows/parparvm-tests.yml'
+      - 'scripts/ci/start-sqlserver-strict.sh'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
       # GpuBlendContractTest reads each GPU backend's blend factors out of its
@@ -406,6 +408,13 @@ jobs:
           WHENEVER SQLERROR EXIT FAILURE
           GRANT EXECUTE ON SYS.DBMS_LOCK TO cn1;
           SQL
+
+      # TDS 8.0 on the native runtime: TLS first, ALPN tds/8.0. A step, not a
+      # service, because the server needs a certificate generated first.
+      - name: Start SQL Server 2025 for sslmode=strict
+        run: |
+          URL=$(bash scripts/ci/start-sqlserver-strict.sh "$RUNNER_TEMP/sqlstrict")
+          echo "CN1_DBCHECK_SQLSERVER_STRICT=$URL" >> "$GITHUB_ENV"
 
       # The backend's MySQL client REFUSES to complete caching_sha2_password's
       # full exchange on an unencrypted connection, because that exchange sends

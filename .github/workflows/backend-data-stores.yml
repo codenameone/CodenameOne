@@ -23,6 +23,8 @@ on:
       - '.github/workflows/backend-data-stores.yml'
       - 'scripts/ci/retry.sh'
       - '.github/scripts/require-no-skipped-tests.sh'
+      - 'scripts/ci/start-sqlserver-strict.sh'
+      - 'vm/backend/impl/javase/com/codename1/backend/Tcp.java'
       - 'vm/backend/src/com/codename1/backend/aws/**'
       - 'vm/backend/src/com/codename1/backend/bson/**'
       - 'vm/backend/src/com/codename1/backend/document/**'
@@ -206,6 +208,18 @@ jobs:
         run: |
           mvn -B -pl backend test -Dtest='SearchEngineTest' \
             -Dcn1.backend.database=mysql \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+          bash "$GITHUB_WORKSPACE/.github/scripts/require-no-skipped-tests.sh" backend/target/surefire-reports \
+            SearchEngineTest
+
+      - name: SQL full-text search on SQL Server 2025 over TDS 8.0 strict
+        working-directory: maven
+        run: |
+          URL=$(bash "$GITHUB_WORKSPACE/scripts/ci/start-sqlserver-strict.sh" "$RUNNER_TEMP/sqlstrict")
+          CN1_TEST_DATABASE_URL="$URL" mvn -B -pl backend test -Dtest='SearchEngineTest' \
+            -Dcn1.backend.database=sqlserver \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"

@@ -59,6 +59,12 @@ import com.codename1.backend.annotations.Isolation;
 /// without TLS is refused unless `sslmode=disable` says the plaintext is
 /// deliberate.
 ///
+/// `sslmode=strict` is TDS 8.0: TLS first, before any TDS byte, with PRELOGIN
+/// and the login inside it, the certificate verified for the host and ALPN
+/// `tds/8.0` offered. It is what a server or Azure SQL set to strict encryption
+/// requires. SQL Server on Linux serves it from 2025; 2022 on Linux refuses
+/// every strict connection (error 17821) whatever its certificate.
+///
 /// #### Sign-in
 ///
 /// A SQL login by name and password, or a Windows account over NTLMv2 when the
@@ -190,7 +196,8 @@ public final class SqlServer {
     /// demand TLS to a certificate that verifies for `host`, `verify-ca` a
     /// chain to `caFile` without the name, `prefer` uses TLS and fails when the
     /// server has none, since a login cannot be protected without it, and
-    /// `disable` is plaintext, deliberately.
+    /// `disable` is plaintext, deliberately. `strict` is SQL Server's own: TDS
+    /// 8.0, TLS before the first packet, verified as `require` is.
     ///
     /// A user written `DOMAIN\\user` signs in as that Windows account over
     /// NTLMv2; any other is a SQL login.
@@ -200,13 +207,14 @@ public final class SqlServer {
     public static SqlServer connect(String host, int port, String database, String user,
             String password, String sslMode, String caFile, int timeoutMillis,
             int socketTimeoutMillis) throws IOException {
-        String mode = SqlLimits.canonicalSslMode(sslMode == null ? "prefer" : sslMode);
+        boolean strict = sslMode != null && "strict".equals(sslMode.trim());
+        String mode = strict ? "require" : SqlLimits.canonicalSslMode(sslMode == null ? "prefer" : sslMode);
         SqlLimits.requireRootForVerifyCa(mode, caFile);
         String targetHost = host;
         int targetPort = port <= 0 ? 1433 : port;
         for (int hop = 0 ; ; hop++) {
             SqlServer session = open(targetHost, targetPort, database, user, password, mode,
-                    sslMode, caFile, timeoutMillis, socketTimeoutMillis);
+                    sslMode, strict, caFile, timeoutMillis, socketTimeoutMillis);
             if (session.routeHost == null) {
                 return session;
             }
@@ -220,7 +228,7 @@ public final class SqlServer {
     }
 
     private static SqlServer open(String host, int port, String database, String user,
-            String password, String mode, String modeAsWritten, String caFile,
+            String password, String mode, String modeAsWritten, boolean strict, String caFile,
             int timeoutMillis, int socketTimeoutMillis) throws IOException {
         Tcp connection = Tcp.connect(host, port, timeoutMillis);
         try {
@@ -228,6 +236,20 @@ public final class SqlServer {
                 connection.setReadTimeout(socketTimeoutMillis);
             }
             SqlServer session = new SqlServer(connection);
+            if (strict) {
+                // TDS 8.0: the server tells a TLS ClientHello from a PRELOGIN
+                // packet by its first byte, so the handshake goes first and the
+                // whole exchange, PRELOGIN included, runs inside it.
+                try {
+                    connection.startTls(host, caFile, true, "tds/8.0");
+                } catch (IOException err) {
+                    throw new IOException("TDS 8.0 (sslmode=strict) to " + host + " failed: "
+                            + err.getMessage() + ". The server closes the handshake when it "
+                            + "has no certificate it accepts for strict connections, and SQL "
+                            + "Server 2022 on Linux has none; use sslmode=require there", err);
+                }
+                session.encrypted = true;
+            }
             session.negotiate(host, mode, modeAsWritten, caFile);
             session.login(host, database, user == null ? "" : user,
                     password == null ? "" : password);
@@ -262,6 +284,10 @@ public final class SqlServer {
         send(PACKET_PRELOGIN, request, request.length);
 
         byte[] answer = readWholeMessage(4096);
+        if (encrypted) {
+            // Strict: already inside TLS, and the option is not negotiated.
+            return;
+        }
         int offered = -1;
         for (int iter = 0 ; iter + 5 <= answer.length && (answer[iter] & 0xff) != 0xff ; iter += 5) {
             if (answer[iter] == 1) {

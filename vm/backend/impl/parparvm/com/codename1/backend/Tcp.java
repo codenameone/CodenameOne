@@ -97,7 +97,14 @@ public final class Tcp {
     /// a certificate for anybody.
     public void startTls(String host, String caFile, boolean verifyHost)
             throws IOException {
-        upgrade(host, caFile, verifyHost, -1);
+        upgrade(host, caFile, verifyHost, -1, null);
+    }
+
+    /// [#startTls(String, String, boolean)] offering one ALPN protocol, which
+    /// TDS 8.0 asks for as `tds/8.0`.
+    public void startTls(String host, String caFile, boolean verifyHost, String alpn)
+            throws IOException {
+        upgrade(host, caFile, verifyHost, -1, alpn);
     }
 
     /// Starts TLS with the handshake carried INSIDE TDS packets, which is how
@@ -112,10 +119,10 @@ public final class Tcp {
     /// else and uses [#startTls(String, String, boolean)].
     public void startTlsTunnelled(String host, String caFile, boolean verifyHost,
                                   int packetType) throws IOException {
-        upgrade(host, caFile, verifyHost, packetType & 0xff);
+        upgrade(host, caFile, verifyHost, packetType & 0xff, null);
     }
 
-    private void upgrade(String host, String caFile, boolean verifyHost, int tunnelType)
+    private void upgrade(String host, String caFile, boolean verifyHost, int tunnelType, String alpn)
             throws IOException {
         if (!verifyHost && caFile == null) {
             throw new IOException("Skipping the host name check needs a trust "
@@ -133,6 +140,7 @@ public final class Tcp {
         // The trust root is a file name that crosses to a native; see
         // Urls.requireNoNul for what a NUL in it loads instead.
         Urls.requireNoNul("An sslrootcert path", caFile);
+        Urls.requireNoNul("An ALPN protocol", alpn);
         checkOpen();
         if (tls != 0) {
             return;
@@ -152,7 +160,9 @@ public final class Tcp {
         long session;
         claim(claimed);
         try {
-            session = tunnelType < 0
+            session = alpn != null
+                    ? startTlsAlpnImpl(claimed[0], host, caFile, verifyHost, alpn)
+                    : tunnelType < 0
                     ? startTlsImpl(claimed[0], host, caFile, verifyHost)
                     : startTlsTunnelledImpl(claimed[0], host, caFile, verifyHost, tunnelType);
         } finally {
@@ -462,6 +472,8 @@ public final class Tcp {
     private static native int closeImpl(long handle);
     private static native long startTlsImpl(long handle, String host, String caFile,
             boolean verifyHost);
+    private static native long startTlsAlpnImpl(long handle, String host, String caFile,
+            boolean verifyHost, String alpn);
     private static native long startTlsTunnelledImpl(long handle, String host, String caFile,
             boolean verifyHost, int packetType);
     private static native String tlsErrorImpl();

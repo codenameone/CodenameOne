@@ -611,7 +611,7 @@ static BIO_METHOD* cn1TunnelEnsureMethod(void) {
 
 /* tunnelType < 0 is a handshake on the bare socket; otherwise it travels in
    TDS packets of that type. */
-static JAVA_LONG cn1ClientTlsStart(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost, int tunnelType) {
+static JAVA_LONG cn1ClientTlsStart(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost, int tunnelType, JAVA_OBJECT alpn) {
     SSL_CTX* ctx;
     SSL* ssl;
     char* h;
@@ -687,6 +687,29 @@ static JAVA_LONG cn1ClientTlsStart(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, 
        arriving with a pointer OpenSSL has not seen before. */
     SSL_set_mode(ssl, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_set_tlsext_host_name(ssl, h);
+    /* ALPN, when the protocol names one (TDS 8.0 asks for "tds/8.0"). The CA
+     * path above is no longer needed, so the thread's scratch buffer is free to
+     * hold this conversion. The wire form is each name behind its length byte. */
+    if(alpn != JAVA_NULL) {
+        const char* name = stringToUTF8(threadStateData, alpn);
+        size_t len = name == 0 ? 0 : strlen(name);
+        unsigned char wire[256];
+        if(len == 0 || len > 255) {
+            snprintf(cn1ClientTlsError, sizeof(cn1ClientTlsError), "an ALPN protocol name is 1 to 255 bytes");
+            SSL_free(ssl);
+            free(h);
+            return 0;
+        }
+        wire[0] = (unsigned char)len;
+        memcpy(wire + 1, name, len);
+        /* Returns 0 on success, unlike the rest of OpenSSL. */
+        if(SSL_set_alpn_protos(ssl, wire, (unsigned int)(len + 1)) != 0) {
+            snprintf(cn1ClientTlsError, sizeof(cn1ClientTlsError), "ALPN could not be set");
+            SSL_free(ssl);
+            free(h);
+            return 0;
+        }
+    }
     /* The name check. Without it a valid certificate for any other host would
      * pass, which is most of what TLS is for here.
      *
@@ -775,11 +798,15 @@ static JAVA_LONG cn1ClientTlsStart(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, 
 }
 
 JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost) {
-    return cn1ClientTlsStart(threadStateData, handle, host, caFile, verifyHost, -1);
+    return cn1ClientTlsStart(threadStateData, handle, host, caFile, verifyHost, -1, JAVA_NULL);
+}
+
+JAVA_LONG com_codename1_backend_Tcp_startTlsAlpnImpl___long_java_lang_String_java_lang_String_boolean_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost, JAVA_OBJECT alpn) {
+    return cn1ClientTlsStart(threadStateData, handle, host, caFile, verifyHost, -1, alpn);
 }
 
 JAVA_LONG com_codename1_backend_Tcp_startTlsTunnelledImpl___long_java_lang_String_java_lang_String_boolean_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost, JAVA_INT packetType) {
-    return cn1ClientTlsStart(threadStateData, handle, host, caFile, verifyHost, packetType & 0xff);
+    return cn1ClientTlsStart(threadStateData, handle, host, caFile, verifyHost, packetType & 0xff, JAVA_NULL);
 }
 
 JAVA_OBJECT com_codename1_backend_Tcp_tlsErrorImpl___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
@@ -932,6 +959,10 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
 }
 
 JAVA_LONG com_codename1_backend_Tcp_startTlsTunnelledImpl___long_java_lang_String_java_lang_String_boolean_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost, JAVA_INT packetType) {
+    return 0;
+}
+
+JAVA_LONG com_codename1_backend_Tcp_startTlsAlpnImpl___long_java_lang_String_java_lang_String_boolean_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT host, JAVA_OBJECT caFile, JAVA_BOOLEAN verifyHost, JAVA_OBJECT alpn) {
     return 0;
 }
 

@@ -1311,7 +1311,11 @@ public final class Database {
                         || "ssl-mode".equals(key) || "sslMode".equals(key)) {
                     // Validated here, before any socket, and handed on as
                     // written so the drivers' errors name the user's spelling.
-                    canonicalSslMode(value);
+                    // strict is SQL Server's TDS 8.0 alone; every other driver
+                    // refuses it when it connects.
+                    if (!"strict".equals(value.trim())) {
+                        canonicalSslMode(value);
+                    }
                     out.sslMode = value.trim();
                 } else if ("user".equals(key)) {
                     out.user = value;

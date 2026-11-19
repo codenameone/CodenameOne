@@ -138,7 +138,14 @@ public final class Tcp {
     /// a certificate for anybody.
     public void startTls(String host, String caFile, boolean verifyHost)
             throws IOException {
-        upgrade(host, caFile, verifyHost, null);
+        upgrade(host, caFile, verifyHost, null, null);
+    }
+
+    /// [#startTls(String, String, boolean)] offering one ALPN protocol, which
+    /// TDS 8.0 asks for as `tds/8.0`.
+    public void startTls(String host, String caFile, boolean verifyHost, String alpn)
+            throws IOException {
+        upgrade(host, caFile, verifyHost, null, alpn);
     }
 
     /// Starts TLS with the handshake carried INSIDE TDS packets, which is how
@@ -153,10 +160,10 @@ public final class Tcp {
     /// else and uses [#startTls(String, String, boolean)].
     public void startTlsTunnelled(String host, String caFile, boolean verifyHost,
                                   int packetType) throws IOException {
-        upgrade(host, caFile, verifyHost, new TunnelSocket(socket, packetType));
+        upgrade(host, caFile, verifyHost, new TunnelSocket(socket, packetType), null);
     }
 
-    private void upgrade(String host, String caFile, boolean verifyHost, TunnelSocket tunnel)
+    private void upgrade(String host, String caFile, boolean verifyHost, TunnelSocket tunnel, String alpn)
             throws IOException {
         if (!verifyHost && caFile == null) {
             throw new IOException("Skipping the host name check needs a trust "
@@ -192,6 +199,9 @@ public final class Tcp {
         SSLParameters parameters = upgraded.getSSLParameters();
         if (verifyHost) {
             parameters.setEndpointIdentificationAlgorithm("HTTPS");
+        }
+        if (alpn != null) {
+            parameters.setApplicationProtocols(new String[] {alpn});
         }
         upgraded.setSSLParameters(parameters);
         if (tunnel != null) {

@@ -105,6 +105,10 @@ final class SqlLimits {
         if ("verify-ca".equals(v) || "VERIFY_CA".equals(v)) {
             return "verify-ca";
         }
+        if ("strict".equals(v)) {
+            throw new IOException("sslmode=strict is SQL Server's TDS 8.0 and no other engine's: "
+                    + "use require or verify-full for TLS verified for the host");
+        }
         throw new IOException("sslmode=" + sslMode + " is not one this runtime "
                 + "implements: use require, verify-full, verify-ca, prefer or disable. It is "
                 + "refused rather than read as prefer, which would accept plaintext");
