@@ -2163,7 +2163,10 @@ class CleanTargetIntegrationTest {
         // This is a guard against a hang, not a performance budget: the perf
         // gate is what judges speed. So it judges progress, not total time --
         // ninja prints a line per translation unit, and a build whose output
-        // has not grown for BUILD_STALL_MINUTES is the hang. A fixed total
+        // has not grown for BUILD_STALL_MINUTES is the hang. The last step is
+        // the -flto=thin link of every object, which prints nothing until it
+        // ends and outlasted a 15-minute window on both Linux legs (after step
+        // 7,736 of 7,737), so the window has to cover that link. A fixed total
         // deadline failed healthy builds every time the suite grew. The overall
         // cap only backstops a build that keeps printing without finishing,
         // and stays under the job's own timeout so the test reports it.
@@ -2173,7 +2176,7 @@ class CleanTargetIntegrationTest {
                 BUILD_STALL_MINUTES * 60_000L);
     }
 
-    private static final long BUILD_STALL_MINUTES = 15;
+    private static final long BUILD_STALL_MINUTES = 50;
     private static final long BUILD_CAP_MINUTES = 125;
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {
