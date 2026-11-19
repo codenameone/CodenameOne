@@ -370,7 +370,7 @@ final class OdsReader {
             int grouped = Math.min(rowRepeat, 4096);
             book.allocated(grouped);
             for (int i = 0; i < grouped; i++) {
-                sheet.setRowOutlineLevel(row + i, Math.min(7, groupDepth));
+                sheet.setRowOutlineLevel(row + i, groupDepth);
             }
         }
         row = (int) Math.min((long) row + rowRepeat, (long) Node.MAX_ROW + 1);
@@ -585,7 +585,14 @@ final class OdsReader {
             value = duration(time);
             fallbackFormat = "[h]:mm:ss";
         } else if ("boolean".equals(type)) {
-            value = "true".equals(bool) ? Boolean.TRUE : Boolean.FALSE;
+            if ("true".equals(bool) || "1".equals(bool)) {
+                value = Boolean.TRUE;
+            } else if ("false".equals(bool) || "0".equals(bool)) {
+                value = Boolean.FALSE;
+            } else {
+                // xsd:boolean is these four spellings; anything else is a damaged file
+                throw new IllegalArgumentException("Not a boolean: " + bool);
+            }
         } else if ("string".equals(type)) {
             value = string != null ? string : text.toString();
         }

@@ -443,7 +443,7 @@ public final class Workbook {
     ///
     /// Values keep their types -- a number is a number in the file, a date a date -- and are
     /// never the text the grid formats them to. The depth of a row of a tree grid becomes its
-    /// outline level, and the grid's frozen columns stay frozen.
+    /// outline level, up to 7, the deepest level the file formats hold, and the grid's frozen columns stay frozen.
     ///
     /// A grouped grid is copied as it is shown: each group row becomes a row holding the
     /// group's key (in the grouped column, when that column is shown) and its aggregates as

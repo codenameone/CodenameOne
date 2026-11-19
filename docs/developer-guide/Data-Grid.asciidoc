@@ -607,7 +607,8 @@ the grid formatted it to:
 include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-save,indent=0]
 ----
 
-The depth of a row in a tree grid becomes its outline level, and the grid's
+The depth of a row in a tree grid becomes its outline level, up to 7, the
+deepest level the file formats hold, and the grid's
 frozen columns stay frozen. A grouped grid is copied as it's shown, too: each
 group row becomes a row with the group's key (in the grouped column, when that
 column is shown) and its aggregates as plain values,

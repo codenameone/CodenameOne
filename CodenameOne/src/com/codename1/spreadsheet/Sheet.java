@@ -1220,10 +1220,10 @@ public final class Sheet extends AbstractTableModel {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: for a width that is not a number or is infinite, which
+    /// - `IllegalArgumentException`: for a width that is negative, not a number or infinite, which
     ///   no file can hold, or a column outside the sheet
     public void setColumnWidth(int column, double characters) {
-        if (Double.isNaN(characters) || Double.isInfinite(characters)) {
+        if (Double.isNaN(characters) || Double.isInfinite(characters) || characters < 0) {
             throw new IllegalArgumentException("Not a column width: " + characters);
         }
         if (column < 0 || column > Node.MAX_COL) {
