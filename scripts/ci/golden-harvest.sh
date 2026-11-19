@@ -35,17 +35,13 @@ list() {
   [ "${#WORKFLOWS[@]}" -gt 0 ] || { log "no workflows read from golden-capture.sh"; return 1; }
   : > "$runs_file"
   # A capture (golden-capture.yml) dispatches the workflows one after another
-  # over a few minutes. Once any of them has a live capture run here, a
-  # workflow without one is still to come, not finished: harvesting then would
-  # take the legs that are done and leave the rest to a branch that has moved.
-  # Cancelled capture runs do not count: a capture that failed part way
-  # cancels the ones it started and marks its status as an error; the PR's
-  # own runs were cancelled too, so nothing at that head harvests until
-  # Golden capture is re-run. (A screenshot workflow dispatched by hand at a PR head counts as
-  # a capture too; nothing else dispatches them.) A capture that failed after
-  # one of its legs had already completed leaves that run live and the head
-  # never harvests; the PR's golden-plan still names the gap, and the next
-  # push captures again. Legs run far longer than dispatching takes.
+  # over a few minutes. A workflow without a run may still be coming until the
+  # capture status says dispatching is complete. Harvesting is incremental:
+  # every completed run can contribute images even while other legs are live.
+  # A cancelled capture contributes no run unless the cancelled run itself
+  # has a capture artifact; completed runs are still harvested regardless of
+  # the state of other legs. (A screenshot workflow dispatched by hand at a PR
+  # head counts as a capture too; nothing else dispatches them.)
   all=""
   for wf in "${WORKFLOWS[@]}"; do
     # One assignment per workflow, so a failed API call stops the listing
@@ -55,9 +51,8 @@ list() {
   done
   if jq -e -s 'any(.[].runs[]; .event == "workflow_dispatch" and .conclusion != "cancelled")' <<<"$all" >/dev/null; then
     capture=1
-    # A capture starts only the workflows whose goldens are missing, and
-    # sets its "Golden capture" status once all of them are dispatched.
-    # Until then a workflow without a capture run may still be coming.
+    # A capture starts only the workflows whose goldens are missing. Before
+    # its status is set, a workflow without a capture run may still be coming.
     dispatched="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/statuses" \
                     --jq 'any(.[]; .context == "Golden capture")')"
   fi
@@ -92,12 +87,17 @@ list() {
                  | "\(.id) \(.status)"' <<<"$runs")
   done
   echo "capture=$capture" >> "${GITHUB_OUTPUT:-/dev/null}"
+  if [ -s "$runs_file" ]; then
+    completed="$(awk '$2 == "completed" { n++ } END { print n+0 }' "$runs_file")"
+    echo "runs=$completed" >> "${GITHUB_OUTPUT:-/dev/null}"
+  else
+    echo "runs=" >> "${GITHUB_OUTPUT:-/dev/null}"
+  fi
   if [ "$pending" = 0 ] && [ -s "$runs_file" ]; then
     echo "ready=1" >> "${GITHUB_OUTPUT:-/dev/null}"
   else
-    log "not every screenshot run at $sha has completed; the last one harvests"
+    log "some screenshot runs at $sha are still pending; collecting completed runs now"
     echo "ready=0" >> "${GITHUB_OUTPUT:-/dev/null}"
-    [ -z "${HARVEST_REQUIRE_READY:-}" ] || return 3
   fi
 }
 

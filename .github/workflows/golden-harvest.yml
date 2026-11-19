@@ -6,15 +6,15 @@ name: Golden harvest
 # missing (a new test, a golden the PR deleted); what it cannot see, the run
 # itself finds. Every screenshot job uploads the images it rendered that have
 # no golden (`cn1ss-capture-<leg>`, .github/actions/cn1ss-capture) and still
-# fails its gate on them. Once every screenshot run at the PR's head has
-# completed, this commits those images to the branch with CN1SS_GH_TOKEN, and
+# fails its gate on them. As screenshot runs at the PR's head complete, this
+# commits any images they have already uploaded to the branch with
+# CN1SS_GH_TOKEN, and
 # the push starts CI again on a head that has them.
 #
 # It is also the second half of golden-capture.yml: that dispatches the
 # screenshot workflows in capture mode (workflow_dispatch runs on the PR
-# branch) and exits, and this collects them the same way once the last one has
-# completed, and settles the "Golden capture" status the capture left pending
-# on the PR.
+# branch) and exits, and this collects them the same way after each one
+# completes. It settles the "Golden capture" status after the final leg.
 #
 # workflow_run always runs the default branch's copy of this file, so the
 # harvest does nothing for any PR until it is on master, including the PR
@@ -123,7 +123,7 @@ jobs:
         run: |
           trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" failure "$WF capture was cancelled; re-run Golden capture"
       - name: Check the push token
-        if: steps.list.outputs.ready == '1'
+        if: steps.list.outputs.runs != '0'
         env:
           CN1SS_GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
         run: |
@@ -139,14 +139,14 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v6
-        if: steps.list.outputs.ready == '1'
+        if: steps.list.outputs.runs != '0'
         with:
           ref: ${{ github.event.workflow_run.head_branch || inputs.head_ref }}
           token: ${{ secrets.CN1SS_GH_TOKEN }}
           path: pr
       - name: Collect, commit and push the goldens
         id: collect
-        if: steps.list.outputs.ready == '1'
+        if: steps.list.outputs.runs != '0'
         env:
           # The runs at this head are a capture's (golden-capture.yml), not
           # only the PR's own: whichever run completed last started this.
@@ -177,15 +177,14 @@ jobs:
           # A leg restarted since the first listing is not done: the
           # harvest its completion starts takes over.
           rc=0
-          HARVEST_REQUIRE_READY=1 ../trusted/scripts/ci/golden-harvest.sh list "$HEAD_SHA" ../runs.txt || rc=$?
-          if [ "$rc" = 3 ]; then
-            exit 0
-          elif [ "$rc" != 0 ]; then
+          ../trusted/scripts/ci/golden-harvest.sh list "$HEAD_SHA" ../runs.txt || rc=$?
+          if [ "$rc" != 0 ]; then
             exit "$rc"
           fi
-          if [ "$CAPTURE" = 1 ]; then
-            # A leg GitHub never gave a runner is re-run, not reported as a
-            # failed capture; its completion starts the harvest again.
+          # A leg GitHub never gave a runner is re-run, not reported as a
+          # failed capture; its completion starts the harvest again. Do not
+          # wait to collect artifacts from legs that already finished.
+          if [ "$CAPTURE" = 1 ] && [ "${{ steps.list.outputs.ready }}" = 1 ]; then
             redone="$(RERUN_TOKEN="$CN1SS_GH_TOKEN" ../trusted/scripts/ci/golden-harvest.sh redo-dropped ../runs.txt)"
             if [ "$redone" -gt 0 ]; then
               ../trusted/scripts/ci/golden-harvest.sh status "$HEAD_SHA" pending \
@@ -205,9 +204,10 @@ jobs:
             git push origin "HEAD:$HEAD_REF"
             committed="$(git rev-parse HEAD)"
           fi
-          if [ "$CAPTURE" = 1 ]; then
+          if [ "$CAPTURE" = 1 ] && [ "${{ steps.list.outputs.ready }}" = 1 ]; then
             # A leg that failed still uploads what it rendered, so a commit
-            # does not mean every leg came back.
+            # does not mean every leg came back. Settle only after every
+            # requested run is complete.
             failed=""
             while read -r wf id; do
               c="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq .conclusion)" || c=unknown
