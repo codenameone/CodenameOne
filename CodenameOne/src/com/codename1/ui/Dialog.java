@@ -3733,11 +3733,17 @@ public class Dialog extends Form implements AbstractDialog {
         //    unit as millimetres, so this is physical, not iOS-point, width).
         // Unset (0) keeps the legacy full-width behaviour.
         int origPrefWidth = prefWidth;
-        int maxPct = getUIManager().getThemeConstant("dialogMaxWidthPercentInt", 0);
+        // Both caps exist so that text wraps. Content that cannot wrap -- the
+        // Material pickers' calendar and clock face -- would only be cut off
+        // by them (a headline ending in "..." and month arrows on top of each
+        // other), so the dialog that holds it says so and is as wide as its
+        // content, up to the screen.
+        boolean fixedContent = getClientProperty("$PACKED_NO_WIDTH_CAP") != null;
+        int maxPct = fixedContent ? 0 : getUIManager().getThemeConstant("dialogMaxWidthPercentInt", 0);
         if (maxPct > 0 && maxPct < 100) {
             prefWidth = Math.min(prefWidth, width * maxPct / 100);
         }
-        int maxWidthMM = getUIManager().getThemeConstant("dialogMaxWidthMMInt", 0);
+        int maxWidthMM = fixedContent ? 0 : getUIManager().getThemeConstant("dialogMaxWidthMMInt", 0);
         if (maxWidthMM > 0) {
             int maxWidthPx = Display.getInstance().convertToPixels(maxWidthMM, true);
             if (maxWidthPx > 0) {

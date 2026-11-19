@@ -19,15 +19,19 @@
 package com.codenameone.examples.slate.client;
 
 import com.codename1.io.Preferences;
+import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.spinner.Picker;
 import com.codenameone.examples.slate.Telemetry;
 import com.codenameone.examples.slate.api.AppointmentDto;
 import com.codenameone.examples.slate.api.DaySlotsDto;
@@ -49,11 +53,20 @@ import com.codenameone.examples.slate.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 // tag::slate-slot-picker[]
 /// Choosing when: a service, who with, and a free start, by the day or the
 /// week.
+///
+/// The day is chosen two ways. A strip of pills has the days around the one
+/// shown, a tap each. Beside it a date `Picker` opens the Material calendar
+/// for any other day -- the theme asks for it with `pickerStyle: material`,
+/// so the same field is the platform's own picker under another theme. The
+/// calendar starts today and has no last day: how far ahead a booking may be
+/// is the business's rule, the server holds it, and a day past it comes back
+/// with no starts and the reason.
 ///
 /// The free starts are the server's answer and nobody else's: the slot
 /// engine has every provider's hours, bookings, buffers and connected
@@ -76,6 +89,8 @@ public final class BookForm extends LiveChannel.Adapter {
     private final Form form;
     private final AppointmentDto moving;
     private final Container choices = new Container(BoxLayout.y());
+    private final Container days = new Container(new BorderLayout());
+    private Picker dayField;
     private final Container slots = new Container(BoxLayout.y());
     // Below the times, not above them: the times are what the screen is for,
     // and the switch is set once and left alone.
@@ -89,6 +104,11 @@ public final class BookForm extends LiveChannel.Adapter {
     private long day = Times.dayStart(System.currentTimeMillis());
     /// The client's own busy time on this phone over the days shown, once read.
     private List<long[]> mine = new ArrayList<long[]>();
+    /// The first day of the strip `mine` was read for.
+    private long mineFrom;
+    /// Counts the reads of the busy time, so that an answer can tell whether
+    /// a later read has replaced the one it belongs to.
+    private int mineRead;
     /// Beside the times on a wide window: the start picked, held, with its
     /// price and the button that books it. Null on a phone.
     private final Container summary;
@@ -256,27 +276,100 @@ public final class BookForm extends LiveChannel.Adapter {
                         readMine();
                     })));
         }
-        choices.add(dayStrip());
+        days.setName("days");
+        fillDays();
+        choices.add(days);
         Ui.relayout(choices);
     }
 
+    /// The first day of the strip: today, or as many whole strips later as
+    /// it takes to have the chosen day on it.
+    private long stripStart() {
+        long today = Times.dayStart(System.currentTimeMillis());
+        // Noon, so a day an hour short or long still counts as one.
+        int ahead = (int) ((Times.dayStart(day) - today + 12 * Times.HOUR) / Times.DAY);
+        return Times.addDays(today, Math.max(0, ahead) / DAYS_SHOWN * DAYS_SHOWN);
+    }
+
+    /// The calendar and the strip, for the day that is chosen.
+    private void fillDays() {
+        days.removeAll();
+        dayField = dayPicker();
+        days.add(BorderLayout.WEST, dayField);
+        final Container strip = dayStrip();
+        days.add(BorderLayout.CENTER, strip);
+        // The chosen day may be the last pill of a strip that scrolls.
+        final String chosen = "day-" + Times.iso(day);
+        CN.callSerially(() -> {
+            for (int iter = 0; iter < strip.getComponentCount(); iter++) {
+                Component pill = strip.getComponentAt(iter);
+                if (chosen.equals(pill.getName())) {
+                    strip.scrollComponentToVisible(pill);
+                }
+            }
+        });
+    }
+
+    /// The Material calendar, for a day the strip does not have.
+    private Picker dayPicker() {
+        final Picker picker = new Picker();
+        picker.setType(Display.PICKER_TYPE_DATE);
+        // Yesterday cannot be booked whatever the business allows. The other
+        // end is the server's to decide, and it says why when it refuses.
+        picker.setStartDate(new Date(Times.dayStart(System.currentTimeMillis())));
+        picker.setFormatter(new SimpleDateFormat("MMM d"));
+        picker.setDate(new Date(day));
+        picker.setName("day-picker");
+        picker.setUIID("SvDayPicker");
+        picker.setMaterialIcon(FontImage.MATERIAL_EVENT, 2.8f);
+        // Told when the field is tapped as well as when a date is confirmed:
+        // a tap, like a Cancel, leaves the date what it was.
+        picker.addActionListener(e -> pick(picker.getDate().getTime(), false));
+        return picker;
+    }
+
+    /// Shows `millis`'s day. The picker keeps the time of day it was given,
+    /// and a day is its midnight in the phone's zone everywhere in this app.
+    private void pick(long millis, boolean onStrip) {
+        long chosen = Math.max(Times.dayStart(millis), Times.dayStart(System.currentTimeMillis()));
+        if (chosen == day) {
+            return;
+        }
+        long shown = stripStart();
+        day = chosen;
+        if (onStrip && stripStart() == shown) {
+            // The pill is already down and the strip is where the finger
+            // left it: only the field has to say the new day.
+            dayField.setDate(new Date(day));
+        } else {
+            fillDays();
+        }
+        Ui.relayout(choices);
+        if (stripStart() != mineFrom) {
+            readMine();
+        } else {
+            loadSlots();
+        }
+    }
+
     private Container dayStrip() {
+        final long first = stripStart();
         long today = Times.dayStart(System.currentTimeMillis());
         String[] labels = new String[DAYS_SHOWN];
         String[] values = new String[DAYS_SHOWN];
         for (int iter = 0; iter < DAYS_SHOWN; iter++) {
-            long d = Times.addDays(today, iter);
-            labels[iter] = iter == 0 ? Lang.tr("Today") : iter == 1 ? Lang.tr("Tomorrow") : Times.shortDay(d);
+            long d = Times.addDays(first, iter);
+            labels[iter] = d == today ? Lang.tr("Today")
+                    : d == Times.addDays(today, 1) ? Lang.tr("Tomorrow") : Times.shortDay(d);
             values[iter] = Times.iso(d);
         }
         return Ui.pills("day", labels, values, Times.iso(day), iso -> {
             for (int iter = 0; iter < DAYS_SHOWN; iter++) {
-                long d = Times.addDays(today, iter);
+                long d = Times.addDays(first, iter);
                 if (Times.iso(d).equals(iso)) {
-                    day = d;
+                    pick(d, true);
                 }
             }
-            loadSlots();
         });
     }
 
@@ -293,13 +386,21 @@ public final class BookForm extends LiveChannel.Adapter {
 
     /// The client's own busy time, when they asked for it to be checked.
     private void readMine() {
+        final long from = stripStart();
+        final int read = ++mineRead;
+        mineFrom = from;
         if (!DeviceCalendar.canReadBusy() || !Preferences.get(CHECK_CALENDAR, false)) {
             mine = new ArrayList<long[]>();
             loadSlots();
             return;
         }
-        long from = Times.dayStart(System.currentTimeMillis());
         DeviceCalendar.busy(null, from, Times.addDays(from, DAYS_SHOWN + 7), busy -> {
+            // An answer that a later read has replaced -- the strip was left,
+            // or the check was turned off -- is not the busy time to mark:
+            // the later read brings its own.
+            if (read != mineRead) {
+                return;
+            }
             mine = busy;
             loadSlots();
         });
