@@ -134,10 +134,6 @@ public class ScatterSeries extends XYSeries {
         return this;
     }
 
-    private int diameter(ChartContext ctx, int i, double maxSize) {
-        return diameterOf(ctx, aux[0][i], maxSize);
-    }
-
     private int diameterOf(ChartContext ctx, double s, double maxSize) {
         if (!bubbles || !(maxSize > 0) || isGap(s)) { //NOPMD LogicInversion - also true for a NaN max
             return Math.max(3, ctx.mm(pointMm));
@@ -232,12 +228,18 @@ public class ScatterSeries extends XYSeries {
         double ms = maxSize();
         int best = -1;
         double bestD = Double.MAX_VALUE;
+        // hit what paint drew: the animated position and size, and only points in the visible x range
+        double xmin = ctx.getXAxis().getVisibleMin();
+        double xmax = ctx.getXAxis().getVisibleMax();
         for (int i = 0; i < count; i++) {
-            double v = getY(i);
-            if (isGap(v) || isGap(xs[i])) {
+            if (isGap(xs[i]) || xs[i] < xmin || xs[i] > xmax) {
                 continue;
             }
-            int r = Math.max(radius, diameter(ctx, i, ms) / 2);
+            double v = animatedY(ctx, i);
+            if (isGap(v)) {
+                continue;
+            }
+            int r = Math.max(radius, diameterOf(ctx, bubbles ? animatedAux(ctx, 0, i) : aux[0][i], ms) / 2);
             double dx = ctx.screenX(this, xs[i], v) - ctx.getOriginX() - x;
             double dy = ctx.screenY(this, xs[i], v) - ctx.getOriginY() - y;
             double d = dx * dx + dy * dy;

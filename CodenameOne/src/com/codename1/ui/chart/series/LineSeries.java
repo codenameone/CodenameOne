@@ -508,13 +508,21 @@ public class LineSeries extends XYSeries {
         advanceDash(t0 * len);
         double ux = dx / len;
         double uy = dy / len;
-        double pos = t0 * len;
-        double end = t1 * len;
-        while (pos < end) {
+        // Walk the visible part from its own start: positions measured from an unclipped start
+        // far off the plot are so large that adding a dash length to them changes nothing, and
+        // the loop would never end. The iteration cap is a second line of defence.
+        double cx0 = x0 + dx * t0;
+        double cy0 = y0 + dy * t0;
+        double pos = 0;
+        double end = (t1 - t0) * len;
+        double maxSteps = end / dashLen + 4;
+        int steps = 0;
+        while (pos < end && steps < maxSteps) {
+            steps++;
             double step = Math.min(dashLeft, end - pos);
             if (dashOn) {
-                dashes.moveTo((float) (x0 + ux * pos), (float) (y0 + uy * pos));
-                dashes.lineTo((float) (x0 + ux * (pos + step)), (float) (y0 + uy * (pos + step)));
+                dashes.moveTo((float) (cx0 + ux * pos), (float) (cy0 + uy * pos));
+                dashes.lineTo((float) (cx0 + ux * (pos + step)), (float) (cy0 + uy * (pos + step)));
             }
             pos += step;
             dashLeft -= step;

@@ -210,6 +210,23 @@ public class RadarSeries extends Series {
         if (!(top > 0) || top == Double.POSITIVE_INFINITY) { //NOPMD LogicInversion - also catches NaN
             top = 1;
         }
+        // While values shrink the polygons are still painted at the old, larger values; the scale
+        // must hold them or a polygon is drawn far outside the rings. Growth keeps the target's
+        // scale (shown values are below it), so a grow-in is not cancelled.
+        double shownMax = 0;
+        for (int k = 0; k < rs.size(); k++) {
+            RadarSeries rr = (RadarSeries) rs.get(k);
+            if (!(rr.getVisibilityFraction() > 0)) { //NOPMD LogicInversion - also rejects NaN
+                continue;
+            }
+            for (int i = 0; i < rr.values.length; i++) {
+                double sv = pos(rr.shown(ctx, i));
+                if (sv > shownMax && sv != Double.POSITIVE_INFINITY) {
+                    shownMax = sv;
+                }
+            }
+        }
+        top = Math.max(top, shownMax);
         // the ring loops below stop at RINGS whatever the arithmetic says, so no scale can hang the EDT
         if (top / step > MAX_RINGS) {
             step = top / MAX_RINGS;

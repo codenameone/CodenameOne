@@ -147,8 +147,10 @@ public class SunburstSeries extends HierarchySeries {
         double a = start;
         for (int i = 0; i < parent.getChildCount(); i++) {
             TreeNode c = parent.getChild(i);
-            double s = sweep * c.getValue() / total;
-            if (s <= 0) {
+            // divide first: sweep * value overflows for values near Double.MAX_VALUE, and an
+            // infinite or NaN sweep would hand the sector shape a NaN angle
+            double s = sweep * (c.getValue() / total);
+            if (!(s > 0) || Double.isInfinite(s)) { //NOPMD LogicInversion - also rejects NaN
                 continue;
             }
             int color = colorOf(ctx, c);
