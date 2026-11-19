@@ -307,6 +307,9 @@ final class XlsxReader {
                 if (width != null && (x.boolAttr("customWidth") || x.attr("customWidth") == null)) {
                     try {
                         double w = Double.parseDouble(width);
+                        if (Double.isNaN(w) || Double.isInfinite(w)) {
+                            w = 0;
+                        }
                         for (int c = min; c <= max; c++) {
                             sheet.setColumnWidth(c, w);
                         }

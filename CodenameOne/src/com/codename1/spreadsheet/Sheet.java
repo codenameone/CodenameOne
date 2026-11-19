@@ -1110,7 +1110,15 @@ public final class Sheet extends AbstractTableModel {
     /// - `column`: the column
     ///
     /// - `characters`: the width in characters of the default font; 0 for the default width
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a width that is not a number or is infinite, which
+    ///   no file can hold
     public void setColumnWidth(int column, double characters) {
+        if (Double.isNaN(characters) || Double.isInfinite(characters)) {
+            throw new IllegalArgumentException("Not a column width: " + characters);
+        }
         if (characters > 0) {
             columnWidths.put(Integer.valueOf(column), Double.valueOf(characters));
         } else {

@@ -1203,7 +1203,44 @@ final class CellFormat {
     }
 
     /// `# ?/?`: a whole part and the closest fraction whose denominator fits the placeholders.
+    /// A fraction with the text its format writes around it: `$# ?/2` shows 2.5 as
+    /// `$2 1/2`, and a section for negatives such as `-# ?/2` brings its own sign.
     private static String formatFraction(Section s, double abs, boolean negative) {
+        int first = -1;
+        int last = -1;
+        for (int i = 0; i < s.tokens.size(); i++) {
+            Token t = s.tokens.get(i);
+            if (t.kind == DIGIT || t.kind == SLASH) {
+                if (first < 0) {
+                    first = i;
+                }
+                last = i;
+                if (t.kind == SLASH) {
+                    int[] fixed = fixedDenominator(s.tokens, i);
+                    if (fixed != null) {
+                        last = fixed[1];
+                        i = fixed[1];
+                    }
+                }
+            }
+        }
+        StringBuilder prefix = new StringBuilder();
+        StringBuilder suffix = new StringBuilder();
+        for (int i = 0; i < s.tokens.size(); i++) {
+            Token t = s.tokens.get(i);
+            if (t.kind == LITERAL && (i < first || i > last)) {
+                (i < first ? prefix : suffix).append(t.text);
+            }
+        }
+        String body = fractionBody(s, abs, negative);
+        if (prefix.length() == 0 && suffix.length() == 0) {
+            return body;
+        }
+        boolean signed = body.startsWith("-");
+        return (signed ? "-" : "") + prefix + (signed ? body.substring(1) : body) + suffix;
+    }
+
+    private static String fractionBody(Section s, double abs, boolean negative) {
         int denominatorDigits = 0;
         int numeratorDigits = 0;
         int wholeDigits = 0;

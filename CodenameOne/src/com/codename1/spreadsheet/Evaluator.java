@@ -498,7 +498,14 @@ final class Evaluator {
             return CellError.NAME;
         }
         Node[] a = n.args;
-        argDepth++;
+        // the conditionals pass their arguments through: a range in IF(A1:A3<0,...) at the top
+        // of a formula meets the formula's row, as it would without the IF around it
+        boolean through = (info & Functions.CATEGORY) == Functions.SPECIAL && Functions.index(SWITCH_1, name) >= 0
+                && Functions.index(SWITCH_1, name) <= 5;
+        int depthBefore = argDepth;
+        if (!through) {
+            argDepth++;
+        }
         try {
             if ((info & Functions.CATEGORY) == Functions.SPECIAL) {
                 return special(name, a);
@@ -514,7 +521,7 @@ final class Evaluator {
         } catch (EvalError e) {
             return e.error; //NOPMD UnnecessaryLocalBeforeReturn - the caught error carries the value
         } finally {
-            argDepth--;
+            argDepth = depthBefore;
         }
     }
 
@@ -528,7 +535,11 @@ final class Evaluator {
             Object v = args[i];
             if (v instanceof Ref) {
                 Ref r = (Ref) v;
-                v = r.isSingleCell() ? value(r.sheet, r.r1, r.c1) : (Object) matrix(r);
+                // a range straight in a formula's own function call is the cell in the
+                // formula's row or column, as Excel reads ABS(A1:A3) in a file without
+                // dynamic arrays, the way the operators intersect at the top level
+                v = r.isSingleCell() ? value(r.sheet, r.r1, r.c1)
+                        : argDepth == 1 && !arrayFormula ? intersectImplicitly(r) : (Object) matrix(r);
                 args[i] = v;
             }
             if (v instanceof Object[][]) {
@@ -795,7 +806,12 @@ final class Evaluator {
     Object scalar(Object v) {
         if (v instanceof Ref) {
             Ref r = (Ref) v;
-            return value(r.sheet, r.r1, r.c1);
+            if (r.r1 == r.r2 && r.c1 == r.c2 && r.next == null && r.lastSheet == null) {
+                return value(r.sheet, r.r1, r.c1);
+            }
+            // a range where one value is wanted is the cell in the formula's own row or
+            // column, as Excel reads ABS(A1:A3) in a file without dynamic arrays: @A1:A3
+            return arrayFormula ? value(r.sheet, r.r1, r.c1) : intersectImplicitly(r);
         }
         if (v instanceof Object[][]) {
             Object[][] m = (Object[][]) v;

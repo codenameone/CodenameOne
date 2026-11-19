@@ -921,7 +921,8 @@ class SpreadsheetHostileFileTest extends UITestBase {
     @Test
     void writtenOutDenominators() throws IOException {
         String[][] cases = {
-            {"# ??/16", "0.333", "  5/16"}, {"# ?/10", "0.37", " 4/10"}, {"# ??/100", "0.333", " 33/100"}, {"# ?/10", "2", "2   "},
+            {"# ??/16", "0.333", "  5/16"}, {"# ?/10", "0.37", " 4/10"}, {"# ??/100", "0.333", " 33/100"}, {"# ?/10", "2", "2   "}, {"\"x\"# ?/2", "2.5", "x2 1/2"}, {"$# ?/2", "2.5", "$2 1/2"},
+            {"# ??/16;-# ??/16", "-2.71", "-2 11/16"}, {"# ?/2\" kg\"", "2.5", "2 1/2 kg"},
             {"0/16", "123456.789", "1975309/16"}, {"# ?/8", "1.5", "1 4/8"}, {"0/0", "1E20", "100000000000000000000/1"},
         };
         for (String[] c : cases) {
@@ -930,6 +931,22 @@ class SpreadsheetHostileFileTest extends UITestBase {
                 wrong.append('\n').append(c[0]).append(" on ").append(c[1]).append(" gave '").append(got)
                         .append("', expected '").append(c[2]).append('\'');
             }
+        }
+        Sheet scal = new Workbook().addSheet("S");
+        for (int r = 0; r < 3; r++) {
+            scal.setCellValue(r, 0, Double.valueOf(-(r + 1)));
+        }
+        scal.setCellFormula(1, 2, "=ABS(A1:A3)");
+        same(Double.valueOf(2), scal.getCellValue(1, 2), "a range where one value is wanted: the formula's own row");
+        scal.setCellFormula(1, 3, "=IF(A1:A3<-1,\"y\",\"n\")");
+        same("y", scal.getCellValue(1, 3), "the comparison of the formula's own row");
+        scal.setCellFormula(5, 2, "=ABS(A1:A3)");
+        same(CellError.VALUE, scal.getCellValue(5, 2), "no cell of the range in the formula's row");
+        try {
+            scal.setColumnWidth(0, Double.POSITIVE_INFINITY);
+            wrong.append("\nan infinite column width was accepted");
+        } catch (IllegalArgumentException expected) {
+            // no file can hold it
         }
         // what LibreOffice's TEXT answers for these; 1E20 over 0/0 is #FMT there, every digit here
         // the denominator survives OpenDocument
