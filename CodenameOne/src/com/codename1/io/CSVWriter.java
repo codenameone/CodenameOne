@@ -37,12 +37,11 @@ import java.io.Writer;
 ///
 /// ```java
 /// CSVWriter csv = new CSVWriter();
-/// try (OutputStream out = FileSystemStorage.getInstance().openOutputStream(path)) {
-///     csv.write(out, new String[][] {
-///         {"Name", "Notes"},
-///         {"Doe, John", "said \"hello\""}
-///     });
-/// }
+/// String text = csv.toString(new String[][] {
+///     {"Name", "Notes"},
+///     {"Doe, John", "said \"hello\""}
+/// });
+/// Log.p(text);
 /// ```
 ///
 /// Spreadsheets open a `.csv` file with the separator of the machine's locale and, without a

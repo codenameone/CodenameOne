@@ -611,18 +611,19 @@ final class StatFunctions {
                 int last = takesK ? Math.min(a.length, 3) : a.length;
                 int counted = 0;
                 for (int i = 2; i < last; i++) {
-                    Object[][] m = ev.matrix(a[i]);
-                    for (Object[] line : m) {
-                        for (Object v : line) {
-                            if (v instanceof CellError) {
-                                if (!ignoreErrors) {
-                                    throw EvalError.of((CellError) v);
+                    for (Object[][] m : ev.areas(a[i])) {
+                        for (Object[] line : m) {
+                            for (Object v : line) {
+                                if (v instanceof CellError) {
+                                    if (!ignoreErrors) {
+                                        throw EvalError.of((CellError) v);
+                                    }
+                                } else if (v instanceof Double) {
+                                    list.add(((Double) v).doubleValue());
+                                    counted++;
+                                } else if (v != null && !"".equals(v)) {
+                                    counted++;
                                 }
-                            } else if (v instanceof Double) {
-                                list.add(((Double) v).doubleValue());
-                                counted++;
-                            } else if (v != null && !"".equals(v)) {
-                                counted++;
                             }
                         }
                     }
@@ -641,45 +642,62 @@ final class StatFunctions {
     /// empty cells and empty texts.
     private static int count(Evaluator ev, Object[] a, int mode) {
         int count = 0;
-        for (Object arg : a) {
-            if (arg instanceof Ref || arg instanceof Object[][]) {
-                if (arg instanceof Ref) {
-                    Ref ref = (Ref) arg;
-                    if (mode == 2) {
-                        // every cell of the range counts, the ones past the data included
-                        count += (ref.rows() - ref.clip().rows()) * ref.cols()
-                                + (ref.cols() - ref.clip().cols()) * ref.clip().rows();
+        for (Object whole : a) {
+            if (whole instanceof Ref) {
+                // every area of a union and every sheet of a 3D reference, one at a time
+                for (Ref r = (Ref) whole; r != null; r = r.next) {
+                    int first = ev.workbook.indexOf(r.sheet);
+                    int last = r.lastSheet == null ? first : ev.workbook.indexOf(r.lastSheet);
+                    for (int s = first; s <= last; s++) {
+                        count += count(ev, new Ref(ev.workbook.getSheet(s), null, r.r1, r.c1, r.r2, r.c2), mode);
                     }
                 }
-                Object[][] m = ev.matrix(arg);
-                for (Object[] line : m) {
-                    for (Object v : line) {
-                        if (mode == 0) {
-                            if (v instanceof Double) {
-                                count++;
-                            }
-                        } else if (mode == 1) {
-                            if (v != null) {
-                                count++;
-                            }
-                        } else if (v == null || "".equals(v)) {
+                continue;
+            }
+            count += count(ev, whole, mode);
+        }
+        return count;
+    }
+
+    private static int count(Evaluator ev, Object arg, int mode) {
+        int count = 0;
+        if (arg instanceof Ref || arg instanceof Object[][]) {
+            if (arg instanceof Ref) {
+                Ref ref = (Ref) arg;
+                if (mode == 2) {
+                    // every cell of the range counts, the ones past the data included
+                    count += (ref.rows() - ref.clip().rows()) * ref.cols()
+                            + (ref.cols() - ref.clip().cols()) * ref.clip().rows();
+                }
+            }
+            Object[][] m = ev.matrix(arg);
+            for (Object[] line : m) {
+                for (Object v : line) {
+                    if (mode == 0) {
+                        if (v instanceof Double) {
                             count++;
                         }
+                    } else if (mode == 1) {
+                        if (v != null) {
+                            count++;
+                        }
+                    } else if (v == null || "".equals(v)) {
+                        count++;
                     }
                 }
-            } else if (arg != Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object
-                if (mode == 0) {
-                    if (arg instanceof Double || arg instanceof Boolean
-                            || arg instanceof String && Values.parseNumber((String) arg) != null) {
-                        count++;
-                    }
-                } else if (mode == 1) {
-                    if (arg != null) {
-                        count++;
-                    }
-                } else if (arg == null || "".equals(arg)) {
+            }
+        } else if (arg != Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object
+            if (mode == 0) {
+                if (arg instanceof Double || arg instanceof Boolean
+                        || arg instanceof String && Values.parseNumber((String) arg) != null) {
                     count++;
                 }
+            } else if (mode == 1) {
+                if (arg != null) {
+                    count++;
+                }
+            } else if (arg == null || "".equals(arg)) {
+                count++;
             }
         }
         return count;

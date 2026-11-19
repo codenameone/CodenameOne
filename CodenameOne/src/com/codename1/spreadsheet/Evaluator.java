@@ -800,6 +800,24 @@ final class Evaluator {
         return v == MISSING ? null : v;
     }
 
+    /// The values of an argument as one matrix per area: each part of a union and each
+    /// sheet of a 3D reference, for the functions that take several areas.
+    ArrayList<Object[][]> areas(Object v) {
+        ArrayList<Object[][]> out = new ArrayList<Object[][]>();
+        if (v instanceof Ref) {
+            for (Ref r = (Ref) v; r != null; r = r.next) {
+                int first = workbook.indexOf(r.sheet);
+                int last = r.lastSheet == null ? first : workbook.indexOf(r.lastSheet);
+                for (int s = first; s <= last; s++) {
+                    out.add(matrix(new Ref(workbook.getSheet(s), null, r.r1, r.c1, r.r2, r.c2)));
+                }
+            }
+        } else {
+            out.add(matrix(v));
+        }
+        return out;
+    }
+
     /// The values of an argument as rows and columns. A range is cut down to the rows and
     /// columns that hold data first.
     Object[][] matrix(Object v) {
@@ -807,7 +825,14 @@ final class Evaluator {
             return (Object[][]) v;
         }
         if (v instanceof Ref) {
-            Ref r = ((Ref) v).clip();
+            Ref whole = (Ref) v;
+            if (whole.next != null || whole.lastSheet != null && whole.lastSheet != whole.sheet) { //NOPMD CompareObjectsWithEquals - one sheet object per sheet
+                // a union or a span of sheets is not rows and columns: Excel answers #VALUE!
+                // where a function wants them, and the functions that take several areas
+                // (SUM, COUNT and the like) walk them themselves
+                throw EvalError.VALUE;
+            }
+            Ref r = whole.clip();
             int rows = r.rows();
             int cols = r.cols();
             Object[][] out = new Object[rows][cols];

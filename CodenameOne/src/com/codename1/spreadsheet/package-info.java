@@ -30,11 +30,20 @@
 /// into a file.
 ///
 /// ```java
-/// Workbook book = Workbook.read(input, Workbook.Format.XLSX);
-/// Sheet sheet = book.getSheet(0);
+/// Workbook book = new Workbook();
+/// // com.codename1.ui has a Sheet too, hence the full name
+/// com.codename1.spreadsheet.Sheet sheet = book.addSheet("Prices");
+/// sheet.setCellValue("A1", "Item");
+/// sheet.setCellValue("B1", "Price");
+/// sheet.setCellValue("A2", "Tea");
+/// sheet.setCellValue("B2", Double.valueOf(3.5));
+/// sheet.setCellFormula("B3", "=SUM(B2:B2)");
 /// sheet.setHeaderRow(true);
 /// DataGrid grid = new DataGrid(sheet);
 /// grid.setColumns(sheet.createColumns());
+/// Form form = new Form("Prices", new BorderLayout());
+/// form.add(BorderLayout.CENTER, grid);
+/// form.show();
 /// ```
 ///
 /// Cells keep their types: a number is a `Double`, a date a `java.util.Date`, a logical

@@ -608,7 +608,7 @@ older binary `.xls` format or a file protected with a password.
 Writing XLSX fails fast on what Excel can't open unchanged: a sheet name longer
 than 31 characters, a formula or defined name longer than 8,192 (counted as the
 file stores it, with the prefixes newer functions take) or a cell of text longer
-than 32,767. The write throws `IOException` naming the sheet or the cell, because
+than 32,767. Writing throws `IOException` naming the sheet or the cell, because
 Excel would otherwise open the file only by repairing it and dropping or cutting
 what's over the limit. `setExcelLimitsEnforced(false)` writes the file unchanged,
 for a spreadsheet without those limits. OpenDocument has none of them.

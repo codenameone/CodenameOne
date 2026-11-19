@@ -904,6 +904,27 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void countsOverEveryArea() {
+        Workbook w = new Workbook();
+        Sheet s = w.addSheet("S");
+        w.addSheet("M").setCellValue("A1", Double.valueOf(5));
+        w.addSheet("Q").setCellValue("A1", Double.valueOf(7));
+        String[] formulas = {"COUNT(S:Q!A1)", "COUNT(M:Q!A1)", "COUNTA(S:Q!A1)", "COUNT((M!A1,Q!A1))",
+            "AGGREGATE(2,0,M:Q!A1)", "SUBTOTAL(2,M:Q!A1)", "COUNTBLANK(S!B1:B2)", "SUM(S:Q!A1)"};
+        Object[] expected = {Double.valueOf(2), Double.valueOf(2), Double.valueOf(2), Double.valueOf(2),
+            Double.valueOf(2), Double.valueOf(2), Double.valueOf(2), Double.valueOf(12)};
+        for (int i = 0; i < formulas.length; i++) {
+            s.setCellFormula(i, 3, "=" + formulas[i]);
+            same(expected[i], s.getCellValue(i, 3), formulas[i]);
+        }
+        // a function that wants rows and columns refuses several areas, as Excel does
+        s.setCellFormula("E1", "=SUMPRODUCT(M:Q!A1)");
+        same(CellError.VALUE, s.getCellValue("E1"), "SUMPRODUCT over sheets");
+        s.setCellFormula("E2", "=COUNTIF(M:Q!A1,\">0\")");
+        same(CellError.VALUE, s.getCellValue("E2"), "COUNTIF over sheets");
+    }
+
+    @Test
     void roundEightLosses() throws Exception {
         // names nested in names are held to one depth, on a small stack too. 1 MB, not
         // less: the coverage agent the build runs tests under makes every frame larger, and

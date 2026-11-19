@@ -36,20 +36,34 @@ import java.util.HashMap;
 /// formulas, read from and written to Excel (`.xlsx`), OpenDocument (`.ods`), CSV and TSV
 /// files.
 ///
-/// Every [Sheet] is a [TableModel], so a file is three lines away from a grid:
+/// Every [Sheet] is a [TableModel], so a sheet, read from a file with [#read] or built in
+/// code as here, is shown by handing it to a grid:
 ///
 /// ```java
-/// Workbook book = Workbook.read(input, Workbook.Format.XLSX);
-/// Sheet sheet = book.getSheet(0);
+/// Workbook book = new Workbook();
+/// // com.codename1.ui has a Sheet too, hence the full name
+/// com.codename1.spreadsheet.Sheet sheet = book.addSheet("Prices");
+/// sheet.setCellValue("A1", "Item");
+/// sheet.setCellValue("B1", "Price");
+/// sheet.setCellValue("A2", "Tea");
+/// sheet.setCellValue("B2", Double.valueOf(3.5));
+/// sheet.setCellFormula("B3", "=SUM(B2:B2)");
 /// sheet.setHeaderRow(true);
 /// DataGrid grid = new DataGrid(sheet);
 /// grid.setColumns(sheet.createColumns());
+/// Form form = new Form("Prices", new BorderLayout());
+/// form.add(BorderLayout.CENTER, grid);
+/// form.show();
 /// ```
 ///
-/// and a grid one line from a file:
+/// and [#fromGrid] turns what a grid shows back into a workbook, which [#write] saves as a
+/// file:
 ///
 /// ```java
-/// Workbook.fromGrid(grid).write(output, Workbook.Format.XLSX);
+/// DataGrid grid = new DataGrid(new DefaultTableModel(new String[] {"Item", "Price"},
+///         new Object[][] {{"Tea", Double.valueOf(3.5)}, {"Cake", Double.valueOf(4)}}, false));
+/// Workbook book = Workbook.fromGrid(grid);
+/// Log.p(book.getSheet(0).getCellText(1, 1));
 /// ```
 ///
 /// #### Formulas
