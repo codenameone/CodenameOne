@@ -69,6 +69,13 @@ fi
 JDK8_URL="https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u462-b08/OpenJDK8U-jdk_${arch_jdk8}_${os}_hotspot_8u462b08.tar.gz"
 JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${os}_hotspot_17.0.16_8.tar.gz"
 MAVEN_URL="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.tar.gz"
+# Tried in order before MAVEN_URL. Maven Central rate limits CI with 429s, and every job
+# that provisions a workspace downloads this archive, so Central is the last resort: first
+# our own R2 repository (same path as Central; absent until someone uploads it, which just
+# falls through), then Apache's release archive, which is not behind Central's limits.
+# Whatever source answers, the archive must match MAVEN_SHA512, Apache's published digest.
+MAVEN_MIRROR_URLS="https://repo.codenameone.com/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.tar.gz https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz"
+MAVEN_SHA512="706f01b20dec0305a822ab614d51f32b07ee11d0218175e55450242e49d2156386483b506b3a4e8a03ac8611bae96395fd5eec15f50d3013d5deed6d1ee18224"
 
 # Downloads a toolchain archive, waiting out a rate limit rather than sprinting into it.
 #
@@ -93,6 +100,17 @@ download_archive() {
   done
   log "could not download $url" >&2
   return 1
+}
+
+# True when FILE's SHA-512 is EXPECTED. shasum on macOS, sha512sum on Linux.
+sha512_matches() {
+  local file="$1" expected="$2" actual
+  if command -v sha512sum >/dev/null 2>&1; then
+    actual=$(sha512sum "$file" | cut -d' ' -f1)
+  else
+    actual=$(shasum -a 512 "$file" | cut -d' ' -f1)
+  fi
+  [ "$actual" = "$expected" ]
 }
 
 install_jdk() {
@@ -156,8 +174,26 @@ if [ -z "${MAVEN_HOME:-}" ] || ! [ -x "$MAVEN_HOME/bin/mvn" ]; then
   if [ -f "$mvn_archive" ]; then
     log "Using cached Maven archive $(basename "$mvn_archive")"
   else
-    log "Downloading Maven from $MAVEN_URL"
-    download_archive "$MAVEN_URL" "$mvn_archive"
+    mvn_got=""
+    for mvn_url in $MAVEN_MIRROR_URLS; do
+      log "Downloading Maven from $mvn_url"
+      # One quick try per mirror; the patient rate-limit backoff is kept for Central.
+      if curl -fsSL --retry 2 --retry-delay 5 "$mvn_url" -o "$mvn_archive" \
+          && sha512_matches "$mvn_archive" "$MAVEN_SHA512"; then
+        mvn_got=1
+        break
+      fi
+      rm -f "$mvn_archive"
+    done
+    if [ -z "$mvn_got" ]; then
+      log "Downloading Maven from $MAVEN_URL"
+      download_archive "$MAVEN_URL" "$mvn_archive"
+      if ! sha512_matches "$mvn_archive" "$MAVEN_SHA512"; then
+        log "Maven archive from $MAVEN_URL does not match its published SHA-512" >&2
+        rm -f "$mvn_archive"
+        exit 1
+      fi
+    fi
   fi
   mvn_top=$(tar -tzf "$mvn_archive" 2>/dev/null | head -1 | cut -d/ -f1 || true)
   if [ -z "$mvn_top" ]; then

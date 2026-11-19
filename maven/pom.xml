@@ -584,33 +584,6 @@
                     </additionalOptions>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.sonatype.central</groupId>
-                <artifactId>central-publishing-maven-plugin</artifactId>
-                <version>0.8.0</version>
-                <extensions>true</extensions>
-                <configuration>
-                    <publishingServerId>central</publishingServerId>
-                    <autoPublish>true</autoPublish>
-                    <!--
-                    Artifacts that are still built and installed locally but are no
-                    longer published. This plugin runs with extensions=true, which
-                    clears maven-deploy-plugin's executions and takes over the deploy
-                    phase, so the per-module <maven.deploy.skip> properties are NOT
-                    enough on their own: PublishMojo filters purely on
-                    excludeArtifacts.contains(artifact.getArtifactId()). The module
-                    properties are kept for the plain maven-deploy-plugin path.
-
-                    Matching is on the bare artifactId, not groupId:artifactId.
-                    -->
-                    <excludeArtifacts>
-                        <!-- Deprecated Resource Editor, frozen at ${cn1.designer.version}. -->
-                        <excludeArtifact>codenameone-designer</excludeArtifact>
-                        <!-- Exists only to give the editor Batik SVG support. -->
-                        <excludeArtifact>codenameone-javase-svg</excludeArtifact>
-                    </excludeArtifacts>
-                </configuration>
-            </plugin>
 
         </plugins>
     </build>
@@ -644,6 +617,42 @@
                             </gpgArguments>
                         </configuration>
                     </plugin>
+                    <!--
+                    Release only. With extensions=true Maven must resolve this plugin
+                    before ANY build starts, so in the default build it made every PR
+                    build fetch it from Maven Central, and Central's 429 rate limiting
+                    failed those builds. Nothing is published to Central any more: the
+                    release runs it with -DskipPublishing=true only to stage the signed,
+                    checksummed tree that maven/scripts/r2/publish-staging-to-r2.sh
+                    uploads. release.yml always passes -Psign-artifacts for that build.
+                    -->
+                        <plugin>
+                            <groupId>org.sonatype.central</groupId>
+                            <artifactId>central-publishing-maven-plugin</artifactId>
+                            <version>0.8.0</version>
+                            <extensions>true</extensions>
+                            <configuration>
+                                <publishingServerId>central</publishingServerId>
+                                <autoPublish>true</autoPublish>
+                                <!--
+                                Artifacts that are still built and installed locally but are no
+                                longer published. This plugin runs with extensions=true, which
+                                clears maven-deploy-plugin's executions and takes over the deploy
+                                phase, so the per-module <maven.deploy.skip> properties are NOT
+                                enough on their own: PublishMojo filters purely on
+                                excludeArtifacts.contains(artifact.getArtifactId()). The module
+                                properties are kept for the plain maven-deploy-plugin path.
+
+                                Matching is on the bare artifactId, not groupId:artifactId.
+                                -->
+                                <excludeArtifacts>
+                                    <!-- Deprecated Resource Editor, frozen at ${cn1.designer.version}. -->
+                                    <excludeArtifact>codenameone-designer</excludeArtifact>
+                                    <!-- Exists only to give the editor Batik SVG support. -->
+                                    <excludeArtifact>codenameone-javase-svg</excludeArtifact>
+                                </excludeArtifacts>
+                            </configuration>
+                        </plugin>
                 </plugins>
             </build>
         </profile>
