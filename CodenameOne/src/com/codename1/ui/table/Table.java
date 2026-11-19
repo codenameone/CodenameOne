@@ -55,6 +55,10 @@ import java.util.Date;
 /// `com.codename1.ui.List` a `Table` doesn't feature a separate renderer
 /// and instead allows developers to derive the class.
 ///
+/// A `Table` makes a component for every cell, so it suits a few dozen rows
+/// laid out as a form. For data -- many rows, sorting, filtering, frozen
+/// columns or a tree -- use `DataGrid`, which paints only the rows on screen.
+///
 /// ```java
 /// Form hi = new Form("Table", new BorderLayout());
 /// TableModel model = new DefaultTableModel(new String[] {"Col 1", "Col 2", "Col 3"}, new Object[][] {

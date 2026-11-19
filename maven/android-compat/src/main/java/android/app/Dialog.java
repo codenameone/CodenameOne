@@ -295,6 +295,11 @@ public class Dialog implements DialogInterface, Window.Callback {
         dismiss();
     }
 
+    /// Holds the dialog to the screen's height; `AlertDialog` asks for it.
+    void capHeightToScreen() {
+        mDecor.capHeight = true;
+    }
+
     /// The Codename One dialog showing this one, for tests.
     com.codename1.ui.Dialog host() {
         return mHost;
@@ -330,8 +335,18 @@ public class Dialog implements DialogInterface, Window.Callback {
     }
 
     /// The dialog's root: as wide as Android makes a dialog, which is the
-    /// screen minus margins and at most 560dp.
+    /// screen minus margins and at most 560dp, and no taller than the safe
+    /// area minus margins. Without the height limit a dialog whose content
+    /// is taller than the screen grew past it, was centred, and lost both
+    /// ends: the title under the status bar and the buttons below the screen,
+    /// with nothing to scroll (discussion #6259). Capped, `AlertDialog`'s
+    /// scrolling body gives up the space and its button bar stays visible.
     static final class DialogFrame extends FrameLayout {
+        /// Only an alert dialog is held to the screen's height: any other
+        /// dialog keeps the height its own layout asks for, a full-screen
+        /// one included.
+        boolean capHeight;
+
         DialogFrame(Context c) {
             super(c);
         }
@@ -345,7 +360,24 @@ public class Dialog implements DialogInterface, Window.Callback {
             if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED || w > max) {
                 w = max;
             }
+            int maxH = maxHeight(density);
+            int h = MeasureSpec.getSize(heightMeasureSpec);
+            int hMode = MeasureSpec.getMode(heightMeasureSpec);
+            if (capHeight && (hMode == MeasureSpec.UNSPECIFIED || h > maxH)) {
+                heightMeasureSpec = MeasureSpec.makeMeasureSpec(maxH,
+                        hMode == MeasureSpec.EXACTLY ? MeasureSpec.EXACTLY : MeasureSpec.AT_MOST);
+            }
             super.onMeasure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), heightMeasureSpec);
+        }
+
+        private static int maxHeight(float density) {
+            com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+            int available = d.getDisplayHeight();
+            com.codename1.ui.geom.Rectangle safe = d.getDisplaySafeArea(new com.codename1.ui.geom.Rectangle());
+            if (safe != null && safe.getHeight() > 0 && safe.getHeight() < available) {
+                available = safe.getHeight();
+            }
+            return Math.max(Math.round(96 * density), available - Math.round(48 * density));
         }
     }
 }

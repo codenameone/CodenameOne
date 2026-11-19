@@ -142,6 +142,17 @@ public final class Config {
     /// The database, as a SQLite path or a PostgreSQL or MySQL URL. Also read from
     /// DATABASE_URL.
     public static final String DATASOURCE_URL = "cn1.datasource.url";
+    /// The database of each tenant, a URL with `${tenant}` in it, for
+    /// [com.codename1.backend.tenancy.TenantDataSources#fromConfig]. Unset, every
+    /// tenant uses [#DATASOURCE_URL], which suits a schema per tenant.
+    public static final String TENANCY_DATASOURCE_URL = "cn1.tenancy.datasource.url";
+    /// A statement each tenant's connections run as they open, with `${tenant}`
+    /// in it, such as `SET search_path TO ${tenant}`.
+    public static final String TENANCY_CONNECTION_INIT = "cn1.tenancy.datasource.init";
+    /// How many connections each tenant's pool holds.
+    public static final String TENANCY_POOL_SIZE = "cn1.tenancy.datasource.pool.size";
+    /// How many tenant pools stay open at once.
+    public static final String TENANCY_MAX_POOLS = "cn1.tenancy.datasource.maxPools";
     /// How many connections the pool holds.
     public static final String DATASOURCE_POOL_SIZE = "cn1.datasource.pool.size";
     /// How long a borrow waits for a free connection, in milliseconds.

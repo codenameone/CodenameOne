@@ -27,8 +27,11 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
 /**
- * Build wrapper for the native Windows ("win32") target: a real Win32 executable
- * produced by ParparVM -&gt; clang-cl, the Windows analog of the iOS device build.
+ * Sends a native Windows build (a standalone exe, no JVM) to the build server. Free;
+ * {@code buildWindowsNative} is the same goal under a clearer name.
+ *
+ * <p>Build wrapper for the native Windows ("win32") target: a real Win32 executable
+ * produced by ParparVM -&gt; clang-cl, the Windows analog of the iOS device build.</p>
  *
  * <p>This is the user-facing goal for the cloud "win32" build target. A regular
  * (release) build produces two binaries -- x64 and arm64, optimized and stripped;

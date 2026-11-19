@@ -1,6 +1,126 @@
 == Working with macOS
 
+Codename One builds two different Mac applications from one project, and their names are easy to mix up:
+
+[cols="1,2,2", options="header"]
+|===
+| | Native macOS build | macOS desktop build
+| What you get | A real AppKit application compiled ahead of time. No JVM inside. | Your app running on a bundled JVM through the Java SE port.
+| Account | *Free.* It also builds locally with Xcode. | *Pro feature.*
+| Build target | `mac-os-x-native` with `codename1.platform=ios` | `mac-os-x-desktop` with `codename1.platform=javase`
+| Maven goal, Gradle task | `cn1:buildMacNative`, `buildMacNative` | `cn1:buildMacDesktop`, `buildMacDesktop`
+| Script, IDE entry | `./build.sh mac_native`, *Mac Native Build (free)* | `./build.sh mac_desktop`, *Mac Desktop Build (JVM, Pro)*
+|===
+
+Start with the native build. It's the one most applications want, and it needs no subscription. <<_native_macos_build_appkit>> covers it; <<_macos_desktop_build_options>> covers the JVM build.
+
+=== Native macOS Build (AppKit)
+
+The *native macOS build* is an ahead-of-time compiled target: ParparVM translates your bytecode to C and the result is built into a real AppKit application. Its Xcode project targets the macOS SDK, links AppKit and Metal, and carries no UIKit at all. The output is a single signed `.app` bundle suitable for Mac App Store or Developer ID distribution.
+
+This target is a good fit when:
+
+* You need native-speed startup and rendering on the Mac, not a wrapped JVM.
+* You want a single `.app` bundle without a JRE inside it.
+* You want the Mac conventions your users expect: a real title bar, a real menu bar, and real windows.
+
+Java source is shared with your other targets; no Mac-specific code is required.
+
+[NOTE]
+====
+A few device capabilities have no macOS counterpart and are inert rather than
+emulated: motion sensors, orientation locking, SMS, and background task
+scheduling. `Display` reports each of them as unsupported, so an application
+that checks before using one behaves correctly without a Mac-specific branch.
+
+Accessibility is partly wired. Codename One builds a portable semantics tree for
+its lightweight components -- see <<_accessibility_semantics>> -- and this port
+maps `announceForAccessibility()` onto an AppKit announcement, so live messages
+reach VoiceOver. What it doesn't do yet is publish that tree through
+`NSAccessibility`, so VoiceOver can't navigate the interface element by element.
+The tree itself is shared and already consumed by the other ports, so what's
+missing here is this port's bridge to it rather than the semantics.
+====
+
+Each additional window your application opens through the `Window` API is a real `NSWindow`, with its own GPU surface rather than a raster copied from somewhere else. See <<_desktop_windows>>.
+
+==== Local Build
+
+To generate an Xcode project locally that you can open and run on the Mac:
+
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/working-with-mac-os-x.sh[tag=working-with-mac-os-x-shell-001,indent=0]
+----
+
+The output is written to:
+
+----
+target/<finalName>-mac-source/<MainClass>.xcodeproj
+----
+
+Open the project in Xcode, select the `My Mac` destination, and press Run. The resulting `.app` is identical in shape to one produced by the cloud build server.
+
+==== Cloud Build
+
+To produce a release-ready signed Mac app on the Codename One build server:
+
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/working-with-mac-os-x.sh[tag=working-with-mac-os-x-shell-002,indent=0]
+----
+
+Mac distribution requires *its own certificates and provisioning profile* — Apple issues separate _Mac App Distribution_ (3rd Party Mac Developer Application) and _Developer ID Application_ certificates that aren't interchangeable with the _iPhone Distribution_ certificate used for iOS App Store builds. <<_understanding_mac_certificates>> and <<_obtaining_certificates>> describe these certificates and how to get them from Apple; they sit in the desktop section, but the certificates are the same. For the native build, configure them via the parallel `codename1.mac.*` hints:
+
+[cols="1,3", options="header"]
+|===
+| Hint | Purpose
+| `codename1.mac.appid` | Mac bundle identifier (the App Store Connect record is distinct from the iOS one).
+| `codename1.mac.certificate` | Path to the `.p12` containing the Mac signing certificate. Bundle both _Mac App Distribution_ and _Developer ID Application_ into a single P12 when targeting both channels.
+| `codename1.mac.certificatePassword` | Password to unlock the P12.
+| `codename1.mac.provision` | Path to the Mac `.provisionprofile`.
+|===
+
+The Apple Developer Team ID itself can stay shared with your iOS build (a single Apple Developer account) — `macos.teamId` falls back to `ios.release.teamId` when not set. The server returns a signed `.app` bundle.
+
+==== IDE Shortcuts
+
+The IntelliJ workspace template ships two native macOS run configurations alongside the iOS ones:
+
+* *Mac Native Project* (Local Builds folder) -- equivalent to running `mvn package -Dcodename1.buildTarget=mac-source`. Use this to generate the Xcode project for hands-on debugging.
+* *Mac Native Build (free)* (Build Server folder) -- equivalent to `mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native`. Use this for cloud builds. The entry beside it, *Mac Desktop Build (JVM, Pro)*, is the JVM build described in <<_macos_desktop_build_options>>.
+
+==== Distribution
+
+The native macOS build supports both Mac App Store and Developer ID distribution. The generated Xcode project includes two `ExportOptions-*-Mac.plist` files in `dist/`:
+
+* `ExportOptions-AppStore-Mac.plist` -- App Store distribution (sandboxed, hardened runtime off).
+* `ExportOptions-DeveloperID-Mac.plist` -- Developer ID distribution (hardened runtime on, sandbox off).
+
+After archiving in Xcode, run:
+
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/working-with-mac-os-x.sh[tag=working-with-mac-os-x-shell-003,indent=0]
+----
+
+[[_entitlements_2]]
+==== Entitlements
+
+The native macOS build emits a `<MainClass>.entitlements` plist (or `<MainClass>-AppStore.entitlements` + `<MainClass>-DeveloperID.entitlements` when both channels are configured). The defaults are sensible: App Sandbox on for the App Store channel, hardened runtime on for the Developer ID channel, network client access enabled, user-selected file access enabled. The signing-certificate identity defaults to _Apple Distribution_ for the App Store channel and _Developer ID Application_ for the Developer ID channel.
+
+==== Supported Distribution Channels
+
+[cols="1,3", options="header"]
+|===
+| Channel        | Notes
+| App Store      | Sandboxed, hardened runtime off. Signed with _Apple Distribution_; uploaded via App Store Connect.
+| Developer ID   | Hardened runtime on, sandbox off. Signed with _Developer ID Application_; notarized before distribution.
+|===
+
 === macOS Desktop Build Options
+
+IMPORTANT: This section is about the macOS *desktop* build, which bundles a JVM and is a Pro feature. The free build with no JVM is the native one, in <<_native_macos_build_appkit>>.
 
 Launch Codename One Settings from the Maven project root and open *Hints* to configure `desktop.mac.*` build hints such as entitlements and `Info.plist` entries:
 
@@ -88,6 +208,7 @@ image::img/mac-desktop-export-certificates-as-p12.png[Exporting certificates as 
 You will then be prompted to select a location to save the `.p12` file, as well as selecting a password for the file.
 
 
+[[_entitlements]]
 ==== Entitlements
 
 When distributing apps in the Mac App Store, or when using the "Sandboxed DMG" bundle type, your app is run inside a sandboxed environment, meaning that it doesn't have access to the outside world. It's provided its own "sandboxed" container for file system access, and it doesn't get any network access. If your app requires access to the "outside world," request the required entitlements with `desktop.mac.entitlement.*` entries in the *Hints* view.
@@ -103,113 +224,3 @@ You can add custom entries to the https://developer.apple.com/library/archive/do
 
 desktop.mac.plist.KEYNAME::
 Injects the entry with key `KEYNAME` into the Info.plist file. For example, `desktop.mac.plist.LSApplicationCategoryType=public.app-category.business`
-
-
-=== Native macOS Build (AppKit)
-
-The "macOS Desktop" section above covers the JavaSE bundled-JRE wrapper. The *native macOS build* is a separate, ahead-of-time compiled target: ParparVM translates your bytecode to C and the result is built into a real AppKit application. Its Xcode project targets the macOS SDK, links AppKit and Metal, and carries no UIKit at all. The output is a single signed `.app` bundle suitable for Mac App Store or Developer ID distribution.
-
-This target is a good fit when:
-
-* You need native-speed startup and rendering on the Mac, not a wrapped JVM.
-* You want a single `.app` bundle without a JRE inside it.
-* You want the Mac conventions your users expect: a real title bar, a real menu bar, and real windows.
-
-Java source is shared with your other targets; no Mac-specific code is required.
-
-NOTE: This target replaced a Mac Catalyst build, which produced a UIKit application running in macOS's iOS compatibility layer. Existing projects keep building without an edit and simply get the AppKit app instead. If you depend on the previous behavior, see <<_working_with_mac_catalyst>>.
-
-[NOTE]
-====
-A few device capabilities have no macOS counterpart and are inert rather than
-emulated: motion sensors, orientation locking, SMS, and background task
-scheduling. `Display` reports each of them as unsupported, so an application
-that checks before using one behaves correctly without a Mac-specific branch.
-
-Accessibility is partly wired. Codename One builds a portable semantics tree for
-its lightweight components -- see <<_accessibility_semantics>> -- and this port
-maps `announceForAccessibility()` onto an AppKit announcement, so live messages
-reach VoiceOver. What it doesn't do yet is publish that tree through
-`NSAccessibility`, so VoiceOver can't navigate the interface element by element.
-The tree itself is shared and already consumed by the other ports, so what's
-missing here is this port's bridge to it rather than the semantics.
-====
-
-Each additional window your application opens through the `Window` API is a real `NSWindow`, with its own GPU surface rather than a raster copied from somewhere else. See <<_desktop_windows>>.
-
-==== Local Build
-
-To generate an Xcode project locally that you can open and run on the Mac:
-
-[source,shell]
-----
-include::../demos/common/src/main/snippets/developer-guide/working-with-mac-os-x.sh[tag=working-with-mac-os-x-shell-001,indent=0]
-----
-
-The output is written to:
-
-----
-target/<finalName>-mac-source/<MainClass>.xcodeproj
-----
-
-Open the project in Xcode, select the `My Mac` destination, and press Run. The resulting `.app` is identical in shape to one produced by the cloud build server.
-
-==== Cloud Build
-
-To produce a release-ready signed Mac app on the Codename One build server:
-
-[source,shell]
-----
-include::../demos/common/src/main/snippets/developer-guide/working-with-mac-os-x.sh[tag=working-with-mac-os-x-shell-002,indent=0]
-----
-
-Mac distribution requires *its own certificates and provisioning profile* — Apple issues separate _Mac App Distribution_ (3rd Party Mac Developer Application) and _Developer ID Application_ certificates that aren't interchangeable with the _iPhone Distribution_ certificate used for iOS App Store builds. Configure them via the parallel `codename1.mac.*` hints:
-
-[cols="1,3", options="header"]
-|===
-| Hint | Purpose
-| `codename1.mac.appid` | Mac bundle identifier (the App Store Connect record is distinct from the iOS one).
-| `codename1.mac.certificate` | Path to the `.p12` containing the Mac signing certificate. Bundle both _Mac App Distribution_ and _Developer ID Application_ into a single P12 when targeting both channels.
-| `codename1.mac.certificatePassword` | Password to unlock the P12.
-| `codename1.mac.provision` | Path to the Mac `.provisionprofile`.
-|===
-
-The Apple Developer Team ID itself can stay shared with your iOS build (a single Apple Developer account) — `macos.teamId` falls back to `ios.release.teamId` when not set. The server returns a signed `.app` bundle.
-
-==== IDE Shortcuts
-
-The IntelliJ workspace template ships two macOS run configurations alongside the iOS ones:
-
-* *Mac Native Project* (Local Builds folder) -- equivalent to running `mvn package -Dcodename1.buildTarget=mac-source`. Use this to generate the Xcode project for hands-on debugging.
-* *Mac Native Build* (Build Server folder) -- equivalent to `mvn package -Dcodename1.buildTarget=mac-os-x-native`. Use this for cloud builds.
-
-==== Distribution
-
-The native macOS build supports both Mac App Store and Developer ID distribution. The generated Xcode project includes two `ExportOptions-*-Mac.plist` files in `dist/`:
-
-* `ExportOptions-AppStore-Mac.plist` -- App Store distribution (sandboxed, hardened runtime off).
-* `ExportOptions-DeveloperID-Mac.plist` -- Developer ID distribution (hardened runtime on, sandbox off).
-
-After archiving in Xcode, run:
-
-[source,shell]
-----
-include::../demos/common/src/main/snippets/developer-guide/working-with-mac-os-x.sh[tag=working-with-mac-os-x-shell-003,indent=0]
-----
-
-==== Entitlements
-
-The native macOS build emits a `<MainClass>.entitlements` plist (or `<MainClass>-AppStore.entitlements` + `<MainClass>-DeveloperID.entitlements` when both channels are configured). The defaults are sensible: App Sandbox on for the App Store channel, hardened runtime on for the Developer ID channel, network client access enabled, user-selected file access enabled. The signing-certificate identity defaults to _Apple Distribution_ for the App Store channel and _Developer ID Application_ for the Developer ID channel.
-
-==== Supported Distribution Channels
-
-[cols="1,3", options="header"]
-|===
-| Channel        | Notes
-| App Store      | Sandboxed, hardened runtime off. Signed with _Apple Distribution_; uploaded via App Store Connect.
-| Developer ID   | Hardened runtime on, sandbox off. Signed with _Developer ID Application_; notarized before distribution.
-|===
-
-=== If You Need the Previous Mac Behavior
-
-Projects that depend on the Mac Catalyst build this target replaced can still build it: set `macNative.enabled=true` and build the iOS target, which is what Catalyst has always been. See <<_working_with_mac_catalyst>>.

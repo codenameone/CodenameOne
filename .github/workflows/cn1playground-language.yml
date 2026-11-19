@@ -77,6 +77,8 @@ jobs:
     needs: golden-plan
     if: needs.golden-plan.outputs.run == 'true'
     name: Playground in the browser
+    # The job has taken 24-58 minutes; see the browser step for why it has a limit.
+    timeout-minutes: 90
     runs-on: ubuntu-24.04
 
     steps:
@@ -118,6 +120,13 @@ jobs:
       # Builds the open-world JavaScript bundle, then compiles, translates and runs
       # samples/editor in Chromium and demo behavior in Chromium and Firefox.
       - name: Run playground browser tests
+        # This step takes 16-28 minutes. With no limit, the 2026-11-18
+        # nightly sat in it for 81 minutes until the runner lost contact
+        # with GitHub, which also lost the log; the same commit passed when
+        # re-run. On the step, so the upload below still runs when it is
+        # hit. The runner enforces a step limit, so one that is frozen
+        # rather than busy is stopped by the job's limit instead.
+        timeout-minutes: 60
         env:
           # Hosted Linux runners have no hardware GPU. Local runs use browser defaults.
           PLAYGROUND_SOFTWARE_GL: "1"

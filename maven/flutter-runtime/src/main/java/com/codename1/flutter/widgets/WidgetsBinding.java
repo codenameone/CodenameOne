@@ -45,8 +45,24 @@ public final class WidgetsBinding {
      */
     public static final class PlatformDispatcher {
 
-        /** dart:ui's {@code PlatformDispatcher.instance}: the binding's one dispatcher. */
-        public static final PlatformDispatcher instance = WidgetsBinding.instance.platformDispatcher();
+        /**
+         * dart:ui's {@code PlatformDispatcher.instance}: the binding's one dispatcher.
+         *
+         * <p>Created HERE, and the binding takes it from here. It used to be
+         * read back out of {@code WidgetsBinding.instance}, which is a class
+         * initialization cycle: the binding's initializer constructs the
+         * binding, whose field made a dispatcher, whose initializer read
+         * {@code WidgetsBinding.instance} -- still null, because the
+         * constructor that would assign it had not returned. Every
+         * application that touched the binding first died in its first
+         * layout with an ExceptionInInitializerError. This class must never
+         * name {@code WidgetsBinding} in its own initializer.</p>
+         */
+        public static final PlatformDispatcher instance = new PlatformDispatcher();
+
+        /** One per process, as in Flutter: dart:ui gives it no constructor. */
+        private PlatformDispatcher() {
+        }
 
         /** The system-wide brightness. Defaults to light in this runtime. */
         public Brightness platformBrightness = Brightness.light;
@@ -73,7 +89,7 @@ public final class WidgetsBinding {
         return instance;
     }
 
-    private final PlatformDispatcher platformDispatcher = new PlatformDispatcher();
+    private final PlatformDispatcher platformDispatcher = PlatformDispatcher.instance;
 
     private WidgetsBinding() {
     }

@@ -15,8 +15,7 @@
 # were called inside one run.
 set -euo pipefail
 
-# The workflows that own a hellocodenameone golden directory. scripts-ios.yml
-# also carries Mac Catalyst (it passes the input on to that call).
+# The workflows that own a hellocodenameone golden directory.
 WORKFLOWS=(
   scripts-ios.yml
   scripts-android.yml
@@ -37,7 +36,7 @@ workflows() {
   local d want=""
   for d in "$@"; do
     case "$d" in
-      scripts/ios/*|scripts/mac-catalyst/*) want+=" scripts-ios.yml" ;;
+      scripts/ios/*) want+=" scripts-ios.yml" ;;
       scripts/android/*) want+=" scripts-android.yml" ;;
       scripts/javascript/*) want+=" scripts-javascript.yml" ;;
       scripts/linux/*) want+=" linux-build-run.yml" ;;

@@ -27,13 +27,21 @@ Without this configuration present, some functionality in the IDE may be limited
                 <property name="codename1.buildTarget">local-javascript</property>
                 <property name="codename1.platform">javascript</property>
             </configuration>
-            <configuration id="Mac Desktop App" profiles="">
+            <configuration id="Mac Native App (free)" profiles="">
+                <property name="codename1.buildTarget">mac-os-x-native</property>
+                <property name="codename1.platform">ios</property>
+            </configuration>
+            <configuration id="Windows Native App (free)" profiles="">
+                <property name="codename1.buildTarget">windows-device</property>
+                <property name="codename1.platform">win</property>
+            </configuration>
+            <configuration id="Mac Desktop App (JVM, Pro)" profiles="">
                 <property name="codename1.buildTarget">mac-os-x-desktop</property>
                 <property name="codename1.platform">javase</property>
             </configuration>
-            <configuration id="Mac Native App" profiles="">
-                <property name="codename1.buildTarget">mac-os-x-native</property>
-                <property name="codename1.platform">ios</property>
+            <configuration id="Windows Desktop App (JVM, Pro)" profiles="">
+                <property name="codename1.buildTarget">windows-desktop</property>
+                <property name="codename1.platform">javase</property>
             </configuration>
             <configuration id="Linux Desktop App" profiles="">
                 <property name="codename1.buildTarget">linux-desktop</property>
@@ -45,14 +53,6 @@ Without this configuration present, some functionality in the IDE may be limited
             </configuration>
             <configuration id="Simulator" profiles="">
                 <property name="codename1.platform">javase</property>
-            </configuration>
-            <configuration id="Windows Desktop App" profiles="">
-                <property name="codename1.buildTarget">windows-desktop</property>
-                <property name="codename1.platform">javase</property>
-            </configuration>
-            <configuration id="Windows Device App" profiles="">
-                <property name="codename1.buildTarget">windows-device</property>
-                <property name="codename1.platform">win</property>
             </configuration>
             <configuration id="iOS App (Debug)" profiles="">
                 <property name="codename1.buildTarget">ios-device</property>

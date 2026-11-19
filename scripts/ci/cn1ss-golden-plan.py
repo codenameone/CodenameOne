@@ -68,7 +68,6 @@ DIR_PORTS = {
     "scripts/linux/screenshots-arm": {"linux-arm64"},
     "scripts/windows/screenshots": {"windows-x64", "windows-arm64"},
     "scripts/macos/screenshots": {"macos"},
-    "scripts/mac-catalyst/screenshots": {"mac-catalyst"},
 }
 PORTS = set().union(*DIR_PORTS.values())
 # A declaration naming ios-metal means both iOS Metal legs; name ios-metal-27
@@ -88,7 +87,6 @@ GOLDEN_DIRS = [
     "scripts/linux/screenshots-arm",
     "scripts/windows/screenshots",
     "scripts/macos/screenshots",
-    "scripts/mac-catalyst/screenshots",
 ]
 
 CAPTURE_CALL = re.compile(r"\b(createForm|captureWhenSettled|emitCurrentFormScreenshot|emitImage)\s*\("

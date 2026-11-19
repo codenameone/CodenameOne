@@ -81,11 +81,11 @@ function help() {
     println("  android");
     println("    Builds android app.");
     println("  mac_desktop");
-    println("    Builds Mac OS desktop app.");
-    println("    *Mac OS Desktop builds are a Pro user feature.");
+    println("    Builds a Mac OS desktop app that bundles a JVM.");
+    println("    *Pro feature. Not the native Mac build, which is free.");
     println("  windows_desktop");
-    println("    Builds Windows desktop app.");
-    println("    *Windows Desktop builds are a Pro user feature.");
+    println("    Builds a Windows desktop app that bundles a JVM.");
+    println("    *Pro feature. Not the native Windows build, which is free.");
     println("  javascript");
     println("    Builds as a web app.");
     println("    *JavaScript builds are available to all users.");

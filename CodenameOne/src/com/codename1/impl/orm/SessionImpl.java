@@ -64,6 +64,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     private int mergeDepth;
     private int deferredFetch;
     private int aliasSequence;
+    /// The tenant this session's identity map holds rows of, [#UNSCOPED_BINDING]
+    /// after an unscoped read, null before the first tenant-partitioned
+    /// statement or after [#clear].
+    private String boundTenant;
+    private static final String UNSCOPED_BINDING = "*";
     String deleteFrom(String table, String alias) {
         // Older platform SQLite versions do not accept a DELETE target alias.
         if ("sqlite".equals(sql.dialect())) {
@@ -210,6 +215,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     @Override
     public <T> com.codename1.orm.session.JpqlQuery<T> createNativeQuery(String statement, Class<T> resultType) {
         check();
+        checkNativeSql();
         return new NativeQueryImpl<T>(this, statement, resultType);
     }
 
@@ -235,6 +241,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// The connection this session writes through. The outbox
     /// (`com.codename1.io.outbox`) keeps its table here so that a message
     /// enqueued inside a transaction commits or rolls back with it.
+    ///
+    /// Not tenant checked, on purpose: the outbox's own table is not tenant
+    /// data, and this lives in the internal `impl` package, which applications
+    /// do not call. Application SQL goes through `createNativeQuery`, which is.
     public SqlAccess sqlAccess() {
         check();
         return sql;
@@ -310,7 +320,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     @Override
     public void rollbackTransaction() {
-        check();
+        checkOpen();
         if (!transaction) {
             throw new PersistenceException("No active transaction");
         }
@@ -444,7 +454,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     @Override
     public void clear() {
-        check();
+        checkOpen();
+        boundTenant = null;
         for (Object entity : entries.keySet()) {
             EntityState state = state(entity);
             if (state != null) {
@@ -2307,6 +2318,12 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         Relationship relation = owner.relationships()[owner.relationIndex(field)];
         autoFlush();
         Object id = owner.identifier(entity);
+        if (owner.tenantIndex() >= 0 && ((Number) read("SELECT COUNT(*) FROM " + tableSource(owner) +
+                " cn1_owner WHERE " + matches(keyColumns(owner), null), owner.keyValues(id),
+                new int[] {Attribute.BIGINT}).get(0)[0]).longValue() == 0) {
+            // Another tenant's owner: its join rows are not this tenant's to count.
+            return 0;
+        }
         if (relation.element) {
             return countJoin(relation.joinTable, joinColumns(relation.joinColumn, owner), owner.keyValues(id));
         }
@@ -2324,15 +2341,37 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             if (inverse.column >= 0) {
                 return inverseQuery(target, inverse, owner, id).count();
             }
-            return countJoin(inverse.joinTable, joinColumns(inverse.inverseJoinColumn, owner), owner.keyValues(id));
+            return countJoin(inverse.joinTable, joinColumns(inverse.inverseJoinColumn, owner), owner.keyValues(id),
+                             target, joinColumns(inverse.joinColumn, target));
         }
-        return countJoin(relation.joinTable, joinColumns(relation.joinColumn, owner), owner.keyValues(id));
+        return countJoin(relation.joinTable, joinColumns(relation.joinColumn, owner), owner.keyValues(id),
+                         target, joinColumns(relation.inverseJoinColumn, target));
     }
     private long countJoin(String table, String[] columns, Object[] key) {
         return ((Number) read("SELECT COUNT(*) FROM " + q(table) + " WHERE " + matches(columns, null), key,
                         new int[] {Attribute.BIGINT})
                         .get(0)[0])
                 .longValue();
+    }
+    /// A join-table count that, for a tenant-partitioned target, only counts
+    /// links to the current tenant's rows -- the same rows loading the
+    /// collection answers. A plain count would disclose how many of another
+    /// tenant's rows a shared owner links to.
+    private long countJoin(String table, String[] columns, Object[] key, EntityModel target, String[] targetColumns) {
+        if (target.tenantIndex() < 0 || tenant(target) == null) {
+            return countJoin(table, columns, key);
+        }
+        String[] keys = keyColumns(target);
+        StringBuilder on = new StringBuilder();
+        for (int i = 0; i < keys.length; i++) {
+            if (i > 0) {
+                on.append(" AND ");
+            }
+            on.append("cn1_target.").append(q(keys[i])).append(" = cn1_join.").append(q(targetColumns[i]));
+        }
+        return ((Number) read("SELECT COUNT(*) FROM " + q(table) + " cn1_join INNER JOIN " + tableSource(target) +
+                        " cn1_target ON " + on + " WHERE " + matches(columns, "cn1_join"), key,
+                        new int[] {Attribute.BIGINT}).get(0)[0]).longValue();
     }
     private QueryImpl inverseQuery(EntityModel target, Relationship inverse, EntityModel owner, Object id) {
         QueryImpl query = query(target.type());
@@ -3091,6 +3130,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         return model;
     }
     void check() {
+        checkOpen();
+        // Every operation, not only the ones that build SQL: a find answered
+        // from the identity map never reaches tenant(model).
+        if (boundTenant != null && sql instanceof TenantSource) {
+            TenantSource source = (TenantSource) sql;
+            bind(source.isUnscoped() ? UNSCOPED_BINDING : String.valueOf(source.currentTenant()));
+        }
+    }
+    /// The closed check alone, for the calls that must work after a tenant
+    /// switch: clearing the session and rolling its transaction back.
+    void checkOpen() {
         if (closed) {
             throw new PersistenceException("Session is closed");
         }
@@ -3121,7 +3171,142 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     String limit(int count, int offset) {
         return sql.limit(count, offset);
     }
+    /// The discriminator condition and the tenant condition of `model`, joined
+    /// by `AND`; empty when the entity has neither. Every read goes through
+    /// [#tableSource] and every bulk write adds this, so the tenant predicate
+    /// rides along wherever the discriminator already had to.
     String discriminatorCondition(EntityModel model, String alias) {
+        String discriminator = typeCondition(model, alias);
+        String tenant = tenantCondition(model, alias);
+        if (tenant.length() == 0) {
+            return discriminator;
+        }
+        return discriminator.length() == 0 ? tenant : discriminator + " AND " + tenant;
+    }
+
+    /// The backend's exception for a tenancy failure. Only reached when the
+    /// connection is a [TenantSource].
+    private RuntimeException tenantFailure(int kind, String message) {
+        return ((TenantSource) sql).failure(kind, message);
+    }
+
+    /// The current tenant for an entity with a tenant field
+    /// field, or null when the entity has none, the connection has no notion
+    /// of a tenant (the client) or the caller asked to run unscoped.
+    ///
+    /// @throws RuntimeException (the backend's MissingTenantException) when the connection is tenant aware and
+    /// no tenant is current. Failing closed is the point: answering every
+    /// tenant's rows is the leak this feature exists to prevent.
+    String tenant(EntityModel model) {
+        if (model.tenantIndex() < 0 || !(sql instanceof TenantSource)) {
+            return null;
+        }
+        TenantSource source = (TenantSource) sql;
+        if (source.isUnscoped()) {
+            bind(UNSCOPED_BINDING);
+            return null;
+        }
+        String tenant = source.currentTenant();
+        if (tenant == null) {
+            throw tenantFailure(TenantSource.MISSING, "No current tenant for " + model.table());
+        }
+        TenantSource.Ids.check(tenant);
+        bind(tenant);
+        return tenant;
+    }
+
+    /// Ties the session to one tenant. The identity map answers a find from
+    /// memory, so a session that loaded tenant A's row and then served tenant
+    /// B would hand B that row without asking the database; a transaction that
+    /// wrote for A would commit B's changes in it. Switching therefore fails
+    /// until [#clear], which empties the map.
+    private void bind(String tenant) {
+        if (boundTenant == null) {
+            boundTenant = tenant;
+        } else if (!boundTenant.equals(tenant)) {
+            throw tenantFailure(TenantSource.MISMATCH, "This session holds rows of " +
+                    (UNSCOPED_BINDING.equals(boundTenant) ? "an unscoped context" : "tenant " + boundTenant) +
+                    " and cannot be used for " + (UNSCOPED_BINDING.equals(tenant) ? "unscoped work" : "tenant " + tenant) +
+                    "; call clear() or open a new session");
+        }
+    }
+
+    /// Native SQL is never rewritten, so on a tenant-aware connection whose
+    /// session maps a tenant-partitioned entity it is refused unless the caller
+    /// opted in ([TenantSource#isNativeSqlAllowed]) or runs unscoped. Failing
+    /// at creation names the call site; a native SELECT that silently read
+    /// every tenant's rows would name nothing.
+    void checkNativeSql() {
+        if (!(sql instanceof TenantSource)) {
+            return;
+        }
+        TenantSource source = (TenantSource) sql;
+        if (source.isUnscoped() || source.isNativeSqlAllowed()) {
+            return;
+        }
+        for (EntityModel<?> model : models.values()) {
+            if (model.tenantIndex() >= 0) {
+                throw tenantFailure(TenantSource.NATIVE_SQL, "Native SQL is not filtered by tenant and " +
+                        "this session maps tenant-partitioned entities (" + model.table() + "). Run it inside " +
+                        "TenantContext.allowNativeSql(...) after adding the tenant condition yourself, or inside " +
+                        "TenantContext.runUnscoped(...)");
+            }
+        }
+    }
+
+    /// The tenant identifier is restricted to `[A-Za-z0-9_.-]` by
+    /// [TenantSource.Ids#check], so it is written into the statement as a
+    /// literal, exactly as the discriminator values are. A parameter would have
+    /// to be threaded through every caller that builds a FROM clause, and a
+    /// missed one would shift every later parameter by one.
+    String tenantCondition(EntityModel model, String alias) {
+        String tenant = tenant(model);
+        if (tenant == null) {
+            return "";
+        }
+        return (alias == null ? "" : alias + ".") + q(model.attributes()[model.tenantIndex()].column) +
+               " = '" + tenant + "'";
+    }
+
+    /// Writes the current tenant into a new entity before its INSERT. An entity
+    /// that already names a different tenant is refused rather than silently
+    /// moved, since that is a caller trying to write into another tenant.
+    private void stampTenant(Entry entry) {
+        EntityModel model = entry.model;
+        String tenant = tenant(model);
+        if (tenant == null) {
+            return;
+        }
+        int index = model.tenantIndex();
+        Object existing = model.get(entry.entity, index);
+        if (existing != null && !tenant.equals(existing)) {
+            throw tenantFailure(TenantSource.MISMATCH, "Entity of " + model.table() + " belongs to tenant " + existing +
+                                              ", not the current tenant " + tenant);
+        }
+        if (existing == null) {
+            replace(entry, model.with(entry.entity, index, tenant));
+        }
+    }
+
+    /// Refuses an UPDATE that would move a row to another tenant. The WHERE
+    /// clause limits which row is written, not what it is set to, so without
+    /// this a tenant could plant rows in a tenant it does not own -- through a
+    /// managed entity or a merged detached one, which both end here. Checked
+    /// after @PreUpdate, which could also set the field.
+    private void checkTenantUnchanged(Entry entry) {
+        EntityModel model = entry.model;
+        int index = model.tenantIndex();
+        if (index < 0 || !(sql instanceof TenantSource) || entry.snapshot == null) {
+            return;
+        }
+        Object now = model.get(entry.entity, index);
+        if (!same(now, entry.snapshot[index])) {
+            throw tenantFailure(TenantSource.MISMATCH, "The tenant of a " + model.table() + " row cannot change (from " +
+                                              entry.snapshot[index] + " to " + now + ")");
+        }
+    }
+
+    private String typeCondition(EntityModel model, String alias) {
         if (model.discriminatorIndex() < 0) {
             return "";
         }
@@ -3262,6 +3447,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         model.lifecycle(entry.entity, 0);
         cascadePersist(entry);
         resolveTargets(entry);
+        // After @PrePersist, before the required-column check the tenant column is part of.
+        stampTenant(entry);
         checkTransientAssociations(entry);
         if (!attrs[model.idIndex()].generated && !same(entry.initialId, model.identifier(entry.entity))) {
             throw new PersistenceException("Managed primary key cannot change");
@@ -3482,6 +3669,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return false;
         }
         model.lifecycle(entry.entity, 2);
+        checkTenantUnchanged(entry);
         cascadePersist(entry);
         insertPending(inserted);
         checkTransientAssociations(entry);
@@ -3745,6 +3933,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 result.append(alias).append('.');
             }
             result.append(q(model.attributes()[id].column)).append(" = ?");
+        }
+        // Finds, single-row updates and deletes and the counter all address a
+        // row by its key; the tenant condition makes another tenant's row with
+        // that key read as missing.
+        String tenant = tenantCondition(model, alias);
+        if (tenant.length() > 0) {
+            result.append(" AND ").append(tenant);
         }
         return result.toString();
     }

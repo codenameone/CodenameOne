@@ -13,10 +13,17 @@ for a practical comparison). The native port needs no JVM on the target machine.
 .The Codename One Initializr app running as a native Windows `.exe` (ParparVM + Direct2D/DirectWrite, no JVM)
 image::img/windows-native-initializr.png[Codename One running as a native Windows executable,scaledwidth=70%]
 
-NOTE: The native Windows port is a young port. It renders, runs and edits text,
-but several platform services are still being filled in. Treat it as a foundation
-to build on rather than a feature-complete replacement for the desktop build, and
-consult the port's `status.md` for the current gap list.
+IMPORTANT: The native Windows build is *free*, on the build server and locally. The build that needs a Pro
+subscription is the other one, the Windows *desktop* build, which bundles a JVM.
+Their names are easy to mix up, so check which one you're sending: the native
+build is the `windows-device` target with `codename1.platform=win`
+(`cn1:buildWindowsNative`, `./build.sh windows_native`, *Windows Native Build
+(free)* in the IDE), and the desktop build is `windows-desktop` with
+`codename1.platform=javase` (`cn1:buildWindowsDesktop`,
+`./build.sh windows_desktop`, *Windows Desktop Build (JVM, Pro)*).
+
+NOTE: This port is newer than the desktop build, and some platform services are
+still being filled in. Test the features your app depends on.
 
 === How it works (the technology stack)
 
@@ -75,8 +82,8 @@ itself was built on Linux.
 
 === Cloud builds (the `win32` target)
 
-On the Codename One build cloud the native Windows build is the *win32* target,
-and it builds on Linux (the Android/JavaScript build group) using the cross-compile
+The build cloud's own name for the native Windows build is *win32*; in your
+project it's the `windows-device` build target. It builds on Linux (the Android/JavaScript build group) using the cross-compile
 above. Trigger it like any other cloud target:
 
 [source,bash]
@@ -84,7 +91,9 @@ above. Trigger it like any other cloud target:
 include::../demos/common/src/main/snippets/developer-guide/working-with-windows.sh[tag=working-with-windows-bash-001,indent=0]
 ----
 
-The convenience goal `mvn cn1:buildWin32`, run from the project root, does the same thing. A regular
+The convenience goal `mvn cn1:buildWindowsNative`, run from the project root, does the same thing,
+as do `./build.sh windows_native` and the *Windows Native Build (free)* entry in the IDE.
+`cn1:buildWin32` and `cn1:buildWindowsDevice` are older names for the same goal. A regular
 (release) build returns **two** binaries -- x64 and arm64, both stripped release exes. Setting the
 `windows.debug` build hint instead returns a **single** x64 exe with symbols, for
 diagnosis. (To build locally on a Windows box, use
@@ -252,6 +261,11 @@ They trade off self-containment, size, startup and maturity differently:
 packaged as a Windows installer.
 |A runnable `.jar` of your app plus the Codename One jars.
 
+|Account
+|Free.
+|Pro feature when the build server packages it.
+|Free -- it builds on your own machine.
+
 |JVM required on the target?
 |No -- fully self-contained.
 |No if the installer bundles a JRE; otherwise it relies on one.
@@ -285,15 +299,14 @@ on an arm64 machine it runs through Windows' x64 emulation).
 |Windows-only installer.
 |Cross-platform -- the same jar runs anywhere a supported JVM exists.
 
-|Maturity
-|Young -- a foundation, with gaps (see `status.md`).
-|Mature, battle-tested.
-|Mature, battle-tested.
+|Platform services
+|Newer port; some are still being filled in.
+|The full Java SE port.
+|The full Java SE port.
 |===
 
-In practical terms: reach for the *native `.exe`* when you want to ship a single
-self-contained, JVM-free, architecture-native Windows app that starts instantly;
-reach for the *desktop (JVM) app* when you want the mature, fully featured desktop
-experience and don't mind shipping (or depending on) a JVM; and reach for the
-*jar* when you want the smallest, most portable artifact for machines that already
-have a JDK.
+In practical terms: start with the *native `.exe`*. It's free, self-contained,
+JVM-free and architecture-native, and it starts instantly. Reach for the
+*desktop (JVM) app* when you have a Pro subscription and depend on something the
+native port doesn't provide yet, and for the *jar* when you want the smallest,
+most portable artifact for machines that already have a JDK.

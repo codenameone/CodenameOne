@@ -68,7 +68,9 @@ Codename One earlier offered a UWP (Universal Windows Platform) target based on 
 
 JavaScript build targets translate the bytecode statically with ParparVM, the same translator that generates the C sources for iOS. Cloud builds keep the original TeaVM-based compiler as a compatibility fallback, which you select with the `javascript.port` build hint. To support the complex UI Codename One uses the HTML5 Canvas API which allows absolute flexibility for building applications.
 
-Desktop builds are packaged on the same cloud machines, a Mac for the macOS installer and a Windows machine for the Windows one. The build originally used `javapackager`, which was abandoned because it couldn't package a ZuluFX runtime reliably; installers are now produced directly with third-party packaging tools.
+Native Mac and Windows apps take the route iOS takes: ParparVM turns the bytecode into C, which is compiled into an AppKit application or a Win32 executable with no JVM inside. These native builds are free; see <<_native_macos_build_appkit>> and <<_building_a_native_windows_app>>.
+
+Desktop builds are a different target with a similar name. They run your app on a bundled JVM and are a Pro feature. They're packaged on the same cloud machines, a Mac for the macOS installer and a Windows machine for the Windows one. The build originally used `javapackager`, which was abandoned because it couldn't package a ZuluFX runtime reliably; installers are now produced directly with third-party packaging tools.
 
 .What each target does with the same bytecode
 image::img/build-pipeline.svg[How one set of Java sources reaches each platform,scaledwidth=85%]

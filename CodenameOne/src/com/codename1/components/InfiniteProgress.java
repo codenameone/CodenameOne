@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Transform;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
@@ -74,6 +75,8 @@ public class InfiniteProgress extends Component {
     /// The default color of the current material design progress spinner
     private static int defaultMaterialDesignColor = 0x6200ee;
     private final WeakHashMap<Integer, Image> cache = new WeakHashMap<Integer, Image>();
+    /// Scratch for the context's transform while the spinner is painted rotated.
+    private Transform savedTransform;
     private Image animation;
     private int angle = 0;
     private int tick;
@@ -426,11 +429,51 @@ public class InfiniteProgress extends Component {
         }
         int v = angle % 360;
         Style s = getStyle();
-        /*if(g.isAffineSupported()) {
-            g.rotate(((float)v) / 57.2957795f, getAbsoluteX() + s.getPadding(LEFT) + getWidth() / 2, getAbsoluteY() + s.getPadding(TOP) + getHeight() / 2);
-            g.drawImage(getAnimation(), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));
-            g.resetAffine();
-        } else {*/
+        int drawX = getX() + s.getPaddingLeftNoRTL();
+        int drawY = getY() + s.getPaddingTop();
+        if (v == 0) {
+            g.drawImage(animation, drawX, drawY);
+            return;
+        }
+        if (g.isAffineSupported() && g.isTransformSupported()) {
+            // Rotate through the transform instead of Image.rotate(): every angle the
+            // cache below has not seen yet allocates and renders a new image in the
+            // middle of a paint, so the first full turn of a spinner did that on every
+            // frame. On iOS that flickered the first pull-to-refresh after each launch
+            // (issue #6269); the look and feel keeps one InfiniteProgress, so later
+            // refreshes found the cache full and were smooth.
+            //
+            // The pivot is the image's own center, in the same coordinates the image is
+            // drawn in. An earlier version of this branch pivoted on
+            // getAbsoluteX()/getAbsoluteY() while drawing at getX()/getY(), and on the
+            // component's width rather than the image's, which is why the rotated image
+            // drifted off its position and the branch was disabled.
+            //
+            // Undoing the rotation: when the context had no transform, which is the
+            // ordinary case, resetAffine() puts it back exactly. A rotation followed
+            // by its inverse is not bit exact in float, and the residue would leave a
+            // "non-identity" matrix behind for every sibling painted after this one.
+            // When a parent did set a transform (a scaled form, a transition),
+            // resetAffine() would discard it, and a getTransform()/setTransform()
+            // round trip would re-conjugate an impl-space matrix with the Graphics
+            // translation, so the inverse rotation is the right tool there.
+            if (savedTransform == null) {
+                savedTransform = Transform.makeIdentity();
+            }
+            g.getTransform(savedTransform);
+            boolean wasIdentity = savedTransform.isIdentity();
+            float radians = (float) Math.toRadians(v);
+            int pivotX = drawX + animation.getWidth() / 2;
+            int pivotY = drawY + animation.getHeight() / 2;
+            g.rotateRadians(radians, pivotX, pivotY);
+            g.drawImage(animation, drawX, drawY);
+            if (wasIdentity) {
+                g.resetAffine();
+            } else {
+                g.rotateRadians(-radians, pivotX, pivotY);
+            }
+            return;
+        }
 
         Image rotated;
         if (animation instanceof FontImage) {
@@ -443,8 +486,7 @@ public class InfiniteProgress extends Component {
                 cache.put(angle, rotated);
             }
         }
-        g.drawImage(rotated, getX() + s.getPaddingLeftNoRTL(), getY() + s.getPaddingTop());
-        //}
+        g.drawImage(rotated, drawX, drawY);
     }
 
     /// #### Returns

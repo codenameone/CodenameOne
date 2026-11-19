@@ -2714,6 +2714,10 @@ public class GeneratorModel {
                 {"Android Build", "buildAndroid"},
                 {"iOS Debug Build", "buildIos"},
                 {"iOS Release Build", "buildIosRelease"},
+                // The free native desktop builds. The JVM desktop builds, a Pro feature, are
+                // left to the command line: an entry here is what a developer reaches for.
+                {"Mac Native Build (free)", "buildMacNative"},
+                {"Windows Native Build (free)", "buildWindowsDevice"},
                 {"JavaScript Build", "buildJavascript"},
                 {"JavaScript Local Build", "buildJavascriptLocal"},
                 {"Certificate Wizard", "certificateWizard"},
@@ -2865,7 +2869,10 @@ public class GeneratorModel {
                     .append("submits a hosted build.\n")
                     .append("- `./gradlew buildAndroidGradleProject` and `./gradlew buildIosXcodeProject` generate native ")
                     .append("IDE projects locally.\n")
-                    .append("- `./gradlew buildMacDesktop` and `./gradlew buildWindowsDesktop` build desktop apps.\n")
+                    .append("- `./gradlew buildMacNative` and `./gradlew buildWindowsDevice` build native Mac and ")
+                    .append("Windows apps, with no JVM. They are free.\n")
+                    .append("- `./gradlew buildMacDesktop` and `./gradlew buildWindowsDesktop` build desktop apps that ")
+                    .append("bundle a JVM. Those two are a Pro feature.\n")
                     .append("- `./gradlew settings` opens Codename One Settings; `./gradlew tasks` lists everything else.\n\n")
                     .append("Complete the browser login when a build asks for it. Local tasks such as `run` and ")
                     .append("`buildJavascriptLocal` do not create a cloud build.\n\n")

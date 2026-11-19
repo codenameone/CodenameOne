@@ -52,8 +52,13 @@ kill %1                                           # stop the simulator when done
 - A bug that only reproduces on an Android phone or an iPhone is still debuggable:
   attach a Java debugger to the device build and drive it over MCP the same way;
   see `.agent-skills/codename-one/references/on-device-debugging.md`.
-- Native cloud builds use `mvn package -Dcodename1.platform=<ios|android|javascript|javase> -Dcodename1.buildTarget=...`
+- Native cloud builds use `mvn package -Dcodename1.platform=<ios|android|javascript|win|linux|javase> -Dcodename1.buildTarget=...`
   from the project root. A platform with no module of its own is built from `common/`.
+- A Mac or Windows app means the NATIVE build, which has no JVM and is free:
+  `-Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native` and
+  `-Dcodename1.platform=win -Dcodename1.buildTarget=windows-device`. The similarly named
+  `mac-os-x-desktop` and `windows-desktop` targets bundle a JVM and are a Pro feature;
+  send one only when it is asked for by name.
 - Local native-project builds (`-Dcodename1.buildTarget=ios-source`, `mac-source`,
   `android-source`) open Xcode / Android Studio when they finish. Always add
   `-Dopen=false` so you generate the sources without launching an IDE window.

@@ -11,7 +11,7 @@ series: ["release-2026-11-13"]
 
 ![Splat, a team paintball shooter, headed to Steam](/blog/ship-your-java-game-on-steam.jpg)
 
-Here's my claim, and the rest of this post is the evidence: the engine is the least important decision in a small game. Art decides whether people play it, the server decides whether it's fair, and the store decides whether anyone finds it. Splat, our third game template after Skirmish and [Dash](/blog/build-an-endless-runner-in-java/), is a first person team paintball shooter, four against four, in 3D, online, written in Java with Codename One. It's the kind of game people assume needs a commercial engine. Watch it first and judge for yourself.
+The engine is the least important decision in a small game. Art decides whether people play it, the server decides whether it's fair, and the store decides whether anyone finds it. Splat, our third game template after Skirmish and [Dash](/blog/build-an-endless-runner-in-java/), is a first person team paintball shooter, four against four, in 3D, online, written in Java with Codename One. It's the kind of game people assume needs a commercial engine. Watch it first and judge for yourself.
 
 {{< guide-block >}}
 <video controls playsinline preload="metadata" poster="/blog/release-2026-11-13/splat-desktop-demo-poster.jpg" width="960" height="564" style="width:100%;height:auto;display:block;margin:16px auto" aria-label="Splat on the desktop: menus, a briefing and a match"><source src="/blog/release-2026-11-13/splat-desktop-demo.mp4" type="video/mp4"><a href="/blog/release-2026-11-13/splat-desktop-demo.mp4">Download the desktop video</a>.</video>

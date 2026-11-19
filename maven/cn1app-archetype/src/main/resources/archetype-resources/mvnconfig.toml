@@ -33,24 +33,24 @@ command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javascript", "
 label="JavaScript Build"
 group="Local"
 
-[mac_desktop]
-command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=mac-os-x-desktop", "-U", "-e"]
-label="Mac Desktop Build"
+[windows_device]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=win", "-Dcodename1.buildTarget=windows-device", "-U", "-e"]
+label="Windows Native Build (free)"
 group="Cloud"
 
 [mac_native]
 command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=mac-os-x-native", "-U", "-e"]
-label="Mac Native Build"
+label="Mac Native Build (free)"
 group="Cloud"
 
 [windows_desktop]
 command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=windows-desktop", "-U", "-e"]
-label="Windows Desktop Build"
+label="Windows Desktop Build (JVM, Pro)"
 group="Cloud"
 
-[windows_device]
-command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=win", "-Dcodename1.buildTarget=windows-device", "-U", "-e"]
-label="Windows Device Build"
+[mac_desktop]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=mac-os-x-desktop", "-U", "-e"]
+label="Mac Desktop Build (JVM, Pro)"
 group="Cloud"
 
 [linux_device]

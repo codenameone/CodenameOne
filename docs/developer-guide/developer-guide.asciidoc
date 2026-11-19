@@ -71,6 +71,8 @@ include::Rich-Text-And-Code-Editing.asciidoc[]
 
 include::Scheduling-And-Gantt.asciidoc[]
 
+include::Data-Grid.asciidoc[]
+
 include::Node-Graphs.asciidoc[]
 
 include::Accessibility-Semantics.asciidoc[]
@@ -325,8 +327,6 @@ include::Desktop-Interop.asciidoc[]
 include::Kotlin-Multiplatform-Interop.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
-
-include::Working-with-Mac-Catalyst.asciidoc[]
 
 include::Working-With-Windows.asciidoc[]
 

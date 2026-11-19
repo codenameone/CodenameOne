@@ -46,6 +46,9 @@ public final class HoursForm {
     static final String[] DAYS = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
         "Saturday", "Sunday"};
 
+    /// Hours, and time off, are kept to the quarter hour bookings start on.
+    static final int QUARTER = 15;
+
     private final Form form = Ui.form("Working hours", "Hours");
     private final Container page = Ui.page();
     private final CheckBox[] open = new CheckBox[7];
@@ -109,15 +112,28 @@ public final class HoursForm {
     }
     // end::slate-hours-form[]
 
+    // tag::slate-time-picker[]
+    /// A time of day in quarter hours. The theme's `pickerStyle: material`
+    /// makes the field open the Material clock face; Cancel there, or Back,
+    /// leaves the time what it was.
     static Picker time(String name, int minute) {
-        Picker p = new Picker();
+        final Picker p = new Picker();
         p.setType(Display.PICKER_TYPE_TIME);
-        p.setMinuteStep(15);
+        p.setMinuteStep(QUARTER);
         p.setTime(minute);
         p.setName(name);
         p.setUIID("SvPicker");
+        // The step is where the hand stops. The clock also takes a time that
+        // is typed, and a typed 09:10 is brought back to the quarter here.
+        p.addActionListener(e -> {
+            int chosen = p.getTime();
+            if (chosen % QUARTER != 0) {
+                p.setTime(chosen / QUARTER * QUARTER);
+            }
+        });
         return p;
     }
+    // end::slate-time-picker[]
 
     private static WorkingHoursDto first(WeekDto week, int weekday) {
         for (int iter = 0; iter < week.hours().size(); iter++) {

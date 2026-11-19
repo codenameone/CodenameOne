@@ -22,7 +22,6 @@
     "scripts/ios/screenshots-metal",
     "scripts/ios/screenshots-watch",
     "scripts/ios/screenshots-tv",
-    "scripts/mac-catalyst/screenshots",
     "scripts/macos/screenshots",
     "scripts/javascript/screenshots",
     "scripts/linux/screenshots",
@@ -47,12 +46,6 @@
       "name": "macOS",
       "detail": "Native AppKit build",
       "workflow": "scripts-macos.yml"
-    },
-    {
-      "id": "mac-catalyst",
-      "name": "macOS (Mac Catalyst)",
-      "detail": "Legacy Mac Catalyst build",
-      "workflow": "scripts-ios.yml"
     },
     {
       "id": "javascript",
@@ -126,7 +119,8 @@
         "AndroidCompatJetpackScreenshotTest",
         "AndroidCompatRecyclerScreenshotTest",
         "AndroidCompatMaterialScreenshotTest",
-        "AndroidCompatKotlinScreenshotTest"
+        "AndroidCompatKotlinScreenshotTest",
+        "AndroidCompatTallDialogScreenshotTest"
       ]
     },
     {
@@ -482,6 +476,16 @@
         "SchedulerMonthThemeScreenshotTest",
         "SchedulerResourceThemeScreenshotTest",
         "SchedulerThemeScreenshotTest"
+      ]
+    },
+    {
+      "id": "data-grid",
+      "category": "Rich components",
+      "name": "Data grid and tree grid",
+      "description": "Checks the data grid with a frozen column, sort arrows, grouping with aggregates and a selected row, and the tree grid with nested rows, in light and dark themes.",
+      "tests": [
+        "DataGridThemeScreenshotTest",
+        "TreeGridThemeScreenshotTest"
       ]
     },
     {
@@ -1588,6 +1592,14 @@
       "test": "GanttThemeScreenshotTest"
     },
     {
+      "pattern": "DataGridTheme*",
+      "test": "DataGridThemeScreenshotTest"
+    },
+    {
+      "pattern": "TreeGridTheme*",
+      "test": "TreeGridThemeScreenshotTest"
+    },
+    {
       "pattern": "NodeGraphTheme*",
       "test": "NodeGraphThemeScreenshotTest"
     },
@@ -1830,6 +1842,10 @@
     {
       "pattern": "AndroidCompatKotlin",
       "test": "AndroidCompatKotlinScreenshotTest"
+    },
+    {
+      "pattern": "AndroidCompatTallDialog",
+      "test": "AndroidCompatTallDialogScreenshotTest"
     },
     {
       "pattern": "UnityCompatSprites",

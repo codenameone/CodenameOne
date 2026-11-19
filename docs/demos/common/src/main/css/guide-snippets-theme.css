@@ -924,6 +924,38 @@ GanttLinkCritical {
 }
 /* end::scheduling-css-gantt[] */
 
+/* tag::datagrid-css[] */
+DataGridHeader {
+    background-color: #0f766e;
+    color: #ffffff;
+    font-family: "native:MainBold";
+}
+
+DataGridRow {
+    background-color: #ffffff;
+    color: #134e4a;
+}
+
+DataGridRowAlt {
+    background-color: #f0fdfa;
+    color: #134e4a;
+}
+
+DataGridRow.selected {
+    background-color: #99f6e4;
+    color: #042f2e;
+}
+
+DataGridLine {
+    color: #99f6e4;
+}
+
+DataGridCheck {
+    background-color: #0d9488;
+    color: #ffffff;
+}
+/* end::datagrid-css[] */
+
 /* tag::picker-material-constant[] */
 #Constants {
     pickerStyle: "material";

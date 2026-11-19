@@ -100,15 +100,32 @@ Call `Biometrics.getInstance().stopAuthentication()` to dismiss an active prompt
 
 === Listing enrolled biometrics
 
-`getAvailableBiometrics()` returns a `List<BiometricType>` to drive UI affordances (icon, prompt copy):
+`getAvailableBiometrics()` returns a `List<BiometricType>` of what the device can authenticate with. On Android 10 and later that's every modality the device has hardware for once any biometric is enrolled, so use `getPromptType()` (next section) to pick an icon or prompt copy:
 
 - `FINGERPRINT`: iOS Touch ID; Android fingerprint sensor.
 - `FACE`: iOS Face ID; Android face recognition (API 29+).
 - `IRIS`: a handful of Samsung devices; never on iOS.
-- `STRONG`: Android class-3 authenticator tier (false-acceptance < 1/100,000); only Android API 30+.
+- `STRONG`: a class-3 authenticator tier (false-acceptance < 1/100,000). Windows and Linux report this alone, because they don't learn the modality.
 - `WEAK`: Android class-2 authenticator tier; only Android API 30+. Can't unlock Keystore-bound keys, so weak-only devices can't use `SecureStorage`.
 
 Never use this list to decide whether to call `authenticate()`; always use `canAuthenticate()` for that decision.
+
+=== Choosing the wording of your own UI
+
+`getPromptType()` answers one question: what should the app call biometric authentication on this device? It returns `FINGERPRINT`, `FACE`, `BIOMETRICS` or `NONE`, and the answer needs no platform or OS version check:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BiometricAuthenticationJava005Snippet.java[tag=biometric-authentication-java-005,indent=0]
+----
+
+A single modality is named, and anything else that can authenticate is `BIOMETRICS`:
+
+- iOS names Touch ID or Face ID.
+- Android reports that some biometric is enrolled and not which one, so an Android device with more than one kind of biometric hardware answers `BIOMETRICS`. Use neutral wording there; the system prompt directs the user to the right sensor.
+- Windows and Linux always answer `BIOMETRICS`. Windows Hello doesn't say what it verifies with, and that may be a PIN.
+
+The call asks the platform each time, so make it when you build the screen and keep the answer.
 
 === Simulator workflow
 

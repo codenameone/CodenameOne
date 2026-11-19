@@ -57,6 +57,34 @@
       ]
     },
     {
+      "test": "DataGridThemeScreenshotTest",
+      "reason": "The data grid baseline is a grid of columns and rows. A watch face has room for a column or two at most, so the capture there would only record how the grid fails to fit.",
+      "platform_support": "DataGrid compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the grid in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "data-grid-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "TreeGridThemeScreenshotTest",
+      "reason": "The tree grid baseline is a grid of columns and rows. A watch face has room for a column or two at most, so the capture there would only record how the grid fails to fit.",
+      "platform_support": "DataGrid compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the grid in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "data-grid-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "NodeGraphThemeScreenshotTest",
       "reason": "The node graph baseline is a diagram of five connected nodes in a group. A watch face has no room for it, so the capture there would only record how the diagram fails to fit.",
       "platform_support": "The NodeGraph component compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
@@ -173,7 +201,6 @@
           "prefix": "webview-not-captured-on-desktop",
           "ports": [
             "macos",
-            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -213,7 +240,6 @@
           "ports": [
             "ios-metal",
             "macos",
-            "mac-catalyst",
             "tvos"
           ]
         },
@@ -265,7 +291,6 @@
           "ports": [
             "ios-metal",
             "macos",
-            "mac-catalyst",
             "tvos",
             "watchos",
             "linux-x64",
@@ -359,7 +384,6 @@
           "ports": [
             "ios-metal",
             "macos",
-            "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -369,7 +393,6 @@
           "ports": [
             "ios-metal",
             "macos",
-            "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -379,7 +402,6 @@
           "ports": [
             "ios-metal",
             "macos",
-            "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -389,7 +411,6 @@
           "ports": [
             "ios-metal",
             "macos",
-            "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -472,8 +493,7 @@
         },
         {
           "ports": [
-            "ios-metal",
-            "mac-catalyst"
+            "ios-metal"
           ],
           "state": "supported",
           "label": "AVFoundation",
@@ -536,8 +556,7 @@
           "ports": [
             "android",
             "ios-metal",
-            "macos",
-            "mac-catalyst"
+            "macos"
           ],
           "state": "supported",
           "label": "Native recorder",
@@ -616,7 +635,6 @@
         {
           "ports": [
             "macos",
-            "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -648,7 +666,6 @@
         },
         {
           "ports": [
-            "mac-catalyst",
             "watchos"
           ],
           "state": "conditional",
@@ -719,8 +736,7 @@
         },
         {
           "ports": [
-            "macos",
-            "mac-catalyst"
+            "macos"
           ],
           "state": "conditional",
           "label": "Apple entitlement",
@@ -766,9 +782,7 @@
           "detail": "Apple StoreKit purchase, restore, and subscription flow."
         },
         {
-          "ports": [
-            "mac-catalyst"
-          ],
+          "ports": [],
           "state": "conditional",
           "label": "StoreKit",
           "detail": "Requires a signed Mac App Store configuration and matching products."
@@ -823,9 +837,7 @@
           "detail": "EventKit calendar access is available once the application references it, which is what links the framework and requests the entitlement. Contacts are not: the legacy AddressBook C API the shared implementation uses does not exist on macOS and no Contacts.framework backend has been written, so isContactsPermissionGranted() reports false."
         },
         {
-          "ports": [
-            "mac-catalyst"
-          ],
+          "ports": [],
           "state": "conditional",
           "label": "Apple services",
           "detail": "Availability depends on the Catalyst target, entitlement, and user account."
@@ -872,7 +884,6 @@
         },
         {
           "ports": [
-            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -922,7 +933,6 @@
         {
           "ports": [
             "macos",
-            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -957,7 +967,6 @@
         {
           "ports": [
             "macos",
-            "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -998,8 +1007,7 @@
         },
         {
           "ports": [
-            "macos",
-            "mac-catalyst"
+            "macos"
           ],
           "state": "conditional",
           "label": "Target-dependent",
@@ -1048,7 +1056,6 @@
         {
           "ports": [
             "macos",
-            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1076,7 +1083,6 @@
             "android",
             "ios-metal",
             "macos",
-            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1118,7 +1124,6 @@
         {
           "ports": [
             "macos",
-            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1167,7 +1172,6 @@
         {
           "ports": [
             "macos",
-            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1210,7 +1214,6 @@
         {
           "ports": [
             "macos",
-            "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -1252,7 +1255,6 @@
         {
           "ports": [
             "macos",
-            "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -1293,7 +1295,6 @@
         {
           "ports": [
             "macos",
-            "mac-catalyst",
             "linux-x64",
             "linux-arm64"
           ],
@@ -1341,7 +1342,6 @@
           "ports": [
             "android",
             "ios-metal",
-            "mac-catalyst",
             "macos",
             "javascript",
             "linux-x64",
@@ -1377,7 +1377,6 @@
             "android",
             "ios-metal",
             "macos",
-            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
