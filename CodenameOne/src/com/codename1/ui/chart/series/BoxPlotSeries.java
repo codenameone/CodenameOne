@@ -297,6 +297,10 @@ public class BoxPlotSeries extends XYSeries {
             }
             double lo = getAux(MIN, i);
             double hi = getAux(MAX, i);
+            // a median set outside the whiskers is still drawn, so it is kept on the axis
+            double med = getY(i);
+            min = Math.min(min, med);
+            max = Math.max(max, med);
             if (!isGap(lo)) {
                 min = Math.min(min, lo);
             }

@@ -71,6 +71,11 @@ public class BarSeries extends XYSeries {
     }
 
     @Override
+    protected boolean consumesStackBase() {
+        return true;
+    }
+
+    @Override
     public double[] getYBounds() {
         double[] b = super.getYBounds();
         if (b == null) {

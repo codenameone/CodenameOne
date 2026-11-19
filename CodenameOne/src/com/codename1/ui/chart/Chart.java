@@ -34,6 +34,7 @@ import com.codename1.ui.chart.axis.Axis;
 import com.codename1.ui.chart.axis.CategoryAxis;
 import com.codename1.ui.chart.axis.NumberAxis;
 import com.codename1.ui.chart.layout.LabelLayout;
+import com.codename1.ui.chart.series.RangeBarSeries;
 import com.codename1.ui.chart.series.ScatterSeries;
 import com.codename1.ui.chart.series.XYSeries;
 import com.codename1.ui.events.WheelEvent;
@@ -1709,12 +1710,14 @@ public class Chart extends Component {
             sb.append(emptyText == null ? "No data." : emptyText);
             return sb.toString();
         }
+        boolean anyShown = false;
         for (int i = 0; i < series.size(); i++) {
             Series s = series.get(i);
             if (!s.isVisible()) {
                 // the summary describes the picture; a series hidden from it is not read out
                 continue;
             }
+            anyShown = true;
             sb.append(s.getName() == null ? "Series " + (i + 1) : s.getName()).append(": ");
             double[] yb = valueRange(s);
             if (yb == null && s instanceof XYSeries) {
@@ -1722,7 +1725,7 @@ public class Chart extends Component {
             } else if (yb != null) {
                 // an x/y series is summarized from its numbers; formatting every point of a long
                 // series on each accessibility query would be wasted work
-                sb.append(((XYSeries) s).size()).append(" values from ").append(s.formatValue(null, yb[0]))
+                sb.append(valueCount((XYSeries) s)).append(" values from ").append(s.formatValue(null, yb[0]))
                         .append(" to ").append(s.formatValue(null, yb[1]));
             } else {
                 ArrayList<String[]> rows = new ArrayList<String[]>();
@@ -1740,7 +1743,22 @@ public class Chart extends Component {
             }
             sb.append(". ");
         }
+        if (!anyShown) {
+            // every series hidden: the picture is the empty chart, and so is its description
+            sb.append(emptyText == null ? "No data." : emptyText);
+        }
         return sb.toString().trim();
+    }
+
+    // the points that have a value; a gap is not a value to count
+    private static int valueCount(XYSeries xy) {
+        int n = 0;
+        for (int i = 0; i < xy.size(); i++) {
+            if (!xy.isGapAt(i)) {
+                n++;
+            }
+        }
+        return n;
     }
 
     // the smallest and largest data values, without the baseline a bar or area adds to its bounds
@@ -1753,6 +1771,17 @@ public class Chart extends Component {
         double max = -Double.MAX_VALUE;
         for (int i = 0; i < xy.size(); i++) {
             if (!xy.isGapAt(i)) {
+                if (xy instanceof RangeBarSeries) {
+                    // a range reads as where it lies, not how long it is
+                    RangeBarSeries rb = (RangeBarSeries) xy;
+                    double a = rb.getStart(i);
+                    double b = rb.getEnd(i);
+                    if (finite(a) && finite(b)) {
+                        min = Math.min(min, Math.min(a, b));
+                        max = Math.max(max, Math.max(a, b));
+                    }
+                    continue;
+                }
                 double v = xy.getY(i);
                 min = Math.min(min, v);
                 max = Math.max(max, v);

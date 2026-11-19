@@ -45,10 +45,19 @@ public abstract class XYSeries extends Series {
     // each extra channel's offset from its point's value where the last transition started, per
     // fromY slot; null on entry, so a first appearance grows out of the point's own value
     private double[][] fromAux;
+    // the stacked base as painted where the last transition started, per fromY slot; null when
+    // there is no transition, so the base is the settled one
+    private double[] fromBase;
+    // for a series that rests on a stack base, its value as painted (visibility weighted) where
+    // the last transition started, per fromY slot, so the layer and the base above it tween alike
+    private double[] fromPainted;
     private String stackGroup;
     private int maxPoints;
     /// Extra values per point (open/high/low, a range start, quartiles), parallel to `ys`.
     double[][] aux;
+    // per channel and point: true when the value was given explicitly, false when it came from
+    // auxDefault and so follows the point's value through set()
+    private boolean[][] explicit;
 
     /// Creates an empty series.
     ///
@@ -69,6 +78,7 @@ public abstract class XYSeries extends Series {
     protected XYSeries(String name, int auxChannels) {
         super(name);
         aux = new double[auxChannels][16];
+        explicit = new boolean[auxChannels][16];
     }
 
     /// Replaces all points, each with its extra values.
@@ -97,12 +107,14 @@ public abstract class XYSeries extends Series {
         ys = new double[cap];
         for (int k = 0; k < aux.length; k++) {
             aux[k] = new double[cap];
+            explicit[k] = new boolean[cap];
         }
         for (int i = 0; i < count; i++) {
             xs[i] = x == null ? i : x[i];
             ys[i] = y[i];
             for (int k = 0; k < aux.length; k++) {
                 aux[k][i] = channels[k][i];
+                explicit[k][i] = true;
             }
         }
         dataChanged();
@@ -125,6 +137,7 @@ public abstract class XYSeries extends Series {
         ys[count] = y;
         for (int k = 0; k < aux.length; k++) {
             aux[k][count] = values[k];
+            explicit[k][count] = true;
         }
         count++;
         dataChanged();
@@ -160,6 +173,7 @@ public abstract class XYSeries extends Series {
         ys[i] = y;
         for (int k = 0; k < aux.length; k++) {
             aux[k][i] = values[k];
+            explicit[k][i] = true;
         }
         dataChanged();
     }
@@ -171,8 +185,9 @@ public abstract class XYSeries extends Series {
         System.arraycopy(xs, i + 1, xs, i, tail);
         System.arraycopy(ys, i + 1, ys, i, tail);
         if (aux != null) {
-            for (double[] channel : aux) {
-                System.arraycopy(channel, i + 1, channel, i, tail);
+            for (int k = 0; k < aux.length; k++) {
+                System.arraycopy(aux[k], i + 1, aux[k], i, tail);
+                System.arraycopy(explicit[k], i + 1, explicit[k], i, tail);
             }
         }
         count--;
@@ -198,14 +213,25 @@ public abstract class XYSeries extends Series {
         return aux[channel][i];
     }
 
+    // marks every extra channel of point i as given explicitly, so set() leaves them alone
+    void markExplicit(int i) {
+        if (explicit != null) {
+            for (boolean[] e : explicit) {
+                e[i] = true;
+            }
+        }
+    }
+
     private void slide() {
         if (maxPoints > 0 && count >= maxPoints) {
             System.arraycopy(xs, 1, xs, 0, count - 1);
             System.arraycopy(ys, 1, ys, 0, count - 1);
             if (aux != null) {
-                for (double[] channel : aux) {
-                    System.arraycopy(channel, 1, channel, 0, count - 1);
-                    channel[count - 1] = 0;
+                for (int k = 0; k < aux.length; k++) {
+                    System.arraycopy(aux[k], 1, aux[k], 0, count - 1);
+                    aux[k][count - 1] = 0;
+                    System.arraycopy(explicit[k], 1, explicit[k], 0, count - 1);
+                    explicit[k][count - 1] = false;
                 }
             }
             // clear the vacated slot so nothing of the dropped point can leak into the next one
@@ -242,6 +268,7 @@ public abstract class XYSeries extends Series {
                     na[i] = auxDefault(k, y[i]);
                 }
                 aux[k] = na;
+                explicit[k] = new boolean[xs.length];
             }
         }
         dataChanged();
@@ -268,6 +295,7 @@ public abstract class XYSeries extends Series {
         if (aux != null) {
             for (int k = 0; k < aux.length; k++) {
                 aux[k][count] = auxDefault(k, y);
+                explicit[k][count] = false;
             }
         }
         count++;
@@ -282,6 +310,14 @@ public abstract class XYSeries extends Series {
         }
         begin();
         ys[index] = y;
+        if (aux != null) {
+            // a channel derived from the value follows it; one given explicitly stays put
+            for (int k = 0; k < aux.length; k++) {
+                if (!explicit[k][index]) {
+                    aux[k][index] = auxDefault(k, y);
+                }
+            }
+        }
         dataChanged();
         return this;
     }
@@ -304,8 +340,9 @@ public abstract class XYSeries extends Series {
             System.arraycopy(xs, drop, xs, 0, n);
             System.arraycopy(ys, drop, ys, 0, n);
             if (aux != null) {
-                for (double[] channel : aux) {
-                    System.arraycopy(channel, drop, channel, 0, n);
+                for (int k = 0; k < aux.length; k++) {
+                    System.arraycopy(aux[k], drop, aux[k], 0, n);
+                    System.arraycopy(explicit[k], drop, explicit[k], 0, n);
                 }
             }
             count = n;
@@ -357,6 +394,9 @@ public abstract class XYSeries extends Series {
                     double[] na = new double[cap];
                     System.arraycopy(aux[k], 0, na, 0, count);
                     aux[k] = na;
+                    boolean[] ne = new boolean[cap];
+                    System.arraycopy(explicit[k], 0, ne, 0, count);
+                    explicit[k] = ne;
                 }
             }
         }
@@ -372,12 +412,12 @@ public abstract class XYSeries extends Series {
     /// The base this series' point `i` rests on: 0, or the stacked sum of the earlier series
     /// in its group.
     public double getBase(int i) {
-        return stackBase(null, i);
+        return stackBase(false, i);
     }
 
-    // the sum of the earlier layers under point i: settled values weighted by their shown
-    // fraction for a null ctx, else each layer's value as painted in this frame
-    private double stackBase(ChartContext ctx, int i) {
+    // the sum of the earlier layers under point i: settled values weighted by the fraction each
+    // is shown now, or with `target` by the fraction it ends at (1 shown, 0 hidden)
+    private double stackBase(boolean target, int i) {
         if (stackGroup == null || getChart() == null) {
             return 0;
         }
@@ -399,7 +439,7 @@ public abstract class XYSeries extends Series {
                 XYSeries xo = (XYSeries) o;
                 // a series fading in or out carries its layers by the fraction it is shown, so
                 // the stack above it slides with the fade instead of snapping at its start
-                float frac = xo.getVisibilityFraction();
+                float frac = target ? (xo.isVisible() ? 1 : 0) : xo.getVisibilityFraction();
                 if (!(frac > 0)) { //NOPMD LogicInversion - also skips a NaN fraction
                     continue;
                 }
@@ -408,7 +448,7 @@ public abstract class XYSeries extends Series {
                     if (j >= 0) {
                         double v = xo.ys[j];
                         if (!isGap(v) && (v < 0) == negative) {
-                            sum += ctx == null ? v * frac : xo.animatedY(ctx, j);
+                            sum += v * frac;
                         }
                     }
                 }
@@ -543,15 +583,33 @@ public abstract class XYSeries extends Series {
     /// transition started.
     public double animatedY(ChartContext ctx, int i) {
         double v = rawAnimatedY(ctx, i);
-        if (ctx != null && stackGroup != null) {
-            // a stack layer fading in or out is drawn at the fraction it is shown, and the layers
-            // above rest on exactly that (animatedBase), so the stack never gaps or overlaps
-            float f = getVisibilityFraction();
-            if (f >= 0 && f < 1) {
-                v *= f;
-            }
+        if (ctx == null || stackGroup == null || !consumesStackBase()) {
+            return v;
+        }
+        // a stack layer fading in or out is drawn at the fraction it is shown. Mid transition it
+        // tweens from its painted value to its settled weighted one with the same progress the
+        // base above it tweens with (animatedBase), so the two meet and the stack never gaps
+        double t = ctx.getProgress();
+        int j = fromSlot(i);
+        if (fromPainted != null && t < 1 && j >= 0 && j < fromPainted.length) {
+            return lerp(fromPainted[j], ys[i] * (isVisible() ? 1 : 0), t);
+        }
+        float f = getVisibilityFraction();
+        if (f >= 0 && f < 1) {
+            v *= f;
         }
         return v;
+    }
+
+    /// True for a series drawn on its stack base (an area or a bar), which a stack group lifts
+    /// and whose layer shrinks with the fraction it is shown while it fades; false for marks
+    /// that keep their own values (scatter, error bars, candles, boxes).
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    protected boolean consumesStackBase() {
+        return false;
     }
 
     // the interpolated value without the visibility weighting of a fading stack layer
@@ -621,12 +679,15 @@ public abstract class XYSeries extends Series {
         }
         if (!isAuxRelative(channel)) {
             // an absolute channel (a bubble size) has no relation to y: a matched point tweens
-            // its own old value, a new point grows from zero
+            // its own old value, a new point (and every point of a first appearance) grows from zero
             int j = fromSlot(i);
+            if (fromAux == null) {
+                return lerp(0, target, t);
+            }
             if (j < 0 || fromX != null && fromX[j] != xs[i]) { //NOPMD CompareDoubles - exact x match intended
                 return lerp(0, target, t);
             }
-            double f = fromAux == null || j >= fromAux[channel].length ? Double.NaN : fromAux[channel][j];
+            double f = j >= fromAux[channel].length ? Double.NaN : fromAux[channel][j];
             return isGap(f) ? target : lerp(f, target, t);
         }
         double y = ys[i];
@@ -664,20 +725,29 @@ public abstract class XYSeries extends Series {
     /// The stacked base shown at `i` in the current frame.
     public double animatedBase(ChartContext ctx, int i) {
         double t = ctx == null ? 1 : ctx.getProgress();
-        if (t >= 1) {
+        if (t >= 1 || fromBase == null) {
             return getBase(i);
         }
-        // computed from the layers below as they are painted this frame, never tweened from a
-        // snapshot toward a target that is itself moving
-        return stackBase(ctx, i);
+        // tweened from the base as painted when the change began to the settled one, with the
+        // same progress as the layers below (animatedY), so a fade, a removed layer or a new
+        // group all slide instead of snapping
+        double target = stackGroup == null ? getBase(i) : stackBase(true, i);
+        int j = fromSlot(i);
+        return j < 0 || j >= fromBase.length ? target : lerp(fromBase[j], target, t);
     }
 
     @Override
     protected void captureTransitionStart() {
         ChartContext ctx = getChart() == null ? null : getChart().getLastContext();
         double[] fy = new double[count];
+        double[] fb = new double[count];
+        double[] fp = consumesStackBase() ? new double[count] : null;
         for (int i = 0; i < count; i++) {
             fy[i] = rawAnimatedY(ctx, i);
+            fb[i] = animatedBase(ctx, i);
+            if (fp != null) {
+                fp[i] = animatedY(ctx, i);
+            }
         }
         double[][] fa = null;
         if (aux != null) {
@@ -697,6 +767,8 @@ public abstract class XYSeries extends Series {
         fromY = fy;
         fromX = fx;
         fromAux = fa;
+        fromBase = fb;
+        fromPainted = fp;
     }
 
     @Override
@@ -704,6 +776,8 @@ public abstract class XYSeries extends Series {
         fromY = null;
         fromX = null;
         fromAux = null;
+        fromBase = null;
+        fromPainted = null;
     }
 
     @Override
@@ -711,6 +785,9 @@ public abstract class XYSeries extends Series {
         fromY = new double[count];
         fromX = null;
         fromAux = null;
+        // the whole stack grows out of zero together
+        fromBase = new double[count];
+        fromPainted = consumesStackBase() ? new double[count] : null;
     }
 
     @Override
@@ -858,7 +935,7 @@ public abstract class XYSeries extends Series {
     ///
     /// the coordinate in pixels
     public int screenPosition(ChartContext ctx, int i, boolean vertical) {
-        double top = getBase(i) + ys[i];
+        double top = paintedTop(ctx, i);
         if (vertical) {
             return (int) ctx.screenY(this, xs[i], top) - ctx.getOriginY();
         }
@@ -896,6 +973,14 @@ public abstract class XYSeries extends Series {
         return best;
     }
 
+    // where point i is drawn in this frame, so a hover finds what is on screen mid transition
+    private double paintedTop(ChartContext ctx, int i) {
+        if (!consumesStackBase()) {
+            return animatedY(ctx, i);
+        }
+        return animatedBase(ctx, i) + animatedY(ctx, i);
+    }
+
     @Override
     public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
         int[] r = visibleRange(ctx);
@@ -908,7 +993,7 @@ public abstract class XYSeries extends Series {
             if (isGap(v) || isGap(xs[i])) {
                 continue;
             }
-            double top = getBase(i) + v;
+            double top = paintedTop(ctx, i);
             double dx = ctx.screenX(this, xs[i], top) - ox - x;
             double dy = ctx.screenY(this, xs[i], top) - oy - y;
             double d = dx * dx + dy * dy;
@@ -956,7 +1041,7 @@ public abstract class XYSeries extends Series {
         if (index < 0 || index >= count) {
             return null;
         }
-        double top = getBase(index) + ys[index];
+        double top = paintedTop(ctx, index);
         int sx = (int) ctx.screenX(this, xs[index], top) - ctx.getOriginX();
         int sy = (int) ctx.screenY(this, xs[index], top) - ctx.getOriginY();
         return new ChartPoint(this, index, xs[index], ys[index], sx, sy, null);

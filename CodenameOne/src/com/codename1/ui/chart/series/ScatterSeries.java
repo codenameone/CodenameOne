@@ -55,6 +55,7 @@ public class ScatterSeries extends XYSeries {
     public ScatterSeries setSizes(double... sizes) {
         for (int i = 0; i < count; i++) {
             aux[0][i] = sizes != null && i < sizes.length ? sizes[i] : Double.NaN;
+            markExplicit(i);
         }
         setBubbles(sizes != null);
         repaintChart();

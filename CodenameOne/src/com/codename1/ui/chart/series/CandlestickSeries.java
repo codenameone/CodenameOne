@@ -113,7 +113,9 @@ public class CandlestickSeries extends XYSeries {
 
     @Override
     public XYSeries add(double x, double y) {
-        return addOhlc(x, y, y, y, y);
+        // a candle of one price: its open, high and low are derived from it, so set() moves them
+        ha = null;
+        return super.add(x, y);
     }
 
     /// Updates the last period in place, as a live tick does to the current candle.
@@ -135,6 +137,8 @@ public class CandlestickSeries extends XYSeries {
         if (getChart() != null) {
             getChart().beginChange();
         }
+        // a live candle holds real prices now: set() below must not re-derive its open, high or low
+        markExplicit(i);
         if (!isGap(price)) {
             if (!(aux[HIGH][i] >= price)) { //NOPMD LogicInversion - also true for a NaN high
                 aux[HIGH][i] = price;
@@ -291,6 +295,12 @@ public class CandlestickSeries extends XYSeries {
         for (int i = 0; i < n; i++) {
             double l = getLow(i);
             double h = getHigh(i);
+            double c = getY(i);
+            // a close set outside an explicit high/low is still drawn, so it is kept on the axis
+            if (!isGap(c)) {
+                min = Math.min(min, c);
+                max = Math.max(max, c);
+            }
             if (!isGap(l)) {
                 min = Math.min(min, l);
             }

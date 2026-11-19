@@ -112,6 +112,11 @@ public class LineSeries extends XYSeries {
     }
 
     @Override
+    protected boolean consumesStackBase() {
+        return true;
+    }
+
+    @Override
     public void paint(ChartContext ctx) {
         splineRotated = ctx.isRotated();
         int[] r = visibleRange(ctx);

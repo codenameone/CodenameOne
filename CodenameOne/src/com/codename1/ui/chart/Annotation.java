@@ -154,6 +154,10 @@ public final class Annotation {
         }
         double n0 = axis.toNormalized(from);
         double n1 = axis.toNormalized(to);
+        if (Double.isNaN(n0) || Double.isNaN(n1)) {
+            // a value a log axis cannot place (zero or below) has no position on the plot
+            return null;
+        }
         if (n1 < 0 || n0 > 1) {
             return null;
         }
