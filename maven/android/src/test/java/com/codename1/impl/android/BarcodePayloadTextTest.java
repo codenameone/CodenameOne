@@ -68,6 +68,17 @@ class BarcodePayloadTextTest {
     }
 
     @Test
+    void utf8ByteOrderMarkIsDropped() {
+        byte[] body = TEXT.getBytes(UTF8);
+        byte[] bom = new byte[body.length + 3];
+        bom[0] = (byte) 0xEF;
+        bom[1] = (byte) 0xBB;
+        bom[2] = (byte) 0xBF;
+        System.arraycopy(body, 0, bom, 3, body.length);
+        assertEquals(TEXT, BarcodePayloadText.decode(bom, "windows-1250"));
+    }
+
+    @Test
     void asciiIsTheSameEverywhere() {
         byte[] ascii = "HRVHUB30\nEUR\n000000000002891".getBytes(UTF8);
         assertEquals("HRVHUB30\nEUR\n000000000002891",

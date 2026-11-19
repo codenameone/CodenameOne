@@ -52,7 +52,7 @@ public final class BarcodePayloadText {
     /// single-byte charset is valid UTF-8 only if every byte from 0xC2 up is
     /// followed by the exact continuation bytes UTF-8 requires, which
     /// ordinary accented text does not do. Pure ASCII reads the same either
-    /// way. A named charset that cannot be used -- an unknown name, or bytes
+    /// way. A leading UTF-8 byte order mark is dropped. A named charset that cannot be used -- an unknown name, or bytes
     /// not valid in it -- falls back to the default decoding.
     public static String decode(byte[] bytes, String charsetName) {
         String utf8 = utf8OrNull(bytes);
@@ -68,6 +68,10 @@ public final class BarcodePayloadText {
             }
         }
         if (utf8 != null) {
+            // A UTF-8 byte order mark is a marker, not text.
+            if (utf8.length() > 0 && utf8.charAt(0) == (char) 0xFEFF) {
+                return utf8.substring(1);
+            }
             return utf8;
         }
         return new String(bytes, Charset.forName("ISO-8859-1"));
