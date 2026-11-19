@@ -203,12 +203,18 @@ final class OdsWriter {
                 if (node == null) {
                     continue;
                 }
+                // a reference to the row above is stored wrapped, as the last row; LibreOffice
+                // does not wrap, so the base cell is moved far enough that nothing has to
+                int[] reach = FormulaParser.reach(node);
+                Node expression = reach[0] == 0 && reach[1] == 0 ? node : FormulaParser.fromCell(node, reach[0], reach[1]);
                 x.raw("<table:named-expression").attr("table:name", nameItem)
-                        .attr("table:expression", FormulaParser.print(node, true));
+                        .attr("table:expression", FormulaParser.print(expression, true));
                 if (book.getSheetCount() > 0) {
                     StringBuilder base = new StringBuilder("$");
                     FormulaParser.appendSheetName(base, book.getSheet(0).getName());
-                    x.attr("table:base-cell-address", base.append(".$A$1").toString());
+                    base.append(".$");
+                    FormulaParser.appendColumn(base, reach[1]);
+                    x.attr("table:base-cell-address", base.append('$').append(reach[0] + 1).toString());
                 }
                 x.raw("/>");
             }

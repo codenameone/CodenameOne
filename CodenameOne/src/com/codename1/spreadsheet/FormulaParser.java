@@ -1220,6 +1220,59 @@ final class FormulaParser {
         return row == 0 && col == 0 ? definition : shift(definition, row, col, true);
     }
 
+    /// How far up and left of A1 a name's relative references reach once their wrapped
+    /// coordinates are read as offsets: the base cell OpenDocument needs so that none wraps.
+    static int[] reach(Node definition) {
+        int[] r = new int[2];
+        ArrayList<Node> stack = new ArrayList<Node>();
+        stack.add(definition);
+        while (!stack.isEmpty()) {
+            Node n = stack.remove(stack.size() - 1);
+            if (n == null) {
+                continue;
+            }
+            if (n.kind == Node.REF) {
+                if (!n.wholeCol) {
+                    r[0] = Math.max(r[0], back(n.absR1, n.r1, Node.MAX_ROW));
+                    r[0] = Math.max(r[0], back(n.absR2, n.r2, Node.MAX_ROW));
+                }
+                if (!n.wholeRow) {
+                    r[1] = Math.max(r[1], back(n.absC1, n.c1, Node.MAX_COL));
+                    r[1] = Math.max(r[1], back(n.absC2, n.c2, Node.MAX_COL));
+                }
+            } else if (n.args != null) {
+                for (Node a : n.args) {
+                    stack.add(a);
+                }
+            }
+        }
+        return r;
+    }
+
+    static boolean hasSheetlessRef(Node definition) {
+        ArrayList<Node> stack = new ArrayList<Node>();
+        stack.add(definition);
+        while (!stack.isEmpty()) {
+            Node n = stack.remove(stack.size() - 1);
+            if (n == null) {
+                continue;
+            }
+            if (n.kind == Node.REF && n.sheet == null) {
+                return true;
+            }
+            if (n.args != null) {
+                for (Node a : n.args) {
+                    stack.add(a);
+                }
+            }
+        }
+        return false;
+    }
+
+    private static int back(boolean absolute, int v, int max) {
+        return absolute || v <= max / 2 ? 0 : max + 1 - v;
+    }
+
     private static int wrap(int v, int size) {
         int m = v % size;
         return m < 0 ? m + size : m;
@@ -1343,7 +1396,10 @@ final class FormulaParser {
             } else {
                 int count = -delta;
                 int end = at + count;
-                if (fixedA && fixedB && a >= at && b < end) {
+                if (fixedA && fixedB && a >= at && b < end
+                        || fixedA != fixedB && (fixedA ? a : b) >= at && (fixedA ? a : b) < end) {
+                    // a name's relative end does not follow an edit, so one whose fixed end
+                    // was removed has nothing left to stand for
                     return new Node(Node.ERR, CellError.REF);
                 }
                 if (a >= end) {

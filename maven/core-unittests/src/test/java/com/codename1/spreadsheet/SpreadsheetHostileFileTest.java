@@ -113,6 +113,21 @@ class SpreadsheetHostileFileTest extends UITestBase {
                         + "</sheetData></worksheet>");
     }
 
+    private static byte[] unzip(byte[] zip, String name) throws IOException {
+        java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(new ByteArrayInputStream(zip));
+        for (java.util.zip.ZipEntry e = in.getNextEntry(); e != null; e = in.getNextEntry()) {
+            if (name.equals(e.getName())) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                byte[] b = new byte[8192];
+                for (int n = in.read(b); n > 0; n = in.read(b)) {
+                    out.write(b, 0, n);
+                }
+                return out.toByteArray();
+            }
+        }
+        return new byte[0];
+    }
+
     private static byte[] ods(String rows) throws IOException {
         return zip("mimetype", "application/vnd.oasis.opendocument.spreadsheet", "content.xml",
                 "<office:document-content" + ODS_NS + "><office:body><office:spreadsheet><table:table table:name=\"S\">"
@@ -956,6 +971,26 @@ class SpreadsheetHostileFileTest extends UITestBase {
         same("T!$A2", t.getWorkbook().getDefinedName("Below"), "a relative name's text");
         t.insertColumns(0, 1);
         same(Double.valueOf(3), t.getCellValue("C5"), "the row above, after inserting a column");
+        // written to OpenDocument from a base cell that needs no wrapping, and read back the same
+        ByteArrayOutputStream ods = new ByteArrayOutputStream();
+        t.getWorkbook().write(ods, Workbook.Format.ODS);
+        String content = new String(unzip(ods.toByteArray(), "content.xml"), "UTF-8");
+        if (content.indexOf("1048576") >= 0) {
+            wrong.append("\na wrapped reference reached content.xml");
+        }
+        Sheet back = Workbook.read(new ByteArrayInputStream(ods.toByteArray()), Workbook.Format.ODS).getSheet(0);
+        back.setCellValue("B4", Double.valueOf(30));
+        same(Double.valueOf(30), back.getCellValue("C5"), "the row above, through OpenDocument");
+        // a mixed name whose fixed end is removed stands for nothing
+        t.getWorkbook().setDefinedName("Mixed", "=T!$A1:$A$5");
+        t.removeRows(0, 5);
+        same("#REF!", t.getWorkbook().getDefinedName("Mixed"), "a mixed name with its fixed end removed");
+        try {
+            t.getWorkbook().setDefinedName("NoSheet", "$A$1:$A$5");
+            wrong.append("\na name without a sheet was accepted");
+        } catch (IllegalArgumentException expected) {
+            // a name belongs to no sheet
+        }
         // OpenDocument: a relative name is relative to its base cell, here B2, so from B1 it is A1
         Workbook o = Workbook.read(new ByteArrayInputStream(ods("<table:table-row><table:table-cell office:value-type=\"float\""
                 + " office:value=\"5\"/><table:table-cell table:formula=\"of:=N\"/></table:table-row><table:table-row>"

@@ -604,11 +604,15 @@ public final class Workbook {
     /// - `name`: the name; replaces a definition of the same name, ignoring case
     ///
     /// - `formula`: what the name stands for, such as `Sheet1!$A$1:$A$10` or `0.17`; null
-    ///   removes the name
+    ///   removes the name. Every reference names its sheet. A reference without `$` is
+    ///   relative, as in Excel: written as if the name were used in A1, and moved to the
+    ///   cell that uses it, so `Sheet1!$A2` in a formula in row 5 means `Sheet1!$A6`, and
+    ///   the last row stands for the row above.
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: when the formula cannot be read
+    /// - `IllegalArgumentException`: when the formula cannot be read, or has a reference
+    ///   that does not name its sheet
     public void setDefinedName(String name, String formula) {
         String key = FormulaParser.asciiUpper(name);
         if (formula == null) {
@@ -632,6 +636,10 @@ public final class Workbook {
                 node = FormulaParser.parse(text, false);
             } catch (FormulaSyntaxException e) {
                 throw new IllegalArgumentException("Cannot read the formula of " + name + ": " + e.getMessage()); //NOPMD PreserveStackTrace - the device library has no constructor that takes a cause
+            }
+            if (FormulaParser.hasSheetlessRef(node)) {
+                // a name belongs to no sheet: a reference without one would follow no edit
+                throw new IllegalArgumentException("A reference in " + name + " has no sheet name: " + formula);
             }
             defineName(name, text, node);
         }
