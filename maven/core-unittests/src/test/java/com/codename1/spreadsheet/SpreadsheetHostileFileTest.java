@@ -939,6 +939,23 @@ class SpreadsheetHostileFileTest extends UITestBase {
         same(Double.valueOf(20), s.getCellValue("D1"), "row range on the right of an intersection");
         s.setCellValue("E1", new java.math.BigDecimal("1e400"));
         same(CellError.NUM, s.getCellValue("E1"), "a number past a double");
+        // inserting rows moves the cell that uses a relative name, never the name itself
+        Sheet t = new Workbook().addSheet("T");
+        t.getWorkbook().setDefinedName("Up", "=T!$A1048576");
+        t.getWorkbook().setDefinedName("Below", "=T!$A2");
+        t.getWorkbook().setDefinedName("Fixed", "=T!$A$2");
+        for (int r = 0; r < 6; r++) {
+            t.setCellValue(r, 0, Double.valueOf(r + 1));
+        }
+        t.setCellFormula("B4", "=Up");
+        t.setCellFormula("C1", "=Below+Fixed");
+        t.insertRows(0, 1);
+        t.insertRows(5, 1);
+        same(Double.valueOf(3), t.getCellValue("B5"), "the row above, after inserting rows");
+        same(Double.valueOf(4), t.getCellValue("C2"), "the row below and a fixed cell, after inserting rows");
+        same("T!$A2", t.getWorkbook().getDefinedName("Below"), "a relative name's text");
+        t.insertColumns(0, 1);
+        same(Double.valueOf(3), t.getCellValue("C5"), "the row above, after inserting a column");
         // OpenDocument: a relative name is relative to its base cell, here B2, so from B1 it is A1
         Workbook o = Workbook.read(new ByteArrayInputStream(ods("<table:table-row><table:table-cell office:value-type=\"float\""
                 + " office:value=\"5\"/><table:table-cell table:formula=\"of:=N\"/></table:table-row><table:table-row>"

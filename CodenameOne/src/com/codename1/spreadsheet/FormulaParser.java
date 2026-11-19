@@ -1306,13 +1306,32 @@ final class FormulaParser {
     ///
     /// - `delta`: the number inserted, or minus the number removed
     static Node restructure(Node n, boolean refersToEdited, String editedSheet, boolean rows, int at, int delta) {
+        return restructure(n, refersToEdited, editedSheet, rows, at, delta, false);
+    }
+
+    /// As [#restructure(Node, boolean, String, boolean, int, int)] for a defined name: a
+    /// name's relative references are offsets from the cell that uses it, which moves with
+    /// its own formula, so only its absolute references follow the edit.
+    static Node restructureName(Node n, String editedSheet, boolean rows, int at, int delta) {
+        return restructure(n, false, editedSheet, rows, at, delta, true);
+    }
+
+    private static Node restructure(Node n, boolean refersToEdited, String editedSheet, boolean rows, int at, int delta,
+            boolean name) {
         if (n.kind == Node.REF) {
             boolean hit = n.sheet == null ? refersToEdited : n.sheet.equalsIgnoreCase(editedSheet) && n.sheet2 == null;
             if (!hit || rows && n.wholeCol || !rows && n.wholeRow) {
                 return n;
             }
-            int a = rows ? n.r1 : n.c1;
-            int b = rows ? n.r2 : n.c2;
+            boolean fixedA = !name || (rows ? n.absR1 : n.absC1);
+            boolean fixedB = !name || (rows ? n.absR2 : n.absC2);
+            if (!fixedA && !fixedB) {
+                return n;
+            }
+            int a0 = rows ? n.r1 : n.c1;
+            int b0 = rows ? n.r2 : n.c2;
+            int a = a0;
+            int b = b0;
             int max = rows ? Node.MAX_ROW : Node.MAX_COL;
             if (delta > 0) {
                 if (a >= at) {
@@ -1324,7 +1343,7 @@ final class FormulaParser {
             } else {
                 int count = -delta;
                 int end = at + count;
-                if (a >= at && b < end) {
+                if (fixedA && fixedB && a >= at && b < end) {
                     return new Node(Node.ERR, CellError.REF);
                 }
                 if (a >= end) {
@@ -1337,6 +1356,12 @@ final class FormulaParser {
                 } else if (b >= at) {
                     b = at - 1;
                 }
+            }
+            if (!fixedA) {
+                a = a0;
+            }
+            if (!fixedB) {
+                b = b0;
             }
             if (b > max || a > max) {
                 return new Node(Node.ERR, CellError.REF);
@@ -1358,10 +1383,10 @@ final class FormulaParser {
             // a chain of operators is walked and not recursed into: see Node.spine
             Node[] spine = Node.spine(n);
             Node first = spine[0].args[0];
-            Node left = restructure(first, refersToEdited, editedSheet, rows, at, delta);
+            Node left = restructure(first, refersToEdited, editedSheet, rows, at, delta, name);
             boolean moved = left != first; //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one
             for (Node link : spine) {
-                Node right = restructure(link.args[1], refersToEdited, editedSheet, rows, at, delta);
+                Node right = restructure(link.args[1], refersToEdited, editedSheet, rows, at, delta, name);
                 moved |= right != link.args[1]; //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one
                 left = moved ? new Node(Node.BINARY, link.value, left, right) : link;
             }
@@ -1370,7 +1395,7 @@ final class FormulaParser {
         Node[] args = new Node[n.args.length];
         boolean changed = false;
         for (int i = 0; i < args.length; i++) {
-            args[i] = restructure(n.args[i], refersToEdited, editedSheet, rows, at, delta);
+            args[i] = restructure(n.args[i], refersToEdited, editedSheet, rows, at, delta, name);
             changed |= args[i] != n.args[i]; //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one
         }
         if (!changed) {

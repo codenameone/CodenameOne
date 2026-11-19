@@ -754,7 +754,7 @@ public final class Workbook {
             String key = FormulaParser.asciiUpper(nameItem);
             Node node = nameNodes.get(key);
             if (node != null) {
-                Node moved = FormulaParser.restructure(node, false, edited.getName(), rows, at, delta);
+                Node moved = FormulaParser.restructureName(node, edited.getName(), rows, at, delta);
                 if (moved != node) { //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one
                     nameNodes.put(key, moved);
                     nameFormulas.put(key, FormulaParser.display(moved));
