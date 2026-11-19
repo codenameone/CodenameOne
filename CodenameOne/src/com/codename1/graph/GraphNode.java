@@ -227,7 +227,32 @@ public class GraphNode {
         return !inputs.isEmpty() || !outputs.isEmpty();
     }
 
-    /// The port with this id, or null.
+    /// The input port with this id, or null. An input and an output may share
+    /// an id, so an edge's target port is looked up here and its source port
+    /// in `getOutput(String)`.
+    public GraphPort getInput(String portId) {
+        return find(inputs, portId);
+    }
+
+    /// The output port with this id, or null.
+    public GraphPort getOutput(String portId) {
+        return find(outputs, portId);
+    }
+
+    private static GraphPort find(List<GraphPort> ports, String portId) {
+        if (portId == null) {
+            return null;
+        }
+        for (int i = 0; i < ports.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: asked per edge per frame
+            GraphPort p = ports.get(i);
+            if (portId.equals(p.getId())) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /// The port with this id, inputs searched first, or null.
     public GraphPort getPort(String portId) {
         if (portId == null) {
             return null;

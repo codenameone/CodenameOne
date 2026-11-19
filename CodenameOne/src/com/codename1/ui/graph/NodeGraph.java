@@ -1690,12 +1690,9 @@ public class NodeGraph extends Container {
             return;
         }
         // an input and an output of one node may share an id
-        List<GraphPort> ports = input ? n.getInputs() : n.getOutputs();
-        for (int i = 0; i < ports.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed, no iterator
-            if (portId.equals(ports.get(i).getId())) {
-                connectedPorts.put(ports.get(i), Boolean.TRUE);
-                return;
-            }
+        GraphPort p = input ? n.getInput(portId) : n.getOutput(portId);
+        if (p != null) {
+            connectedPorts.put(p, Boolean.TRUE);
         }
     }
 
@@ -1846,8 +1843,8 @@ public class NodeGraph extends Container {
         if (sr == null || tr == null) {
             return 0;
         }
-        GraphPort sp = sg == null ? s.getPort(e.getSourcePortId()) : null;
-        GraphPort tp = tg == null ? t.getPort(e.getTargetPortId()) : null;
+        GraphPort sp = sg == null ? s.getOutput(e.getSourcePortId()) : null;
+        GraphPort tp = tg == null ? t.getInput(e.getTargetPortId()) : null;
         double[] route = sg == null && tg == null ? e.getRoute() : null;
         int bends = route == null ? 0 : route.length / 2;
         boolean ports = sp != null || tp != null;
@@ -2149,6 +2146,8 @@ public class NodeGraph extends Container {
             }
             nodeRenderer.paintNode(g, this, n, x, y, nw, nh, bigSelection ? paintSelected.contains(n) : selection.contains(n));
         }
+        // holds nothing between frames: a removed node is not kept reachable
+        paintSelected.clear();
         g.setAntiAliased(aa);
     }
 
@@ -2751,7 +2750,7 @@ public class NodeGraph extends Container {
                 if (s != null) {
                     detached = e;
                     connectNode = s;
-                    connectPort = s.getPort(e.getSourcePortId());
+                    connectPort = s.getOutput(e.getSourcePortId());
                     connectedPorts.clear();
                     return;
                 }
@@ -3299,7 +3298,7 @@ public class NodeGraph extends Container {
                 int w = worldToScreenLength(n.getWidth());
                 int h = worldToScreenLength(n.getHeight());
                 String portId = (String) c.getClientProperty("cn1$graphPort");
-                GraphPort port = portId == null ? null : n.getPort(portId);
+                GraphPort port = portId == null ? null : n.getInput(portId);
                 if (port != null) {
                     // the trailing half of the port's row, clear of its label
                     int ph = Math.min(c.getPreferredH(), Math.max(1, worldToScreenLength(

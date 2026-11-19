@@ -58,7 +58,7 @@ public class DefaultGraphEdgeRenderer implements GraphEdgeRenderer {
     private int typeColor(NodeGraph graph, GraphEdge edge, int fallback) {
         GraphNodeRenderer r = graph.getNodeRenderer();
         GraphNode n = edge.getSourcePortId() == null ? null : graph.getModel().getNode(edge.getSourceId());
-        GraphPort p = n == null ? null : n.getPort(edge.getSourcePortId());
+        GraphPort p = n == null ? null : n.getOutput(edge.getSourcePortId());
         if (p == null || p.getType() == null || !(r instanceof DefaultGraphNodeRenderer)) {
             return fallback;
         }

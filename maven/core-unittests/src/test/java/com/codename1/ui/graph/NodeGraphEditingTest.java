@@ -616,4 +616,108 @@ class NodeGraphEditingTest extends UITestBase {
         g.getParent().revalidate();
         assertNotNull(g.getPortEditor(n, n.getPort("in")));
     }
+
+    @FormTest
+    void anInputAndAnOutputMayShareAnId() {
+        DefaultGraphModel m = new DefaultGraphModel();
+        GraphNode a = new GraphNode("a", "A", 0, 0, 120, 60).addInput("v", "in", "num").addOutput("v", "out", "num");
+        GraphNode b = new GraphNode("b", "B", 300, 0, 120, 60).addInput("v", "in", "num");
+        m.addNode(a);
+        m.addNode(b);
+        m.connect(a, a.getOutput("v"), b, b.getInput("v"));
+        NodeGraph g = show(m);
+        assertFalse(a.getOutput("v").isInput());
+        assertTrue(a.getInput("v").isInput());
+        // the edge leaves a's output, so that one is connected and a's input is not
+        assertTrue(g.isPortConnected(a, a.getOutput("v")));
+        assertFalse(g.isPortConnected(a, a.getInput("v")));
+        assertTrue(g.isPortConnected(b, b.getInput("v")));
+    }
+
+    @FormTest
+    void aReadOnlyGraphOpensNoLabelEditor() {
+        DefaultGraphModel m = twoBoxes();
+        NodeGraph g = show(m);
+        g.setEditingEnabled(false);
+        GraphNode a = m.getNode("a");
+        String label = a.getLabel();
+        g.startLabelEdit(a);
+        assertFalse(hasLabelField(Display.getInstance().getCurrent()));
+        assertEquals(label, a.getLabel());
+        assertFalse(history.canUndo());
+    }
+
+    private static boolean hasLabelField(Component c) {
+        if (c.getClientProperty("cn1$graphLabel") != null) {
+            return true;
+        }
+        if (c instanceof com.codename1.ui.Container) {
+            com.codename1.ui.Container k = (com.codename1.ui.Container) c;
+            for (int i = 0; i < k.getComponentCount(); i++) {
+                if (hasLabelField(k.getComponentAt(i))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @FormTest
+    void aLargeSelectionPaintsSelectedExactlyTheSelectedNodes() {
+        DefaultGraphModel m = new DefaultGraphModel();
+        for (int i = 0; i < 12; i++) {
+            m.addNode(new GraphNode("n" + i, "n" + i, (i % 4) * 90, (i / 4) * 70, 80, 50));
+        }
+        NodeGraph g = show(m);
+        g.setZoom(1f);
+        g.setView(0, 0);
+        for (int i = 0; i < 10; i++) {
+            g.toggleSelection(m.getNode("n" + i));
+        }
+        assertEquals(10, g.getSelectedNodes().size());
+        final java.util.Map<String, Boolean> seen = new java.util.HashMap<String, Boolean>();
+        g.setNodeRenderer(new DefaultGraphNodeRenderer() {
+            @Override
+            public void paintNode(com.codename1.ui.Graphics gr, NodeGraph graph, GraphNode node,
+                    int x, int y, int w, int h, boolean selected) {
+                seen.put(node.getId(), Boolean.valueOf(selected));
+            }
+        });
+        Image img = Image.createImage(600, 400);
+        g.paintGraph(img.getGraphics(), 600, 400);
+        assertEquals(12, seen.size());
+        for (int i = 0; i < 12; i++) {
+            assertEquals(Boolean.valueOf(i < 10), seen.get("n" + i), "n" + i);
+        }
+    }
+
+    @FormTest
+    void removingAnEarlierPaletteItemKeepsTheOneHeld() {
+        DefaultGraphModel m = new DefaultGraphModel();
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new BorderLayout());
+        NodeGraph g = new NodeGraph(m);
+        GraphPalette palette = new GraphPalette(g);
+        GraphNodeTemplate step = new GraphNodeTemplate("Step").setShape(GraphShapes.RECT);
+        GraphNodeTemplate end = new GraphNodeTemplate("End").setShape(GraphShapes.TERMINATOR);
+        palette.add(step).add(end);
+        form.add(BorderLayout.CENTER, g);
+        form.add(BorderLayout.WEST, palette);
+        form.revalidate();
+        g.setZoom(1f);
+        g.setView(0, 0);
+        int px = palette.getAbsoluteX() + palette.getWidth() / 2;
+        int py = palette.getAbsoluteY() + palette.getPreferredH() * 3 / 4;
+        Component c = g.canvas();
+        int tx = c.getAbsoluteX() + 200;
+        int ty = c.getAbsoluteY() + 150;
+        // "End" is held; "Step", above it, goes away mid-drag
+        palette.pointerPressed(px, py);
+        palette.pointerDragged((px + tx) / 2, (py + ty) / 2);
+        palette.remove(step);
+        palette.pointerDragged(tx, ty);
+        palette.pointerReleased(tx, ty);
+        assertEquals(1, m.getNodes().size());
+        assertEquals(GraphShapes.TERMINATOR, m.getNodes().get(0).getShape());
+    }
 }
