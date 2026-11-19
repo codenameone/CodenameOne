@@ -81,7 +81,7 @@ final class CellFormat {
         double conditionValue;
     }
 
-    private static final int MAX_CODE = 1024;
+    static final int MAX_CODE = 1024;
     private final String code;
     private final Section[] sections;
 
@@ -233,6 +233,10 @@ final class CellFormat {
             }
         }
         return true;
+    }
+
+    boolean isPercent() {
+        return sections.length > 0 && sections[0].percents > 0;
     }
 
     boolean isText() {
@@ -511,10 +515,6 @@ final class CellFormat {
         // anything else is a colour or a locale, which change nothing in the text
     }
 
-    /// Writes the format as an OpenDocument data style, which describes in elements what a
-    /// format code spells. Only the first section is written: the format has conditions of
-    /// its own for the others, and a sheet shows a negative number with its sign without
-    /// them. Answers false, and writes nothing, for a format that needs no style.
     private static boolean isDigits(String s) {
         for (int i = 0; i < s.length(); i++) {
             if (s.charAt(i) < '0' || s.charAt(i) > '9') {
@@ -524,11 +524,82 @@ final class CellFormat {
         return s.length() > 0;
     }
 
+    /// Writes the format as an OpenDocument data style, which describes in elements what a
+    /// format code spells. A code of several sections is one style per section, and the
+    /// last of them maps a value to the others by the condition of each, which is how
+    /// OpenDocument spells sections. Answers false, and writes nothing, for a format that
+    /// needs no style.
     boolean writeOds(XmlOut x, String name) throws java.io.IOException {
-        Section s = sections[0];
-        if (isGeneral() || s.tokens.isEmpty()) {
+        if (isGeneral() || sections[0].tokens.isEmpty()) {
             return false;
         }
+        // the number sections; a fourth is for text, which a number style has no place for
+        int count = Math.min(sections.length, 3);
+        boolean sectioned = count >= 2 && !sections[0].date;
+        for (int i = 0; sectioned && i < count; i++) {
+            sectioned = !sections[i].tokens.isEmpty() && !sections[i].date;
+        }
+        if (!sectioned) {
+            return writeOds(x, name, sections[0], "");
+        }
+        StringBuilder maps = new StringBuilder();
+        boolean explicit = sections[0].condition != 0;
+        for (int i = 0; i < count - 1; i++) {
+            String sub = name + "P" + i;
+            writeOds(x, sub, sections[i], "");
+            String condition;
+            if (sections[i].condition != 0) {
+                condition = conditionText(sections[i]);
+            } else if (explicit) {
+                // after a condition of its own, the second section takes what is left
+                // below; the last takes everything else
+                condition = "value()<0";
+            } else if (count == 2) {
+                condition = "value()>=0";
+            } else {
+                condition = i == 0 ? "value()>0" : "value()<0";
+            }
+            maps.append("<style:map style:condition=\"").append(xmlAttr(condition))
+                    .append("\" style:apply-style-name=\"").append(sub).append("\"/>");
+        }
+        return writeOds(x, name, sections[count - 1], maps.toString());
+    }
+
+    private static String conditionText(Section s) {
+        String op;
+        switch (s.condition) {
+            case '<':
+                op = s.conditionOrEqual ? "<=" : "<";
+                break;
+            case '>':
+                op = s.conditionOrEqual ? ">=" : ">";
+                break;
+            case '!':
+                op = "!=";
+                break;
+            default:
+                op = "=";
+                break;
+        }
+        return "value()" + op + FormulaParser.numberText(s.conditionValue);
+    }
+
+    private static String xmlAttr(String s) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '<') {
+                sb.append("&lt;");
+            } else if (c == '>') {
+                sb.append("&gt;");
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private boolean writeOds(XmlOut x, String name, Section s, String maps) throws java.io.IOException {
         if (s.hasText && !s.date && s.integerDigits == 0 && s.decimals == 0) {
             x.raw("<number:text-style").attr("style:name", name).raw(">");
             for (int i = 0; i < s.tokens.size(); i++) {
@@ -539,7 +610,7 @@ final class CellFormat {
                     x.raw("<number:text>").text(t.text, false).raw("</number:text>");
                 }
             }
-            x.raw("</number:text-style>");
+            x.raw(maps).raw("</number:text-style>");
             return true;
         }
         if (s.date) {
@@ -590,10 +661,43 @@ final class CellFormat {
                 }
             }
         }
+        // Text between the digits of the whole part, 000-00-0000, is text embedded in the
+        // number, placed by how many digits follow it.
+        int firstInteger = -1;
+        int lastInteger = -1;
+        for (int i = 0; i < s.tokens.size() && !s.exponent && !s.fraction; i++) {
+            Token t = s.tokens.get(i);
+            if (t.kind == POINT) {
+                break;
+            }
+            if (t.kind == DIGIT && t.text.length() == 1) {
+                if (firstInteger < 0) {
+                    firstInteger = i;
+                }
+                lastInteger = i;
+            }
+        }
+        ArrayList<String> embedded = new ArrayList<String>();
+        for (int i = firstInteger + 1; firstInteger >= 0 && i < lastInteger; i++) {
+            Token t = s.tokens.get(i);
+            if (t.kind == LITERAL) {
+                int after = 0;
+                for (int k = i + 1; k <= lastInteger; k++) {
+                    Token d = s.tokens.get(k);
+                    after += d.kind == DIGIT && d.text.length() == 1 ? 1 : 0;
+                }
+                embedded.add(String.valueOf(after));
+                embedded.add(t.text);
+            }
+        }
         for (int i = 0; i < s.tokens.size(); i++) {
             Token t = s.tokens.get(i);
             if (numberWritten && i <= fractionEnd) {
                 // the space, the slash and the denominator are the fraction element's own
+                continue;
+            }
+            if (t.kind == LITERAL && i > firstInteger && i < lastInteger && firstInteger >= 0) {
+                // written inside the number element
                 continue;
             }
             if (t.kind == LITERAL || t.kind == PERCENT) {
@@ -630,11 +734,20 @@ final class CellFormat {
                     if (s.thousands > 0) {
                         x.attr("number:display-factor", FormulaParser.numberText(Values.pow10(3 * s.thousands)));
                     }
-                    x.raw("/>");
+                    if (!embedded.isEmpty()) {
+                        x.raw(">");
+                        for (int k = 0; k < embedded.size(); k += 2) {
+                            x.raw("<number:embedded-text").attr("number:position", embedded.get(k)).raw(">")
+                                    .text(embedded.get(k + 1), false).raw("</number:embedded-text>");
+                        }
+                        x.raw("</number:number>");
+                    } else {
+                        x.raw("/>");
+                    }
                 }
             }
         }
-        x.raw("</").raw(tag).raw(">");
+        x.raw(maps).raw("</").raw(tag).raw(">");
         return true;
     }
 
@@ -744,6 +857,16 @@ final class CellFormat {
 
     /// The text a value is shown as.
     String format(Object value, boolean date1904) {
+        try {
+            return formatValue(value, date1904);
+        } catch (EvalError e) {
+            // The text of a cell is never an exception: whatever a code cannot write a number
+            // in, the number is shown as General shows it.
+            return value instanceof Double ? Values.general(((Double) value).doubleValue()) : String.valueOf(value);
+        }
+    }
+
+    private String formatValue(Object value, boolean date1904) {
         if (value == null) {
             return "";
         }
@@ -829,7 +952,15 @@ final class CellFormat {
             int step = Math.max(1, s.integerDigits);
             exponent = (int) Math.floor(com.codename1.util.MathUtil.log10(abs));
             exponent = (int) (Math.floor((double) exponent / step) * step);
-            abs = abs / Values.pow10signed(exponent);
+            // a subnormal number's power of ten is not a double, so it is divided out in two
+            if (exponent < -300) {
+                abs = abs * 1e300 / Values.pow10signed(exponent + 300);
+            } else {
+                abs = abs / Values.pow10signed(exponent);
+            }
+            if (Double.isNaN(abs) || Double.isInfinite(abs)) {
+                return Values.general(negative ? -abs : abs);
+            }
             if (Values.round(abs, s.decimals) >= Values.pow10(step)) {
                 exponent += step;
                 abs /= Values.pow10(step);

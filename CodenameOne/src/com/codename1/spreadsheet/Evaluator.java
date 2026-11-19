@@ -129,6 +129,9 @@ final class Evaluator {
 
     // ------------------------------------------------------------------ the tree
 
+    /// The most characters the texts of one array result hold together.
+    static final long MAX_ARRAY_TEXT = 4L * 1024 * 1024;
+
     Object eval(Node n) {
         switch (n.kind) {
             case Node.NUM:
@@ -201,11 +204,24 @@ final class Evaluator {
         }
     }
 
-    private Object binary(Node n) {
+    private Object binary(Node top) {
+        if (top.args[0].kind != Node.BINARY) {
+            return binary(top, eval(top.args[0]));
+        }
+        // a chain, a+b+c+..., is walked and not recursed into: see Node.spine
+        Node[] spine = Node.spine(top);
+        Object a = eval(spine[0].args[0]);
+        for (Node link : spine) {
+            a = binary(link, a);
+        }
+        return a;
+    }
+
+    /// One operator, its left operand already evaluated.
+    private Object binary(Node n, Object a) {
         String op = n.name();
         char c = op.charAt(0);
         if (c == ':' || c == ' ' || c == ',') {
-            Object a = eval(n.args[0]);
             Object b = eval(n.args[1]);
             if (a instanceof CellError) {
                 return a;
@@ -249,7 +265,8 @@ final class Evaluator {
             // <> <= >=
             code = c == '<' ? (op.charAt(1) == '>' ? '!' : 'l') : 'g';
         }
-        return lift(code, operand(eval(n.args[0])), operand(eval(n.args[1])));
+        Object left = operand(a);
+        return lift(code, left, operand(eval(n.args[1])));
     }
 
     /// Turns what an operand evaluated to into a scalar or an array.
@@ -379,8 +396,14 @@ final class Evaluator {
                     return number(-Values.num(a));
                 case '%':
                     return number(Values.num(a) / 100);
-                case '&':
-                    return Values.text(a) + Values.text(b);
+                case '&': {
+                    String x = Values.text(a);
+                    String y = Values.text(b);
+                    if (x.length() + y.length() > TextFunctions.MAX_TEXT) {
+                        return CellError.VALUE;
+                    }
+                    return x + y;
+                }
                 case '=':
                     return Boolean.valueOf(Values.compare(a, b) == 0);
                 case '!':
@@ -495,13 +518,23 @@ final class Evaluator {
         }
         Object[][] out = new Object[rows][cols];
         Object[] scalars = new Object[args.length];
+        // Each element of REPT over a million-cell array may be the longest text there is;
+        // what the whole array holds is capped as a cell's text is.
+        long chars = 0;
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
                 for (int i = 0; i < args.length; i++) {
                     Object v = args[i];
                     scalars[i] = v instanceof Object[][] ? element((Object[][]) v, r, c) : v;
                 }
-                out[r][c] = callScalar(info, name, scalars);
+                Object v = callScalar(info, name, scalars);
+                if (v instanceof String) {
+                    chars += ((String) v).length();
+                    if (chars > MAX_ARRAY_TEXT) {
+                        return CellError.VALUE;
+                    }
+                }
+                out[r][c] = v;
             }
         }
         return out;

@@ -151,7 +151,11 @@ final class XlsxReader {
         StringBuilder sb = new StringBuilder();
         for (int e = x.next(); e != XmlScanner.EOF; e = x.next()) {
             if (e == XmlScanner.START && "si".equals(x.name)) {
-                strings.add(readRichText(x, sb, "si"));
+                String text = readRichText(x, sb, "si");
+                // a table of strings takes memory as cells do: a few bytes of a compressed
+                // file can list millions of them
+                book.allocated(1 + text.length() / 16);
+                strings.add(text);
             }
         }
     }
@@ -259,14 +263,35 @@ final class XlsxReader {
                         letters++;
                     }
                     col = FormulaParser.column(ref, 0, letters);
+                    if (letters < ref.length()) {
+                        // the cell's own row wins over the row element's, as it does in Excel;
+                        // a row past the last one is a damaged file, not row 1
+                        long r = 0;
+                        for (int i = letters; i < ref.length(); i++) {
+                            char d = ref.charAt(i);
+                            if (d < '0' || d > '9' || r > Node.MAX_ROW + 1) {
+                                throw new IllegalArgumentException("No such cell: " + ref);
+                            }
+                            r = r * 10 + (d - '0');
+                        }
+                        if (r < 1 || r > Node.MAX_ROW + 1) {
+                            throw new IllegalArgumentException("No such cell: " + ref);
+                        }
+                        row = (int) r - 1;
+                    }
                     if (row < 0) {
                         row = 0;
                     }
                 }
                 readCell(sheet, x, row, col, sharedFormulas, sharedOrigins, sb);
             } else if ("col".equals(tag)) {
-                int min = x.intAttr("min", 1) - 1;
-                int max = Math.min(x.intAttr("max", min + 1) - 1, min + 1024);
+                // what Excel writes for "every column from here on" runs to the last column;
+                // anything past it is not a column, and each column set is counted
+                int min = Math.max(0, x.intAttr("min", 1) - 1);
+                int max = Math.min(x.intAttr("max", min + 1) - 1, Node.MAX_COL);
+                if (min <= max) {
+                    book.allocated(max - min + 1);
+                }
                 String width = x.attr("width");
                 if (width != null && (x.boolAttr("customWidth") || x.attr("customWidth") == null)) {
                     try {
@@ -444,8 +469,9 @@ final class XlsxReader {
                     break;
                 }
                 default:
+                    String number = raw.trim();
                     try {
-                        value = Double.valueOf(Double.parseDouble(raw.trim()));
+                        value = Values.isDecimal(number) ? (Object) Double.valueOf(Double.parseDouble(number)) : raw;
                     } catch (NumberFormatException err) {
                         value = raw;
                     }
@@ -546,6 +572,11 @@ final class XlsxReader {
                 cell.format = cell.format > 0 && cell.format < formats.length ? formats[cell.format] : 0;
                 // A cell written as an ISO date says it is a date by its type alone and need
                 // not have a date format; without one it would read as a bare day number.
+                if (cell.value instanceof Double && isoDates.contains(cell) && book.isDate1904()
+                        && ((Double) cell.value).doubleValue() >= 1462) {
+                    // the text of the date was numbered from 1900
+                    cell.value = Double.valueOf(((Double) cell.value).doubleValue() - 1462);
+                }
                 if (cell.value instanceof Double && isoDates.contains(cell) && !book.format(cell.format).isDate()) {
                     double day = ((Double) cell.value).doubleValue();
                     cell.format = book.formatId(day - Math.floor(day) > 0 ? "yyyy-mm-dd hh:mm:ss" : "yyyy-mm-dd");

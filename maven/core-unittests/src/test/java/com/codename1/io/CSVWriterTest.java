@@ -58,6 +58,8 @@ class CSVWriterTest {
         w.setLineEnding("\n");
         assertEquals("'=1+1,'@cmd,'+A1,-12.5,+3,'-x,ok\n",
                 w.toString(new String[][]{{"=1+1", "@cmd", "+A1", "-12.5", "+3", "-x", "ok"}}));
+        // a number in scientific notation is a number, and has nothing to run
+        assertEquals("-1.5e3,+2E+10,'-1e,'-1e3x\n", w.toString(new String[][]{{"-1.5e3", "+2E+10", "-1e", "-1e3x"}}));
     }
 
     @Test

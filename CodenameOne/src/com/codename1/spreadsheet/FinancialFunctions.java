@@ -229,6 +229,17 @@ final class FinancialFunctions {
                 }
                 double book = cost;
                 double current = 0;
+                if (period > 1200) {
+                    // A life of centuries in months is still a few hundred periods; past that
+                    // the period count comes from the file and is not looped to. The book
+                    // value falls geometrically until it meets the salvage value and stays.
+                    double rate = Math.min(factor / life, 1);
+                    book = Math.max(cost * MathUtil.pow(1 - rate, Math.floor(period) - 1), salvage);
+                    if (cost <= salvage) {
+                        book = cost;
+                    }
+                    return d(Math.min(book * factor / life, Math.max(0, book - salvage)));
+                }
                 for (int p = 1; p <= (int) period; p++) {
                     current = Math.min(book * factor / life, Math.max(0, book - salvage));
                     book -= current;

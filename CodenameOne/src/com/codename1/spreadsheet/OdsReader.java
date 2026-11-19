@@ -39,6 +39,9 @@ final class OdsReader {
     private final Workbook book;
     private final long[] budget = {XmlScanner.MAX_DOCUMENT};
     private final HashMap<String, String> dataStyles = new HashMap<String, String>();
+    /// The sections of a style that maps values to other styles: condition and style name,
+    /// in order.
+    private final HashMap<String, ArrayList<String[]>> styleMaps = new HashMap<String, ArrayList<String[]>>();
     private final HashMap<String, String> cellStyles = new HashMap<String, String>();
     private final HashMap<String, Double> columnStyleWidths = new HashMap<String, Double>();
     private final HashMap<String, int[]> panes = new HashMap<String, int[]>();
@@ -234,11 +237,17 @@ final class OdsReader {
                     || "boolean-style".equals(tag)) {
                 String name = x.attr("style:name");
                 boolean elapsed = "false".equals(x.attr("number:truncate-on-overflow"));
-                String code = readDataStyle(x, tag, elapsed);
+                ArrayList<String[]> maps = new ArrayList<String[]>();
+                String code = readDataStyle(x, tag, elapsed, maps);
                 if (name != null && code.length() > 0) {
                     dataStyles.put(name, code);
+                    if (!maps.isEmpty()) {
+                        styleMaps.put(name, maps);
+                    }
                 }
             } else if ("null-date".equals(tag)) {
+                // table:case-sensitive is not read: comparisons are Excel's, without case,
+                // which is also what LibreOffice writes unless a user changed it.
                 String date = x.attr("table:date-value");
                 book.setDate1904(date != null && date.startsWith("1904"));
             } else if ("named-range".equals(tag)) {
@@ -325,8 +334,11 @@ final class OdsReader {
                 }
             }
         }
-        if (groupDepth > 0 && rowHasContent) {
-            for (int i = 0; i < rowRepeat && i < 4096; i++) {
+        if (groupDepth > 0) {
+            // a group of empty rows is still a group; what a repeat asks for is counted
+            int grouped = Math.min(rowRepeat, 4096);
+            book.allocated(grouped);
+            for (int i = 0; i < grouped; i++) {
                 sheet.setRowOutlineLevel(row + i, groupDepth);
             }
         }
@@ -362,12 +374,48 @@ final class OdsReader {
         return index.intValue();
     }
 
+    /// The format code of a data style, with the sections its maps name before its own: a
+    /// map to a style for `value()>=0` is the first section of a code of two.
+    private String sectioned(String name) {
+        String own = dataStyles.get(name);
+        ArrayList<String[]> maps = styleMaps.get(name);
+        if (own == null || maps == null) {
+            return own;
+        }
+        ArrayList<String> conditions = new ArrayList<String>();
+        ArrayList<String> codes = new ArrayList<String>();
+        for (int i = 0; i < maps.size() && codes.size() < 2; i++) {
+            String[] m = maps.get(i);
+            String code = dataStyles.get(m[1]);
+            String condition = m[0];
+            if (code == null || condition == null || !condition.startsWith("value()")) {
+                continue;
+            }
+            conditions.add(condition.substring(7).trim());
+            codes.add(code);
+        }
+        if (codes.isEmpty()) {
+            return own;
+        }
+        StringBuilder sb = new StringBuilder();
+        boolean implicit = codes.size() == 1 ? ">=0".equals(conditions.get(0))
+                : ">0".equals(conditions.get(0)) && "<0".equals(conditions.get(1));
+        for (int i = 0; i < codes.size(); i++) {
+            if (!implicit) {
+                String c = conditions.get(i);
+                sb.append('[').append(c.startsWith("!=") ? "<>" + c.substring(2) : c).append(']');
+            }
+            sb.append(codes.get(i)).append(';');
+        }
+        return sb.append(own).toString();
+    }
+
     private void resolveFormats() {
         int[] ids = new int[pendingFormats.size() + 1];
         for (int i = 1; i < ids.length; i++) {
             String[] pending = pendingFormats.get(i - 1);
             String data = pending[0] == null ? null : cellStyles.get(pending[0]);
-            String code = data == null ? null : dataStyles.get(data);
+            String code = data == null ? null : sectioned(data);
             int id = code == null ? 0 : book.formatId(code);
             String fallback = pending[1];
             if (fallback != null) {
@@ -435,7 +483,12 @@ final class OdsReader {
                 inParagraph = true;
             } else if (inParagraph) {
                 if ("s".equals(x.name)) {
-                    int n = x.intAttr("text:c", 1);
+                    int n = Math.min(x.intAttr("text:c", 1), XmlScanner.MAX_TEXT - text.length());
+                    if (n > 0) {
+                        // Spaces the file asks for take memory it never sent: two bytes each,
+                        // and a cell is counted as about seventy.
+                        book.allocated(n / 36);
+                    }
                     for (int i = 0; i < n && text.length() < XmlScanner.MAX_TEXT; i++) {
                         text.append(' ');
                     }
@@ -534,11 +587,11 @@ final class OdsReader {
     }
 
     private static Object parseDouble(String s) {
-        if (s == null) {
+        if (s == null || !Values.isDecimal(s.trim())) {
             return null;
         }
         try {
-            return Double.valueOf(Double.parseDouble(s));
+            return Double.valueOf(Double.parseDouble(s.trim()));
         } catch (NumberFormatException e) {
             return null;
         }
@@ -569,7 +622,10 @@ final class OdsReader {
 
     // ------------------------------------------------------------------ number formats
 
-    private static void repeat(StringBuilder sb, char c, int n) {
+    private static void repeat(StringBuilder sb, char c, int count) {
+        // a style is a few placeholders; a count from the file past the longest format code
+        // is not written out
+        int n = Math.min(count, CellFormat.MAX_CODE);
         for (int i = 0; i < n; i++) {
             sb.append(c);
         }
@@ -594,7 +650,8 @@ final class OdsReader {
     }
 
     /// The format code that says what a data style says.
-    private static String readDataStyle(XmlScanner x, String styleTag, boolean elapsed) throws IOException {
+    private static String readDataStyle(XmlScanner x, String styleTag, boolean elapsed, ArrayList<String[]> maps)
+            throws IOException {
         StringBuilder sb = new StringBuilder();
         boolean date = "date-style".equals(styleTag) || "time-style".equals(styleTag);
         boolean percent = "percentage-style".equals(styleTag);
@@ -608,7 +665,9 @@ final class OdsReader {
             }
             String tag = x.name;
             boolean longStyle = "long".equals(x.attr("number:style"));
-            if ("text".equals(tag)) {
+            if ("map".equals(tag)) {
+                maps.add(new String[] {x.attr("style:condition"), x.attr("style:apply-style-name")});
+            } else if ("text".equals(tag)) {
                 String s = x.elementText();
                 literal(sb, s, date ? " -/:.," : percent ? " $-+()%" : " $-+()");
             } else if ("currency-symbol".equals(tag)) {
@@ -617,14 +676,35 @@ final class OdsReader {
                 int decimals = x.intAttr("number:decimal-places", 0);
                 int minDecimals = Math.min(decimals, x.intAttr("number:min-decimal-places", decimals));
                 int minInteger = x.intAttr("number:min-integer-digits", 1);
-                if (x.boolAttr("number:grouping")) {
-                    sb.append(minInteger == 0 ? "#,###" : "#,##");
-                    repeat(sb, '0', Math.max(1, minInteger));
+                boolean grouping = x.boolAttr("number:grouping");
+                double factor = x.doubleAttr("number:display-factor", 1);
+                StringBuilder whole = new StringBuilder();
+                if (grouping) {
+                    whole.append(minInteger == 0 ? "#,###" : "#,##");
+                    repeat(whole, '0', Math.max(1, minInteger));
                 } else if (minInteger == 0) {
-                    sb.append('#');
+                    whole.append('#');
                 } else {
-                    repeat(sb, '0', minInteger);
+                    repeat(whole, '0', minInteger);
                 }
+                // text inside the digits, 000-00-0000, placed by the count of digits after it
+                for (int n = x.next(); n != XmlScanner.EOF; n = x.next()) {
+                    if (n == XmlScanner.END && "number".equals(x.name)) {
+                        break;
+                    }
+                    if (n == XmlScanner.START && "embedded-text".equals(x.name)) {
+                        int position = x.intAttr("number:position", 0);
+                        StringBuilder text = new StringBuilder();
+                        literal(text, x.elementText(), " -/()");
+                        int at = whole.length();
+                        for (int digits = 0; at > 0 && digits < position; at--) {
+                            char ch = whole.charAt(at - 1);
+                            digits += ch == '0' || ch == '#' ? 1 : 0;
+                        }
+                        whole.insert(at, text);
+                    }
+                }
+                sb.append(whole);
                 if (decimals > 0) {
                     sb.append('.');
                     repeat(sb, '0', minDecimals);
@@ -632,12 +712,10 @@ final class OdsReader {
                 }
                 // shown in thousands or in millions: a comma after the digits for each three
                 // places the number is divided by
-                double factor = x.doubleAttr("number:display-factor", 1);
                 for (int k = 0; k < 5 && factor >= 1000; k++) {
                     sb.append(',');
                     factor /= 1000;
                 }
-                x.skipElement();
             } else if ("scientific-number".equals(tag)) {
                 int decimals = x.intAttr("number:decimal-places", 0);
                 repeat(sb, '0', Math.max(1, x.intAttr("number:min-integer-digits", 1)));

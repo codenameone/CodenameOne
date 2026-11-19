@@ -123,6 +123,11 @@ public final class Sheet extends AbstractTableModel {
         if (row < 0 || col < 0 || row > Node.MAX_ROW || col > Node.MAX_COL) {
             throw new IllegalArgumentException("No such cell: row " + row + ", column " + col);
         }
+        if (rows.size() <= row) {
+            // The rows above a cell far down take room too, though they hold nothing: a
+            // reference each, an eighth of what a cell takes.
+            workbook.allocated((row + 1 - rows.size() + 7) / 8);
+        }
         while (rows.size() <= row) {
             rows.add(null);
         }
@@ -188,7 +193,21 @@ public final class Sheet extends AbstractTableModel {
         c.odsSyntax = false;
         c.alwaysDirty = false;
         c.arrayFormula = false;
+        c.keepsCached = false;
+        c.circular = false;
         c.state = Cell.CLEAN;
+        if (c.autoFormat) {
+            // the date format =TODAY() brought would turn the 5 typed over it into a date
+            c.autoFormat = false;
+            c.format = 0;
+        }
+    }
+
+    /// What a formula read from a file is counted as against the cell limit. A formula cell
+    /// holds its text and a tree of it, measured at about eight times what a number takes,
+    /// and more for a long formula.
+    static long formulaCost(int length) {
+        return 8 + length / 8;
     }
 
     /// Puts a formula read from a file into a cell, with the value the file stored for it.
@@ -197,12 +216,14 @@ public final class Sheet extends AbstractTableModel {
     void loadFormula(int row, int col, String text, boolean ods, Object cached, boolean hasCached,
             boolean array) {
         Cell c = ensure(row, col);
+        workbook.allocated(formulaCost(text.length()));
         storeRaw(row, col, cached);
         c.arrayFormula = array;
         try {
             c.formula = FormulaParser.parse(text, ods);
             c.formulaText = FormulaParser.display(c.formula);
             c.state = hasCached ? Cell.CLEAN : Cell.DIRTY;
+            c.keepsCached = hasCached && Workbook.callsUnknown(c.formula, 0);
             workbook.formulaSet(c);
         } catch (FormulaSyntaxException e) {
             c.formula = null;
@@ -220,7 +241,9 @@ public final class Sheet extends AbstractTableModel {
         c.arrayFormula = array;
         c.formula = node;
         c.formulaText = FormulaParser.display(node);
+        workbook.allocated(formulaCost(c.formulaText.length()));
         c.state = hasCached ? Cell.CLEAN : Cell.DIRTY;
+        c.keepsCached = hasCached && Workbook.callsUnknown(node, 0);
         workbook.formulaSet(c);
     }
 
@@ -358,10 +381,13 @@ public final class Sheet extends AbstractTableModel {
         String name = (String) node.value;
         if ("DATE".equalsIgnoreCase(name) || "TODAY".equalsIgnoreCase(name)) {
             c.format = workbook.formatId("yyyy-mm-dd");
+            c.autoFormat = true;
         } else if ("NOW".equalsIgnoreCase(name)) {
             c.format = workbook.formatId("yyyy-mm-dd hh:mm:ss");
+            c.autoFormat = true;
         } else if ("TIME".equalsIgnoreCase(name)) {
             c.format = workbook.formatId("hh:mm:ss");
+            c.autoFormat = true;
         }
     }
 
@@ -435,7 +461,9 @@ public final class Sheet extends AbstractTableModel {
     /// - `format`: a format code in Excel's syntax, such as `0.0%` or `d mmm yyyy`; null for
     ///   none
     public void setCellFormat(int row, int column, String format) {
-        ensure(row, column).format = workbook.formatId(format);
+        Cell c = ensure(row, column);
+        c.format = workbook.formatId(format);
+        c.autoFormat = false;
         fire(row, column);
     }
 
@@ -471,6 +499,13 @@ public final class Sheet extends AbstractTableModel {
         }
         if (text.charAt(0) == '\'') {
             setCellValue(row, column, text.substring(1));
+            return;
+        }
+        Cell typedInto = cell(row, column);
+        if (typedInto != null && !typedInto.autoFormat && workbook.format(typedInto.format).isText()) {
+            // a cell formatted as text keeps what is typed: the zeros of 00123, and a formula
+            // as its text
+            setCellValue(row, column, text);
             return;
         }
         if (text.charAt(0) == '=' && text.length() > 1) {
@@ -560,6 +595,44 @@ public final class Sheet extends AbstractTableModel {
 
     private int offset() {
         return headerRow ? 1 : 0;
+    }
+
+    int headerRows() {
+        return offset();
+    }
+
+    /// What an editor opens with for a cell: the formula, or the value written so that
+    /// typing it back gives the same value.
+    String editText(int row, int column) {
+        Cell c = cell(row, column);
+        if (c == null) {
+            return "";
+        }
+        if (c.isFormula()) {
+            return getCellFormula(row, column);
+        }
+        Object v = c.value;
+        if (v == null) {
+            return "";
+        }
+        if (v instanceof Boolean) {
+            return ((Boolean) v).booleanValue() ? "TRUE" : "FALSE";
+        }
+        if (!(v instanceof Double)) {
+            return v.toString();
+        }
+        double d = ((Double) v).doubleValue();
+        CellFormat format = workbook.format(c.format);
+        if (format.isDate()) {
+            boolean day = d >= 1;
+            boolean time = d - Math.floor(d) > 0;
+            String code = day ? time ? "yyyy-mm-dd hh:mm:ss" : "yyyy-mm-dd" : "hh:mm:ss";
+            return new CellFormat(code).format(v, workbook.isDate1904());
+        }
+        if (format.isPercent()) {
+            return Values.general(d * 100) + "%";
+        }
+        return Values.general(d);
     }
 
     @Override
@@ -939,6 +1012,10 @@ public final class Sheet extends AbstractTableModel {
             if (logicals != total || total == 0) {
                 column.setFormatter(new Formatter(workbook, cellFormat));
             }
+            // the formatter is the column's: what the grid sorts, filters and groups by. The
+            // cells are painted and edited one by one, each in its own format
+            column.setRenderer(new SheetCells.Renderer(this));
+            column.setEditor(new SheetCells.Editor(this));
             Double width = columnWidths.get(Integer.valueOf(col));
             if (width != null && width.doubleValue() > 0) {
                 column.setWidthMM((float) (width.doubleValue() * MM_PER_CHARACTER));
@@ -1034,6 +1111,25 @@ public final class Sheet extends AbstractTableModel {
         }
     }
 
+    /// One past the last row with an outline level, which may hold nothing: a writer
+    /// writes rows that far so that a group of empty rows is kept.
+    int outlineExtent() {
+        int last = 0;
+        for (Integer row : outlineLevels.keySet()) {
+            last = Math.max(last, row.intValue() + 1);
+        }
+        return last;
+    }
+
+    /// One past the last column with a width of its own.
+    int widthExtent() {
+        int last = 0;
+        for (Integer col : columnWidths.keySet()) {
+            last = Math.max(last, col.intValue() + 1);
+        }
+        return last;
+    }
+
     /// The number of rows at the top that stay in place while the rest scrolls.
     ///
     /// #### Returns
@@ -1078,7 +1174,7 @@ public final class Sheet extends AbstractTableModel {
     /// - `lastColumn`: the right column
     public void addMergedRegion(int firstRow, int firstColumn, int lastRow, int lastColumn) {
         if (!loadMergedRegion(firstRow, firstColumn, lastRow, lastColumn)) {
-            throw new IllegalArgumentException("Not a rectangle of the sheet: rows " + firstRow + " to " + lastRow
+            throw new IllegalArgumentException("Not a rectangle of the sheet, or over a merge it has: rows " + firstRow + " to " + lastRow
                     + ", columns " + firstColumn + " to " + lastColumn);
         }
     }
@@ -1092,6 +1188,15 @@ public final class Sheet extends AbstractTableModel {
         int c2 = Math.max(firstColumn, lastColumn);
         if (r1 < 0 || c1 < 0 || r2 > Node.MAX_ROW || c2 > Node.MAX_COL) {
             return false;
+        }
+        // a cell is in one merge; a file with two over one cell is repaired on opening. A
+        // file with merges by the hundred thousand is not compared pair by pair.
+        int compared = Math.min(merges.size(), 4096);
+        for (int i = 0; i < compared; i++) {
+            int[] m = merges.get(i);
+            if (r1 <= m[2] && r2 >= m[0] && c1 <= m[3] && c2 >= m[1]) {
+                return false;
+            }
         }
         merges.add(new int[] {r1, c1, r2, c2});
         return true;

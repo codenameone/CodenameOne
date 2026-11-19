@@ -53,7 +53,7 @@ final class FormulaParser {
         this.argSeparator = ods ? ';' : ',';
     }
 
-    private static final int MAX_DEPTH = 200;
+    static final int MAX_DEPTH = 200;
     /// Twice the 8,192 characters Excel allows a formula.
     private static final int MAX_LENGTH = 16384;
     private int depth;
@@ -197,10 +197,14 @@ final class FormulaParser {
 
     private Node percent() {
         Node n = unary();
-        for (;;) {
+        // every sign after an operand is a level of the tree, as every sign before it is
+        for (int signs = 0;; signs++) {
             ws();
             if (!eat('%')) {
                 return n;
+            }
+            if (signs + depth >= MAX_DEPTH) {
+                throw fail();
             }
             n = new Node(Node.PERCENT, null, n);
         }
@@ -280,7 +284,15 @@ final class FormulaParser {
         while (p < len && s.charAt(p) == ':') {
             p++;
             Node right = primary();
-            if (left.kind == Node.REF && right.kind == Node.REF && right.sheet == null) {
+            if (left.kind == Node.REF && right.kind == Node.REF && right.sheet != null) {
+                // Sheet1!A1:Sheet1!B2 names its sheet twice; A1:Other!B2 is no rectangle
+                if (left.sheet == null || left.sheet2 != null || right.sheet2 != null
+                        || !left.sheet.equalsIgnoreCase(right.sheet)) {
+                    throw fail();
+                }
+                right.sheet = null;
+            }
+            if (left.kind == Node.REF && right.kind == Node.REF) {
                 left = bound(left, right);
             } else {
                 left = new Node(Node.BINARY, ":", left, right);
@@ -584,6 +596,11 @@ final class FormulaParser {
             a = bound(a, b);
             if (second != null && !second.equals(a.sheet)) {
                 a.sheet2 = second;
+                // one cell through several sheets is written with both corners in this
+                // format, and is still one cell
+                if (a.r1 == a.r2 && a.c1 == a.c2 && !a.wholeCol && !a.wholeRow) {
+                    a.area = false;
+                }
             }
         }
         expect(']');
@@ -943,16 +960,20 @@ final class FormulaParser {
                 sb.append(')');
                 break;
             case Node.BINARY:
-                print(sb, n.args[0], ods, prefixes);
-                String op = n.name();
-                if (ods && ",".equals(op)) {
-                    sb.append('~');
-                } else if (ods && " ".equals(op)) {
-                    sb.append('!');
-                } else {
-                    sb.append(op);
+                // a chain of operators is walked and not recursed into: see Node.spine
+                Node[] spine = Node.spine(n);
+                print(sb, spine[0].args[0], ods, prefixes);
+                for (Node link : spine) {
+                    String op = link.name();
+                    if (ods && ",".equals(op)) {
+                        sb.append('~');
+                    } else if (ods && " ".equals(op)) {
+                        sb.append('!');
+                    } else {
+                        sb.append(op);
+                    }
+                    print(sb, link.args[1], ods, prefixes);
                 }
-                print(sb, n.args[1], ods, prefixes);
                 break;
             case Node.UNARY:
                 sb.append(n.name());
@@ -1027,14 +1048,15 @@ final class FormulaParser {
             }
             sb.append('.');
             printCorner(sb, n, true);
-            if (n.area) {
+            // one cell on several sheets is still a range to this syntax: [$Jan.B2:$Mar.B2]
+            if (n.area || n.sheet2 != null) {
                 sb.append(':');
                 if (n.sheet2 != null) {
                     sb.append('$');
                     appendSheetName(sb, n.sheet2);
                 }
                 sb.append('.');
-                printCorner(sb, n, false);
+                printCorner(sb, n, !n.area);
             }
             sb.append(']');
             return;
@@ -1112,8 +1134,28 @@ final class FormulaParser {
         return looksLikeCellOrLiteral(name);
     }
 
+    /// Whether a name is a reference in Excel's other notation, R1C1, R2, C3, RC: Excel
+    /// wants such a sheet name quoted, and reports a file as damaged when it is not.
+    private static boolean isR1C1(String name) {
+        int i = 0;
+        int n = name.length();
+        if (i < n && (name.charAt(i) == 'R' || name.charAt(i) == 'r')) {
+            i++;
+            while (i < n && isDigit(name.charAt(i))) {
+                i++;
+            }
+        }
+        if (i < n && (name.charAt(i) == 'C' || name.charAt(i) == 'c')) {
+            i++;
+            while (i < n && isDigit(name.charAt(i))) {
+                i++;
+            }
+        }
+        return i == n && n > 0;
+    }
+
     private static boolean looksLikeCellOrLiteral(String name) {
-        if ("TRUE".equalsIgnoreCase(name) || "FALSE".equalsIgnoreCase(name)) {
+        if ("TRUE".equalsIgnoreCase(name) || "FALSE".equalsIgnoreCase(name) || isR1C1(name)) {
             return true;
         }
         int i = 0;
@@ -1162,6 +1204,15 @@ final class FormulaParser {
         }
         if (n.args == null || n.args.length == 0) {
             return n;
+        }
+        if (n.kind == Node.BINARY) {
+            // a chain of operators is walked and not recursed into: see Node.spine
+            Node[] spine = Node.spine(n);
+            Node left = shift(spine[0].args[0], dr, dc);
+            for (Node link : spine) {
+                left = new Node(Node.BINARY, link.value, left, shift(link.args[1], dr, dc));
+            }
+            return left;
         }
         Node[] args = new Node[n.args.length];
         for (int i = 0; i < args.length; i++) {
@@ -1237,6 +1288,19 @@ final class FormulaParser {
         }
         if (n.args == null || n.args.length == 0) {
             return n;
+        }
+        if (n.kind == Node.BINARY) {
+            // a chain of operators is walked and not recursed into: see Node.spine
+            Node[] spine = Node.spine(n);
+            Node first = spine[0].args[0];
+            Node left = restructure(first, refersToEdited, editedSheet, rows, at, delta);
+            boolean moved = left != first; //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one
+            for (Node link : spine) {
+                Node right = restructure(link.args[1], refersToEdited, editedSheet, rows, at, delta);
+                moved |= right != link.args[1]; //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one
+                left = moved ? new Node(Node.BINARY, link.value, left, right) : link;
+            }
+            return left;
         }
         Node[] args = new Node[n.args.length];
         boolean changed = false;

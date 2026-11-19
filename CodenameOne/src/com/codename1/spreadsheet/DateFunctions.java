@@ -50,8 +50,35 @@ final class DateFunctions {
         return v;
     }
 
+    private static final int DAYS_TO_1904 = 1462;
+    private static final double LAST_DAY = 2958465;
+
+    /// Text that names a day is read in the 1900 numbering; a workbook that counts from 1904
+    /// has to have it in its own, or `YEAR("2024-03-15")` answers 2028. Only the date
+    /// functions do this: text added to a number in such a workbook is still read in the
+    /// 1900 numbering.
+    private static Object[] in1904(Object[] a) {
+        Object[] out = a;
+        for (int i = 0; i < a.length; i++) {
+            if (a[i] instanceof String && Values.isDateText((String) a[i])) {
+                Double d = Values.parseDateTime(((String) a[i]).trim());
+                if (d != null) {
+                    if (out == a) { //NOPMD CompareObjectsWithEquals - whether the copy was made yet
+                        out = new Object[a.length];
+                        System.arraycopy(a, 0, out, 0, a.length);
+                    }
+                    out[i] = Double.valueOf(d.doubleValue() - DAYS_TO_1904);
+                }
+            }
+        }
+        return out;
+    }
+
     static Object call(String name, Evaluator ev, Object[] a) {
         boolean d1904 = ev.workbook.isDate1904();
+        if (d1904 && !"DATEVALUE".equals(name) && !"TIMEVALUE".equals(name)) {
+            a = in1904(a);
+        }
         switch (Functions.index(SWITCH_1, name)) {
             case 0: { // DATE
                 double year = Math.floor(Evaluator.num(a, 0));
@@ -75,6 +102,9 @@ final class DateFunctions {
                     throw EvalError.VALUE;
                 }
                 double s = v.doubleValue();
+                if (d1904 && Values.isDateText(Evaluator.text(a, 0))) {
+                    s -= DAYS_TO_1904;
+                }
                 return d("DATEVALUE".equals(name) ? Math.floor(s) : s - Math.floor(s));
             }
             case 3: // YEAR
@@ -340,6 +370,11 @@ final class DateFunctions {
         boolean intl = name.endsWith(".INTL");
         double start = Math.floor(ev.scalarNum(a, 0));
         double second = ev.scalarNum(a, 1);
+        // Past the last day there is, the 31st of December 9999, adding one to a day number
+        // is lost in rounding and a loop over the days never ends.
+        if (start < 0 || start > LAST_DAY || name.startsWith("NETWORKDAYS") && (second < 0 || second > LAST_DAY)) {
+            throw EvalError.NUM;
+        }
         boolean[] off = weekend(ev, intl ? Evaluator.arg(a, 2) : Evaluator.MISSING);
         DoubleList holidays = new DoubleList();
         int h = intl ? 3 : 2;

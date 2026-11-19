@@ -158,9 +158,17 @@ public final class Workbook {
     private ArrayList<Cell> rangeReaders;
     private ArrayList<Ref> rangeRefs;
     private final ArrayList<Cell> volatileCells = new ArrayList<Cell>();
+    // the cells being calculated, outermost first
+    private final ArrayList<Cell> visiting = new ArrayList<Cell>();
+    /// The names of the sheets, folded, while a file is read; see attach.
+    private HashMap<String, Integer> attachedNames;
+    /// The longest sheet name read from a file. OpenDocument has no limit and Excel stops at
+    /// 31; this is far past any real name and keeps a hostile one from reaching every
+    /// formula that is printed.
+    private static final int MAX_SHEET_NAME = 255;
 
     /// Creates a workbook with no sheets.
-    private static long cellLimit = 4000000L;
+    private static long cellLimit = 1000000L;
     private long allocatedCells;
     private boolean loading;
 
@@ -210,6 +218,7 @@ public final class Workbook {
             throw new IOException("Cannot read the spreadsheet: " + e.getMessage()); //NOPMD PreserveStackTrace - the device library has no constructor that takes a cause
         } finally {
             book.loading = false;
+            book.attachedNames = null;
         }
         book.rebuildReaders();
         return book;
@@ -218,7 +227,7 @@ public final class Workbook {
     /// Counts the places for cells a sheet has just made room for. A file is not trusted
     /// with memory: a few hundred bytes can name a cell in the last column of every row, or
     /// say that one cell repeats a million times.
-    void allocated(int cells) {
+    void allocated(long cells) {
         allocatedCells += cells;
         if (loading && allocatedCells > cellLimit) {
             throw new IllegalArgumentException("it has more cells than a workbook is read with, " + cellLimit
@@ -227,12 +236,14 @@ public final class Workbook {
     }
 
     /// The most cells `read` fills before it gives up on a file with an `IOException`,
-    /// four million unless it is changed.
+    /// one million unless it is changed. A million numbers take about 75 MB.
     ///
     /// A file is not trusted with memory: a few hundred bytes of a compressed file can name
     /// a cell in the last column of every row, or say that one row repeats a million times.
     /// What is counted is the room the rows take, so a single cell far to the right counts
-    /// as every cell to its left.
+    /// as every cell to its left, and the rows above the last one count too. A formula
+    /// counts as eight cells and more for a long one, and the shared strings, the column
+    /// widths and the spaces a file asks for are counted with the cells.
     ///
     /// #### Returns
     ///
@@ -456,10 +467,48 @@ public final class Workbook {
 
     /// Adds a sheet a file reader filled before it knew the sheet's name.
     void attach(Sheet s, String name) {
-        String unique = name;
-        for (int n = 2; getSheet(unique) != null; n++) {
-            unique = name + " (" + n + ")";
+        // A file names its sheets as it likes; what addSheet refuses is refused here too, by
+        // replacing the character, so that every sheet can be named by a formula and is
+        // written back as a name another spreadsheet accepts.
+        StringBuilder sb = new StringBuilder(name == null ? "" : name.trim());
+        for (int i = 0; i < sb.length(); i++) {
+            if ("[]*?:/\\".indexOf(sb.charAt(i)) >= 0) {
+                sb.setCharAt(i, '_');
+            }
         }
+        while (sb.length() > 0 && sb.charAt(0) == '\'') {
+            sb.deleteCharAt(0);
+        }
+        while (sb.length() > 0 && sb.charAt(sb.length() - 1) == '\'') {
+            sb.deleteCharAt(sb.length() - 1);
+        }
+        if (sb.length() > MAX_SHEET_NAME) {
+            sb.setLength(MAX_SHEET_NAME);
+        }
+        String base = sb.length() == 0 ? "Sheet" + (sheets.size() + 1) : sb.toString();
+        // Names already taken are kept in a set while a file is read: a file of thousands
+        // of sheets that share one name is otherwise a search through every sheet for every
+        // suffix of every sheet.
+        if (attachedNames == null) {
+            attachedNames = new HashMap<String, Integer>();
+            for (Sheet each : sheets) {
+                attachedNames.put(FormulaParser.asciiUpper(each.getName()), Integer.valueOf(1));
+            }
+        }
+        String unique = base;
+        String key = FormulaParser.asciiUpper(base);
+        Integer taken = attachedNames.get(key);
+        if (taken != null) {
+            int n = taken.intValue() + 1;
+            attachedNames.put(key, Integer.valueOf(n));
+            unique = base + " (" + n + ")";
+            while (attachedNames.containsKey(FormulaParser.asciiUpper(unique))) {
+                n++;
+                unique = base + " (" + n + ")";
+            }
+            attachedNames.put(key, Integer.valueOf(n));
+        }
+        attachedNames.put(FormulaParser.asciiUpper(unique), Integer.valueOf(1));
         s.rename(unique);
         sheets.add(s);
     }
@@ -540,6 +589,11 @@ public final class Workbook {
         }
         structureChanged();
         markAllStale();
+        if (!loading) {
+            for (int s = 0; s < sheets.size(); s++) { //NOPMD ForLoopCanBeForeach - a listener may add a sheet while they are told
+                sheets.get(s).fireAll();
+            }
+        }
     }
 
     void defineName(String name, String text, Node node) {
@@ -660,6 +714,33 @@ public final class Workbook {
         }
     }
 
+    /// Whether a formula calls a function this package does not have.
+    static boolean callsUnknown(Node node, int depth) {
+        Node n = node;
+        if (n == null || depth > FormulaParser.MAX_DEPTH * 4) {
+            return false;
+        }
+        // down the left of a chain of operators in a loop: see Node.spine
+        while (n.kind == Node.BINARY) {
+            if (callsUnknown(n.args[1], depth + 1)) {
+                return true;
+            }
+            n = n.args[0];
+        }
+        if (n.kind == Node.FUNC && n.value instanceof String
+                && Functions.info(FormulaParser.asciiUpper((String) n.value)) < 0) {
+            return true;
+        }
+        if (n.args != null) {
+            for (Node arg : n.args) {
+                if (callsUnknown(arg, depth + 1)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private void markAllStale() {
         for (Sheet sheet : sheets) {
             int rows = sheet.usedRows();
@@ -669,7 +750,9 @@ public final class Workbook {
                     continue;
                 }
                 for (int c = 0; c < cells.length; c++) {
-                    if (cells[c] != null && cells[c].formula != null) {
+                    // nothing a cell reads has changed here, so one that calls a function
+                    // this package does not have keeps the value its file stored
+                    if (cells[c] != null && cells[c].formula != null && !cells[c].keepsCached) {
                         cells[c].state = Cell.DIRTY;
                     }
                 }
@@ -703,6 +786,7 @@ public final class Workbook {
         }
         if (c.state != Cell.CLEAN) {
             if (c.state == Cell.VISITING) {
+                circle(c);
                 return CellError.CIRCULAR;
             }
             calculate(c);
@@ -710,10 +794,49 @@ public final class Workbook {
         return c.value;
     }
 
+    /// A cell that is being calculated was read again: it and every cell entered since are
+    /// a circle, and each of them is the error whatever its formula makes of what it read.
+    /// Without this `=COUNT(B1)+1` beside `=A1+1` is a number or an error depending on
+    /// which of the two is looked at first, since COUNT does not mind an error.
+    private void circle(Cell read) {
+        for (int i = visiting.size() - 1; i >= 0; i--) {
+            Cell v = visiting.get(i);
+            if (v == read) { //NOPMD CompareObjectsWithEquals - a cell is an identity
+                v.circular = true;
+                return;
+            }
+            if (v.circular && read.circular) {
+                // marked by an earlier turn round the same circle, and so is all below it
+                return;
+            }
+            v.circular = true;
+        }
+    }
+
     /// Calculates a cell and, first, every stale cell it reads. The cells wait on a list and
     /// not on the call stack: a column in which every row adds to the one above is ten
     /// thousand cells deep, and a device's stack is not.
     private void calculate(Cell root) {
+        int entered = visiting.size();
+        boolean finished = false;
+        try {
+            calculateFrom(root);
+            finished = true;
+        } finally {
+            if (!finished) {
+                // Something escaped a formula (out of memory, a stack). The cells half way
+                // through are left to be calculated again rather than reading as a circle
+                // forever after.
+                for (int i = visiting.size() - 1; i >= entered; i--) {
+                    Cell v = visiting.remove(i);
+                    v.circular = false;
+                    v.state = Cell.DIRTY;
+                }
+            }
+        }
+    }
+
+    private void calculateFrom(Cell root) {
         ArrayList<Cell> stack = new ArrayList<Cell>();
         stack.add(root);
         while (!stack.isEmpty()) {
@@ -725,6 +848,7 @@ public final class Workbook {
             }
             if (c.state == Cell.DIRTY) {
                 c.state = Cell.VISITING;
+                visiting.add(c);
                 if (c.formula != null) {
                     pushStalePrecedents(c, stack);
                 }
@@ -739,6 +863,16 @@ public final class Workbook {
                 v = c.value;
             } else {
                 v = evaluator.evaluate(c.formula, c.sheet, c.row, c.col, c.arrayFormula);
+            }
+            int last = visiting.size() - 1;
+            if (last >= 0 && visiting.get(last) == c) { //NOPMD CompareObjectsWithEquals - a cell is an identity
+                visiting.remove(last);
+            } else {
+                visiting.remove(c);
+            }
+            if (c.circular) {
+                c.circular = false;
+                v = CellError.CIRCULAR;
             }
             c.value = v;
             c.state = Cell.CLEAN;
@@ -811,6 +945,15 @@ public final class Workbook {
             }
             return;
         }
+        if (n.kind == Node.BINARY) {
+            // a chain of operators is walked and not recursed into: see Node.spine
+            Node[] spine = Node.spine(n);
+            collect(spine[0].args[0], home, out, depth);
+            for (Node link : spine) {
+                collect(link.args[1], home, out, depth);
+            }
+            return;
+        }
         if (n.args != null) {
             for (int i = 0; i < n.args.length; i++) {
                 collect(n.args[i], home, out, depth);
@@ -820,9 +963,17 @@ public final class Workbook {
 
     /// Whether a formula has to be calculated again after any change at all: it uses a
     /// function whose result moves by itself, or one that reads cells it does not name.
-    boolean isVolatile(Node n, int depth) {
+    boolean isVolatile(Node node, int depth) {
+        Node n = node;
         if (n == null) {
             return false;
+        }
+        // down the left of a chain of operators in a loop: see Node.spine
+        while (n.kind == Node.BINARY) {
+            if (isVolatile(n.args[1], depth)) {
+                return true;
+            }
+            n = n.args[0];
         }
         if (n.kind == Node.FUNC) {
             int info = Functions.info(n.name());

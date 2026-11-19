@@ -223,7 +223,10 @@ public class CSVParser {
         return total;
     }
 
-    /// Parses input from the given stream and returns the tokens broken into rows and columns
+    /// Parses input from the given stream and returns the tokens broken into rows and columns.
+    /// The stream is read as UTF-8, without the byte order mark a file may start with, and as
+    /// UTF-16 when it starts with that encoding's byte order mark, as Excel's "Unicode text"
+    /// does. The mark is therefore never part of the first cell.
     ///
     /// #### Parameters
     ///
@@ -274,7 +277,10 @@ public class CSVParser {
         return Util.getReader(new PrefixedInputStream(first, second, in));
     }
 
-    /// Parses input from the given stream and returns the tokens broken into rows and columns
+    /// Parses input from the given stream and returns the tokens broken into rows and columns.
+    /// The stream is read as UTF-8, without the byte order mark a file may start with, and as
+    /// UTF-16 when it starts with that encoding's byte order mark, as Excel's "Unicode text"
+    /// does. The mark is therefore never part of the first cell.
     ///
     /// #### Parameters
     ///

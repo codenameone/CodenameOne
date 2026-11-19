@@ -75,6 +75,27 @@ final class Node {
         this.args = args;
     }
 
+    /// The operators of a chain such as `a+b+c+d`, innermost first, and the leftmost operand
+    /// under them at index 0 of the result's companion, `spine[0].args[0]`.
+    ///
+    /// A chain parses into a tree that leans left, as deep as the chain is long, and a long
+    /// sum is an ordinary formula. Whatever walks a formula walks this list in a loop and
+    /// recurses only into the right-hand operands, whose depth the parser limits: a stack
+    /// that overflows is not an exception on every device.
+    static Node[] spine(Node top) {
+        int count = 0;
+        for (Node x = top; x.kind == BINARY; x = x.args[0]) {
+            count++;
+        }
+        Node[] spine = new Node[count];
+        Node x = top;
+        for (int i = count - 1; i >= 0; i--) {
+            spine[i] = x;
+            x = x.args[0];
+        }
+        return spine;
+    }
+
     String name() {
         return (String) value;
     }

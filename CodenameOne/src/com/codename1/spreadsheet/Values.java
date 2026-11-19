@@ -196,6 +196,9 @@ final class Values {
                 }
                 s = sb.toString();
             }
+            if (!isDecimal(s)) {
+                return null;
+            }
             try {
                 double d = Double.parseDouble(s);
                 return Double.valueOf(percent ? d / 100 : d);
@@ -222,7 +225,14 @@ final class Values {
         return from + 3 == s.length() || s.charAt(from + 3) < '0' || s.charAt(from + 3) > '9';
     }
 
+    /// Whether text names a day, and not only a time of day or a number.
+    static boolean isDateText(String text) {
+        String s = text.trim();
+        return namedDate(s, new int[1]) >= 0 || s.length() >= 8 && s.indexOf('-') == 4 && parseDateTime(s) != null;
+    }
+
     /// `yyyy-mm-dd`, `yyyy-mm-ddThh:mm[:ss]`, `yyyy-mm-dd hh:mm[:ss]`, `hh:mm[:ss[.fff]]`.
+    /// The day is numbered in the 1900 system.
     static Double parseDateTime(String s) {
         int n = s.length();
         double day = 0;
@@ -581,5 +591,45 @@ final class Values {
 
     static boolean equalsIgnoreCase(Object a, Object b) {
         return compare(a, b) == 0;
+    }
+
+    /// Whether text is a number in decimal notation: a sign, digits with at most one point,
+    /// and an exponent. `Double.parseDouble` also takes `0x1p3`, `1d` and `NaN`, which no
+    /// spreadsheet writes as a number, and a device's class library may read them otherwise.
+    static boolean isDecimal(String s) {
+        int n = s.length();
+        int i = 0;
+        if (i < n && (s.charAt(i) == '+' || s.charAt(i) == '-')) {
+            i++;
+        }
+        int digits = 0;
+        boolean point = false;
+        for (; i < n; i++) {
+            char c = s.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digits++;
+            } else if (c == '.' && !point) {
+                point = true;
+            } else {
+                break;
+            }
+        }
+        if (digits == 0) {
+            return false;
+        }
+        if (i < n && (s.charAt(i) == 'e' || s.charAt(i) == 'E')) {
+            i++;
+            if (i < n && (s.charAt(i) == '+' || s.charAt(i) == '-')) {
+                i++;
+            }
+            int exponent = 0;
+            for (; i < n && s.charAt(i) >= '0' && s.charAt(i) <= '9'; i++) {
+                exponent++;
+            }
+            if (exponent == 0) {
+                return false;
+            }
+        }
+        return i == n;
     }
 }

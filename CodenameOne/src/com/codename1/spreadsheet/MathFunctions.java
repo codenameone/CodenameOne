@@ -103,8 +103,13 @@ final class MathFunctions {
             k = n - k;
         }
         double r = 1;
-        for (int i = 1; i <= k; i++) {
+        // past what a double holds the answer is #NUM!, and the loop is not left to count
+        // to a bound given by the file
+        for (double i = 1; i <= k; i++) {
             r = r * (n - k + i) / i;
+            if (Double.isInfinite(r)) {
+                throw EvalError.NUM;
+            }
         }
         return Math.floor(r + 0.5);
     }
@@ -359,6 +364,9 @@ final class MathFunctions {
                 double r = 1;
                 for (double i = n - k + 1; i <= n; i++) {
                     r *= i;
+                    if (Double.isInfinite(r)) {
+                        throw EvalError.NUM;
+                    }
                 }
                 return d(r);
             }

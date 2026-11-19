@@ -30,7 +30,9 @@ final class TextFunctions {
     static final String RANGE_NAMES = "CONCAT CONCATENATE TEXTJOIN";
 
     /// The longest text a cell holds.
-    private static final int MAX_TEXT = 32767;
+    /// The longest text a formula makes, as in Excel. Every function that joins text stops
+    /// at it while it joins, not after: a file's formulas are not trusted with memory.
+    static final int MAX_TEXT = 32767;
 
     private TextFunctions() {
     }
@@ -291,6 +293,9 @@ final class TextFunctions {
         }
         if (v != null && v != Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object
             sb.append(Values.text(v));
+            if (sb.length() > MAX_TEXT) {
+                throw EvalError.VALUE;
+            }
         }
     }
 
@@ -335,6 +340,7 @@ final class TextFunctions {
         // here, as in a spreadsheet, and never the noise of the binary fraction.
         int shown = 0;
         long fraction = 0;
+        String small = null;
         if (rounded >= 1e15) {
             int e = (int) Math.floor(com.codename1.util.MathUtil.log10(rounded));
             double scaled = Math.floor(rounded / Values.pow10(e - 14) + 0.5);
@@ -346,6 +352,18 @@ final class TextFunctions {
             for (int i = 14; i < e; i++) {
                 digits.append('0');
             }
+        } else if (rounded > 0 && rounded < 0.1 && decimals > 15) {
+            // the zeros after the point are not among the fifteen digits: 0.00012345678901234500
+            int[] exp = new int[1];
+            String mantissa = Long.toString(Values.significand(rounded, 15, exp));
+            StringBuilder sb = new StringBuilder();
+            for (int i = -1; i > exp[0]; i--) {
+                sb.append('0');
+            }
+            sb.append(mantissa);
+            small = sb.length() > decimals ? sb.substring(0, decimals) : sb.toString();
+            shown = small.length();
+            digits.append('0');
         } else {
             long whole = (long) Math.floor(rounded);
             int wholeDigits = whole == 0 ? 0 : Long.toString(whole).length();
@@ -360,7 +378,9 @@ final class TextFunctions {
         }
         if (decimals > 0) {
             tail.append('.');
-            if (shown > 0) {
+            if (small != null) {
+                tail.append(small);
+            } else if (shown > 0) {
                 String f = Long.toString(fraction);
                 for (int i = f.length(); i < shown; i++) {
                     tail.append('0');
@@ -412,6 +432,9 @@ final class TextFunctions {
                 sb.append(s.substring(pos, at + from.length()));
             }
             pos = at + from.length();
+            if (sb.length() > MAX_TEXT) {
+                throw EvalError.VALUE;
+            }
             if (seen == instance) {
                 break;
             }
@@ -432,25 +455,27 @@ final class TextFunctions {
         if (instance == 0 || delimiter.length() == 0) {
             throw EvalError.VALUE;
         }
-        String hay = ignoreCase ? s.toLowerCase() : s;
-        String needle = ignoreCase ? delimiter.toLowerCase() : delimiter;
+        // Searched in the text itself, ignoring case character by character: a folded copy
+        // can differ in length from the text, and the offsets found in it would cut the
+        // text in the wrong place.
+        int n = delimiter.length();
         int at = -1;
         if (instance > 0) {
             int pos = 0;
             for (int i = 0; i < instance; i++) {
-                at = hay.indexOf(needle, pos);
+                at = find(s, delimiter, pos, ignoreCase, true);
                 if (at < 0) {
                     break;
                 }
-                pos = at + needle.length();
+                pos = at + n;
             }
             if (at < 0 && matchEnd) {
                 at = s.length();
             }
         } else {
-            int pos = hay.length();
+            int pos = s.length();
             for (int i = 0; i < -instance; i++) {
-                at = pos - needle.length() < 0 ? -1 : hay.lastIndexOf(needle, pos - needle.length());
+                at = pos - n < 0 ? -1 : find(s, delimiter, pos - n, ignoreCase, false);
                 if (at < 0) {
                     break;
                 }
@@ -470,6 +495,26 @@ final class TextFunctions {
             return s.substring(0, at);
         }
         return at >= s.length() ? "" : s.substring(at + delimiter.length());
+    }
+
+    /// Where a delimiter is, searching forward from a position or backward from it.
+    private static int find(String s, String delimiter, int from, boolean ignoreCase, boolean forward) {
+        int n = delimiter.length();
+        int last = s.length() - n;
+        if (forward) {
+            for (int i = Math.max(0, from); i <= last; i++) {
+                if (s.regionMatches(ignoreCase, i, delimiter, 0, n)) {
+                    return i;
+                }
+            }
+        } else {
+            for (int i = Math.min(from, last); i >= 0; i--) {
+                if (s.regionMatches(ignoreCase, i, delimiter, 0, n)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
     }
 
     private static Object numberValue(Object[] a) {

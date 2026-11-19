@@ -22,6 +22,7 @@
  */
 package com.codename1.spreadsheet;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.table.DefaultTableModel;
 import com.codename1.ui.table.GridColumn;
@@ -163,7 +164,7 @@ class SpreadsheetEdgeCaseTest extends UITestBase {
         same(Double.valueOf(4), s.getCellValue("B3"), "a shared formula with no stored value");
         same("plain", s.getCellValue("C1"), "C1");
         same("rich text", s.getCellValue("C2"), "runs of rich text");
-        same("a<b]]>A😀<&bogus;", s.getCellValue("C3"), "character data, references and an unknown entity");
+        same("a<b]]>A\uD83D\uDE00<&bogus;", s.getCellValue("C3"), "character data, references and an unknown entity");
         same("inline", s.getCellValue("D1"), "an inline string");
         same(Boolean.TRUE, s.getCellValue("E1"), "E1");
         same(Boolean.FALSE, s.getCellValue("K1"), "K1");
@@ -613,5 +614,222 @@ class SpreadsheetEdgeCaseTest extends UITestBase {
         loan.getSheet("Terms").setCellValue("B2", Double.valueOf(0.089));
         assertEquals("1|1 Feb 2026|1,573.29|133.50|1,439.79|16,560.21|8.0%", row(schedule, 1));
         assertEquals("12|1 Jan 2027|1,573.29|11.58|1,561.71|0.00|100.0%", row(schedule, 12));
+    }
+
+    @Test
+    void aCircleIsACircleWhicheverCellIsReadFirst() {
+        // COUNT does not mind an error, so without care this is 1 beside an error when A1 is
+        // read first and 2 beside 1 when B1 is
+        for (int first = 0; first < 2; first++) {
+            Workbook w = new Workbook();
+            Sheet s = w.addSheet("S");
+            s.setCellFormula("A1", "=COUNT(B1)+1");
+            s.setCellFormula("B1", "=A1+1");
+            s.setCellFormula("C1", "=IFERROR(B1,0)");
+            Object one = s.getCellValue(first == 0 ? "A1" : "B1");
+            Object two = s.getCellValue(first == 0 ? "B1" : "A1");
+            assertEquals(CellError.CIRCULAR, one, "read first, order " + first);
+            assertEquals(CellError.CIRCULAR, two, "read second, order " + first);
+            // a cell outside the circle may do with the error what it likes
+            assertEquals(Double.valueOf(0), s.getCellValue("C1"));
+            // and the circle is over when it is broken
+            s.setCellValue("B1", Double.valueOf(5));
+            assertEquals(Double.valueOf(2), s.getCellValue("A1"));
+        }
+        Workbook w = new Workbook();
+        Sheet s = w.addSheet("S");
+        for (int r = 0; r < 4; r++) {
+            s.setCellValue(r, 0, Double.valueOf(r + 1));
+        }
+        String[] own = {"=COUNT(A1:A5)", "=COUNTA(A:A)", "=SUMIF(A1:A5,\">2\")", "=IFERROR(A5+1,0)", "=A5"};
+        for (String formula : own) {
+            s.setCellFormula("A5", formula);
+            assertEquals(CellError.CIRCULAR, s.getCellValue("A5"), formula);
+        }
+        // three cells round, entered at each of them
+        for (int start = 0; start < 3; start++) {
+            Workbook ring = new Workbook();
+            Sheet r = ring.addSheet("S");
+            r.setCellFormula("A1", "=N(B1)+1");
+            r.setCellFormula("B1", "=IFERROR(C1,7)");
+            r.setCellFormula("C1", "=ISERROR(A1)+0");
+            r.getCellValue(0, start);
+            assertEquals(CellError.CIRCULAR, r.getCellValue("A1"), "from " + start);
+            assertEquals(CellError.CIRCULAR, r.getCellValue("B1"), "from " + start);
+            assertEquals(CellError.CIRCULAR, r.getCellValue("C1"), "from " + start);
+        }
+    }
+
+    @Test
+    void whatTheSecondReviewFound() throws IOException {
+        // one cell on several sheets, through both files
+        Workbook w = new Workbook();
+        String[] months = {"Jan", "Feb", "Mar"};
+        for (int i = 0; i < 3; i++) {
+            w.addSheet(months[i]).setCellValue("B2", Double.valueOf(1000 * (i + 1)));
+        }
+        Sheet sum = w.addSheet("Year");
+        sum.setCellFormula("A1", "=SUM(Jan:Mar!B2)");
+        sum.setCellFormula("A2", "=SUM(Jan:Mar!B2:B3)");
+        for (Workbook.Format format : new Workbook.Format[] {Workbook.Format.ODS, Workbook.Format.XLSX}) {
+            Workbook back = copy(w, format);
+            Sheet year = back.getSheet("Year");
+            assertEquals("=SUM(Jan:Mar!B2)", year.getCellFormula(0, 0), format.toString());
+            assertEquals("=SUM(Jan:Mar!B2:B3)", year.getCellFormula(1, 0), format.toString());
+            back.getSheet("Feb").setCellValue("B2", Double.valueOf(1));
+            assertEquals(Double.valueOf(4001), year.getCellValue("A1"), format.toString());
+        }
+
+        // MATCH in a sorted list is the last of the equal entries, as the lookups have it,
+        // and a number larger than any is the place of the last number
+        double[] list = {3, 1, 4, 1, 5, 2};
+        for (int i = 0; i < list.length; i++) {
+            sheet.setCellValue(i, 0, Double.valueOf(list[i]));
+            sheet.setCellValue(i, 1, String.valueOf((char) ('a' + i)));
+        }
+        num(6, "=MATCH(1E+99,A1:A6)");
+        val("f", "=INDEX(B1:B6,MATCH(1E+99,A1:A6))");
+        val("f", "=VLOOKUP(1E+99,A1:B6,2)");
+        num(5, "=MATCH(5,{1,3,5,5,5,7},1)");
+        num(3, "=MATCH(5,{1,3,5,5,5,7},0)");
+        num(2, "=MATCH(4,{1,3,5,7},1)");
+        num(2, "=MATCH(4,{7,5,3,1},-1)");
+        num(3, "=MATCH(5,{9,5,5,1},-1)");
+        val(CellError.NA, "=MATCH(0,{1,3,5,7},1)");
+
+        // fifteen digits, counted from the first that is not a zero
+        val("0.00012345678901234500", "=TEXT(0.000123456789012345,\"0.00000000000000000000\")");
+        val("0.30000000000000000000", "=TEXT(0.1+0.2,\"0.00000000000000000000\")");
+        val("0.05000000000000000000", "=TEXT(0.05,\"0.00000000000000000000\")");
+        val("0.0000000000000001", "=TEXT(0.0000000000000001,\"0.0000000000000000\")");
+
+        // unequal is the opposite of equal, for text that reads as the number too
+        sheet.setCellValue("D1", "10");
+        sheet.setCellValue("D2", Double.valueOf(10));
+        sheet.setCellValue("D3", "ten");
+        num(2, "=COUNTIF(D1:D3,\"=10\")");
+        num(1, "=COUNTIF(D1:D3,\"<>10\")");
+
+        // a range has one sheet
+        assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                sheet.setCellFormula("E1", "=SUM(A1:'Other sheet'!B2)");
+            }
+        });
+        Sheet other = book.addSheet("Other sheet");
+        other.setCellValue("A1", Double.valueOf(2));
+        other.setCellValue("B2", Double.valueOf(3));
+        sheet.setCellFormula("E1", "=SUM('Other sheet'!A1:'Other sheet'!B2)");
+        assertEquals(Double.valueOf(5), sheet.getCellValue("E1"));
+        // a typed formula keeps the text it was typed as
+        assertEquals("=SUM('Other sheet'!A1:'Other sheet'!B2)", sheet.getCellFormula(0, 4));
+
+        // a cell is in one merge
+        sheet.addMergedRegion(10, 0, 11, 1);
+        assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                sheet.addMergedRegion(11, 1, 12, 2);
+            }
+        });
+        sheet.addMergedRegion(12, 0, 12, 1);
+        assertEquals(2, sheet.getMergedRegionCount());
+    }
+
+    @Test
+    void theFormatOfATypedDateGoesWithIt() {
+        Object[] next = {"=1+1", Double.valueOf(5), "7", "text"};
+        Object[] expected = {Double.valueOf(2), Double.valueOf(5), Double.valueOf(7), "text"};
+        String[] typed = {"=TODAY()", "=NOW()", "=DATE(2024,3,15)", "=TIME(1,2,3)"};
+        for (String formula : typed) {
+            for (int i = 0; i < next.length; i++) {
+                Sheet s = new Workbook().addSheet("S");
+                s.setValueAt(0, 0, formula);
+                if (!formula.startsWith("=TIME")) {
+                    assertTrue(s.getCellValue(0, 0) instanceof Date, formula);
+                }
+                if (next[i] instanceof String) {
+                    s.setValueAt(0, 0, next[i]);
+                } else {
+                    s.setCellValue(0, 0, next[i]);
+                }
+                assertEquals(expected[i], s.getCellValue(0, 0), formula + " then " + next[i]);
+                assertEquals("General", s.getCellFormat(0, 0), formula + " then " + next[i]);
+            }
+        }
+        // cleared and written again, and a format somebody chose
+        Sheet s = new Workbook().addSheet("S");
+        s.setValueAt(0, 0, "=TODAY()");
+        s.setCellValue(0, 0, null);
+        s.setCellValue(0, 0, Double.valueOf(7));
+        assertEquals(Double.valueOf(7), s.getCellValue(0, 0));
+        s.setValueAt(0, 1, "=TODAY()");
+        s.setCellFormat(0, 1, "dd/mm/yyyy");
+        s.setCellValue(0, 1, Double.valueOf(45000));
+        assertEquals("dd/mm/yyyy", s.getCellFormat(0, 1));
+        assertTrue(s.getCellValue(0, 1) instanceof Date);
+    }
+
+    @Test
+    void aWorkbookThatCountsFrom1904() throws IOException {
+        book.setDate1904(true);
+        num(2024, "=YEAR(\"2024-03-15\")");
+        num(15, "=DAY(\"15-Mar-2024\")");
+        val(Boolean.TRUE, "=DATEVALUE(\"2024-03-15\")=DATE(2024,3,15)");
+        num(0.5, "=TIMEVALUE(\"12:00\")");
+        num(12, "=HOUR(\"2024-03-15 12:30\")");
+        num(1, "=DAYS(\"2024-03-16\",\"2024-03-15\")");
+        // a date a file writes as text
+        Workbook w = open(xlsx("<x:workbookPr date1904=\"1\"/>", "<sheetData><row r=\"1\">"
+                + "<c r=\"A1\" t=\"d\"><v>2024-03-15</v></c></row></sheetData>", ""), Workbook.Format.XLSX);
+        Sheet s = w.getSheet(0);
+        s.setCellFormula("B1", "=YEAR(A1)");
+        assertEquals(Double.valueOf(2024), s.getCellValue("B1"));
+        assertEquals("2024-03-15", s.getCellText(0, 0));
+    }
+
+    @FormTest
+    void aFunctionThisPackageLacksKeepsItsStoredValue() throws IOException {
+        Workbook w = open(xlsx("", "<sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c>"
+                + "<c r=\"B1\"><f>IMSUM(A1)</f><v>42</v></c><c r=\"C1\"><f>B1+1</f><v>43</v></c></row></sheetData>",
+                ""), Workbook.Format.XLSX);
+        Sheet s = w.getSheet(0);
+        final int[] told = {0};
+        s.addDataChangeListener(new com.codename1.ui.events.DataChangedListener() {
+            public void dataChanged(int type, int index) {
+                told[0]++;
+            }
+        });
+        // nothing the formula reads changes in any of these
+        s.insertRows(9, 1);
+        w.setDefinedName("Rate", "=0.1");
+        assertTrue(told[0] > 0, "a name that formulas may read is announced");
+        w.recalculate();
+        w.addSheet("More");
+        w.removeSheet(w.getSheetCount() - 1);
+        assertEquals(Double.valueOf(42), s.getCellValue("B1"));
+        assertEquals(Double.valueOf(43), s.getCellValue("C1"));
+        assertEquals("=IMSUM(A1)", s.getCellFormula(0, 1));
+        // and now something does
+        s.setCellValue("A1", Double.valueOf(2));
+        assertEquals(CellError.NAME, s.getCellValue("B1"));
+        // typed, it has no stored value to keep
+        s.setCellFormula("D1", "=IMSUM(A1)");
+        assertEquals(CellError.NAME, s.getCellValue("D1"));
+    }
+
+    @Test
+    void aTextFileReadAndWrittenStaysAsLongAsItWas() throws IOException {
+        String text = "a,b\r\nc,d\r\n";
+        for (int round = 0; round < 3; round++) {
+            String[][] rows = new com.codename1.io.CSVParser().parse(new java.io.StringReader(text));
+            java.io.StringWriter out = new java.io.StringWriter();
+            new com.codename1.io.CSVWriter().write(out, rows);
+            text = out.toString();
+        }
+        assertEquals("a,b\r\nc,d\r\n", text);
+        // an empty row in the middle is a row
+        java.io.StringWriter out = new java.io.StringWriter();
+        new com.codename1.io.CSVWriter().write(out, new String[][] {{"a"}, {}, {"b"}, {}});
+        assertEquals("a\r\n\r\nb\r\n", out.toString());
     }
 }

@@ -427,10 +427,13 @@ logical value is a `Boolean` and an error such as `#DIV/0!` is a `CellError`.
 of the file, for a file the user chose.
 
 A file the user chose is a file someone else wrote. `Workbook.read` throws an
-`IOException` for one that's damaged, that isn't a spreadsheet, or that asks for
-more memory than a sheet should take: a few hundred compressed bytes can
-describe millions of cells. It stops at four million cells, and
-`Workbook.setCellLimit` raises that for an application that reads larger files.
+`IOException` for one that's damaged or that isn't a spreadsheet. It also
+throws for a file larger than the cell limit, because a few hundred compressed
+bytes can describe millions of cells. The limit is one million cells, about
+75 MB of numbers. A formula counts as eight cells or more, and the rows above
+the last cell, the shared text and the column widths count as well.
+`Workbook.setCellLimit` raises the limit for an application that reads larger
+files on a device with the memory for them.
 
 ==== A whole workbook
 
@@ -511,11 +514,19 @@ a cell, which is what the grid's editor does: `=B2*C2` is a formula, `25%` is th
 number 0.25, `2024-02-29` is a date and `'=B2` is the text `=B2`. Give it a
 `Double`, a `Date` or a `Boolean` to store a value unchanged.
 
+The columns `createColumns()` builds edit a cell the way a spreadsheet does. The
+field opens with the formula of a cell that has one, and otherwise with the whole
+value and not its formatted text, so a price shown as `1,234.50` opens as
+`1234.5`. A field that's closed unchanged writes nothing. Each cell is also
+painted in its own number format, which matters for a total in a currency
+format under a column of plain numbers. Sorting, filtering and grouping use the
+column's formatter, which is the format most of its cells have.
+
 Formulas are written the way Excel writes them, in English and with commas
 between arguments, whichever format the file is in. They can use ranges, whole
 rows and columns, other sheets, defined names and array constants. A formula
 that refers to itself, directly or through other cells, shows a `CellError` for
-a circular reference instead of looping.
+a circular reference instead of looping, and so does every cell of the circle.
 
 The following functions are available. `Workbook.getSupportedFunctions()` returns
 the same list.
@@ -560,7 +571,7 @@ to the file, and its cell shows the value the file stored for it. The cell shows
 `#NAME?` once a cell it reads has changed, because the stored value is stale by
 then.
 
-Three things work differently from Excel:
+A few things work differently from Excel:
 
 * A formula that returns an array shows its first value, and that value is
   what another cell reads from it. Results don't spill into the neighboring

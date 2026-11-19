@@ -605,6 +605,251 @@ class SpreadsheetHostileFileTest extends UITestBase {
         same("46086", sheet.getCellText(2, 8), "arithmetic on a date is a number");
     }
 
+    /// What the second review of files found: memory nothing counted, chains of operators
+    /// as deep as they are long, formulas that never return, formats that throw.
+    @Test
+    void memoryNothingCounted() throws IOException {
+        // one cell at the bottom of each of sixty sheets: the rows above it take room
+        StringBuilder tables = new StringBuilder();
+        for (int i = 0; i < 60; i++) {
+            tables.append("<table:table table:name=\"S").append(i).append("\"><table:table-row")
+                    .append(" table:number-rows-repeated=\"1048575\"><table:table-cell/></table:table-row><table:table-row>")
+                    .append("<table:table-cell office:value-type=\"float\" office:value=\"1\"/></table:table-row></table:table>");
+        }
+        refused("a cell at the bottom of sixty sheets", zip("mimetype", "application/vnd.oasis.opendocument.spreadsheet",
+                "content.xml", "<office:document-content" + ODS_NS + "><office:body><office:spreadsheet>" + tables
+                        + "</office:spreadsheet></office:body></office:document-content>"), Workbook.Format.ODS);
+        // a column width for every column, three thousand times over
+        refused("three thousand widths of every column", xlsx("</sheetData><cols>"
+                + repeat("<col min=\"1\" max=\"16384\" width=\"10\" customWidth=\"1\"/>", 3000) + "</cols><sheetData>", null),
+                Workbook.Format.XLSX);
+        // but "every column from here on" is how Excel ends a file, and it is kept whole
+        Workbook rest = survive("one width for the rest of the columns", xlsx("</sheetData><cols>"
+                + "<col min=\"3\" max=\"16384\" width=\"12\" customWidth=\"1\"/></cols><sheetData>", null), Workbook.Format.XLSX);
+        if (rest != null) {
+            same(Double.valueOf(12), Double.valueOf(rest.getSheet(0).getColumnWidth(16383)), "the width of the last column");
+        }
+        // a number style of three hundred million digits
+        long started = System.currentTimeMillis();
+        survive("a style of three hundred million digits", zip("mimetype", "application/vnd.oasis.opendocument.spreadsheet",
+                "content.xml", "<office:document-content" + ODS_NS
+                        + " xmlns:number=\"urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0\""
+                        + " xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\"><office:automatic-styles>"
+                        + "<number:number-style style:name=\"N1\"><number:number number:min-integer-digits=\"300000000\"/>"
+                        + "</number:number-style><style:style style:name=\"ce1\" style:family=\"table-cell\""
+                        + " style:data-style-name=\"N1\"/></office:automatic-styles><office:body><office:spreadsheet>"
+                        + "<table:table table:name=\"S\"><table:table-row><table:table-cell table:style-name=\"ce1\""
+                        + " office:value-type=\"float\" office:value=\"1\"/></table:table-row></table:table>"
+                        + "</office:spreadsheet></office:body></office:document-content>"), Workbook.Format.ODS);
+        // spaces in two hundred cells, each as many as a text may hold
+        String spaces = "<table:table-cell office:value-type=\"string\"><text:p><text:s text:c=\"2000000000\"/></text:p>"
+                + "</table:table-cell>";
+        refused("two hundred cells of four million spaces", ods("<table:table-row>" + repeat(spaces, 200)
+                + "</table:table-row>"), Workbook.Format.ODS);
+        // a table of strings that the cells never use
+        Workbook.setCellLimit(200000);
+        refused("half a million shared strings", zip("[Content_Types].xml", "<Types/>",
+                "xl/workbook.xml", "<workbook xmlns=\"" + MAIN + "\" xmlns:r=\"" + REL + "\">"
+                        + "<sheets><sheet name=\"S\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>",
+                "xl/_rels/workbook.xml.rels", "<Relationships>"
+                        + "<Relationship Id=\"rId1\" Type=\"" + REL + "/worksheet\" Target=\"worksheets/sheet1.xml\"/>"
+                        + "<Relationship Id=\"rId2\" Type=\"" + REL + "/sharedStrings\" Target=\"sharedStrings.xml\"/>"
+                        + "</Relationships>",
+                "xl/sharedStrings.xml", "<sst xmlns=\"" + MAIN + "\">" + repeat("<si><t>a</t></si>", 500000) + "</sst>",
+                "xl/worksheets/sheet1.xml", "<worksheet xmlns=\"" + MAIN + "\"><sheetData/></worksheet>"), Workbook.Format.XLSX);
+        // one formula row repeated down the whole sheet: a tree for every row
+        Workbook.setCellLimit(limit);
+        refused("a formula repeated a million times", ods("<table:table-row table:number-rows-repeated=\"1048576\">"
+                + "<table:table-cell table:formula=\"of:=[.B1]+1\" office:value-type=\"float\" office:value=\"1\"/>"
+                + "<table:table-cell office:value-type=\"float\" office:value=\"1\"/></table:table-row>"), Workbook.Format.ODS);
+        same(Boolean.TRUE, Boolean.valueOf(System.currentTimeMillis() - started < 20000), "the files above took seconds");
+        // a cell's own row is where it is; a row past the last is a damaged file
+        Workbook own = survive("a cell whose row differs from its row element's",
+                xlsx("<row r=\"2\"><c r=\"B9\"><v>7</v></c></row>", null), Workbook.Format.XLSX);
+        if (own != null) {
+            same(Double.valueOf(7), own.getSheet(0).getCellValue("B9"), "the cell is at its own reference");
+        }
+        refused("a cell in row 1048577", xlsx("<row r=\"1\"><c r=\"A1048577\"><v>1</v></c></row>", null), Workbook.Format.XLSX);
+        refused("a cell in row 0", xlsx("<row r=\"1\"><c r=\"A0\"><v>1</v></c></row>", null), Workbook.Format.XLSX);
+        // numbers are written in decimal, and nothing else reads as one
+        Workbook hex = survive("a value in hexadecimal", xlsx("<row r=\"1\"><c r=\"A1\"><v>0x1p3</v></c>"
+                + "<c r=\"B1\"><v>1d</v></c><c r=\"C1\"><v>-1.5E+3</v></c></row>", null), Workbook.Format.XLSX);
+        if (hex != null) {
+            same("0x1p3", hex.getSheet(0).getCellValue("A1"), "0x1p3 is not 8");
+            same("1d", hex.getSheet(0).getCellValue("B1"), "1d is not 1");
+            same(Double.valueOf(-1500), hex.getSheet(0).getCellValue("C1"), "scientific notation is a number");
+        }
+    }
+
+    /// A workbook whose sheets have these names, each holding 5 in A1.
+    private static byte[] namedSheets(String[] names) throws IOException {
+        StringBuilder sheets = new StringBuilder();
+        StringBuilder rels = new StringBuilder();
+        String[] parts = new String[6 + 2 * names.length];
+        for (int i = 0; i < names.length; i++) {
+            sheets.append("<sheet name=\"").append(names[i]).append("\" sheetId=\"").append(i + 1)
+                    .append("\" r:id=\"rId").append(i + 1).append("\"/>");
+            rels.append("<Relationship Id=\"rId").append(i + 1).append("\" Type=\"").append(REL)
+                    .append("/worksheet\" Target=\"worksheets/sheet").append(i + 1).append(".xml\"/>");
+            parts[6 + 2 * i] = "xl/worksheets/sheet" + (i + 1) + ".xml";
+            parts[7 + 2 * i] = "<worksheet xmlns=\"" + MAIN + "\"><sheetData><row r=\"1\"><c r=\"A1\"><v>5</v></c>"
+                    + "</row></sheetData></worksheet>";
+        }
+        parts[0] = "[Content_Types].xml";
+        parts[1] = "<Types/>";
+        parts[2] = "xl/workbook.xml";
+        parts[3] = "<workbook xmlns=\"" + MAIN + "\" xmlns:r=\"" + REL + "\"><sheets>" + sheets + "</sheets></workbook>";
+        parts[4] = "xl/_rels/workbook.xml.rels";
+        parts[5] = "<Relationships>" + rels + "</Relationships>";
+        return zip(parts);
+    }
+
+    @Test
+    void sheetNamesFromAFile() throws IOException {
+        String[] names = {"", "   ", "a/b", "[x]", "a:b", "'q'", "Same", "same", "Same"};
+        Workbook w = survive("sheets no formula could name", namedSheets(names), Workbook.Format.XLSX);
+        if (w == null) {
+            wrong.append("\nthe workbook of odd names was refused");
+            return;
+        }
+        String[] expected = {"Sheet1", "Sheet2", "a_b", "_x_", "a_b (2)", "q", "Same", "same (2)", "Same (3)"};
+        for (int i = 0; i < expected.length; i++) {
+            same(expected[i], w.getSheet(i).getName(), "sheet " + i);
+        }
+        // and each can be named by a formula
+        Sheet s = w.addSheet("Reader");
+        s.setCellFormula("A1", "='a_b (2)'!A1+q!A1");
+        same(Double.valueOf(10), s.getCellValue("A1"), "a formula reads the renamed sheets");
+        // thousands of sheets that share one name are read in a moment
+        String[] many = new String[3000];
+        for (int i = 0; i < many.length; i++) {
+            many[i] = "S";
+        }
+        long started = System.currentTimeMillis();
+        Workbook big = Workbook.read(new ByteArrayInputStream(namedSheets(many)), Workbook.Format.XLSX);
+        same(Boolean.TRUE, Boolean.valueOf(System.currentTimeMillis() - started < 5000), "3000 sheets of one name took seconds");
+        same("S (3000)", big.getSheet(2999).getName(), "the last of them");
+        // a sheet whose name reads as a reference in R1C1 notation is quoted in a formula
+        Workbook r1 = new Workbook();
+        r1.addSheet("R1C1").setCellValue("A1", Double.valueOf(3));
+        Sheet user = r1.addSheet("User");
+        user.setCellFormula("A1", "='R1C1'!A1*2");
+        same("='R1C1'!A1*2", user.getCellFormula(0, 0), "R1C1 is quoted");
+        user.setCellFormula("A2", "='RC'!A1+'C3'!A1");
+        same("='RC'!A1+'C3'!A1", user.getCellFormula(1, 0), "RC and C3 are quoted");
+    }
+
+    @Test
+    void formulasThatNeverReturn() {
+        // a sum of a thousand terms is an ordinary formula, and a chain of operators is as
+        // long as the formula allows, on a small stack
+        final StringBuilder chain = new StringBuilder("=A1");
+        while (chain.length() < 16000) {
+            chain.append("+A1");
+        }
+        final String[] failed = {null};
+        Thread small = new Thread(null, new Runnable() {
+            public void run() {
+                try {
+                    Workbook w = new Workbook();
+                    Sheet s = w.addSheet("S");
+                    s.setCellValue("A1", Double.valueOf(1));
+                    s.setCellFormula("B1", chain.toString());
+                    Object v = s.getCellValue("B1");
+                    if (!Double.valueOf(chain.length() / 3).equals(v)) {
+                        failed[0] = "the chain added up to " + v;
+                    }
+                    s.insertRows(0, 1);
+                    s.setCellFormula("C1", "=(A2,A2,A2,A2,A2,A2) " + repeat("A2:A3 ", 2000) + "A2");
+                    s.getCellValue("C1");
+                    for (Workbook.Format f : new Workbook.Format[] {Workbook.Format.XLSX, Workbook.Format.ODS,
+                            Workbook.Format.CSV}) {
+                        ByteArrayOutputStream out = new ByteArrayOutputStream();
+                        w.write(out, f);
+                        if (f != Workbook.Format.CSV) {
+                            Workbook back = Workbook.read(new ByteArrayInputStream(out.toByteArray()), f);
+                            back.getSheet(0).getCellValue("B2");
+                        }
+                    }
+                } catch (Throwable t) { //NOPMD AvoidCatchingThrowable - a stack overflow is the failure looked for
+                    failed[0] = t.toString();
+                }
+            }
+        }, "small stack", 256 * 1024);
+        small.start();
+        try {
+            small.join(60000);
+        } catch (InterruptedException e) {
+            failed[0] = e.toString();
+        }
+        same(null, failed[0], "a long chain of operators on a small stack");
+        val(CellError.VALUE, "LEN(SUBSTITUTE(REPT(\"a\",32767),\"a\",REPT(\"b\",32767)))");
+        val(CellError.VALUE, "CONCAT(SEQUENCE(1000,1000),SEQUENCE(1000,1000))");
+        val(CellError.VALUE, "ROWS(REPT(SEQUENCE(1000,1000),SEQUENCE(1000,1000)))");
+        val(CellError.VALUE, "LEN(REPT(\"a\",20000)&REPT(\"a\",20000))");
+        val(CellError.NUM, "COMBIN(1E15,5E14)");
+        val(CellError.NUM, "COMBINA(1E15,5E14)");
+        val(CellError.NUM, "PERMUT(1E9,5E8)");
+        val(CellError.NUM, "NETWORKDAYS(1E300,1E300,1E300)");
+        val(CellError.NUM, "WORKDAY(1E300,5)");
+        long started = System.currentTimeMillis();
+        eval("DDB(1,1E15,1E15,1E15)");
+        val(CellError.NA, "MODE(SEQUENCE(1000,1000))");
+        val(Double.valueOf(1000000), "ROWS(MODE.MULT(SEQUENCE(1000,1000)*0+{1}))*0+1000000");
+        val(Double.valueOf(999000), "INDEX(FREQUENCY(SEQUENCE(1000,1000),SEQUENCE(1000)),1001)");
+        same(Boolean.TRUE, Boolean.valueOf(System.currentTimeMillis() - started < 10000), "the formulas above took seconds");
+        // the answers small cases give did not move
+        val(Double.valueOf(2), "MODE(1,2,2,3,3)");
+        val(Double.valueOf(3), "MODE(3,1,1,3)");
+        val(Double.valueOf(0.25), "DDB(1,0,4,2)");
+        val(Double.valueOf(252), "COMBIN(10,5)");
+        val(Double.valueOf(720), "PERMUT(10,3)");
+        // forty cells that each double the one before
+        Workbook w = new Workbook();
+        Sheet s = w.addSheet("S");
+        s.setCellValue("A1", "ab");
+        for (int r = 2; r <= 40; r++) {
+            s.setCellFormula("A" + r, "=A" + (r - 1) + "&A" + (r - 1));
+        }
+        w.recalculate();
+        same(CellError.VALUE, s.getCellValue("A40"), "text that doubles forty times");
+        // a format code in scientific notation on a number too small for a power of ten
+        same("4.00E-320", CellFormat.format("0.00E+00", Double.valueOf(4e-320), false), "a subnormal number");
+        same("4.94E-324", CellFormat.format("0.00E+00", Double.valueOf(Double.MIN_VALUE), false), "the smallest number");
+        same("40.0E-321", CellFormat.format("##0.0E+0", Double.valueOf(4e-320), false), "in engineering notation");
+        // TEXTAFTER ignoring case does not cut the text where a folded copy would
+        val("B", "TEXTAFTER(\"\u0130a-B\",\"-\",1,1)");
+        val("x", "TEXTAFTER(\"aBcx\",\"bc\",1,1)");
+        val("aB", "TEXTBEFORE(\"aBcx\",\"CX\",-1,1)");
+    }
+
+    @Test
+    void whatOpenDocumentKeeps() throws IOException {
+        String[] codes = {"#,##0.00_);(#,##0.00)", "#,##0;-#,##0;\"zero\"", "[>100]\"big\";0", "000-00-0000"};
+        double[] values = {-1234.5, 0, 0, 123456789};
+        String[] shown = {"(1,234.50)", "zero", "0", "123-45-6789"};
+        Workbook w = new Workbook();
+        Sheet s = w.addSheet("S");
+        for (int i = 0; i < codes.length; i++) {
+            s.setCellValue(i, 0, Double.valueOf(values[i]));
+            s.setCellFormat(i, 0, codes[i]);
+        }
+        s.setRowOutlineLevel(40, 2);
+        s.setColumnWidth(300, 5);
+        for (Workbook.Format f : new Workbook.Format[] {Workbook.Format.ODS, Workbook.Format.XLSX}) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            w.write(out, f);
+            Sheet back = Workbook.read(new ByteArrayInputStream(out.toByteArray()), f).getSheet(0);
+            for (int i = 0; i < codes.length; i++) {
+                same(shown[i], s.getCellText(i, 0), codes[i]);
+                same(shown[i], back.getCellText(i, 0), codes[i] + " through " + f);
+            }
+            same(Integer.valueOf(2), Integer.valueOf(back.getRowOutlineLevel(40)), "an empty grouped row through " + f);
+            same(Double.valueOf(5), Double.valueOf(Math.round(back.getColumnWidth(300) * 100) / 100.0),
+                    "the width of an empty column through " + f);
+        }
+    }
+
     private static String repeat(String s, int times) {
         StringBuilder sb = new StringBuilder(s.length() * times);
         for (int i = 0; i < times; i++) {

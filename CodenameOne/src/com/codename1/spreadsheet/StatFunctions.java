@@ -112,15 +112,15 @@ final class StatFunctions {
 
     /// The value that occurs most often; the one met first wins a tie.
     static double mode(DoubleList list) {
+        // The most frequent value, the earliest in the list among those as frequent: counted
+        // over a sorted copy, since counting each value against every other is a million
+        // squared steps for a column of a million
+        double[] sorted = list.sorted();
         double best = 0;
         int bestCount = 1;
         for (int i = 0; i < list.size; i++) {
-            int count = 0;
-            for (int j = 0; j < list.size; j++) {
-                if (list.data[j] == list.data[i]) {
-                    count++;
-                }
-            }
+            // in the list's order, so that of two values as frequent the earlier wins
+            int count = count(sorted, list.data[i]);
             if (count > bestCount) {
                 bestCount = count;
                 best = list.data[i];
@@ -130,6 +130,41 @@ final class StatFunctions {
             throw EvalError.NA;
         }
         return best;
+    }
+
+    /// How often a value is in a sorted array, found by two binary searches.
+    private static int count(double[] sorted, double v) {
+        return upper(sorted, v) - lower(sorted, v);
+    }
+
+    /// The first index whose value is not below v.
+    private static int lower(double[] sorted, double v) {
+        int lo = 0;
+        int hi = sorted.length;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (sorted[mid] < v) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        return lo;
+    }
+
+    /// The first index whose value is above v.
+    private static int upper(double[] sorted, double v) {
+        int lo = 0;
+        int hi = sorted.length;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (sorted[mid] <= v) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        return lo;
     }
 
     static double nth(DoubleList list, double k, boolean largest) {
@@ -512,11 +547,8 @@ final class StatFunctions {
                 Object[][] out = new Object[bins.length + 1][1];
                 int[] counts = new int[bins.length + 1];
                 for (int i = 0; i < data.size; i++) {
-                    int b = 0;
-                    while (b < bins.length && data.data[i] > bins[b]) {
-                        b++;
-                    }
-                    counts[b]++;
+                    // the first bin the value is not above
+                    counts[lower(bins, data.data[i])]++;
                 }
                 for (int i = 0; i < counts.length; i++) {
                     out[i][0] = d(counts[i]);
@@ -680,26 +712,21 @@ final class StatFunctions {
 
     private static Object modeMult(DoubleList list) {
         ArrayList<Double> modes = new ArrayList<Double>();
+        double[] sorted = list.sorted();
         int best = 2;
         for (int i = 0; i < list.size; i++) {
-            int count = 0;
-            boolean seen = false;
-            for (int j = 0; j < list.size; j++) {
-                if (list.data[j] == list.data[i]) {
-                    if (j < i) {
-                        seen = true;
-                    }
-                    count++;
-                }
+            best = Math.max(best, count(sorted, list.data[i]));
+        }
+        // each value once, in the order it first appears; a value is marked by where its
+        // run starts in the sorted copy
+        boolean[] listed = new boolean[sorted.length];
+        for (int i = 0; i < list.size; i++) {
+            double v = list.data[i];
+            int at = lower(sorted, v);
+            if (!listed[at] && count(sorted, v) == best) {
+                listed[at] = true;
+                modes.add(d(v));
             }
-            if (seen || count < best) {
-                continue;
-            }
-            if (count > best) {
-                best = count;
-                modes.clear();
-            }
-            modes.add(d(list.data[i]));
         }
         if (modes.isEmpty()) {
             throw EvalError.NA;

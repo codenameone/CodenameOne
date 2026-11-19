@@ -151,7 +151,8 @@ final class OdsWriter {
         // column widths
         for (int s = 0; s < book.getSheetCount(); s++) {
             Sheet sheet = book.getSheet(s);
-            for (int c = 0; c < sheet.usedColumns(); c++) {
+            int widths = Math.max(sheet.usedColumns(), sheet.widthExtent());
+            for (int c = 0; c < widths; c++) {
                 double w = sheet.getColumnWidth(c);
                 if (w > 0) {
                     x.raw("<style:style").attr("style:name", "co" + s + "_" + c).raw(" style:family=\"table-column\">")
@@ -182,7 +183,9 @@ final class OdsWriter {
         // The formulas are written with the meaning they have here, which is Excel's: a
         // criterion is a wildcard pattern for the whole cell. An OpenDocument file that does not
         // say so is read with regular expressions, and COUNTIF(range,"*et") counts nothing.
-        x.raw("<table:calculation-settings table:use-wildcards=\"true\" table:use-regular-expressions=\"false\"")
+        // Text compares without case here as in Excel, and OpenDocument's default is with it.
+        x.raw("<table:calculation-settings table:case-sensitive=\"false\" table:use-wildcards=\"true\"")
+                .raw(" table:use-regular-expressions=\"false\"")
                 .raw(" table:search-criteria-must-apply-to-whole-cell=\"true\"");
         if (book.isDate1904()) {
             x.raw("><table:null-date table:date-value=\"1904-01-01\"/></table:calculation-settings>");
@@ -220,7 +223,7 @@ final class OdsWriter {
 
     private void writeSheet(XmlOut x, Sheet sheet, int index) throws IOException {
         x.raw("<table:table").attr("table:name", sheet.getName()).raw(">");
-        int columns = Math.max(1, sheet.usedColumns());
+        int columns = Math.max(1, Math.max(sheet.usedColumns(), sheet.widthExtent()));
         for (int c = 0; c < columns; c++) {
             x.raw("<table:table-column");
             if (sheet.getColumnWidth(c) > 0) {
@@ -228,7 +231,7 @@ final class OdsWriter {
             }
             x.raw("/>");
         }
-        int rows = sheet.usedRows();
+        int rows = Math.max(sheet.usedRows(), sheet.outlineExtent());
         anchors.clear();
         int[] lastAnchor = new int[0];
         for (int i = 0; i < sheet.getMergedRegionCount(); i++) {

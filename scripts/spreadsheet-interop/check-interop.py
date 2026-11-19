@@ -100,10 +100,65 @@ def compare(label, ours_values, ours_formulas, theirs_path):
     return cells
 
 
+# LibreOffice keeps the values a file stores unless it is told to calculate on load, and
+# its default for both formats is not to. Without this every value compared would be our
+# own value read back, and the check would prove nothing about our formulas.
+RECALCULATE_ON_LOAD = """<?xml version="1.0" encoding="UTF-8"?>
+<oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<item oor:path="/org.openoffice.Office.Calc/Formula/Load"><prop oor:name="OOXMLRecalcMode" oor:op="fuse"><value>0</value></prop></item>
+<item oor:path="/org.openoffice.Office.Calc/Formula/Load"><prop oor:name="ODFRecalcMode" oor:op="fuse"><value>0</value></prop></item>
+</oor:items>
+"""
+
+
+def recalculating_profile(work):
+    user = os.path.join(work, "profile", "user")
+    os.makedirs(user, exist_ok=True)
+    with open(os.path.join(user, "registrymodifications.xcu"), "w") as f:
+        f.write(RECALCULATE_ON_LOAD)
+    return "-env:UserInstallation=file://" + os.path.join(work, "profile")
+
+
+PLANTED_PARTS = {
+    "[Content_Types].xml": '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    '<Default Extension="xml" ContentType="application/xml"/>'
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+    '</Types>',
+    "_rels/.rels": '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+    '</Relationships>',
+    "xl/workbook.xml": '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    "xl/_rels/workbook.xml.rels": '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+    '</Relationships>',
+    "xl/worksheets/sheet1.xml": '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    '<sheetData><row r="1"><c r="A1"><f>1+1</f><v>3</v></c></row></sheetData></worksheet>',
+}
+
+
+def check_recalculates(work, profile):
+    """A file whose stored value is wrong must come back right, or nothing here is evidence."""
+    import zipfile
+    planted = os.path.join(work, "planted.xlsx")
+    with zipfile.ZipFile(planted, "w") as z:
+        for name, text in PLANTED_PARTS.items():
+            z.writestr(name, text)
+    out = convert(planted, "xlsx", os.path.join(work, "planted-out"), profile)
+    if out:
+        got = load_workbook(out, data_only=True)["S"]["A1"].value
+        if norm(got) != 2.0:
+            fail(f"LibreOffice kept the stored value of =1+1 ({got!r}): it is not recalculating on load")
+
+
 def main():
     src = sys.argv[1]
     work = tempfile.mkdtemp()
-    profile = "-env:UserInstallation=file://" + os.path.join(work, "profile")
+    profile = recalculating_profile(work)
+    check_recalculates(work, profile)
     names = sorted(f[:-5] for f in os.listdir(src) if f.endswith(".xlsx"))
     if not names:
         fail("nothing to check in " + src)

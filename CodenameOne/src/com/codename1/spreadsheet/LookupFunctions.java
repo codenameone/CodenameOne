@@ -150,7 +150,10 @@ final class LookupFunctions {
                 Object key = ev.scalar(Evaluator.arg(a, 0));
                 Object[] vector = vector(ev, Evaluator.arg(a, 1));
                 int type = (int) ev.scalarNum(a, 2, 1);
-                int at = find(key, vector, type == 0 ? 0 : type > 0 ? -1 : 1, type == 0, 1);
+                // a sorted list is searched the way the lookups search it: among equal entries the
+                // last one answers, and MATCH(1E+99, list) is the place of the last number
+                int at = find(key, vector, type == 0 ? 0 : type > 0 ? -1 : 1, type == 0,
+                        type == 0 ? 1 : type > 0 ? 2 : -2);
                 if (at < 0) {
                     throw EvalError.NA;
                 }

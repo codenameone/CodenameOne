@@ -47,6 +47,13 @@ final class Cell {
     boolean alwaysDirty;
     /// Written in the file as an array formula: evaluated without implicit intersection.
     boolean arrayFormula;
+    // the format came from a typed formula such as =TODAY(), and goes when the formula does
+    boolean autoFormat;
+    // calls a function this package does not have: the value its file stored stands until
+    // something it reads changes
+    boolean keepsCached;
+    // found to read itself, directly or through others, while it was being calculated
+    boolean circular;
     /// The references the formula names, found when first needed.
     Ref[] refs;
 

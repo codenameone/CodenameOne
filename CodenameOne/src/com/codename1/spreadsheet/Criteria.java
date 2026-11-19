@@ -111,10 +111,12 @@ final class Criteria {
             double x;
             if (v instanceof Double) {
                 x = ((Double) v).doubleValue();
-            } else if (v instanceof String && op == EQ) {
+            } else if (v instanceof String && (op == EQ || op == NE)) {
+                // text that reads as the number is equal to it, and so is not unequal to it:
+                // the two tests are each other's opposite
                 Double parsed = Values.parseNumber((String) v);
                 if (parsed == null) {
-                    return false;
+                    return op == NE;
                 }
                 x = parsed.doubleValue();
             } else {

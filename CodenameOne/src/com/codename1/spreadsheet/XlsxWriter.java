@@ -240,8 +240,8 @@ final class XlsxWriter {
             x.raw("<sheetData/></worksheet>");
             return;
         }
-        int rows = sheet.usedRows();
-        int columns = sheet.usedColumns();
+        int rows = Math.max(sheet.usedRows(), sheet.outlineExtent());
+        int columns = Math.max(sheet.usedColumns(), sheet.widthExtent());
         boolean outline = false;
         for (int r = 0; r < rows && !outline; r++) {
             outline = sheet.getRowOutlineLevel(r) > 0;
@@ -305,7 +305,7 @@ final class XlsxWriter {
                 x.attr("outlineLevel", level);
             }
             x.raw(">");
-            if (any) {
+            if (any && cells != null) {
                 for (int c = 0; c < cells.length; c++) {
                     if (cells[c] != null) {
                         writeCell(x, cells[c], r, c, header && r == 0 ? bold : 0);

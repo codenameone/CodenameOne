@@ -235,8 +235,14 @@ public class CSVWriter {
     /// - `java.io.IOException`: if the writer fails
     public void write(Writer out, String[][] rows) throws IOException {
         writeHeader(out);
-        for (String[] lineItem : rows) {
-            writeRow(out, lineItem);
+        int count = rows.length;
+        // CSVParser.parse answers a last row with no cells for a file that ends in a line
+        // ending, as most do. Written back it would be a blank line more on every round.
+        if (count > 0 && (rows[count - 1] == null || rows[count - 1].length == 0)) {
+            count--;
+        }
+        for (int i = 0; i < count; i++) {
+            writeRow(out, rows[i]);
         }
     }
 
@@ -363,12 +369,25 @@ public class CSVWriter {
         // separators of thousands and decimals, spaces, a percent sign -- is a negative
         // amount, a phone number or a dash, and has nothing to run. Anything else after a
         // sign could be an expression.
-        for (int i = 1; i < value.length(); i++) {
+        int len = value.length();
+        for (int i = 1; i < len; i++) {
             char c = value.charAt(i);
+            if ((c == 'e' || c == 'E') && isDigit(value, i - 1)) {
+                // the exponent of a number written in scientific notation, -1.5e3 or 2E+10
+                int next = i + 1 < len && (value.charAt(i + 1) == '+' || value.charAt(i + 1) == '-') ? i + 2 : i + 1;
+                if (isDigit(value, next)) {
+                    i = next;
+                    continue;
+                }
+            }
             if ((c < '0' || c > '9') && c != '.' && c != ',' && c != ' ' && c != '%') {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean isDigit(String s, int i) {
+        return i >= 0 && i < s.length() && s.charAt(i) >= '0' && s.charAt(i) <= '9';
     }
 }
