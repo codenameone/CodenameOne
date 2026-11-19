@@ -134,7 +134,7 @@ final class OdsReader {
                     }
                 }
             } else if (e == XmlScanner.END) {
-                if (depth == tableDepth) {
+                if (table != null && depth == tableDepth) {
                     // mode 2 is a frozen split; 1 is a split that scrolls, at a pixel position
                     if (modes[0] != 2) {
                         pane[0] = 0;

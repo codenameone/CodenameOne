@@ -1125,6 +1125,36 @@ final class CellFormat {
         return true;
     }
 
+    /// Writes `n/d`, padding each part to its placeholders the way Excel lines fractions up:
+    /// a `?` with no digit is a space, a `0` a zero and a `#` nothing. The numerator pads on
+    /// the left, the denominator on the right.
+    private static void appendFraction(StringBuilder sb, long n, long d, CharSequence numeratorMarks,
+            CharSequence denominatorMarks) {
+        String num = String.valueOf(n);
+        for (int i = 0; i < numeratorMarks.length() - num.length(); i++) {
+            pad(sb, numeratorMarks.charAt(i));
+        }
+        sb.append(num).append('/');
+        String den = String.valueOf(d);
+        sb.append(den);
+        if (denominatorMarks != null) {
+            // a zero written after the digits would read as another digit, so only ? pads here
+            for (int i = den.length(); i < denominatorMarks.length(); i++) {
+                if (denominatorMarks.charAt(i) == '?') {
+                    sb.append(' ');
+                }
+            }
+        }
+    }
+
+    private static void pad(StringBuilder sb, char mark) {
+        if (mark == '?') {
+            sb.append(' ');
+        } else if (mark == '0') {
+            sb.append('0');
+        }
+    }
+
     /// `# ?/?`: a whole part and the closest fraction whose denominator fits the placeholders.
     private static String formatFraction(Section s, double abs, boolean negative) {
         int denominatorDigits = 0;
@@ -1133,17 +1163,24 @@ final class CellFormat {
         boolean pastSlash = false;
         boolean spaceSeen = false;
         int fixedDenominator = 0;
+        StringBuilder wholeMarks = new StringBuilder();
+        StringBuilder numeratorMarks = new StringBuilder();
+        StringBuilder denominatorMarks = new StringBuilder();
         for (int i = 0; i < s.tokens.size(); i++) {
             Token t = s.tokens.get(i);
             if (t.kind == SLASH) {
                 pastSlash = true;
             } else if (t.kind == DIGIT) {
+                char mark = t.text.charAt(t.text.length() - 1);
                 if (pastSlash) {
                     denominatorDigits++;
+                    denominatorMarks.append(mark);
                 } else if (spaceSeen) {
                     numeratorDigits++;
+                    numeratorMarks.append(mark);
                 } else {
                     wholeDigits++;
+                    wholeMarks.append(mark);
                 }
             } else if (t.kind == LITERAL && !pastSlash) {
                 if (" ".equals(t.text) && wholeDigits > 0) {
@@ -1198,10 +1235,10 @@ final class CellFormat {
                 if (sb.length() > 0 && sb.charAt(sb.length() - 1) != '-') {
                     sb.append(' ');
                 }
-                sb.append(bestN).append('/').append(bestD);
+                appendFraction(sb, bestN, bestD, numeratorMarks, fixedDenominator > 0 ? null : denominatorMarks);
             }
         } else {
-            sb.append(bestN).append('/').append(bestD);
+            appendFraction(sb, bestN, bestD, wholeMarks, fixedDenominator > 0 ? null : denominatorMarks);
         }
         for (int i = 0; i < s.tokens.size(); i++) {
             Token t = s.tokens.get(i);

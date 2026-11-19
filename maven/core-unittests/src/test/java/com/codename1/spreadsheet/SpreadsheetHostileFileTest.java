@@ -904,6 +904,27 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void settingsWithAStrayEndTag() throws IOException {
+        // an end tag before any sheet's settings once read the split modes of no sheet
+        Workbook w = Workbook.read(new ByteArrayInputStream(zip("mimetype", "application/vnd.oasis.opendocument.spreadsheet",
+                "content.xml", "<office:document-content" + ODS_NS + "><office:body><office:spreadsheet>"
+                        + "<table:table table:name=\"S\"><table:table-row><table:table-cell office:value-type=\"float\""
+                        + " office:value=\"1\"/></table:table-row></table:table></office:spreadsheet></office:body>"
+                        + "</office:document-content>",
+                "settings.xml", "</a></b><office:document-settings/>")), Workbook.Format.ODS);
+        same(Double.valueOf(1), w.getSheet(0).getCellValue(0, 0), "the cell past broken settings");
+    }
+
+    @Test
+    void fractionsLineUpOnQuestionMarks() {
+        // what LibreOffice answers for TEXT with these formats; Excel pads the same way
+        same("-2  1/3 ", CellFormat.format("# ??/??", Double.valueOf(-2.3333333333), false), "# ??/??");
+        same(" 1/2 ", CellFormat.format("??/??", Double.valueOf(0.5), false), "??/??");
+        same("3  1/10", CellFormat.format("0 ??/??", Double.valueOf(3.1), false), "0 ??/??");
+        same("1/4", CellFormat.format("#/#", Double.valueOf(0.25), false), "#/#");
+    }
+
+    @Test
     void countsOverEveryArea() {
         Workbook w = new Workbook();
         Sheet s = w.addSheet("S");
