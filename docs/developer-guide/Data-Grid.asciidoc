@@ -578,6 +578,10 @@ A few things work differently from Excel:
   cells: a formula that needs the whole array wraps the call that makes it, as
   in `=SUM(SEQUENCE(3))`. An array formula a file brings that fills several
   cells, as one entered in Excel with Ctrl+Shift+Enter, keeps filling them.
+  Excel refuses to change part of such an array; here, editing one of its
+  cells, or inserting or removing rows or columns through it, ends the array.
+  The formula keeps its own cell and the other cells keep the values they
+  showed. Replacing or clearing the formula clears them, as in Excel.
 * A range given where one value is wanted is taken whole, as Excel 365 takes
   it: `=SUM(ABS(A1:A3))` adds all three. Older spreadsheet applications take
   the cell in the formula's own row instead, so the writers save such a

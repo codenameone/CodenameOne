@@ -189,6 +189,11 @@ public final class Workbook {
             int rows = Math.min(at[2], Node.MAX_ROW + 1 - at[0]);
             int cols = Math.min(at[3], Node.MAX_COL + 1 - at[1]);
             allocated((long) rows * cols);
+            if (!spanFree(sheet, at[0], at[1], rows, cols)) {
+                // a span over another formula or another array: no file Excel writes, and
+                // written back it would be one Excel refuses; the formula keeps its own cell
+                continue;
+            }
             anchor.arrayRows = rows;
             anchor.arrayCols = cols;
             for (int r = 0; r < rows; r++) {
@@ -204,6 +209,21 @@ public final class Workbook {
             }
         }
         arraySpans = null;
+    }
+
+    private static boolean spanFree(Sheet sheet, int row, int col, int rows, int cols) {
+        for (int r = 0; r < rows && row + r < sheet.usedRows(); r++) {
+            for (int c = 0; c < cols; c++) {
+                if (r == 0 && c == 0) {
+                    continue;
+                }
+                Cell m = sheet.cell(row + r, col + c);
+                if (m != null && (m.formula != null || m.formulaText != null || m.arrayAnchor != null)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /// Hands the elements of an array formula's result to the other cells it fills.

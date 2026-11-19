@@ -998,7 +998,8 @@ class SpreadsheetHostileFileTest extends UITestBase {
         }
         String[][] lifted = {
             {"=SUM(VLOOKUP(A1:A3,A1:A3,1,0))", "6"}, {"=SUM(MATCH(A1:A3,A1:A3,0))", "6"},
-            {"=SUM(COUNTIF(A1:A3,A1:A3))", "3"}, {"=SUM(CHOOSE({1,2},10,20))", "30"}, {"=SUM(INDEX(A1:A3,{1,2}))", "3"},
+            {"=SUM(COUNTIF(A1:A3,A1:A3))", "3"}, {"=SUM(CHOOSE({1,2},{1;2;3},{4;5;6}))", "21"},
+            {"=SUM(IFS(A1:A3>1,A1:A3,TRUE,0))", "5"}, {"=SUM(SWITCH(A1:A3,2,10,0))", "10"}, {"=SUM(CHOOSE({1,2},10,20))", "30"}, {"=SUM(INDEX(A1:A3,{1,2}))", "3"},
         };
         for (int i = 0; i < lifted.length; i++) {
             lk.setCellFormula(10, i, lifted[i][0]);
@@ -1030,6 +1031,28 @@ class SpreadsheetHostileFileTest extends UITestBase {
             if (new String(unzip(o.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8").indexOf("ref=\"A1:A3\"") < 0) {
                 wrong.append("\n").append(f).append(": the array formula no longer fills A1:A3");
             }
+        }
+        // editing the array: a filled cell ends it, clearing the formula clears what it filled
+        Sheet ed = Workbook.read(new ByteArrayInputStream(spanned), Workbook.Format.XLSX).getSheet(0);
+        ed.setCellValue(1, 0, "mine");
+        ed.setCellValue(0, 1, Double.valueOf(7));
+        same("mine", ed.getCellValue(1, 0), "an edited filled cell keeps its value");
+        same(Double.valueOf(14), ed.getCellValue(0, 0), "the formula keeps its own cell");
+        ByteArrayOutputStream eo = new ByteArrayOutputStream();
+        ed.getWorkbook().write(eo, Workbook.Format.XLSX);
+        if (new String(unzip(eo.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8").indexOf("ref=\"A1:A3\"") >= 0) {
+            wrong.append("\nan array edited in part is still written whole");
+        }
+        Sheet cl = Workbook.read(new ByteArrayInputStream(spanned), Workbook.Format.XLSX).getSheet(0);
+        cl.getCellValue(2, 0);
+        cl.setCellValue(0, 0, null);
+        same(null, cl.getCellValue(2, 0), "clearing the formula clears what it filled");
+        Sheet cut = Workbook.read(new ByteArrayInputStream(spanned), Workbook.Format.XLSX).getSheet(0);
+        cut.insertRows(1, 1);
+        ByteArrayOutputStream co = new ByteArrayOutputStream();
+        cut.getWorkbook().write(co, Workbook.Format.XLSX);
+        if (new String(unzip(co.toByteArray(), "xl/worksheets/sheet1.xml"), "UTF-8").indexOf("ref=\"A1:A3\"") >= 0) {
+            wrong.append("\nrows inserted through an array leave its old span");
         }
         Workbook leap = new Workbook();
         Sheet ls = leap.addSheet("D");

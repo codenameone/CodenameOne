@@ -159,12 +159,14 @@ public final class Sheet extends AbstractTableModel {
         if (value == null) {
             Cell old = cell(row, col);
             if (old != null) {
+                dissolveArray(old);
                 old.value = null;
                 clearFormula(old);
             }
             return;
         }
         Cell c = ensure(row, col);
+        dissolveArray(c);
         clearFormula(c);
         if (value instanceof Date) {
             double serial = workbook.toSerial((Date) value);
@@ -188,6 +190,60 @@ public final class Sheet extends AbstractTableModel {
             c.value = value;
         } else {
             c.value = value.toString();
+        }
+    }
+
+    /// An edit of a cell an array formula of several cells fills, or of the cell holding it,
+    /// ends the array, which Excel would refuse to edit in part. Replacing or clearing the
+    /// formula clears the cells it filled, as in Excel; editing one of the filled cells leaves
+    /// the formula in its own cell only and the other cells holding the values they showed.
+    private void dissolveArray(Cell c) {
+        if (c.isArrayMember()) {
+            dissolve(c.arrayAnchor, false);
+        } else if (c.formula != null && c.arrayFormula && c.arrayRows * c.arrayCols > 1) {
+            dissolve(c, true);
+        }
+    }
+
+    private void dissolve(Cell anchor, boolean clear) {
+        int rows = anchor.arrayRows;
+        int cols = anchor.arrayCols;
+        anchor.arrayRows = 1;
+        anchor.arrayCols = 1;
+        for (int r = 0; r < rows; r++) {
+            for (int k = 0; k < cols; k++) {
+                Cell m = r == 0 && k == 0 ? null : cell(anchor.row + r, anchor.col + k);
+                if (m == null || m.arrayAnchor != anchor) { //NOPMD CompareObjectsWithEquals - a cell is an identity
+                    continue;
+                }
+                m.arrayAnchor = null;
+                if (clear) {
+                    m.value = null;
+                    workbook.cellChanged(this, m.row, m.col);
+                }
+            }
+        }
+    }
+
+    /// Ends every array formula of several cells that an insertion or removal of rows or
+    /// columns would cut through, keeping the values its cells show; one moved whole stays.
+    private void dissolveCrossed(boolean byRow, int at, int count, boolean insert) {
+        for (int r = 0; r < usedRows(); r++) {
+            Cell[] cells = rowCells(r);
+            if (cells == null) {
+                continue;
+            }
+            for (Cell c : cells) {
+                if (c == null || c.formula == null || !c.arrayFormula || c.arrayRows * c.arrayCols <= 1) {
+                    continue;
+                }
+                int first = byRow ? c.row : c.col;
+                int last = first + (byRow ? c.arrayRows : c.arrayCols) - 1;
+                boolean crossed = insert ? at > first && at <= last : at <= last && at + count - 1 >= first;
+                if (crossed) {
+                    dissolve(c, false);
+                }
+            }
         }
     }
 
@@ -268,6 +324,7 @@ public final class Sheet extends AbstractTableModel {
     /// leaves a marker here that it replaces when it has read the rest of the file.
     void storeRaw(int row, int col, Object value) {
         Cell c = ensure(row, col);
+        dissolveArray(c);
         clearFormula(c);
         c.value = value;
     }
@@ -422,6 +479,7 @@ public final class Sheet extends AbstractTableModel {
 
     private void putFormula(int row, int column, String text, Node node) {
         Cell c = ensure(row, column);
+        dissolveArray(c);
         clearFormula(c);
         c.formula = node;
         c.formulaText = text;
@@ -787,6 +845,7 @@ public final class Sheet extends AbstractTableModel {
         if (count <= 0 || row < 0 || row > Node.MAX_ROW) {
             return;
         }
+        dissolveCrossed(true, row, count, true);
         // no more than reach the edge of the grid, so that no position overflows
         count = Math.min(count, Node.MAX_ROW + 1 - row);
         if (row < rows.size()) {
@@ -831,6 +890,7 @@ public final class Sheet extends AbstractTableModel {
         if (count <= 0 || row < 0 || row > Node.MAX_ROW) {
             return;
         }
+        dissolveCrossed(true, row, count, false);
         // no more than reach the edge of the grid, so that no position overflows
         count = Math.min(count, Node.MAX_ROW + 1 - row);
         for (int i = 0; i < count && row < rows.size(); i++) {
@@ -861,6 +921,7 @@ public final class Sheet extends AbstractTableModel {
         if (count <= 0 || column < 0 || column > Node.MAX_COL) {
             return;
         }
+        dissolveCrossed(false, column, count, true);
         // no more than reach the edge of the grid, so that no position overflows
         count = Math.min(count, Node.MAX_COL + 1 - column);
         if (column < usedColumns && (long) usedColumns - 1 + count > Node.MAX_COL) {
@@ -908,6 +969,7 @@ public final class Sheet extends AbstractTableModel {
         if (count <= 0 || column < 0 || column > Node.MAX_COL) {
             return;
         }
+        dissolveCrossed(false, column, count, false);
         // no more than reach the edge of the grid, so that no position overflows
         count = Math.min(count, Node.MAX_COL + 1 - column);
         // the cells go only as far as the data, but references move by the whole count

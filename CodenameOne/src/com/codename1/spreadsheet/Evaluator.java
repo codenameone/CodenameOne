@@ -639,7 +639,10 @@ final class Evaluator {
             }
             case 3: // IFS
                 for (int i = 0; i + 1 < a.length; i += 2) {
-                    Object cond = scalar(eval(a[i]));
+                    Object cond = operand(eval(a[i]));
+                    if (cond instanceof Object[][]) {
+                        return perElement(3, a);
+                    }
                     if (cond instanceof CellError) {
                         return cond;
                     }
@@ -652,13 +655,19 @@ final class Evaluator {
                 if (a.length < 3) {
                     return CellError.VALUE;
                 }
-                Object subject = scalar(eval(a[0]));
+                Object subject = operand(eval(a[0]));
+                if (subject instanceof Object[][]) {
+                    return perElement(4, a);
+                }
                 if (subject instanceof CellError) {
                     return subject;
                 }
                 int i = 1;
                 for (; i + 1 < a.length; i += 2) {
-                    Object candidate = scalar(eval(a[i]));
+                    Object candidate = operand(eval(a[i]));
+                    if (candidate instanceof Object[][]) {
+                        return perElement(4, a);
+                    }
                     if (candidate instanceof CellError) {
                         return candidate;
                     }
@@ -674,19 +683,7 @@ final class Evaluator {
                 }
                 Object first = operand(eval(a[0]));
                 if (first instanceof Object[][]) {
-                    // an array of choices: one per element, as Excel 365 answers
-                    Object[][] m = (Object[][]) first;
-                    spread = true;
-                    Object[][] out = new Object[m.length][width(m)];
-                    for (int r = 0; r < m.length; r++) {
-                        for (int c = 0; c < out[r].length; c++) {
-                            Object e = m[r][c];
-                            int k = e instanceof CellError ? -1 : (int) Math.floor(Values.num(e));
-                            out[r][c] = e instanceof CellError ? e : k < 1 || k >= a.length ? CellError.VALUE
-                                    : scalar(operand(eval(a[k])));
-                        }
-                    }
-                    return out;
+                    return perElement(5, a);
                 }
                 Object index = first;
                 if (index instanceof CellError) {
@@ -832,6 +829,73 @@ final class Evaluator {
 
     /// One value out of whatever an argument evaluated to: the cell of a single cell
     /// reference, the first element of an array or a range.
+    /// IFS (3), SWITCH (4) or CHOOSE (5) answered once per element when one of the values
+    /// it decides on is an array, as Excel 365 answers: every argument is evaluated, and an
+    /// argument that is an array gives each position its own element.
+    private Object perElement(int kind, Node[] a) {
+        spread = true;
+        Object[] v = new Object[a.length];
+        int rows = 1;
+        int cols = 1;
+        for (int i = 0; i < a.length; i++) {
+            v[i] = operand(eval(a[i]));
+            if (v[i] instanceof Object[][]) {
+                Object[][] m = (Object[][]) v[i];
+                rows = Math.max(rows, m.length);
+                cols = Math.max(cols, width(m));
+            }
+        }
+        Object[][] out = new Object[rows][cols];
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                out[r][c] = decide(kind, v, r, c);
+            }
+        }
+        return out;
+    }
+
+    private static Object at(Object v, int r, int c) {
+        return v instanceof Object[][] ? element((Object[][]) v, r, c) : v;
+    }
+
+    private static Object decide(int kind, Object[] v, int r, int c) {
+        if (kind == 3) {
+            for (int i = 0; i + 1 < v.length; i += 2) {
+                Object cond = at(v[i], r, c);
+                if (cond instanceof CellError) {
+                    return cond;
+                }
+                if (Values.bool(cond)) {
+                    return at(v[i + 1], r, c);
+                }
+            }
+            return CellError.NA;
+        }
+        if (kind == 4) {
+            Object subject = at(v[0], r, c);
+            if (subject instanceof CellError) {
+                return subject;
+            }
+            int i = 1;
+            for (; i + 1 < v.length; i += 2) {
+                Object candidate = at(v[i], r, c);
+                if (candidate instanceof CellError) {
+                    return candidate;
+                }
+                if (Values.compare(subject, candidate) == 0) {
+                    return at(v[i + 1], r, c);
+                }
+            }
+            return i < v.length ? at(v[i], r, c) : CellError.NA;
+        }
+        Object index = at(v[0], r, c);
+        if (index instanceof CellError) {
+            return index;
+        }
+        int k = (int) Math.floor(Values.num(index));
+        return k < 1 || k >= v.length ? CellError.VALUE : at(v[k], r, c);
+    }
+
     /// Notes that the formula took an array where one value is wanted.
     void spreads() {
         spread = true;
