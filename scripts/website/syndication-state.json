@@ -3436,6 +3436,18 @@
         "url": "https://dev.to/codenameone/port-your-spring-code-with-fewer-edits-and-libraries-that-bring-their-own-server-207p",
         "syndicated_at": "2026-11-18T14:29:49+00:00"
       }
+    },
+    "debug-dart-in-a-java-debugger": {
+      "hashnode": {
+        "url": "https://debugagent.com/debug-your-dart-in-a-java-debugger-and-jfx-central-on-a-phone",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6afe4a1f1e9032bc86167d06",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-19T01:01:10+00:00"
+      }
     }
   }
 }
