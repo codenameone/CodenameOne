@@ -20,6 +20,12 @@
             <artifactId>codenameone-core</artifactId>
 
         </dependency>
+        <!-- Unit tests for the port's pure-Java helpers (no Android runtime). -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
        
         
     </dependencies>
@@ -27,6 +33,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>6</maven.compiler.source>
         <maven.compiler.target>6</maven.compiler.target>
+        <maven.compiler.testSource>1.8</maven.compiler.testSource>
+        <maven.compiler.testTarget>1.8</maven.compiler.testTarget>
         <src.dir>src/main/java</src.dir>
         <real.src.dir>../../Ports/Android/src</real.src.dir>
         <codename1.src.dir>../../CodenameOne/src</codename1.src.dir>
