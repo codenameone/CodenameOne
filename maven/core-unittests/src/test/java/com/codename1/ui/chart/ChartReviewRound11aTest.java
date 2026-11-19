@@ -196,14 +196,14 @@ public class ChartReviewRound11aTest extends UITestBase {
         assertTrue(w.isTotal(1), "the total moved with its bar");
         assertFalse(w.isTotal(2));
         assertTrue(w.isTotal(3));
-        assertEquals(5, w.getY(1), 0, "the total is the sum of what is left");
-        assertEquals(8, w.getY(3), 0);
+        assertEquals(15, w.getY(1), 0, "the total keeps the rows that slid off");
+        assertEquals(18, w.getY(3), 0);
         w.add(4, 1);
         assertTrue(w.isTotal(0), "slid one more place");
         assertFalse(w.isTotal(3), "an added step is not a total");
-        assertEquals(0, w.getBase(1), 0, "a step after a total starts from zero again");
-        assertEquals(3, w.getY(2), 0, "the total after the slide sums what is left");
-        assertEquals(3, w.getBase(3), 0);
+        assertEquals(15, w.getBase(1), 0, "a step after a total starts on it");
+        assertEquals(18, w.getY(2), 0, "the total after the slide is the real cumulative sum");
+        assertEquals(18, w.getBase(3), 0);
     }
 
     @FormTest

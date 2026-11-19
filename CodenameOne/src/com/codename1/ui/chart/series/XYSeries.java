@@ -262,12 +262,18 @@ public abstract class XYSeries extends Series {
 
     // the first row of `n` that new data keeps: with setMaxPoints only the newest rows stay, as
     // they would had the rows arrived one at a time through add()
-    private int keptFrom(int n) {
+    int keptFrom(int n) {
         return maxPoints > 0 && n > maxPoints ? n - maxPoints : 0;
+    }
+
+    // called with the series still intact, before its first n rows drop off the front (a slide or
+    // a setMaxPoints trim), for a series whose values depend on the rows before them
+    void rowsDropping(int n) {
     }
 
     private void slide() {
         if (maxPoints > 0 && count >= maxPoints) {
+            rowsDropping(1);
             dropFromSlot(0);
             System.arraycopy(xs, 1, xs, 0, count - 1);
             System.arraycopy(ys, 1, ys, 0, count - 1);
@@ -385,6 +391,7 @@ public abstract class XYSeries extends Series {
             int drop = count - n;
             // the dropped rows leave their slots exactly as slide() does, so an unsorted series
             // still tweens each remaining point from its own old value
+            rowsDropping(drop);
             dropFromSlots(0, drop);
             System.arraycopy(xs, drop, xs, 0, n);
             System.arraycopy(ys, drop, ys, 0, n);

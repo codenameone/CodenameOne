@@ -545,7 +545,16 @@ public class Chart extends Component {
         // a series that lays its points out while painting (pie, treemap, sunburst, Sankey)
         // knows a point only after a paint, and a point just added only after the next one:
         // such a selection is kept and applied right after the series paint
+        // an index the series can never have (or a series of another chart) is ignored, as
+        // before; anything else replaces the old point even when it must wait for a paint
+        if (lastContext != null && (s.chart != this || index < 0 || index >= s.getPointCount())) { //NOPMD CompareObjectsWithEquals - identity of the owning chart is intended
+            repaint();
+            return this;
+        }
         if (lastContext == null || !selectQuietly(s, index)) {
+            // leaving the old point selected (with its highlight and tooltip) while the new one
+            // waits would show a selection the caller just replaced
+            selected = null;
             pendingSelection = s;
             pendingSelectionIndex = index;
         }
@@ -1189,9 +1198,10 @@ public class Chart extends Component {
             }
         }
         g.setClip(clip);
-        // after the series paint, so a layout-driven series has laid out the point; one
-        // attempt only, a point that still does not exist is dropped
-        if (pendingSelection != null) {
+        // after the series paint, so a layout-driven series has laid out the point. A series
+        // not painted this time (hidden or faded out) keeps its selection waiting until it is;
+        // one that painted gets one attempt, and a point that still does not exist is dropped
+        if (pendingSelection != null && pendingSelection.visibility > 0) {
             Series ps = pendingSelection;
             pendingSelection = null;
             selectQuietly(ps, pendingSelectionIndex);

@@ -28,6 +28,7 @@ import com.codename1.ui.chart.ChartContext;
 import com.codename1.ui.chart.ChartPoint;
 import com.codename1.ui.chart.ColorScale;
 import com.codename1.ui.chart.Series;
+import com.codename1.ui.chart.axis.LogAxis;
 
 /// A heatmap: a grid of cells coloured by value. Column `c` sits at x = c and row `r` at y = r,
 /// so pair it with a `CategoryAxis` on each axis to name the columns and rows.
@@ -377,9 +378,34 @@ public class HeatmapSeries extends Series {
         double vx = ctx.screenX(this, 0, 1) - ox;
         double vy = ctx.screenY(this, 0, 1) - oy;
         double det = ux * vy - uy * vx;
-        if (!(Math.abs(det) > 0)) { //NOPMD LogicInversion - also true for NaN
-            return null;
+        float[] b = new float[4];
+        // a finite, non-degenerate system answers a linear grid; on a log axis cell 0 sits at
+        // minus infinity and the grid is not affine at all, so a miss there scans what is visible
+        if (Math.abs(det) > 0 && !Double.isInfinite(det)) {
+            ChartPoint p = hitNear(ctx, ax, ay, ox, oy, ux, uy, vx, vy, det, b);
+            if (p != null) {
+                return p;
+            }
+            if (!(ctx.getXAxis() instanceof LogAxis) && !(ctx.getValueAxis(this) instanceof LogAxis)) {
+                return null;
+            }
         }
+        int[] range = new int[4];
+        visibleCells(ctx.getXAxis(), getColumns(), range, 0);
+        visibleCells(ctx.getValueAxis(this), matrix.length, range, 2);
+        for (int r = range[2]; r <= range[3] && r < matrix.length; r++) {
+            for (int c = range[0]; c <= range[1] && c < matrix[r].length; c++) {
+                if (inCell(ctx, ax, ay, r, c, b)) {
+                    return getPoint(ctx, cellId(r, c));
+                }
+            }
+        }
+        return null;
+    }
+
+    // the cell under the point by the affine solve, checking it and its neighbours exactly
+    private ChartPoint hitNear(ChartContext ctx, float ax, float ay, double ox, double oy, double ux, double uy,
+            double vx, double vy, double det, float[] b) {
         double dx = ax - ox;
         double dy = ay - oy;
         double fc = (dx * vy - dy * vx) / det;
@@ -389,16 +415,19 @@ public class HeatmapSeries extends Series {
         }
         int c0 = (int) Math.floor(fc + 0.5);
         int r0 = (int) Math.floor(fr + 0.5);
-        float[] b = new float[4];
         for (int r = Math.max(0, r0 - 1); r <= r0 + 1 && r < matrix.length; r++) {
             for (int c = Math.max(0, c0 - 1); c <= c0 + 1 && c < matrix[r].length; c++) {
-                cell(ctx, r, c, b);
-                if (ax >= b[0] && ax <= b[0] + b[2] && ay >= b[1] && ay <= b[1] + b[3] && !isGap(matrix[r][c])) {
+                if (inCell(ctx, ax, ay, r, c, b)) {
                     return getPoint(ctx, cellId(r, c));
                 }
             }
         }
         return null;
+    }
+
+    private boolean inCell(ChartContext ctx, float ax, float ay, int r, int c, float[] b) {
+        cell(ctx, r, c, b);
+        return ax >= b[0] && ax <= b[0] + b[2] && ay >= b[1] && ay <= b[1] + b[3] && !isGap(matrix[r][c]);
     }
 
     @Override

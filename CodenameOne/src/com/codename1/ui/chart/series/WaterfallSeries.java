@@ -45,6 +45,8 @@ public class WaterfallSeries extends BarSeries {
     // parallel array) so every row mutation -- a slide, a setMaxPoints trim, a removed or replaced
     // row -- moves the flag with its bar
     private static final int TOTAL = 1;
+    // the running total of the rows that dropped off the front, which the first kept row starts on
+    private double baseOffset;
     private boolean connectors = true;
 
     /// Creates an empty series.
@@ -78,6 +80,7 @@ public class WaterfallSeries extends BarSeries {
             y[i] = deltas[i];
         }
         // the bases and totals are filled in by dataChanged, which every change goes through
+        baseOffset = prefixRun(y, total, keptFrom(n));
         setRows(null, y, new double[][]{base, total});
         return this;
     }
@@ -93,6 +96,7 @@ public class WaterfallSeries extends BarSeries {
         for (int i = 0; i < n; i++) {
             total[i] = isTotal(i) ? 1 : 0;
         }
+        baseOffset = prefixRun(y, total, keptFrom(n));
         setRows(x, y, new double[][]{base, total});
         return this;
     }
@@ -101,7 +105,10 @@ public class WaterfallSeries extends BarSeries {
     /// joined. A NaN delta is a gap: its bar is not drawn and the running total carries past it.
     @Override
     protected void dataChanged() {
-        double run = 0;
+        if (count == 0) {
+            baseOffset = 0;
+        }
+        double run = baseOffset;
         double[] base = aux[0];
         for (int i = 0; i < count; i++) {
             if (isTotal(i)) {
@@ -118,6 +125,36 @@ public class WaterfallSeries extends BarSeries {
             }
         }
         super.dataChanged();
+    }
+
+    // the running total the first `n` rows add up to, starting from zero
+    private static double prefixRun(double[] deltas, double[] total, int n) {
+        double run = 0;
+        for (int i = 0; i < n; i++) {
+            double d = deltas[i];
+            if (total[i] == 0 && !Double.isNaN(d) && !Double.isInfinite(d)) {
+                run += d;
+            }
+        }
+        return run;
+    }
+
+    // rows leaving the front take their share of the running total into the offset, so a slide or
+    // a setMaxPoints trim does not re-base every remaining bar at zero
+    @Override
+    void rowsDropping(int n) {
+        double[] total = aux[TOTAL];
+        int end = Math.min(n, count);
+        for (int i = 0; i < end; i++) {
+            if (total[i] != 0) {
+                // a total row shows the run so far and adds nothing to it
+                continue;
+            }
+            double d = ys[i];
+            if (!Double.isNaN(d) && !Double.isInfinite(d)) {
+                baseOffset += d;
+            }
+        }
     }
 
     /// Shows or hides the thin lines joining each bar's end to the next bar's start.

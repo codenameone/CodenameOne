@@ -32,6 +32,7 @@ package com.codename1.ui.chart.series;
 ///
 /// ```java
 /// int[] keep = Downsample.lttb(x, y, 2000);
+/// // pick(x, keep) is the kept indices when x is null, so the points keep their positions
 /// series.setData(Downsample.pick(x, keep), Downsample.pick(y, keep));
 /// ```
 public final class Downsample {
@@ -159,7 +160,8 @@ public final class Downsample {
     ///
     /// #### Parameters
     ///
-    /// - `values`: the full array; null gives null, for an index based x
+    /// - `values`: the full array; null stands for an index based x, so the result is the kept
+    ///   indices themselves as doubles and the points keep their original x positions
     ///
     /// - `indices`: what `lttb` returned
     ///
@@ -167,12 +169,9 @@ public final class Downsample {
     ///
     /// a new array of the picked values
     public static double[] pick(double[] values, int[] indices) {
-        if (values == null) {
-            return null; //NOPMD ReturnEmptyCollectionRatherThanNull - null x means index based x, as in setData
-        }
         double[] out = new double[indices.length];
         for (int i = 0; i < indices.length; i++) {
-            out[i] = values[indices[i]];
+            out[i] = values == null ? indices[i] : values[indices[i]];
         }
         return out;
     }

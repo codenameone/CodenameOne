@@ -124,14 +124,19 @@ public class RadarSeries extends Series {
         return new String[values.length];
     }
 
-    // the number of spokes of the grid every radar of the chart is drawn on: the shared spoke
-    // names when any series names them, otherwise the longest series. A value past it has no
-    // spoke and is ignored, and a spoke past a series' values is a gap in its polygon
+    // the number of spokes of the grid every radar of the chart is drawn on, one number for the
+    // whole chart: the grid owner's (the first radar painted at all, which draws the grid) spoke
+    // names, else any series' names, else the longest series. A value past it has no spoke and
+    // is ignored, and a series with fewer values than spokes is an open line over those it has
     private int spokeCount() {
-        if (spokes != null && spokes.length > 0) {
-            return spokes.length;
-        }
         java.util.ArrayList<Series> rs = radars();
+        RadarSeries owner = gridOwner(rs);
+        if (owner == null) {
+            owner = this;
+        }
+        if (owner.spokes != null && owner.spokes.length > 0) {
+            return owner.spokes.length;
+        }
         int longest = values.length;
         for (int k = 0; k < rs.size(); k++) {
             RadarSeries r = (RadarSeries) rs.get(k);
@@ -141,6 +146,18 @@ public class RadarSeries extends Series {
             longest = Math.max(longest, r.values.length);
         }
         return longest;
+    }
+
+    // the radar that draws the grid: the first one painted at all. A hidden first radar is never
+    // painted, so keying on the first in the list would lose the grid
+    private static RadarSeries gridOwner(java.util.ArrayList<Series> rs) {
+        for (int k = 0; k < rs.size(); k++) {
+            RadarSeries candidate = (RadarSeries) rs.get(k);
+            if (candidate.getVisibilityFraction() > 0) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private java.util.ArrayList<Series> radars() {
@@ -259,17 +276,7 @@ public class RadarSeries extends Series {
         lastCy = cy;
         lastR = r;
         lastMax = top;
-        // The grid belongs to the first radar that is painted at all: a hidden
-        // first radar is never painted, so keying on rs.get(0) lost the grid.
-        RadarSeries gridOwner = null;
-        for (int k = 0; k < rs.size(); k++) {
-            RadarSeries candidate = (RadarSeries) rs.get(k);
-            if (candidate.getVisibilityFraction() > 0) {
-                gridOwner = candidate;
-                break;
-            }
-        }
-        boolean first = gridOwner == this; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+        boolean first = gridOwner(rs) == this; //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
         if (first) {
             g.setColor(ctx.getTheme().getGridColor());
             for (int rk = 1; rk <= MAX_RINGS && rk * step <= top + step * 1e-6; rk++) {
@@ -334,12 +341,20 @@ public class RadarSeries extends Series {
                 poly.lineTo(Shapes.px(cx, rr, a), Shapes.py(cy, rr, a));
             }
         }
-        poly.closePath();
+        // a series with a value for every spoke is a closed, filled polygon; one with fewer is an
+        // open line over the spokes it has, since a closing chord would cross spokes it has no
+        // value on
+        boolean closed = m == n;
+        if (closed) {
+            poly.closePath();
+        }
         int alpha = g.getAlpha();
         float vis = getVisibilityFraction();
         g.setColor(getColor());
-        g.setAlpha((int) (alpha * vis * fillAlpha));
-        g.fillShape(poly);
+        if (closed) {
+            g.setAlpha((int) (alpha * vis * fillAlpha));
+            g.fillShape(poly);
+        }
         g.setAlpha((int) (alpha * vis));
         g.drawShape(poly, new Stroke(Math.max(1, ctx.mm(0.5f)), Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 1));
         g.setAlpha(alpha);
