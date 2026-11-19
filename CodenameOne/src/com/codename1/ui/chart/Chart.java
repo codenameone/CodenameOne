@@ -34,6 +34,7 @@ import com.codename1.ui.chart.axis.Axis;
 import com.codename1.ui.chart.axis.CategoryAxis;
 import com.codename1.ui.chart.axis.NumberAxis;
 import com.codename1.ui.chart.layout.LabelLayout;
+import com.codename1.ui.chart.series.ScatterSeries;
 import com.codename1.ui.chart.series.XYSeries;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
@@ -774,6 +775,7 @@ public class Chart extends Component {
         for (Series s : series) {
             s.visibility = s.isVisible() ? 1 : 0;
             s.visFrom = s.visibility;
+            s.transitionEnded();
         }
     }
 
@@ -1512,7 +1514,8 @@ public class Chart extends Component {
         int anchorY;
         if (tooltipMode == TOOLTIP_SHARED && sharedX == sharedX && hasCartesian()) {
             for (Series s : series) {
-                if (s.isVisible() && s instanceof XYSeries) {
+                // scatter points are not aligned by x with other series (see its getPointCount)
+                if (s.isVisible() && s instanceof XYSeries && !(s instanceof ScatterSeries)) {
                     int i = indexAtX((XYSeries) s, sharedX);
                     ChartPoint cp = i < 0 ? null : s.getPoint(ctx, i);
                     if (cp != null) {
@@ -1789,7 +1792,7 @@ public class Chart extends Component {
         double bestX = Double.NaN;
         int bestD = Integer.MAX_VALUE;
         for (Series candidate : series) {
-            if (!candidate.isVisible() || !(candidate instanceof XYSeries)) {
+            if (!candidate.isVisible() || !(candidate instanceof XYSeries) || candidate instanceof ScatterSeries) {
                 continue;
             }
             XYSeries xs = (XYSeries) candidate;
@@ -1828,7 +1831,9 @@ public class Chart extends Component {
         if (i < 0) {
             return -1;
         }
-        double tol = 1e-9 * Math.max(1, Math.abs(x));
+        // relative to the series' own spacing, not to x: on epoch milliseconds 1e-9 * |x| is a
+        // millisecond or more, which would match a neighbouring sample of dense data
+        double tol = 1e-6 * s.getMinXSpacing();
         return Math.abs(s.getX(i) - x) <= tol ? i : -1;
     }
 

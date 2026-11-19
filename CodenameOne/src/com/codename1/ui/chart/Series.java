@@ -111,6 +111,10 @@ public abstract class Series {
 
     /// Plots the series against the secondary (right) value axis.
     public Series setSecondaryAxis(boolean secondaryAxis) {
+        if (chart != null) {
+            // snapshot first, or the transition replays whatever an earlier one captured
+            chart.beginChange();
+        }
         this.secondaryAxis = secondaryAxis;
         dataChanged();
         return this;
@@ -245,6 +249,12 @@ public abstract class Series {
 
     /// Records a zero baseline as the start of the entry animation.
     protected void captureEntryStart() {
+    }
+
+    /// Called by the chart when a transition has finished, so a subclass can drop the start
+    /// values it captured; a later change that forgot to snapshot then shows its new values
+    /// instead of replaying a transition from long gone data.
+    protected void transitionEnded() {
     }
 
     /// Formats a value for a label or tooltip.

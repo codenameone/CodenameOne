@@ -129,7 +129,10 @@ public class ScatterSeries extends XYSeries {
     }
 
     private int diameter(ChartContext ctx, int i, double maxSize) {
-        double s = aux[0][i];
+        return diameterOf(ctx, aux[0][i], maxSize);
+    }
+
+    private int diameterOf(ChartContext ctx, double s, double maxSize) {
         if (!bubbles || !(maxSize > 0) || isGap(s)) { //NOPMD LogicInversion - also true for a NaN max
             return Math.max(3, ctx.mm(pointMm));
         }
@@ -188,7 +191,9 @@ public class ScatterSeries extends XYSeries {
             if (isGap(v)) {
                 continue;
             }
-            int d = (int) (diameter(ctx, i, ms) * Math.min(1, ctx.getProgress() * 1.5f + (bubbles ? 0 : 1)));
+            // the size channel animates per point like the value: a bubble grows from nothing only
+            // on the series' entry, and a change elsewhere leaves every other bubble's size alone
+            int d = diameterOf(ctx, bubbles ? animatedAux(ctx, 0, i) : aux[0][i], ms);
             int sx = (int) ctx.screenX(this, xs[i], v);
             int sy = (int) ctx.screenY(this, xs[i], v);
             if (dedupe) {

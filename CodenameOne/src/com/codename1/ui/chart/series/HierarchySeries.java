@@ -73,6 +73,9 @@ public abstract class HierarchySeries extends Series {
     ///
     /// this series
     public HierarchySeries setRoot(TreeNode root) {
+        if (getChart() != null) {
+            getChart().beginChange();
+        }
         this.root = root;
         this.current = root;
         dataChanged();

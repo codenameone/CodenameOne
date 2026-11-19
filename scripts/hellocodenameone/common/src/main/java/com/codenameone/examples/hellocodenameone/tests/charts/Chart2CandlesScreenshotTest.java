@@ -28,6 +28,8 @@ import com.codename1.ui.chart.axis.Axis;
 import com.codename1.ui.chart.axis.SessionTimeAxis;
 import com.codename1.ui.chart.indicator.Indicators;
 import com.codename1.ui.chart.series.CandlestickSeries;
+import java.util.Calendar;
+import java.util.Date;
 
 /// Forty candlesticks on a session time axis that skips weekends, with a 10-period SMA.
 public class Chart2CandlesScreenshotTest extends AbstractChart2ScreenshotTest {
@@ -42,11 +44,23 @@ public class Chart2CandlesScreenshotTest extends AbstractChart2ScreenshotTest {
         double[] l = new double[n];
         double[] cl = new double[n];
         double p = 100;
+        // noon of Thursday 2 January 2025 in the device's OWN zone: the axis formats and places
+        // ticks in the default zone and takes none of its own, so a fixed UTC instant lands on
+        // another calendar day east of UTC+11 or west of UTC-11. Local noon is that day in every
+        // zone, and a daylight saving shift of an hour keeps each later sample on its day too.
+        Calendar day = Calendar.getInstance();
+        day.setTime(new Date(0));
+        day.set(Calendar.YEAR, 2025);
+        day.set(Calendar.MONTH, Calendar.JANUARY);
+        day.set(Calendar.DAY_OF_MONTH, 2);
+        day.set(Calendar.HOUR_OF_DAY, 12);
+        day.set(Calendar.MINUTE, 0);
+        day.set(Calendar.SECOND, 0);
+        day.set(Calendar.MILLISECOND, 0);
+        long start = day.getTime().getTime();
         for (int i = 0; i < n; i++) {
             // two trading weeks per row of ten, weekends skipped by the axis
-            // noon UTC: every timezone from UTC-11 to UTC+11 sees the same calendar day, so the
-            // labels and tick placement do not depend on the device's zone
-            t[i] = 1735776000000L + 12 * 3600000L + (i / 5 * 7 + i % 5) * 86400000L;
+            t[i] = start + (i / 5 * 7 + i % 5) * 86400000L;
             double d = ((i * 37) % 11 - 5) * 0.6;
             o[i] = p;
             cl[i] = p + d;

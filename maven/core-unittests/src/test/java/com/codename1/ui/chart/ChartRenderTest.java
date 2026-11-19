@@ -55,20 +55,64 @@ public class ChartRenderTest extends UITestBase {
 
     private Chart render(Chart c) {
         c.setAnimationDuration(0);
-        int shown = fills(c);
+        fills(c);
         if (!c.getSeries().isEmpty()) {
-            // the series themselves must draw: hiding them has to take fills or shapes away,
-            // not merely leave the axes and background
-            for (Series s : c.getSeries()) {
+            // each series must draw. Hiding every series would compare against the chart's empty
+            // state, which draws less for reasons of its own, so a series that painted nothing
+            // passed; instead a companion that always paints one rectangle keeps the chart
+            // non-empty, and only the series under test is hidden.
+            Series[] all = c.getSeries().toArray(new Series[0]);
+            Companion companion = new Companion(all[0].isCartesian());
+            c.addSeries(companion);
+            // no legend, and the companion spans the same data, so hiding the series changes
+            // neither the axes nor a legend entry: what disappears is what the series painted
+            c.setLegendPosition(Chart.LEGEND_NONE);
+            for (Series s : all) {
+                companion.mirror = s;
+                int shown = fills(c);
                 s.setVisible(false);
-            }
-            int hidden = fills(c);
-            assertTrue(shown > hidden, "series drew nothing: " + shown + " fills shown, " + hidden + " hidden");
-            for (Series s : c.getSeries()) {
+                int hidden = fills(c);
                 s.setVisible(true);
+                assertTrue(companion.painted, "the companion keeps the chart non-empty");
+                assertTrue(shown > hidden, s.getName() + " drew nothing: " + shown + " calls shown, " + hidden + " with it hidden");
             }
+            c.removeSeries(companion);
         }
         return c;
+    }
+
+    // paints one rectangle in every frame, so hiding the series under test leaves a chart that is
+    // still drawing data; a series whose paint does nothing then fails the comparison above
+    private static final class Companion extends Series {
+        private final boolean cartesian;
+        boolean painted;
+        Series mirror;
+
+        Companion(boolean cartesian) {
+            super("companion");
+            this.cartesian = cartesian;
+        }
+
+        @Override
+        public boolean isCartesian() {
+            return cartesian;
+        }
+
+        @Override
+        public double[] getXBounds() {
+            return mirror == null ? null : mirror.getXBounds();
+        }
+
+        @Override
+        public double[] getYBounds() {
+            return mirror == null ? null : mirror.getYBounds();
+        }
+
+        @Override
+        public void paint(ChartContext ctx) {
+            painted = true;
+            ctx.getGraphics().fillRect(ctx.getPlotX(), ctx.getPlotY(), 2, 2);
+        }
     }
 
     // the drawing calls of one render (lines, rects, arcs, shapes); text is not counted

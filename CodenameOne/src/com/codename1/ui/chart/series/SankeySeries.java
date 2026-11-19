@@ -104,6 +104,9 @@ public class SankeySeries extends Series {
     ///
     /// this series
     public SankeySeries clear() {
+        if (getChart() != null) {
+            getChart().beginChange();
+        }
         nodeNames.clear();
         links.clear();
         linkValues.clear();

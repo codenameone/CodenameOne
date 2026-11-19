@@ -295,7 +295,12 @@ public class LineSeries extends XYSeries {
         GeneralPath p = new GeneralPath();
         appendLine(p, px, py, from, to, true);
         for (int i = to; i >= from; i--) {
-            p.lineTo(px[i], pb[i]);
+            // the baseline is a value-axis pixel: vertical upright, horizontal when rotated
+            if (splineRotated) {
+                p.lineTo(pb[i], py[i]);
+            } else {
+                p.lineTo(px[i], pb[i]);
+            }
         }
         p.closePath();
         return p;
@@ -307,7 +312,12 @@ public class LineSeries extends XYSeries {
         }
         if (mode == STEP) {
             for (int i = from + 1; i <= to; i++) {
-                p.lineTo(px[i], py[i - 1]);
+                // the step runs along the category first: across upright, down when rotated
+                if (splineRotated) {
+                    p.lineTo(px[i - 1], py[i]);
+                } else {
+                    p.lineTo(px[i], py[i - 1]);
+                }
                 p.lineTo(px[i], py[i]);
             }
         } else if (mode == SPLINE && to - from >= 2) {
@@ -412,7 +422,11 @@ public class LineSeries extends XYSeries {
         int h = ctx.getFont().getHeight();
         int[] out = new int[2];
         LabelLayout ll = ctx.getLabels();
-        for (int i = r[0]; i <= r[1]; i++) {
+        // dense data cannot show a label per point anyway; offer at most one point per pixel of
+        // the category extent, so the work stays bounded by the plot rather than by the data
+        int extent = Math.max(1, ctx.isRotated() ? ctx.getPlotHeight() : ctx.getPlotWidth());
+        int step = Math.max(1, (r[1] - r[0] + extent) / extent);
+        for (int i = r[0]; i <= r[1]; i += step) {
             double v = ys[i];
             if (isGap(v) || isGap(xs[i])) {
                 continue;

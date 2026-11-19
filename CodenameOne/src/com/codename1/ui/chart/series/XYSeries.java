@@ -282,9 +282,34 @@ public abstract class XYSeries extends Series {
             throw new IndexOutOfBoundsException("Index " + index + " of a series of " + count + " points");
         }
         begin();
+        double old = ys[index];
         ys[index] = y;
+        valueSet(index, old, y);
         dataChanged();
         return this;
+    }
+
+    /// Called by `set` after the value of point `index` changed, before the transition starts,
+    /// so the extra channels can follow it. By default a channel that still holds the value
+    /// `auxDefault` derived from the old y (so it was never given one of its own) is derived
+    /// again from the new y; a channel that was set explicitly is left alone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the point
+    ///
+    /// - `oldY`: its previous value
+    ///
+    /// - `y`: its new value
+    protected void valueSet(int index, double oldY, double y) {
+        if (aux == null) {
+            return;
+        }
+        for (int k = 0; k < aux.length; k++) {
+            if (Double.compare(aux[k][index], auxDefault(k, oldY)) == 0) {
+                aux[k][index] = auxDefault(k, y);
+            }
+        }
     }
 
     /// Removes every point.
@@ -317,6 +342,8 @@ public abstract class XYSeries extends Series {
 
     /// Stacks this series on earlier ones sharing the same group name; null for none.
     public XYSeries setStackGroup(String group) {
+        // snapshot first: the bases move, and they must move from what is on screen
+        begin();
         stackGroup = group;
         dataChanged();
         return this;
@@ -388,14 +415,20 @@ public abstract class XYSeries extends Series {
             if (o == this) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
                 break;
             }
-            if (o instanceof XYSeries && o.isVisible()) {
+            if (o instanceof XYSeries) {
                 XYSeries xo = (XYSeries) o;
+                // a series fading in or out carries its layers by the fraction it is shown, so
+                // the stack above it slides with the fade instead of snapping at its start
+                float frac = xo.getVisibilityFraction();
+                if (!(frac > 0)) { //NOPMD LogicInversion - also skips a NaN fraction
+                    continue;
+                }
                 if (stackGroup.equals(xo.stackGroup) && xo.isSecondaryAxis() == isSecondaryAxis()) {
                     int j = i < xo.count && xo.xs[i] == x ? i : xo.indexOfX(x);
                     if (j >= 0) {
                         double v = xo.ys[j];
                         if (!isGap(v) && (v < 0) == negative) {
-                            sum += v;
+                            sum += v * frac;
                         }
                     }
                 }
@@ -647,6 +680,14 @@ public abstract class XYSeries extends Series {
         fromBase = fb;
         fromX = fx;
         fromAux = fa;
+    }
+
+    @Override
+    protected void transitionEnded() {
+        fromY = null;
+        fromX = null;
+        fromBase = null;
+        fromAux = null;
     }
 
     @Override
