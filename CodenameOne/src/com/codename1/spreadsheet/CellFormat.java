@@ -666,13 +666,16 @@ final class CellFormat {
             if (t.kind == SLASH) {
                 slash = i;
                 fractionEnd = i;
+                int[] fixed = fixedDenominator(s.tokens, i);
+                if (fixed != null) {
+                    fixedDenominator = String.valueOf(fixed[0]);
+                    fractionEnd = fixed[1];
+                    i = fixed[1];
+                }
             } else if (t.kind == DIGIT && slash >= 0) {
                 fractionEnd = i;
             } else if (t.kind == LITERAL && slash < 0 && " ".equals(t.text) && i > 0 && s.tokens.get(i - 1).kind == DIGIT) {
                 wholeEnd = i;
-            } else if (t.kind == LITERAL && slash == i - 1 && isDigits(t.text.trim())) {
-                fixedDenominator = t.text.trim();
-                fractionEnd = i;
             }
         }
         for (int i = 0; i < s.tokens.size(); i++) {
@@ -1214,6 +1217,11 @@ final class CellFormat {
             Token t = s.tokens.get(i);
             if (t.kind == SLASH) {
                 pastSlash = true;
+                int[] fixed = fixedDenominator(s.tokens, i);
+                if (fixed != null) {
+                    fixedDenominator = fixed[0];
+                    i = fixed[1];
+                }
             } else if (t.kind == DIGIT) {
                 char mark = t.text.charAt(t.text.length() - 1);
                 if (pastSlash) {
@@ -1229,13 +1237,6 @@ final class CellFormat {
             } else if (t.kind == LITERAL && !pastSlash) {
                 if (" ".equals(t.text) && wholeDigits > 0) {
                     spaceSeen = true;
-                }
-            } else if (t.kind == LITERAL && pastSlash && denominatorDigits == 0) {
-                // a denominator written out, as in # ?/8
-                try {
-                    fixedDenominator = Integer.parseInt(t.text.trim());
-                } catch (NumberFormatException e) {
-                    fixedDenominator = 0;
                 }
             }
         }
@@ -1268,6 +1269,20 @@ final class CellFormat {
             bestN = 0;
         }
         StringBuilder sb = new StringBuilder();
+        if (!mixed && abs * bestD >= 9.0E15) {
+            // past the integers a double holds exactly there is no fraction left, and a long
+            // cannot hold the numerator: every digit of it, over the denominator
+            if (negative) {
+                sb.append('-');
+            }
+            sb.append(wholeDigits(Math.floor(abs * bestD + 0.5))).append('/').append(bestD);
+            for (int i = 1; fixedDenominator <= 0 && i < denominatorMarks.length(); i++) {
+                if (denominatorMarks.charAt(i) == '?') {
+                    sb.append(' ');
+                }
+            }
+            return sb.toString();
+        }
         if (negative && (whole != 0 || bestN != 0)) {
             sb.append('-');
         }
@@ -1306,9 +1321,9 @@ final class CellFormat {
                 }
             }
             if (bestN != 0 || zeroShown) {
-                if (sb.length() > 0 && sb.charAt(sb.length() - 1) != '-') {
-                    sb.append(' ');
-                }
+                // the space between the parts stays when the whole part shows nothing, as in
+                // LibreOffice and Excel: # ?/10 shows 0.37 as " 4/10"
+                sb.append(' ');
                 appendFraction(sb, bestN, bestD, numeratorMarks, fixedDenominator > 0 ? null : denominatorMarks);
             }
         } else {
@@ -1321,6 +1336,33 @@ final class CellFormat {
             }
         }
         return sb.toString();
+    }
+
+    /// The denominator a fraction writes out, as the 16 of `# ??/16` or the 100 of
+    /// `# ??/100`, and the index of its last token; null when the denominator is made of
+    /// placeholders. A written denominator starts with a digit 1 to 9, and every digit after
+    /// it, a 0 included, belongs to it.
+    private static int[] fixedDenominator(ArrayList<Token> tokens, int slash) {
+        StringBuilder digits = new StringBuilder();
+        int last = slash;
+        for (int i = slash + 1; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            // a placeholder's text carries the slash or point before it: its digit is the last
+            String text = t.kind == LITERAL ? t.text.trim()
+                    : t.kind == DIGIT ? t.text.substring(t.text.length() - 1) : null;
+            if (text == null || text.length() == 0 || !isDigits(text) || digits.length() == 0 && t.kind != LITERAL) {
+                break;
+            }
+            if (digits.length() == 0 && text.charAt(0) == '0') {
+                break;
+            }
+            digits.append(text);
+            last = i;
+        }
+        if (digits.length() == 0 || digits.length() > 9) {
+            return null;
+        }
+        return new int[] {Integer.parseInt(digits.toString()), last};
     }
 
     private static void pad(StringBuilder sb, long v, int width) {

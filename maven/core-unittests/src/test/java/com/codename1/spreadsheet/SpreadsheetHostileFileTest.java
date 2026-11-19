@@ -919,6 +919,31 @@ class SpreadsheetHostileFileTest extends UITestBase {
     }
 
     @Test
+    void writtenOutDenominators() throws IOException {
+        String[][] cases = {
+            {"# ??/16", "0.333", "  5/16"}, {"# ?/10", "0.37", " 4/10"}, {"# ??/100", "0.333", " 33/100"}, {"# ?/10", "2", "2   "},
+            {"0/16", "123456.789", "1975309/16"}, {"# ?/8", "1.5", "1 4/8"}, {"0/0", "1E20", "100000000000000000000/1"},
+        };
+        for (String[] c : cases) {
+            String got = CellFormat.format(c[0], Double.valueOf(c[1]), false);
+            if (!c[2].equals(got)) {
+                wrong.append('\n').append(c[0]).append(" on ").append(c[1]).append(" gave '").append(got)
+                        .append("', expected '").append(c[2]).append('\'');
+            }
+        }
+        // what LibreOffice's TEXT answers for these; 1E20 over 0/0 is #FMT there, every digit here
+        // the denominator survives OpenDocument
+        Workbook w = new Workbook();
+        Sheet s = w.addSheet("S");
+        s.setCellValue("A1", Double.valueOf(0.333));
+        s.setCellFormat(0, 0, "# ??/16");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        w.write(out, Workbook.Format.ODS);
+        same("5/16", Workbook.read(new ByteArrayInputStream(out.toByteArray()), Workbook.Format.ODS).getSheet(0)
+                .getCellText(0, 0).trim(), "sixteenths through OpenDocument");
+    }
+
+    @Test
     void roundTwentyFiveLosses() throws IOException {
         Sheet s = new Workbook().addSheet("S");
         try {
