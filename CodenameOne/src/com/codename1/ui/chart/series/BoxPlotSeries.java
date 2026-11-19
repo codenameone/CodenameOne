@@ -243,10 +243,10 @@ public class BoxPlotSeries extends XYSeries {
         return i < byBox.length ? byBox[i] : null;
     }
 
-    // A box with any NaN or infinite statistic is a gap: it is neither drawn nor counted in the bounds.
+    // A box with any NaN or infinite statistic or x is a gap: it is neither drawn nor counted in the bounds.
     private boolean isGap(int i) {
         double m = getY(i);
-        if (isGap(m)) {
+        if (isGap(m) || isGap(getX(i))) {
             return true;
         }
         for (int k = 0; k < 4; k++) {

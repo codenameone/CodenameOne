@@ -39,6 +39,8 @@ import com.codename1.ui.geom.GeneralPath;
 public class FunnelSeries extends CategoricalSeries {
     private float[] lastTop = new float[0];
     private float[] lastH = new float[0];
+    private int lastCount;
+    private final GeneralPath stagePath = new GeneralPath();
     private float lastCx;
     private float lastScale;
 
@@ -66,8 +68,16 @@ public class FunnelSeries extends CategoricalSeries {
                 max = Math.max(max, clean(displayValue(ctx, i)));
             }
         }
-        lastTop = new float[n];
-        lastH = new float[n];
+        // grown only when the stage count grows; lastCount bounds what the hit tests read
+        if (lastTop.length < n) {
+            lastTop = new float[n];
+            lastH = new float[n];
+        }
+        for (int i = 0; i < n; i++) {
+            lastTop[i] = 0;
+            lastH[i] = 0;
+        }
+        lastCount = n;
         if (shown == 0 || max <= 0) {
             return;
         }
@@ -104,7 +114,8 @@ public class FunnelSeries extends CategoricalSeries {
             }
             float w0 = (float) (v / max * maxW);
             float w1 = (float) (next / max * maxW);
-            GeneralPath p = new GeneralPath();
+            GeneralPath p = stagePath;
+            p.reset();
             p.moveTo(cx - w0 / 2, y);
             p.lineTo(cx + w0 / 2, y);
             p.lineTo(cx + w1 / 2, y + bandH);
@@ -141,7 +152,7 @@ public class FunnelSeries extends CategoricalSeries {
         float ay = y + ctx.getOriginY();
         float ax = x + ctx.getOriginX();
         // the arrays of the last paint may be longer than data changed since
-        int n = Math.min(lastTop.length, values.length);
+        int n = Math.min(lastCount, values.length);
         for (int i = 0; i < n; i++) {
             if (lastH[i] > 0 && ay >= lastTop[i] && ay <= lastTop[i] + lastH[i]
                     && Math.abs(ax - lastCx) <= Math.max(clean(displayValue(ctx, i)) * lastScale / 2, radius)) {
@@ -153,7 +164,7 @@ public class FunnelSeries extends CategoricalSeries {
 
     @Override
     public ChartPoint getPoint(ChartContext ctx, int i) {
-        if (i < 0 || i >= lastTop.length || lastH[i] <= 0) {
+        if (i < 0 || i >= lastCount || lastH[i] <= 0) {
             return null;
         }
         return point(ctx, i, lastCx, lastTop[i] + lastH[i] / 2);

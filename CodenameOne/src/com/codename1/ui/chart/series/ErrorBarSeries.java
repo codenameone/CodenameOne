@@ -120,7 +120,7 @@ public class ErrorBarSeries extends XYSeries {
             // whiskers and marker move from where they were when the last transition started, so a
             // change elsewhere leaves this one still; only a first appearance grows out of the value
             double v = animatedY(ctx, i);
-            if (isGap(v)) {
+            if (isGap(v) || isGap(getX(i))) {
                 continue;
             }
             // a NaN end has no whisker: it would round to pixel 0, so that side collapses onto

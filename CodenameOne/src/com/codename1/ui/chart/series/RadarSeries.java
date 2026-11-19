@@ -164,15 +164,25 @@ public class RadarSeries extends Series {
         return null;
     }
 
+    // refilled on every call, so it always follows the chart's current series without allocating
+    private final java.util.ArrayList<Series> radarBuf = new java.util.ArrayList<Series>();
+    private final GeneralPath ringPath = new GeneralPath();
+    private final GeneralPath polyPath = new GeneralPath();
+    private final Stroke ringStroke = new Stroke(1, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 1);
+    private Stroke polyStroke;
+
     private java.util.ArrayList<Series> radars() {
-        java.util.ArrayList<Series> out = new java.util.ArrayList<Series>();
+        java.util.ArrayList<Series> out = radarBuf;
+        out.clear();
         Chart c = getChart();
         if (c == null) {
             out.add(this);
             return out;
         }
         List<Series> all = c.getSeries();
-        for (Series s : all) {
+        int count = all.size();
+        for (int k = 0; k < count; k++) {
+            Series s = all.get(k);
             if (s instanceof RadarSeries) {
                 out.add(s);
             }
@@ -286,7 +296,8 @@ public class RadarSeries extends Series {
             for (int rk = 1; rk <= MAX_RINGS && rk * step <= top + step * 1e-6; rk++) {
                 double tk = rk * step;
                 float rr = (float) (r * tk / top);
-                GeneralPath ring = new GeneralPath();
+                GeneralPath ring = ringPath;
+                ring.reset();
                 for (int i = 0; i <= n; i++) {
                     double a = 360.0 * (i % n) / n;
                     if (i == 0) {
@@ -295,7 +306,7 @@ public class RadarSeries extends Series {
                         ring.lineTo(Shapes.px(cx, rr, a), Shapes.py(cy, rr, a));
                     }
                 }
-                g.drawShape(ring, new Stroke(1, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 1));
+                g.drawShape(ring, ringStroke);
             }
             for (int i = 0; i < n; i++) {
                 double a = 360.0 * i / n;
@@ -331,7 +342,8 @@ public class RadarSeries extends Series {
                 }
             }
         }
-        GeneralPath poly = new GeneralPath();
+        GeneralPath poly = polyPath;
+        poly.reset();
         int m = Math.min(n, values.length);
         if (m == 0) {
             return;
@@ -360,7 +372,11 @@ public class RadarSeries extends Series {
             g.fillShape(poly);
         }
         g.setAlpha((int) (alpha * vis));
-        g.drawShape(poly, new Stroke(Math.max(1, ctx.mm(0.5f)), Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 1));
+        int sw = Math.max(1, ctx.mm(0.5f));
+        if (polyStroke == null || Math.round(polyStroke.getLineWidth()) != sw) {
+            polyStroke = new Stroke(sw, Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 1);
+        }
+        g.drawShape(poly, polyStroke);
         g.setAlpha(alpha);
     }
 
@@ -411,7 +427,9 @@ public class RadarSeries extends Series {
     @Override
     public void collectTableRows(List<String[]> rows) {
         String[] sp = spokes();
-        for (int i = 0; i < values.length; i++) {
+        // a value past the grid's spokes is not drawn, so it has no row either
+        int n = Math.min(values.length, spokeCount());
+        for (int i = 0; i < n; i++) {
             rows.add(new String[]{getName(), i < sp.length && sp[i] != null ? sp[i] : String.valueOf(i + 1), formatValue(null, values[i])});
         }
     }

@@ -466,9 +466,11 @@ public class CandlestickSeries extends XYSeries {
 
     @Override
     public void paintLegendSymbol(Graphics g, int x, int y, int size) {
-        g.setColor(getChart() == null ? 0x009E73 : getChart().getTheme().getPositiveColor());
+        g.setColor(upColor != null ? upColor.intValue()
+                : getChart() == null ? 0x009E73 : getChart().getTheme().getPositiveColor());
         g.fillRect(x, y + size / 4, size / 2, size / 2);
-        g.setColor(getChart() == null ? 0xD55E00 : getChart().getTheme().getNegativeColor());
+        g.setColor(downColor != null ? downColor.intValue()
+                : getChart() == null ? 0xD55E00 : getChart().getTheme().getNegativeColor());
         g.fillRect(x + size / 2, y, size / 2, size);
     }
 

@@ -49,6 +49,9 @@ public final class Annotation {
     private boolean behind;
     private boolean dashed = true;
     private boolean includeInRange = true;
+    private final GeneralPath dashPath = new GeneralPath();
+    private Stroke dashStroke;
+    private int dashWidth;
 
     private Annotation(int kind, double from, double to, String label) {
         this.kind = kind;
@@ -245,13 +248,18 @@ public final class Annotation {
             }
             g.setAlpha(alpha);
         } else {
-            float w = Math.max(1, ctx.mm(0.35f));
-            Stroke s = new Stroke(w, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 4);
+            int w = Math.max(1, ctx.mm(0.35f));
+            if (dashStroke == null || dashWidth != w) {
+                dashStroke = new Stroke(w, Stroke.CAP_BUTT, Stroke.JOIN_MITER, 4);
+                dashWidth = w;
+            }
             // at least a pixel: mm() rounds to 0 on a low density, and a 0 step never ends the loop
             int dash = Math.max(1, dashed ? ctx.mm(1.5f) : Math.max(pw, ph));
             int len = horizontalLine ? pw : ph;
+            // every dash is a sub path of one reused path, drawn once
+            GeneralPath p = dashPath;
+            p.reset();
             for (int o = 0; o < len; o += dash * 2) {
-                GeneralPath p = new GeneralPath();
                 int end = Math.min(len, o + dash);
                 if (horizontalLine) {
                     p.moveTo(px + o, a0);
@@ -260,8 +268,8 @@ public final class Annotation {
                     p.moveTo(a0, py + o);
                     p.lineTo(a0, py + end);
                 }
-                g.drawShape(p, s);
             }
+            g.drawShape(p, dashStroke);
         }
         if (labelText != null) {
             g.setColor(c);

@@ -38,6 +38,9 @@ import com.codename1.ui.chart.layout.Shapes;
 /// cpu.addBand(0, 60, 0x009E73).addBand(60, 85, 0xE69F00).addBand(85, 100, 0xD55E00);
 /// ```
 public class GaugeSeries extends Series {
+    // reused by every paint: a sector path is rebuilt and filled before the next is made
+    private final com.codename1.ui.geom.GeneralPath sectorPath = new com.codename1.ui.geom.GeneralPath();
+    private final com.codename1.ui.geom.GeneralPath needlePath = new com.codename1.ui.geom.GeneralPath();
     private double min;
     private double max;
     private double value;
@@ -257,7 +260,7 @@ public class GaugeSeries extends Series {
         int faded = (int) (alpha * getVisibilityFraction());
         g.setAlpha(faded);
         g.setColor(ctx.getTheme().getGridColor());
-        g.fillShape(Shapes.sector(cx, cy, r, r - th, start, sweep));
+        g.fillShape(Shapes.sector(sectorPath, cx, cy, r, r - th, start, sweep));
         double v = shown(ctx);
         // NaN is "no reading": the track and bands are drawn, the value arc and needle are not
         boolean hasValue = !isGap(v);
@@ -270,14 +273,14 @@ public class GaugeSeries extends Series {
                     double a0 = angleOf(Math.max(min, b[0]));
                     double a1 = angleOf(Math.min(max, b[1]));
                     if (a1 > a0) {
-                        g.fillShape(Shapes.sector(cx, cy, r, r - th, a0, a1 - a0));
+                        g.fillShape(Shapes.sector(sectorPath, cx, cy, r, r - th, a0, a1 - a0));
                     }
                 }
                 g.setAlpha(faded);
             }
             if (hasValue) {
                 g.setColor(colorFor(v));
-                g.fillShape(Shapes.sector(cx, cy, r, r - th, start, angleOf(v) - start));
+                g.fillShape(Shapes.sector(sectorPath, cx, cy, r, r - th, start, angleOf(v) - start));
             }
         } else {
             for (int i = 0; i < bands.size(); i++) {
@@ -287,14 +290,15 @@ public class GaugeSeries extends Series {
                 double a1 = angleOf(Math.min(max, b[1]));
                 // a band wholly outside [min, max] clamps to an empty or reversed sweep
                 if (a1 > a0) {
-                    g.fillShape(Shapes.sector(cx, cy, r, r - th, a0, a1 - a0));
+                    g.fillShape(Shapes.sector(sectorPath, cx, cy, r, r - th, a0, a1 - a0));
                 }
             }
         }
         if (needle && hasValue) {
             double a = angleOf(v);
             float nw = Math.max(2, ctx.mm(0.8f));
-            com.codename1.ui.geom.GeneralPath p = new com.codename1.ui.geom.GeneralPath();
+            com.codename1.ui.geom.GeneralPath p = needlePath;
+            p.reset();
             p.moveTo(Shapes.px(cx, r - th / 2, a), Shapes.py(cy, r - th / 2, a));
             p.lineTo(Shapes.px(cx, nw, a + 90), Shapes.py(cy, nw, a + 90));
             p.lineTo(Shapes.px(cx, nw, a - 90), Shapes.py(cy, nw, a - 90));

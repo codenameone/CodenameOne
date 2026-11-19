@@ -48,6 +48,8 @@ public class WaterfallSeries extends BarSeries {
     // the running total of the rows that dropped off the front, which the first kept row starts on
     private double baseOffset;
     private boolean connectors = true;
+    private final float[] spanA = new float[2];
+    private final float[] spanB = new float[2];
 
     /// Creates an empty series.
     ///
@@ -257,11 +259,23 @@ public class WaterfallSeries extends BarSeries {
             for (int i = 0; i + 1 < size(); i++) {
                 double d = getY(i);
                 double end = getBase(i) + (Double.isNaN(d) || Double.isInfinite(d) ? 0 : d);
-                float x0 = ctx.screenX(this, getX(i), end);
-                float y0 = ctx.screenY(this, getX(i), end);
-                float x1 = ctx.screenX(this, getX(i + 1), end);
-                float y1 = ctx.screenY(this, getX(i + 1), end);
-                g.drawLine(Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1));
+                if (isGap(getX(i)) || isGap(getX(i + 1))) {
+                    continue;
+                }
+                // from this bar's edge to the next bar's facing edge at the running total, so the
+                // line bridges the gap between the bars instead of crossing their bodies
+                bandSpan(ctx, i, spanA);
+                bandSpan(ctx, i + 1, spanB);
+                boolean forward = spanB[0] >= spanA[0];
+                int from = Math.round(forward ? spanA[1] : spanA[0]);
+                int to = Math.round(forward ? spanB[0] : spanB[1]);
+                if (ctx.isRotated()) {
+                    int vx = Math.round(ctx.screenX(this, getX(i), end));
+                    g.drawLine(vx, from, vx, to);
+                } else {
+                    int vy = Math.round(ctx.screenY(this, getX(i), end));
+                    g.drawLine(from, vy, to, vy);
+                }
             }
             g.setAlpha(oldAlpha);
         }

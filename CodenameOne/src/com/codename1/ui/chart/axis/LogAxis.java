@@ -123,6 +123,48 @@ public class LogAxis extends Axis {
         if (value >= 1e6) {
             return compact(value, value);
         }
-        return super.defaultFormat(value, 0);
+        int decimals = decimalsFor(value);
+        double abs = Math.abs(value);
+        if (decimals > 0 && abs < 1) {
+            // a value below one is spelled out digit by digit: the platform's double formatting
+            // may answer 1.0E-4 for 0.0001, which is no axis label
+            long scale = 1;
+            for (int k = 0; k < decimals; k++) {
+                scale *= 10;
+            }
+            long digits = Math.round(abs * scale);
+            if (digits < scale) {
+                String sample = formatNumber(1.5, 1);
+                StringBuilder sb = new StringBuilder();
+                if (value < 0) {
+                    sb.append('-');
+                }
+                sb.append('0').append(sample.substring(1, sample.length() - 1));
+                String d = Long.toString(digits);
+                for (int k = d.length(); k < decimals; k++) {
+                    sb.append('0');
+                }
+                return sb.append(d).toString();
+            }
+        }
+        return formatNumber(value, decimals);
+    }
+
+    /// Decimal places that show `value` exactly when it is a tick (a short mantissa times a
+    /// power of ten), and two significant digits otherwise, so 0.0001 does not print as 0.00.
+    static int decimalsFor(double value) {
+        double abs = Math.abs(value);
+        if (!(abs > 0) || Double.isInfinite(abs)) { //NOPMD LogicInversion - also catches NaN
+            return 0;
+        }
+        int cap = (int) Math.max(2, Math.min(12, 1 - MathUtil.floor(MathUtil.log10(abs))));
+        double scaled = abs;
+        for (int d = 0; d < cap; d++) {
+            if (Math.abs(scaled - Math.rint(scaled)) <= 1e-6 * scaled) {
+                return d;
+            }
+            scaled *= 10;
+        }
+        return cap;
     }
 }

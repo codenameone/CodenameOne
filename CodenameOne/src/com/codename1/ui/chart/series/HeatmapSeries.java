@@ -46,6 +46,9 @@ public class HeatmapSeries extends Series {
     int paintedCells;
 
     private double[][] matrix = new double[0][0];
+    private boolean extentValid;
+    private double dataMin;
+    private double dataMax;
     private double[][] from;
     private ColorScale scale;
     private Double fixedMin;
@@ -83,6 +86,7 @@ public class HeatmapSeries extends Series {
             matrix[r] = new double[values[r].length];
             System.arraycopy(values[r], 0, matrix[r], 0, values[r].length);
         }
+        extentValid = false;
         dataChanged();
         return this;
     }
@@ -150,7 +154,7 @@ public class HeatmapSeries extends Series {
     ///
     /// a new `{min, max}` array
     public double[] getValueRange() {
-        return extent();
+        return new double[]{extentMin(), extentMax()};
     }
 
     /// The hit point id of a cell, `row * getColumns() + column`, which never aliases however wide
@@ -169,7 +173,12 @@ public class HeatmapSeries extends Series {
         return row * Math.max(1, getColumns()) + column;
     }
 
-    private double[] extent() {
+    // the data's own smallest and largest value, computed once per setMatrix: the matrix
+    // changes nowhere else, so painting reads the cache instead of scanning every cell
+    private void ensureExtent() {
+        if (extentValid) {
+            return;
+        }
         double min = Double.MAX_VALUE;
         double max = -Double.MAX_VALUE;
         for (double[] row : matrix) {
@@ -185,13 +194,19 @@ public class HeatmapSeries extends Series {
             min = 0;
             max = 1;
         }
-        if (fixedMin != null) {
-            min = fixedMin.doubleValue();
-        }
-        if (fixedMax != null) {
-            max = fixedMax.doubleValue();
-        }
-        return new double[]{min, max};
+        dataMin = min;
+        dataMax = max;
+        extentValid = true;
+    }
+
+    private double extentMin() {
+        ensureExtent();
+        return fixedMin != null ? fixedMin.doubleValue() : dataMin;
+    }
+
+    private double extentMax() {
+        ensureExtent();
+        return fixedMax != null ? fixedMax.doubleValue() : dataMax;
     }
 
     @Override
@@ -241,7 +256,7 @@ public class HeatmapSeries extends Series {
 
     @Override
     protected void captureEntryStart() {
-        double[] e = extent();
+        double[] e = getValueRange();
         from = new double[matrix.length][];
         for (int r = 0; r < matrix.length; r++) {
             from[r] = new double[matrix[r].length];
@@ -293,8 +308,8 @@ public class HeatmapSeries extends Series {
         Graphics g = ctx.getGraphics();
         Font f = ctx.getFont();
         int fh = f.getHeight();
-        double[] e = extent();
-        double span = e[1] - e[0];
+        double lo = extentMin();
+        double span = extentMax() - lo;
         ColorScale cs = scale();
         int gap = Math.max(1, ctx.mm(0.2f));
         int alpha = g.getAlpha();
@@ -315,7 +330,7 @@ public class HeatmapSeries extends Series {
                     continue;
                 }
                 cell(ctx, r, c, b);
-                int color = cs.colorAt(span > 0 ? (v - e[0]) / span : 0.5);
+                int color = cs.colorAt(span > 0 ? (v - lo) / span : 0.5);
                 g.setColor(color);
                 int w = Math.max(1, Math.round(b[2]) - gap);
                 int h = Math.max(1, Math.round(b[3]) - gap);

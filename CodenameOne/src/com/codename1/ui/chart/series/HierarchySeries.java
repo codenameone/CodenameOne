@@ -44,7 +44,19 @@ public abstract class HierarchySeries extends Series {
     final ArrayList<TreeNode> nodes = new ArrayList<TreeNode>();
     final ArrayList<float[]> cells = new ArrayList<float[]>();
     int[] crumb;
+    // what crumb points at while the breadcrumb is shown, reused by every paint
+    final int[] crumbBuf = new int[4];
     private boolean entering;
+    /// Bumped by every change to the tree, so a cached layout knows it is stale.
+    int treeVersion;
+    // recorded geometries, reused from one paint to the next once nodes and cells are cleared
+    private final ArrayList<float[]> cellPool = new ArrayList<float[]>();
+    // the breadcrumb text, rebuilt only when the node, the width, the font or the tree changes
+    private String crumbText;
+    private TreeNode crumbNode;
+    private Font crumbFont;
+    private int crumbWidth;
+    private int crumbVersion;
 
     /// Creates the series.
     ///
@@ -84,6 +96,7 @@ public abstract class HierarchySeries extends Series {
         if (attached && root != null) {
             root.addChangeListener(treeListener);
         }
+        treeVersion++;
         dataChanged();
         return this;
     }
@@ -98,6 +111,8 @@ public abstract class HierarchySeries extends Series {
             return;
         }
         attached = true;
+        // edits made while detached fired no change: cached layouts must not survive them
+        treeVersion++;
         if (root != null) {
             root.addChangeListener(treeListener);
             // edits made while detached were not seen: a drilled-in node may have left the tree
@@ -134,6 +149,7 @@ public abstract class HierarchySeries extends Series {
             if (!isUnderRoot(current)) {
                 current = root;
             }
+            treeVersion++;
             dataChanged();
         }
     };
@@ -313,11 +329,23 @@ public abstract class HierarchySeries extends Series {
         Graphics g = ctx.getGraphics();
         Font f = ctx.getFont();
         int fh = f.getHeight();
-        String text = LabelLayout.ellipsize(f, "< " + current.getPath(), ctx.getPlotWidth());
+        if (crumbText == null || crumbNode != current || crumbFont != f //NOPMD CompareObjectsWithEquals - identity is the cache key
+                || crumbWidth != ctx.getPlotWidth() || crumbVersion != treeVersion) {
+            crumbText = LabelLayout.ellipsize(f, "< " + current.getPath(), ctx.getPlotWidth());
+            crumbNode = current;
+            crumbFont = f;
+            crumbWidth = ctx.getPlotWidth();
+            crumbVersion = treeVersion;
+        }
+        String text = crumbText;
         g.setColor(ctx.getTheme().getSecondaryTextColor());
         g.setFont(f);
         g.drawString(text, ctx.getPlotX(), ctx.getPlotY());
-        crumb = new int[]{ctx.getPlotX(), ctx.getPlotY(), f.stringWidth(text), fh};
+        crumb = crumbBuf;
+        crumb[0] = ctx.getPlotX();
+        crumb[1] = ctx.getPlotY();
+        crumb[2] = f.stringWidth(text);
+        crumb[3] = fh;
         ctx.getLabels().reserve(crumb[0], crumb[1], crumb[2], crumb[3]);
         return fh + ctx.mm(1);
     }
@@ -329,6 +357,24 @@ public abstract class HierarchySeries extends Series {
     /// - `n`: the node
     ///
     /// - `geometry`: the shape's geometry, interpreted by the subclass
+    // a geometry array for the next record call: the one the same slot held last paint when it
+    // has the length, so painting an unchanged tree allocates nothing
+    final float[] nextCell(int len) {
+        int k = cells.size();
+        if (k < cellPool.size()) {
+            float[] c = cellPool.get(k);
+            if (c.length == len) {
+                return c;
+            }
+            c = new float[len];
+            cellPool.set(k, c);
+            return c;
+        }
+        float[] c = new float[len];
+        cellPool.add(c);
+        return c;
+    }
+
     protected void record(TreeNode n, float[] geometry) {
         nodes.add(n);
         cells.add(geometry);

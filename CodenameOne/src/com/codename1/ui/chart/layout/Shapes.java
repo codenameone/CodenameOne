@@ -86,7 +86,34 @@ public final class Shapes {
     ///
     /// a closed path
     public static GeneralPath sector(float cx, float cy, float outer, float inner, double start, double sweep) {
-        GeneralPath p = new GeneralPath();
+        return sector(new GeneralPath(), cx, cy, outer, inner, start, sweep);
+    }
+
+    /// The same sector written into a path the caller reuses, so painting allocates nothing.
+    /// The path is reset first.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the path to reset and fill
+    ///
+    /// - `cx`: the centre x
+    ///
+    /// - `cy`: the centre y
+    ///
+    /// - `outer`: the outer radius
+    ///
+    /// - `inner`: the inner radius, 0 for a wedge
+    ///
+    /// - `start`: the start angle in degrees
+    ///
+    /// - `sweep`: the sweep in degrees, positive clockwise
+    ///
+    /// #### Returns
+    ///
+    /// `p`, closed
+    public static GeneralPath sector(GeneralPath p, float cx, float cy, float outer, float inner, double start,
+            double sweep) {
+        p.reset();
         // a non-finite sweep would ask for Integer.MAX_VALUE steps and hang the EDT; past a
         // full turn a sector looks the same, so the sweep is clamped to one turn either way
         double sw = sweep;

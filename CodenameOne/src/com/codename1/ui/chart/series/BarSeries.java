@@ -210,6 +210,14 @@ public class BarSeries extends XYSeries {
         return bs.size() > 1 ? bs.getMinXSpacing() : 0;
     }
 
+    // the extent of bar i across its band (x when upright, y when rotated): out[0] start, out[1] end
+    final void bandSpan(ChartContext ctx, int i, float[] out) {
+        float[] b = barRect(ctx, i, 0, 0, slot(), bandPixels(ctx));
+        boolean rot = ctx.isRotated();
+        out[0] = rot ? b[1] : b[0];
+        out[1] = out[0] + (rot ? b[3] : b[2]);
+    }
+
     private float[] barRect(ChartContext ctx, int i, double base, double v, float[] slot, float bandPx) {
         // one slot is the closest spacing of the data: a category band, a day on a time axis
         float band = bandPx * barFraction;
@@ -249,7 +257,7 @@ public class BarSeries extends XYSeries {
         boolean top = getStackGroup() == null || isTopOfStack();
         for (int i = r[0]; i <= r[1]; i++) {
             double v = animatedY(ctx, i);
-            if (isGap(v)) {
+            if (isGap(v) || isGap(xs[i])) {
                 continue;
             }
             float[] b = barRect(ctx, i, animatedBase(ctx, i), v, slot, bandPx);
@@ -305,7 +313,7 @@ public class BarSeries extends XYSeries {
         int pad = ctx.mm(0.8f);
         for (int i = r[0]; i <= r[1]; i++) {
             double v = getY(i);
-            if (isGap(v)) {
+            if (isGap(v) || isGap(xs[i])) {
                 continue;
             }
             float[] b = barRect(ctx, i, animatedBase(ctx, i), animatedY(ctx, i), slot, bandPx);
@@ -365,7 +373,7 @@ public class BarSeries extends XYSeries {
         for (int i = r[0]; i <= r[1]; i++) {
             // the rect as painted this frame, so a tap mid transition hits the bar it sees
             double v = animatedY(ctx, i);
-            if (isGap(v)) {
+            if (isGap(v) || isGap(xs[i])) {
                 continue;
             }
             float[] b = barRect(ctx, i, animatedBase(ctx, i), v, slot, bandPx);

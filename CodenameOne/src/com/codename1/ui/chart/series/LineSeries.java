@@ -248,6 +248,10 @@ public class LineSeries extends XYSeries {
     private boolean[] bufGap = new boolean[0];
     private Stroke stroke;
     private final GeneralPath path = new GeneralPath();
+    private final GeneralPath areaBuf = new GeneralPath();
+    private final int[] labelSpot = new int[2];
+    private float[] tanD = new float[0];
+    private float[] tanT = new float[0];
     private static final int CURVE_STEPS = 12;
     private final GeneralPath dashes = new GeneralPath();
     private final float[] segCoords = new float[6];
@@ -311,7 +315,8 @@ public class LineSeries extends XYSeries {
     }
 
     private GeneralPath areaPath(float[] px, float[] py, float[] pb, int from, int to) {
-        GeneralPath p = new GeneralPath();
+        GeneralPath p = areaBuf;
+        p.reset();
         appendLine(p, px, py, from, to, true);
         for (int i = to; i >= from; i--) {
             // the baseline is a value-axis pixel: vertical upright, horizontal when rotated
@@ -340,7 +345,12 @@ public class LineSeries extends XYSeries {
                 p.lineTo(px[i], py[i]);
             }
         } else if (mode == SPLINE && to - from >= 2) {
-            appendSpline(p, px, py, from, to, splineRotated);
+            int n = to - from + 1;
+            if (tanD.length < n) {
+                tanD = new float[n];
+                tanT = new float[n];
+            }
+            appendSpline(p, px, py, from, to, splineRotated, tanD, tanT);
         } else {
             for (int i = from + 1; i <= to; i++) {
                 p.lineTo(px[i], py[i]);
@@ -352,10 +362,17 @@ public class LineSeries extends XYSeries {
     // runs down the screen, so the tangents are taken against y: taken against x, which is then the
     // value, a value that turns back makes the curve double back on itself (a cusp).
     static void appendSpline(GeneralPath p, float[] px, float[] py, int from, int to, boolean rotated) {
+        int n = to - from + 1;
+        appendSpline(p, px, py, from, to, rotated, new float[n], new float[n]);
+    }
+
+    // the same, with the tangent work arrays supplied (each at least to - from + 1 long)
+    static void appendSpline(GeneralPath p, float[] px, float[] py, int from, int to, boolean rotated,
+            float[] d, float[] t0) {
         if (rotated) {
             // rotated, the category (the independent variable) runs down the screen: take the
             // tangents against y, or a value that turns back reads as a cusp
-            float[] t = monotoneTangents(py, px, from, to);
+            float[] t = monotoneTangents(py, px, from, to, d, t0);
             for (int i = from; i < to; i++) {
                 float h = (py[i + 1] - py[i]) / 3f;
                 p.curveTo(px[i] + t[i - from] * h, py[i] + h, px[i + 1] - t[i - from + 1] * h, py[i + 1] - h,
@@ -363,7 +380,7 @@ public class LineSeries extends XYSeries {
             }
             return;
         }
-        float[] t = monotoneTangents(px, py, from, to);
+        float[] t = monotoneTangents(px, py, from, to, d, t0);
         for (int i = from; i < to; i++) {
             float h = (px[i + 1] - px[i]) / 3f;
             p.curveTo(px[i] + h, py[i] + t[i - from] * h, px[i + 1] - h, py[i + 1] - t[i - from + 1] * h,
@@ -375,12 +392,16 @@ public class LineSeries extends XYSeries {
     /// the curve stays monotone between neighbouring points.
     static float[] monotoneTangents(float[] x, float[] y, int from, int to) {
         int n = to - from + 1;
-        float[] d = new float[n - 1];
+        return monotoneTangents(x, y, from, to, new float[n], new float[n]);
+    }
+
+    // the same into supplied work arrays, each at least to - from + 1 long; returns `t`
+    static float[] monotoneTangents(float[] x, float[] y, int from, int to, float[] d, float[] t) {
+        int n = to - from + 1;
         for (int i = 0; i < n - 1; i++) {
             float dx = x[from + i + 1] - x[from + i];
             d[i] = dx == 0 ? 0 : (y[from + i + 1] - y[from + i]) / dx;
         }
-        float[] t = new float[n];
         t[0] = d[0];
         t[n - 1] = d[n - 2];
         for (int i = 1; i < n - 1; i++) {
@@ -551,7 +572,7 @@ public class LineSeries extends XYSeries {
         Graphics g = ctx.getGraphics();
         g.setFont(ctx.getFont());
         int h = ctx.getFont().getHeight();
-        int[] out = new int[2];
+        int[] out = labelSpot;
         LabelLayout ll = ctx.getLabels();
         // dense data cannot show a label per point anyway; offer at most one point per pixel of
         // the category extent, so the work stays bounded by the plot rather than by the data

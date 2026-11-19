@@ -38,6 +38,7 @@ import com.codename1.ui.chart.layout.Shapes;
 /// chart.addSeries(new SunburstSeries("Disk usage", root).setMaxDepth(3));
 /// ```
 public class SunburstSeries extends HierarchySeries {
+    private final com.codename1.ui.geom.GeneralPath sectorPath = new com.codename1.ui.geom.GeneralPath();
     private float cx;
     private float cy;
     private float hole;
@@ -91,7 +92,11 @@ public class SunburstSeries extends HierarchySeries {
         // the hole goes back up even when it is too small for the label; hitTest also takes a
         // tap in a narrow band just outside the rings, so a sunburst too small to have a usable hole can still drill out
         if (current != root) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
-            crumb = new int[]{Math.round(cx - hole), Math.round(cy - hole), Math.round(hole * 2), Math.round(hole * 2)};
+            crumb = crumbBuf;
+            crumb[0] = Math.round(cx - hole);
+            crumb[1] = Math.round(cy - hole);
+            crumb[2] = Math.round(hole * 2);
+            crumb[3] = Math.round(hole * 2);
         }
         g.setAlpha(alpha);
     }
@@ -178,8 +183,13 @@ public class SunburstSeries extends HierarchySeries {
             int color = colorOf(ctx, c);
             g.setColor(color);
             double pad = s > 1 ? 0.4 : 0;
-            g.fillShape(Shapes.sector(cx, cy, outer, inner, a + pad, s - pad * 2));
-            record(c, new float[]{inner, outer, (float) a, (float) s});
+            g.fillShape(Shapes.sector(sectorPath, cx, cy, outer, inner, a + pad, s - pad * 2));
+            float[] cell = nextCell(4);
+            cell[0] = inner;
+            cell[1] = outer;
+            cell[2] = (float) a;
+            cell[3] = (float) s;
+            record(c, cell);
             if (labels) {
                 double mid = a + s / 2;
                 float mr = (inner + outer) / 2;

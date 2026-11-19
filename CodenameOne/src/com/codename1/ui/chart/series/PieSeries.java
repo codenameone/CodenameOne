@@ -43,6 +43,9 @@ import com.codename1.ui.chart.layout.Shapes;
 /// chart.addSeries(pie);
 /// ```
 public class PieSeries extends CategoricalSeries {
+    /// Reused by every slice of every frame, so painting allocates no path.
+    private final com.codename1.ui.geom.GeneralPath sectorPath = new com.codename1.ui.geom.GeneralPath();
+
     /// Names and percentages outside the pie on leader lines.
     public static final int LABELS_OUTSIDE = 0;
     /// Percentages inside slices large enough to hold them.
@@ -61,6 +64,12 @@ public class PieSeries extends CategoricalSeries {
     private float lastR;
     private double[] lastStart = new double[0];
     private double[] lastSweep = new double[0];
+    private int lastCount;
+    // the outside labels' work arrays, reused by every paint
+    private int[] labelIdx = new int[0];
+    private float[] labelWant = new float[0];
+    private boolean[] labelDrop = new boolean[0];
+    private float[] labelY = new float[0];
 
     /// Creates an empty pie.
     ///
@@ -237,8 +246,12 @@ public class PieSeries extends CategoricalSeries {
         lastCx = cx;
         lastCy = cy;
         lastR = r;
-        lastStart = new double[n];
-        lastSweep = new double[n];
+        // grown only when the slice count grows; lastCount bounds what the hit tests read
+        if (lastStart.length < n) {
+            lastStart = new double[n];
+            lastSweep = new double[n];
+        }
+        lastCount = n;
         double a = startAngle;
         float inner = r * innerFraction;
         int alpha = g.getAlpha();
@@ -261,7 +274,7 @@ public class PieSeries extends CategoricalSeries {
                     oy = Shapes.py(0, ctx.mm(1.5f), mid);
                 }
                 g.setColor(getColor(i));
-                g.fillShape(Shapes.sector(cx + ox, cy + oy, r, inner, a + pad, sweep - pad * 2));
+                g.fillShape(Shapes.sector(sectorPath, cx + ox, cy + oy, r, inner, a + pad, sweep - pad * 2));
             }
             a += sweep;
         }
@@ -320,8 +333,14 @@ public class PieSeries extends CategoricalSeries {
         int top = ctx.getPlotY();
         int bottom = ctx.getPlotY() + ctx.getPlotHeight();
         for (int side = 0; side < 2; side++) {
-            int[] idx = new int[n];
-            float[] want = new float[n];
+            if (labelIdx.length < n) {
+                labelIdx = new int[n];
+                labelWant = new float[n];
+                labelDrop = new boolean[n];
+                labelY = new float[n];
+            }
+            int[] idx = labelIdx;
+            float[] want = labelWant;
             int m = 0;
             for (int i = 0; i < n; i++) {
                 double sweep = lastSweep[i];
@@ -380,7 +399,10 @@ public class PieSeries extends CategoricalSeries {
                 idx[b - 1] = ti;
             }
         }
-        boolean[] drop = new boolean[m];
+        boolean[] drop = labelDrop;
+        for (int k = 0; k < m; k++) {
+            drop[k] = false;
+        }
         int capacity = Math.max(0, (bottom - top) / fh);
         int kept = m;
         while (kept > capacity) {
@@ -393,7 +415,7 @@ public class PieSeries extends CategoricalSeries {
             drop[worst] = true;
             kept--;
         }
-        float[] y = new float[m];
+        float[] y = labelY;
         float prev = top - fh;
         for (int k = 0; k < m; k++) {
             if (drop[k]) {
@@ -425,7 +447,7 @@ public class PieSeries extends CategoricalSeries {
             return null;
         }
         double deg = Math.toDegrees(com.codename1.util.MathUtil.atan2(ax, -ay));
-        for (int i = 0; i < lastSweep.length; i++) {
+        for (int i = 0; i < lastCount; i++) {
             double rel = deg - lastStart[i];
             rel = rel - 360 * Math.floor(rel / 360);
             if (lastSweep[i] > 0 && rel <= lastSweep[i]) {
@@ -437,7 +459,7 @@ public class PieSeries extends CategoricalSeries {
 
     @Override
     public ChartPoint getPoint(ChartContext ctx, int i) {
-        if (i < 0 || i >= lastSweep.length) {
+        if (i < 0 || i >= lastCount) {
             return null;
         }
         double mid = lastStart[i] + lastSweep[i] / 2;

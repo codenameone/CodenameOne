@@ -79,14 +79,17 @@ public class TreemapSeries extends HierarchySeries {
         if (n == 0) {
             return;
         }
-        double[] v = new double[n];
+        if (valueBuf.length < n) {
+            valueBuf = new double[n];
+        }
+        double[] v = valueBuf;
         for (int i = 0; i < n; i++) {
             // a branch whose children overflowed the sum is infinite: it counts as the largest
             // finite value so it keeps its place, where Squarify would count it as nothing
             double cv = parent.getChild(i).getValue();
             v[i] = cv == Double.POSITIVE_INFINITY ? Double.MAX_VALUE : cv;
         }
-        float[][] rects = Squarify.layout(v, x, y, w, h);
+        float[][] rects = layoutOf(parent, v, n, x, y, w, h);
         Graphics g = ctx.getGraphics();
         Font f = ctx.getFont();
         int fh = f.getHeight();
@@ -105,7 +108,12 @@ public class TreemapSeries extends HierarchySeries {
             int color = colorOf(ctx, c);
             g.setColor(color);
             g.fillRect(Math.round(rx), Math.round(ry), Math.round(rw), Math.round(rh));
-            record(c, new float[]{rx, ry, rw, rh});
+            float[] cell = nextCell(4);
+            cell[0] = rx;
+            cell[1] = ry;
+            cell[2] = rw;
+            cell[3] = rh;
+            record(c, cell);
             boolean nest = c.getChildCount() > 0 && depth < getMaxDepth() && rw > fh * 4 && rh > fh * 3;
             if (labels && rw > pad * 2 + fh && rh > fh + pad) {
                 g.setColor(BarSeries.contrast(color));
@@ -125,6 +133,44 @@ public class TreemapSeries extends HierarchySeries {
             }
         }
     }
+
+    // Squarify's answer for a node, kept until the tree changes or the node's box moves, so a
+    // still treemap lays nothing out and allocates nothing while it repaints
+    private float[][] layoutOf(TreeNode parent, double[] v, int n, float x, float y, float w, float h) {
+        if (layoutVersion != treeVersion) {
+            layouts.clear();
+            layoutVersion = treeVersion;
+        }
+        CachedLayout e = layouts.get(parent);
+        if (e != null && e.rects.length == n && Float.compare(e.x, x) == 0 && Float.compare(e.y, y) == 0
+                && Float.compare(e.w, w) == 0 && Float.compare(e.h, h) == 0) {
+            return e.rects;
+        }
+        double[] exact = new double[n];
+        System.arraycopy(v, 0, exact, 0, n);
+        if (e == null) {
+            e = new CachedLayout();
+            layouts.put(parent, e);
+        }
+        e.rects = Squarify.layout(exact, x, y, w, h);
+        e.x = x;
+        e.y = y;
+        e.w = w;
+        e.h = h;
+        return e.rects;
+    }
+
+    private static final class CachedLayout {
+        float x;
+        float y;
+        float w;
+        float h;
+        float[][] rects;
+    }
+
+    private final java.util.HashMap<TreeNode, CachedLayout> layouts = new java.util.HashMap<TreeNode, CachedLayout>();
+    private int layoutVersion = -1;
+    private double[] valueBuf = new double[0];
 
     @Override
     protected boolean contains(float[] r, float x, float y) {

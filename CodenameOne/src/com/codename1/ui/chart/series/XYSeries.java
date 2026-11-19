@@ -1060,19 +1060,29 @@ public abstract class XYSeries extends Series {
     /// neighbour each side so lines run to the plot edge. Data whose x values are not
     /// ascending (a scatter filled in any order) cannot be binary searched, so every point is
     /// in range then.
+    ///
+    /// The array is reused by the next call on this series, so read it before calling again.
     protected int[] visibleRange(ChartContext ctx) {
+        int[] out = rangeBuf;
         if (count == 0) {
-            return new int[]{0, -1};
+            out[0] = 0;
+            out[1] = -1;
+            return out;
         }
         if (!isAscending()) {
-            return new int[]{0, count - 1};
+            out[0] = 0;
+            out[1] = count - 1;
+            return out;
         }
         double lo = ctx.getXAxis().getVisibleMin();
         double hi = ctx.getXAxis().getVisibleMax();
-        int a = Math.max(0, lowerBound(lo) - 1);
-        int b = Math.min(count - 1, lowerBound(hi));
-        return new int[]{a, b};
+        out[0] = Math.max(0, lowerBound(lo) - 1);
+        out[1] = Math.min(count - 1, lowerBound(hi));
+        return out;
     }
+
+    // visibleRange's result, reused so painting a frame allocates nothing
+    private final int[] rangeBuf = new int[2];
 
     /// The screen position of point `i` along one direction, relative to the chart like
     /// `ChartPoint.getScreenX()`, without allocating a point.

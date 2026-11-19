@@ -123,6 +123,7 @@ public class Chart extends Component {
     private boolean entryPending = true;
     private double[] axisFrom;
     private ChartContext lastContext;
+    private final LabelLayout labelLayout = new LabelLayout(0, 0, 0, 0);
 
     // interaction state
     private ChartPoint selected;
@@ -1181,7 +1182,9 @@ public class Chart extends Component {
         ctx.plotY = plotY;
         ctx.plotW = Math.max(0, plotW);
         ctx.plotH = Math.max(0, plotH);
-        ctx.labels = new LabelLayout(plotX, plotY - fh / 2, ctx.plotW, ctx.plotH + fh / 2);
+        // one layout reused by every paint: setBounds forgets the last frame's labels
+        labelLayout.setBounds(plotX, plotY - fh / 2, ctx.plotW, ctx.plotH + fh / 2);
+        ctx.labels = labelLayout;
         lastContext = ctx;
         if (ctx.plotW <= 0 || ctx.plotH <= 0) {
             // the title and legend took the whole component: there is no plot to draw into,
