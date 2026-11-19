@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.search;
 
+import com.codename1.backend.DataIntegrityViolationException;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
 import com.codename1.backend.sql.Dialect;
@@ -115,8 +116,10 @@ public final class SqlSearchEngine implements SearchEngine {
                     + "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", null);
         } else if (kind == SQLSERVER) {
             // 191 characters keeps the key inside SQL Server's 900-byte limit.
-            data.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (idx NVARCHAR(191) NOT NULL, "
-                    + "id NVARCHAR(191) NOT NULL, body NVARCHAR(MAX) NOT NULL, doc NVARCHAR(MAX) NOT NULL, "
+            // The key is binary-collated: the default collation folds case,
+            // and documents "Abc" and "abc" are two documents.
+            data.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (idx NVARCHAR(191) COLLATE Latin1_General_100_BIN2 NOT NULL, "
+                    + "id NVARCHAR(191) COLLATE Latin1_General_100_BIN2 NOT NULL, body NVARCHAR(MAX) NOT NULL, doc NVARCHAR(MAX) NOT NULL, "
                     + "PRIMARY KEY (idx, id))", null);
         } else if (kind == ORACLE) {
             // body and doc may be NULL: Oracle stores an empty text as NULL.
@@ -166,7 +169,23 @@ public final class SqlSearchEngine implements SearchEngine {
             }
             text = w.toString();
         }
-        data.execute(sql, new Object[] {index, id, text, Json.write(document)});
+        Object[] params = {index, id, text, Json.write(document)};
+        try {
+            data.execute(sql, params);
+        } catch (DataIntegrityViolationException err) {
+            // Oracle's MERGE is not atomic against a concurrent insert of the
+            // same key: the loser of that race gets ORA-00001, and run again
+            // the row now matches and is updated.
+            if (kind != ORACLE || !isUniqueViolation(err)) {
+                throw err;
+            }
+            data.execute(sql, params);
+        }
+    }
+
+    static boolean isUniqueViolation(DataIntegrityViolationException err) {
+        String text = err.getMessage();
+        return text != null && text.indexOf("ORA-00001") >= 0;
     }
 
     private static void collectText(Object value, StringBuilder out, int depth) {
@@ -301,7 +320,9 @@ public final class SqlSearchEngine implements SearchEngine {
             // its own capitalised form; such words are checked in memory alone.
             if (isAscii(t)) {
                 // The words are folded already (see terms).
-                sql.append(kind == ORACLE ? " AND LOWER(body) LIKE ? ESCAPE '\\'"
+                // Oracle compares case-sensitively, and so does SQL Server
+                // under a _CS or binary database collation.
+                sql.append(kind == ORACLE || kind == SQLSERVER ? " AND LOWER(body) LIKE ? ESCAPE '\\'"
                         : " AND body LIKE ? ESCAPE '\\'");
                 params[n++] = "%" + likeEscape(t) + "%";
             }

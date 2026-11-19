@@ -378,13 +378,24 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
             execute(oracleIgnoringExisting("CREATE TABLE cn1_orm_sequences (sequence_name "
                     + dialect.assignedKeyColumn(Dialect.TEXT) + ", next_value "
                     + dialect.columnType(Dialect.BIGINT) + " NOT NULL)"), new Object[0]);
-            execute("MERGE INTO cn1_orm_sequences s USING (SELECT ? AS n FROM DUAL) v ON (s.sequence_name = v.n)"
-                    + " WHEN NOT MATCHED THEN INSERT (sequence_name,next_value) VALUES (v.n,0)", new Object[]{name});
+            try {
+                execute("MERGE INTO cn1_orm_sequences s USING (SELECT ? AS n FROM DUAL) v ON (s.sequence_name = v.n)"
+                        + " WHEN NOT MATCHED THEN INSERT (sequence_name,next_value) VALUES (v.n,0)", new Object[]{name});
+            } catch (com.codename1.backend.DataIntegrityViolationException err) {
+                // Two processes seeding the same generator: Oracle's MERGE is
+                // not atomic, and the loser's ORA-00001 means the row exists.
+                if (err.getMessage() == null || err.getMessage().indexOf("ORA-00001") < 0) {
+                    throw err;
+                }
+            }
             return;
         }
         boolean sqlServer = "sqlserver".equals(dialect.getName());
         if (strategy == 2 && sqlServer) {
-            execute("IF OBJECT_ID(?, 'SO') IS NULL EXEC('CREATE SEQUENCE ' + ?  + ' AS BIGINT START WITH 1')",
+            // 2714 is the sequence a concurrent first call created between
+            // the check and the CREATE.
+            execute("BEGIN TRY IF OBJECT_ID(?, 'SO') IS NULL EXEC('CREATE SEQUENCE ' + ?  + ' AS BIGINT START WITH 1'); "
+                    + "END TRY BEGIN CATCH IF ERROR_NUMBER() <> 2714 THROW; END CATCH",
                     new Object[]{quote(name), quote(name)});
             return;
         }

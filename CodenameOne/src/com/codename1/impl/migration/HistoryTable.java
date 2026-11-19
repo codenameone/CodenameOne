@@ -173,7 +173,8 @@ public final class HistoryTable {
         String succeeded = quote("success") + (sqlServer || oracle ? " = 1" : "");
         List<String[]> raw = target.query("SELECT " + quote("installed_rank") + ", " + quote("version") + ", "
                 + quote("description") + ", " + quote("type") + ", " + quote("script") + ", " + quote("checksum")
-                + ", CAST(" + quote("installed_on") + " AS " + text + "), " + quote("execution_time")
+                + ", " + (oracle ? "TO_CHAR(" + quote("installed_on") + ", 'YYYY-MM-DD HH24:MI:SS.FF3')"
+                        : "CAST(" + quote("installed_on") + " AS " + text + ")") + ", " + quote("execution_time")
                 + ", CASE WHEN " + succeeded + " THEN 1 ELSE 0 END FROM " + quoted + " ORDER BY "
                 + quote("installed_rank"), null);
         List<Row> rows = new ArrayList<Row>();
