@@ -154,10 +154,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return function;
         }
         if (sqlServer()) {
-            // LEN ignores trailing spaces. DATALENGTH counts the bytes of the
-            // NVARCHAR value, two per UTF-16 unit, which is String.length();
-            // the halving is written by the caller's "/ 2" below.
-            return "DATALENGTH";
+            // LEN ignores trailing spaces. DATALENGTH counts the bytes of an
+            // NVARCHAR value, two per UTF-16 unit, which is String.length() --
+            // so the argument is converted first, or a VARCHAR column of a
+            // hand-written schema would count bytes. Both callers write
+            // `name(argument)`; lengthResult closes the two calls opened here
+            // and halves the result.
+            return "DATALENGTH(CONVERT(NVARCHAR(MAX), ";
         }
         return "mysql".equals(sql.dialect()) ? "CHAR_LENGTH" : function;
     }
@@ -190,6 +193,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             right = "NULLIF(" + right + ", 0)";
             if ("/".equals(op) && kind != Attribute.REAL && "mysql".equals(sql.dialect())) {
                 op = "DIV";
+            }
+            // Oracle's NUMBER division is exact and it has no % operator; TRUNC
+            // and MOD truncate toward zero, as Java does.
+            if (oracle() && kind != Attribute.REAL) {
+                return checkedArithmetic(("/".equals(op) ? "TRUNC(" + left + " / " + right + ")"
+                        : "MOD(" + left + ", " + right + ")"), kind);
+            }
+            if (oracle() && "%".equals(op)) {
+                return checkedArithmetic("MOD(" + left + ", " + right + ")", kind);
             }
         }
         return checkedArithmetic("(" + left + " " + op + " " + right + ")", kind);
@@ -229,7 +241,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// A rendered LENGTH call as a count of UTF-16 units: SQL Server's
     /// DATALENGTH counts two bytes per unit of an NVARCHAR value.
     String lengthResult(String call) {
-        return sqlServer() ? "(" + call + " / 2)" : call;
+        return sqlServer() ? "(" + call + ")) / 2)" : call;
     }
     /// The argument of AVG: SQL Server averages integers as integers and
     /// truncates, so an integral argument is widened before the average.
@@ -245,18 +257,22 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String signed = "CAST(" + value + " AS " + type + ")";
         String sum = "(" + signed + " + CASE WHEN " + signed + " < 0 THEN CAST('-9223372036854775808' AS "
                 + type + ") ELSE CAST('9223372036854775807' AS " + type + ") END)";
-        // NUMBER arithmetic has 38 digits and does not overflow; narrowing
-        // the sum back to 19 digits is what raises the error (ORA-01438).
-        return oracle() ? "CAST(" + sum + " AS NUMBER(19))" : sum;
+        // NUMBER arithmetic has 38 digits and does not overflow, and NUMBER(19)
+        // holds every 19-digit value, so the sum above (about 9.2E18) would
+        // FIT. Twenty digits narrowed to 19 is what raises ORA-01438.
+        return oracle() ? "CAST(ABS(" + signed + ") + 10000000000000000000 AS NUMBER(19))" : sum;
     }
     String checkedFloatAssignment(String expression) {
         String value = numericOperand(expression, Attribute.REAL);
         String magnitude = "ABS(" + value + ")";
         // Match Values.asFloat: reject finite overflow and rounding a nonzero
         // double to zero. Half the smallest float rounds to zero (ties to even).
-        String invalid = "(" + magnitude + " > 3.4028234663852886e38 AND " + magnitude
-                + " <= 1.7976931348623157e308) OR (" + magnitude + " > 0 AND " + magnitude
-                + " <= 7.006492321624085e-46)";
+        // Oracle reads an unsuffixed literal as NUMBER, whose range ends near
+        // 1E126 (ORA-01426); the d suffix makes it a BINARY_DOUBLE.
+        String d = oracle() ? "d" : "";
+        String invalid = "(" + magnitude + " > 3.4028234663852886e38" + d + " AND " + magnitude
+                + " <= 1.7976931348623157e308" + d + ") OR (" + magnitude + " > 0 AND " + magnitude
+                + " <= 7.006492321624085e-46" + d + ")";
         String sign = "(CASE WHEN " + value + " < 0 THEN -1 ELSE 1 END)";
         return "(CASE WHEN " + invalid + " THEN " + integralOverflow(sign) + " ELSE " + value + " END)";
     }
@@ -2360,7 +2376,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // fewest digits that hold its range: NUMBER(3) a TINYINT, (5) a
             // SMALLINT, (10) an int, (19) a long -- what a schema written for
             // the other engines becomes on Oracle.
-            int precision = leadingNumber(type);
+            // NUMBER(*,0) is the default precision, 38 digits.
+            int precision = type.replace(" ", "").indexOf("(*") >= 0 ? 38 : leadingNumber(type);
             return precision <= 0 ? 0 : precision <= 3 ? 1 : precision <= 5 ? 2 : precision <= 8 ? 3
                     : precision <= 10 ? 4 : precision <= 19 ? 8 : 9;
         }
@@ -3320,6 +3337,28 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// SQL Server locks with a table hint, which is written after the table
     /// it applies to, so it goes after the alias of the statement's first
     /// table -- the root entity's, in every statement the ORM renders.
+    /// `statement` with its paging and its lock, in the order each engine
+    /// takes them: the clause after the paging everywhere (MySQL refuses
+    /// `FOR UPDATE LIMIT`), and on SQL Server the hint after the table. Oracle
+    /// refuses a lock on a row-limited query outright (ORA-02014); a caller that
+    /// can lock the rows one by one asks [#followOnLock] first.
+    String lockedPage(String statement, String clause, int count, int offset) {
+        String paging = limit(statement, count, offset);
+        if (sqlServer()) {
+            return locked(statement, clause) + paging;
+        }
+        if (clause.length() > 0 && paging.length() > 0 && oracle()) {
+            throw new PersistenceException("Oracle cannot lock the rows of a paged query (ORA-02014): "
+                    + "select the entities, or lock without setMaxResults/setFirstResult");
+        }
+        return statement + paging + clause;
+    }
+    /// Whether a paged, locked read must lock its rows after reading them, by
+    /// key, one statement each: Oracle's answer to ORA-02014, as Hibernate's
+    /// follow-on locking is.
+    boolean followOnLock(String clause, int count, int offset) {
+        return oracle() && clause.length() > 0 && sql.limit(count, offset).length() > 0;
+    }
     String locked(String statement, String clause) {
         if (clause.length() == 0 || !sqlServer()) {
             return statement + clause;
@@ -4054,7 +4093,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return;
         }
         if (entry.deleting) {
-            if ("sqlite".equals(sql.dialect()) || "postgresql".equals(sql.dialect())) {
+            if (!immediateForeignKeys()) {
                 return;
             }
             throw new PersistenceException("Cyclic non-nullable delete dependencies");

@@ -210,6 +210,13 @@ public final class SqlServer {
         boolean strict = sslMode != null && "strict".equals(sslMode.trim());
         String mode = strict ? "require" : SqlLimits.canonicalSslMode(sslMode == null ? "prefer" : sslMode);
         SqlLimits.requireRootForVerifyCa(mode, caFile);
+        // An NTLMv2 response seen on the wire can be cracked offline or relayed,
+        // and this client sends no channel binding, so a Windows sign-in only
+        // ever travels inside TLS.
+        if ("disable".equals(mode) && user != null && user.indexOf('\\') >= 0) {
+            throw new IOException("A Windows sign-in (" + user + ") is never sent without TLS; "
+                    + "connect with sslmode=require");
+        }
         String targetHost = host;
         int targetPort = port <= 0 ? 1433 : port;
         for (int hop = 0 ; ; hop++) {
@@ -221,6 +228,14 @@ public final class SqlServer {
             session.close();
             if (hop > 0) {
                 throw new IOException("The server at " + host + " redirected the login twice");
+            }
+            // verify-ca checks the chain and not the name, so any host holding a
+            // certificate from that CA would get the password; a route under it
+            // may only move the port.
+            if ("verify-ca".equals(mode) && !session.routeHost.equalsIgnoreCase(targetHost)) {
+                throw new IOException("The server at " + targetHost + " redirected the login to "
+                        + session.routeHost + ", and sslmode=verify-ca does not check host names; "
+                        + "connect with sslmode=verify-full to follow the redirect");
             }
             targetHost = session.routeHost;
             targetPort = session.routePort;

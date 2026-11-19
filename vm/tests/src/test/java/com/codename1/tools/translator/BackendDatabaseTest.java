@@ -75,6 +75,7 @@ class BackendDatabaseTest {
         // SQL Server 2025 over TDS 8.0 (sslmode=strict): TLS first, ALPN tds/8.0.
         addIfSet(urls, "CN1_DBCHECK_SQLSERVER_STRICT");
         addIfSet(urls, "CN1_DBCHECK_ORACLE");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE21");
         if (urls.size() == 1 && BackendTestSupport.isRequired()) {
             fail("No CN1_DBCHECK_POSTGRES, _MYSQL, _SQLSERVER or _ORACLE is set, so only SQLite "
                     + "was exercised; the server engines are the ones with a wire "

@@ -175,7 +175,7 @@ public final class NativeQueryImpl<T> implements JpqlQuery<T> {
         if (max == 0) {
             return result;
         }
-        for (Object[] row : session.read(session.locked(sql, session.lockClause(lock)) + session.limit(sql, max, skip), args, new int[]{SqlAccess.NATIVE_SCALAR})) {
+        for (Object[] row : session.read(session.lockedPage(sql, session.lockClause(lock), max, skip), args, new int[]{SqlAccess.NATIVE_SCALAR})) {
             Object value = row[0];
             try {
                 if (kind == Attribute.REAL && value instanceof Number) {

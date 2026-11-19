@@ -72,6 +72,7 @@ class BackendMigrationTest {
         addIfSet(urls, "CN1_DBCHECK_MYSQL");
         addIfSet(urls, "CN1_DBCHECK_SQLSERVER");
         addIfSet(urls, "CN1_DBCHECK_ORACLE");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE21");
         if (urls.size() == 1 && BackendTestSupport.isRequired()) {
             fail("No CN1_DBCHECK_POSTGRES, _MYSQL, _SQLSERVER or _ORACLE is set, so only SQLite "
                     + "was exercised; the session lock and the failed-migration marker are "

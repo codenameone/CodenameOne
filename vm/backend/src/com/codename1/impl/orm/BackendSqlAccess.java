@@ -264,7 +264,8 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
             // is what FOR SHARE means elsewhere.
             return mode == LockMode.PESSIMISTIC_WRITE ? " WITH (UPDLOCK, ROWLOCK)" : " WITH (HOLDLOCK, ROWLOCK)";
         }
-        if (mode == LockMode.PESSIMISTIC_WRITE) {
+        // Oracle has no shared row lock: FOR UPDATE is the only lock it takes.
+        if (mode == LockMode.PESSIMISTIC_WRITE || "oracle".equals(dialect.getName())) {
             return " FOR UPDATE";
         }
         return "mysql".equals(dialect.getName()) ? " LOCK IN SHARE MODE" : " FOR SHARE";

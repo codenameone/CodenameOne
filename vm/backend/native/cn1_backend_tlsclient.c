@@ -690,10 +690,11 @@ static JAVA_LONG cn1ClientTlsStart(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, 
     /* ALPN, when the protocol names one (TDS 8.0 asks for "tds/8.0"). The CA
      * path above is no longer needed, so the thread's scratch buffer is free to
      * hold this conversion. The wire form is each name behind its length byte. */
+    unsigned char wire[256];
+    size_t alpnLength = 0;
     if(alpn != JAVA_NULL) {
         const char* name = stringToUTF8(threadStateData, alpn);
         size_t len = name == 0 ? 0 : strlen(name);
-        unsigned char wire[256];
         if(len == 0 || len > 255) {
             snprintf(cn1ClientTlsError, sizeof(cn1ClientTlsError), "an ALPN protocol name is 1 to 255 bytes");
             SSL_free(ssl);
@@ -702,6 +703,7 @@ static JAVA_LONG cn1ClientTlsStart(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, 
         }
         wire[0] = (unsigned char)len;
         memcpy(wire + 1, name, len);
+        alpnLength = len;
         /* Returns 0 on success, unlike the rest of OpenSSL. */
         if(SSL_set_alpn_protos(ssl, wire, (unsigned int)(len + 1)) != 0) {
             snprintf(cn1ClientTlsError, sizeof(cn1ClientTlsError), "ALPN could not be set");
@@ -775,7 +777,7 @@ static JAVA_LONG cn1ClientTlsStart(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, 
         /* The handshake is over and so is the framing: from here the TLS
            records go to the socket as they are. */
         struct cn1TunnelBio* t = (struct cn1TunnelBio*)BIO_get_data(SSL_get_rbio(ssl));
-        if(t == 0 || t->pendingLength > 0 || t->wireLength > 0 || t->remaining > 0) {
+        if(t == 0 || t->pendingLength > 0 || t->wireLength > 0 || t->remaining > 0 || t->headerHave > 0) {
             snprintf(cn1ClientTlsError, sizeof(cn1ClientTlsError),
                      "the tunnelled handshake ended mid-packet");
             SSL_free(ssl);
@@ -793,6 +795,20 @@ static JAVA_LONG cn1ClientTlsStart(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, 
         }
         SSL_free(ssl);
         return 0;
+    }
+    /* A protocol that asked for ALPN needs the server to have chosen it: an
+       endpoint that ignored the extension (a TLS terminator, a server that does
+       not speak it) is not the protocol this connection is for. */
+    if(alpnLength > 0) {
+        const unsigned char* chosen = 0;
+        unsigned int chosenLength = 0;
+        SSL_get0_alpn_selected(ssl, &chosen, &chosenLength);
+        if(chosenLength != alpnLength || memcmp(chosen, wire + 1, alpnLength) != 0) {
+            snprintf(cn1ClientTlsError, sizeof(cn1ClientTlsError),
+                     "the server did not select ALPN protocol %.*s", (int)alpnLength, (const char*)(wire + 1));
+            SSL_free(ssl);
+            return 0;
+        }
     }
     return (JAVA_LONG)(intptr_t)ssl;
 }

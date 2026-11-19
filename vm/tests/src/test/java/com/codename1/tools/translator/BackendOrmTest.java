@@ -77,6 +77,7 @@ class BackendOrmTest {
         addIfSet(urls, "CN1_DBCHECK_MYSQL");
         addIfSet(urls, "CN1_DBCHECK_SQLSERVER");
         addIfSet(urls, "CN1_DBCHECK_ORACLE");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE21");
         // MariaDB is its own arm, not a spelling of the MySQL one: the two do
         // not share a case-sensitive NO PAD collation, so Database.open reads
         // the handshake banner and picks Dialect.MARIADB or Dialect.MYSQL from

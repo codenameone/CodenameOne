@@ -238,6 +238,12 @@ public final class Tcp {
                 }
             }
         }
+        if (alpn != null && !alpn.equals(upgraded.getApplicationProtocol())) {
+            // An endpoint that ignored ALPN (a TLS terminator, a server that
+            // does not speak the protocol) is not what this connection is for.
+            upgraded.close();
+            throw new IOException("The server did not select ALPN protocol " + alpn);
+        }
         if (tunnel != null) {
             // The handshake is over, and so is the framing: from here the TLS
             // records go to the socket as they are.

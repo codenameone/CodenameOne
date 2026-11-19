@@ -162,7 +162,7 @@ public abstract class Dialect {
     /// it on exactly one of the three.
     ///
     /// The quote character itself is doubled, which is the escape all three
-    /// accept. A name carrying a NUL is refused rather than escaped: no engine can
+    /// accept (Oracle, which has none, refuses a name containing its quote). A name carrying a NUL is refused rather than escaped: no engine can
     /// hold one, and SQLite reads statements as C strings, so passing it through
     /// would truncate the statement instead of failing.
     public abstract String quote(String identifier);
@@ -1084,7 +1084,14 @@ public abstract class Dialect {
         /// SQL could reach. The client folds an all-upper-case column label back
         /// to lower case, so rows are keyed the way they are on PostgreSQL.
         @Override
+        ///
+        /// Oracle has no escape for `"` inside a quoted name -- doubling it ends
+        /// the identifier and starts another token -- so such a name is refused.
         public String quote(String identifier) {
+            if (identifier != null && identifier.indexOf('"') >= 0) {
+                throw new IllegalArgumentException("An Oracle identifier cannot contain '\"': "
+                        + identifier);
+            }
             return quoteWith(asciiUpper(identifier), '"');
         }
 

@@ -272,12 +272,22 @@ public final class Oracle {
     /// `sslMode` is what the other engines take, except that a connection
     /// without TLS is a plain listener port and never an attempt that falls
     /// back: `require` and `verify-full` demand TLS to a certificate that
-    /// verifies for `host`, `verify-ca` a chain to `caFile` without the name,
-    /// and `prefer` and `disable` connect without TLS.
+    /// verifies for `host`, and `verify-ca` a chain to `caFile` without the name.
+    /// Without TLS the password is still never sent, but an active attacker
+    /// can pick the verifier and its iteration count and crack the answer
+    /// offline, and every row crosses in the clear, so plaintext is only
+    /// `disable`, written deliberately; an absent mode or `prefer` is refused,
+    /// as SQL Server refuses it.
     public static Oracle connect(String host, int port, String service, String user,
             String password, String sslMode, String caFile, int timeoutMillis,
             int socketTimeoutMillis) throws IOException {
         String mode = SqlLimits.canonicalSslMode(sslMode == null ? "prefer" : sslMode);
+        if ("prefer".equals(mode)) {
+            throw new IOException("Oracle serves TLS on a listener port of its own and never "
+                    + "falls back, so sslmode=prefer cannot mean anything here. Set sslmode=require "
+                    + "for a TCPS listener (usually port 2484), or sslmode=disable to connect in "
+                    + "the clear deliberately.");
+        }
         SqlLimits.requireRootForVerifyCa(mode, caFile);
         if (service == null || service.length() == 0) {
             throw new IOException("An Oracle URL names its service after the port: "
@@ -640,8 +650,14 @@ public final class Oracle {
                     + "client does not implement. Reset its password on a server with "
                     + "SQLNET.ALLOWED_LOGON_VERSION_SERVER at 12 or higher");
         }
-        byte[] serverPart = Crypto.aesCbcDecryptBlocks(passwordHash, new byte[16],
-                unhex(sessionKeyHex));
+        byte[] serverKey = unhex(sessionKeyHex);
+        // 48 bytes with an 11g verifier, 32 with 12c; anything else would
+        // index past the key below.
+        if (serverKey.length != (verifier == VERIFIER_12C ? 32 : 48)) {
+            throw new IOException("The Oracle server sent a session key of " + serverKey.length
+                    + " bytes for verifier 0x" + Integer.toHexString(verifier));
+        }
+        byte[] serverPart = Crypto.aesCbcDecryptBlocks(passwordHash, new byte[16], serverKey);
         byte[] clientPart = Crypto.randomBytes(serverPart.length);
         byte[] encryptedClient = Crypto.aesCbcEncryptBlocks(passwordHash, new byte[16],
                 clientPart);
@@ -702,11 +718,18 @@ public final class Oracle {
                 + "NLS_NUMERIC_CHARACTERS='.,'", new Object[0], null);
     }
 
+    private static final int MAX_PBKDF2_ITERATIONS = 1000000;
+
     private static int parseCount(Map session, String key) throws IOException {
         Object value = session.get(key);
         if (value instanceof String) {
             try {
-                return Integer.parseInt((String) value);
+                int count = Integer.parseInt((String) value);
+                // A server picks these, so a hostile one could ask for hours
+                // of PBKDF2. Oracle's defaults are 4096 and 3.
+                if (count >= 1 && count <= MAX_PBKDF2_ITERATIONS) {
+                    return count;
+                }
             } catch (NumberFormatException err) {
                 // reported below
             }
@@ -2051,7 +2074,15 @@ public final class Oracle {
 
     /// A NUMBER's digits: base 100, an exponent byte then the mantissa, with
     /// negative values complemented and ended by 102.
-    static String decodeNumber(byte[] data) {
+    static String decodeNumber(byte[] data) throws IOException {
+        if (data.length == 0) {
+            throw new IOException("The Oracle server sent an empty NUMBER");
+        }
+        // Positive infinity, which BINARY_DOUBLE converted to NUMBER can hold;
+        // negative infinity is the one-byte 0x00 below.
+        if (data.length == 2 && (data[0] & 0xff) == 0xff && (data[1] & 0xff) == 101) {
+            return "1E+126";
+        }
         int exponent = data[0] & 0xff;
         boolean positive = (exponent & 0x80) != 0;
         if (data.length == 1) {
@@ -2072,6 +2103,9 @@ public final class Oracle {
         for (int iter = 1 ; iter <= last ; iter++) {
             int pair = data[iter] & 0xff;
             pair = positive ? pair - 1 : 101 - pair;
+            if (pair < 0 || pair > 99) {
+                throw new IOException("The Oracle server sent a malformed NUMBER");
+            }
             digits.append((char) ('0' + pair / 10)).append((char) ('0' + pair % 10));
         }
         // The decimal point falls after (exponent + 1) pairs.
@@ -2138,6 +2172,9 @@ public final class Oracle {
                 } catch (NumberFormatException err) {
                     throw new IOException("Not a number: " + text, err);
                 }
+                // Far past NUMBER's range either way; clamped so that adding
+                // it to the point below cannot overflow.
+                exponent = Math.max(-1000000, Math.min(1000000, exponent));
                 break;
             } else {
                 throw new IOException("Not a number: " + text);
@@ -2182,7 +2219,9 @@ public final class Oracle {
                     + "NUMBER holds (40)");
         }
         int pairExponent = point / 2;
-        if (pairExponent > 62 || pairExponent < -65) {
+        // The exponent byte is pairExponent + 192, which must stay in
+        // 128..255 for the sign bit to mean positive.
+        if (pairExponent > 63 || pairExponent < -64) {
             throw new IOException("The number " + text + " is out of the range Oracle's "
                     + "NUMBER holds");
         }

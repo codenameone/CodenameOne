@@ -87,7 +87,7 @@ final class Ntlm {
         System.arraycopy(challenge, 24, serverChallenge, 0, 8);
         int infoLength = int16(challenge, 40);
         int infoOffset = int32(challenge, 44);
-        if (infoOffset < 0 || infoLength < 0 || infoOffset + infoLength > challenge.length) {
+        if (infoOffset < 0 || infoLength < 0 || infoOffset > challenge.length - infoLength) {
             throw new IOException("The server's NTLM challenge is malformed");
         }
         byte[] targetInfo = new byte[infoLength];

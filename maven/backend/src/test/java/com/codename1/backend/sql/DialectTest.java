@@ -560,7 +560,8 @@ class DialectTest {
         assertEquals("[a]]b]", Dialect.SQLSERVER.quote("a]b"));
         // Upper case: the name Oracle gives the unquoted `order`.
         assertEquals("\"ORDER\"", Dialect.ORACLE.quote("order"));
-        assertEquals("\"A\"\"B\"", Dialect.ORACLE.quote("a\"b"));
+        // Oracle has no escape for its quote: doubling it ends the name.
+        assertThrows(IllegalArgumentException.class, () -> Dialect.ORACLE.quote("a\"b"));
         assertThrows(IllegalArgumentException.class, () -> Dialect.SQLSERVER.quote(""));
     }
 

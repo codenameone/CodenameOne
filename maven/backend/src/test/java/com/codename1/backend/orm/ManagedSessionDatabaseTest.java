@@ -59,10 +59,15 @@ class ManagedSessionDatabaseTest {
         // SQL Server cannot point a session at another schema, so it gets a
         // database of its own, as MySQL does.
         boolean ownDatabase=mysql || "sqlserver".equals(db.dialect().getName());
+        // Oracle's schema is its user, and creating one needs CREATE USER: the
+        // test works in the connected, isolated schema and empties it after.
+        boolean oracle="oracle".equals(db.dialect().getName());
         String schema="cn1_orm_test_"+Long.toHexString(System.nanoTime());
         String quoted=db.dialect().quote(schema);
-        db.execute((ownDatabase?"CREATE DATABASE ":"CREATE SCHEMA ")+quoted,new Object[0]);
-        db=inSchema(db,url,ownDatabase,schema);
+        if(!oracle) {
+            db.execute((ownDatabase?"CREATE DATABASE ":"CREATE SCHEMA ")+quoted,new Object[0]);
+            db=inSchema(db,url,ownDatabase,schema);
+        }
         Models.register(new ManagedSessionTest.Model() {
             public int generation() { return 2; }
             public String generator() { return "Record_Sequence"; }
@@ -95,7 +100,7 @@ class ManagedSessionDatabaseTest {
 
             // PostgreSQL only: its identifiers are case sensitive when quoted,
             // and the column type changes below use its USING clause.
-            if(!ownDatabase) {
+            if(!ownDatabase && !oracle) {
                 db.execute("ALTER TABLE managed_record RENAME COLUMN name TO \"Name\"",new Object[0]);
                 PersistenceException mismatch=assertThrows(PersistenceException.class,session::validateSchema);
                 assertTrue(mismatch.getMessage().contains("Missing column managed_record.name"));
@@ -192,9 +197,17 @@ class ManagedSessionDatabaseTest {
             assertEquals(java.util.Arrays.asList(null,"Z","record"),session.createQuery("select distinct r.name from ManagedSessionTest$Record r order by r.name",String.class).list());
             assertEquals(upper.id,session.createQuery("select distinct r from ManagedSessionTest$Record r order by r.name",ManagedSessionTest.Record.class).offset(1).first().id);
             session.beginTransaction();session.lock(session.find(ManagedSessionTest.Record.class,entity.id),LockMode.PESSIMISTIC_WRITE);
+            // A lock with paging: MySQL takes LIMIT before FOR UPDATE, SQL Server a
+            // table hint, and Oracle (ORA-02014) locks the page's rows by key after.
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r order by r.name",ManagedSessionTest.Record.class)
+                    .lockMode(LockMode.PESSIMISTIC_WRITE).limit(1).list().size());
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r order by r.name",ManagedSessionTest.Record.class)
+                    .lockMode(LockMode.PESSIMISTIC_WRITE).offset(1).limit(1).list().size());
+            assertFalse(session.createQuery("select r from ManagedSessionTest$Record r",ManagedSessionTest.Record.class)
+                    .lockMode(LockMode.PESSIMISTIC_READ).list().isEmpty());
             CountDownLatch attempting=new CountDownLatch(1);
             Future<Long> waiting=workers.submit(()-> {
-                Database other=inSchema(Database.open(url),url,ownDatabase,schema);EntityManager em=EntityManager.open(other);Session s=em.openSession();
+                Database other=(oracle?Database.open(url):inSchema(Database.open(url),url,ownDatabase,schema));EntityManager em=EntityManager.open(other);Session s=em.openSession();
                 try {
                     s.beginTransaction();attempting.countDown();
                     ManagedSessionTest.Record locked=s.find(ManagedSessionTest.Record.class,entity.id,LockMode.PESSIMISTIC_WRITE);
@@ -205,7 +218,7 @@ class ManagedSessionDatabaseTest {
             assertThrows(TimeoutException.class,()->waiting.get(100,TimeUnit.MILLISECONDS));
             session.commitTransaction();assertEquals(1L,waiting.get(5,TimeUnit.SECONDS).longValue());
             Callable<Void> increment=()-> {
-                Database other=inSchema(Database.open(url),url,ownDatabase,schema);EntityManager em=EntityManager.open(other);Session s=em.openSession();
+                Database other=oracle?Database.open(url):inSchema(Database.open(url),url,ownDatabase,schema);EntityManager em=EntityManager.open(other);Session s=em.openSession();
                 try { for(int i=0;i<5;i++) { s.beginTransaction();assertTrue(s.increment(ManagedSessionTest.Record.class,entity.id,"counter",1));s.commitTransaction(); }return null; }
                 finally { s.close();em.close(); }
             };
@@ -230,7 +243,11 @@ class ManagedSessionDatabaseTest {
             }
         } finally {
             workers.shutdownNow();workers.awaitTermination(5,TimeUnit.SECONDS);
-            if(ownDatabase && !mysql) {
+            if(oracle) {
+                try { session.close();db.execute("BEGIN FOR t IN (SELECT table_name FROM user_tables) LOOP "
+                        +"EXECUTE IMMEDIATE 'DROP TABLE \"' || t.table_name || '\" CASCADE CONSTRAINTS PURGE'; END LOOP; END;",new Object[0]); }
+                finally { manager.close(); }
+            } else if(ownDatabase && !mysql) {
                 // SQL Server cannot drop the database a session is in.
                 try { session.close(); } finally { manager.close(); }
                 db.close();

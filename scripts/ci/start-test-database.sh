@@ -50,7 +50,7 @@ WHENEVER SQLERROR EXIT FAILURE
 GRANT EXECUTE ON SYS.DBMS_LOCK TO cn1;
 SQL
     {
-      echo "CN1_TEST_DATABASE_URL=oracle://cn1:cn1secret@127.0.0.1:1521/FREEPDB1"
+      echo "CN1_TEST_DATABASE_URL=oracle://cn1:cn1secret@127.0.0.1:1521/FREEPDB1?sslmode=disable"
       echo "CN1_TEST_DATABASE_RESET=$here/reset-oracle-schema.sh cn1-test-oracle cn1/cn1secret@FREEPDB1"
     } >> "$out"
     ;;

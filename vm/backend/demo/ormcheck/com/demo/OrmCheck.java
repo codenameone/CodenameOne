@@ -79,6 +79,7 @@ public class OrmCheck {
                 generatedKeys(em);
                 roundTripsEveryColumn(notes, pool.dialect().getName());
                 emptyStringInJpql(em, notes);
+                lockedPages(em, notes, pool.dialect().getName());
                 updatesAndDeletes(notes);
                 queriesByFieldName(notes, pool.dialect().getName());
                 anExplicitKeyLeavesTheNextGeneratedOneUsable(pool);
@@ -257,6 +258,40 @@ public class OrmCheck {
      * BIGINT rather than a native timestamp whose text format follows the
      * server's time zone, and a blob is BYTEA, BLOB or LONGBLOB.
      */
+    /// A locked read with paging, in each engine's order: MySQL takes LIMIT
+    /// before FOR UPDATE, SQL Server a table hint, and Oracle, which refuses a
+    /// lock on a row-limited query (ORA-02014), locks the page's rows by key
+    /// after reading them. A read lock is FOR UPDATE on Oracle, which has no
+    /// shared row lock. SQLite has no row locks and refuses the mode.
+    private static void lockedPages(EntityManager em, Dao<Note> notes, String dialect) throws Exception {
+        if ("sqlite".equals(dialect)) {
+            return;
+        }
+        Note a = new Note();
+        a.title = "lock-a";
+        notes.insert(a);
+        Note b = new Note();
+        b.title = "lock-b";
+        notes.insert(b);
+        com.codename1.orm.session.Session s = em.openSession();
+        try {
+            s.beginTransaction();
+            String jpql = "select n from com.demo.Note n where n.title like 'lock-%' order by n.title";
+            int first = s.createQuery(jpql, Note.class)
+                    .lockMode(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE).limit(1).list().size();
+            String second = s.createQuery(jpql, Note.class)
+                    .lockMode(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE).offset(1).limit(1).list().get(0).title;
+            int shared = s.createQuery(jpql, Note.class)
+                    .lockMode(com.codename1.orm.session.LockMode.PESSIMISTIC_READ).list().size();
+            s.commitTransaction();
+            check("locked reads with paging, and a read lock", "1/lock-b/2", first + "/" + second + "/" + shared);
+        } finally {
+            s.close();
+            notes.delete(a);
+            notes.delete(b);
+        }
+    }
+
     /// JPQL comparing with '' agrees with the stored empty string: on
     /// Oracle, where '' is NULL, the comparison is rendered as IS [NOT] NULL.
     private static void emptyStringInJpql(EntityManager em, Dao<Note> notes) throws Exception {

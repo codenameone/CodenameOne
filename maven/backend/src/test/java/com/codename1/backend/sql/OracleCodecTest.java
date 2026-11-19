@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /// The Oracle wire codecs without a server: NUMBER against the bytes Oracle's
 /// own `DUMP()` prints, BINARY_DOUBLE round trips, and the statement helpers.
@@ -55,6 +56,20 @@ class OracleCodecTest {
             assertArrayEquals((byte[]) v[1], Oracle.encodeNumber((String) v[0]), "encode " + v[0]);
             assertEquals(v[0], Oracle.decodeNumber((byte[]) v[1]), "decode " + v[0]);
         }
+    }
+
+    @Test
+    void numberRangeEdges() throws Exception {
+        // The exponent byte is the base-100 exponent + 193; 0xFF and 0x80 are
+        // the largest and smallest positive magnitudes NUMBER holds.
+        assertEquals(0xFF, Oracle.encodeNumber("9E125")[0] & 0xff);
+        assertEquals(0x80, Oracle.encodeNumber("1E-130")[0] & 0xff);
+        assertThrows(java.io.IOException.class, () -> Oracle.encodeNumber("1E126"));
+        assertThrows(java.io.IOException.class, () -> Oracle.encodeNumber("1E-131"));
+        assertThrows(java.io.IOException.class, () -> Oracle.encodeNumber("1E2147483647"));
+        assertEquals("1E+126", Oracle.decodeNumber(new byte[] {(byte) 0xFF, 101}));
+        assertThrows(java.io.IOException.class, () -> Oracle.decodeNumber(new byte[0]));
+        assertThrows(java.io.IOException.class, () -> Oracle.decodeNumber(new byte[] {(byte) 0xC1, (byte) 0xF0}));
     }
 
     @Test

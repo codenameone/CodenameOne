@@ -390,8 +390,10 @@ class ManagedSessionTest {
                 public String table() { return explicit?"bulk_text_explicit":"bulk_text_default"; }
                 public Attribute[] attributes() {
                     Attribute[] attrs=super.attributes().clone();
-                    // VARCHAR is not Unicode on SQL Server; NVARCHAR is.
-                    String declared="sqlserver".equals(db.dialect().getName())?"NVARCHAR(512)":"VARCHAR(512)";
+                    // VARCHAR is not Unicode on SQL Server; NVARCHAR is. Oracle's
+                    // VARCHAR counts bytes unless told CHAR.
+                    String declared="sqlserver".equals(db.dialect().getName())?"NVARCHAR(512)"
+                            :"oracle".equals(db.dialect().getName())?"VARCHAR2(512 CHAR)":"VARCHAR(512)";
                     attrs[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,explicit?declared:null);
                     return attrs;
                 }

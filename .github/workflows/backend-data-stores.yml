@@ -9,6 +9,8 @@ name: Backend data stores
 #
 #   MongoClientTest, DocumentSessionTest   CN1_TEST_MONGODB_URI
 #   DynamoDbTest, DocumentSessionTest      CN1_TEST_DYNAMODB_ENDPOINT
+#   ManagedSessionDatabaseTest             CN1_ORM_TEST_DATABASE_URL (the ORM
+#                                          over each SQL engine)
 #   SearchEngineTest                       CN1_TEST_SEARCH_URL (OpenSearch),
 #                                          CN1_TEST_DATABASE_URL (the SQL
 #                                          engines' full-text search: PostgreSQL,
@@ -39,6 +41,7 @@ on:
       - 'maven/backend/src/test/java/com/codename1/backend/mongo/**'
       - 'maven/backend/src/test/java/com/codename1/backend/search/**'
       - 'maven/backend/src/test/java/com/codename1/backend/orm/SearchIndexerTest.java'
+      - 'maven/backend/src/test/java/com/codename1/backend/orm/ManagedSession*.java'
       - 'maven/backend/pom.xml'
       # Where sessions get their search indexer, and the generator of the
       # sortKeyIndex/searchIndex/searchField methods the stores read.
@@ -191,28 +194,30 @@ jobs:
         working-directory: maven
         env:
           CN1_TEST_DATABASE_URL: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
+          CN1_ORM_TEST_DATABASE_URL: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
         run: |
           mvn -B -pl backend test \
-            -Dtest='MongoClientTest,DynamoDbTest,DocumentSessionTest,SearchEngineTest,SearchIndexerTest' \
+            -Dtest='MongoClientTest,DynamoDbTest,DocumentSessionTest,SearchEngineTest,SearchIndexerTest,ManagedSessionDatabaseTest' \
             -Dcn1.backend.database=postgres \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
           bash "$GITHUB_WORKSPACE/.github/scripts/require-no-skipped-tests.sh" backend/target/surefire-reports \
-            MongoClientTest DynamoDbTest DocumentSessionTest SearchEngineTest SearchIndexerTest
+            MongoClientTest DynamoDbTest DocumentSessionTest SearchEngineTest SearchIndexerTest ManagedSessionDatabaseTest
 
       - name: SQL full-text search on MariaDB
         working-directory: maven
         env:
           CN1_TEST_DATABASE_URL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
+          CN1_ORM_TEST_DATABASE_URL: mysql://root:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
         run: |
-          mvn -B -pl backend test -Dtest='SearchEngineTest' \
+          mvn -B -pl backend test -Dtest='SearchEngineTest,ManagedSessionDatabaseTest' \
             -Dcn1.backend.database=mysql \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
           bash "$GITHUB_WORKSPACE/.github/scripts/require-no-skipped-tests.sh" backend/target/surefire-reports \
-            SearchEngineTest
+            SearchEngineTest ManagedSessionDatabaseTest
 
       - name: SQL full-text search on SQL Server 2025 over TDS 8.0 strict
         working-directory: maven
@@ -230,24 +235,26 @@ jobs:
         working-directory: maven
         env:
           CN1_TEST_DATABASE_URL: sqlserver://sa:Cn1-Secret-9x@127.0.0.1:1433/master?sslmode=disable
+          CN1_ORM_TEST_DATABASE_URL: sqlserver://sa:Cn1-Secret-9x@127.0.0.1:1433/master?sslmode=disable
         run: |
-          mvn -B -pl backend test -Dtest='SearchEngineTest' \
+          mvn -B -pl backend test -Dtest='SearchEngineTest,ManagedSessionDatabaseTest' \
             -Dcn1.backend.database=sqlserver \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
           bash "$GITHUB_WORKSPACE/.github/scripts/require-no-skipped-tests.sh" backend/target/surefire-reports \
-            SearchEngineTest
+            SearchEngineTest ManagedSessionDatabaseTest
 
       - name: SQL full-text search on Oracle
         working-directory: maven
         env:
-          CN1_TEST_DATABASE_URL: oracle://cn1:cn1secret@127.0.0.1:1521/FREEPDB1
+          CN1_TEST_DATABASE_URL: oracle://cn1:cn1secret@127.0.0.1:1521/FREEPDB1?sslmode=disable
+          CN1_ORM_TEST_DATABASE_URL: oracle://cn1:cn1secret@127.0.0.1:1521/FREEPDB1?sslmode=disable
         run: |
-          mvn -B -pl backend test -Dtest='SearchEngineTest' \
+          mvn -B -pl backend test -Dtest='SearchEngineTest,ManagedSessionDatabaseTest' \
             -Dcn1.backend.database=oracle \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
           bash "$GITHUB_WORKSPACE/.github/scripts/require-no-skipped-tests.sh" backend/target/surefire-reports \
-            SearchEngineTest
+            SearchEngineTest ManagedSessionDatabaseTest
