@@ -306,7 +306,8 @@ public final class Oracle {
                     tcp.setReadTimeout(socketTimeoutMillis);
                 }
                 if (SqlLimits.demandsTls(mode)) {
-                    tcp.startTls(host, caFile, SqlLimits.verifiesHost(mode));
+                    // The host dialled, which a redirect may have changed.
+                    tcp.startTls(targetHost, caFile, SqlLimits.verifiesHost(mode));
                 }
                 String sent = descriptor != null ? descriptor
                         : descriptor(targetHost, targetPort, service,
@@ -317,6 +318,14 @@ public final class Oracle {
                     if (hop > 0) {
                         throw new IOException("The listener at " + host
                                 + " redirected the connection twice");
+                    }
+                    // verify-ca checks the issuer and not the name, so any host
+                    // holding a certificate from that CA would pass: a redirect
+                    // there may change only the port, as on SQL Server.
+                    if ("verify-ca".equals(mode) && !host.equalsIgnoreCase(redirect[0])) {
+                        throw new IOException("The listener at " + host + " redirected to "
+                                + redirect[0] + "; sslmode=verify-ca cannot check that host name, "
+                                + "use verify-full");
                     }
                     targetHost = redirect[0];
                     targetPort = Integer.parseInt(redirect[1]);
@@ -333,6 +342,9 @@ public final class Oracle {
                 tcp.close();
                 throw new IOException("The listener at " + host
                         + " redirected to an address this client cannot read", err);
+            } catch (RuntimeException err) {
+                tcp.close();
+                throw new IOException("Malformed reply from the server at " + targetHost, err);
             }
         }
     }
@@ -709,6 +721,17 @@ public final class Oracle {
         sendData(second.toByteArray());
         session.clear();
         readAuth(session);
+        // The server's half: its reply decrypts under the combined key only if
+        // it knew the verifier, so a listener that merely answers is refused
+        // here, before any statement or bind value reaches it.
+        String response = (String) session.get("AUTH_SVR_RESPONSE");
+        byte[] proof = response == null ? new byte[0] : unhex(response);
+        if (proof.length < 32 || proof.length % 16 != 0
+                || !hex(Wire.utf8("SERVER_TO_CLIENT")).equals(hex(slice(
+                        Crypto.aesCbcDecryptBlocks(combined, new byte[16], proof), 16, 32)))) {
+            throw new IOException("The Oracle server did not prove it knows the password "
+                    + "verifier for " + user);
+        }
         // Text that converts to a date, a timestamp or a number is read in ONE
         // format whatever the server's locale says, the same text the other
         // engines accept and this client returns.
@@ -824,6 +847,14 @@ public final class Oracle {
             // on this connection can be trusted to be the answer to its question.
             close();
             throw err;
+        } catch (IndexOutOfBoundsException err) {
+            // A server length or bit vector that disagrees with the data: the
+            // stream is out of step, so the connection is done.
+            close();
+            throw (IOException) new IOException("Malformed reply from the server [" + sql + "]").initCause(err);
+        } catch (NegativeArraySizeException err) {
+            close();
+            throw (IOException) new IOException("Malformed reply from the server [" + sql + "]").initCause(err);
         }
     }
 
@@ -2488,8 +2519,11 @@ public final class Oracle {
         int length = u8();
         boolean negative = (length & 0x80) != 0;
         length &= 0x7f;
+        if (length > 8) {
+            throw new IOException("The Oracle server sent a " + length + "-byte integer");
+        }
         long value = 0;
-        for (int iter = 0 ; iter < length && iter < 8 ; iter++) {
+        for (int iter = 0 ; iter < length ; iter++) {
             value = (value << 8) | u8();
         }
         return negative ? -value : value;

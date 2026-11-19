@@ -47,7 +47,10 @@ binding. Kerberos and Microsoft Entra ID sign-in aren't supported. The password 
 without TLS is refused unless the URL says `sslmode=disable`.
 `sslmode=strict` is TDS 8.0, which a server set to strict encryption requires:
 TLS starts before anything else and the certificate is verified for the host.
-SQL Server on Linux serves it from 2025 on.
+SQL Server on Linux serves it from 2025 on. The mapping writes text as
+`NVARCHAR`. An existing `VARCHAR` column is read as UTF-8 under a UTF-8
+collation and as Windows-1252, the default collation's code page, otherwise;
+text under another code page belongs in `NVARCHAR`.
 
 An Oracle URL is `oracle://user:password@host:1521/service`, where the path is
 the service name, for Oracle Database 19c and newer. With `sslmode` `require`,
@@ -55,7 +58,10 @@ the service name, for Oracle Database 19c and newer. With `sslmode` `require`,
 listener port of its own, usually 2484. Without TLS the URL must say
 `sslmode=disable`: the password itself never crosses the network, but an active
 attacker can choose how the sign-in proves it and crack the answer offline, and
-every row crosses in the clear. Native Network Encryption,
+every row crosses in the clear. The server must prove at sign-in that it
+knows the password verifier, or the connection is refused. A listener that
+redirects the connection under `verify-ca` may change only the port, since that
+mode doesn't check the host name. Native Network Encryption,
 wallets and connection descriptors aren't supported.
 
 The portable statements, the object mapping and migrations work on both. Two

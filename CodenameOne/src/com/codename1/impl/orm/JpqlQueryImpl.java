@@ -328,9 +328,20 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         return new Bound(statement.toString(), values.toArray());
     }
     /// How often each plain parameter or literal value occurs in `template`,
-    /// keyed as [#arguments()] keys them.
+    /// keyed as [#arguments()] keys them -- for values that occur inside the
+    /// GROUP BY clause only. A value repeated elsewhere (the null-aware text
+    /// comparison writes each parameter twice) keeps its bind.
     private Map<String, Integer> repeatedValues(String template) {
         Map<String, Integer> counts = new LinkedHashMap<String, Integer>();
+        java.util.Set<String> grouped = new java.util.HashSet<String>();
+        int groupStart = template.lastIndexOf(" GROUP BY ");
+        int groupEnd = template.length();
+        for (String next : new String[]{" HAVING ", " ORDER BY ", " OFFSET ", " FETCH FIRST "}) {
+            int at = template.indexOf(next, groupStart);
+            if (at >= 0 && at < groupEnd) {
+                groupEnd = at;
+            }
+        }
         int position = 0;
         int start;
         while ((start = template.indexOf("/*cn1-bind-", position)) >= 0) {
@@ -348,11 +359,15 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 Object value = boundValue(binding);
                 key = value == null ? null : "'" + value.getClass().getName() + ":" + value;
             }
+            if (key != null && start > groupStart && start < groupEnd) {
+                grouped.add(key);
+            }
             if (key != null) {
                 Integer count = counts.get(key);
                 counts.put(key, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
             }
         }
+        counts.keySet().retainAll(grouped);
         return counts;
     }
     /// `value` as Oracle literal text when it occurs more than once, else null.
@@ -366,7 +381,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
             return "(" + value + ")";
         }
-        if (value instanceof String && ((String) value).indexOf('\0') < 0) {
+        // A literal is capped at 4000 bytes (ORA-01704); a longer value keeps
+        // its bind, and Oracle then refuses the grouping by name.
+        if (value instanceof String && ((String) value).length() <= 1000 && ((String) value).indexOf('\0') < 0) {
             String text = (String) value;
             StringBuilder quoted = new StringBuilder(text.length() + 3).append("N'");
             for (int i = 0; i < text.length(); i++) {

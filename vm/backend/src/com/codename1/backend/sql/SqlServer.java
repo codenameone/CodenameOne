@@ -995,7 +995,21 @@ public final class SqlServer {
     /// Rows of the first result set go to `rows` when it is not null. An error
     /// the server reported is left in `failure`, to be thrown once the whole
     /// response has been read and the connection is back in step.
+    /// [#readTokens(QueryRows)], with a server length that disagrees with the
+    /// data -- an index past a value, a negative size -- reported as the
+    /// malformed reply it is, so the caller closes the connection rather than
+    /// handing back a stream that is out of step.
     private int readResponse(QueryRows rows) throws IOException {
+        try {
+            return readTokens(rows);
+        } catch (IndexOutOfBoundsException err) {
+            throw (IOException) new IOException("Malformed reply from SQL Server").initCause(err);
+        } catch (NegativeArraySizeException err) {
+            throw (IOException) new IOException("Malformed reply from SQL Server").initCause(err);
+        }
+    }
+
+    private int readTokens(QueryRows rows) throws IOException {
         long affected = 0;
         Column[] columns = null;
         int resultSets = 0;
@@ -1470,19 +1484,29 @@ public final class SqlServer {
     // ---------------- value formats ----------------
 
     /// Text of a VARCHAR column: UTF-8 under a UTF-8 collation, and otherwise
-    /// read as Latin-1, which is exact for ASCII and for the Western code page's
-    /// accented letters. What this runtime writes is NVARCHAR, which never
-    /// comes through here.
-    private static String narrow(byte[] data, boolean utf8) {
+    /// read as Windows-1252, the code page of the default collation
+    /// (SQL_Latin1_General_CP1_CI_AS and Latin1_General_*). It is Latin-1 except
+    /// for 0x80-0x9F, where it has the euro sign, curly quotes and dashes.
+    /// Columns under other code pages (Cyrillic, Greek, CJK) are not decoded:
+    /// the runtime reads UTF-8 and Latin-1 only, and such text belongs in
+    /// NVARCHAR, which is what this runtime writes and never comes through here.
+    static String narrow(byte[] data, boolean utf8) {
         if (utf8) {
             return Wire.fromUtf8(data);
         }
         StringBuilder out = new StringBuilder(data.length);
         for (byte each : data) {
-            out.append((char) (each & 0xff));
+            int code = each & 0xff;
+            out.append(code >= 0x80 && code < 0xa0 ? CP1252_HIGH.charAt(code - 0x80) : (char) code);
         }
         return out.toString();
     }
+
+    /// Windows-1252 at 0x80-0x9F; the five bytes it leaves undefined keep
+    /// their Latin-1 value.
+    private static final String CP1252_HIGH =
+            "\u20ac\u0081\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\u008d\u017d\u008f"
+            + "\u0090\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u009d\u017e\u0178";
 
     /// A signed little-endian integer of 2, 4 or 8 bytes.
     private static long little(byte[] data, int offset, int length) {

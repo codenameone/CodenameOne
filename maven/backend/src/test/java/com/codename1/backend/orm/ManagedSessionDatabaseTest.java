@@ -205,6 +205,10 @@ class ManagedSessionDatabaseTest {
                     .lockMode(LockMode.PESSIMISTIC_WRITE).offset(1).limit(1).list().size());
             assertFalse(session.createQuery("select r from ManagedSessionTest$Record r",ManagedSessionTest.Record.class)
                     .lockMode(LockMode.PESSIMISTIC_READ).list().isEmpty());
+            // A text parameter compared outside GROUP BY stays a bind: on Oracle a
+            // 1500-character literal would be refused (ORA-01704).
+            assertTrue(session.createQuery("select r.counter, count(r) from ManagedSessionTest$Record r where r.name = :n group by r.counter",Object[].class)
+                    .setParameter("n",new String(new char[1500]).replace('\0','y')).list().isEmpty());
             CountDownLatch attempting=new CountDownLatch(1);
             Future<Long> waiting=workers.submit(()-> {
                 Database other=(oracle?Database.open(url):inSchema(Database.open(url),url,ownDatabase,schema));EntityManager em=EntityManager.open(other);Session s=em.openSession();
