@@ -27,6 +27,7 @@ import com.codename1.ui.chart.ChartContext;
 import com.codename1.ui.chart.ChartPoint;
 import com.codename1.ui.chart.Series;
 
+import java.util.Arrays;
 import java.util.List;
 
 /// A series of `(x, y)` points in primitive arrays. A `NaN` y is a gap: lines break there
@@ -409,6 +410,7 @@ public abstract class XYSeries extends Series {
     @Override
     protected void dataChanged() {
         orderState = 0;
+        minXSpacing = 0;
         super.dataChanged();
     }
 
@@ -716,15 +718,44 @@ public abstract class XYSeries extends Series {
     /// The smallest gap between neighbouring x values, the width of one bar or candle slot;
     /// 1 when there are fewer than two points, which is a category band.
     public double getMinXSpacing() {
+        // computed once per change to the data: paint asks for it every frame
+        if (minXSpacing > 0) {
+            return minXSpacing;
+        }
+        double[] v = xs;
+        int n = count;
+        if (!isAscending()) {
+            // descending or unsorted x (or one with gaps) still has slots as wide as the
+            // closest two distinct values; sort a copy of the finite ones to find them
+            if (spacingBuffer == null || spacingBuffer.length < count) {
+                spacingBuffer = new double[count];
+            }
+            n = 0;
+            for (int i = 0; i < count; i++) {
+                if (!isGap(xs[i])) {
+                    spacingBuffer[n++] = xs[i];
+                }
+            }
+            for (int i = n; i < spacingBuffer.length; i++) {
+                spacingBuffer[i] = Double.MAX_VALUE;
+            }
+            Arrays.sort(spacingBuffer);
+            v = spacingBuffer;
+        }
         double m = Double.MAX_VALUE;
-        for (int i = 1; i < count; i++) {
-            double d = xs[i] - xs[i - 1];
+        for (int i = 1; i < n; i++) {
+            double d = v[i] - v[i - 1];
             if (d > 0 && d < m) {
                 m = d;
             }
         }
-        return m == Double.MAX_VALUE ? 1 : m;
+        minXSpacing = m == Double.MAX_VALUE ? 1 : m;
+        return minXSpacing;
     }
+
+    // 0 until getMinXSpacing computes it; reset by every change to the data
+    private double minXSpacing;
+    private double[] spacingBuffer;
 
     /// First index whose x is at or after `x`, for culling points outside the viewport.
     protected int lowerBound(double x) {

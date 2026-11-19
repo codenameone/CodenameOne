@@ -297,6 +297,10 @@ public class SankeySeries extends Series {
         for (int l = 0; l < links.size(); l++) {
             int[] e = links.get(l);
             double v = linkValues.get(l)[0];
+            // the layout counts NaN, infinite and negative links as nothing, so the tooltip must too
+            if (!(v > 0 && v < Double.POSITIVE_INFINITY)) { //NOPMD LogicInversion - also true for NaN
+                continue;
+            }
             if (e[0] == i) {
                 out += v;
             }
@@ -327,7 +331,8 @@ public class SankeySeries extends Series {
             float x0 = lay.getNodeX(e[0]) + nodeWidth;
             float x1 = lay.getNodeX(e[1]);
             // a back link runs right to left; its ribbon spans the same x range reversed
-            if (ax < Math.min(x0, x1) || ax > Math.max(x0, x1) || x1 == x0) {
+            // paint skips an empty link, so nothing is there to hit
+            if (!(lay.getLinkWidth(l) > 0) || ax < Math.min(x0, x1) || ax > Math.max(x0, x1) || x1 == x0) { //NOPMD LogicInversion - also true for NaN
                 continue;
             }
             float s = ribbonEase((ax - x0) / (x1 - x0));

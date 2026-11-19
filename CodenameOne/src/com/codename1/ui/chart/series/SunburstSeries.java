@@ -96,6 +96,18 @@ public class SunburstSeries extends HierarchySeries {
     }
 
     @Override
+    protected boolean crumbContains(float ax, float ay) {
+        // the hole is a circle: the corners of its bounding square are on the first ring
+        if (!super.crumbContains(ax, ay)) {
+            return false;
+        }
+        float r = crumb[2] / 2f;
+        float dx = ax - (crumb[0] + r);
+        float dy = ay - (crumb[1] + r);
+        return dx * dx + dy * dy <= r * r;
+    }
+
+    @Override
     public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
         ChartPoint p = super.hitTest(ctx, x, y, radius);
         if (p != null || crumb == null) {

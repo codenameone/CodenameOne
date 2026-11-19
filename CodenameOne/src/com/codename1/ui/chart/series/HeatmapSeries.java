@@ -301,7 +301,7 @@ public class HeatmapSeries extends Series {
         int stride = Math.max(1, getColumns());
         int r = index < 0 ? -1 : index / stride;
         int c = index < 0 ? -1 : index % stride;
-        if (ctx == null || r < 0 || r >= matrix.length || c >= matrix[r].length || matrix[r][c] != matrix[r][c]) {
+        if (ctx == null || r < 0 || r >= matrix.length || c >= matrix[r].length || isGap(matrix[r][c])) {
             return null;
         }
         float[] b = cell(ctx, r, c);
@@ -316,7 +316,7 @@ public class HeatmapSeries extends Series {
         for (int r = 0; r < matrix.length; r++) {
             for (int c = 0; c < matrix[r].length; c++) {
                 float[] b = cell(ctx, r, c);
-                if (ax >= b[0] && ax <= b[0] + b[2] && ay >= b[1] && ay <= b[1] + b[3] && matrix[r][c] == matrix[r][c]) {
+                if (ax >= b[0] && ax <= b[0] + b[2] && ay >= b[1] && ay <= b[1] + b[3] && !isGap(matrix[r][c])) {
                     return getPoint(ctx, cellId(r, c));
                 }
             }

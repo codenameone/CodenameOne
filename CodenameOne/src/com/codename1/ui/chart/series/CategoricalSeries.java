@@ -192,7 +192,7 @@ public abstract class CategoricalSeries extends Series {
     protected double displayValue(ChartContext ctx, int i) {
         double v = values[i];
         // NaN and negative parts draw as nothing; a NaN must not poison the total
-        double target = hidden[i] || !(v > 0) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
+        double target = hidden[i] || !(v > 0 && v < Double.POSITIVE_INFINITY) ? 0 : v; //NOPMD LogicInversion - NaN, infinities and negatives count as nothing
         double t = ctx == null ? 1 : ctx.getProgress();
         if (t >= 1 || from == null || i >= from.length) {
             return target;

@@ -102,10 +102,36 @@ public abstract class HierarchySeries extends Series {
         if (getChart() != null) {
             getChart().beginChange();
         }
-        current = node == null ? root : node;
+        // a node outside this tree (or above a root that is itself a subtree) would paint and drill
+        // through nodes the chart does not own, so it falls back to the root
+        current = isUnderRoot(node) ? node : root;
         entering = true;
         dataChanged();
         return this;
+    }
+
+    private boolean isUnderRoot(TreeNode node) {
+        for (TreeNode n = node; n != null; n = n.getParent()) {
+            if (n == root) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// True when a point, in screen coordinates, is on the breadcrumb that goes back up.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ax`: the x coordinate
+    ///
+    /// - `ay`: the y coordinate
+    ///
+    /// #### Returns
+    ///
+    /// true on the breadcrumb
+    protected boolean crumbContains(float ax, float ay) {
+        return crumb != null && ax >= crumb[0] && ax <= crumb[0] + crumb[2] && ay >= crumb[1] && ay <= crumb[1] + crumb[3];
     }
 
     /// Enables zooming into a node by tapping it.
@@ -283,7 +309,7 @@ public abstract class HierarchySeries extends Series {
     public ChartPoint hitTest(ChartContext ctx, int x, int y, int radius) {
         float ax = x + ctx.getOriginX();
         float ay = y + ctx.getOriginY();
-        if (crumb != null && ax >= crumb[0] && ax <= crumb[0] + crumb[2] && ay >= crumb[1] && ay <= crumb[1] + crumb[3]) {
+        if (crumbContains(ax, ay)) {
             return new ChartPoint(this, -1, 0, current.getValue(), x, y, current.getParent() == null ? null : current.getParent().getLabel());
         }
         for (int i = nodes.size() - 1; i >= 0; i--) {
@@ -330,7 +356,7 @@ public abstract class HierarchySeries extends Series {
             return false;
         }
         if (p.getIndex() < 0) {
-            setCurrent(current.getParent());
+            setCurrent(current == root ? root : current.getParent()); //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
             return true;
         }
         TreeNode n = getNode(p);
@@ -339,7 +365,7 @@ public abstract class HierarchySeries extends Series {
         }
         // zoom into the tapped node's top level branch under the current node
         TreeNode target = n;
-        while (target.getParent() != null && target.getParent() != current) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
+        while (target.getParent() != null && target.getParent() != current && target != root) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended
             target = target.getParent();
         }
         if (target.getChildCount() > 0 && target != current) { //NOPMD CompareObjectsWithEquals - identity of the same instance is intended

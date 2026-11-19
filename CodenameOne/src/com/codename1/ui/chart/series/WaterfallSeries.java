@@ -181,6 +181,9 @@ public class WaterfallSeries extends BarSeries {
         if (connectors && ctx.getProgress() >= 1) {
             Graphics g = ctx.getGraphics();
             g.setColor(ctx.getTheme().getAxisColor());
+            int oldAlpha = g.getAlpha();
+            // the connectors fade with the bars when the series is shown or hidden
+            g.setAlpha(Math.round(oldAlpha * getVisibilityFraction()));
             for (int i = 0; i + 1 < size(); i++) {
                 double d = getY(i);
                 double end = getBase(i) + (Double.isNaN(d) || Double.isInfinite(d) ? 0 : d);
@@ -190,6 +193,7 @@ public class WaterfallSeries extends BarSeries {
                 float y1 = ctx.screenY(this, getX(i + 1), end);
                 g.drawLine(Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1));
             }
+            g.setAlpha(oldAlpha);
         }
         super.paint(ctx);
     }

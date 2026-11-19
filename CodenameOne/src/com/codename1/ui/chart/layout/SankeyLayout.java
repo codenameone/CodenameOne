@@ -341,8 +341,8 @@ public final class SankeyLayout {
         }
     }
 
-    // NaN and negative values count as nothing; Math.max(0, NaN) is NaN and would poison the sums
+    // NaN, infinite and negative values count as nothing; Math.max(0, NaN) is NaN and would poison the sums
     private static double pos(double v) {
-        return !(v > 0) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
+        return v > 0 && v < Double.POSITIVE_INFINITY ? v : 0; // NaN, infinities and negatives count as nothing
     }
 }

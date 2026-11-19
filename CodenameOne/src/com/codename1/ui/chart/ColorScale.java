@@ -46,6 +46,13 @@ public class ColorScale {
             // as an index error in the first paint
             throw new IllegalArgumentException("positions and colors must be non-empty and of equal length");
         }
+        for (int i = 0; i < positions.length; i++) {
+            double v = positions[i];
+            // interpolation searches the stops in order: NaN, an infinity or a step back finds the wrong pair
+            if (!(v > Double.NEGATIVE_INFINITY && v < Double.POSITIVE_INFINITY) || i > 0 && v < positions[i - 1]) { //NOPMD LogicInversion - also true for NaN
+                throw new IllegalArgumentException("positions must be finite and non-decreasing");
+            }
+        }
         this.positions = new double[positions.length];
         this.colors = new int[colors.length];
         System.arraycopy(positions, 0, this.positions, 0, positions.length);

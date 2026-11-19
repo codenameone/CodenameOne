@@ -160,6 +160,6 @@ public class FunnelSeries extends CategoricalSeries {
     }
 
     private static double clean(double v) {
-        return !(v > 0) ? 0 : v; //NOPMD LogicInversion - the negated comparison is also true for NaN
+        return v > 0 && v < Double.POSITIVE_INFINITY ? v : 0; // NaN, infinities and negatives count as nothing
     }
 }

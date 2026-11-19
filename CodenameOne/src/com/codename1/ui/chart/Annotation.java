@@ -120,7 +120,7 @@ public final class Annotation {
     }
 
     boolean isOnValueAxis() {
-        return includeInRange && (kind == VALUE_LINE || kind == VALUE_BAND);
+        return includeInRange && (kind == VALUE_LINE || kind == VALUE_BAND) && finite(from) && finite(to);
     }
 
     double getValueExtent() {
@@ -135,6 +135,10 @@ public final class Annotation {
     private int labelX;
     private int labelY;
 
+    private static boolean finite(double v) {
+        return v > Double.NEGATIVE_INFINITY && v < Double.POSITIVE_INFINITY;
+    }
+
     /// `{a0, a1, horizontal ? 1 : 0}`: the line or band's pixel extent, or null off screen.
     private int[] extent(ChartContext ctx) {
         boolean valueKind = kind == VALUE_LINE || kind == VALUE_BAND;
@@ -143,6 +147,10 @@ public final class Annotation {
         if (valueKind) {
             com.codename1.ui.chart.axis.Axis second = ctx.getChart().getSecondaryYAxis();
             axis = secondaryAxis && second != null ? second : ctx.getChart().getYAxis();
+        }
+        if (!finite(from) || !finite(to)) {
+            // NaN normalizes to NaN, which every comparison above lets through to the plot's bottom edge
+            return null;
         }
         double n0 = axis.toNormalized(from);
         double n1 = axis.toNormalized(to);

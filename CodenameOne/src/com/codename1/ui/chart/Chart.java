@@ -197,6 +197,10 @@ public class Chart extends Component {
 
     /// Removes a series.
     public Chart removeSeries(Series s) {
+        if (s == null || s.chart != this) { //NOPMD CompareObjectsWithEquals - identity of the owning chart is intended
+            // a series this chart does not own belongs to another chart, which still paints it
+            return this;
+        }
         beginChange();
         series.remove(s);
         s.chart = null;
