@@ -62,6 +62,12 @@ jobs:
       - name: Check every job installs the Maven Central mirror
         run: python3 scripts/check-maven-central-mirror.py
 
+      # Those wrappers download from repo.codenameone.com, so a Maven or wrapper version
+      # bump fails here, in one place, until the "Seed Maven distributions to R2"
+      # workflow has copied it there -- not in every job that starts Maven.
+      - name: Check R2 serves every Maven distribution the tree names
+        run: bash maven/scripts/r2/seed-maven-distributions.sh --verify
+
       - name: Check CI selection and obsolete-run cancellation
         run: |
           python3 scripts/ci/test_select_cn1lib_checks.py

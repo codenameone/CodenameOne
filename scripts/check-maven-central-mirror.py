@@ -180,6 +180,7 @@ def main():
         if path.name in WORKFLOW_EXEMPT:
             continue
         findings += check_file(path, fix)
+    findings += check_wrappers()
     if fix:
         print("inserted the mirror step where it was missing; re-run without --fix to verify")
         return 0
