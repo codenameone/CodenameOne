@@ -3472,6 +3472,11 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-11-20T01:01:41+00:00"
+      },
+      "devto": {
+        "id": 5082274,
+        "url": "https://dev.to/codenameone/shopify-was-wrong-and-right-to-dump-react-native-2c93",
+        "syndicated_at": "2026-11-20T14:01:07+00:00"
       }
     }
   }
