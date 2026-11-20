@@ -31,12 +31,14 @@ import java.util.Set;
 ///
 /// By default an edge is refused when it connects a node to itself, repeats
 /// an edge that exists, leaves an input port or enters an output port, joins
-/// two ports whose types are both set and differ, or takes a port past its
+/// two ports whose types are both set, differ and were not paired with
+/// `allowType`, or takes a port past its
 /// `GraphPort.getMaxConnections`. Cycles are allowed unless
 /// `setAllowCycles(false)` is called.
 public class ConnectionValidator {
     private boolean allowCycles = true;
     private boolean allowSelfLoops;
+    private final Set<String> allowedTypes = new HashSet<String>();
 
     /// True, the default, when an edge may close a cycle.
     public boolean isAllowCycles() {
@@ -58,6 +60,19 @@ public class ConnectionValidator {
         this.allowSelfLoops = allowSelfLoops;
     }
 
+    /// Lets an output of one type feed an input of another, for instance
+    /// `allowType("int", "number")`. Equal types always connect.
+    public void allowType(String outputType, String inputType) {
+        allowedTypes.add(outputType + "\n" + inputType);
+    }
+
+    /// True when an output of the first type may feed an input of the second:
+    /// either is null, they are equal, or `allowType` named the pair.
+    public boolean isTypeAllowed(String outputType, String inputType) {
+        return outputType == null || inputType == null || outputType.equals(inputType)
+                || allowedTypes.contains(outputType + "\n" + inputType);
+    }
+
     /// True when the edge may be made.
     public boolean canConnect(GraphModel model, GraphNode source, GraphPort sourcePort,
                               GraphNode target, GraphPort targetPort) {
@@ -73,8 +88,8 @@ public class ConnectionValidator {
         if (targetPort != null && !targetPort.isInput()) {
             return false;
         }
-        if (sourcePort != null && targetPort != null && sourcePort.getType() != null
-                && targetPort.getType() != null && !sourcePort.getType().equals(targetPort.getType())) {
+        if (sourcePort != null && targetPort != null
+                && !isTypeAllowed(sourcePort.getType(), targetPort.getType())) {
             return false;
         }
         List<GraphEdge> edges = model.getEdges();

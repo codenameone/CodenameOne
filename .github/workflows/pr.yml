@@ -207,6 +207,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Validate Java 25 markdown docs style (CodenameOne + CLDC11)
         run: ./.github/scripts/validate-java25-markdown-docs.sh
       - name: Set up Java
@@ -228,6 +230,8 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set up Node
         if: ${{ matrix.java-version == 8 }}
         uses: actions/setup-node@v6
@@ -890,6 +894,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Build JavaDocs
         if: matrix.java-version == 8

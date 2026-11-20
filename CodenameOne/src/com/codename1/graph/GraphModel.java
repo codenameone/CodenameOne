@@ -30,6 +30,10 @@ import java.util.List;
 /// so a model that refuses an edit (by returning false or null) keeps the
 /// graph as it was. `AbstractGraphModel` refuses all of them; extend
 /// `DefaultGraphModel` for an editable graph in memory.
+///
+/// Write a model of your own by extending `AbstractGraphModel`, not by
+/// implementing this interface: an edit a later component learns to make
+/// arrives there as one more method that refuses.
 public interface GraphModel {
     /// Every node, in painting order: later nodes are drawn over earlier ones.
     List<GraphNode> getNodes();
@@ -94,6 +98,66 @@ public interface GraphModel {
     ///
     /// false when the model refuses
     boolean setCollapsed(GraphGroup group, boolean collapsed);
+
+    /// Adds a node the user made, from a palette or by pasting.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses, or already has a node with this id
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the node
+    /// - `index`: where in `getNodes` it goes, which is its painting order;
+    ///   negative, or past the end, for the end. Undoing a removal puts a
+    ///   node back where it was.
+    ///
+    /// A view's undo of a delete puts nodes back through this method, so a
+    /// model that refuses it cannot have its deletes undone.
+    boolean insertNode(GraphNode node, int index);
+
+    /// Adds an edge as it is, without the checks `connect` makes: pasting and
+    /// undo put back edges that were valid when they were made.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses, has an edge with this id, or lacks one of
+    /// the nodes the edge names
+    ///
+    /// #### Parameters
+    ///
+    /// - `edge`: the edge
+    /// - `index`: where in `getEdges` it goes; negative, or past the end, for
+    ///   the end
+    boolean insertEdge(GraphEdge edge, int index);
+
+    /// Gives a node a new size, in world units.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses
+    boolean resizeNode(GraphNode node, double width, double height);
+
+    /// Moves a node into a group or a lane, or out of every one with null.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses
+    boolean setNodeGroup(GraphNode node, String groupId);
+
+    /// Gives a lane new bounds, in world units.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses
+    boolean resizeGroup(GraphGroup group, double x, double y, double width, double height);
+
+    /// Sets the value an unconnected input port uses.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model refuses
+    boolean setPortValue(GraphPort port, Object value);
 
     /// Adds a listener told about every change.
     void addChangeListener(GraphChangeListener l);

@@ -55,6 +55,9 @@ jobs:
           distribution: temurin
           java-version: '25'
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Capture Java 25 path
         run: echo "JDK_25_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 

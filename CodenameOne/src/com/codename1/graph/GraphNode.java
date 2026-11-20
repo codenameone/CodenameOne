@@ -40,6 +40,7 @@ public class GraphNode {
     private double height;
     private String groupId;
     private String styleKey;
+    private String shape;
     private boolean pinned;
     private Object userData;
     private final List<GraphPort> inputs = new ArrayList<GraphPort>();
@@ -148,6 +149,24 @@ public class GraphNode {
         this.styleKey = styleKey;
     }
 
+    /// The outline the node is drawn with, one of the `GraphShapes` names or a
+    /// name registered with `com.codename1.ui.graph.GraphShapeRegistry`. Null,
+    /// the default, is the view's ordinary box.
+    public String getShape() {
+        return shape;
+    }
+
+    /// Sets the outline, for instance `GraphShapes.DECISION` for the diamond
+    /// of a flow chart.
+    ///
+    /// #### Returns
+    ///
+    /// this node, so calls can be chained
+    public GraphNode setShape(String shape) {
+        this.shape = shape;
+        return this;
+    }
+
     /// True when automatic arrangements must leave the node where it is.
     public boolean isPinned() {
         return pinned;
@@ -208,7 +227,32 @@ public class GraphNode {
         return !inputs.isEmpty() || !outputs.isEmpty();
     }
 
-    /// The port with this id, or null.
+    /// The input port with this id, or null. An input and an output may share
+    /// an id, so an edge's target port is looked up here and its source port
+    /// in `getOutput(String)`.
+    public GraphPort getInput(String portId) {
+        return find(inputs, portId);
+    }
+
+    /// The output port with this id, or null.
+    public GraphPort getOutput(String portId) {
+        return find(outputs, portId);
+    }
+
+    private static GraphPort find(List<GraphPort> ports, String portId) {
+        if (portId == null) {
+            return null;
+        }
+        for (int i = 0; i < ports.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: asked per edge per frame
+            GraphPort p = ports.get(i);
+            if (portId.equals(p.getId())) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /// The port with this id, inputs searched first, or null.
     public GraphPort getPort(String portId) {
         if (portId == null) {
             return null;
@@ -226,7 +270,32 @@ public class GraphNode {
         return null;
     }
 
-    /// True when the world point lies inside the node.
+    /// A node like this one under another id: the same label, bounds, shape,
+    /// style, group and ports, with their values, and the same user data
+    /// object. For pasting and duplicating.
+    public GraphNode copy(String newId) {
+        GraphNode c = new GraphNode(newId, label, x, y, width, height);
+        c.description = description;
+        c.groupId = groupId;
+        c.styleKey = styleKey;
+        c.shape = shape;
+        c.pinned = pinned;
+        c.userData = userData;
+        for (int pass = 0; pass < 2; pass++) {
+            List<GraphPort> ports = pass == 0 ? inputs : outputs;
+            int n = ports.size();
+            for (int i = 0; i < n; i++) {
+                GraphPort p = ports.get(i);
+                GraphPort q = new GraphPort(p.getId(), p.getDirection(), p.getLabel(), p.getType());
+                q.setMaxConnections(p.getMaxConnections());
+                q.setValue(p.getValue());
+                c.addPort(q);
+            }
+        }
+        return c;
+    }
+
+    /// True when the world point lies inside the node's bounds.
     public boolean contains(double px, double py) {
         return px >= x && py >= y && px < x + width && py < y + height;
     }

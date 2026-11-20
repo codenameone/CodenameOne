@@ -40,7 +40,13 @@ workflows() {
       scripts/android/*) want+=" scripts-android.yml" ;;
       scripts/javascript/*) want+=" scripts-javascript.yml" ;;
       scripts/linux/*) want+=" linux-build-run.yml" ;;
-      scripts/windows/*) want+=" parparvm-tests-windows.yml windows-cross-build-run.yml" ;;
+      # Three legs compare against scripts/windows (native x64, native arm64,
+      # cross-built x64), but one rendering is a golden: the native x64 leg
+      # alone captures. Rendering all three only made the harvest refuse a
+      # golden whenever arm64 anti-aliased a glyph past its allowance, and
+      # held the capture on the scarcest runner. The other legs are compared
+      # against it by the normal run the harvest commit starts.
+      scripts/windows/*) want+=" parparvm-tests-windows.yml" ;;
       scripts/macos/*) want+=" scripts-macos.yml" ;;
       *) want+=" ${WORKFLOWS[*]}" ;;
     esac

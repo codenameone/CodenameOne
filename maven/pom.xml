@@ -454,6 +454,32 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+    <!--
+    Google's mirror of Maven Central, tried before Central itself (the super
+    POM's central is always last). Maven Central answers 429 to GitHub's
+    runners for long enough that four retries over seven minutes still failed
+    reading this POM's junit-bom import, in workflows across the board. The
+    mirror serves Central's exact content; anything it lacks still resolves
+    from Central.
+    -->
+    <repositories>
+        <repository>
+            <id>google-maven-central</id>
+            <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>google-maven-central</id>
+            <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
     <build>
         <pluginManagement>
             <plugins>

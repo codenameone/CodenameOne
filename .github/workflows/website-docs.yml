@@ -186,6 +186,9 @@ jobs:
           # Java workflow here already caches this way.
           cache: 'maven'
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -255,6 +258,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Build website
         run: |

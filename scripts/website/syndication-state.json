@@ -3453,6 +3453,26 @@
         "url": "https://dev.to/codenameone/debug-your-dart-in-a-java-debugger-and-jfx-central-on-a-phone-366e",
         "syndicated_at": "2026-11-19T14:01:11+00:00"
       }
+    },
+    "shopify-was-wrong-and-right-to-dump-react-native": {
+      "hashnode": {
+        "url": "https://debugagent.com/shopify-was-wrong-and-right-to-dump-react-native",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aff9ba0b5ebf26e4fae825c",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-20T01:01:11+00:00"
+      },
+      "foojay": {
+        "id": 461,
+        "url": "https://github.com/foojayio/website/pull/461",
+        "pull_request_url": "https://github.com/foojayio/website/pull/461",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-11-20T01:01:41+00:00"
+      }
     }
   }
 }

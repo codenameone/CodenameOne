@@ -68,6 +68,23 @@ public class CodeEditor extends AbstractEditorComponent {
     private int tabSize = 4;
     private CodeCompletionProvider completionProvider;
     private final EventDispatcher protectedEditListeners = new EventDispatcher();
+    private final EventDispatcher keyListeners = new EventDispatcher();
+    private boolean singleLine;
+
+    /// Enter or the keyboard's action key, in an editor of one line. See `#setSingleLine(boolean)`.
+    public static final int KEY_ENTER = 1;
+    /// Tab, in an editor of one line.
+    public static final int KEY_TAB = 2;
+    /// Shift+Tab, in an editor of one line.
+    public static final int KEY_BACK_TAB = 3;
+    /// Escape, in an editor of one line.
+    public static final int KEY_ESCAPE = 4;
+    /// The up arrow, in an editor of one line.
+    public static final int KEY_UP = 5;
+    /// The down arrow, in an editor of one line.
+    public static final int KEY_DOWN = 6;
+    /// F4, in an editor of one line, on a port with a keyboard that delivers it.
+    public static final int KEY_F4 = 7;
 
     /// Creates an empty code editor.
     public CodeEditor() {
@@ -327,6 +344,53 @@ public class CodeEditor extends AbstractEditorComponent {
         command("setCompletionEnabled", provider != null ? "1" : "0");
     }
 
+    /// Sets whether the editor holds one line, as a field does: the editor of a spreadsheet
+    /// cell or a search box. Enter, Tab, Shift+Tab, Escape and the up and down arrows then
+    /// change nothing in the text; each is reported to the listeners of
+    /// `#addKeyListener(ActionListener)` instead, which decide what it does (end the edit,
+    /// move to the next field, pick from a list the application shows). Line numbers are
+    /// hidden, and a line break typed, pasted or set becomes a space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `singleLine`: true for one line
+    public void setSingleLine(boolean singleLine) {
+        this.singleLine = singleLine;
+        if (singleLine) {
+            showLineNumbers = false;
+        }
+        command("setSingleLine", singleLine ? "1" : "0");
+    }
+
+    /// Whether the editor holds one line.
+    ///
+    /// #### Returns
+    ///
+    /// true when it was set to one line
+    public boolean isSingleLine() {
+        return singleLine;
+    }
+
+    /// Adds a listener told of the keys an editor of one line leaves to the application. The
+    /// event's `ActionEvent#getKeyEvent()` is one of `#KEY_ENTER`, `#KEY_TAB`,
+    /// `#KEY_BACK_TAB`, `#KEY_ESCAPE`, `#KEY_UP`, `#KEY_DOWN` and `#KEY_F4`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addKeyListener(ActionListener l) {
+        keyListeners.addListener(l);
+    }
+
+    /// Removes a listener added with `#addKeyListener(ActionListener)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeKeyListener(ActionListener l) {
+        keyListeners.removeListener(l);
+    }
+
     /// Returns the current completion provider, or null if none is set.
     public CodeCompletionProvider getCompletionProvider() {
         return completionProvider;
@@ -336,6 +400,16 @@ public class CodeEditor extends AbstractEditorComponent {
     void onEditorEvent(String type, String value) {
         if ("complete".equals(type)) {
             handleCompletionRequest(value);
+            return;
+        }
+        if ("key".equals(type)) {
+            int key = "enter".equals(value) ? KEY_ENTER : "tab".equals(value) ? KEY_TAB
+                    : "backtab".equals(value) ? KEY_BACK_TAB : "escape".equals(value) ? KEY_ESCAPE
+                    : "up".equals(value) ? KEY_UP : "down".equals(value) ? KEY_DOWN
+                    : "f4".equals(value) ? KEY_F4 : 0;
+            if (key != 0) {
+                keyListeners.fireActionEvent(new ActionEvent(this, key));
+            }
             return;
         }
         if ("protectedEdit".equals(type)) {

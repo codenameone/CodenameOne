@@ -1,0 +1,6 @@
+# The x64 and arm64 legs share this golden and anti-alias one tag glyph
+# on the cards differently: 3 pixels, delta 35 light / 50 dark, measured
+# on capture runs 44489462078 (both legs) and 44489468095 (cross-built
+# x64, identical to native x64). Absorb that variance only.
+maxChannelDelta=56
+maxMismatchPercent=0.01

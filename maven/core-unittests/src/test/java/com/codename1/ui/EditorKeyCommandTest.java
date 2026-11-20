@@ -91,4 +91,41 @@ class EditorKeyCommandTest extends UITestBase {
         v.onKeyCommand(TextInputClient.KEY_TAB, TextInputClient.MOD_SHIFT);
         assertEquals("    indented", v.getText(), "shift-tab removes one indent level from the line");
     }
+
+    @FormTest
+    void singleLineReportsTheKeysAFormNeedsAndStaysOneLine() {
+        implementation.setTextInputSupported(true);
+        final CodeEditor editor = new CodeEditor("java", "a\nb");
+        editor.setSingleLine(true);
+        final java.util.List<Integer> keys = new java.util.ArrayList<Integer>();
+        editor.addKeyListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                assertSame(editor, evt.getSource());
+                keys.add(Integer.valueOf(evt.getKeyEvent()));
+            }
+        });
+        Form f = new Form("k", new BorderLayout());
+        f.add(BorderLayout.CENTER, editor);
+        f.show();
+        for (int i = 0; i < 8; i++) {
+            flushSerialCalls();
+        }
+        assertTrue(editor.isSingleLine());
+        CodeView v = (CodeView) editor.getComponentAt(0);
+        assertEquals("a b", v.getText(), "a line break already there becomes a space");
+        v.setSelectionRange(3, 3);
+        v.commitText("\n");
+        v.onKeyCommand(TextInputClient.KEY_TAB, 0);
+        v.onKeyCommand(TextInputClient.KEY_TAB, TextInputClient.MOD_SHIFT);
+        v.onKeyCommand(TextInputClient.KEY_ESCAPE, 0);
+        v.onKeyCommand(TextInputClient.KEY_UP, 0);
+        v.onKeyCommand(TextInputClient.KEY_DOWN, 0);
+        assertEquals(java.util.Arrays.asList(Integer.valueOf(CodeEditor.KEY_ENTER), Integer.valueOf(CodeEditor.KEY_TAB),
+                Integer.valueOf(CodeEditor.KEY_BACK_TAB), Integer.valueOf(CodeEditor.KEY_ESCAPE),
+                Integer.valueOf(CodeEditor.KEY_UP), Integer.valueOf(CodeEditor.KEY_DOWN)), keys);
+        assertEquals("a b", v.getText(), "enter and tab insert nothing");
+        v.insertText("c\nd");
+        assertEquals("a bc d", v.getText(), "pasted lines are joined");
+    }
 }

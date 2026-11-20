@@ -210,6 +210,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
 
@@ -269,6 +272,9 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       # build.sh requires a JDK 8 BY NAME, and the Java 17 setup below replaces
       # JAVA_HOME -- so the value has to be captured while it is still correct.
       - name: Record JDK 8 for the native screenshot server
@@ -288,6 +294,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Set up Node 20
         uses: actions/setup-node@v6

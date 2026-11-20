@@ -136,6 +136,9 @@ jobs:
           distribution: temurin
           java-version: '8'
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install clang and cmake
         run: bash scripts/ci/apt-get-install.sh clang cmake
 

@@ -143,6 +143,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       # The scripts and the runtime's C# target netstandard2.1, which any SDK
       # builds, but the console sample is also built for net10.0 (that build is
       # the `dotnet run` oracle) and the metadata dumper is a net10.0 program.
@@ -253,6 +255,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up JDK 8
         uses: actions/setup-java@v5
@@ -260,6 +264,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -332,6 +338,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up JDK 8
         uses: actions/setup-java@v5
@@ -339,6 +347,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       # xvfb for the CSS compiler, which opens an AWT frame.
       - name: Install xvfb
         run: bash scripts/ci/apt-get-install.sh xvfb

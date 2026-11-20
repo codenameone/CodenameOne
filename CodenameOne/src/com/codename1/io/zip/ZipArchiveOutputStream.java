@@ -165,7 +165,12 @@ public class ZipArchiveOutputStream extends DeflaterOutputStream {
         byte[] extra = r.entry.getExtra();
         r.extra = extra == null ? new byte[0] : extra.clone();
         validateExtra(r.extra);
-        r.extra = timestampExtra(r.extra, r.entry.getTime());
+        // The container formats that open with an uncompressed "mimetype" entry -- OpenDocument,
+        // EPUB -- are recognised by the type standing at a fixed place in the file, right
+        // after the name, and forbid an extra field in that entry for that reason.
+        if (!(r.entry.getMethod() == STORED && "mimetype".equals(r.entry.getName()) && r.extra.length == 0)) {
+            r.extra = timestampExtra(r.extra, r.entry.getTime());
+        }
         if (r.name.length == 0) {
             throw new ZipException("Empty entry name");
         }

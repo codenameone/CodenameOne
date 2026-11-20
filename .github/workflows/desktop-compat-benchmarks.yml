@@ -68,6 +68,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
       # The same script the benchmark container is built from: the GTK stack,
       # Xvfb and a window manager, JDK 17 and 21, zig, the OpenJFX jmods.
@@ -126,12 +128,16 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "BENCH_JDK21_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "JAVA17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
       # Zulu: Temurin publishes no JDK 8 for Apple silicon.
       - name: Set up JDK 8
@@ -140,6 +146,8 @@ jobs:
           java-version: '8'
           distribution: 'zulu'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
       - name: Build Codename One (JDK 8)
         env:
@@ -200,6 +208,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       # clang-cl uses the MSVC headers, CRT and linker, so the MSVC developer
       # environment has to be on PATH for the cmake the builder spawns.
       - name: Set up the MSVC developer environment
@@ -216,12 +226,16 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "BENCH_JDK21_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "JAVA17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
       - name: Set up JDK 8
         uses: actions/setup-java@v5
@@ -229,6 +243,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
       # The scripts call python3; the runner's interpreter is "python".
       - name: Provide python3

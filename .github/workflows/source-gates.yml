@@ -48,6 +48,9 @@ jobs:
           # The copyright-header gate diffs against the PR base.
           fetch-depth: 0
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       # A raw control byte makes a file binary to grep, which then reports "no
       # match" instead of an error. Absolute: no baseline, no exclusions.
       - name: Scan tracked text files for raw control characters

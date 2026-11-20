@@ -217,6 +217,8 @@ jobs:
       CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Test screenshot server startup probe
         run: bash scripts/ci/tests/cn1ss-selfcheck-test.sh
       - name: Set TMPDIR
@@ -233,6 +235,8 @@ jobs:
         with:
           java-version: ${{ matrix.java_version }}
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set JDK_HOME
         if: matrix.id != 'default'
         run: echo "JDK_HOME=${JAVA_HOME}" >> $GITHUB_ENV
@@ -364,7 +368,7 @@ jobs:
           disk-size: 2048M
           script: |
             ${{ matrix.emulator_setup || 'true' }}
-            ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+            CN1SS_EMULATOR_SETUP="${{ matrix.emulator_setup }}" ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       # After the emulator, deliberately: the instrumentation suite runs against
       # the APK the primary build produced, and this rewrites that project in
       # place. It is the end-to-end half of the API 37 coverage -- the offline

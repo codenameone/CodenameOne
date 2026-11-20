@@ -53,6 +53,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Show Xcode toolchain
         run: |
           xcodebuild -version

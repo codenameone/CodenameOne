@@ -54,6 +54,8 @@ jobs:
       link: ${{ steps.plan.outputs.admob_link }}
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Select impacted libraries before allocating a Mac
         id: plan
         env:
@@ -74,6 +76,8 @@ jobs:
         with:
           distribution: zulu
           java-version: '8'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Install xcodegen once
         if: needs.select.outputs.libraries != ''
         run: command -v xcodegen || brew install xcodegen

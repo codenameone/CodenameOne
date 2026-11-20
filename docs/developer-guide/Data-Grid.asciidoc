@@ -403,6 +403,319 @@ image::img/generated/datagrid-dark.png["The sorted orders grid on a dark backgro
 .The grid in the iOS theme
 image::img/generated/datagrid-ios.png["The sorted orders grid with the colors of the iOS theme",scaledwidth=70%]
 
+=== Spreadsheet files
+
+A grid reads and writes spreadsheets through the `com.codename1.spreadsheet` package.
+A `Workbook` is an Excel `.xlsx` file, an OpenDocument `.ods` file or separated text
+such as CSV, and each of its `Sheet` objects is a `TableModel`:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-open,indent=0]
+----
+
+`setHeaderRow(true)` takes the column names from the first row of the sheet.
+`createColumns()` then builds a `GridColumn` for each column: its kind comes from
+the values the column holds, and its formatter from the number format of its
+cells, so a price shows as `1,234.50` and a date the way the file formats it.
+
+Cells keep their types. A number is a `Double`, a date is a `java.util.Date`, a
+logical value is a `Boolean` and an error such as `#DIV/0!` is a `CellError`.
+`Sheet.getCellText` answers the text a spreadsheet would show for a cell.
+
+`Workbook.Format.detect` picks the format from a file name and the first bytes
+of the file, for a file the user chose.
+
+A file the user chose is a file someone else wrote. `Workbook.read` throws an
+`IOException` for one that's damaged or that isn't a spreadsheet. It also
+throws for a file larger than the cell limit, because a few hundred compressed
+bytes can describe millions of cells. The limit is one million cells, about
+75 MB of numbers. A formula counts as eight cells or more, and the rows above
+the last cell, the shared text and the column widths count as well.
+`Workbook.setCellLimit` raises the limit for an application that reads larger
+files on a device with the memory for them.
+
+==== A whole workbook
+
+A workbook usually has several sheets that read one another. The samples that
+follow open `regional-sales.xlsx`, a file LibreOffice saved, from the
+application's resources. It has a sheet of orders, a sheet of commission rates
+and sales targets for each region, and a summary that reads both:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-resource,indent=0]
+----
+
+Each sheet is a model of its own, so a grid for each one in a `Tabs` component
+is the workbook the way a spreadsheet shows it:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-workbook,indent=0]
+----
+
+.The Orders sheet. The dates, prices and discounts are formatted by the number formats of the file, and Net is a formula
+image::img/generated/datagrid-sheet-orders.png["A grid under three tabs named Orders, Rates and Summary showing orders with a date written as day, short month and year, a price such as 1,250.00, a discount such as 5.0% and a net amount",scaledwidth=70%]
+
+The Summary sheet has no values of its own. Every cell after the first column
+is a formula: `COUNTIF`, `SUMIF` and `SUMIFS` over the orders, `VLOOKUP` and
+`INDEX` with `MATCH` into the rates, and an `IF` that names the standing of
+each region:
+
+.The Summary sheet, calculated from the other two
+image::img/generated/datagrid-sheet-summary.png["The Summary tab with a row for North, South, East and West and a row for all regions; South has the largest revenue, 42,664.50, and the last row reads South leads",scaledwidth=70%]
+
+==== Formulas
+
+Formulas are live. A formula reads other cells by their address in the sheet, so
+sorting or filtering the grid never changes what `B2` means. When a cell changes,
+every formula that reads that cell is calculated again and the grid repaints
+the cells that changed:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-formula,indent=0]
+----
+
+An edit reaches other sheets the same way. This corrects one order on the
+Orders sheet:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-edit,indent=0]
+----
+
+The grid of the Summary sheet repaints the cells that depend on that order, and
+nothing in the application asks it to:
+
+.The Summary sheet after the correction: the row for West, the totals and the leading region have changed
+image::img/generated/datagrid-sheet-recalc.png["The Summary tab where West now has 180 units and a revenue of 60,117.10, the total revenue is 163,326.52 and the last row reads West leads",scaledwidth=70%]
+
+A formula can also read a cell through a defined name. `loan-schedule.ods` is
+an OpenDocument file whose Schedule sheet calculates every payment with `PMT`,
+`IPMT`, `PPMT` and `EDATE` from four names on its Terms sheet:
+
+.A loan schedule read from an OpenDocument file
+image::img/generated/datagrid-sheet-loan.png["A grid under tabs named Terms and Schedule with a row for each month: a due date, a payment of 1,556.65, the interest, the principal, the balance and the share repaid",scaledwidth=70%]
+
+Changing the cell a name stands for calculates the whole schedule again:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-name,indent=0]
+----
+
+.The same schedule at the higher rate
+image::img/generated/datagrid-sheet-loan-rate.png["The Schedule tab where every payment is now 1,573.29 and the interest of the first month is 133.50",scaledwidth=70%]
+
+Text given to `setValueAt` is read the way a spreadsheet reads what's typed into
+a cell, which is what the grid's editor does: `=B2*C2` is a formula, `25%` is the
+number 0.25, `2024-02-29` is a date and `'=B2` is the text `=B2`. Give it a
+`Double`, a `Date` or a `Boolean` to store a value unchanged.
+
+The columns `createColumns()` builds edit a cell the way a spreadsheet does. The
+field opens with the formula of a cell that has one, and otherwise with the whole
+value and not its formatted text, so a price shown as `1,234.50` opens as
+`1234.5`. A field that's closed unchanged writes nothing. Each cell is also
+painted in its own number format, which matters for a total in a currency
+format under a column of plain numbers. Sorting, filtering and grouping use the
+column's formatter, which is the format most of its cells have.
+
+==== Editing a formula
+
+A cell is edited in a one-line `CodeEditor`, so a formula is typed with the help
+a spreadsheet gives. Each reference is drawn in its own color, and the cells it
+names are outlined in the grid in the same color. Inside a function call, a hint
+under the field shows the function's arguments with the current one in bold:
+
+.Typing a formula: the references and the cells they name share a color, and the hint marks the argument being typed
+image::img/generated/datagrid-sheet-formula-hint.png["The Summary tab with a formula being typed into the Commission column; D2 and A2 are outlined in the grid in the colors they have in the formula, and a hint under it reads ROUND(number, num_digits) with num_digits in bold",scaledwidth=70%]
+
+Typing the start of a name lists the functions, defined names and sheets that
+begin with it, with a description of the selected one. Up and Down move through
+the list, and Enter or Tab inserts the selection:
+
+.Completing a function name
+image::img/generated/datagrid-sheet-formula-complete.png["A cell holding =ROU with a list of ROUND, ROUNDDOWN and ROUNDUP under it; ROUND is selected and described as rounding a number to a specified number of digits",scaledwidth=70%]
+
+While the caret is where a reference can go, after an operator, a comma or an
+opening parenthesis, tapping a cell inserts its address instead of moving the
+selection. Tapping another cell replaces that reference, and a tap with Shift held
+makes a range from the first. On a keyboard, F4 cycles the reference at the
+caret through `$A$1`, `A$1`, `$A1` and `A1`. Enter or Tab writes the formula, and
+the formula is also written when the focus moves to another control. A formula that doesn't parse is
+marked at the error and isn't written, and Escape leaves the cell as it was.
+
+A `FormulaBar` is the field above the sheet: the address of the selected cell
+and its formula, edited with the same help.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-formula-bar,indent=0]
+----
+
+.A formula bar over the Orders sheet
+image::img/generated/datagrid-sheet-formula-bar.png["A bar over the grid reading H5 and fx followed by a formula being edited; the units, price and discount cells of the selected row are outlined in the colors of their references",scaledwidth=70%]
+
+Date, Boolean and choice cells keep their pickers.
+
+Formulas are written the way Excel writes them, in English and with commas
+between arguments, whichever format the file is in. They can use ranges, whole
+rows and columns, other sheets, defined names and array constants. A formula
+that refers to itself, directly or through other cells, shows a `CellError` for
+a circular reference instead of looping, and so does every cell of the circle.
+
+The following functions are available. `Workbook.getSupportedFunctions()` returns
+the same list.
+
+[cols="1,4",options="header"]
+|===
+|Category |Functions
+
+|Math and trigonometry
+|`ABS`, `ACOS`, `ACOSH`, `ACOT`, `ACOTH`, `ARABIC`, `ASIN`, `ASINH`, `ATAN`, `ATAN2`, `ATANH`, `BASE`, `CEILING`, `CEILING.MATH`, `CEILING.PRECISE`, `COMBIN`, `COMBINA`, `COS`, `COSH`, `COT`, `COTH`, `CSC`, `CSCH`, `DECIMAL`, `DEGREES`, `EVEN`, `EXP`, `FACT`, `FACTDOUBLE`, `FLOOR`, `FLOOR.MATH`, `FLOOR.PRECISE`, `GCD`, `INT`, `ISO.CEILING`, `LCM`, `LN`, `LOG`, `LOG10`, `MDETERM`, `MINVERSE`, `MMULT`, `MOD`, `MROUND`, `MULTINOMIAL`, `MUNIT`, `ODD`, `PERMUT`, `PERMUTATIONA`, `PI`, `POWER`, `PRODUCT`, `QUOTIENT`, `RADIANS`, `RAND`, `RANDBETWEEN`, `ROMAN`, `ROUND`, `ROUNDDOWN`, `ROUNDUP`, `SEC`, `SECH`, `SERIESSUM`, `SIGN`, `SIN`, `SINH`, `SQRT`, `SQRTPI`, `SUM`, `SUMIF`, `SUMIFS`, `SUMPRODUCT`, `SUMSQ`, `SUMX2MY2`, `SUMX2PY2`, `SUMXMY2`, `TAN`, `TANH`, `TRUNC`
+
+|Statistics
+|`AGGREGATE`, `AVEDEV`, `AVERAGE`, `AVERAGEA`, `AVERAGEIF`, `AVERAGEIFS`, `BETA.DIST`, `BETA.INV`, `BETADIST`, `BETAINV`, `BINOM.DIST`, `BINOM.DIST.RANGE`, `BINOM.INV`, `BINOMDIST`, `CHIDIST`, `CHIINV`, `CHISQ.DIST`, `CHISQ.DIST.RT`, `CHISQ.INV`, `CHISQ.INV.RT`, `CHISQ.TEST`, `CHITEST`, `CONFIDENCE`, `CONFIDENCE.NORM`, `CONFIDENCE.T`, `CORREL`, `COUNT`, `COUNTA`, `COUNTBLANK`, `COUNTIF`, `COUNTIFS`, `COVAR`, `COVARIANCE.P`, `COVARIANCE.S`, `CRITBINOM`, `DEVSQ`, `EXPON.DIST`, `EXPONDIST`, `F.DIST`, `F.DIST.RT`, `F.INV`, `F.INV.RT`, `F.TEST`, `FDIST`, `FINV`, `FISHER`, `FISHERINV`, `FORECAST`, `FORECAST.LINEAR`, `FREQUENCY`, `FTEST`, `GAMMA`, `GAMMA.DIST`, `GAMMA.INV`, `GAMMADIST`, `GAMMAINV`, `GAMMALN`, `GAMMALN.PRECISE`, `GAUSS`, `GEOMEAN`, `HARMEAN`, `HYPGEOM.DIST`, `HYPGEOMDIST`, `INTERCEPT`, `KURT`, `LARGE`, `LOGINV`, `LOGNORM.DIST`, `LOGNORM.INV`, `LOGNORMDIST`, `MAX`, `MAXA`, `MAXIFS`, `MEDIAN`, `MIN`, `MINA`, `MINIFS`, `MODE`, `MODE.MULT`, `MODE.SNGL`, `NEGBINOM.DIST`, `NEGBINOMDIST`, `NORM.DIST`, `NORM.INV`, `NORM.S.DIST`, `NORM.S.INV`, `NORMDIST`, `NORMINV`, `NORMSDIST`, `NORMSINV`, `PEARSON`, `PERCENTILE`, `PERCENTILE.EXC`, `PERCENTILE.INC`, `PERCENTRANK`, `PERCENTRANK.EXC`, `PERCENTRANK.INC`, `PHI`, `POISSON`, `POISSON.DIST`, `QUARTILE`, `QUARTILE.EXC`, `QUARTILE.INC`, `RANK`, `RANK.AVG`, `RANK.EQ`, `RSQ`, `SKEW`, `SKEW.P`, `SLOPE`, `SMALL`, `STANDARDIZE`, `STDEV`, `STDEV.P`, `STDEV.S`, `STDEVA`, `STDEVP`, `STDEVPA`, `STEYX`, `SUBTOTAL`, `T.DIST`, `T.DIST.2T`, `T.DIST.RT`, `T.INV`, `T.INV.2T`, `T.TEST`, `TDIST`, `TINV`, `TRIMMEAN`, `TTEST`, `VAR`, `VAR.P`, `VAR.S`, `VARA`, `VARP`, `VARPA`, `WEIBULL`, `WEIBULL.DIST`, `Z.TEST`, `ZTEST`
+
+|Logic and information
+|`AND`, `CHOOSE`, `COLUMN`, `ERROR.TYPE`, `FALSE`, `FORMULATEXT`, `IF`, `IFERROR`, `IFNA`, `IFS`, `INDIRECT`, `ISBLANK`, `ISERR`, `ISERROR`, `ISEVEN`, `ISFORMULA`, `ISLOGICAL`, `ISNA`, `ISNONTEXT`, `ISNUMBER`, `ISODD`, `ISREF`, `ISTEXT`, `LET`, `N`, `NA`, `NOT`, `NOW`, `OFFSET`, `OR`, `RAND`, `RANDARRAY`, `RANDBETWEEN`, `ROW`, `SWITCH`, `T`, `TODAY`, `TRUE`, `TYPE`, `XOR`
+
+|Text
+|`CHAR`, `CLEAN`, `CODE`, `CONCAT`, `CONCATENATE`, `DOLLAR`, `EXACT`, `FIND`, `FIXED`, `LEFT`, `LEN`, `LOWER`, `MID`, `NUMBERVALUE`, `PROPER`, `REPLACE`, `REPT`, `RIGHT`, `SEARCH`, `SUBSTITUTE`, `TEXT`, `TEXTAFTER`, `TEXTBEFORE`, `TEXTJOIN`, `TRIM`, `UNICHAR`, `UNICODE`, `UPPER`, `VALUE`
+
+|Date and time
+|`DATE`, `DATEDIF`, `DATEVALUE`, `DAY`, `DAYS`, `DAYS360`, `EDATE`, `EOMONTH`, `HOUR`, `ISOWEEKNUM`, `MINUTE`, `MONTH`, `NETWORKDAYS`, `NETWORKDAYS.INTL`, `NOW`, `SECOND`, `TIME`, `TIMEVALUE`, `TODAY`, `WEEKDAY`, `WEEKNUM`, `WORKDAY`, `WORKDAY.INTL`, `YEAR`, `YEARFRAC`
+
+|Lookup and reference
+|`ADDRESS`, `AREAS`, `COLUMNS`, `HLOOKUP`, `INDEX`, `INDIRECT`, `LOOKUP`, `MATCH`, `OFFSET`, `ROWS`, `SHEET`, `SHEETS`, `TRANSPOSE`, `VLOOKUP`, `XLOOKUP`, `XMATCH`
+
+|Financial
+|`CUMIPMT`, `CUMPRINC`, `DB`, `DDB`, `DOLLARDE`, `DOLLARFR`, `EFFECT`, `FV`, `FVSCHEDULE`, `IPMT`, `IRR`, `ISPMT`, `MIRR`, `NOMINAL`, `NPER`, `NPV`, `PDURATION`, `PMT`, `PPMT`, `PV`, `RATE`, `RRI`, `SLN`, `SYD`, `VDB`, `XIRR`, `XNPV`
+
+|Engineering
+|`BIN2DEC`, `BIN2HEX`, `BIN2OCT`, `BITAND`, `BITLSHIFT`, `BITOR`, `BITRSHIFT`, `BITXOR`, `CONVERT`, `DEC2BIN`, `DEC2HEX`, `DEC2OCT`, `DELTA`, `ERF`, `ERF.PRECISE`, `ERFC`, `ERFC.PRECISE`, `GESTEP`, `HEX2BIN`, `HEX2DEC`, `HEX2OCT`, `OCT2BIN`, `OCT2DEC`, `OCT2HEX`
+
+|Database
+|`DAVERAGE`, `DCOUNT`, `DCOUNTA`, `DGET`, `DMAX`, `DMIN`, `DPRODUCT`, `DSTDEV`, `DSTDEVP`, `DSUM`, `DVAR`, `DVARP`
+
+|Arrays
+|`CHOOSECOLS`, `CHOOSEROWS`, `DROP`, `EXPAND`, `FILTER`, `HSTACK`, `RANDARRAY`, `SEQUENCE`, `SORT`, `SORTBY`, `TAKE`, `TOCOL`, `TOROW`, `UNIQUE`, `VSTACK`, `WRAPCOLS`, `WRAPROWS`
+|===
+
+A formula that uses anything else isn't lost. Its text is kept and written back
+to the file, and its cell shows the value the file stored for it. The cell shows
+`#NAME?` once a cell it reads has changed, because the stored value is stale by
+then.
+
+A few things work differently from Excel:
+
+* A formula that returns an array shows its first value, and that value is
+  what another cell reads from it. Results don't spill into the neighboring
+  cells: a formula that needs the whole array wraps the call that makes it, as
+  in `=SUM(SEQUENCE(3))`. An array formula a file brings that fills several
+  cells, as one entered in Excel with Ctrl+Shift+Enter, keeps filling them.
+  Excel refuses to change part of such an array; here, editing one of its
+  cells, or inserting or removing rows or columns through it, ends the array.
+  The formula keeps its own cell and the other cells keep the values they
+  showed. Replacing or clearing the formula clears them, as in Excel.
+* A range given where one value is wanted is taken whole, as Excel 365 takes
+  it: `=SUM(ABS(A1:A3))` adds all three. Older spreadsheet applications take
+  the cell in the formula's own row instead, so the writers save such a
+  formula as an array formula, so they calculate it over the whole range
+  too. A range that's the whole formula, as in `=A1:A3`, is still the cell in
+  the formula's own row, and so is a range after `@`, as in `=SUM(@A1:A3)`.
+  A formula an `.xlsx` file stores without the array mark was saved by one of
+  those older applications, and Excel opens it with an `@` wherever a function
+  wanting one value is given a range. It's read the same way, so it answers
+  what Excel shows for that file.
+* An array holds at most 1,048,576 values, one whole column. Arithmetic or a
+  comparison over a range larger than that, as in `=SUMPRODUCT(--(A:XFD=0))`,
+  answers `#NUM!` rather than taking the memory. Functions that read a range
+  without making an array of it, such as `SUM`, `COUNTIF` and `INDEX`, have no
+  such limit.
+* Text is read as a date when it's written `2026-01-12` or names its month,
+  as in `12-Jan-2026`. A date of digits and slashes isn't: `1/2/2026` is a
+  different day in different countries.
+* Functions of complex numbers, such as `IMSUM`, and the regression functions
+  that return an array, such as `LINEST` and `TREND`, aren't included.
+* Formulas use `A1` references. The `R1C1` style isn't read.
+
+==== Saving a grid
+
+`Workbook.fromGrid` copies what a grid shows: its rows in the order they're
+sorted and filtered to, and its visible columns in the order they're arranged in.
+Values keep their types, so a number is a number in the file and never the text
+the grid formatted it to:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-sheet-save,indent=0]
+----
+
+The depth of a row in a tree grid becomes its outline level, up to 7, the
+deepest level the file formats hold, and the grid's
+frozen columns stay frozen. A grouped grid is copied as it's shown, too: each
+group row becomes a row with the group's key (in the grouped column, when that
+column is shown) and its aggregates as plain values,
+and the rows of a collapsed group are left out. A total over such a column counts
+the aggregates as well. `Workbook.fromModel` copies a `TableModel` without a
+grid, and so copies the data alone.
+
+A workbook also keeps number formats, column widths, frozen panes, merged cells,
+outline levels and defined names between reading and writing. It doesn't keep
+charts, images, fonts, colors or conditional formatting, and it doesn't read the
+older binary `.xls` format or a file protected with a password.
+
+Writing XLSX fails fast on what Excel can't open unchanged: a sheet name longer
+than 31 characters, a formula or defined name longer than 8,192 (counted as the
+file stores it, with the prefixes newer functions take) or a cell of text longer
+than 32,767. Writing throws `IOException` naming the sheet or the cell, because
+Excel would otherwise open the file only by repairing it and dropping or cutting
+what's over the limit. `setExcelLimitsEnforced(false)` writes the file unchanged,
+for a spreadsheet without those limits. OpenDocument has none of them.
+
+A formula, in any format, can nest up to 64 functions, Excel's own limit, and up
+to 128 levels of parentheses, signs and arguments in all. A deeper formula typed
+in throws `IllegalArgumentException`. In a file, it keeps the value the file
+stored and isn't calculated; saved in the same format it keeps its formula too,
+while saved in the other format it's written as that value, since its formula
+can't be translated. That limit stays on with
+`setExcelLimitsEnforced(false)`, because it protects the stack of the device
+that calculates.
+
+Each function takes the number of arguments Excel lets it take, so `ROUND(A1)`
+and `ABS(1,2)` are refused the same way: thrown when typed, kept as their stored
+value when read. OpenDocument allows a few calls Excel doesn't, such as `ROUND`
+with one argument; read from an `.ods` file, such a formula keeps its value
+rather than reaching an `.xlsx` file that Excel would refuse.
+
+==== Separated text
+
+Text has no types, so reading CSV guesses them: a cell that reads as a number, a
+date or a logical value becomes one, cell by cell. A column of postal codes or
+part numbers is the exception, because it would otherwise lose the zeros at the
+start of `00420`: where any cell of a column would lose digits as a number, every
+cell of that column stays text, logical values and dates included. The separator is detected from the first
+lines when the file uses a semicolon, a tab or a bar instead of a comma.
+
+A cell that starts with `=` stays text when it's read from CSV. A file from
+somewhere else doesn't get to run a formula.
+
+Writing CSV applies the same care in the other direction. Text that a
+spreadsheet would run as a formula when it opens the file, such as `=1+1` or
+`@SUM(A1)`, is written with an apostrophe in front, which tells the spreadsheet
+that it's text. Numbers aren't touched, so `-5` stays a number.
+
+`CSVParser` and `CSVWriter` in `com.codename1.io` read and write the text itself,
+without a workbook:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/datagrid/DataGridSnippets.java[tag=grid-csv,indent=0]
+----
+
 === The row engine
 
 The sort and the tree flattening are public, for a view of your own that needs

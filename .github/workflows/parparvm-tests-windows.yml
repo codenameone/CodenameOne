@@ -163,6 +163,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       # clang-cl uses the MSVC headers, CRT and linker, so the MSVC developer
       # environment has to be on PATH for the spawned cmake/clang-cl to work.
       # The arch is matched to the runner so the arm64 leg builds native arm64.
@@ -219,6 +222,8 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 Path
         if: ${{ matrix.name == 'x64' }}
         shell: pwsh
@@ -230,6 +235,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '11'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 11 Path
         if: ${{ matrix.name == 'x64' }}
         shell: pwsh
@@ -244,6 +251,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 17 Path
         if: ${{ matrix.name == 'x64' }}
         shell: pwsh
@@ -254,6 +263,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 21 Path
         shell: pwsh
         run: echo "JDK_21_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
@@ -264,6 +275,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '25'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 25 Path
         if: ${{ matrix.name == 'x64' }}
         shell: pwsh
@@ -283,6 +296,9 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       # Only the native-compilation tests are run here: this runner exists to
       # prove the translated C compiles with clang-cl (LLVM) and executes on
@@ -391,6 +407,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -421,6 +440,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 17 path
         shell: pwsh
         run: echo "JDK_17_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
@@ -433,6 +454,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '8'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 path
         shell: pwsh
         run: echo "JDK_8_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
@@ -742,8 +765,10 @@ jobs:
     # the performance verdict. Requiring success let an x64 perf regression skip the
     # whole arm64 leg, its screenshots and its own perf gate included. An x64 failure
     # before the upload still fails here, at the download, with its own message.
+    # Not in a golden capture: the x64 leg's rendering is the golden
+    # (golden-capture.sh), and this leg is held to it by the normal run.
     if: >-
-      needs.golden-plan.outputs.run == 'true' && (
+      needs.golden-plan.outputs.run == 'true' && inputs.cn1ss_capture == '' && (
       !cancelled() && needs.windows-port-screenshot.result != 'skipped' &&
       (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
       )
@@ -753,6 +778,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -796,6 +824,9 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
           cache: 'maven'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Restore compiled core + port classes
         uses: ./.github/actions/download-artifact-with-retry
@@ -996,6 +1027,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Download x64 screenshot artifact
         uses: ./.github/actions/download-artifact-with-retry
         with:
@@ -1117,6 +1150,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Download arm64 screenshot artifact
         uses: ./.github/actions/download-artifact-with-retry
         with:
@@ -1229,6 +1264,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       # clang-cl uses the MSVC STL/CRT headers and the Windows SDK, which reach
       # the compiler through the INCLUDE/LIB environment vcvarsall sets up.
       - name: Set up MSVC environment
@@ -1272,13 +1310,20 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           clang-cl --version
+          # The runner's clang-cl is the standalone LLVM on PATH, not one matched
+          # to the image's MSVC STL. Image 20261116 moved the STL to 14.52, which
+          # refuses any clang older than 22 (STL1000) while the runner ships 20, so
+          # the check is a statement about the image, not about these sources. The
+          # STL's own escape hatch turns it off; a real incompatibility still fails
+          # the compile on the line that uses it.
+          $mismatch = '/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH'
           # The widgetboard TU deliberately avoids the cn1 headers (cn1_globals.h's
           # C11 stdatomic conflicts with the C++ <atomic> the winrt headers pull) and
           # compiles at C++20: C++/WinRT at C++17 falls back to
           # <experimental/coroutine>, which the modern MSVC STL rejects under clang
           # (STL1009). This mirrors the -DCMAKE_CXX_STANDARD=20 WindowsNativeBuilder
           # passes for windows.msix=true builds.
-          clang-cl /c /std:c++20 /EHsc /DCN1_WIDGETBOARD=1 /Iwinrt-gen "/I$env:CN1_WASDK_DIR/include" `
+          clang-cl /c /std:c++20 /EHsc $mismatch /DCN1_WIDGETBOARD=1 /Iwinrt-gen "/I$env:CN1_WASDK_DIR/include" `
             Ports/WindowsPort/nativeSources/cn1_windows_widgetboard.cpp /Fowidgetboard.obj
           if ($LASTEXITCODE -ne 0) { throw "cn1_windows_widgetboard.cpp failed to compile with CN1_WIDGETBOARD=1" }
           # A translated app supplies the generated cn1_class_method_index.h; the
@@ -1286,7 +1331,7 @@ jobs:
           # needs this one constant from it here.
           New-Item -ItemType Directory -Force stub-index | Out-Null
           "#define cn1_array_start_offset 1000" | Set-Content stub-index/cn1_class_method_index.h -Encoding ascii
-          clang-cl /c /std:c++17 /EHsc /Istub-index /Ivm/ByteCodeTranslator/src `
+          clang-cl /c /std:c++17 /EHsc $mismatch /Istub-index /Ivm/ByteCodeTranslator/src `
             Ports/WindowsPort/nativeSources/cn1_windows_widgets.cpp /Fowidgets.obj
           if ($LASTEXITCODE -ne 0) { throw "cn1_windows_widgets.cpp failed to compile" }
           Write-Host "Widgets Board provider + floating-widget TUs compiled clean."

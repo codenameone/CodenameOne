@@ -31,6 +31,9 @@ jobs:
           # credential leaves only the PAT, so the push succeeds.
           persist-credentials: false
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Wait for developer-guide.pdf on the release
         env:
           GH_TOKEN: ${{ github.token }}

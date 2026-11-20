@@ -40,11 +40,18 @@ public final class GuideFigures {
         FigureVariant[] scheduling = SchedulingFigures.variants();
         FigureVariant[] graph = GraphFigures.variants();
         FigureVariant[] grid = DataGridFigures.variants();
-        FigureVariant[] all = new FigureVariant[general.length + scheduling.length + graph.length + grid.length];
-        System.arraycopy(general, 0, all, 0, general.length);
-        System.arraycopy(scheduling, 0, all, general.length, scheduling.length);
-        System.arraycopy(graph, 0, all, general.length + scheduling.length, graph.length);
-        System.arraycopy(grid, 0, all, general.length + scheduling.length + graph.length, grid.length);
+        FigureVariant[] kanban = KanbanFigures.variants();
+        FigureVariant[][] parts = {general, scheduling, graph, grid, kanban};
+        int count = 0;
+        for (FigureVariant[] part : parts) {
+            count += part.length;
+        }
+        FigureVariant[] all = new FigureVariant[count];
+        int at = 0;
+        for (FigureVariant[] part : parts) {
+            System.arraycopy(part, 0, all, at, part.length);
+            at += part.length;
+        }
         return all;
     }
 

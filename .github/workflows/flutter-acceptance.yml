@@ -72,6 +72,9 @@ jobs:
             ${{ runner.os }}-m2-flutter-acceptance-
             ${{ runner.os }}-m2
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable

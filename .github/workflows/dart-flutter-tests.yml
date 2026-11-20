@@ -76,6 +76,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Check the container's JDK 17
         run: |
           if [ -z "${JAVA_HOME_17:-}" ] || [ ! -x "$JAVA_HOME_17/bin/javac" ]; then
@@ -94,6 +97,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-m2-dart-
             ${{ runner.os }}-m2
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       # JDK 17, because the runtimes compile at release 17: maven/pom.xml adds
       # them to the reactor only on 17+ (flutter-modules), and the transpiler
