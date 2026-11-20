@@ -1,0 +1,20 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * Use of this source code is governed by the license in the LICENSE file beside
+ * this project's pom.xml.
+ */
+package com.codenameone.examples.papercut.ui;
+
+/// Where the game goes between screens, in one place.
+public final class Nav {
+    private Nav() {
+    }
+
+    public static void launch() {
+        home();
+    }
+
+    public static void home() {
+        new HomeForm().show();
+    }
+}
