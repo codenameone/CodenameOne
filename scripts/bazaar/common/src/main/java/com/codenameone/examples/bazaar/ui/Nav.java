@@ -86,6 +86,7 @@ public final class Nav {
         AdminSections.install();
         ShopSections.install();
         com.codenameone.examples.bazaar.merchant.MerchantSections.install();
+        com.codenameone.examples.bazaar.pos.PosSections.install();
         Session.onSignedOut(() -> {
             LiveChannel.stop();
             Telemetry.signedOut("expired");
@@ -188,6 +189,10 @@ public final class Nav {
         String saved = AppConfig.mode(Session.owner(user.username()));
         if (saved != null && modes(user).contains(saved)) {
             return saved;
+        }
+        if (user.cashier() && modes(user).contains(POS)) {
+            // A cashier and nothing more: the register is the job.
+            return POS;
         }
         return user.admin() ? ADMIN : user.merchant() ? MERCHANT : SHOP;
     }

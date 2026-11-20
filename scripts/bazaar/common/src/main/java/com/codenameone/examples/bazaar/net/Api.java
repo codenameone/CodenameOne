@@ -26,6 +26,7 @@ import com.codenameone.examples.bazaar.api.CatalogApi;
 import com.codenameone.examples.bazaar.api.CheckoutApi;
 import com.codenameone.examples.bazaar.api.DiscountApi;
 import com.codenameone.examples.bazaar.api.FulfillmentApi;
+import com.codenameone.examples.bazaar.api.PosApi;
 import com.codenameone.examples.bazaar.api.ReturnApi;
 import com.codenameone.examples.bazaar.api.GiftCardApi;
 import com.codenameone.examples.bazaar.api.InventoryApi;
@@ -57,6 +58,7 @@ public final class Api {
     private static ShippingApi shipping;
     private static FulfillmentApi fulfilment;
     private static ReturnApi returns;
+    private static PosApi pos;
 
     private Api() {
     }
@@ -77,6 +79,7 @@ public final class Api {
         shipping = RestClients.create(ShippingApi.class, baseUrl);
         fulfilment = RestClients.create(FulfillmentApi.class, baseUrl);
         returns = RestClients.create(ReturnApi.class, baseUrl);
+        pos = RestClients.create(PosApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -137,5 +140,9 @@ public final class Api {
 
     public static ReturnApi returns() {
         return returns;
+    }
+
+    public static PosApi pos() {
+        return pos;
     }
 }

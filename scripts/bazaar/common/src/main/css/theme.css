@@ -1671,3 +1671,805 @@ DocDrag { color: var(--text-muted); background-color: var(--surface-alt); border
     DocActions { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
     DocDrag { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
 }
+
+/* Point of sale */
+
+PosRoot {
+    background-color: var(--surface-alt);
+    padding: 0;
+    margin: 0;
+}
+
+PosPage {
+    background-color: var(--surface-alt);
+    padding: 3mm;
+    margin: 0;
+}
+
+PosHeader {
+    background-color: var(--surface);
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0;
+    border-bottom: 1px solid var(--line);
+}
+
+PosTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosMuted {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosGroup {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 3mm 1mm 1mm 1mm;
+    margin: 0;
+}
+
+PosError {
+    color: var(--danger);
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosAmount {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    text-align: center;
+    padding: 2mm;
+    margin: 0;
+}
+
+PosPinBox {
+    background-color: var(--surface);
+    padding: 4mm;
+    margin: 2mm;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+PosPinDots {
+    color: var(--brand);
+    font-size: 6mm;
+    text-align: center;
+    padding: 2mm;
+    margin: 0;
+}
+
+PosPad {
+    padding: 1mm;
+    margin: 0;
+}
+
+PosKey {
+    color: var(--text);
+    background-color: var(--surface);
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    text-align: center;
+    padding: 4mm 2mm 4mm 2mm;
+    margin: 1mm;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+PosKey.pressed {
+    background-color: var(--surface-press);
+}
+
+PosChoice {
+    color: var(--text);
+    background-color: var(--surface);
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    text-align: center;
+    padding: 3.5mm 2mm 3.5mm 2mm;
+    margin: 1mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+PosChoice.pressed {
+    background-color: var(--surface-press);
+}
+
+PosPay {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    text-align: center;
+    padding: 4.5mm 2mm 4.5mm 2mm;
+    margin: 1.5mm;
+    border-radius: var(--radius);
+}
+
+PosPay.pressed {
+    background-color: var(--brand-pressed);
+}
+
+PosPay.disabled {
+    color: var(--text-muted);
+    background-color: var(--line);
+}
+
+PosTool {
+    color: var(--text);
+    background-color: transparent;
+    font-size: 3mm;
+    padding: 2mm;
+    margin: 0.5mm;
+}
+
+PosTool.pressed {
+    background-color: var(--surface-press);
+}
+
+PosField {
+    color: var(--text);
+    background-color: var(--surface);
+    font-size: 3.6mm;
+    padding: 2.5mm;
+    margin: 1mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-small);
+}
+
+PosScan {
+    color: var(--text);
+    background-color: var(--surface);
+    font-size: 4mm;
+    padding: 3mm;
+    margin: 1mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+PosScanHint {
+    color: var(--text-muted);
+    font-size: 4mm;
+}
+
+PosScanRow {
+    background-color: var(--surface);
+    padding: 1.5mm;
+    margin: 0;
+}
+
+PosChips {
+    background-color: var(--surface);
+    padding: 0 1.5mm 1.5mm 1.5mm;
+    margin: 0;
+}
+
+PosChip {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    font-size: 3mm;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0.5mm;
+    border-radius: var(--radius);
+}
+
+PosChipOn {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0.5mm;
+    border-radius: var(--radius);
+}
+
+PosProducts {
+    background-color: var(--surface-alt);
+    padding: 0;
+    margin: 0;
+}
+
+PosGrid {
+    padding: 1.5mm;
+    margin: 0;
+}
+
+PosTile {
+    background-color: var(--surface);
+    padding: 1.5mm;
+    margin: 1mm;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+PosTile.pressed {
+    background-color: var(--surface-press);
+}
+
+PosTileArt {
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+
+PosTileTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 1mm 0.5mm 0 0.5mm;
+    margin: 0;
+}
+
+PosTilePrice {
+    color: var(--text);
+    font-size: 3mm;
+    padding: 0.5mm;
+    margin: 0;
+}
+
+PosTileStock {
+    color: var(--text-muted);
+    font-size: 2.4mm;
+    padding: 0 0.5mm 0 0.5mm;
+    margin: 0;
+}
+
+PosTileLow {
+    color: var(--warning);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 0 0.5mm 0 0.5mm;
+    margin: 0;
+}
+
+PosCart {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+    border-left: 1px solid var(--line);
+}
+
+PosCartHead {
+    background-color: var(--surface);
+    padding: 1mm;
+    margin: 0;
+    border-bottom: 1px solid var(--line);
+}
+
+PosCartRow {
+    background-color: var(--surface);
+    padding: 2mm 2.5mm 2mm 2.5mm;
+    margin: 0;
+    border-bottom: 1px solid var(--line);
+}
+
+PosCustomerRow {
+    background-color: var(--brand-tint);
+    padding: 2mm 2.5mm 2mm 2.5mm;
+    margin: 0;
+}
+
+PosCartTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosCartDetail {
+    color: var(--text-muted);
+    font-size: 2.7mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosCartDeal {
+    color: var(--success);
+    font-size: 2.7mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosStepper {
+    padding: 0;
+    margin: 0;
+}
+
+PosStep {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    padding: 2.2mm;
+    margin: 0.5mm;
+    border-radius: var(--radius-small);
+}
+
+PosStep.pressed {
+    background-color: var(--surface-press);
+}
+
+PosQty {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    text-align: center;
+    padding: 2mm 1.5mm 2mm 1.5mm;
+    margin: 0;
+}
+
+PosLineTotal {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    text-align: right;
+    padding: 2mm 0 2mm 2mm;
+    margin: 0;
+}
+
+PosTotals {
+    background-color: var(--surface);
+    padding: 2mm 3mm 1mm 3mm;
+    margin: 0;
+    border-top: 1px solid var(--line);
+}
+
+PosTotalRow {
+    padding: 0.5mm 0 0.5mm 0;
+    margin: 0;
+}
+
+PosTotalRowLabel {
+    color: var(--text-muted);
+    font-size: 3mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosTotalRowValue {
+    color: var(--text);
+    font-size: 3mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosGrand {
+    padding: 1.5mm 0 1mm 0;
+    margin: 0;
+}
+
+PosGrandLabel {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosGrandValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosPill {
+    color: var(--success);
+    background-color: var(--success-tint);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 1.5mm 3mm 1.5mm 3mm;
+    margin: 0.5mm;
+    border-radius: var(--radius);
+}
+
+PosPillOffline {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 1.5mm 3mm 1.5mm 3mm;
+    margin: 0.5mm;
+    border-radius: var(--radius);
+}
+
+PosPillSyncing {
+    color: var(--warning);
+    background-color: var(--warning-tint);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 1.5mm 3mm 1.5mm 3mm;
+    margin: 0.5mm;
+    border-radius: var(--radius);
+}
+
+PosOutboxRow {
+    background-color: var(--surface);
+    padding: 2.5mm;
+    margin: 0 0 1mm 0;
+    border-radius: var(--radius-small);
+}
+
+PosBadgePENDING {
+    cn1-derive: SvBadge;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+
+PosBadgeSYNCING {
+    cn1-derive: SvBadge;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+
+PosBadgeSYNCED {
+    cn1-derive: SvBadge;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+
+PosBadgeDUPLICATE {
+    cn1-derive: SvBadge;
+    color: var(--brand);
+    background-color: var(--brand-tint);
+}
+
+PosBadgeERROR {
+    cn1-derive: SvBadge;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+
+PosCountLabel {
+    color: var(--text);
+    font-size: 3.2mm;
+    padding: 2.5mm 1mm 2.5mm 1mm;
+    margin: 0;
+}
+
+PosQr {
+    text-align: center;
+    padding: 2mm;
+    margin: 0;
+}
+
+PosDisplay {
+    background-color: var(--surface);
+    padding: 6mm;
+    margin: 0;
+}
+
+PosDisplayStore {
+    color: var(--text-muted);
+    font-size: 4mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosDisplayLine {
+    color: var(--text);
+    font-size: 5mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosDisplayTotal {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 9mm;
+    padding: 4mm 1mm 1mm 1mm;
+    margin: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    PosRoot {
+        background-color: var(--surface-alt-dark);
+    }
+
+    PosPage {
+        background-color: var(--surface-alt-dark);
+    }
+
+    PosHeader {
+        background-color: var(--surface-dark);
+        border-bottom: 1px solid var(--line-dark);
+    }
+
+    PosTitle {
+        color: var(--text-dark);
+    }
+
+    PosMuted {
+        color: var(--text-muted-dark);
+    }
+
+    PosGroup {
+        color: var(--text-muted-dark);
+    }
+
+    PosError {
+        color: var(--danger-dark);
+    }
+
+    PosAmount {
+        color: var(--text-dark);
+    }
+
+    PosPinBox {
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+    }
+
+    PosPinDots {
+        color: var(--brand-dark);
+    }
+
+    PosKey {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+    }
+
+    PosKey.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosChoice {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius);
+    }
+
+    PosChoice.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosPay {
+        color: var(--brand-contrast-dark);
+        background-color: var(--brand-dark);
+        border-radius: var(--radius);
+    }
+
+    PosPay.pressed {
+        background-color: var(--brand-pressed-dark);
+    }
+
+    PosPay.disabled {
+        color: var(--text-muted-dark);
+        background-color: var(--line-dark);
+    }
+
+    PosTool {
+        color: var(--text-dark);
+    }
+
+    PosTool.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosField {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius-small);
+    }
+
+    PosScan {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius);
+    }
+
+    PosScanHint {
+        color: var(--text-muted-dark);
+    }
+
+    PosScanRow {
+        background-color: var(--surface-dark);
+    }
+
+    PosChips {
+        background-color: var(--surface-dark);
+    }
+
+    PosChip {
+        color: var(--text-dark);
+        background-color: var(--surface-alt-dark);
+        border-radius: var(--radius);
+    }
+
+    PosChipOn {
+        color: var(--brand-contrast-dark);
+        background-color: var(--brand-dark);
+        border-radius: var(--radius);
+    }
+
+    PosProducts {
+        background-color: var(--surface-alt-dark);
+    }
+
+    PosTile {
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+    }
+
+    PosTile.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosTileTitle {
+        color: var(--text-dark);
+    }
+
+    PosTilePrice {
+        color: var(--text-dark);
+    }
+
+    PosTileStock {
+        color: var(--text-muted-dark);
+    }
+
+    PosTileLow {
+        color: var(--warning-dark);
+    }
+
+    PosCart {
+        background-color: var(--surface-dark);
+        border-left: 1px solid var(--line-dark);
+    }
+
+    PosCartHead {
+        background-color: var(--surface-dark);
+        border-bottom: 1px solid var(--line-dark);
+    }
+
+    PosCartRow {
+        background-color: var(--surface-dark);
+        border-bottom: 1px solid var(--line-dark);
+    }
+
+    PosCustomerRow {
+        background-color: var(--brand-tint-dark);
+    }
+
+    PosCartTitle {
+        color: var(--text-dark);
+    }
+
+    PosCartDetail {
+        color: var(--text-muted-dark);
+    }
+
+    PosCartDeal {
+        color: var(--success-dark);
+    }
+
+    PosStep {
+        color: var(--text-dark);
+        background-color: var(--surface-alt-dark);
+        border-radius: var(--radius-small);
+    }
+
+    PosStep.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosQty {
+        color: var(--text-dark);
+    }
+
+    PosLineTotal {
+        color: var(--text-dark);
+    }
+
+    PosTotals {
+        background-color: var(--surface-dark);
+        border-top: 1px solid var(--line-dark);
+    }
+
+    PosTotalRowLabel {
+        color: var(--text-muted-dark);
+    }
+
+    PosTotalRowValue {
+        color: var(--text-dark);
+    }
+
+    PosGrandLabel {
+        color: var(--text-dark);
+    }
+
+    PosGrandValue {
+        color: var(--text-dark);
+    }
+
+    PosPill {
+        color: var(--success-dark);
+        background-color: var(--success-tint-dark);
+        border-radius: var(--radius);
+    }
+
+    PosPillOffline {
+        color: var(--danger-dark);
+        background-color: var(--danger-tint-dark);
+        border-radius: var(--radius);
+    }
+
+    PosPillSyncing {
+        color: var(--warning-dark);
+        background-color: var(--warning-tint-dark);
+        border-radius: var(--radius);
+    }
+
+    PosOutboxRow {
+        background-color: var(--surface-dark);
+        border-radius: var(--radius-small);
+    }
+
+    PosBadgePENDING {
+        cn1-derive: SvBadge;
+        color: var(--warning-dark);
+        background-color: var(--warning-tint-dark);
+    }
+
+    PosBadgeSYNCING {
+        cn1-derive: SvBadge;
+        color: var(--warning-dark);
+        background-color: var(--warning-tint-dark);
+    }
+
+    PosBadgeSYNCED {
+        cn1-derive: SvBadge;
+        color: var(--success-dark);
+        background-color: var(--success-tint-dark);
+    }
+
+    PosBadgeDUPLICATE {
+        cn1-derive: SvBadge;
+        color: var(--brand-dark);
+        background-color: var(--brand-tint-dark);
+    }
+
+    PosBadgeERROR {
+        cn1-derive: SvBadge;
+        color: var(--danger-dark);
+        background-color: var(--danger-tint-dark);
+    }
+
+    PosCountLabel {
+        color: var(--text-dark);
+    }
+
+    PosDisplay {
+        background-color: var(--surface-dark);
+    }
+
+    PosDisplayStore {
+        color: var(--text-muted-dark);
+    }
+
+    PosDisplayLine {
+        color: var(--text-dark);
+    }
+
+    PosDisplayTotal {
+        color: var(--text-dark);
+    }
+}
