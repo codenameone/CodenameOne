@@ -85,6 +85,7 @@ public final class Nav {
     public static void launch() {
         AdminSections.install();
         ShopSections.install();
+        com.codenameone.examples.bazaar.merchant.MerchantSections.install();
         Session.onSignedOut(() -> {
             LiveChannel.stop();
             Telemetry.signedOut("expired");

@@ -40,6 +40,8 @@ public final class DesktopActions {
     public static final String NEW_ORDER = "newOrder";
     public static final String OPEN_STORE = "openStore";
     public static final String EXPORT_CSV = "exportCsv";
+    /// File > Import CSV: read records from a spreadsheet into the screen shown.
+    public static final String IMPORT_CSV = "importCsv";
     public static final String PRINT = "print";
     public static final String FIND = "find";
     public static final String REFRESH = "refresh";

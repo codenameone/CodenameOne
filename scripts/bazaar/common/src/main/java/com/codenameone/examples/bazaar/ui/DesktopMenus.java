@@ -65,6 +65,7 @@ public final class DesktopMenus {
         file(form, "New Order", DesktopActions.NEW_ORDER, 'n', Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT);
         file(form, "Open Store...", DesktopActions.OPEN_STORE, 'o', 0);
         form.getToolbar().addCommandToSideMenu(Command.createDesktopSeparator(Command.DESKTOP_MENU_FILE));
+        file(form, "Import CSV...", DesktopActions.IMPORT_CSV, 'i', Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT);
         file(form, "Export CSV...", DesktopActions.EXPORT_CSV, 'e', 0);
         Command print = Command.createDesktopRole(Command.DESKTOP_ROLE_PRINT,
                 e -> DesktopActions.run(DesktopActions.PRINT));

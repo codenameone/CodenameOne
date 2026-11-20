@@ -1350,6 +1350,43 @@ ShopCentered { color: var(--text); font-family: "native:MainRegular"; font-size:
  * DARK MODE. The same rules, with the second value of each colour. A rule added
  * above that names a colour needs its line here.
  */
+/* ---- Merchant app ---- */
+MeRoot { background-color: var(--surface-alt); padding: 0; margin: 0; }
+MeBar { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 3mm 1.6mm 3mm; margin: 0; }
+MeTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 1mm; margin: 0; }
+MeTool { color: var(--text-muted); background-color: transparent; padding: 1.4mm; margin: 0 0.6mm 0 0.6mm; border-radius: var(--radius-small); }
+MeTool.pressed { background-color: var(--surface-press); }
+MeStore { color: var(--brand); background-color: var(--brand-tint); font-family: "native:MainBold"; font-size: 2.8mm; padding: 1.2mm 2.4mm 1.2mm 2.4mm; margin: 0 1.6mm 0 0; border-radius: var(--radius-small); }
+MeStore.pressed { background-color: var(--surface-press); }
+MePage { background-color: var(--surface-alt); padding: 2.4mm 3mm 3mm 3mm; margin: 0; }
+MeCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0 0 2.4mm 0; }
+MeSide { background-color: transparent; padding: 0 0 0 2.4mm; margin: 0; }
+MeListRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.2mm 3mm 2.2mm 3mm; margin: 0; }
+MeListRow.pressed { background-color: var(--surface-press); }
+MeRuleRow { background-color: transparent; padding: 0.8mm 0 0.8mm 0; margin: 0; }
+MeTiles { background-color: transparent; padding: 0; margin: 0 0 2.4mm 0; }
+MeTile { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0 1.2mm 1.2mm 0; }
+MeTileCaption { color: var(--text-muted); background-color: transparent; font-size: 2.6mm; padding: 0; margin: 0; }
+MeTileValue { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 5mm; padding: 0.6mm 0 0.6mm 0; margin: 0; }
+MeSpark { color: var(--brand); background-color: transparent; padding: 0; margin: 0.6mm 0 0 0; }
+MeFilters { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 3mm 1.6mm 3mm; margin: 0; }
+MeFilter { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); font-size: 2.8mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0 0 0 1.2mm; }
+MeSearch { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); padding: 1.4mm 2mm 1.4mm 2mm; margin: 0; }
+MeBulk { background-color: var(--brand-tint); padding: 1.2mm 3mm 1.2mm 3mm; margin: 0; }
+MeBulkText { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; padding: 1.4mm 2mm 1.4mm 0; margin: 0; }
+MeButtons { background-color: transparent; padding: 1.6mm 3mm 1.6mm 3mm; margin: 0; }
+MeTimelineRow { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0; }
+MeTimelineDot { color: var(--brand); background-color: transparent; padding: 0 1.6mm 0 0; margin: 0; }
+MeThumb { background-color: var(--surface-alt); border-radius: var(--radius-small); padding: 0; margin: 0 2mm 0 0; }
+MeGallery { background-color: transparent; padding: 0; margin: 0 0 1.6mm 0; }
+MeDrop { color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 3mm; margin: 1.6mm 0 0 0; text-align: center; }
+MeLowStock { color: var(--danger); background-color: transparent; font-family: "native:MainBold"; padding: 0; margin: 0; }
+MeSwatch { background-color: var(--brand); border: 1px solid var(--line-strong); border-radius: var(--radius-small); padding: 2.4mm; margin: 0 1.2mm 1.2mm 0; }
+MeAccentPreview { background-color: var(--brand); border-radius: var(--radius); padding: 3mm; margin: 1.6mm 0 1.6mm 0; }
+MeAccentName { color: var(--brand-contrast); background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; padding: 0; margin: 0; }
+MeAccentTagline { color: var(--brand-contrast); background-color: transparent; font-size: 2.8mm; padding: 0.6mm 0 0 0; margin: 0; }
+
+
 @media (prefers-color-scheme: dark) {
     SvProductCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
     SvProductCard.pressed { background-color: var(--surface-alt-dark); }
@@ -1590,4 +1627,30 @@ ShopCentered { color: var(--text); font-family: "native:MainRegular"; font-size:
     ShopPlacedIcon { color: var(--success-dark); }
     ShopOrderNumber { color: var(--text-muted-dark); }
     ShopCentered { color: var(--text-dark); }
+    /* Merchant app */
+    MeRoot { background-color: var(--surface-alt-dark); }
+    MeBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeTitle { color: var(--text-dark); }
+    MeTool { color: var(--text-muted-dark); }
+    MeTool.pressed { background-color: var(--surface-press-dark); }
+    MeStore { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    MeStore.pressed { background-color: var(--surface-press-dark); }
+    MePage { background-color: var(--surface-alt-dark); }
+    MeCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    MeListRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeListRow.pressed { background-color: var(--surface-press-dark); }
+    MeTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    MeTileCaption { color: var(--text-muted-dark); }
+    MeTileValue { color: var(--text-dark); }
+    MeSpark { color: var(--brand-dark); }
+    MeFilters { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeFilter { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+    MeSearch { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+    MeBulk { background-color: var(--brand-tint-dark); }
+    MeBulkText { color: var(--brand-dark); }
+    MeTimelineDot { color: var(--brand-dark); }
+    MeThumb { background-color: var(--surface-alt-dark); }
+    MeDrop { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-strong-dark); }
+    MeLowStock { color: var(--danger-dark); }
+    MeSwatch { border: 1px solid var(--line-strong-dark); }
 }

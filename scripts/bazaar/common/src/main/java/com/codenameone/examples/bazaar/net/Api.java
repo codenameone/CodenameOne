@@ -24,7 +24,11 @@ import com.codenameone.examples.bazaar.api.AdminApi;
 import com.codenameone.examples.bazaar.api.CartApi;
 import com.codenameone.examples.bazaar.api.CatalogApi;
 import com.codenameone.examples.bazaar.api.CheckoutApi;
+import com.codenameone.examples.bazaar.api.DiscountApi;
 import com.codenameone.examples.bazaar.api.GiftCardApi;
+import com.codenameone.examples.bazaar.api.InventoryApi;
+import com.codenameone.examples.bazaar.api.ShippingApi;
+import com.codenameone.examples.bazaar.api.TaxApi;
 import com.codenameone.examples.bazaar.api.OrderApi;
 import com.codenameone.examples.bazaar.api.PaymentApi;
 import com.codenameone.examples.bazaar.api.StoreApi;
@@ -45,6 +49,10 @@ public final class Api {
     private static CheckoutApi checkout;
     private static OrderApi orders;
     private static GiftCardApi giftCards;
+    private static InventoryApi inventory;
+    private static DiscountApi discounts;
+    private static TaxApi taxes;
+    private static ShippingApi shipping;
 
     private Api() {
     }
@@ -59,6 +67,10 @@ public final class Api {
         checkout = RestClients.create(CheckoutApi.class, baseUrl);
         orders = RestClients.create(OrderApi.class, baseUrl);
         giftCards = RestClients.create(GiftCardApi.class, baseUrl);
+        inventory = RestClients.create(InventoryApi.class, baseUrl);
+        discounts = RestClients.create(DiscountApi.class, baseUrl);
+        taxes = RestClients.create(TaxApi.class, baseUrl);
+        shipping = RestClients.create(ShippingApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -95,5 +107,21 @@ public final class Api {
 
     public static GiftCardApi giftCards() {
         return giftCards;
+    }
+
+    public static InventoryApi inventory() {
+        return inventory;
+    }
+
+    public static DiscountApi discounts() {
+        return discounts;
+    }
+
+    public static TaxApi taxes() {
+        return taxes;
+    }
+
+    public static ShippingApi shipping() {
+        return shipping;
     }
 }
