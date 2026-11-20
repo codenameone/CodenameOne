@@ -1,0 +1,334 @@
+[[bazaar-implementors-guide]]
+== Bazaar: Building on the sample
+
+Bazaar began as a copy of <<savor-implementors-guide,Savor>> and kept what a
+store needs from it: the module layout, the accounts and sign-in, the cards and
+the payment provider, text messages, push notifications, the live channel, the
+operations console and hosting the app in a browser. This chapter covers what a
+commerce platform adds: a catalog with variants, an inventory ledger that never
+oversells, orders paid in two steps, a point of sale that keeps selling with no
+network, fulfilment, signed webhooks, automations drawn as graphs, documents
+rendered as PDF files and a storefront that search engines can read.
+
+[[bazaar-launch]]
+=== Running it
+
+The project is in `scripts/bazaar`. Start the server on the development profile,
+which seeds the demo accounts, two stores with their products and stock, and
+simulates the cards:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/bazaar.sh[tag=bazaar-sh-server,indent=0]
+----
+
+Then run the app in the simulator, from the project's directory:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/bazaar.sh[tag=bazaar-sh-simulator,indent=0]
+----
+
+`backend/server.sh run --web` builds the app for a browser as well and serves it at
+`http://localhost:8080/`. The same server also serves the HTML storefront under
+`/s/<handle>`, described in <<bazaar-storefront>>.
+
+=== The modules
+
+`shared` holds the contract: the data transfer objects and the `@RestClient`
+interfaces both sides compile against. `common` is the app, one adaptive app for
+phones, tablets, desktops and browsers. `backend` is the server. Its packages
+follow the domain:
+
+[cols="1,3"]
+|===
+| Package | What it holds
+
+| `catalog`, `store`
+| Stores, their staff and locations, products, options, variants and collections.
+
+| `inventory`
+| Stock per variant and location, the move ledger, counts, transfers, suppliers
+  and purchase orders.
+
+| `cart`, `checkout`, `pricing`, `rates`
+| Carts for guests and accounts, the quote (discounts, tax, shipping) and placing
+  an order.
+
+| `order`, `fulfil`, `returns`, `giftcard`
+| Orders and their events, fulfilments and tracking, refunds and returns, gift
+  cards.
+
+| `pay`
+| The payment provider: holds, captures, voids and refunds.
+
+| `pos`
+| Registers, shifts, cash moves and the offline sale sync.
+
+| `webhook`, `automation`
+| Signed outgoing webhooks and the automation engine.
+
+| `docs`
+| Invoices, packing slips, labels, purchase orders, credit notes, shift reports
+  and receipts as PDF files.
+
+| `web`
+| The server-rendered storefront.
+
+| `analytics`, `admin`
+| Store statistics and the platform console.
+|===
+
+The app's packages split the same way by audience: `shop` for shoppers,
+`merchant` for store staff, `pos` for the register, `admin` for the platform, and
+`ui` for the shell they share. Which of them a person sees follows the roles the
+server returns: a shopper opens on the storefront, store staff on the merchant
+dashboard, a cashier on the register, an administrator on the platform console.
+
+Money is a `long` count of minor units everywhere, on both sides and in every
+transfer object. Nothing stores or adds money as a floating point number.
+
+=== The inventory ledger
+
+Stock is one `InventoryLevel` row per variant and location, holding what's on
+hand, what's committed to placed orders, and what's incoming on purchase
+orders. What can be sold is on hand less committed. No code writes a level
+without writing an `InventoryMove` in the same transaction, with a reason
+(`SALE`, `RESERVE`, `RELEASE`, `RETURN`, `RESTOCK`, `COUNT`, `DAMAGE`,
+`TRANSFER_OUT`, `TRANSFER_IN`, `RECEIVE`, `CORRECTION` or `POS_SYNC`), so the
+history of every number is in the moves and the levels can be rebuilt from them.
+
+Checkout reserves stock through `Inventory.reserve`. The reservation is a
+conditional update: it names the version of the level it read and succeeds only
+if nobody changed the row since, and only if enough is still available. A lost
+race reads the row again and retries a few times. Two shoppers buying the last
+unit at the same moment therefore can't both succeed: one update matches and the
+other finds nothing left. A variant that allows backorders, or one whose stock
+isn't tracked, skips the check.
+
+Shipping a fulfilment takes the units off hand and off committed together;
+cancelling an order releases what it reserved. A return that's restocked writes
+a `RETURN` move. Counting a shelf writes the difference as a `COUNT` move rather
+than overwriting the number.
+
+The one exception to "never below zero" is the register. A sale made offline has
+already happened: the customer left with the goods. The sync records it with a
+`POS_SYNC` move even when that takes a level negative, marks the sale as
+oversold, and raises a low-stock alert for a person to sort out.
+
+[[bazaar-payments]]
+=== Authorize at checkout, capture at shipping
+
+An online order holds its total on the card when it's placed and takes the
+money when the first fulfilment ships. A cancelled order voids the hold, and
+refunds can be partial, line by line or by amount. Point of sale orders and
+pickup orders capture at once.
+
+[source,java]
+----
+include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/pay/Payments.java[tag=bazaar-authorize,indent=0]
+----
+
+Everything provider specific sits behind `PaymentProvider`. The development
+profile uses a simulated provider; the Stripe implementation adds a card on
+Stripe's own page, so a card number never reaches the app or this server.
+
+[source,java]
+----
+include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/pay/PaymentProvider.java[tag=bazaar-payment-provider,indent=0]
+----
+
+=== Who may call what
+
+The security configuration is the one place that says which routes are public,
+which need a signed-in account, and which need a role. The storefront's reads
+and the guest cart are open; the merchant routes need staff of the store, which
+each service checks again against the store's staff list; the platform routes
+need an administrator.
+
+[source,java]
+----
+include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/SecurityConfig.java[tag=bazaar-api-rules,indent=0]
+----
+
+[[bazaar-pos]]
+=== The offline register
+
+The register is built to keep selling with no network. When a cashier opens a
+shift, the app keeps a snapshot of the catalog, the prices, the tax rates and the
+customers it may need. A sale is priced on the device from that snapshot, written
+to the outbox with an id the register made for it, and only then is the receipt
+shown:
+
+[source,java]
+----
+include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/pos/Outbox.java[tag=bazaar-outbox-add,indent=0]
+----
+
+The outbox sends what's waiting in batches, and backs off from two seconds to
+five minutes while the server can't be reached. A register restarted in the
+middle of a request finds the sale still waiting and sends it again. That's
+safe because the server keys every sale by the store and the register's id for
+it, and answers a sale it already has as a duplicate instead of recording it
+twice:
+
+[source,java]
+----
+include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/pos/Outbox.java[tag=bazaar-outbox-answer,indent=0]
+----
+
+On the server, `PosSales.sync` records each sale of a batch in its own
+transaction, so one bad sale doesn't hold back the rest. It prices the sale
+again with the server's own rates and accepts the register's total when the two
+differ by no more than a currency unit or 1%, whichever is larger: a
+stale tax rate moves a total by cents. A larger gap, or a gift card that ran dry
+while the register was offline, is answered as an error that the outbox screen
+shows for a person to retry or settle.
+
+=== Fulfilment
+
+The merchant's fulfilment board shows every open order as a card in To pack,
+Packed, Shipped, or Delivered. On a wide screen it's a `KanbanBoard`: dragging a
+card one column to the right does what that column means on the server (packs
+it, buys the cheapest label and ships it, or marks it delivered), and any other
+move is put back. On a phone it shows one column at a time, with a button on each
+card that moves it on. The live channel reloads the board when an order changes. The pick
+list for the cards in the first column is made on the device, with the same
+`com.codenameone.pdf` package the server renders invoices with:
+
+[source,java]
+----
+include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/merchant/PickListPdf.java[tag=bazaar-picklist-pdf,indent=0]
+----
+
+=== Documents on the server and on the device
+
+The PDF package is shared with the backend, so the server renders invoices,
+packing slips, shipping labels with a Code 128 barcode, purchase orders, credit
+notes, shift reports and receipts with the same API the app uses. Each is a
+`GET` under the store's merchant routes ending in `.pdf`; a shopper gets the
+invoice of their own order from `/api/orders/{orderId}/invoice.pdf`. The app shows
+them with the PDF viewer, prints them where the platform has a printer, shares
+them, and on a desktop lets the user drag the file out of the window.
+
+=== Webhooks
+
+A store can register addresses to be told about `orders/create`, `orders/paid`,
+`orders/fulfilled`, `orders/cancelled`, `refunds/create`, `inventory/low`,
+`products/update` and `customers/create`. Every delivery is a `POST` of the event
+as JSON, signed with the webhook's secret: the `X-Bazaar-Signature` header holds
+`sha256=` and the hexadecimal HMAC-SHA256 of the body. A receiver computes the
+same value over the exact bytes it received and compares the two in constant
+time before trusting the body. A delivery not answered with a 2xx status
+is retried after 1, 2, 4, 8 and 16 minutes, and is marked failed after six
+attempts. The merchant's webhooks page lists every delivery with its status and
+response, and can send one again.
+
+[[bazaar-automations]]
+=== Automations
+
+An automation is a graph drawn in the app's NodeGraph editor and stored as JSON
+in `Automation.graphJson`. Each node is a trigger, a condition or an action. A
+node's data is a map of its parameters with its type repeated under `type`, and
+every value is kept as text, whole numbers for money and counts. Ports are named
+`in`, `out`, `yes` and `no`:
+
+[source,java]
+----
+include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/merchant/AutomationCodec.java[tag=bazaar-automation-encode,indent=0]
+----
+
+The server's `NodeCatalog` is the list of node types, which the editor reads to
+build its palette, so a new type needs no app release:
+
+[cols="1,3"]
+|===
+| Kind | Types
+
+| Trigger
+| `order.created`, `order.paid`, `order.fulfilled`, `inventory.low`,
+  `customer.created`, `cart.abandoned`
+
+| Condition
+| `if.total_over`, `if.customer_tag`, `if.product_tag`, `if.channel`,
+  `if.country`; each has a `yes` and a `no` output
+
+| Action
+| `tag.order`, `tag.customer`, `notify.staff`, `email.customer`,
+  `discount.create_code`, `inventory.reorder`, `webhook.send`, `wait.minutes`
+|===
+
+`AutomationGraph` parses a graph and says what's wrong with it: no trigger,
+triggers of more than one kind, an unknown type, a connection to a missing step
+or a port the step lacks, or a connection into a trigger. An active automation
+must validate before it's saved; an inactive one is a draft and may be
+incomplete. When an event fires, after the change that fired it has committed,
+the engine walks the graph from the matching trigger, following `yes` or `no` at
+each condition, and performs each action in turn. Every action leaves an audit
+event, which is the automation's activity log, and an automation that fails is
+logged without undoing the change. A `wait.minutes` node stores the rest of its
+branch as a run that resumes when the wait is over.
+The development profile seeds two examples in every store: tagging
+orders over a set amount as VIP, and notifying staff and drafting a purchase
+order when stock runs low.
+
+[[bazaar-storefront]]
+=== A storefront search engines can read
+
+The app is a Codename One application, and a crawler that doesn't run
+JavaScript sees nothing of it in a browser. The backend therefore also serves
+the storefront as server-rendered HTML, from templates in
+`backend/src/main/resources/templates`: a store's home page at `/s/<handle>`, its
+collections, search, product pages, a cart that works with plain form posts, and
+order tracking at `/track/<number>`.
+
+Each page carries its title, description, a canonical link (also sent as a
+`Link` header) and link preview tags. `/robots.txt` keeps the API, the sign-in
+pages and the per-visitor pages out of indexes, and `/sitemap.xml` lists every
+active store, published collection and active product with when it last changed.
+Pages that are the same for every visitor are sent with
+`Cache-Control: public, max-age=60, stale-while-revalidate=600`, so a cache in
+front of the server can absorb a crawl. Checkout hands over to the app hosted on
+the same server, which picks up the same cart.
+
+=== Tests
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/bazaar.sh[tag=bazaar-sh-tests,indent=0]
+----
+
+The first two lines run the server's tests on the JVM and then compiled to a
+native binary, which is how the server ships. `run-e2e.sh` starts a server and
+drives the app's real screens against it in the simulator; `run-web-e2e.sh`
+builds the browser version, has the server host it, and drives it in a headless
+browser.
+
+[[bazaar-before-product]]
+=== Before it's a product
+
+Bazaar runs a store end to end, but several parts are stand-ins for services a
+business contracts for. Plan for these before taking real orders:
+
+* *A real payment service provider.* The Stripe provider has to be tried against
+  a test account before it handles money, and a deployment may need another
+  provider, wallets or local payment methods behind the same `PaymentProvider`.
+* *A tax engine.* The tax rates are a table the merchant edits. Real sales tax and
+  VAT depend on the product category, the destination, thresholds per
+  jurisdiction and filing obligations, which a tax service tracks.
+* *Carrier contracts.* Shipping rates are the merchant's own table and labels are
+  rendered locally. Live rates, purchased labels and tracking updates need
+  accounts with carriers or a shipping aggregator.
+* *PCI scope.* Keep card entry on the provider's hosted page or SDK so card data
+  never touches the app or the server, and confirm the deployment's
+  self-assessment with the provider.
+* *Mail transport.* Receipts, invoices and automation emails need a mail
+  service, with a sending domain that has SPF, DKIM and DMARC set up.
+* *Hardware terminals and printers.* The register takes card payments as a
+  simulated tender and prints through the platform's print service. Card readers
+  and receipt or label printers each need their vendor's SDK, wrapped as a
+  native interface.
+* *Currency conversion for platform totals.* Each store sells in its own
+  currency. The platform console adds store totals unconverted, which is only
+  right while every store uses the same currency; reporting gross merchandise
+  value across currencies needs exchange rates recorded at the time of each sale.

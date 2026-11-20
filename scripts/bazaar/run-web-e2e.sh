@@ -10,7 +10,7 @@
 # `backend/server.sh build --web` left.
 #
 # What it proves: a person who opens the server's address gets the app, can sign
-# in as the demo customer and reaches the home screen, with the live channel open.
+# in as the demo shopper and reaches the home screen, with the live channel open.
 # Screenshots of each step and the browser's log go to target/web-e2e.
 #
 # Needs JAVA_HOME on JDK 17 or newer, the Codename One artifacts this project builds

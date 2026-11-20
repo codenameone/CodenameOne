@@ -3,7 +3,7 @@
 //   URL=http://localhost:18081/ OUT=target/web-e2e node web-e2e.mjs
 //
 // It checks what a person opening the server's address gets: the app loads from
-// the server, reaches the welcome screen, signs in as the demo customer, lands on
+// the server, reaches the welcome screen, signs in as the demo shopper, lands on
 // the home screen with its map, and has its live channel open. Then it signs
 // out, signs in as the demo admin and reaches the admin console.
 // run-web-e2e.sh builds everything, starts the server and runs this; see there.
@@ -33,7 +33,7 @@ try {
 
 const url = process.env.URL;
 const out = process.env.OUT || 'target/web-e2e';
-const email = process.env.BAZAAR_USER || 'customer@bazaar.example';
+const email = process.env.BAZAAR_USER || 'shopper@bazaar.example';
 const password = process.env.BAZAAR_PASSWORD || 'bazaar-demo';
 const admin = process.env.BAZAAR_ADMIN || 'admin@bazaar.example';
 // A cold runner translates nothing at this point, but it does parse several
@@ -63,8 +63,8 @@ const browser = await chromium.launch({
   args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows', '--disable-features=IntensiveWakeUpThrottling']
 });
-// A browser reports where it is, and the restaurants listed are the ones that
-// deliver there: this one is by the seeded restaurants, near Pier 39.
+// A browser reports where it is; the storefront uses it only to estimate
+// shipping, so any location near the seeded stores does.
 const page = await browser.newPage({ viewport: { width: 420, height: 860 },
   geolocation: { latitude: 37.8080, longitude: -122.4120 }, permissions: ['geolocation'] });
 page.on('console', message => {
@@ -237,10 +237,10 @@ try {
 
   // 3. The home screen.
   await waitFor('the home screen', stepSeconds, async () =>
-      (await screenText()).includes('Deliver to'));
-  // The restaurants near the address, read from the server: the seeded ones.
-  const seeded = ['Ember & Crust', 'Harbor Burger Co.', 'Kumo Omakase', 'The Gilded Hen', 'Saffron Grill', 'Jade Bowl', 'Prime & Pepper', 'Luz Taqueria', 'Verde Table', 'Glaze Donut Atelier', 'Velvet Spoon', 'Morning Ritual'];
-  await waitFor('a restaurant near the address', stepSeconds, async () => {
+      (await screenText()).includes('New arrivals'));
+  // The store's hero, read from the server: one of the seeded stores.
+  const seeded = ['Northwind', 'Little Clay'];
+  await waitFor('a seeded store on the home screen', stepSeconds, async () => {
     const text = await screenText();
     return seeded.some(name => text.includes(name));
   });

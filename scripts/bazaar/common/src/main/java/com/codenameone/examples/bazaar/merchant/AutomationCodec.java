@@ -55,6 +55,7 @@ final class AutomationCodec implements GraphJson.UserDataCodec {
 
     static final AutomationCodec INSTANCE = new AutomationCodec();
 
+    // tag::bazaar-automation-encode[]
     @Override
     public Object encode(Object userData) {
         if (!(userData instanceof Map)) {
@@ -69,6 +70,7 @@ final class AutomationCodec implements GraphJson.UserDataCodec {
         }
         return out;
     }
+    // end::bazaar-automation-encode[]
 
     @Override
     public Object decode(Object json) {

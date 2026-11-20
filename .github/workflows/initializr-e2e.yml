@@ -21,6 +21,7 @@ on:
       - 'scripts/sync-initializr-template.py'
       - 'scripts/wayline/common/src/test/**'
       - 'scripts/savor/common/src/test/**'
+      - 'scripts/bazaar/common/src/test/**'
       - 'scripts/skirmish/common/src/test/**'
       - 'scripts/dash/common/src/test/**'
       - 'scripts/parley/common/src/test/**'

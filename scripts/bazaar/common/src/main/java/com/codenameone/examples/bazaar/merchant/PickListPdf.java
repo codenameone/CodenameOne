@@ -59,6 +59,7 @@ final class PickListPdf {
         return "bazaar:order:" + order.orderId();
     }
 
+    // tag::bazaar-picklist-pdf[]
     /// Builds the pick list for `orderIds` out of `queue` (every queued order
     /// when null).
     ///
@@ -82,6 +83,7 @@ final class PickListPdf {
         p.orders(queue, orderIds, locationNames);
         return p.doc.toByteArray();
     }
+    // end::bazaar-picklist-pdf[]
 
     private void newPage() {
         page = doc.addPage(PdfPageSize.A4);

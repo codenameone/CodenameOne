@@ -817,6 +817,7 @@ aarch64
 # The sample application the Wayline chapters walk through.
 Parley
 Savor
+Bazaar
 Wayline
 # The Brickyard game platform sample: its name, the scripting language it runs and the terms of its games.
 Brickyard
@@ -925,3 +926,9 @@ worklet
 # PDF standard font names.
 Zapf
 Fieldline
+Northwind
+littleclay
+northwind
+Kanban
+fulfilment
+fulfilments

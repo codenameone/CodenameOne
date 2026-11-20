@@ -1,0 +1,211 @@
+[[bazaar-users-guide]]
+== Bazaar: A commerce platform from four sides
+
+Bazaar is a sample commerce platform with a server behind it. Shoppers browse a
+store, fill a cart and check out. The merchant's staff manage the catalog and the
+stock, pack and ship the orders, and sell over the counter on a register that
+keeps working with no network. An administrator runs the platform the stores
+live on. The app and the server are one Maven project, written in Java on both
+sides.
+
+This chapter is the user's guide: what each kind of user sees and can do.
+<<bazaar-implementors-guide>> is the other half. It explains how the project is
+built and what to replace before it takes real orders.
+
+One app serves everyone, on a phone, a tablet, a desktop or in a browser. The
+server gives every account a set of roles, and the app opens on the screen that
+fits them. On a phone the sections are tabs at the bottom; on a wide screen they
+are a sidebar, and on a desktop the app adds native menus, keyboard shortcuts,
+right-click menus on rows and second windows.
+
+[cols="1,3"]
+|===
+| Role | What it adds
+
+| Shopper
+| Every account is a shopper, and a guest can browse and fill a cart before
+  signing in. Browse and search a store, choose variants, check out, follow the
+  order, keep a wishlist and saved addresses, and review what they bought.
+
+| Owner or manager
+| Runs a store: the dashboard, products, inventory, orders and fulfilment,
+  customers, discounts, gift cards, shipping and taxes, analytics, automations,
+  webhooks and the store's settings.
+
+| Cashier
+| Works the store's register: opens a shift, sells, takes returns and closes the
+  shift with a cash count.
+
+| Administrator
+| Runs the platform: approves and suspends stores, manages accounts and sees the
+  platform's payments and totals.
+|===
+
+=== Trying it
+
+Start the server on the development profile and run the app, as
+<<bazaar-launch>> shows. The development profile creates these accounts, all
+with the password `bazaar-demo`:
+
+[cols="2,3"]
+|===
+| Account | Who
+
+| `shopper@bazaar.example`, `shopper2@bazaar.example`
+| Shoppers
+
+| `shopper3@bazaar.example`
+| A shopper an administrator has flagged
+
+| `owner@bazaar.example`
+| Owns Northwind Outfitters
+
+| `cashier@bazaar.example`
+| Works the Northwind register; the register PIN is `1234`
+
+| `admin@bazaar.example`
+| Runs the platform
+|===
+
+It also creates two stores. Northwind Outfitters (handle `northwind`) sells
+apparel and outdoor gear from a warehouse, a downtown store and a weekend pop-up.
+Little Clay Studio (handle `littleclay`) sells ceramics from one studio shop. Each
+has about thirty products with stock that's plentiful, low and gone, collections,
+a supplier and an open purchase order, shipping zones and tax rates, and three
+discount codes: `WELCOME10` (10% off a first order), `FREESHIP` (free shipping
+over $75) and `BUNDLE` (buy 2, get 1 free).
+
+Cards are simulated: `4242 4242 4242 4242` is accepted and `4000 0000 0000 0002`
+is declined. No money moves.
+
+=== The shopper
+
+The home screen is the store's front page: its banner, its collections and new
+arrivals. The store button at the top switches to another store. Search finds
+products by name, tag or type, and the filter panel narrows the results by
+collection, price and availability and sorts them.
+
+A product page shows its photos, its description and reviews, and lets the
+shopper choose a variant, such as a size and a color. A variant that's out of
+stock says so and can't be added. Products can be kept in the wishlist.
+
+The cart shows the lines, a discount code field and an estimate of shipping and
+tax. Checkout asks for the address, from the saved ones or a new one, the
+shipping method the store offers for it (including pickup or local delivery where
+the store has them), and the card. The card is held, not charged, until the
+order ships.
+
+The orders tab follows each order through its steps: placed, packed, shipped and
+delivered, with the carrier's tracking events. An order can be cancelled until
+it's packed. The shopper can download the invoice as a PDF, ask to return lines
+of a delivered order, and review the products they bought.
+
+The account tab holds the profile, saved addresses, the wallet of cards and the
+settings.
+
+=== The merchant
+
+==== Dashboard and analytics
+
+The dashboard shows today's sales, orders to fulfil, low stock and recent
+activity. Analytics charts sales over a chosen period, by channel (online or
+register), top products, the checkout funnel and customer segments, and exports
+what it shows as CSV.
+
+==== Products and collections
+
+Products are a table on a wide screen and a list on a phone. A product has a
+title, description, type, vendor, tags, photos and options; the variant matrix
+generates one variant per combination of options, each with its own price, SKU,
+barcode and weight. Photos can be dropped onto the editor from the desktop.
+Products can be duplicated, edited in bulk, and imported or exported as CSV.
+Collections are either chosen by hand or smart, defined by rules such as a tag or
+a price range.
+
+==== Inventory
+
+The inventory screen shows what's on hand, committed and available for each
+variant at each location. Stock can be adjusted with a reason, counted, moved
+between locations with a transfer, and received against a purchase order sent to
+a supplier. A barcode scanner, the camera or a keyboard scanner on a desktop,
+finds a variant by its code. Every change is listed in the variant's history.
+
+==== Orders and fulfilment
+
+The orders list filters by status, channel and payment. An order shows its lines,
+payments, notes and timeline, and can be cancelled, refunded in part or in full,
+or marked paid. A draft order is an order the merchant builds by hand, for a phone
+sale.
+
+The fulfilment board shows every open order as a card in To pack, Packed, Shipped
+or Delivered. Dragging a card to the next column packs it, buys a label and ships
+it, or marks it delivered; on a phone each card has a button that moves it on.
+The board makes a pick list for a column as a PDF, and opens the returns queue,
+where returned goods are received and refunded. Packing slips, labels, invoices,
+credit notes and purchase orders can be previewed, printed, shared or, on a
+desktop, dragged out of the window as files.
+
+==== Customers, discounts and gift cards
+
+The customers screen lists the store's customers with their orders, total spent,
+tags and store credit. Discounts are codes for a percentage or an amount off,
+free shipping, or buy some and get some free, with limits on use and dates. Gift
+cards are issued with a code and a QR code, and their balance can be checked.
+
+==== Shipping, taxes and settings
+
+Shipping zones group countries, each with rates: flat, by weight, by price, free
+over an amount, pickup or local delivery. Tax rates are set per country and
+region. The settings hold the store's name, description, logo and banner,
+locations, staff and their roles, and the registers.
+
+==== Automations
+
+An automation is drawn as a graph: a trigger, such as an order being paid or
+stock running low, leads through conditions, such as an order total over an
+amount or a customer tag, to actions, such as tagging the order, notifying staff,
+emailing the customer, creating a discount code, drafting a reorder, sending a
+webhook or waiting. Nodes are added from the palette and joined by dragging from
+an output to an input. The store starts with two examples. An automation is saved
+as a draft until it's switched on, and its activity log shows what each run did.
+
+==== Webhooks
+
+The webhooks page registers addresses to be told about orders, refunds, low stock,
+products and customers. Each webhook has a secret that signs its deliveries, and
+the page lists every delivery with its status and response and can send one again.
+
+=== The register
+
+A cashier signs in, chooses the register and enters the PIN (`1234` for the demo
+cashier), and opens a shift with the cash in the drawer. The sell screen is a
+grid of products and a cart; scanning a barcode adds the item. A sale can be
+attached to a customer, discounted, and paid with any mix of card, cash, gift card
+and store credit, with change worked out for cash. The receipt can be printed,
+emailed or shown as a QR code, and a second window on a desktop shows the cart to
+the customer.
+
+The register keeps selling with no network. Sales wait in the outbox and are sent
+when the connection comes back; the outbox screen shows each one's state, and a
+sale the server refused, such as one paid with a gift card that ran out while the
+register was offline, can be retried after it's sorted out. Returns are taken
+against a receipt. At the end of the shift the cashier counts the drawer, and the
+shift report shows the expected and counted cash.
+
+=== The administrator
+
+The platform console shows the number of stores, orders and the total sold across
+the platform. The stores screen approves pending stores and suspends or reinstates
+active ones, with a reason that stays in the store's history. The users screen
+finds accounts, grants and removes roles, and flags or blocks an account. The
+payments screen lists payments and payouts across the stores.
+
+=== In a browser
+
+The server can host the app itself, so the whole platform runs in a browser with
+nothing installed; `backend/server.sh run --web` builds it and serves it at
+`http://localhost:8080/`. The same server also serves each store as plain HTML
+pages at `/s/<handle>`, for search engines and for visitors who arrive from a
+link: home, collections, search, product pages, a cart, and order tracking at
+`/track/<number>`. Checking out from those pages continues in the app with the
+same cart.

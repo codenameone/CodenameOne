@@ -120,6 +120,7 @@ public final class Outbox {
         return null;
     }
 
+    // tag::bazaar-outbox-add[]
     /// Records a sale; stored before this returns.
     public Entry add(PosSaleDto sale) {
         Entry existing = find(sale.clientId());
@@ -131,6 +132,7 @@ public final class Outbox {
         save();
         return e;
     }
+    // end::bazaar-outbox-add[]
 
     /// Waiting or in flight.
     public int pending() {
@@ -201,6 +203,7 @@ public final class Outbox {
                 backoff(e, now);
                 continue;
             }
+            // tag::bazaar-outbox-answer[]
             String status = r.status() == null ? "" : r.status();
             if ("OK".equalsIgnoreCase(status)) {
                 e.state = SYNCED;
@@ -209,6 +212,7 @@ public final class Outbox {
             } else {
                 e.state = ERROR;
             }
+            // end::bazaar-outbox-answer[]
             e.attempts++;
             e.orderId = r.orderId() == null ? "" : r.orderId();
             e.number = r.number();

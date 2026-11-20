@@ -17,6 +17,7 @@ on:
       # The Savor and Parley chapters, the same way; savor.yml and parley.yml
       # compile and test the samples.
       - 'scripts/savor/**'
+      - 'scripts/bazaar/**'
       # The Bastion chapters, the same way; bastion.yml compiles and tests it.
       - 'scripts/bastion/**'
       - 'scripts/pulse/**'
@@ -154,6 +155,7 @@ jobs:
               # renamed or deleted tag there has to reach the snippet check.
               - 'scripts/wayline/**'
               - 'scripts/savor/**'
+              - 'scripts/bazaar/**'
               - 'scripts/skirmish/**'
               - 'scripts/dash/**'
               - 'scripts/parley/**'
