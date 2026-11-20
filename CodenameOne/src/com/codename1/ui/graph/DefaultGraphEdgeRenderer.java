@@ -23,6 +23,8 @@
 package com.codename1.ui.graph;
 
 import com.codename1.graph.GraphEdge;
+import com.codename1.graph.GraphNode;
+import com.codename1.graph.GraphPort;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.plaf.Style;
@@ -39,6 +41,29 @@ import java.util.Map;
 /// `setColor`.
 public class DefaultGraphEdgeRenderer implements GraphEdgeRenderer {
     private final Map<String, Integer> colors = new HashMap<String, Integer>();
+    private boolean colorByPortType;
+
+    /// True when an edge takes the colour of the port it leaves.
+    public boolean isColorByPortType() {
+        return colorByPortType;
+    }
+
+    /// Draws an edge that has no colour of its own in the colour its source
+    /// port's type has in the graph's `DefaultGraphNodeRenderer`, so the
+    /// wires of a node editor read by type. Off by default.
+    public void setColorByPortType(boolean colorByPortType) {
+        this.colorByPortType = colorByPortType;
+    }
+
+    private int typeColor(NodeGraph graph, GraphEdge edge, int fallback) {
+        GraphNodeRenderer r = graph.getNodeRenderer();
+        GraphNode n = edge.getSourcePortId() == null ? null : graph.getModel().getNode(edge.getSourceId());
+        GraphPort p = n == null ? null : n.getOutput(edge.getSourcePortId());
+        if (p == null || p.getType() == null || !(r instanceof DefaultGraphNodeRenderer)) {
+            return fallback;
+        }
+        return ((DefaultGraphNodeRenderer) r).getAccent(p.getType(), fallback);
+    }
 
     /// Maps an edge style key to a line colour.
     public void setColor(String styleKey, int rgb) {
@@ -55,6 +80,8 @@ public class DefaultGraphEdgeRenderer implements GraphEdgeRenderer {
         Integer custom = edge.getStyleKey() == null ? null : colors.get(edge.getStyleKey());
         if (custom != null) {
             color = custom.intValue();
+        } else if (colorByPortType) {
+            color = typeColor(graph, edge, color);
         }
         if (selected) {
             color = GraphLook.style("NodeGraphNodeSelected").getFgColor();
@@ -62,36 +89,130 @@ public class DefaultGraphEdgeRenderer implements GraphEdgeRenderer {
         float zoom = graph.getZoom();
         float width = Math.max(1f, GraphLook.mm(0.3f) * Math.min(zoom, 2f) * (selected ? 1.8f : 1f));
         g.setColor(color);
-        double arrow = edge.isDirected() ? Math.max(4, GraphLook.mm(1.5f) * Math.min(zoom, 1.5f)) : 0;
-        // stop the line short of the target so the arrow's tip is sharp
+        double size = Math.max(4, GraphLook.mm(1.5f) * Math.min(zoom, 1.5f));
+        int head = edge.getTargetArrow();
+        int tail = edge.getSourceArrow();
+        int style = edge.getLineStyle();
+        // stop the line short of a filled head so its tip is sharp
         double ex = xs[count - 1];
         double ey = ys[count - 1];
-        double bx = xs[count - 2];
-        double by = ys[count - 2];
-        double dx = ex - bx;
-        double dy = ey - by;
+        double dx = ex - xs[count - 2];
+        double dy = ey - ys[count - 2];
         double len = Math.sqrt(dx * dx + dy * dy);
+        double sx = xs[0];
+        double sy = ys[0];
+        double tdx = sx - xs[1];
+        double tdy = sy - ys[1];
+        double tlen = Math.sqrt(tdx * tdx + tdy * tdy);
+        double headCut = cut(head, size);
+        double tailCut = cut(tail, size);
+        double phase = 0;
         for (int i = 0; i < count - 1; i++) {
+            double x1 = xs[i];
+            double y1 = ys[i];
             double x2 = xs[i + 1];
             double y2 = ys[i + 1];
-            if (i == count - 2 && arrow > 0 && len > arrow) {
-                x2 = ex - dx / len * arrow * 0.8;
-                y2 = ey - dy / len * arrow * 0.8;
+            if (i == 0 && tailCut > 0 && tlen > tailCut && (count > 2 || tlen > tailCut + headCut)) {
+                x1 = sx - tdx / tlen * tailCut;
+                y1 = sy - tdy / tlen * tailCut;
             }
-            GraphLook.line(g, xs[i], ys[i], x2, y2, width);
+            // a segment shorter than the cut would come out the other side of its start
+            if (i == count - 2 && headCut > 0 && len > headCut) {
+                x2 = ex - dx / len * headCut;
+                y2 = ey - dy / len * headCut;
+            }
+            if (style == GraphEdge.LINE_SOLID) {
+                GraphLook.line(g, x1, y1, x2, y2, width);
+            } else {
+                phase = dashes(g, x1, y1, x2, y2, width, style == GraphEdge.LINE_DOTTED, phase);
+            }
         }
-        if (arrow > 0 && len > 0.01) {
-            double ux = dx / len;
-            double uy = dy / len;
-            double half = arrow * 0.55;
-            int[] ax = {(int) Math.round(ex), (int) Math.round(ex - ux * arrow - uy * half),
-                (int) Math.round(ex - ux * arrow + uy * half)};
-            int[] ay = {(int) Math.round(ey), (int) Math.round(ey - uy * arrow + ux * half),
-                (int) Math.round(ey - uy * arrow - ux * half)};
-            g.fillPolygon(ax, ay, 3);
+        if (len > 0.01) {
+            paintHead(g, head, ex, ey, dx / len, dy / len, size, width);
+        }
+        if (tlen > 0.01) {
+            paintHead(g, tail, sx, sy, tdx / tlen, tdy / tlen, size, width);
         }
         if (edge.getLabel() != null && edge.getLabel().length() > 0 && zoom >= graph.getDetailZoom()) {
             paintLabel(g, graph.getZoom(), edge.getLabel(), xs, ys, count);
+        }
+    }
+
+    // How far from its tip the line under a head stops.
+    private static double cut(int kind, double size) {
+        switch (kind) {
+            case GraphEdge.ARROW_FILLED:
+                return size * 0.8;
+            case GraphEdge.ARROW_DIAMOND:
+                return size * 1.4;
+            case GraphEdge.ARROW_CIRCLE:
+                return size * 0.8;
+            default:
+                return 0;
+        }
+    }
+
+    // Draws one segment as dashes or dots; a stroke has no dash pattern, so
+    // the segment is walked. The phase carries the pattern round a bend.
+    private static double dashes(Graphics g, double x1, double y1, double x2, double y2,
+            float width, boolean dotted, double phase) {
+        double dx = x2 - x1;
+        double dy = y2 - y1;
+        double len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 0.01) {
+            return phase;
+        }
+        double on = dotted ? Math.max(1.5, width) : Math.max(4, width * 4);
+        double off = dotted ? Math.max(3, width * 2.5) : Math.max(3, width * 3);
+        double period = on + off;
+        double at = -phase;
+        while (at < len) {
+            double a = Math.max(0, at);
+            double b = Math.min(len, at + on);
+            if (b > a) {
+                GraphLook.line(g, x1 + dx * a / len, y1 + dy * a / len, x1 + dx * b / len, y1 + dy * b / len, width);
+            }
+            at += period;
+        }
+        return (phase + len) % period;
+    }
+
+    // Paints the mark at one end of an edge; the unit vector points at the tip.
+    private static void paintHead(Graphics g, int kind, double ex, double ey, double ux, double uy,
+            double size, float width) {
+        double half = size * 0.55;
+        switch (kind) {
+            case GraphEdge.ARROW_FILLED: {
+                int[] ax = {(int) Math.round(ex), (int) Math.round(ex - ux * size - uy * half),
+                    (int) Math.round(ex - ux * size + uy * half)};
+                int[] ay = {(int) Math.round(ey), (int) Math.round(ey - uy * size + ux * half),
+                    (int) Math.round(ey - uy * size - ux * half)};
+                g.fillPolygon(ax, ay, 3);
+                break;
+            }
+            case GraphEdge.ARROW_OPEN:
+                GraphLook.line(g, ex, ey, ex - ux * size - uy * half, ey - uy * size + ux * half, width);
+                GraphLook.line(g, ex, ey, ex - ux * size + uy * half, ey - uy * size - ux * half, width);
+                break;
+            case GraphEdge.ARROW_DIAMOND: {
+                double mid = size * 0.75;
+                double side = size * 0.42;
+                int[] ax = {(int) Math.round(ex), (int) Math.round(ex - ux * mid - uy * side),
+                    (int) Math.round(ex - ux * size * 1.5), (int) Math.round(ex - ux * mid + uy * side)};
+                int[] ay = {(int) Math.round(ey), (int) Math.round(ey - uy * mid + ux * side),
+                    (int) Math.round(ey - uy * size * 1.5), (int) Math.round(ey - uy * mid - ux * side)};
+                g.fillPolygon(ax, ay, 4);
+                break;
+            }
+            case GraphEdge.ARROW_CIRCLE: {
+                int r = (int) Math.max(2, Math.round(size * 0.45));
+                int cx = (int) Math.round(ex - ux * r);
+                int cy = (int) Math.round(ey - uy * r);
+                g.fillArc(cx - r, cy - r, r * 2, r * 2, 0, 360);
+                break;
+            }
+            default:
+                break;
         }
     }
 

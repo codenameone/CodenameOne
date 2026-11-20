@@ -479,6 +479,51 @@
       ]
     },
     {
+      "id": "flow-chart",
+      "category": "Rich components",
+      "name": "Flow chart",
+      "description": "Checks the node graph as a flow chart: the flow chart outlines in two swimlanes, dashed and plain lines, open and circle arrow ends and a selected decision, in light and dark themes.",
+      "tests": [
+        "FlowChartThemeScreenshotTest"
+      ]
+    },
+    {
+      "id": "flow-chart-shapes",
+      "category": "Rich components",
+      "name": "Flow chart shapes and lines",
+      "description": "Checks every built-in node outline, the solid, dashed and dotted lines, every kind of arrow end, vertical swimlanes and the resize handles of a selected node, in light and dark themes.",
+      "tests": [
+        "FlowChartShapesScreenshotTest"
+      ]
+    },
+    {
+      "id": "node-editor",
+      "category": "Rich components",
+      "name": "Node editor",
+      "description": "Checks the node graph as a node editor: a palette of node templates, typed ports with a colour per type, edges coloured by the port they leave and the values of unconnected inputs, in light and dark themes.",
+      "tests": [
+        "NodeEditorThemeScreenshotTest"
+      ]
+    },
+    {
+      "id": "kanban-board",
+      "category": "Rich components",
+      "name": "Kanban board",
+      "description": "Checks the Kanban board with two swimlanes and a folded one, a column over its limit, a folded column, tagged and badged cards and a selected card, in light and dark themes.",
+      "tests": [
+        "KanbanBoardThemeScreenshotTest"
+      ]
+    },
+    {
+      "id": "kanban-cards",
+      "category": "Rich components",
+      "name": "Kanban cards",
+      "description": "Checks a Kanban board without swimlanes: cards that carry a component, coloured tags, wrapped titles and descriptions, a column within its limit and an empty column, in light and dark themes.",
+      "tests": [
+        "KanbanCardsThemeScreenshotTest"
+      ]
+    },
+    {
       "id": "pdf-viewer",
       "category": "Rich components",
       "name": "PDF viewer",
@@ -1503,6 +1548,26 @@
     {
       "pattern": "NodeGraphTheme*",
       "test": "NodeGraphThemeScreenshotTest"
+    },
+    {
+      "pattern": "FlowChartTheme*",
+      "test": "FlowChartThemeScreenshotTest"
+    },
+    {
+      "pattern": "KanbanBoardTheme*",
+      "test": "KanbanBoardThemeScreenshotTest"
+    },
+    {
+      "pattern": "KanbanCardsTheme*",
+      "test": "KanbanCardsThemeScreenshotTest"
+    },
+    {
+      "pattern": "FlowChartShapes*",
+      "test": "FlowChartShapesScreenshotTest"
+    },
+    {
+      "pattern": "NodeEditorTheme*",
+      "test": "NodeEditorThemeScreenshotTest"
     },
     {
       "pattern": "PdfViewer*",

@@ -33,4 +33,10 @@
 /// of thousands of nodes costs what is on screen. A node that needs a real
 /// control gets one from a `NodeComponentFactory`. Colours and fonts come
 /// from the `NodeGraph*` UIIDs.
+///
+/// For a flow chart, a node takes an outline from the `GraphShapeRegistry`
+/// and a `com.codename1.graph.GraphGroup` made as a lane is a swimlane. A
+/// `GraphPalette` beside the graph creates nodes from templates, a
+/// `PortEditorFactory` edits the value of an unconnected input, and with a
+/// `com.codename1.util.UndoHistory` every edit can be undone.
 package com.codename1.ui.graph;

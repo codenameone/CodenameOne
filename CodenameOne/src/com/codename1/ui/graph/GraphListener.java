@@ -70,4 +70,26 @@ public interface GraphListener {
 
     /// A group was collapsed or expanded by a tap on its title.
     void groupToggled(NodeGraph graph, GraphGroup group);
+
+    /// A node is about to be added: dropped from a `GraphPalette`, pasted or
+    /// duplicated. The node is already where it will be.
+    ///
+    /// #### Returns
+    ///
+    /// false to refuse
+    boolean nodeCreating(NodeGraph graph, GraphNode node);
+
+    /// A node was added by the user.
+    void nodeCreated(NodeGraph graph, GraphNode node);
+
+    /// A node was dragged by a corner and is about to take a new size, in
+    /// world units.
+    ///
+    /// #### Returns
+    ///
+    /// false to refuse, which puts it back
+    boolean nodeResizing(NodeGraph graph, GraphNode node, double width, double height);
+
+    /// A node was resized by the user.
+    void nodeResized(NodeGraph graph, GraphNode node);
 }

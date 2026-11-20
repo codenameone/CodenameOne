@@ -200,6 +200,85 @@ public class DefaultGraphModel extends AbstractGraphModel {
         return true;
     }
 
+    @Override
+    public boolean insertNode(GraphNode node, int index) {
+        if (node == null || nodeIndex.containsKey(node.getId())) {
+            return false;
+        }
+        nodeIndex.put(node.getId(), node);
+        if (index < 0 || index >= nodes.size()) {
+            nodes.add(node);
+        } else {
+            nodes.add(index, node);
+        }
+        fireChanged();
+        return true;
+    }
+
+    @Override
+    public boolean insertEdge(GraphEdge edge, int index) {
+        if (edge == null || edgeIndex.containsKey(edge.getId())
+                || !nodeIndex.containsKey(edge.getSourceId()) || !nodeIndex.containsKey(edge.getTargetId())) {
+            return false;
+        }
+        edgeIndex.put(edge.getId(), edge);
+        if (index < 0 || index >= edges.size()) {
+            edges.add(edge);
+        } else {
+            edges.add(index, edge);
+        }
+        fireChanged();
+        return true;
+    }
+
+    @Override
+    public boolean resizeNode(GraphNode node, double width, double height) {
+        node.setSize(width, height);
+        fireChanged();
+        return true;
+    }
+
+    @Override
+    public boolean setNodeGroup(GraphNode node, String groupId) {
+        node.setGroupId(groupId);
+        fireChanged();
+        return true;
+    }
+
+    @Override
+    public boolean resizeGroup(GraphGroup group, double x, double y, double width, double height) {
+        group.setBounds(x, y, width, height);
+        fireChanged();
+        return true;
+    }
+
+    @Override
+    public boolean setPortValue(GraphPort port, Object value) {
+        port.setValue(value);
+        fireChanged();
+        return true;
+    }
+
+    /// Removes a group. Its members stay, in no group.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model has no such group
+    public boolean removeGroup(GraphGroup group) {
+        if (!groups.remove(group)) {
+            return false;
+        }
+        int n = nodes.size();
+        for (int i = 0; i < n; i++) {
+            GraphNode node = nodes.get(i);
+            if (group.getId().equals(node.getGroupId())) {
+                node.setGroupId(null);
+            }
+        }
+        fireChanged();
+        return true;
+    }
+
     private String nextEdgeId() {
         String id;
         do {
