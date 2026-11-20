@@ -64,6 +64,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       # The template's resources are derived from scripts/dash and committed.
       # A change to one without the other is a template that is not the project
       # this workflow tests.
@@ -86,6 +88,8 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 Path
         run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
@@ -94,6 +98,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 17 Path
         run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
@@ -134,6 +140,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install native build tools
         run: |
           bash scripts/ci/apt-get-update.sh
@@ -147,6 +156,8 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 Path
         run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
@@ -155,6 +166,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 17 Path
         run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
@@ -233,6 +246,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       # The runner's own MySQL 8.0 rather than a service container: a service
       # cannot be given server options, and MySQL 8.4 (mysql:8) turns
       # mysql_native_password off. The backend does caching_sha2_password's
@@ -250,6 +266,8 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 Path
         run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
@@ -258,6 +276,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 17 Path
         run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
@@ -303,6 +323,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Install Codename One artifacts (core / javase / css-compiler / plugin / backend)
         # Retried only for a failure that is the network's: a compilation
@@ -367,6 +390,8 @@ jobs:
       CN1_APP_DIR: scripts/dash
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
       - name: Cache codenameone-tools
@@ -423,6 +448,9 @@ jobs:
       CN1_APP_DIR: scripts/dash
     steps:
       - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Cache CocoaPods and user gems
         uses: actions/cache@v5

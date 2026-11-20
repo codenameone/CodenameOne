@@ -26,6 +26,7 @@ import com.codename1.graph.GraphNode;
 import com.codename1.graph.GraphPort;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.plaf.Style;
 
 import java.util.HashMap;
@@ -42,6 +43,7 @@ import java.util.Map;
 /// `setAccent`; a node without one uses the selection colour.
 public class DefaultGraphNodeRenderer implements GraphNodeRenderer {
     private final Map<String, Integer> accents = new HashMap<String, Integer>();
+    private final GeneralPath path = new GeneralPath();
 
     /// Maps a node style key to the colour of its strip and its ports.
     public void setAccent(String styleKey, int rgb) {
@@ -65,6 +67,11 @@ public class DefaultGraphNodeRenderer implements GraphNodeRenderer {
         float zoom = graph.getZoom();
         int arc = Math.max(2, Math.round(GraphLook.mm(1.6f) * Math.min(zoom, 1.5f)));
         boolean detail = zoom >= graph.getDetailZoom();
+        GraphShape shape = GraphShapeRegistry.get(node.getShape());
+        if (shape != null && g.isShapeSupported()) {
+            paintShape(g, graph, node, shape, x, y, w, h, selected);
+            return;
+        }
         if (detail) {
             GraphLook.shadow(g, x, y, w, h, arc, selected ? 1f : 0.6f);
         }
@@ -82,6 +89,54 @@ public class DefaultGraphNodeRenderer implements GraphNodeRenderer {
         }
         if (detail) {
             paintText(g, graph, node, x + strip * 2, y, w - strip * 2, h, fg, bg);
+        }
+        if (node.hasPorts()) {
+            paintPorts(g, graph, node, bg, fg, detail);
+        }
+    }
+
+    /// Paints a node that has an outline of its own: the outline filled, a
+    /// tint of the node's accent when its style key has one, and the label in
+    /// the middle.
+    private void paintShape(Graphics g, NodeGraph graph, GraphNode node, GraphShape shape,
+            int x, int y, int w, int h, boolean selected) {
+        Style s = GraphLook.style("NodeGraphNode");
+        int bg = GraphLook.bg(s, 0xffffff);
+        int fg = s.getFgColor();
+        int primary = GraphLook.style("NodeGraphNodeSelected").getFgColor();
+        Integer accent = node.getStyleKey() == null ? null : accents.get(node.getStyleKey());
+        float zoom = graph.getZoom();
+        boolean detail = zoom >= graph.getDetailZoom();
+        int fill = accent == null ? bg : GraphLook.mix(bg, accent.intValue(), 45);
+        int line = selected ? primary : accent == null ? GraphLook.mix(bg, fg, 130) : accent.intValue();
+        float width = Math.max(1f, GraphLook.mm(0.3f) * Math.min(zoom, 1.5f)) * (selected ? 1.8f : 1f);
+        path.reset();
+        shape.outline(path, x, y, w - 1, h - 1);
+        g.setColor(fill);
+        g.fillShape(path);
+        g.setColor(line);
+        g.drawShape(path, GraphLook.stroke(width));
+        path.reset();
+        shape.detail(path, x, y, w - 1, h - 1);
+        if (path.getPointsSize() > 0) {
+            g.drawShape(path, GraphLook.stroke(Math.max(1f, width / (selected ? 1.8f : 1f))));
+        }
+        if (detail && node.getLabel() != null) {
+            Font f = GraphLook.font("NodeGraphNode", zoom);
+            g.setFont(f);
+            // a diamond or an ellipse is narrower than its bounds where the text is
+            int room = Math.max(1, w * 3 / 4);
+            String label = GraphLook.fit(node.getLabel(), f, room);
+            String more = node.hasPorts() || node.getDescription() == null ? null
+                    : GraphLook.fit(node.getDescription(), f, room);
+            int th = more == null ? f.getHeight() : f.getHeight() * 2;
+            int ty = y + (h - th) / 2;
+            g.setColor(fg);
+            g.drawString(label, x + (w - f.stringWidth(label)) / 2, ty);
+            if (more != null) {
+                g.setColor(GraphLook.mix(fill, fg, 150));
+                g.drawString(more, x + (w - f.stringWidth(more)) / 2, ty + f.getHeight());
+            }
         }
         if (node.hasPorts()) {
             paintPorts(g, graph, node, bg, fg, detail);

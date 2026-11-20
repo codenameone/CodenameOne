@@ -1,0 +1,9 @@
+# LibreOffice and openpyxl: the two independent implementations the spreadsheet
+# package is checked against. See scripts/check-spreadsheet-interop.sh.
+FROM docker.io/library/debian:bookworm-slim
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      libreoffice-calc-nogui python3 python3-openpyxl python3-odf \
+ && rm -rf /var/lib/apt/lists/*
+ENV HOME=/tmp/lo-home
+WORKDIR /work

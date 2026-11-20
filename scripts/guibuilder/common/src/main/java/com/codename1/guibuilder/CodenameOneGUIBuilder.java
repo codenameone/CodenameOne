@@ -9742,7 +9742,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             + "BrowserComponent|BrowserWindow|Button|ButtonGroup|ByteProperty|CN|CN1Constants|CSSColor|"
             + "Calendar|CharProperty|CheckBox|ClipboardContent|ClipboardDataProvider|CodeCompletion|"
             + "CodeCompletionProvider|CodeDiagnostic|CodeEditor|CollectionProperty|ComboBox|Command|"
-            + "CommonProgressAnimations|Component|ComponentGroup|ComponentImage|ComponentSelector|"
+            + "CommonProgressAnimations|Component|ComponentEdit|ComponentGroup|ComponentImage|ComponentSelector|"
             + "ConicGradient|Container|ContextMenu|CoordinateLayout|Desktop|DevicePosture|Dialog|Dimension|"
             + "Display|DoubleProperty|DynamicImage|EditField|Editable|EncodedImage|FloatProperty|FlowLayout|"
             + "Font|FontImage|Form|GeneratedSVGImage|Gradient|Graphics|GridBagConstraints|GridBagLayout|"

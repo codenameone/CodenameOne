@@ -58,6 +58,8 @@ jobs:
       CN1SS_SKIP_COVERAGE: '1'
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
       - name: Free Disk Space

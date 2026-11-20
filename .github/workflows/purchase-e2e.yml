@@ -69,6 +69,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Select JDK 8
         run: |
           echo "JAVA_HOME=${JAVA_HOME_8}" >> "$GITHUB_ENV"
@@ -124,6 +127,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Cache CocoaPods and user gems
         uses: actions/cache@v5
@@ -229,6 +235,8 @@ jobs:
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
       - name: Cache codenameone-tools

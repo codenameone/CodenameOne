@@ -1,0 +1,45 @@
+# Copies the files Maven is bootstrapped from (the distributions the Maven wrappers
+# unpack, the takari wrapper jar, the archive setup-workspace.sh installs) from
+# Google's copy of Maven Central into the Codename One R2 repository, at the same path.
+#
+# Manual, and idempotent: what is already in R2 is skipped. Run it after bumping a
+# Maven or wrapper version anywhere in the tree and before merging that change --
+# scripts/check-maven-central-mirror.py points the CI wrappers at R2, so a version
+# that is not there yet fails every job that starts Maven through that wrapper.
+name: Seed Maven distributions to R2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Writes into the same bucket a release writes into.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Files to seed
+        run: bash maven/scripts/r2/seed-maven-distributions.sh --list
+
+      - name: Seed
+        run: bash maven/scripts/r2/seed-maven-distributions.sh
+
+      - name: Verify
+        # Reads the public URL, so it also proves the custom domain serves the upload.
+        run: bash maven/scripts/r2/seed-maven-distributions.sh --verify

@@ -78,6 +78,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install native build tools
         run: |
           bash scripts/ci/apt-get-update.sh
@@ -97,6 +100,8 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 path
         run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
 

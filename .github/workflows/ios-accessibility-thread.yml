@@ -39,5 +39,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Check accessibility queries and cached state across Apple platform guards
         run: python3 scripts/ios/accessibility-thread-tests/check.py

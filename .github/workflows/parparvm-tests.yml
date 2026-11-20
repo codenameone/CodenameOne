@@ -263,6 +263,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Install native build tools
         run: |
           bash scripts/ci/apt-get-update.sh
@@ -273,6 +275,8 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 Path
         run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
       # -O1 rather than the release shape: this asks whether a configuration still
@@ -417,6 +421,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       # Migrations serialise on DBMS_LOCK, which an ordinary user may not call.
       - name: Let the Oracle test user take migration locks
         run: |
@@ -475,6 +482,8 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 Path
         run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
@@ -483,6 +492,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '11'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 11 Path
         run: echo "JDK_11_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
@@ -491,6 +502,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 17 Path
         run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
@@ -499,6 +512,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 21 Path
         run: echo "JDK_21_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
@@ -507,6 +522,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '25'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 25 Path
         run: echo "JDK_25_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
@@ -516,6 +533,9 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '8'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -766,6 +786,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install native build tools
         run: |
           bash scripts/ci/apt-get-update.sh
@@ -777,6 +800,8 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 Path
         run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
@@ -785,6 +810,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 17 Path
         run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
@@ -843,6 +870,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install native build tools
         run: |
           bash scripts/ci/apt-get-update.sh
@@ -854,6 +884,8 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 8 Path
         run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
@@ -862,6 +894,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Save JDK 17 Path
         run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
@@ -910,6 +944,9 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Cache the Autobahn image
         id: autobahn-cache
@@ -960,6 +997,9 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Build release jars
         # This job runs once per published release, so a transient Maven Central

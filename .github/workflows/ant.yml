@@ -41,6 +41,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
     - name: Free disk space for desktop runtime dependencies
       run: |
         # This Java-only job does not use the preinstalled Android, .NET, or
@@ -56,6 +58,8 @@ jobs:
         java-version: '8'
         distribution: 'temurin'
         cache: 'maven'
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
     - name: Install dependencies
       # The archetype integration test packages a backend natively at the end,
       # which links -lcurl -lssl -lcrypto -lnghttp2 and needs their headers to

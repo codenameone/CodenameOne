@@ -65,4 +65,22 @@ public class GraphAdapter implements GraphListener {
     @Override
     public void groupToggled(NodeGraph graph, GraphGroup group) {
     }
+
+    @Override
+    public boolean nodeCreating(NodeGraph graph, GraphNode node) {
+        return true;
+    }
+
+    @Override
+    public void nodeCreated(NodeGraph graph, GraphNode node) {
+    }
+
+    @Override
+    public boolean nodeResizing(NodeGraph graph, GraphNode node, double width, double height) {
+        return true;
+    }
+
+    @Override
+    public void nodeResized(NodeGraph graph, GraphNode node) {
+    }
 }

@@ -73,6 +73,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Check native keyboard press ownership
         run: python3 scripts/ios/keyboard-peer-tests/check.py
 

@@ -15,6 +15,13 @@ import threading
 import time
 from urllib.parse import parse_qs
 
+
+def without_psmodulepath():
+    """os.environ minus PSModulePath, matched without case: on Windows the keys
+    come back upper-cased, so dict(os.environ, PSModulePath=...) would hand the
+    child two spellings of one variable and either could win."""
+    return {k: v for k, v in os.environ.items() if k.upper() != 'PSMODULEPATH'}
+
 source = Path(sys.argv[1]).resolve()
 # The reason table (REASON_CASES) is about the launcher's own code, which every
 # Initializr download shares: generate-initializr-fixtures.py asks for it on one
@@ -54,10 +61,18 @@ with tempfile.TemporaryDirectory(prefix='cn1-launcher-') as directory:
     parent = Path(directory)
     project = parent / "Project O'Brien with spaces"
     if source.is_file():
+        # Windows PowerShell 5.1 (`powershell`) is started from a PowerShell 7 step, and
+        # inherits PSModulePath with PowerShell 7's module folder first. 5.1 then loads
+        # PowerShell 7's Microsoft.PowerShell.Archive, whose Expand-Archive calls a
+        # .NET Core-only ExtractToDirectory overload: "Cannot find an overload for
+        # ExtractToDirectory and the argument count: 3" (windows-latest 20261111). That
+        # error is non-terminating, so powershell exited 0 having extracted nothing.
+        # Dropping PSModulePath is what the shipped mvnw.cmd does for the same reason
+        # (5.1 rebuilds its own default), and Stop makes any extraction error fail.
         if windows:
             command = ["powershell", "-NoProfile", "-Command",
-                       "Expand-Archive -LiteralPath $env:CN1_TEST_ZIP -DestinationPath $env:CN1_TEST_PROJECT"]
-            subprocess.run(command, env=dict(os.environ, CN1_TEST_ZIP=str(source), CN1_TEST_PROJECT=str(project)), check=True)
+                       "$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath $env:CN1_TEST_ZIP -DestinationPath $env:CN1_TEST_PROJECT"]
+            subprocess.run(command, env=dict(without_psmodulepath(), CN1_TEST_ZIP=str(source), CN1_TEST_PROJECT=str(project)), check=True)
         else:
             subprocess.run(['unzip', '-q', str(source), '-d', str(project)], check=True)
         for name in ['build.sh', 'run.sh', 'mvnw']:

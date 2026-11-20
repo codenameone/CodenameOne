@@ -65,6 +65,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
       - name: Cache codenameone-tools

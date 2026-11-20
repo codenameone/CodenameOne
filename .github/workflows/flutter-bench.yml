@@ -96,6 +96,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Link cn1-binaries
         run: ln -s /opt/cn1-binaries ../cn1-binaries
 
@@ -235,6 +238,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Download the framework
         uses: actions/download-artifact@v4
@@ -435,6 +441,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Collect every platform's result
         uses: actions/download-artifact@v4
         with:
@@ -483,6 +492,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Collect every platform's result
         uses: actions/download-artifact@v4

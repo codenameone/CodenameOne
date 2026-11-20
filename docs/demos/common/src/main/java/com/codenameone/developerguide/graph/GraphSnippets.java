@@ -26,19 +26,32 @@ import com.codename1.graph.DefaultGraphModel;
 import com.codename1.graph.GraphEdge;
 import com.codename1.graph.GraphGroup;
 import com.codename1.graph.GraphNode;
+import com.codename1.graph.GraphJson;
+import com.codename1.graph.GraphNodeTemplate;
+import com.codename1.graph.GraphShapes;
 import com.codename1.graph.GraphPort;
 import com.codename1.graph.arrange.ForceArrangement;
 import com.codename1.graph.arrange.LayeredArrangement;
 import com.codename1.graph.arrange.RadialArrangement;
 import com.codename1.graph.arrange.TreeArrangement;
 import com.codename1.io.Log;
+import com.codename1.io.Preferences;
+import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Slider;
+import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.graph.GraphAdapter;
+import com.codename1.ui.graph.GraphPalette;
 import com.codename1.ui.graph.NodeComponentFactory;
 import com.codename1.ui.graph.NodeGraph;
+import com.codename1.ui.graph.PortEditorFactory;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.util.UndoHistory;
+
+import java.io.IOException;
 
 public class GraphSnippets {
     public void firstGraph() {
@@ -166,4 +179,124 @@ public class GraphSnippets {
         // end::graph-components[]
     }
 
+    public NodeGraph flowChart() {
+        // tag::graph-flowchart[]
+        DefaultGraphModel model = new DefaultGraphModel();
+        model.addGroup(GraphGroup.lane("shop", "Shop", true, 0, 0, 620, 150));
+        model.addGroup(GraphGroup.lane("warehouse", "Warehouse", true, 0, 150, 620, 150));
+
+        GraphNode start = new GraphNode("start", "Order placed", 50, 48, 110, 54)
+                .setShape(GraphShapes.TERMINATOR);
+        start.setGroupId("shop");
+        model.addNode(start);
+        GraphNode paid = new GraphNode("paid", "Paid?", 220, 40, 110, 70)
+                .setShape(GraphShapes.DECISION);
+        paid.setGroupId("shop");
+        model.addNode(paid);
+        GraphNode cancel = new GraphNode("cancel", "Cancelled", 400, 48, 110, 54)
+                .setShape(GraphShapes.TERMINATOR);
+        cancel.setGroupId("shop");
+        model.addNode(cancel);
+        GraphNode stock = new GraphNode("stock", "Stock", 50, 198, 110, 54)
+                .setShape(GraphShapes.DATABASE);
+        stock.setGroupId("warehouse");
+        model.addNode(stock);
+        GraphNode pick = new GraphNode("pick", "Pick items", 220, 198, 110, 54)
+                .setShape(GraphShapes.SUBPROCESS);
+        pick.setGroupId("warehouse");
+        model.addNode(pick);
+        GraphNode ship = new GraphNode("ship", "Ship", 400, 198, 110, 54)
+                .setShape(GraphShapes.DATA);
+        ship.setGroupId("warehouse");
+        model.addNode(ship);
+
+        model.addEdge("start", "paid");
+        model.addEdge("paid", "cancel").setLabel("no");
+        model.addEdge("paid", "pick").setLabel("yes");
+        model.addEdge("pick", "ship");
+        GraphEdge reads = model.addEdge("stock", "pick");
+        reads.setLineStyle(GraphEdge.LINE_DASHED);
+        reads.setTargetArrow(GraphEdge.ARROW_OPEN);
+
+        NodeGraph graph = new NodeGraph(model);
+        graph.setEdgeStyle(NodeGraph.EDGE_ORTHOGONAL);
+        graph.setEditingEnabled(true);
+        graph.setResizable(true);
+        // end::graph-flowchart[]
+        return graph;
+    }
+
+    public Container palette() {
+        // tag::graph-palette[]
+        NodeGraph graph = new NodeGraph();
+        GraphPalette palette = new GraphPalette(graph);
+        palette.add(new GraphNodeTemplate("Step").setShape(GraphShapes.RECT));
+        palette.add(new GraphNodeTemplate("Decision")
+                .setShape(GraphShapes.DECISION).setSize(110, 70));
+        palette.add(new GraphNodeTemplate("Stored data").setShape(GraphShapes.DATABASE));
+        palette.add(new GraphNodeTemplate("Multiply")
+                .addInput("a", "A", "number")
+                .addInput("b", "B", "number")
+                .addOutput("out", "Result", "number"));
+
+        Container editor = new Container(new BorderLayout());
+        editor.add(BorderLayout.WEST, palette);
+        editor.add(BorderLayout.CENTER, graph);
+        // end::graph-palette[]
+        return editor;
+    }
+
+    public void saveAndLoad() {
+        // tag::graph-json[]
+        NodeGraph graph = new NodeGraph();
+        Preferences.set("diagram", GraphJson.toJson(graph.getModel()));
+
+        String saved = Preferences.get("diagram", null);
+        if (saved != null) {
+            try {
+                graph.setModel(GraphJson.fromJson(saved));
+            } catch (IOException notAGraph) {
+                Log.e(notAGraph);
+            }
+        }
+        // end::graph-json[]
+    }
+
+    public Container undoAndClipboard() {
+        // tag::graph-undo[]
+        final NodeGraph graph = new NodeGraph();
+        // every edit goes into the application's history; one button serves
+        // the graph and any other component that records into it
+        UndoHistory history = UndoHistory.getGlobal();
+        Button undo = new Button("Undo");
+        undo.addActionListener(e -> graph.undo());
+        history.addListener(h -> undo.setEnabled(h.canUndo()));
+        Button redo = new Button("Redo");
+        redo.addActionListener(e -> graph.redo());
+        Button copy = new Button("Copy");
+        copy.addActionListener(e -> graph.copySelection());
+        Button paste = new Button("Paste");
+        paste.addActionListener(e -> graph.paste());
+        Button duplicate = new Button("Duplicate");
+        duplicate.addActionListener(e -> graph.duplicateSelection());
+        // end::graph-undo[]
+        return BoxLayout.encloseX(undo, redo, copy, paste, duplicate);
+    }
+
+    public void portValues() {
+        // tag::graph-port-values[]
+        NodeGraph graph = new NodeGraph();
+        graph.setPortEditorFactory(new PortEditorFactory() {
+            @Override
+            public Component createEditor(final NodeGraph g, GraphNode node, final GraphPort port) {
+                if (!"number".equals(port.getType())) {
+                    return null;
+                }
+                final TextField field = new TextField(String.valueOf(port.getValue()), "", 4, TextField.DECIMAL);
+                field.addActionListener(e -> g.setPortValue(port, Double.valueOf(field.getAsDouble(0))));
+                return field;
+            }
+        });
+        // end::graph-port-values[]
+    }
 }

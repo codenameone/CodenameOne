@@ -423,6 +423,38 @@ class MaterialPickerTest extends UITestBase {
         }
     }
 
+    /// A theme caps the width of an alert so that its text wraps. A calendar
+    /// cannot wrap, so the cap must not reach the picker's dialog: it cut the
+    /// headline short and put the month's arrows on top of each other.
+    @FormTest
+    void theThemesCapOnAnAlertsWidthDoesNotCutTheCalendar() {
+        Hashtable<String, Object> props = new Hashtable<String, Object>();
+        props.put("@pickerStyle", "material");
+        props.put("@dialogMaxWidthPercentInt", "20");
+        UIManager.getInstance().addThemeProps(props);
+        try {
+            Picker picker = new Picker();
+            picker.setUseLightweightPopup(true);
+            picker.setType(Display.PICKER_TYPE_DATE);
+            picker.setDate(date(2026, 0, 5, 0, 0));
+            open(picker);
+            Dialog dlg = picker.getMaterialDialog();
+            assertNotNull(dlg);
+            Component widget = (Component) picker.getOpenWidget();
+            int wanted = Math.min(widget.getPreferredW(), Display.getInstance().getDisplayWidth());
+            assertTrue(wanted > Display.getInstance().getDisplayWidth() * 20 / 100,
+                    "the calendar is wider than the cap, or this checks nothing");
+            assertTrue(widget.getWidth() >= wanted - dlg.getDialogStyle().getHorizontalPadding(),
+                    "the calendar has the width it asked for: " + widget.getWidth() + " of " + wanted);
+            tapComponent(named(dlg, "PickerMaterialCancel"));
+            flushSerialCalls();
+        } finally {
+            props.put("@dialogMaxWidthPercentInt", "0");
+            UIManager.getInstance().addThemeProps(props);
+            style("wheel");
+        }
+    }
+
     @FormTest
     void aPickerOpensTheMaterialDialogWhenTheThemeAsksForIt() {
         style("material");

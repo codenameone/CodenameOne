@@ -110,6 +110,8 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "CN1_BACKEND_PACKAGE_JDK=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up JDK 8
         uses: actions/setup-java@v5
@@ -117,6 +119,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       # clang compiles the C the translator emits. Required rather than optional
       # here: the packaging check skips without it, and a skip reads like a pass.
       #

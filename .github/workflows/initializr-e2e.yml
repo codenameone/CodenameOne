@@ -78,6 +78,9 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Ensure a virtual display (xvfb) for the simulator
         run: |
           if ! command -v xvfb-run >/dev/null 2>&1; then

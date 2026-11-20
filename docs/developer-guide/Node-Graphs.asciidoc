@@ -173,6 +173,103 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/graph/Grap
 .A slider inside a node
 image::img/generated/graph-components.png["The node editor with a real slider inside the roughness node",scaledwidth=70%]
 
+=== Flow charts and swim lanes
+
+A node has a shape as well as a size. `setShape` takes one of the names in
+`GraphShapes`: a terminator, a decision diamond, a document, a database
+cylinder and the other symbols of a flow chart. The shape is used three times,
+and the three agree. It's the outline that's painted, the area a tap has to
+land in, and the line an edge stops at.
+
+An edge has a line style, solid, dashed or dotted, and an arrow kind for each
+of its ends. A lane is a group with bounds of its own, made with
+`GraphGroup.lane`. It's drawn as a band with a title along one side, and a node
+dragged from one lane into another joins it.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/graph/GraphSnippets.java[tag=graph-flowchart,indent=0]
+----
+
+.A flow chart in two swim lanes
+image::img/generated/graph-flowchart.png["Six flow chart symbols in two bands titled Shop and Warehouse: a rounded start, a decision diamond with yes and no branches, a database cylinder joined to a step by a dashed line",scaledwidth=70%]
+
+`LayeredArrangement.setRespectLanes(true)` arranges a chart without taking a
+node out of its lane. The layers run along the lanes, and each node stays in
+the band of its own. Nodes in no lane go past the last one.
+
+With `setResizable(true)` a selected node shows a handle on each corner, and
+dragging one resizes it. The edges of a lane are dragged the same way. To draw
+an outline that isn't in the list, implement `GraphShape` and give it a name
+with `GraphShapeRegistry.register`.
+
+=== A palette of nodes
+
+`GraphPalette` is a strip of node templates beside a graph. The user drags a
+template onto the canvas, or taps it and then taps where the node should go.
+A `GraphNodeTemplate` holds what the new node starts with: its label, shape,
+size and ports. The same palette serves a flow chart, where the templates are
+shapes, and a node editor, where they're the kinds of node with their ports.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/graph/GraphSnippets.java[tag=graph-palette,indent=0]
+----
+
+A listener hears `nodeCreating` before the node reaches the model and may
+change it or refuse it.
+
+=== Values on input ports
+
+An input that nothing is connected to often needs a value of its own: the
+factor of a multiplication, the color of a material. `GraphPort.setValue`
+holds it, and a `PortEditorFactory` supplies the small component the user
+changes it with. The editor is shown beside the port while nothing is
+connected to it.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/graph/GraphSnippets.java[tag=graph-port-values,indent=0]
+----
+
+`DefaultGraphEdgeRenderer.setColorByPortType(true)` draws each edge in the
+color of the type it carries, so a number, a color and a texture can be told
+apart at a glance.
+
+=== Saving, undo and the clipboard
+
+`GraphJson` writes a whole model as JSON text and reads it back, lanes and
+port values included. A node's user data is written through a
+`UserDataCodec` when you supply one.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/graph/GraphSnippets.java[tag=graph-json,indent=0]
+----
+
+Every edit the user makes can be undone: a move, a connection, a deletion, a
+resize or a paste. One gesture is one step, so deleting five selected nodes
+and their edges is undone together. Changes the application makes to the
+model directly aren't recorded.
+
+The steps go into the application's history, `UndoHistory.getGlobal()`,
+which the Kanban board and the rich text and code editors share. A single
+Undo button takes back the last change wherever it was made, and brings the
+component it was made in back into view. `setUndoHistory` gives the graph a
+history of its own, or turns undo off with null. Showing another model drops
+that model's steps and keeps the rest.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/graph/GraphSnippets.java[tag=graph-undo,indent=0]
+----
+
+Copied nodes go to the clipboard as JSON together with the edges between
+them, and a paste gives them new ids. With a keyboard, Delete removes the
+selection, and with Control or Command, C, X, V and D copy, cut, paste and
+duplicate, Z undoes and Shift-Z redoes. A phone has no such keys, so put the
+same methods behind a menu or a toolbar.
+
 === Finding your way
 
 `setMinimapVisible(true)` shows a small map of the whole graph in a corner,
@@ -198,6 +295,11 @@ The graph is styled through these UIIDs, which the native themes define:
 |`NodeGraphEdge` |The edges and their arrows
 |`NodeGraphEdgeLabel` |The pill behind an edge label
 |`NodeGraphMinimap` |The minimap
+|`NodeGraphLane` |The band of a lane
+|`NodeGraphLaneHeader` |The title strip of a lane
+|`NodeGraphHandle` |The resize handles of a selected node
+|`NodeGraphPalette` |The background of a palette
+|`NodeGraphPaletteItem` |The label under a template in a palette
 |===
 
 For more than colors, implement `GraphNodeRenderer` or `GraphEdgeRenderer`,

@@ -173,6 +173,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       # Before anything that reads the guide. The build hint table is rendered
       # from maven/build-hint-catalog rather than checked in, so the lint, the
       # image and snippet checks, the HTML and PDF build and Vale all need it on
@@ -541,6 +544,9 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Install language-tool-python
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'

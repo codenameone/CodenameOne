@@ -3436,6 +3436,43 @@
         "url": "https://dev.to/codenameone/port-your-spring-code-with-fewer-edits-and-libraries-that-bring-their-own-server-207p",
         "syndicated_at": "2026-11-18T14:29:49+00:00"
       }
+    },
+    "debug-dart-in-a-java-debugger": {
+      "hashnode": {
+        "url": "https://debugagent.com/debug-your-dart-in-a-java-debugger-and-jfx-central-on-a-phone",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6afe4a1f1e9032bc86167d06",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-19T01:01:10+00:00"
+      },
+      "devto": {
+        "id": 5074693,
+        "url": "https://dev.to/codenameone/debug-your-dart-in-a-java-debugger-and-jfx-central-on-a-phone-366e",
+        "syndicated_at": "2026-11-19T14:01:11+00:00"
+      }
+    },
+    "shopify-was-wrong-and-right-to-dump-react-native": {
+      "hashnode": {
+        "url": "https://debugagent.com/shopify-was-wrong-and-right-to-dump-react-native",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6aff9ba0b5ebf26e4fae825c",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-20T01:01:11+00:00"
+      },
+      "foojay": {
+        "id": 461,
+        "url": "https://github.com/foojayio/website/pull/461",
+        "pull_request_url": "https://github.com/foojayio/website/pull/461",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-11-20T01:01:41+00:00"
+      }
     }
   }
 }

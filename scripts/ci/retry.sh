@@ -106,6 +106,44 @@ purge_maven_negative_cache() {
   fi
 }
 
+# A retry of a Maven command reads Maven Central through Google's mirror of it.
+# Central's 429 window from the runner edge was observed to outlast all four
+# attempts -- 30s, 2m and 5m of backoff and still "status: 429" on the root
+# POM's junit-bom import, failing every leg of PR CI on master -- so asking the
+# same host again is not enough. The mirror serves Central's exact content and
+# does not rate limit the runners. It goes in as GLOBAL settings (-gs): user
+# settings still apply on top, so a job's own servers and mirrors are kept, and
+# the first attempt always talks to Central as before.
+mirror_settings=""
+run_attempt() {
+  if [ "$attempt" -gt 1 ]; then
+    case "$(basename "$1")" in
+      mvn|mvnw|mvn.cmd|mvnw.cmd)
+        if [ -z "$mirror_settings" ]; then
+          mirror_settings="$(mktemp)"
+          cat > "$mirror_settings" <<'XML'
+<settings>
+  <mirrors>
+    <mirror>
+      <id>google-maven-central</id>
+      <mirrorOf>central</mirrorOf>
+      <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+    </mirror>
+  </mirrors>
+</settings>
+XML
+        fi
+        echo "retry.sh: attempt ${attempt} reads Maven Central through Google's mirror" >&2
+        cmd="$1"
+        shift
+        "$cmd" -gs "$mirror_settings" "$@"
+        return $?
+        ;;
+    esac
+  fi
+  "$@"
+}
+
 if [ "$#" -eq 0 ]; then
   echo "retry.sh: no command given" >&2
   exit 2
@@ -133,18 +171,18 @@ wait_seconds="$delay"
 status=0
 attempt=1
 log=""
+trap 'rm -f ${log:+"$log"} ${mirror_settings:+"$mirror_settings"}' EXIT
 if [ -n "$only_matching" ]; then
   log="$(mktemp)"
-  trap 'rm -f "$log"' EXIT
 fi
 while [ "$attempt" -le "$attempts" ]; do
   if [ -n "$only_matching" ]; then
     # Streamed as well as captured, so the step's log reads exactly as it would
     # without the wrapper.
-    "$@" 2>&1 | tee "$log"
+    run_attempt "$@" 2>&1 | tee "$log"
     status=$?
   else
-    "$@" && exit 0
+    run_attempt "$@" && exit 0
     status=$?
   fi
   if [ "$status" -eq 0 ]; then

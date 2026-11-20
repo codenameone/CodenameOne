@@ -25,6 +25,7 @@ package com.codename1.ui.graph;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Stroke;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
@@ -51,10 +52,17 @@ final class GraphLook {
         {"NodeGraphEdge", 0x79747e, 0xffffff, 0x938f99, 0x1c1b1f, 0, 0},
         {"NodeGraphEdgeLabel", 0x49454f, 0xffffff, 0xcac4d0, 0x1c1b1f, 255, 1},
         {"NodeGraphMinimap", 0x49454f, 0xf3edf7, 0xcac4d0, 0x2b2930, 255, 0},
+        {"NodeGraphLane", 0x79747e, 0xffffff, 0x938f99, 0x1c1b1f, 110, 0},
+        {"NodeGraphLaneHeader", 0x1d1b20, 0xe7e0ec, 0xe6e1e5, 0x36343b, 255, 2},
+        {"NodeGraphHandle", 0x1a73e8, 0xffffff, 0x8ab4f8, 0x1c1b1f, 255, 0},
+        {"NodeGraphPalette", 0x1d1b20, 0xf3edf7, 0xe6e1e5, 0x211f26, 255, 0},
+        {"NodeGraphPaletteItem", 0x1d1b20, 0xffffff, 0xe6e1e5, 0x2b2930, 255, 1},
     };
 
     private static final HashMap<String, Style> STYLES = new HashMap<String, Style>();
-    private static final HashMap<String, Font> FONTS = new HashMap<String, Font>();
+    // per UIID, then per pixel size: asked once per node per frame, and an
+    // Integer of a font size is a cached one, so a lookup allocates nothing
+    private static final HashMap<String, HashMap<Integer, Font>> FONTS = new HashMap<String, HashMap<Integer, Font>>();
     private static int generation = -1;
     private static Boolean darkSeen;
 
@@ -94,11 +102,16 @@ final class GraphLook {
         if (size == Math.round(px)) {
             return base;
         }
-        String key = uiid + ':' + size;
-        Font f = FONTS.get(key);
+        HashMap<Integer, Font> sizes = FONTS.get(uiid);
+        if (sizes == null) {
+            sizes = new HashMap<Integer, Font>();
+            FONTS.put(uiid, sizes);
+        }
+        Integer key = Integer.valueOf(size);
+        Font f = sizes.get(key);
         if (f == null) {
             f = base.derive(size, base.getStyle());
-            FONTS.put(key, f);
+            sizes.put(key, f);
         }
         return f;
     }
@@ -177,6 +190,25 @@ final class GraphLook {
         return Math.max(1, Math.round(mm(mm) * Math.min(zoom, 1.5f)));
     }
 
+    // the last two strokes asked for, newest first: a frame asks for the
+    // same two widths for every node it paints. Painting is the EDT's alone.
+    private static final Stroke[] STROKES = new Stroke[2];
+
+    /// A stroke for the outline of a shape. It is shared: do not change it.
+    static Stroke stroke(float width) {
+        Stroke s = STROKES[0];
+        if (s != null && s.getLineWidth() == width) {
+            return s;
+        }
+        s = STROKES[1];
+        if (s == null || s.getLineWidth() != width) {
+            s = new Stroke(width, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 4f);
+        }
+        STROKES[1] = STROKES[0];
+        STROKES[0] = s;
+        return s;
+    }
+
     /// Mixes two RGB colours: 0 is all `a`, 255 all `b`.
     static int mix(int a, int b, int amount) {
         int inv = 255 - amount;
@@ -208,8 +240,18 @@ final class GraphLook {
         }
         double nx = -dy / len * width / 2;
         double ny = dx / len * width / 2;
-        int[] xs = {(int) Math.round(x1 + nx), (int) Math.round(x2 + nx), (int) Math.round(x2 - nx), (int) Math.round(x1 - nx)};
-        int[] ys = {(int) Math.round(y1 + ny), (int) Math.round(y2 + ny), (int) Math.round(y2 - ny), (int) Math.round(y1 - ny)};
+        // new arrays per call, never shared scratch: Android's async view
+        // queues the arrays it is given and draws them after paint returns
+        int[] xs = new int[4];
+        int[] ys = new int[4];
+        xs[0] = (int) Math.round(x1 + nx);
+        xs[1] = (int) Math.round(x2 + nx);
+        xs[2] = (int) Math.round(x2 - nx);
+        xs[3] = (int) Math.round(x1 - nx);
+        ys[0] = (int) Math.round(y1 + ny);
+        ys[1] = (int) Math.round(y2 + ny);
+        ys[2] = (int) Math.round(y2 - ny);
+        ys[3] = (int) Math.round(y1 - ny);
         g.fillPolygon(xs, ys, 4);
     }
 

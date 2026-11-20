@@ -355,6 +355,40 @@ public abstract class E2e extends AbstractTest {
         });
     }
 
+    /// The Material picker of the dialog that is open -- a calendar or a
+    /// clock face, by its class -- or null when no dialog has one.
+    ///
+    /// A test sets it the way the app could and then presses the dialog's own
+    /// OK or Cancel (`PickerMaterialOk`, `PickerMaterialCancel`): the days and
+    /// the clock are painted, not buttons a test can find by name.
+    protected <T extends Component> T open(final Class<T> kind) {
+        if (CN.isEdt()) {
+            Form current = Display.getInstance().getCurrent();
+            return current instanceof com.codename1.ui.Dialog ? find(current, kind) : null;
+        }
+        final Object[] found = new Object[1];
+        onEdt(() -> found[0] = open(kind));
+        @SuppressWarnings("unchecked")
+        T picker = (T) found[0];
+        return picker;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T extends Component> T find(Component from, Class<T> kind) {
+        if (kind.isInstance(from)) {
+            return (T) from;
+        }
+        if (from instanceof Container) {
+            for (Component child : (Container) from) {
+                T found = find(child, kind);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
     /// Goes back, the way the arrow in the title bar does.
     protected void back() {
         onEdt(() -> Display.getInstance().getCurrent().getBackCommand().actionPerformed(null));

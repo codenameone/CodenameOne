@@ -30,6 +30,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Verify native macOS font aliases with AppKit
         run: python3 scripts/test_mac_native_font.py
 

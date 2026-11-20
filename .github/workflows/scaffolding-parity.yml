@@ -70,6 +70,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Validate Initializr embedded Maven coordinates
         run: python3 maven/integration-tests/validate_initializr_pom_coordinates.py
       - name: Validate Codename One repository is declared by every scaffold
