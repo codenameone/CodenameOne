@@ -461,6 +461,15 @@
       ]
     },
     {
+      "id": "spreadsheet",
+      "category": "Rich components",
+      "name": "Spreadsheet files and formulas",
+      "description": "Reads and writes Excel, OpenDocument and CSV workbooks and recalculates their formulas on the device: typed values, number formats, dates, lookups and text functions, and a round trip through each file format.",
+      "tests": [
+        "SpreadsheetApiTest"
+      ]
+    },
+    {
       "id": "node-graph",
       "category": "Rich components",
       "name": "Node graph",

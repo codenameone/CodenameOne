@@ -682,6 +682,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new CallDetectionAPITest(),
             new DeviceInputApiTest(),
             new Base64NativePerformanceTest(),
+            new SpreadsheetApiTest(),
             new AccessibilityTest(),
             new FileSystemStorageOpenInputStreamMissingTest(),
             new MutableImageReadbackTest(),

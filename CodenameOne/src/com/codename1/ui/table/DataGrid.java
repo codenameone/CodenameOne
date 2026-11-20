@@ -144,6 +144,9 @@ public class DataGrid extends ScrollSurface {
     private String emptyText = "";
     private GridCellRenderer defaultRenderer = new DefaultGridCellRenderer();
     private GridCellEditor defaultEditor = new DefaultGridCellEditor();
+    private GridCellPicker cellPicker;
+    private boolean picking;
+    private com.codename1.ui.Painter overlayPainter;
 
     // layout
     private boolean dirty = true;
@@ -1461,6 +1464,9 @@ public class DataGrid extends ScrollSurface {
             g.setColor(GridLook.style("DataGridCheck").getBgColor());
             g.drawLine(x + ex - 1, y, x + ex - 1, y + getHeight());
         }
+        if (overlayPainter != null) {
+            overlayPainter.paint(g, new com.codename1.ui.geom.Rectangle(x, y, getWidth(), getHeight()));
+        }
     }
 
     // Where a visible column's left edge, or its right edge, is in the
@@ -1468,6 +1474,50 @@ public class DataGrid extends ScrollSurface {
     private int columnScreenX(int i, boolean rightEdge) {
         int e = colX[i] + (rightEdge ? colW[i] : 0);
         return i < frozenCount ? e : getHeaderWidth() + e - getOffsetX();
+    }
+
+    /// Sets what takes the taps on cells while it asks for them, as the formula editor of a
+    /// spreadsheet does to put the tapped cell's reference into a formula. Null, the default,
+    /// leaves every tap to the grid.
+    ///
+    /// #### Parameters
+    ///
+    /// - `picker`: the picker, or null
+    public void setCellPicker(GridCellPicker picker) {
+        cellPicker = picker;
+        picking = false;
+    }
+
+    /// The picker set with `#setCellPicker(GridCellPicker)`.
+    ///
+    /// #### Returns
+    ///
+    /// the picker, or null
+    public GridCellPicker getCellPicker() {
+        return cellPicker;
+    }
+
+    /// Sets a painter that draws over the cells and the headers, after everything else, as the
+    /// outlines a spreadsheet draws around the cells a formula being edited refers to. The
+    /// rectangle it is given is the grid's, in the coordinates it paints in, so a cell is at
+    /// the rectangle's corner plus what `#getCellBounds(int, int, int[])` answers. Null, the
+    /// default, draws nothing; `repaint()` after what it draws changes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `painter`: the painter, or null
+    public void setOverlayPainter(com.codename1.ui.Painter painter) {
+        overlayPainter = painter;
+        repaint();
+    }
+
+    /// The painter set with `#setOverlayPainter(com.codename1.ui.Painter)`.
+    ///
+    /// #### Returns
+    ///
+    /// the painter, or null
+    public com.codename1.ui.Painter getOverlayPainter() {
+        return overlayPainter;
     }
 
     /// The bounds of a cell in the grid's own coordinates: x, y, width,
@@ -1576,6 +1626,15 @@ public class DataGrid extends ScrollSurface {
 
     @Override
     protected void pressStarted(int x, int y) {
+        picking = false;
+        if (cellPicker != null && y >= headerH && cellPicker.isPicking(this)) {
+            refreshLayout();
+            if (rowAt(y) >= 0 && columnAt(x) >= 0) {
+                // the tap goes to the picker, and the edit stays open
+                picking = true;
+                return;
+            }
+        }
         if (editor != null) {
             commitEdit();
         }
@@ -1584,6 +1643,15 @@ public class DataGrid extends ScrollSurface {
     @Override
     protected void tapped(int x, int y, boolean doubleTap) {
         refreshLayout();
+        if (picking) {
+            picking = false;
+            int pickedRow = rowAt(y);
+            int pickedColumn = columnAt(x);
+            if (cellPicker != null && pickedRow >= 0 && pickedColumn >= 0) {
+                cellPicker.cellPicked(this, pickedRow, pickedColumn, Display.getInstance().isShiftKeyDown());
+            }
+            return;
+        }
         requestFocus();
         int col = columnAt(x);
         if (y < headerH) {
@@ -1971,7 +2039,11 @@ public class DataGrid extends ScrollSurface {
 
             @Override
             public Dimension getPreferredSize(Container parent) {
-                return new Dimension(0, 0);
+                // as big as the pane it is in: a container paints its children clipped to
+                // itself, and the pane lays this out at its preferred size, so at 0 by 0 an
+                // editor that Codename One paints was never seen
+                Container pane = parent.getParent();
+                return pane == null ? new Dimension(0, 0) : new Dimension(pane.getWidth(), pane.getHeight());
             }
         }, ed);
         editorHolder.add(cmp);

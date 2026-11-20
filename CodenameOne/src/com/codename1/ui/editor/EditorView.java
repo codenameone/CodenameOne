@@ -48,6 +48,11 @@ import com.codename1.ui.TopLevelContainer;
 /// styled rich text) subclass it and override `#paintContent(Graphics, int, int, int, int)` and the
 /// document/measurement hooks.
 public class EditorView extends Component implements TextInputClient, TextInputClient.CompositionCancellation, com.codename1.ui.TextInputGeometry.Provider {
+    /// The key code a port delivers to a focused editor for F4. Function keys have no code of
+    /// their own in Codename One, and a desktop key code for one is a printable character
+    /// (F4 is 115, an `s`), so a port that has a keyboard uses this code instead.
+    public static final int KEY_CODE_F4 = -0xF4;
+
     private EditorHost host;
     private final boolean codeMode;
     private EditorDocument doc = new EditorDocument();
