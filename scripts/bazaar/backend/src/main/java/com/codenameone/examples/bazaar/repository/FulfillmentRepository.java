@@ -20,6 +20,9 @@
 package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.Fulfillment;
 import java.util.List;
@@ -32,4 +35,12 @@ public interface FulfillmentRepository extends CrudRepository<Fulfillment, Strin
     List<Fulfillment> findByStoreIdOrderByCreatedAtDesc(String storeId);
 
     Fulfillment findByTrackingNumber(String trackingNumber);
+
+    List<Fulfillment> findByStatusIn(List<String> statuses);
+
+    /// Moves a fulfilment from one status to the next only if nobody moved
+    /// it first; answers the rows changed.
+    @Modifying
+    @Query("update Fulfillment f set f.status = :to where f.id = :id and f.status = :from")
+    int claimStatus(@Param("id") String id, @Param("from") String from, @Param("to") String to);
 }

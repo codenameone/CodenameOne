@@ -25,6 +25,9 @@ import com.codename1.backend.annotations.Bean;
 import com.codename1.backend.annotations.Configuration;
 import com.codename1.backend.annotations.Value;
 import com.codename1.backend.push.CloudPush;
+import com.codenameone.examples.bazaar.carrier.CarrierProvider;
+import com.codenameone.examples.bazaar.carrier.MisconfiguredCarrier;
+import com.codenameone.examples.bazaar.carrier.SimulatedCarrier;
 import com.codenameone.examples.bazaar.geo.Geocoder;
 import com.codenameone.examples.bazaar.geo.PhotonGeocoder;
 import com.codenameone.examples.bazaar.geo.StubGeocoder;
@@ -222,6 +225,32 @@ public class Services {
         }
     }
     // end::bazaar-push-choice[]
+
+    /// `bazaar.carrier.provider` is `simulated` -- rates from weight and
+    /// distance, labels with made-up tracking numbers, and scans that walk
+    /// each parcel to the door one `bazaar.carrier.simulated.step.seconds`
+    /// (default 75) at a time. Unset, it is `simulated` on a development
+    /// profile; any other profile gets a [MisconfiguredCarrier], because the
+    /// sample ships no real carrier integration and must not print labels for
+    /// parcels nobody will collect. A real one is one more [CarrierProvider]
+    /// chosen here.
+    @Bean
+    public CarrierProvider carrierProvider(Config config,
+            @Value("${bazaar.carrier.provider:}") String chosen,
+            @Value("${bazaar.carrier.simulated.step.seconds:75}") int stepSeconds) {
+        String kind = chosen.trim().length() > 0 ? chosen.trim()
+                : config.isDevelopmentProfile() ? SimulatedCarrier.NAME : "";
+        if (SimulatedCarrier.NAME.equalsIgnoreCase(kind)) {
+            return new SimulatedCarrier(Math.max(1, stepSeconds) * 1000L);
+        }
+        if (kind.length() == 0) {
+            return new MisconfiguredCarrier("none", "carrier provider is not configured; this "
+                    + "sample has no real carrier integration, so set bazaar.carrier.provider="
+                    + "simulated or add a CarrierProvider");
+        }
+        return new MisconfiguredCarrier(kind, "bazaar.carrier.provider is '" + kind
+                + "', which is not simulated");
+    }
 
     /// The names, after `prefix`, of the settings in `namesAndValues` whose
     /// value is empty, separated by commas.

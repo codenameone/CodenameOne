@@ -20,6 +20,9 @@
 package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.ReturnRequest;
 import java.util.List;
@@ -30,4 +33,9 @@ public interface ReturnRequestRepository extends CrudRepository<ReturnRequest, S
     List<ReturnRequest> findByOrderId(String orderId);
 
     List<ReturnRequest> findByStoreIdOrderByCreatedAtDesc(String storeId);
+
+    /// Moves a return on only if nobody moved it first; answers the rows changed.
+    @Modifying
+    @Query("update ReturnRequest r set r.status = :to where r.id = :id and r.status = :from")
+    int claimStatus(@Param("id") String id, @Param("from") String from, @Param("to") String to);
 }
