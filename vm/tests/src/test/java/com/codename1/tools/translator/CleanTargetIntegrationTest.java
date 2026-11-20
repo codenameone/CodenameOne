@@ -2160,23 +2160,17 @@ class CleanTargetIntegrationTest {
         // The Rive screens added about 700 more, and an x64 build that was still
         // compiling (step 7,586 of 7,737) was killed by the old fixed 80-minute
         // deadline.
-        // This is a guard against a hang, not a performance budget: the perf
-        // gate is what judges speed. So it judges progress, not total time --
-        // ninja prints a line per translation unit, and a build whose output
-        // has not grown for BUILD_STALL_MINUTES is the hang. The last step is
-        // the -flto=thin link of every object, which prints nothing until it
-        // ends and outlasted a 15-minute window on both Linux legs (after step
-        // 7,736 of 7,737), so the window has to cover that link. A fixed total
-        // deadline failed healthy builds every time the suite grew. The overall
-        // cap only backstops a build that keeps printing without finishing,
-        // and stays under the job's own timeout so the test reports it.
+        // A silence window cannot guard this build: the last step is the
+        // -flto=thin link of every object, which prints nothing until it ends,
+        // and it stayed silent past 15 and then 50 minutes on healthy Linux
+        // builds (master's whole build takes about 76 minutes). So only a total
+        // cap remains, kept under the job's 140-minute timeout so the test,
+        // not the runner, reports a build that never ends.
         ProcessBuilder builder = new ProcessBuilder("cmake", "--build", buildDir.toString());
         builder.directory(workingDir.toFile());
-        return runCommand(builder, BUILD_CAP_MINUTES, java.util.concurrent.TimeUnit.MINUTES,
-                BUILD_STALL_MINUTES * 60_000L);
+        return runCommand(builder, BUILD_CAP_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
     }
 
-    private static final long BUILD_STALL_MINUTES = 50;
     private static final long BUILD_CAP_MINUTES = 125;
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {
