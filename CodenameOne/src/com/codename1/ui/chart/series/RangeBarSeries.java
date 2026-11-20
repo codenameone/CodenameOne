@@ -29,6 +29,7 @@ import com.codename1.ui.chart.ChartPoint;
 /// price ranges. Combine with `Chart.setRotated(true)` for a timeline.
 ///
 /// ```java
+/// double[] lows = {4, 6, 9}, highs = {12, 15, 19};
 /// new RangeBarSeries("Temperature").setRanges(null, lows, highs);
 /// ```
 public class RangeBarSeries extends BarSeries {

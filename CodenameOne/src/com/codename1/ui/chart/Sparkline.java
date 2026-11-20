@@ -34,6 +34,7 @@ import com.codename1.ui.plaf.Style;
 /// with no axes, legend or interaction, cheap enough to have hundreds on screen.
 ///
 /// ```java
+/// Container row = new Container(new BorderLayout());
 /// Sparkline s = new Sparkline(3, 5, 4, 8, 7, 9).setType(Sparkline.AREA);
 /// row.add(BorderLayout.EAST, s);
 /// ```

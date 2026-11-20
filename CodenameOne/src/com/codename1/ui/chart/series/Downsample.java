@@ -31,6 +31,12 @@ package com.codename1.ui.chart.series;
 /// tooltips on very large data:
 ///
 /// ```java
+/// double[] x = null;
+/// double[] y = new double[100000];
+/// for (int i = 0; i < y.length; i++) {
+///     y[i] = Math.sin(i / 500.0);
+/// }
+/// LineSeries series = new LineSeries("Signal");
 /// int[] keep = Downsample.lttb(x, y, 2000);
 /// // pick(x, keep) is the kept indices when x is null, so the points keep their positions
 /// series.setData(Downsample.pick(x, keep), Downsample.pick(y, keep));

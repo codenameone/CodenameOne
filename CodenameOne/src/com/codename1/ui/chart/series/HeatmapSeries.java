@@ -34,6 +34,8 @@ import com.codename1.ui.chart.axis.LogAxis;
 /// so pair it with a `CategoryAxis` on each axis to name the columns and rows.
 ///
 /// ```java
+/// Chart chart = new Chart();
+/// double[][] values = {{3, 8, 5}, {6, 9, 4}, {2, 7, 8}};
 /// chart.setXAxis(new CategoryAxis(Axis.BOTTOM, "Mon", "Tue", "Wed"));
 /// chart.setYAxis(new CategoryAxis(Axis.LEFT, "Morning", "Noon", "Evening"));
 /// chart.addSeries(new HeatmapSeries("Visits").setMatrix(values));

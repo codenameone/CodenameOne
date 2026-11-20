@@ -34,6 +34,13 @@ import com.codename1.ui.chart.layout.Squarify;
 /// their name and value when the text fits, and the tooltip always does.
 ///
 /// ```java
+/// Chart chart = new Chart();
+/// TreeNode root = new TreeNode("All");
+/// root.add(new TreeNode("Photos", 40));
+/// TreeNode apps = root.add(new TreeNode("Apps"));
+/// apps.add(new TreeNode("Games", 15));
+/// apps.add(new TreeNode("Tools", 10));
+/// root.add(new TreeNode("Music", 20));
 /// chart.addSeries(new TreemapSeries("Portfolio", root));
 /// ```
 public class TreemapSeries extends HierarchySeries {

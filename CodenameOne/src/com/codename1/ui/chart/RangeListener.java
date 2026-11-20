@@ -25,8 +25,10 @@ package com.codename1.ui.chart;
 /// Receives the range the user selects by dragging across a chart with brushing on.
 ///
 /// ```java
+/// Chart chart = new Chart();
+/// Label detail = new Label();
 /// chart.setBrushEnabled(true);
-/// chart.addRangeListener((c, from, to) -> loadDetail(from, to));
+/// chart.addRangeListener((c, from, to) -> detail.setText("From " + from + " to " + to));
 /// ```
 public interface RangeListener {
     /// Called when a brush drag ends.

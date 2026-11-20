@@ -30,6 +30,9 @@ import com.codename1.ui.chart.ChartContext;
 /// and zoom together.
 ///
 /// ```java
+/// CandlestickSeries prices = new CandlestickSeries("ACME")
+///         .setOhlc(null, new double[]{10, 11}, new double[]{12, 13}, new double[]{9, 10}, new double[]{11, 12});
+/// double[] volumes = {1200, 1800};
 /// VolumeSeries volume = new VolumeSeries("Volume", prices, volumes);
 /// ```
 public class VolumeSeries extends BarSeries {

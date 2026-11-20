@@ -38,8 +38,9 @@ import com.codename1.ui.layouts.BorderLayout;
 /// The chart snippets the developer guide's Charts section includes.
 public class ModernChartSnippets {
 
-    void firstChart(Form form) {
+    void firstChart() {
         // tag::modern-chart-first[]
+        Form form = new Form("Revenue", new BorderLayout());
         Chart chart = new Chart()
                 .setTitle("Revenue")
                 .setXAxis(new CategoryAxis(Axis.BOTTOM, "Q1", "Q2", "Q3", "Q4"));
@@ -49,13 +50,20 @@ public class ModernChartSnippets {
         // end::modern-chart-first[]
     }
 
-    void financial(long[] times, double[] open, double[] high, double[] low, double[] close, double[] vol) {
+    void financial() {
         // tag::modern-chart-financial[]
+        long day = 24L * 60 * 60 * 1000;
+        long[] times = {0, day, 2 * day, 3 * day, 6 * day};
+        double[] open = {10, 11, 12, 11, 13};
+        double[] high = {12, 13, 14, 13, 15};
+        double[] low = {9, 10, 11, 10, 12};
+        double[] close = {11, 12, 11, 13, 14};
+        double[] vol = {1200, 1800, 900, 1500, 2100};
         CandlestickSeries prices = new CandlestickSeries("ACME");
         prices.setOhlc(null, open, high, low, close);
         Chart main = new Chart().setXAxis(new SessionTimeAxis(Axis.BOTTOM, times));
         main.addSeries(prices);
-        main.addSeries(Indicators.line("SMA 20", prices, Indicators.sma(close, 20)));
+        main.addSeries(Indicators.line("SMA 3", prices, Indicators.sma(close, 3)));
 
         Chart volume = new Chart().setXAxis(new SessionTimeAxis(Axis.BOTTOM, times));
         volume.addSeries(new VolumeSeries("Volume", prices, vol));
@@ -65,8 +73,9 @@ public class ModernChartSnippets {
         // end::modern-chart-financial[]
     }
 
-    void sankey(Chart chart) {
+    void sankey() {
         // tag::modern-chart-sankey[]
+        Chart chart = new Chart();
         SankeySeries flow = new SankeySeries("Energy");
         flow.addLink("Solar", "Grid", 40).addLink("Gas", "Grid", 60).addLink("Grid", "Homes", 55);
         chart.addSeries(flow);

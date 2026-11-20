@@ -31,6 +31,8 @@ import com.codename1.ui.chart.ChartPoint;
 /// Give it the five numbers directly or let it compute them from raw samples:
 ///
 /// ```java
+/// double[] mondaySamples = {120, 135, 150, 180, 240};
+/// double[] tuesdaySamples = {110, 125, 140, 160, 300};
 /// BoxPlotSeries s = new BoxPlotSeries("Latency");
 /// s.addSamples(0, mondaySamples);
 /// s.addSamples(1, tuesdaySamples);

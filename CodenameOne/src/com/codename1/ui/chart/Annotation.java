@@ -32,6 +32,8 @@ import com.codename1.ui.geom.GeneralPath;
 /// threshold, a weekend, a release date.
 ///
 /// ```java
+/// Chart chart = new Chart();
+/// double start = 2, end = 4;
 /// chart.addAnnotation(Annotation.valueLine(100, "Target"));
 /// chart.addAnnotation(Annotation.xBand(start, end, "Outage").setColor(0xEF5350));
 /// ```

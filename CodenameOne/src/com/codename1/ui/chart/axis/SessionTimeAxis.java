@@ -41,6 +41,10 @@ import java.util.Date;
 /// (`getFirstIndex()`) and labels the climbing indices with the times that belong to them.
 ///
 /// ```java
+/// Chart chart = new Chart();
+/// long day = 24L * 60 * 60 * 1000;
+/// long[] timestamps = {0, day, 4 * day};
+/// double[] open = {10, 11, 12}, high = {12, 13, 14}, low = {9, 10, 11}, close = {11, 12, 13};
 /// SessionTimeAxis axis = new SessionTimeAxis(Axis.BOTTOM, timestamps);
 /// chart.setXAxis(axis);
 /// chart.addSeries(new CandlestickSeries("ACME").setOhlc(null, open, high, low, close));

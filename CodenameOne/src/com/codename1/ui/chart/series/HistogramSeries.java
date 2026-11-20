@@ -27,6 +27,7 @@ import com.codename1.util.MathUtil;
 /// A histogram: samples counted into equal width bins and drawn as touching bars.
 ///
 /// ```java
+/// double[] latencies = {120, 135, 150, 180, 240, 95, 160};
 /// new HistogramSeries("Response time").setSamples(latencies, 0);
 /// ```
 public class HistogramSeries extends BarSeries {

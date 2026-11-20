@@ -2626,7 +2626,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/charts/Mod
 
 `XYSeries.add` appends a point and animates it in. With `setMaxPoints(n)` the oldest point drops off as each new one arrives, which suits a sensor or price feed. `CandlestickSeries.updateLast` changes the last candle in place while its period is still open.
 
-A line with more points than about twice the plot's width in pixels draws only the highest and lowest point of each pixel column, so a long series stays fast and a single spike is never lost. That applies to an unrotated chart whose x values ascend; a rotated chart, or a series with unordered x values, draws every point. To also save memory, reduce the data before handing it over: `Downsample.lttb(x, y, 2000)` returns the indices of the points that keep the series' shape, and `Downsample.pick` extracts them. `setLoading("Loading...")` shows that data is on the way: an empty chart shows the text, and a chart with data is dimmed under it. `setLoading(null)` removes it.
+A line with more points than about twice the plot's width in pixels draws only the highest and lowest point of each pixel column, so a long series stays fast and a single spike is never lost. That applies when the chart isn't rotated and the x values ascend; a rotated chart, or a series with unordered x values, draws every point. To also save memory, reduce the data before handing it over: `Downsample.lttb(x, y, 2000)` returns the indices of the points that keep the series' shape, and `Downsample.pick` extracts them. `setLoading("Loading...")` shows that data is on the way: an empty chart shows the text, and a chart with data is dimmed under it. `setLoading(null)` removes it.
 
 ==== Annotations, selection and export
 

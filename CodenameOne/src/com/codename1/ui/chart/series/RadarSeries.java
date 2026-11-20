@@ -41,6 +41,7 @@ import java.util.List;
 /// in a chart share the spokes of the first one and one radial scale.
 ///
 /// ```java
+/// Chart chart = new Chart();
 /// String[] skills = {"Speed", "Power", "Range", "Defense", "Stamina"};
 /// chart.addSeries(new RadarSeries("Alice", skills).setValues(8, 6, 7, 5, 9));
 /// chart.addSeries(new RadarSeries("Bob", skills).setValues(5, 9, 4, 8, 6));

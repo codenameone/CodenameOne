@@ -33,9 +33,13 @@ import com.codename1.ui.chart.series.XYSeries;
 /// index for index.
 ///
 /// ```java
-/// double[] close = ...;
-/// chart.addSeries(Indicators.line("SMA 20", prices, Indicators.sma(close, 20)));
-/// double[][] bb = Indicators.bollinger(close, 20, 2);
+/// double[] open = {10, 11, 12, 11, 13}, high = {12, 13, 14, 13, 15};
+/// double[] low = {9, 10, 11, 10, 12}, close = {11, 12, 11, 13, 14};
+/// CandlestickSeries prices = new CandlestickSeries("ACME").setOhlc(null, open, high, low, close);
+/// Chart chart = new Chart();
+/// chart.addSeries(prices);
+/// chart.addSeries(Indicators.line("SMA 3", prices, Indicators.sma(close, 3)));
+/// double[][] bb = Indicators.bollinger(close, 3, 2);
 /// ```
 public final class Indicators {
     private Indicators() {

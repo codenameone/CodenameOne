@@ -30,6 +30,7 @@ import com.codename1.ui.chart.ChartPoint;
 /// line series of the same values to add error bars to them.
 ///
 /// ```java
+/// double[] mean = {5, 7, 6}, low = {4, 6, 4.5}, high = {6, 8.5, 7};
 /// new ErrorBarSeries("Mean").setIntervals(null, mean, low, high);
 /// ```
 public class ErrorBarSeries extends XYSeries {

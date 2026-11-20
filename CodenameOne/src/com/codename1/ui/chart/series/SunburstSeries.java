@@ -35,6 +35,13 @@ import com.codename1.ui.chart.layout.Shapes;
 /// centre; tap the centre to go back up.
 ///
 /// ```java
+/// Chart chart = new Chart();
+/// TreeNode root = new TreeNode("All");
+/// root.add(new TreeNode("Photos", 40));
+/// TreeNode apps = root.add(new TreeNode("Apps"));
+/// apps.add(new TreeNode("Games", 15));
+/// apps.add(new TreeNode("Tools", 10));
+/// root.add(new TreeNode("Music", 20));
 /// chart.addSeries(new SunburstSeries("Disk usage", root).setMaxDepth(3));
 /// ```
 public class SunburstSeries extends HierarchySeries {

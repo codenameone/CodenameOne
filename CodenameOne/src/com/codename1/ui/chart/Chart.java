@@ -48,6 +48,7 @@ import java.util.List;
 /// An interactive, animated chart.
 ///
 /// ```java
+/// Form form = new Form("Revenue", new BorderLayout());
 /// Chart chart = new Chart()
 ///         .setXAxis(new CategoryAxis(Axis.BOTTOM, "Q1", "Q2", "Q3", "Q4"))
 ///         .setTitle("Revenue");

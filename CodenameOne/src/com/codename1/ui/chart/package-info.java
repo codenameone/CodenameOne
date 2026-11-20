@@ -28,6 +28,7 @@
 /// trackpad and keyboard.
 ///
 /// ```java
+/// Form form = new Form("Revenue", new BorderLayout());
 /// Chart chart = new Chart().setTitle("Revenue")
 ///         .setXAxis(new CategoryAxis(Axis.BOTTOM, "Q1", "Q2", "Q3", "Q4"));
 /// chart.addSeries(new BarSeries("Sales").setData(null, new double[]{120, 180, 150, 210}));

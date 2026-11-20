@@ -37,6 +37,7 @@ import com.codename1.ui.chart.layout.Shapes;
 /// out and the legend and tooltip carry the name instead.
 ///
 /// ```java
+/// Chart chart = new Chart();
 /// PieSeries pie = new PieSeries("Share");
 /// pie.setData(new String[]{"Android", "iOS", "Other"}, new double[]{71, 28, 1});
 /// pie.setInnerRadius(0.6f).setCenterText("2.1B");
