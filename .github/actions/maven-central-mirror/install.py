@@ -14,6 +14,26 @@ import sys
 PROFILE_ID = "cn1-ci-central-mirror"
 
 
+def outside_comments(text, pattern):
+    """First match of pattern in text that is not inside an XML comment, or None."""
+    masked = re.sub(r"<!--.*?-->", lambda m: " " * len(m.group(0)), text, flags=re.S)
+    return re.search(pattern, masked)
+
+
+def insert_into(text, tag, content, dest):
+    """Put content first inside <tag> (open or self-closing), creating it if absent."""
+    m = outside_comments(text, r"<" + tag + r"\s*/>")
+    if m:
+        return text[:m.start()] + "<" + tag + ">\n" + content + "\n</" + tag + ">" + text[m.end():]
+    m = outside_comments(text, r"<" + tag + r"(\s[^>]*)?>")
+    if m:
+        return text[:m.end()] + "\n" + content + text[m.end():]
+    m = outside_comments(text, r"</settings\s*>")
+    if not m:
+        sys.exit("error: " + dest + " has no </settings>; refusing to guess where the profile goes")
+    return text[:m.start()] + "<" + tag + ">\n" + content + "\n</" + tag + ">\n" + text[m.start():]
+
+
 def main(source, dest):
     with open(source, encoding="utf-8") as f:
         shipped = f.read()
@@ -30,16 +50,8 @@ def main(source, dest):
         return
     profile = re.search(r"<profile>.*?</profile>", shipped, re.S).group(0)
     active = "<activeProfile>" + PROFILE_ID + "</activeProfile>"
-    if "</settings>" not in existing:
-        sys.exit("error: " + dest + " has no </settings>; refusing to guess where the profile goes")
-    if "<profiles>" in existing:
-        existing = existing.replace("<profiles>", "<profiles>\n" + profile, 1)
-    else:
-        existing = existing.replace("</settings>", "<profiles>\n" + profile + "\n</profiles>\n</settings>", 1)
-    if "<activeProfiles>" in existing:
-        existing = existing.replace("<activeProfiles>", "<activeProfiles>\n" + active, 1)
-    else:
-        existing = existing.replace("</settings>", "<activeProfiles>" + active + "</activeProfiles>\n</settings>", 1)
+    existing = insert_into(existing, "profiles", profile, dest)
+    existing = insert_into(existing, "activeProfiles", active, dest)
     with open(dest, "w", encoding="utf-8") as f:
         f.write(existing)
     print("Merged the mirror profile into " + dest)

@@ -11,7 +11,8 @@ after an actions/setup-java, which writes a settings.xml of its own, replacing o
 Two more things it holds:
 
 - A job's workspace checkout is a full checkout of the commit under test (no
-  `repository:`, `path:`, `ref:` or `sparse-checkout:`). A job with none is skipped:
+  `repository:`, `path:` or `sparse-checkout:`, and no `ref:` other than the commit
+  under test). A job with none is skipped:
   the local action may not be at ./.github there.
 - A Maven wrapper in a CI-only project must download its distribution from
   repo.codenameone.com, not Central (the files are seeded there by
@@ -121,8 +122,11 @@ def check_file(path, fix):
             # Only a full checkout of the commit under test is sure to contain the local
             # action: another repository, a subdirectory, another ref (master, a PR head)
             # or a sparse checkout may not. Those jobs are housekeeping, not Maven builds.
+            # A ref naming the commit under test (github.sha, a PR head sha) is still a full
+            # checkout and is held to the rule; any other ref is skipped.
             is_checkout = bool(re.search(r"uses:\s*actions/checkout@", body)) and not re.search(
-                r"^\s*(repository|path|ref|sparse-checkout):", body, re.M)
+                r"^\s*(repository|path|sparse-checkout):", body, re.M) and not re.search(
+                r"^\s*ref:(?!.*(github\.sha|head\.sha))", body, re.M)
             # setup-java writes ~/.m2/settings.xml; a cache restore of the whole ~/.m2
             # (not just ~/.m2/repository) can bring back an older run's settings.xml.
             # Either replaces ours, so the mirror is installed again after them.

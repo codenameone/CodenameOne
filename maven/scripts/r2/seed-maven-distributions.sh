@@ -50,7 +50,9 @@ while read -r p; do
     esac
 done <<< "$paths"
 
-served() { curl -fsSIL -o /dev/null "$R2_PUBLIC/$1" 2>/dev/null; }
+# Retried: Check workflows runs --verify on every PR, and one network blip must not
+# turn it red.
+served() { curl -fsSIL --retry 3 --retry-all-errors -o /dev/null "$R2_PUBLIC/$1" 2>/dev/null; }
 
 case "${1:-}" in
     --list) echo "$paths"; exit 0 ;;
