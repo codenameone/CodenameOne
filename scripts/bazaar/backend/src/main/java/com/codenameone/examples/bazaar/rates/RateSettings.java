@@ -176,7 +176,7 @@ public class RateSettings {
         return dto(d);
     }
 
-    static DiscountDto dto(Discount d) {
+    public static DiscountDto dto(Discount d) {
         return new DiscountDto(d.getId(), d.getCode(), d.getTitle(), d.getKind(), d.getAmount(),
                 d.getMinSubtotalCents(), d.getBuyQty(), d.getGetQty(), d.getAppliesTo(),
                 d.getTargetId(), d.isAutomatic(), d.getUsageLimit(), d.getUsedCount(),
@@ -243,7 +243,7 @@ public class RateSettings {
         return dto(r);
     }
 
-    static TaxRateDto dto(TaxRate r) {
+    public static TaxRateDto dto(TaxRate r) {
         return new TaxRateDto(r.getId(), r.getCountry(), r.getRegion(), r.getName(),
                 r.getBasisPoints(), r.isAppliesToShipping());
     }

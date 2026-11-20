@@ -20,6 +20,9 @@
 package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.Shift;
 import java.util.List;
@@ -30,4 +33,18 @@ public interface ShiftRepository extends CrudRepository<Shift, String> {
     List<Shift> findByRegisterIdOrderByOpenedAtDesc(String registerId);
 
     List<Shift> findByStoreIdOrderByOpenedAtDesc(String storeId);
+
+    /// Adds to a shift's running totals in one statement, so a sale and a
+    /// cash move landing at once both count. `drawer` is what the cash
+    /// expected in the drawer moves by.
+    @Modifying(clearAutomatically = true)
+    @Query("update Shift s set s.cashSalesCents = s.cashSalesCents + :cash, "
+            + "s.cardSalesCents = s.cardSalesCents + :card, "
+            + "s.otherSalesCents = s.otherSalesCents + :other, "
+            + "s.cashMovesCents = s.cashMovesCents + :moves, "
+            + "s.expectedCents = s.expectedCents + :drawer, "
+            + "s.salesCount = s.salesCount + :sales where s.id = :id")
+    int addTotals(@Param("id") String id, @Param("cash") long cash, @Param("card") long card,
+            @Param("other") long other, @Param("moves") long moves, @Param("drawer") long drawer,
+            @Param("sales") int sales);
 }

@@ -470,7 +470,17 @@ public class Orders {
     /// released; shipped ones go back on hand when `restock` is set.
     public OrderDto refund(String username, String storeId, String orderId, RefundRequestDto req)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        refundParts(username, storeId, orderId, req, false, StoreAccess.MANAGERS);
+        return detailOf(orderId);
+    }
+
+    /// [#refund] for a caller holding one of `roles`, answering what went
+    /// where: `{total, card, gift card, by hand}`. With `byHand` nothing goes
+    /// back to the card or a gift card: a counter return paid out of the
+    /// drawer. Otherwise what neither takes (cash, store credit) is by hand.
+    public long[] refundParts(String username, String storeId, String orderId,
+            RefundRequestDto req, boolean byHand, String... roles) throws IOException {
+        access.requireStaff(username, storeId, roles);
         StoreOrder order = inStoreRead(storeId, orderId);
         if (req == null) {
             throw new ResponseStatusException(400, "Say what to refund");
@@ -489,12 +499,12 @@ public class Orders {
         long amount = refundAmount(order, req, store.isTaxInclusive());
         Payment payment = paymentRows.findById(orderId);
         long cardPart = 0;
-        if (payment != null) {
+        if (payment != null && !byHand) {
             cardPart = Math.min(amount, payment.getAmountCents() - payment.getRefundedCents());
         }
         long giftPart = amount - cardPart;
         String card = giftCards.cardOf(orderId);
-        if (giftPart > 0 && (card == null || giftPart > giftCards.spentOn(orderId))) {
+        if (byHand || giftPart > 0 && (card == null || giftPart > giftCards.spentOn(orderId))) {
             // Paid by hand (mark paid): the money goes back the same way.
             giftPart = 0;
         }
@@ -506,7 +516,7 @@ public class Orders {
         }
         StoreOrder done = recordRefund(orderId, req, amount, username);
         publish(done);
-        return detailOf(orderId);
+        return new long[] {amount, cardPart, giftPart, amount - cardPart - giftPart};
     }
 
     /// What a refund request is worth; 400 for one that asks for more than

@@ -109,7 +109,8 @@ public class GiftCards {
         card.setBalanceCents(wanted.initialCents());
         card.setCustomerId(Codes.cut(wanted.customerId(), 32));
         card.setNote(Codes.cut(wanted.note(), 500));
-        card.setExpiresAt(wanted.expiresAt() > 0 ? Instant.ofEpochMilli(wanted.expiresAt()) : null);
+        card.setExpiresAt(wanted.expiresAt() > 0 ? Instant.ofEpochMilli(wanted.expiresAt())
+                : Instant.EPOCH);
         card.setActive(true);
         card.setCreatedAt(Instant.now());
         cards.insert(card);

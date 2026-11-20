@@ -37,10 +37,12 @@ import com.codenameone.examples.bazaar.api.RegisterDto;
 import com.codenameone.examples.bazaar.api.UserDto;
 import com.codenameone.examples.bazaar.domain.ClosedAccount;
 import com.codenameone.examples.bazaar.domain.Profile;
+import com.codenameone.examples.bazaar.domain.StoreStaff;
 import com.codenameone.examples.bazaar.live.LiveHub;
 import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.repository.ClosedAccountRepository;
 import com.codenameone.examples.bazaar.repository.ProfileRepository;
+import com.codenameone.examples.bazaar.repository.StoreStaffRepository;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -67,11 +69,13 @@ public class Accounts {
     private final LiveHub live;
     private final ClosedAccountRepository closed;
     private final Grants grants;
+    private final StoreStaffRepository staff;
 
     public Accounts(ProfileRepository profiles, AccountCleanup cleanup,
             JdbcUserDetailsManager users, PasswordEncoder encoder,
             Moderation moderation, Payments payments, LiveHub live,
-            ClosedAccountRepository closed, Grants grants) {
+            ClosedAccountRepository closed, Grants grants, StoreStaffRepository staff) {
+        this.staff = staff;
         this.closed = closed;
         this.grants = grants;
         this.profiles = profiles;
@@ -363,7 +367,7 @@ public class Accounts {
         // The account as it was, answered as what it now is: unable to sign in.
         return new UserDto(was.username(), was.displayName(), was.phone(), was.phoneVerified(),
                 was.customer(), was.admin(), was.merchant(), true, was.flagged(), was.flagReason(),
-                was.language());
+                was.language(), was.email(), was.cashier(), was.staffStores());
     }
 
     /// Everything closing an account deletes, as one transaction: either the
@@ -504,13 +508,30 @@ public class Accounts {
         return held;
     }
 
-    private static UserDto toDto(Profile profile, List<String> authorities, boolean enabled) {
+    /// The account as the app sees it. `cashier` is true for someone who is
+    /// a CASHIER somewhere and holds no more senior place anywhere, so the app
+    /// opens the register first; `staffStores` names every store they work for.
+    private UserDto toDto(Profile profile, List<String> authorities, boolean enabled) {
         boolean customer = authorities.contains("ROLE_" + Roles.CUSTOMER);
         boolean admin = authorities.contains("ROLE_" + Roles.ADMIN);
         boolean merchant = authorities.contains("ROLE_" + Roles.MERCHANT);
+        List<StoreStaff> places = staff.findByUsername(profile.getUsername());
+        List<String> storeIds = new ArrayList<String>();
+        boolean cashier = false;
+        boolean senior = false;
+        for (int iter = 0; iter < places.size(); iter++) {
+            StoreStaff place = places.get(iter);
+            storeIds.add(place.getStoreId());
+            if ("CASHIER".equals(place.getRole())) {
+                cashier = true;
+            } else {
+                senior = true;
+            }
+        }
         return new UserDto(profile.getUsername(), profile.getDisplayName(), profile.getPhone(),
                 profile.isPhoneVerified(), customer, admin, merchant, !enabled, profile.isFlagged(),
-                profile.getFlagReason(), profile.getLanguage());
+                profile.getFlagReason(), profile.getLanguage(), profile.getUsername(),
+                cashier && !senior, storeIds);
     }
 
     /// An e-mail address as an account name: trimmed, and its ASCII letters in

@@ -47,6 +47,7 @@ final class Shop {
     final String storeId;
     final String locationId;
     final String variantId;
+    final String productId;
     final String owner;
     final String sku;
     private final Carts carts;
@@ -65,7 +66,7 @@ final class Shop {
         locationId = stores.addLocation(owner, storeId,
                 new LocationDto(null, "Back room", "WAREHOUSE", "9 Dock Rd", true, true, 0)).id();
         pricing.seed(storeId);
-        String productId = Ids.next();
+        productId = Ids.next();
         db.execute("INSERT INTO product (id, store_id, handle, title, description, vendor, "
                 + "product_type, tags, status, seo_title, seo_description, photo_id, rating_total, "
                 + "rating_count, created_at, updated_at) VALUES (?, ?, ?, 'Mug', '', '', '', '', "

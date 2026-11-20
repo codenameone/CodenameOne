@@ -40,6 +40,7 @@ import com.codenameone.examples.bazaar.domain.Shift;
 import com.codenameone.examples.bazaar.domain.Store;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
 import com.codenameone.examples.bazaar.domain.Supplier;
+import com.codenameone.examples.bazaar.domain.Tender;
 import com.codenameone.examples.bazaar.domain.Variant;
 import com.codenameone.examples.bazaar.fulfil.Fulfillments;
 import com.codenameone.examples.bazaar.order.Orders;
@@ -56,16 +57,18 @@ import com.codenameone.examples.bazaar.repository.ShiftRepository;
 import com.codenameone.examples.bazaar.repository.StoreOrderRepository;
 import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.repository.SupplierRepository;
+import com.codenameone.examples.bazaar.repository.TenderRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /// The printable documents, made on the server with `com.codename1.pdf` --
 /// the same classes an app uses on the device -- and answered as PDF bytes:
 /// invoice, packing slip, 4x6 shipping label, purchase order, credit note
-/// and end-of-shift Z report.
+/// end-of-shift Z report and the 80 mm till receipt.
 ///
 /// Every method checks that what it prints belongs to `storeId`; who may ask
 /// is [DocumentPages]'s concern. Nothing here sends mail: the app shares or
@@ -91,6 +94,7 @@ public class Documents {
     private final RegisterRepository registers;
     private final CashMoveRepository cashMoves;
     private final Fulfillments fulfillments;
+    private final TenderRepository tenders;
 
     public Documents(StoreRepository stores, StoreOrderRepository orders,
             OrderLineRepository lines, LocationRepository locations, VariantRepository variants,
@@ -98,7 +102,8 @@ public class Documents {
             PurchaseLineRepository purchaseLines, SupplierRepository suppliers,
             RefundRepository refunds, RefundLineRepository refundLines, ShiftRepository shifts,
             RegisterRepository registers, CashMoveRepository cashMoves,
-            Fulfillments fulfillments) {
+            Fulfillments fulfillments, TenderRepository tenders) {
+        this.tenders = tenders;
         this.stores = stores;
         this.orders = orders;
         this.lines = lines;
@@ -462,6 +467,170 @@ public class Documents {
         }
         sheet.space(16).muted("Counted by ____________________    Manager ____________________");
         return sheet.finish();
+    }
+
+    // -------------------------------------------------------------- receipt
+
+    /// An 80 mm roll is 226.77 points wide; the printable band is narrower.
+    static final float ROLL_W = 226.77f;
+    /// Characters per line of the text receipt, which is also how the PDF is
+    /// laid out: one monospaced row of this many columns per line.
+    static final int ROLL_COLUMNS = 40;
+
+    /// The receipt of an order as rows of `{left, right}` text: the store,
+    /// the lines, the totals, how it was paid and the change.
+    @Transactional(readOnly = true)
+    public List<String[]> receiptRows(String storeId, String orderId) throws IOException {
+        StoreOrder o = order(storeId, orderId);
+        Store s = stores.findById(storeId);
+        String cur = o.getCurrency();
+        List<String[]> rows = new ArrayList<String[]>();
+        rows.add(new String[] {"=" + s.getName(), ""});
+        if (s.getAddress().length() > 0) {
+            rows.add(new String[] {"=" + s.getAddress(), ""});
+        }
+        Location at = o.getLocationId().length() == 0 ? null : locations.findById(o.getLocationId());
+        if (at != null) {
+            rows.add(new String[] {"=" + at.getName(), ""});
+        }
+        rows.add(new String[] {"-", ""});
+        rows.add(new String[] {"Order #" + o.getNumber(), Sheet.dateTime(millis(o.getCreatedAt()))});
+        if (o.getStaffUsername().length() > 0) {
+            rows.add(new String[] {"Served by " + o.getStaffUsername(), ""});
+        }
+        rows.add(new String[] {"-", ""});
+        List<OrderLine> ls = lines.findByOrderId(orderId);
+        for (int iter = 0; iter < ls.size(); iter++) {
+            OrderLine l = ls.get(iter);
+            rows.add(new String[] {title(l), Sheet.money(l.getPriceCents() * l.getQuantity(), cur)});
+            if (l.getQuantity() != 1) {
+                rows.add(new String[] {"  " + l.getQuantity() + " x " + Sheet.money(l.getPriceCents(),
+                    cur), ""});
+            }
+            if (l.getDiscountCents() > 0) {
+                rows.add(new String[] {"  Discount", Sheet.money(-l.getDiscountCents(), cur)});
+            }
+            if (l.getRefundedQty() > 0) {
+                rows.add(new String[] {"  Returned " + l.getRefundedQty(), ""});
+            }
+        }
+        rows.add(new String[] {"-", ""});
+        rows.add(new String[] {"Subtotal", Sheet.money(o.getSubtotalCents(), cur)});
+        if (o.getDiscountCents() > 0) {
+            rows.add(new String[] {"Discounts", Sheet.money(-o.getDiscountCents(), cur)});
+        }
+        if (o.getShippingCents() > 0) {
+            rows.add(new String[] {"Shipping", Sheet.money(o.getShippingCents(), cur)});
+        }
+        rows.add(new String[] {s.isTaxInclusive() ? "Tax included" : "Tax",
+            Sheet.money(o.getTaxCents(), cur)});
+        rows.add(new String[] {"*TOTAL", Sheet.money(o.getTotalCents(), cur)});
+        List<Tender> ts = tenders.findByOrderId(orderId);
+        long change = 0;
+        for (int iter = 0; iter < ts.size(); iter++) {
+            Tender t = ts.get(iter);
+            String kind = t.getKind();
+            String label = "CASH".equals(kind) ? "Cash" : "CARD".equals(kind) ? "Card"
+                    : "GIFT_CARD".equals(kind) ? "Gift card" : "STORE_CREDIT".equals(kind)
+                    ? "Store credit" : kind;
+            if (t.getReference().length() > 0 && "GIFT_CARD".equals(kind)) {
+                label += " ..." + t.getReference();
+            }
+            rows.add(new String[] {label, Sheet.money(t.getAmountCents() + t.getChangeCents(), cur)});
+            change += t.getChangeCents();
+        }
+        if (change > 0) {
+            rows.add(new String[] {"Change", Sheet.money(change, cur)});
+        }
+        if (o.getRefundedCents() > 0) {
+            rows.add(new String[] {"Refunded", Sheet.money(-o.getRefundedCents(), cur)});
+        }
+        rows.add(new String[] {"-", ""});
+        rows.add(new String[] {"=Thank you for shopping with us", ""});
+        return rows;
+    }
+
+    /// The receipt as plain text, [#ROLL_COLUMNS] wide, for a text message
+    /// or an e-mail body.
+    public String receiptText(String storeId, String orderId) throws IOException {
+        List<String[]> rows = receiptRows(storeId, orderId);
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < rows.size(); iter++) {
+            out.append(textRow(rows.get(iter))).append('\n');
+        }
+        return out.toString();
+    }
+
+    private static String textRow(String[] row) {
+        String left = row[0];
+        if ("-".equals(left)) {
+            StringBuilder dash = new StringBuilder();
+            for (int iter = 0; iter < ROLL_COLUMNS; iter++) {
+                dash.append('-');
+            }
+            return dash.toString();
+        }
+        if (left.startsWith("=")) {
+            String text = cutText(left.substring(1), ROLL_COLUMNS);
+            StringBuilder pad = new StringBuilder();
+            for (int iter = 0; iter < (ROLL_COLUMNS - text.length()) / 2; iter++) {
+                pad.append(' ');
+            }
+            return pad + text;
+        }
+        if (left.startsWith("*")) {
+            left = left.substring(1);
+        }
+        String right = row[1];
+        left = cutText(left, Math.max(1, ROLL_COLUMNS - right.length() - 1));
+        StringBuilder out = new StringBuilder(left);
+        while (out.length() + right.length() < ROLL_COLUMNS) {
+            out.append(' ');
+        }
+        return out.append(right).toString();
+    }
+
+    private static String cutText(String text, int max) {
+        return text.length() <= max ? text : text.substring(0, Math.max(0, max - 1)) + "~";
+    }
+
+    /// The till receipt as a PDF on an 80 mm roll: one page as long as the
+    /// receipt, the same rows as [#receiptText] in a monospaced face so it
+    /// prints the same on a thermal printer as on paper.
+    public byte[] receipt(String storeId, String orderId) throws IOException {
+        List<String[]> rows = receiptRows(storeId, orderId);
+        StoreOrder o = order(storeId, orderId);
+        float size = 7.5f;
+        float lead = 10;
+        float m = 10;
+        float height = 2 * m + 10 + rows.size() * lead;
+        PdfDocument doc = new PdfDocument();
+        doc.setTitle("Receipt " + o.getNumber()).setCreator("Bazaar");
+        PdfPage page = doc.addPage(ROLL_W, height);
+        PdfCanvas c = page.getCanvas();
+        c.setFillColor(0x000000);
+        float y = m + 10;
+        for (int iter = 0; iter < rows.size(); iter++) {
+            String[] row = rows.get(iter);
+            String left = row[0];
+            if ("-".equals(left)) {
+                c.setStrokeColor(0x000000).setLineWidth(0.5f).drawLine(m, y - 3, ROLL_W - m, y - 3);
+            } else if (left.startsWith("=")) {
+                String text = Sheet.fit(left.substring(1), PdfFont.HELVETICA_BOLD, size + 1,
+                        ROLL_W - 2 * m);
+                float w = PdfFont.HELVETICA_BOLD.getStringWidth(text, size + 1);
+                c.setFont(PdfFont.HELVETICA_BOLD, size + 1).drawText(text, (ROLL_W - w) / 2, y);
+            } else {
+                boolean strong = left.startsWith("*");
+                PdfFont f = strong ? PdfFont.COURIER_BOLD : PdfFont.COURIER;
+                String text = strong ? left.substring(1) : left;
+                float rw = f.getStringWidth(row[1], size);
+                c.setFont(f, size).drawText(Sheet.fit(text, f, size, ROLL_W - 2 * m - rw - 6), m, y);
+                c.drawText(row[1], ROLL_W - m - rw, y);
+            }
+            y += lead;
+        }
+        return doc.toByteArray();
     }
 
     // -------------------------------------------------------------- helpers

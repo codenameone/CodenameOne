@@ -33,6 +33,10 @@ import com.codename1.annotations.Mapped;
 ///     what stops one.
 /// @param flagReason Why it was flagged, for the other admins.
 /// @param language The language the app is shown in: `en`, `es`, `fr`, `de` or `he`.
+/// @param email The account's e-mail address.
+/// @param cashier A CASHIER at one or more stores and nothing more senior anywhere: the app opens
+///     the point of sale first.
+/// @param staffStores The ids of the stores the account works for, in any role.
 @Mapped
 public record UserDto(
         String username,
@@ -45,5 +49,8 @@ public record UserDto(
         boolean suspended,
         boolean flagged,
         String flagReason,
-        String language) {
+        String language,
+        String email,
+        boolean cashier,
+        java.util.List<String> staffStores) {
 }

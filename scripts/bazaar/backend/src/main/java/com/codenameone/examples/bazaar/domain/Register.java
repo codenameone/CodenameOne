@@ -42,6 +42,12 @@ public class Register {
     @Column(nullable = false)
     private boolean active;
 
+    @Column(nullable = false, type = "VARCHAR(2)")
+    private String taxCountry = "";
+
+    @Column(nullable = false, type = "VARCHAR(80)")
+    private String taxRegion = "";
+
     public Register() {
     }
 
@@ -83,5 +89,21 @@ public class Register {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public String getTaxCountry() {
+        return taxCountry;
+    }
+
+    public void setTaxCountry(String taxCountry) {
+        this.taxCountry = taxCountry;
+    }
+
+    public String getTaxRegion() {
+        return taxRegion;
+    }
+
+    public void setTaxRegion(String taxRegion) {
+        this.taxRegion = taxRegion;
     }
 }

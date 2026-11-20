@@ -91,6 +91,15 @@ public class DocumentPages {
         return pdf(documents.shiftReport(storeId, id), "z-report-" + id);
     }
 
+    /// The 80 mm till receipt of an order, for any of the store's staff.
+    @GetMapping("/api/merchant/stores/{storeId}/orders/{orderId}/receipt.pdf")
+    public HttpServer.Response receipt(@PathVariable("storeId") String storeId,
+            @PathVariable("orderId") String orderId) throws Exception {
+        access.requireStaff(Caller.name(), storeId, StoreAccess.ANYONE);
+        int number = documents.order(storeId, orderId).getNumber();
+        return pdf(documents.receipt(storeId, orderId), "receipt-" + number);
+    }
+
     /// The shopper's own invoice; 404 for anybody else's order.
     @GetMapping("/api/orders/{orderId}/invoice.pdf")
     public HttpServer.Response myInvoice(@PathVariable("orderId") String orderId)

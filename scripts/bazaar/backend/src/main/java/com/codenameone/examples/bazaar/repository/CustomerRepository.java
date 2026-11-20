@@ -20,6 +20,9 @@
 package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.Customer;
 import java.util.List;
@@ -34,4 +37,17 @@ public interface CustomerRepository extends CrudRepository<Customer, String> {
     Customer findByStoreIdAndEmail(String storeId, String email);
 
     List<Customer> findByUsername(String username);
+
+    /// Takes `amount` of a customer's store credit if they have that much.
+    ///
+    /// @return 1 when taken
+    @Modifying(clearAutomatically = true)
+    @Query("update Customer c set c.storeCreditCents = c.storeCreditCents - :amount "
+            + "where c.id = :id and c.storeCreditCents >= :amount")
+    int debitCreditIf(@Param("id") String id, @Param("amount") long amount);
+
+    /// Puts `amount` of store credit on a customer.
+    @Modifying(clearAutomatically = true)
+    @Query("update Customer c set c.storeCreditCents = c.storeCreditCents + :amount where c.id = :id")
+    int addCredit(@Param("id") String id, @Param("amount") long amount);
 }

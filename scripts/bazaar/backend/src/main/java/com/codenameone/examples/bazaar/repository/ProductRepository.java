@@ -20,6 +20,9 @@
 package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.Product;
 import java.util.List;
@@ -34,4 +37,10 @@ public interface ProductRepository extends CrudRepository<Product, String> {
     Product findByStoreIdAndHandle(String storeId, String handle);
 
     List<Product> findByIdIn(List<String> ids);
+
+    /// Moves a product's rating sums by these amounts.
+    @Modifying(clearAutomatically = true)
+    @Query("update Product p set p.ratingTotal = p.ratingTotal + :total, "
+            + "p.ratingCount = p.ratingCount + :count where p.id = :id")
+    int addRating(@Param("id") String id, @Param("total") long total, @Param("count") long count);
 }

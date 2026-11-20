@@ -511,6 +511,33 @@ public class Payments {
     }
     // end::bazaar-authorize[]
 
+    /// The prefix of a card payment taken on a register's card terminal. The
+    /// terminal settled it with the processor itself, so nothing here asks
+    /// the processor about it: capture, void and refund only move the row.
+    /// A real terminal integration would carry the processor's own reference
+    /// and refund through it.
+    public static final String TERMINAL = "TERM-";
+
+    /// Whether a payment's reference is one the processor knows.
+    private static boolean atProcessor(String reference) {
+        return !CASH.equals(reference) && (reference == null || !reference.startsWith(TERMINAL));
+    }
+
+    /// Records a card payment a register's terminal took for a counter sale,
+    /// and captures it at once. Answers the reference kept, `TERM-` and the
+    /// terminal's own.
+    public String terminal(String orderId, String staff, long amountCents, String currency,
+            String terminalReference) throws IOException {
+        if (amountCents <= 0) {
+            throw new ResponseStatusException(400, "That is not an amount");
+        }
+        String reference = cut(TERMINAL + (terminalReference == null ? "" : terminalReference), 64);
+        keepPayment(orderId, staff, new String[] {"terminal", "Card terminal"}, amountCents,
+                currency, reference);
+        capture(orderId);
+        return reference;
+    }
+
     @Transactional
     private void keepPayment(String orderId, String username, String[] method, long amount,
             String currency, String reference) {
@@ -540,7 +567,7 @@ public class Payments {
             Payment kept = payment(orderId);
             return kept == null ? "" : kept.getStatus();
         }
-        if (!CASH.equals(payment.getProviderRef())) {
+        if (atProcessor(payment.getProviderRef())) {
             try {
                 provider.capture(payment.getProviderRef(), payment.getAmountCents());
             } catch (PaymentDeclinedException declined) {
@@ -565,7 +592,7 @@ public class Payments {
             Payment kept = payment(orderId);
             return kept == null ? "" : kept.getStatus();
         }
-        if (!CASH.equals(payment.getProviderRef())) {
+        if (atProcessor(payment.getProviderRef())) {
             try {
                 provider.release(payment.getProviderRef());
             } catch (IOException failed) {
@@ -601,7 +628,7 @@ public class Payments {
             throw new ResponseStatusException(409, "That payment is changing; try again");
         }
         PaymentProvider.Refund done = null;
-        if (!CASH.equals(payment.getProviderRef())) {
+        if (atProcessor(payment.getProviderRef())) {
             try {
                 done = provider.refund(payment.getProviderRef(), amount);
             } catch (IOException failed) {

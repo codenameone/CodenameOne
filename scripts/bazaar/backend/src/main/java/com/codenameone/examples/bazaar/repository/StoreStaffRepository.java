@@ -20,6 +20,9 @@
 package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Modifying;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.StoreStaff;
 import java.util.List;
@@ -34,4 +37,17 @@ public interface StoreStaffRepository extends CrudRepository<StoreStaff, String>
     StoreStaff findByStoreIdAndUsername(String storeId, String username);
 
     List<StoreStaff> findByStoreId(String storeId);
+
+    /// Locks a PIN until `until` and starts its count of wrong tries again.
+    @Modifying(clearAutomatically = true)
+    @Query("update StoreStaff s set s.pinFailures = 0, s.pinLockedUntil = :until where s.id = :id")
+    int lockPin(@Param("id") String id, @Param("until") java.time.Instant until);
+
+    @Modifying(clearAutomatically = true)
+    @Query("update StoreStaff s set s.pinFailures = s.pinFailures + 1 where s.id = :id")
+    int countPinFailure(@Param("id") String id);
+
+    @Modifying(clearAutomatically = true)
+    @Query("update StoreStaff s set s.pinFailures = 0 where s.id = :id")
+    int clearPinFailures(@Param("id") String id);
 }

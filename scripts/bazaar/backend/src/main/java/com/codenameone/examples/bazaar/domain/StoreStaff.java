@@ -52,6 +52,12 @@ public class StoreStaff {
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
+    @Column(nullable = false)
+    private int pinFailures;
+
+    @Column(nullable = false)
+    private Instant pinLockedUntil = Instant.EPOCH;
+
     public StoreStaff() {
     }
 
@@ -117,5 +123,21 @@ public class StoreStaff {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public int getPinFailures() {
+        return pinFailures;
+    }
+
+    public void setPinFailures(int pinFailures) {
+        this.pinFailures = pinFailures;
+    }
+
+    public Instant getPinLockedUntil() {
+        return pinLockedUntil;
+    }
+
+    public void setPinLockedUntil(Instant pinLockedUntil) {
+        this.pinLockedUntil = pinLockedUntil;
     }
 }
