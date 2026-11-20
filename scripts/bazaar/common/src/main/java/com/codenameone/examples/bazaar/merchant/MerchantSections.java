@@ -25,8 +25,7 @@ import com.codenameone.examples.bazaar.ui.Sections;
 
 /// Puts the merchant app's screens into the merchant mode's sections.
 ///
-/// The fulfilment board is a placeholder section here; a later step replaces
-/// its content with the Kanban board through `Sections.content`.
+/// The fulfilment section is the Kanban board of `FulfilmentPane`.
 public final class MerchantSections {
     /// The order fulfilment board.
     public static final String FULFILMENT = "fulfilment";
@@ -52,7 +51,7 @@ public final class MerchantSections {
         Sections.content(Nav.MERCHANT, Sections.ORDERS, OrdersPane::new);
         Sections.register(Nav.MERCHANT, new Section(FULFILMENT, "Fulfilment", store,
                 FontImage.MATERIAL_LOCAL_SHIPPING,
-                () -> Sections.placeholder(FontImage.MATERIAL_LOCAL_SHIPPING, "Fulfilment")));
+                FulfilmentPane::new));
         Sections.content(Nav.MERCHANT, Sections.PRODUCTS, ProductsPane::new);
         Sections.register(Nav.MERCHANT, new Section(COLLECTIONS, "Collections", store,
                 FontImage.MATERIAL_COLLECTIONS_BOOKMARK, CollectionsPane::new));

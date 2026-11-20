@@ -1654,3 +1654,20 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     MeLowStock { color: var(--danger-dark); }
     MeSwatch { border: 1px solid var(--line-strong-dark); }
 }
+
+/* Fulfilment board (phone column lists), carrier quotes and document previews. */
+FuCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2.4mm 3mm 2.4mm 3mm; margin: 0 0 1.6mm 0; }
+FuCard.pressed { background-color: var(--surface-press); }
+FuChip { color: var(--brand); background-color: var(--brand-tint); border-radius: 2mm; font-size: 2.4mm; padding: 0.4mm 1.6mm 0.4mm 1.6mm; margin: 0.6mm 1mm 0 0; }
+FuRate { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 1mm 1.6mm 1mm; margin: 0; }
+DocActions { background-color: var(--surface); border-top: 1px solid var(--line); padding: 1.6mm; margin: 0; }
+DocDrag { color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.6mm 2.4mm 1.6mm 2.4mm; margin: 0 0 0 1.6mm; font-size: 2.6mm; }
+
+@media (prefers-color-scheme: dark) {
+    FuCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    FuCard.pressed { background-color: var(--surface-press-dark); }
+    FuChip { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    FuRate { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    DocActions { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    DocDrag { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+}

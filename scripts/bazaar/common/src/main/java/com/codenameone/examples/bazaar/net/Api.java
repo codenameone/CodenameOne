@@ -25,6 +25,8 @@ import com.codenameone.examples.bazaar.api.CartApi;
 import com.codenameone.examples.bazaar.api.CatalogApi;
 import com.codenameone.examples.bazaar.api.CheckoutApi;
 import com.codenameone.examples.bazaar.api.DiscountApi;
+import com.codenameone.examples.bazaar.api.FulfillmentApi;
+import com.codenameone.examples.bazaar.api.ReturnApi;
 import com.codenameone.examples.bazaar.api.GiftCardApi;
 import com.codenameone.examples.bazaar.api.InventoryApi;
 import com.codenameone.examples.bazaar.api.ShippingApi;
@@ -53,6 +55,8 @@ public final class Api {
     private static DiscountApi discounts;
     private static TaxApi taxes;
     private static ShippingApi shipping;
+    private static FulfillmentApi fulfilment;
+    private static ReturnApi returns;
 
     private Api() {
     }
@@ -71,6 +75,8 @@ public final class Api {
         discounts = RestClients.create(DiscountApi.class, baseUrl);
         taxes = RestClients.create(TaxApi.class, baseUrl);
         shipping = RestClients.create(ShippingApi.class, baseUrl);
+        fulfilment = RestClients.create(FulfillmentApi.class, baseUrl);
+        returns = RestClients.create(ReturnApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -123,5 +129,13 @@ public final class Api {
 
     public static ShippingApi shipping() {
         return shipping;
+    }
+
+    public static FulfillmentApi fulfilment() {
+        return fulfilment;
+    }
+
+    public static ReturnApi returns() {
+        return returns;
     }
 }

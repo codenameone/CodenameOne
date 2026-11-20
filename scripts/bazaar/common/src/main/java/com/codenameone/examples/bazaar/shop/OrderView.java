@@ -103,11 +103,12 @@ final class OrderView {
         }
 
         Container actions = new Container(new GridLayout(1, 2));
-        // Invoices are rendered as PDFs by an endpoint the server does not
-        // have yet; the button is shown, disabled, so the place is reserved.
-        Button invoice = Ui.secondary("Download invoice", "invoice", null);
+        // The server renders the invoice; the app previews it, with Print,
+        // Share and Save under it.
+        Button invoice = Ui.secondary("Download invoice", "invoice", e ->
+                com.codenameone.examples.bazaar.docs.Pdfs.open("Invoice", "invoice-"
+                        + order.number() + ".pdf", "/api/orders/" + order.id() + "/invoice.pdf"));
         FontImage.setMaterialIcon(invoice, FontImage.MATERIAL_PICTURE_AS_PDF, 3.2f);
-        invoice.setEnabled(false);
         actions.add(invoice);
         if (OrderSteps.cancellable(order)) {
             actions.add(Ui.danger("Cancel order", "cancel-order", e -> {

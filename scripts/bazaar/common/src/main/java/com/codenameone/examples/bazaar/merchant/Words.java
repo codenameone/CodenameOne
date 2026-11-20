@@ -57,7 +57,11 @@ final class Words {
             {"SALE", "Sale"}, {"RESERVE", "Reserved"}, {"RELEASE", "Released"},
             {"TRANSFER_OUT", "Transfer out"}, {"TRANSFER_IN", "Transfer in"},
             {"POS_SYNC", "Point of sale sync"}, {"SENT", "Sent"}, {"RECEIVED", "Received"},
-            {"ORDERED", "Ordered"}, {"PARTIALLY_RECEIVED", "Partially received"}
+            {"ORDERED", "Ordered"}, {"PARTIALLY_RECEIVED", "Partially received"},
+            {"PACKED", "Packed"}, {"SHIPPED", "Shipped"}, {"IN_TRANSIT", "In transit"},
+            {"OUT_FOR_DELIVERY", "Out for delivery"}, {"DELIVERED", "Delivered"},
+            {"PICKED_UP", "Picked up"}, {"SHIP", "Ship"}, {"REQUESTED", "Requested"},
+            {"APPROVED", "Approved"}, {"DECLINED", "Declined"}, {"TO_PACK", "To pack"}
         };
         for (int iter = 0; iter < words.length; iter++) {
             if (words[iter][0].equals(code)) {
@@ -74,16 +78,17 @@ final class Words {
     /// The badge style for a status: good, warning, bad or plain.
     static String badge(String code) {
         if ("ACTIVE".equals(code) || "PAID".equals(code) || "FULFILLED".equals(code)
-                || "RECEIVED".equals(code) || "CLOSED".equals(code)) {
+                || "RECEIVED".equals(code) || "CLOSED".equals(code) || "DELIVERED".equals(code)
+                || "PICKED_UP".equals(code) || "APPROVED".equals(code)) {
             return "SvBadgeGood";
         }
         if ("CANCELLED".equals(code) || "VOIDED".equals(code) || "REFUNDED".equals(code)
-                || "ARCHIVED".equals(code)) {
+                || "ARCHIVED".equals(code) || "DECLINED".equals(code)) {
             return "SvBadgeBad";
         }
         if ("PENDING".equals(code) || "UNFULFILLED".equals(code) || "PARTIAL".equals(code)
                 || "DRAFT".equals(code) || "PARTIALLY_REFUNDED".equals(code)
-                || "AUTHORIZED".equals(code)) {
+                || "AUTHORIZED".equals(code) || "REQUESTED".equals(code)) {
             return "SvBadgeWarn";
         }
         return "SvBadge";

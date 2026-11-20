@@ -251,7 +251,7 @@ abstract class MerchantPane extends Container {
     private void claim() {
         DesktopActions.set(DesktopActions.REFRESH, this::load);
         DesktopActions.set(DesktopActions.FIND, this::find);
-        DesktopActions.set(DesktopActions.PRINT, () -> Ui.say("Printing comes with the fulfilment tools"));
+        DesktopActions.set(DesktopActions.PRINT, () -> Ui.say("Nothing to print on this screen"));
         actions();
         LiveChannel.listen(new LiveChannel.Adapter() {
             @Override

@@ -35,7 +35,10 @@ import com.codenameone.examples.bazaar.api.OrderLineDto;
 import com.codenameone.examples.bazaar.api.OrderNoteDto;
 import com.codenameone.examples.bazaar.api.RefundLineDto;
 import com.codenameone.examples.bazaar.api.RefundRequestDto;
+import com.codenameone.examples.bazaar.api.RefundDto;
+import com.codenameone.examples.bazaar.docs.Pdfs;
 import com.codenameone.examples.bazaar.net.Api;
+import com.codenameone.examples.bazaar.ui.DesktopActions;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.ProductArt;
@@ -74,7 +77,10 @@ final class OrderDetail extends Container {
         head.add(BorderLayout.NORTH, Ui.plain(Lang.tr("Order #{0}", String.valueOf(o.number()))
                 + Ui.DOT + MUi.when(o.createdAt()), "SvHeading"));
         head.add(BorderLayout.CENTER, badges);
-        head.add(BorderLayout.SOUTH, actions(o));
+        Container south = new Container(BoxLayout.y());
+        south.add(actions(o));
+        south.add(documents(o));
+        head.add(BorderLayout.SOUTH, south);
         page.add(head);
 
         Container columns = new Container(Layouts.wide() ? new GridLayout(1, 2) : BoxLayout.y());
@@ -206,6 +212,53 @@ final class OrderDetail extends Container {
             row.add(Ui.danger(Lang.tr("Cancel order"), "order-cancel", e -> cancel(o, () -> reload())));
         }
         return row;
+    }
+
+    /// The order's documents, rendered by the server and previewed here.
+    private Container documents(final OrderDto o) {
+        Container row = new Container(new com.codename1.ui.layouts.FlowLayout());
+        row.setName("order-documents");
+        row.add(Ui.secondary(Lang.tr("Invoice"), "order-invoice", e -> Pdfs.open("Invoice",
+                "invoice-" + o.number() + ".pdf", path(o, "invoice.pdf"))));
+        row.add(Ui.secondary(Lang.tr("Packing slip"), "order-slip", e -> Pdfs.open("Packing slip",
+                "packing-slip-" + o.number() + ".pdf", path(o, "packing-slip.pdf"))));
+        if (o.refundedCents() > 0) {
+            row.add(Ui.secondary(Lang.tr("Credit notes"), "order-credit", e ->
+                    Api.orders().refunds(MerchantState.storeId(), o.id(), Net.to(list -> {
+                        if (list.isEmpty()) {
+                            Ui.say("No refunds yet");
+                            return;
+                        }
+                        Command[] items = new Command[list.size()];
+                        for (int iter = 0; iter < list.size(); iter++) {
+                            final RefundDto r = list.get(iter);
+                            items[iter] = Command.create(MerchantState.money(r.amountCents())
+                                    + Ui.DOT + MUi.when(r.createdAt()), null, ev -> Pdfs.open(
+                                    "Credit note", "credit-note-" + o.number() + ".pdf",
+                                    "/api/merchant/stores/" + MerchantState.storeId() + "/refunds/"
+                                    + r.id() + "/credit-note.pdf"));
+                        }
+                        com.codename1.ui.ContextMenu.show(row, row.getWidth() / 2, 0, items);
+                    }, Ui::fail))));
+        }
+        return row;
+    }
+
+    private static String path(OrderDto o, String file) {
+        return "/api/merchant/stores/" + MerchantState.storeId() + "/orders/" + o.id() + "/" + file;
+    }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        DesktopActions.set(DesktopActions.PRINT, () -> Pdfs.print("invoice-" + order.number()
+                + ".pdf", path(order, "invoice.pdf")));
+    }
+
+    @Override
+    protected void deinitialize() {
+        DesktopActions.clear(DesktopActions.PRINT);
+        super.deinitialize();
     }
 
     private void reload() {

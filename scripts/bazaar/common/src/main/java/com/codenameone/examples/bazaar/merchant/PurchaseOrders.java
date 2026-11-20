@@ -154,6 +154,9 @@ final class PurchaseOrders extends Container {
             buttons.add(Ui.danger(Lang.tr("Cancel order"), "po-cancel", e -> Api.inventory()
                     .cancelPurchaseOrder(MerchantState.storeId(), po.id(), Net.to(x -> done(), Ui::fail))));
         }
+        buttons.add(Ui.secondary(Lang.tr("PDF"), "po-pdf", e -> com.codenameone.examples.bazaar.docs
+                .Pdfs.open("Purchase order", "po-" + po.number() + ".pdf", "/api/merchant/stores/"
+                + MerchantState.storeId() + "/purchase-orders/" + po.id() + "/po.pdf")));
         page.add(buttons);
         pane.open("PO-" + po.number(), page);
     }
