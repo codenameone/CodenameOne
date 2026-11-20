@@ -50,6 +50,9 @@ import com.codenameone.examples.bazaar.domain.StoreStaff;
 import com.codenameone.examples.bazaar.domain.Tender;
 import com.codenameone.examples.bazaar.giftcard.GiftCards;
 import com.codenameone.examples.bazaar.inventory.Inventory;
+import com.codenameone.examples.bazaar.domain.Customer;
+import com.codenameone.examples.bazaar.events.StoreEvents;
+import com.codenameone.examples.bazaar.repository.CustomerRepository;
 import com.codenameone.examples.bazaar.live.LiveHub;
 import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.pricing.Money;
@@ -124,6 +127,8 @@ public class Orders {
     private final StoreAccess access;
     private final LiveHub live;
     private final Quoter quoter;
+    private final StoreEvents storeEvents;
+    private final CustomerRepository customers;
 
     public Orders(StoreOrderRepository orders, OrderLineRepository lines,
             OrderEventRepository events, TenderRepository tenders,
@@ -131,7 +136,7 @@ public class Orders {
             RefundLineRepository refundLines, PaymentRepository paymentRows,
             StoreRepository stores, StoreStaffRepository staff, Payments payments,
             Inventory inventory, GiftCards giftCards, StoreAccess access, LiveHub live,
-            Quoter quoter) {
+            Quoter quoter, StoreEvents storeEvents, CustomerRepository customers) {
         this.orders = orders;
         this.lines = lines;
         this.events = events;
@@ -148,6 +153,8 @@ public class Orders {
         this.access = access;
         this.live = live;
         this.quoter = quoter;
+        this.storeEvents = storeEvents;
+        this.customers = customers;
     }
 
     // -------------------------------------------------------------- shopper
@@ -296,6 +303,7 @@ public class Orders {
         }
         StoreOrder done = recordPaid(orderId, username);
         publish(done);
+        storeEvents.orderPaid(orderId);
         return detailOf(orderId);
     }
 
@@ -340,6 +348,7 @@ public class Orders {
         }
         StoreOrder done = finishCancel(order.getId(), refunded, actor);
         publish(done);
+        storeEvents.orderCancelled(order.getId());
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -382,6 +391,16 @@ public class Orders {
         order.setClosedAt(Instant.now());
         order.setUpdatedAt(Instant.now());
         orders.save(order);
+        // A cancelled order no longer counts toward the customer's orders and
+        // spend, so segments such as VIP see what the customer really bought.
+        Customer customer = order.getCustomerId().length() == 0 ? null
+                : customers.findById(order.getCustomerId());
+        if (customer != null) {
+            customer.setOrdersCount(Math.max(0, customer.getOrdersCount() - 1));
+            customer.setSpentCents(Math.max(0L, customer.getSpentCents() - order.getTotalCents()));
+            customer.setUpdatedAt(Instant.now());
+            customers.save(customer);
+        }
         event(orderId, "CANCELLED", "Order cancelled", actor);
         return order;
     }
@@ -401,6 +420,7 @@ public class Orders {
         if (Payments.PAID.equals(result)) {
             capturedTx(orderId, actor);
             publish(orders.findById(orderId));
+            storeEvents.orderPaid(orderId);
             return PAID;
         }
         if (Payments.FAILED.equals(result)) {
@@ -422,10 +442,15 @@ public class Orders {
     /// is the caller's to move ([Inventory#ship]).
     public StoreOrder recordFulfilled(String orderId, Map<String, Integer> shipped, String actor)
             throws IOException {
+        StoreOrder before = orders.findById(orderId);
+        boolean wasFulfilled = before != null && FULFILLED.equals(before.getFulfilment());
         fulfilledTx(orderId, shipped, actor);
         capturePayment(orderId, actor);
         StoreOrder order = orders.findById(orderId);
         publish(order);
+        if (!wasFulfilled && order != null && FULFILLED.equals(order.getFulfilment())) {
+            storeEvents.orderFulfilled(orderId);
+        }
         return order;
     }
 
@@ -516,6 +541,7 @@ public class Orders {
         }
         StoreOrder done = recordRefund(orderId, req, amount, username);
         publish(done);
+        storeEvents.refunded(orderId, amount);
         return new long[] {amount, cardPart, giftPart, amount - cardPart - giftPart};
     }
 
@@ -726,6 +752,7 @@ public class Orders {
         }
         StoreOrder done = convertedTx(orderId, held, username);
         publish(done);
+        storeEvents.orderPlaced(orderId);
         return detailOf(orderId);
     }
 

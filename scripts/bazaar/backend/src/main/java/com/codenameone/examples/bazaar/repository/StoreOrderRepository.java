@@ -26,6 +26,7 @@ import com.codename1.orm.repository.Modifying;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
 import java.util.List;
+import java.time.Instant;
 
 /// Reads and writes [StoreOrder] rows.
 @Repository(entity = StoreOrder.class, key = String.class)
@@ -55,4 +56,8 @@ public interface StoreOrderRepository extends CrudRepository<StoreOrder, String>
     @Modifying
     @Query("update StoreOrder o set o.financial = :to where o.id = :id and o.financial = :from")
     int claimFinancial(@Param("id") String id, @Param("from") String from, @Param("to") String to);
+
+    List<StoreOrder> findByStoreIdAndCreatedAtGreaterThanEqual(String storeId, Instant since);
+
+    List<StoreOrder> findByCreatedAtGreaterThanEqual(Instant since);
 }

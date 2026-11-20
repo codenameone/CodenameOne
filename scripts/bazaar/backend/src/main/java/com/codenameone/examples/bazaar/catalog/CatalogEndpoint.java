@@ -28,6 +28,7 @@ import com.codenameone.examples.bazaar.api.FacetsDto;
 import com.codenameone.examples.bazaar.api.PhotoDto;
 import com.codenameone.examples.bazaar.api.ProductDto;
 import com.codenameone.examples.bazaar.api.ProductPageDto;
+import com.codenameone.examples.bazaar.events.StoreEvents;
 
 import java.util.List;
 
@@ -36,9 +37,11 @@ import java.util.List;
 @Component
 public class CatalogEndpoint implements CatalogApiServer {
     private final Catalog catalog;
+    private final StoreEvents storeEvents;
 
-    public CatalogEndpoint(Catalog catalog) {
+    public CatalogEndpoint(Catalog catalog, StoreEvents storeEvents) {
         this.catalog = catalog;
+        this.storeEvents = storeEvents;
     }
 
     @Override
@@ -92,7 +95,9 @@ public class CatalogEndpoint implements CatalogApiServer {
     @Override
     public ProductDto updateProduct(String storeId, String productId, ProductDto product)
             throws Exception {
-        return catalog.update(Caller.name(), storeId, productId, product);
+        ProductDto saved = catalog.update(Caller.name(), storeId, productId, product);
+        storeEvents.productUpdated(storeId, productId);
+        return saved;
     }
 
     @Override

@@ -28,4 +28,6 @@ import java.util.List;
 @Repository(entity = AuditEvent.class, key = String.class)
 public interface AuditEventRepository extends CrudRepository<AuditEvent, String> {
     List<AuditEvent> findByStoreIdOrderByCreatedAtDesc(String storeId);
+
+    List<AuditEvent> findByStoreIdAndSubjectOrderByCreatedAtDesc(String storeId, String subject);
 }

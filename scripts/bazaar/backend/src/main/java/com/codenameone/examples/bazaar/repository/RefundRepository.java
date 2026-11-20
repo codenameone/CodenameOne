@@ -28,4 +28,6 @@ import java.util.List;
 @Repository(entity = Refund.class, key = String.class)
 public interface RefundRepository extends CrudRepository<Refund, String> {
     List<Refund> findByOrderId(String orderId);
+
+    List<Refund> findByOrderIdIn(List<String> orderIds);
 }

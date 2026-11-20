@@ -28,4 +28,6 @@ import java.util.List;
 @Repository(entity = PurchaseLine.class, key = String.class)
 public interface PurchaseLineRepository extends CrudRepository<PurchaseLine, String> {
     List<PurchaseLine> findByPurchaseOrderId(String purchaseOrderId);
+
+    List<PurchaseLine> findByVariantId(String variantId);
 }

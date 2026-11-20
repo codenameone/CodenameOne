@@ -65,6 +65,7 @@ import com.codenameone.examples.bazaar.repository.TaxRateRepository;
 import com.codenameone.examples.bazaar.repository.TenderRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
 import com.codenameone.examples.bazaar.store.StoreAccess;
+import com.codenameone.examples.bazaar.events.StoreEvents;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -119,6 +120,7 @@ public class PosSales {
     private final Inventory inventory;
     private final GiftCards giftCards;
     private final Payments payments;
+    private final StoreEvents storeEvents;
 
     public PosSales(Pos pos, StoreAccess access, StoreRepository stores,
             VariantRepository variants, ProductRepository products, TaxRateRepository taxes,
@@ -127,7 +129,7 @@ public class PosSales {
             StoreOrderRepository orderRows, OrderLineRepository lineRows,
             TenderRepository tenders, ShiftRepository shifts, AuditEventRepository audits,
             Quoter quoter, Orders orders, Inventory inventory, GiftCards giftCards,
-            Payments payments) {
+            Payments payments, StoreEvents storeEvents) {
         this.pos = pos;
         this.access = access;
         this.stores = stores;
@@ -148,6 +150,7 @@ public class PosSales {
         this.inventory = inventory;
         this.giftCards = giftCards;
         this.payments = payments;
+        this.storeEvents = storeEvents;
     }
 
     /// Records a batch; one result per sale, in the order sent. A sale that
@@ -259,6 +262,7 @@ public class PosSales {
             throw new ResponseStatusException(409, "The sale is being recorded; send it again");
         }
         orders.publish(placed);
+        storeEvents.orderPlaced(placed.getId());
         return new PosSaleResultDto(sale.clientId(), OK, placed.getId(), placed.getNumber(),
                 placed.getTotalCents(), plan.changeCents, plan.oversold,
                 plan.oversold ? "Sold more than the location had: " + join(plan.oversoldSkus)

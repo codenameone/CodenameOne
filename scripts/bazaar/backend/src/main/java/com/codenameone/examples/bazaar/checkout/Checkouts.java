@@ -34,6 +34,7 @@ import com.codenameone.examples.bazaar.domain.Customer;
 import com.codenameone.examples.bazaar.domain.Discount;
 import com.codenameone.examples.bazaar.domain.DiscountUse;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
+import com.codenameone.examples.bazaar.events.StoreEvents;
 import com.codenameone.examples.bazaar.giftcard.GiftCards;
 import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.order.Orders;
@@ -84,11 +85,12 @@ public class Checkouts {
     private final DiscountUseRepository uses;
     private final CustomerRepository customers;
     private final StoreOrderRepository orderRows;
+    private final StoreEvents storeEvents;
 
     public Checkouts(Carts carts, Quoter quoter, Inventory inventory, Orders orders,
             Payments payments, GiftCards giftCards, DiscountRepository discounts,
             DiscountUseRepository uses, CustomerRepository customers,
-            StoreOrderRepository orderRows) {
+            StoreOrderRepository orderRows, StoreEvents storeEvents) {
         this.carts = carts;
         this.quoter = quoter;
         this.inventory = inventory;
@@ -99,6 +101,7 @@ public class Checkouts {
         this.uses = uses;
         this.customers = customers;
         this.orderRows = orderRows;
+        this.storeEvents = storeEvents;
     }
 
     /// The `client_id` an idempotency key becomes: per shopper, so two
@@ -218,6 +221,7 @@ public class Checkouts {
         StoreOrder done = finish(orderId, quote, due, reference, username);
         carts.clear(cart.getId());
         orders.publish(done);
+        storeEvents.orderPlaced(orderId);
         return orders.detailOf(orderId);
     }
 

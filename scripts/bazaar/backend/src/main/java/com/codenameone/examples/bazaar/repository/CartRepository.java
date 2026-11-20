@@ -21,8 +21,12 @@ package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
+import com.codename1.orm.repository.Query;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Modifying;
 import com.codenameone.examples.bazaar.domain.Cart;
 import java.util.List;
+import java.time.Instant;
 
 /// Reads and writes [Cart] rows.
 @Repository(entity = Cart.class, key = String.class)
@@ -32,4 +36,14 @@ public interface CartRepository extends CrudRepository<Cart, String> {
     Cart findByStoreIdAndUsername(String storeId, String username);
 
     List<Cart> findByStoreIdOrderByUpdatedAtDesc(String storeId);
+
+    List<Cart> findByStoreIdAndCreatedAtGreaterThanEqual(String storeId, Instant since);
+
+    /// Carts nobody has been reminded of, idle since before `before`.
+    List<Cart> findByReminderSentAtAndUpdatedAtLessThan(Instant never, Instant before);
+
+    /// Marks a cart reminded, once: answers 1 for the caller that did it.
+    @Modifying(clearAutomatically = true)
+    @Query("update Cart c set c.reminderSentAt = :at where c.id = :id and c.reminderSentAt = :never")
+    int claimReminder(@Param("id") String id, @Param("never") Instant never, @Param("at") Instant at);
 }

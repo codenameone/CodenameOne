@@ -225,6 +225,7 @@ public class DemoStores {
     private final Accounts accounts;
     private final PasswordEncoder encoder;
     private final com.codenameone.examples.bazaar.pricing.DemoPricing pricing;
+    private final com.codenameone.examples.bazaar.automation.Automations automations;
 
     public DemoStores(StoreRepository stores, StoreStaffRepository staff,
             LocationRepository locations, ProductRepository products,
@@ -233,8 +234,10 @@ public class DemoStores {
             CollectionRepository collections, CollectionProductRepository members,
             SupplierRepository suppliers, PurchaseOrderRepository orders,
             PurchaseLineRepository orderLines, Accounts accounts, PasswordEncoder encoder,
-            com.codenameone.examples.bazaar.pricing.DemoPricing pricing) {
+            com.codenameone.examples.bazaar.pricing.DemoPricing pricing,
+            com.codenameone.examples.bazaar.automation.Automations automations) {
         this.pricing = pricing;
+        this.automations = automations;
         this.stores = stores;
         this.staff = staff;
         this.locations = locations;
@@ -268,11 +271,13 @@ public class DemoStores {
         accounts.setMerchant(cashier, true);
     }
 
-    /// Shipping zones, taxes and the demo discount codes, once per store.
+    /// Shipping zones, taxes, the demo discount codes and the demo
+    /// automations, once per store.
     private void seedPricing(String handle) throws IOException {
         Store store = stores.findByHandle(handle);
         if (store != null) {
             pricing.seed(store.getId());
+            automations.seedDemo(store.getId());
         }
     }
 
