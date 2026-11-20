@@ -28,4 +28,6 @@ import java.util.List;
 @Repository(entity = Location.class, key = String.class)
 public interface LocationRepository extends CrudRepository<Location, String> {
     List<Location> findByStoreIdOrderByPositionAsc(String storeId);
+
+    long countByStoreId(String storeId);
 }

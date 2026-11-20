@@ -28,4 +28,6 @@ import java.util.List;
 @Repository(entity = GiftCardTx.class, key = String.class)
 public interface GiftCardTxRepository extends CrudRepository<GiftCardTx, String> {
     List<GiftCardTx> findByGiftCardIdOrderByCreatedAtAsc(String giftCardId);
+
+    List<GiftCardTx> findByOrderId(String orderId);
 }

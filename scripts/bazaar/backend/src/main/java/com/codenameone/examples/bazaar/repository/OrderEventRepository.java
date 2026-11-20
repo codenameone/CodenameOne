@@ -28,4 +28,6 @@ import java.util.List;
 @Repository(entity = OrderEvent.class, key = String.class)
 public interface OrderEventRepository extends CrudRepository<OrderEvent, String> {
     List<OrderEvent> findByOrderIdOrderByCreatedAtAsc(String orderId);
+
+    void deleteByOrderId(String orderId);
 }

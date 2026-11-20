@@ -28,4 +28,8 @@ import java.util.List;
 @Repository(entity = PurchaseOrder.class, key = String.class)
 public interface PurchaseOrderRepository extends CrudRepository<PurchaseOrder, String> {
     List<PurchaseOrder> findByStoreIdOrderByCreatedAtDesc(String storeId);
+
+    long countByStoreId(String storeId);
+
+    List<PurchaseOrder> findBySupplierId(String supplierId);
 }

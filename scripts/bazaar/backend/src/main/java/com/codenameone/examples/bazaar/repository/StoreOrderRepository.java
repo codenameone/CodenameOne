@@ -20,6 +20,9 @@
 package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Query;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Modifying;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
 import java.util.List;
@@ -40,4 +43,16 @@ public interface StoreOrderRepository extends CrudRepository<StoreOrder, String>
     List<StoreOrder> findByShiftId(String shiftId);
 
     long countByStoreId(String storeId);
+
+    StoreOrder findFirstByStoreIdOrderByNumberDesc(String storeId);
+
+    /// Moves an order from one status to another; 1 for the one caller that did.
+    @Modifying
+    @Query("update StoreOrder o set o.status = :to where o.id = :id and o.status = :from")
+    int claimStatus(@Param("id") String id, @Param("from") String from, @Param("to") String to);
+
+    /// Moves an order's financial status; 1 for the one caller that did.
+    @Modifying
+    @Query("update StoreOrder o set o.financial = :to where o.id = :id and o.financial = :from")
+    int claimFinancial(@Param("id") String id, @Param("from") String from, @Param("to") String to);
 }

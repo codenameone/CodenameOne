@@ -30,4 +30,8 @@ public interface ShippingRateRepository extends CrudRepository<ShippingRate, Str
     List<ShippingRate> findByZoneIdOrderByPositionAsc(String zoneId);
 
     List<ShippingRate> findByStoreId(String storeId);
+
+    List<ShippingRate> findByStoreIdOrderByPositionAsc(String storeId);
+
+    void deleteByZoneId(String zoneId);
 }

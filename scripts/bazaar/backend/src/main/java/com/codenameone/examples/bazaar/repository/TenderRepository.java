@@ -28,4 +28,6 @@ import java.util.List;
 @Repository(entity = Tender.class, key = String.class)
 public interface TenderRepository extends CrudRepository<Tender, String> {
     List<Tender> findByOrderId(String orderId);
+
+    void deleteByOrderId(String orderId);
 }

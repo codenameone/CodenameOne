@@ -32,4 +32,6 @@ public interface StoreStaffRepository extends CrudRepository<StoreStaff, String>
     List<StoreStaff> findByUsername(String username);
 
     StoreStaff findByStoreIdAndUsername(String storeId, String username);
+
+    List<StoreStaff> findByStoreId(String storeId);
 }

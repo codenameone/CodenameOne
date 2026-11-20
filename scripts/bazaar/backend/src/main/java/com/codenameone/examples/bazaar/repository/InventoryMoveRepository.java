@@ -20,6 +20,7 @@
 package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.PageRequest;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.InventoryMove;
 import java.util.List;
@@ -30,4 +31,12 @@ public interface InventoryMoveRepository extends CrudRepository<InventoryMove, S
     List<InventoryMove> findByVariantIdOrderByCreatedAtDesc(String variantId);
 
     List<InventoryMove> findByStoreIdOrderByCreatedAtDesc(String storeId);
+
+    List<InventoryMove> findByStoreIdOrderByCreatedAtDesc(String storeId, PageRequest page);
+
+    List<InventoryMove> findByVariantIdAndLocationId(String variantId, String locationId);
+
+    List<InventoryMove> findByStoreId(String storeId);
+
+    boolean existsByLocationId(String locationId);
 }

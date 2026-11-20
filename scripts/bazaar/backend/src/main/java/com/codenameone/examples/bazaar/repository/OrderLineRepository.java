@@ -30,4 +30,6 @@ public interface OrderLineRepository extends CrudRepository<OrderLine, String> {
     List<OrderLine> findByOrderId(String orderId);
 
     List<OrderLine> findByOrderIdIn(List<String> orderIds);
+
+    void deleteByOrderId(String orderId);
 }

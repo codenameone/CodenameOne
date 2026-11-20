@@ -29,6 +29,7 @@ import com.codenameone.examples.bazaar.api.PaymentSetupDto;
 import com.codenameone.examples.bazaar.domain.Profile;
 import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.repository.ProfileRepository;
+import com.codenameone.examples.bazaar.store.DemoStores;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -65,11 +66,12 @@ public class DemoAccounts {
     private final Payments payments;
     private final ProfileRepository profiles;
     private final Config config;
+    private final DemoStores demoStores;
     private final String adminEmail;
     private final String adminPassword;
 
     public DemoAccounts(Accounts accounts, Moderation moderation, Payments payments,
-            ProfileRepository profiles, Config config,
+            ProfileRepository profiles, Config config, DemoStores demoStores,
             @Value("${bazaar.admin.email:}") String adminEmail,
             @Value("${bazaar.admin.password:}") String adminPassword) {
         this.accounts = accounts;
@@ -77,6 +79,7 @@ public class DemoAccounts {
         this.payments = payments;
         this.profiles = profiles;
         this.config = config;
+        this.demoStores = demoStores;
         this.adminEmail = adminEmail;
         this.adminPassword = adminPassword;
     }
@@ -108,6 +111,8 @@ public class DemoAccounts {
         if (flag) {
             flag(FLAGGED_CUSTOMER, "Three chargebacks in one week", 3);
         }
+        // The stores the owner and the cashier work at, with their catalogs.
+        demoStores.seed(MERCHANT, CASHIER);
     }
 
     /// Marks an account as one the admins flagged some days ago, with the

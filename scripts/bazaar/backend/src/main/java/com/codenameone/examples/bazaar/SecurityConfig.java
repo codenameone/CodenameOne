@@ -136,6 +136,15 @@ public class SecurityConfig {
             // Every card setup is a session made at the payment processor.
             // `Payments` caps how many an account has open; this caps how
             // often it may start one, so abandoning setups in a loop is slow.
+            // A gift card's code is its money. Looking one up, or putting
+            // one on a cart, answers whether a code exists, so both are slow
+            // enough that guessing 16 characters from 32 is hopeless.
+            .rateLimit("/api/shop/gift-cards/**",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(10, 60))
+            .rateLimit("/api/shop/cart/*/gift-card",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(10, 60))
             .rateLimit("/api/payments/methods/setup",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(30, 3600))
@@ -143,6 +152,13 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/account/register")).permitAll()
+                    // The storefront: stores, products and pictures anyone may
+                    // browse. Only reads, and only what is ACTIVE.
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("GET",
+                            "/api/shop/**")).permitAll()
+                    // A cart is usable before signing in: a guest's is found
+                    // by the token its first answer carried.
+                    .requestMatchers("/api/shop/cart/**").permitAll()
                     .requestMatchers("/api/admin/**").hasRole(Roles.ADMIN)
                     .requestMatchers("/api/merchant/**").hasRole(Roles.MERCHANT)
                     .anyRequest().authenticated())

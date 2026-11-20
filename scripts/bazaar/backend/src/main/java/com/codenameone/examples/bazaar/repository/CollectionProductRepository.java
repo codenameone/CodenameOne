@@ -32,4 +32,6 @@ public interface CollectionProductRepository extends CrudRepository<CollectionPr
     List<CollectionProduct> findByProductId(String productId);
 
     int deleteByCollectionId(String collectionId);
+
+    int deleteByProductId(String productId);
 }

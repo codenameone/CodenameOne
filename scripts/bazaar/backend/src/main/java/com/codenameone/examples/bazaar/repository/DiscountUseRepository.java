@@ -21,10 +21,15 @@ package com.codenameone.examples.bazaar.repository;
 
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
+import java.util.List;
 import com.codenameone.examples.bazaar.domain.DiscountUse;
 
 /// Reads and writes [DiscountUse] rows.
 @Repository(entity = DiscountUse.class, key = String.class)
 public interface DiscountUseRepository extends CrudRepository<DiscountUse, String> {
     long countByDiscountIdAndUsername(String discountId, String username);
+
+    List<DiscountUse> findByOrderId(String orderId);
+
+    void deleteByOrderId(String orderId);
 }
