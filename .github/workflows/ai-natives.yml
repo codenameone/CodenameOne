@@ -23,6 +23,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Build xcframeworks
         run: |
           scripts/ai-natives/build.sh whisper ios "$RUNNER_TEMP/repo"
@@ -41,6 +43,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - uses: gradle/actions/setup-gradle@v4
       - name: Install NDK
         run: yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" > /dev/null
@@ -64,6 +68,8 @@ jobs:
       R2_BUCKET: ${{ vars.R2_BUCKET }}
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - uses: actions/download-artifact@v4
         with:
           pattern: ai-natives-*

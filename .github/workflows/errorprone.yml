@@ -76,6 +76,9 @@ jobs:
           java-version: 17
           cache: maven
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install errorprone-checks
         working-directory: maven
         # The checker module must be installed to the local repo BEFORE

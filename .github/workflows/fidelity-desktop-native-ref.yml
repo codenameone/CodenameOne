@@ -70,6 +70,8 @@ jobs:
       NATIVEREF_MODE: ${{ inputs.mode }}
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Install the GTK4 / libadwaita stack
         run: |
           scripts/ci/apt-get-install.sh \
@@ -100,6 +102,8 @@ jobs:
       NATIVEREF_MODE: ${{ inputs.mode }}
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
@@ -135,6 +139,8 @@ jobs:
       NATIVEREF_MODE: ${{ inputs.mode }}
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Capture
         run: scripts/build-macos-native-ref.sh
       - name: Report the environment this run saw

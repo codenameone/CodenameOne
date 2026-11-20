@@ -68,6 +68,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Link cn1-binaries
         run: ln -s /opt/cn1-binaries ../cn1-binaries
 
@@ -126,6 +129,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Set up CPython
         uses: actions/setup-python@v5
         with:
@@ -168,6 +174,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install clang
         run: |
           bash scripts/ci/apt-get-update.sh
@@ -180,6 +189,9 @@ jobs:
           distribution: zulu
           java-version: '8'
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Remember JDK 8
         run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
@@ -188,6 +200,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Remember JDK 17
         run: echo "JAVA17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"

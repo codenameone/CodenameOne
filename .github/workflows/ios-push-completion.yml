@@ -38,5 +38,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Compile, link, and exercise push completion with push enabled and disabled
         run: python3 scripts/ios/push-completion-tests/check.py

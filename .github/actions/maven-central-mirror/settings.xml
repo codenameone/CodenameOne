@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maven settings every CI job installs as ~/.m2/settings.xml (see action.yml beside it).
+
+  Maven Central throttles GitHub's runners, and not always with a 429: CI has seen it
+  answer "not found" for artifacts that exist (maven-resources-plugin 2.6 and
+  maven-install-plugin 3.2.0, each within 250 ms), presumably while throttling. The
+  resolver treats a 404 as final, so retry configuration does not help. Google's copy of Central is not rate limited.
+
+  This is deliberately NOT a <mirror>: a mirror replaces Central, with no way back if the
+  copy lacks something (a release from the last few minutes). Repositories declared in an
+  active settings profile are searched BEFORE the POM's repositories and the super POM's
+  central, and a failure on one repository moves on to the next. So Google answers almost
+  everything, Central is the fallback, and repo.codenameone.com and any other repository a
+  POM names are left exactly as they were.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+  <profiles>
+    <profile>
+      <id>cn1-ci-central-mirror</id>
+      <repositories>
+        <repository>
+          <id>google-maven-central</id>
+          <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>google-maven-central</id>
+          <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>false</enabled></snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>cn1-ci-central-mirror</activeProfile>
+  </activeProfiles>
+</settings>

@@ -81,6 +81,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-m2
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Prepare Codename One binaries
         # The JavaSE port needs jfxrt.jar from cn1-binaries; without it the
         # build fails with a large, misleading set of missing javafx.* errors.

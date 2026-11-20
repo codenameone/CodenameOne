@@ -64,6 +64,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install LLVM cross toolchain + CMake/Ninja
         run: |
           bash scripts/ci/apt-get-update.sh
@@ -93,18 +96,27 @@ jobs:
       - name: Set up JDK 8
         uses: actions/setup-java@v5
         with: { distribution: 'temurin', java-version: '8' }
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up JDK 11
         uses: actions/setup-java@v5
         with: { distribution: 'temurin', java-version: '11' }
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "JDK_11_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with: { distribution: 'temurin', java-version: '17' }
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Restore JDK 8 as the active JDK
         uses: actions/setup-java@v5
         with: { distribution: 'temurin', java-version: '8' }
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Install xwin + lay out the Windows SDK (x64 + arm64)
         env:

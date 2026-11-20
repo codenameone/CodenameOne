@@ -78,6 +78,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Select JDK 8
         run: |
           echo "JAVA_HOME=${JAVA_HOME_8}" >> "$GITHUB_ENV"
@@ -265,6 +268,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Show Xcode toolchain
         run: |

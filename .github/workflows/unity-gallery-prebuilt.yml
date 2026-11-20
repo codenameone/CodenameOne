@@ -85,6 +85,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - if: steps.pack.outputs.cache-hit != 'true'
         run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up JDK 8
@@ -94,6 +96,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set up .NET
         if: steps.pack.outputs.cache-hit != 'true'
         uses: actions/setup-dotnet@v4
