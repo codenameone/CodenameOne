@@ -1,0 +1,14 @@
+<!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
+<!-- cn1:model cart com.codenameone.examples.bazaar.web.CartView -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<main class="wrap"><h1>Your cart</h1>
+<ul class="problems" th:unless="${cart.problems.empty}"><li th:each="m : ${cart.problems}" th:text="${m}">Problem</li></ul>
+<div class="empty-state" th:if="${cart.empty}"><p>Your cart is empty.</p><a class="button" th:href="${page.home}">Keep shopping</a></div>
+<table class="lines" th:unless="${cart.empty}"><thead><tr><th>Item</th><th>Quantity</th><th>Total</th><th><span class="sr">Remove</span></th></tr></thead><tbody>
+<tr th:each="l : ${cart.lines}" th:classappend="${l.available ? '' : 'gone'}"><td><a th:href="${l.url}" th:text="${l.title}">Item</a> <span class="variant" th:unless="${l.variant.empty}" th:text="${l.variant}">Variant</span> <span class="unit" th:text="${l.unit}">$1</span></td>
+<td><form method="post" th:action="${page.cartUrl + '/update'}"><input type="hidden" name="lineId" th:value="${l.id}"><input name="quantity" type="number" min="0" max="99" aria-label="Quantity" th:value="${l.quantity}"><button class="quiet" type="submit">Update</button></form></td>
+<td th:text="${l.total}">$1</td><td><form method="post" th:action="${page.cartUrl + '/remove'}"><input type="hidden" name="lineId" th:value="${l.id}"><button class="quiet" type="submit">Remove</button></form></td></tr></tbody></table>
+<dl class="totals" th:unless="${cart.empty}"><dt>Subtotal</dt><dd th:text="${cart.subtotal}">$1</dd><dt th:unless="${cart.discount.empty}">Discount</dt><dd th:unless="${cart.discount.empty}" th:text="${cart.discount}">-$1</dd><dt th:text="${cart.taxInclusive ? 'Tax included' : 'Tax'}">Tax</dt><dd th:text="${cart.tax}">$0</dd><dt>Total</dt><dd class="total" th:text="${cart.total}">$1</dd></dl>
+<a class="button checkout" th:unless="${cart.empty}" th:href="${cart.checkoutUrl}">Check out</a></main>
+<footer th:replace="~{layout :: footer}"></footer></body></html>

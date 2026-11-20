@@ -32,7 +32,9 @@ import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.pricing.DemoPricing;
 import com.codenameone.examples.bazaar.repository.AuditEventRepository;
+import com.codenameone.examples.bazaar.domain.OrderEvent;
 import com.codenameone.examples.bazaar.repository.GiftCardRepository;
+import com.codenameone.examples.bazaar.repository.OrderEventRepository;
 import com.codenameone.examples.bazaar.repository.PaymentRepository;
 import com.codenameone.examples.bazaar.store.Stores;
 import org.junit.jupiter.api.Test;
@@ -74,6 +76,8 @@ class PosTest {
     private PaymentRepository paymentRows;
     @Autowired
     private AuditEventRepository audits;
+    @Autowired
+    private OrderEventRepository orderEvents;
 
     /// A shop with a register at its location, taxed as New York (4%), and a
     /// shift open on it with a $100 float.
@@ -309,5 +313,65 @@ class PosTest {
         assertEquals(1040, Rest.number(back, "cashCents"));
         // 10000 + 2080 sale - 1040 refund.
         assertEquals(11040, Rest.number(t.shift(), "expectedCents"));
+    }
+
+    private static String card(long cents) {
+        return "{\"kind\":\"CARD\",\"amountCents\":" + cents + ",\"reference\":\"T1\"}";
+    }
+
+    private String eventKinds(Map result) {
+        StringBuilder out = new StringBuilder();
+        for (OrderEvent e : orderEvents.findByOrderIdOrderByCreatedAtAsc((String) result.get("orderId"))) {
+            out.append(e.getKind()).append(' ');
+        }
+        return out.toString();
+    }
+
+    @Test
+    void theToleranceIsAUnitOrOnePercent() {
+        assertEquals(100, com.codenameone.examples.bazaar.pos.PosSales.tolerance(1040));
+        assertEquals(100, com.codenameone.examples.bazaar.pos.PosSales.tolerance(0));
+        assertEquals(250, com.codenameone.examples.bazaar.pos.PosSales.tolerance(25000));
+    }
+
+    @Test
+    void aCardChargedAStaleTotalIsAcceptedAndNoted() throws Exception {
+        Till t = new Till("pos-stale-tax", 10);
+        // The register still had 5% tax: it charged $10.50 for a $10.40 sale.
+        Map r = (Map) t.sync(t.sale("stale", 1, card(1050))).get(0);
+        assertEquals("OK", r.get("status"), String.valueOf(r.get("message")));
+        assertEquals(1040, Rest.number(r, "totalCents"));
+        assertTrue(eventKinds(r).contains("TOTAL_ADJUSTED"), eventKinds(r));
+        assertTrue(String.valueOf(r.get("message")).contains("10 cents"));
+        assertEquals(1050, Rest.number(t.shift(), "cardSalesCents"));
+    }
+
+    @Test
+    void aCardFarPastTheTotalIsAcceptedAsAnOverTender() throws Exception {
+        Till t = new Till("pos-over", 10);
+        Map r = (Map) t.sync(t.sale("over", 1, card(5000))).get(0);
+        assertEquals("OK", r.get("status"), String.valueOf(r.get("message")));
+        assertEquals(1040, Rest.number(r, "totalCents"));
+        assertTrue(eventKinds(r).contains("OVER_TENDERED"), eventKinds(r));
+    }
+
+    @Test
+    void aShortfallWithinRoundingIsAcceptedButAnUnpaidSaleIsNot() throws Exception {
+        Till t = new Till("pos-short", 10);
+        // The register had no tax: $10.00 for a $10.40 sale, 40 cents short.
+        Map r = (Map) t.sync(t.sale("short", 1, card(1000))).get(0);
+        assertEquals("OK", r.get("status"), String.valueOf(r.get("message")));
+        assertTrue(eventKinds(r).contains("TOTAL_ADJUSTED"), eventKinds(r));
+        Map refused = (Map) t.sync(t.sale("unpaid", 2, card(1000))).get(0);
+        assertEquals("ERROR", refused.get("status"));
+        assertFalse(String.valueOf(refused.get("message")).isEmpty());
+    }
+
+    @Test
+    void cashAfterAnOverpayingCardIsAllChange() throws Exception {
+        Till t = new Till("pos-over-cash", 10);
+        Map r = (Map) t.sync(t.sale("oc", 1, card(1100) + "," + cash(500))).get(0);
+        assertEquals("OK", r.get("status"), String.valueOf(r.get("message")));
+        assertEquals(500, Rest.number(r, "changeCents"));
     }
 }

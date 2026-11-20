@@ -1,0 +1,9 @@
+<!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
+<!-- cn1:model stores java.util.List<com.codenameone.examples.bazaar.web.StoreCard> -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<main class="wrap"><h1>Independent shops</h1><p class="lede">Every store on Bazaar, in one place.</p>
+<ul class="grid"><li class="card" th:each="s : ${stores}"><a th:href="${s.url}"><div class="art"><img th:if="${s.art.photo}" th:src="${s.art.url}" th:attr="alt=${s.name}" loading="lazy"><svg th:unless="${s.art.photo}" viewBox="0 0 400 300" role="img" th:attr="aria-label=${s.name}"><defs><linearGradient x1="0" y1="0" x2="1" y2="1" th:attr="id=${s.art.gid}"><stop offset="0" th:attr="stop-color=${s.art.from}"></stop><stop offset="1" th:attr="stop-color=${s.art.to}"></stop></linearGradient></defs><rect width="400" height="300" th:attr="fill=${s.art.fill}"></rect><text x="200" y="180" text-anchor="middle" th:text="${s.art.initials}">B</text></svg></div>
+<h2 th:text="${s.name}">Store</h2><p th:text="${s.tagline}">Tagline</p></a></li></ul>
+<p class="empty-state" th:if="${stores.empty}">No shops are open yet.</p></main>
+<footer th:replace="~{layout :: footer}"></footer></body></html>

@@ -1,0 +1,23 @@
+<!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:fragment="head"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title th:text="${page.title}">Bazaar</title>
+<meta name="description" th:attr="content=${page.description}">
+<meta name="robots" content="noindex" th:if="${page.noindex}">
+<meta property="og:type" th:attr="content=${page.type}">
+<meta property="og:title" th:attr="content=${page.title}">
+<meta property="og:description" th:attr="content=${page.description}">
+<meta property="og:url" th:attr="content=${page.canonical}">
+<meta property="og:site_name" th:attr="content=${page.brand}">
+<meta property="og:image" th:unless="${page.image.empty}" th:attr="content=${page.image}">
+<meta name="twitter:card" th:attr="content=${page.image.empty ? 'summary' : 'summary_large_image'}">
+<meta name="twitter:title" th:attr="content=${page.title}">
+<meta name="twitter:description" th:attr="content=${page.description}">
+<meta name="twitter:image" th:unless="${page.image.empty}" th:attr="content=${page.image}">
+<meta name="theme-color" th:attr="content=${page.accent}">
+<link rel="stylesheet" href="/static/storefront.css"><script src="/static/storefront.js" defer></script></head>
+<body><header th:fragment="header" class="bar"><div class="bar-in"><a class="brand" th:href="${page.home}" th:text="${page.brand}">Bazaar</a>
+<form class="search" method="get" role="search" th:unless="${page.searchUrl.empty}" th:action="${page.searchUrl}"><input type="search" name="q" placeholder="Search" aria-label="Search" th:value="${page.query}"></form>
+<a class="cart-link" th:unless="${page.cartUrl.empty}" th:href="${page.cartUrl}">Cart</a></div>
+<div id="structured-data" hidden th:unless="${page.jsonLd.empty}" th:attr="data-ld=${page.jsonLd}"></div></header>
+<footer th:fragment="footer" class="foot"><div class="wrap"><a href="/">Bazaar</a> <span>Independent shops, one checkout.</span></div></footer></body></html>

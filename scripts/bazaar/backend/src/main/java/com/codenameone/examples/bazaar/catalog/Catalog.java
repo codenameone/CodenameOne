@@ -243,6 +243,23 @@ public class Catalog {
         return page(snapshot, search);
     }
 
+    /// A page of an active store's active products for the server-rendered
+    /// storefront: the same search the app's catalog runs, from plain values.
+    ///
+    /// @param handle the store's handle
+    /// @param collection a published collection's handle, or null for all
+    /// @param q the words to match, or null
+    /// @param sort `relevance`, `title`, `newest`, `price`, `-price` or `rating`
+    /// @param page the zero-based page
+    /// @param size the page size, 1 to 100
+    /// @return the page
+    @Transactional(readOnly = true)
+    public ProductPageDto browse(String handle, String collection, String q, String sort,
+            int page, int size) throws IOException {
+        return products(handle, collection, Search.of(q, null, null, null, null, null, sort,
+                Integer.toString(page), Integer.toString(size)));
+    }
+
     @Transactional(readOnly = true)
     public FacetsDto facets(String handle, String collection, Search search) throws IOException {
         Store store = storeService.activeStore(handle);
@@ -361,6 +378,18 @@ public class Catalog {
             throw new ResponseStatusException(404, "No such photo");
         }
         return new PhotoDto(photo.getId(), photo.getContentType(), Base64.encode(photo.getData()));
+    }
+
+    /// A stored picture of an active store, as stored; 404 for anything else.
+    /// The storefront's pages point `<img>` at it, which a JSON answer cannot be.
+    @Transactional(readOnly = true)
+    public Photo publicPhoto(String photoId) throws IOException {
+        Photo photo = photoId == null || photoId.length() > 32 ? null : photos.findById(photoId);
+        Store owner = photo == null ? null : stores.findById(photo.getOwnerId());
+        if (owner == null || !Stores.ACTIVE.equals(owner.getStatus())) {
+            throw new ResponseStatusException(404, "No such photo");
+        }
+        return photo;
     }
 
     // -------------------------------------------------------------- merchant

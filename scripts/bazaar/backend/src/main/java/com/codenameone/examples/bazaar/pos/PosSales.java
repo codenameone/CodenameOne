@@ -205,7 +205,20 @@ public class PosSales {
         long cashCents;
         long changeCents;
         boolean oversold;
+        /// What the card, gift card and credit paid past this server's total.
+        long overCents;
+        /// What the tenders fell short of this server's total, within tolerance().
+        long shortCents;
         final List<String> oversoldSkus = new ArrayList<String>();
+    }
+
+    /// How far a register's total may fall short of this server's before the
+    /// sale is refused: the larger of one currency unit (100 minor units) and
+    /// 1% of the total. A stale tax rate or a rounding rule applied per line
+    /// rather than per sale moves a total by cents, not by more than a
+    /// percent; anything larger is a sale that was not paid for.
+    public static long tolerance(long totalCents) {
+        return Math.max(100L, Math.max(0L, totalCents) / 100L);
     }
 
     private PosSaleResultDto sale(String username, String storeId, Register register,
@@ -265,8 +278,20 @@ public class PosSales {
         storeEvents.orderPlaced(placed.getId());
         return new PosSaleResultDto(sale.clientId(), OK, placed.getId(), placed.getNumber(),
                 placed.getTotalCents(), plan.changeCents, plan.oversold,
-                plan.oversold ? "Sold more than the location had: " + join(plan.oversoldSkus)
-                        : "");
+                message(plan));
+    }
+
+    private static String message(Plan plan) {
+        StringBuilder out = new StringBuilder();
+        if (plan.oversold) {
+            out.append("Sold more than the location had: ").append(join(plan.oversoldSkus));
+        }
+        if (plan.overCents > 0 || plan.shortCents > 0) {
+            out.append(out.length() > 0 ? ". " : "").append("Total adjusted to the server's by ")
+                    .append(plan.overCents > 0 ? plan.overCents : -plan.shortCents)
+                    .append(" cents");
+        }
+        return out.toString();
     }
 
     private static PosSaleResultDto duplicate(PosSaleDto sale, StoreOrder order) {
@@ -426,17 +451,25 @@ public class PosSales {
                 throw new ResponseStatusException(400, "A tender is CASH, CARD, GIFT_CARD or STORE_CREDIT");
             }
         }
+        // The register priced the sale with its own copy of the tax rates and
+        // discounts, possibly offline and possibly stale, and the card was
+        // charged that total on the terminal before this server saw it. The
+        // sale happened: a card, gift card or credit paying more than this
+        // server's total is recorded as an over-tender, never refused, and a
+        // shortfall within tolerance() is recorded as a rounding difference.
+        // Only a shortfall past the tolerance is refused -- that sale was
+        // genuinely not paid for.
         long other = plan.giftCents + plan.creditCents + plan.cardCents;
-        if (other > due) {
-            throw new ResponseStatusException(400, "The cards and credit pay more than the total");
-        }
-        long rest = due - other;
+        long rest = Math.max(0, due - other);
+        plan.overCents = Math.max(0, other - due);
         plan.cashCents = Math.min(rest, plan.cashTendered);
         plan.changeCents = plan.cashTendered - plan.cashCents;
-        if (plan.cashCents < rest) {
+        long shortCents = rest - plan.cashCents;
+        if (shortCents > tolerance(due)) {
             throw new ResponseStatusException(400, "The tenders do not cover the total of "
                     + due + " cents");
         }
+        plan.shortCents = shortCents;
         // Units sold that the location does not have: the sale stands.
         Map<String, Integer> sold = new HashMap<String, Integer>();
         for (int iter = 0; iter < quote.lines.size(); iter++) {
@@ -530,6 +563,17 @@ public class PosSales {
         shifts.addTotals(shift.getId(), plan.cashCents, plan.cardCents,
                 plan.giftCents + plan.creditCents, 0, plan.cashCents, 1);
         orders.event(o.getId(), "PLACED", "Sold at " + register.getName(), staffName);
+        if (plan.overCents > 0) {
+            orders.event(o.getId(), plan.overCents > tolerance(o.getTotalCents())
+                    ? "OVER_TENDERED" : "TOTAL_ADJUSTED",
+                    "The register took " + plan.overCents + " cents more than the server total of "
+                    + o.getTotalCents() + " cents; the order keeps the server total", staffName);
+        }
+        if (plan.shortCents > 0) {
+            orders.event(o.getId(), "TOTAL_ADJUSTED", "The register took " + plan.shortCents
+                    + " cents less than the server total of " + o.getTotalCents()
+                    + " cents; within the rounding tolerance", staffName);
+        }
     }
 
     private void tender(String orderId, String kind, long amount, long change, String reference)
