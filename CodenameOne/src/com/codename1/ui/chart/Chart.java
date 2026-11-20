@@ -1508,7 +1508,10 @@ public class Chart extends Component {
         // whatever still does not fit its slot is shortened, never overlapped
         int slot = length / Math.max(1, al.ticks.length) - gap;
         if (a instanceof CategoryAxis) {
-            double every = al.step > 0 ? al.step : 1;
+            // a lone label has no step; it owns the whole visible range, not one band. Taking one
+            // band left a phone's single "Department number 1" a few pixels, which ellipsized
+            // to nothing and the axis drew no labels at all
+            double every = al.step > 0 ? al.step : Math.max(1, a.getVisibleMax() - a.getVisibleMin());
             slot = (int) (length * every / Math.max(1e-9, a.getVisibleMax() - a.getVisibleMin())) - gap;
         }
         for (int i = 0; i < al.labels.length; i++) {
