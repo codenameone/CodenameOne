@@ -28,6 +28,7 @@ import com.codenameone.examples.bazaar.AppConfig;
 import com.codenameone.examples.bazaar.Prefs;
 import com.codenameone.examples.bazaar.Telemetry;
 import com.codenameone.examples.bazaar.admin.AdminSections;
+import com.codenameone.examples.bazaar.shop.ShopSections;
 import com.codenameone.examples.bazaar.api.UserDto;
 import com.codenameone.examples.bazaar.live.LiveChannel;
 import com.codenameone.examples.bazaar.net.Account;
@@ -83,6 +84,7 @@ public final class Nav {
     /// The first screen: wherever the stored session leads.
     public static void launch() {
         AdminSections.install();
+        ShopSections.install();
         Session.onSignedOut(() -> {
             LiveChannel.stop();
             Telemetry.signedOut("expired");

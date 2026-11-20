@@ -21,7 +21,13 @@ package com.codenameone.examples.bazaar.net;
 import com.codename1.io.rest.RestClients;
 import com.codenameone.examples.bazaar.api.AccountApi;
 import com.codenameone.examples.bazaar.api.AdminApi;
+import com.codenameone.examples.bazaar.api.CartApi;
+import com.codenameone.examples.bazaar.api.CatalogApi;
+import com.codenameone.examples.bazaar.api.CheckoutApi;
+import com.codenameone.examples.bazaar.api.GiftCardApi;
+import com.codenameone.examples.bazaar.api.OrderApi;
 import com.codenameone.examples.bazaar.api.PaymentApi;
+import com.codenameone.examples.bazaar.api.StoreApi;
 
 /// The server, as the app calls it.
 ///
@@ -33,6 +39,12 @@ public final class Api {
     private static AccountApi account;
     private static AdminApi admin;
     private static PaymentApi payments;
+    private static StoreApi stores;
+    private static CatalogApi catalog;
+    private static CartApi cart;
+    private static CheckoutApi checkout;
+    private static OrderApi orders;
+    private static GiftCardApi giftCards;
 
     private Api() {
     }
@@ -41,6 +53,12 @@ public final class Api {
         account = RestClients.create(AccountApi.class, baseUrl);
         admin = RestClients.create(AdminApi.class, baseUrl);
         payments = RestClients.create(PaymentApi.class, baseUrl);
+        stores = RestClients.create(StoreApi.class, baseUrl);
+        catalog = RestClients.create(CatalogApi.class, baseUrl);
+        cart = RestClients.create(CartApi.class, baseUrl);
+        checkout = RestClients.create(CheckoutApi.class, baseUrl);
+        orders = RestClients.create(OrderApi.class, baseUrl);
+        giftCards = RestClients.create(GiftCardApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -55,6 +73,27 @@ public final class Api {
         return payments;
     }
 
-    // Store, catalog and order clients are added here as the shared module
-    // grows the contracts for them.
+    public static StoreApi stores() {
+        return stores;
+    }
+
+    public static CatalogApi catalog() {
+        return catalog;
+    }
+
+    public static CartApi cart() {
+        return cart;
+    }
+
+    public static CheckoutApi checkout() {
+        return checkout;
+    }
+
+    public static OrderApi orders() {
+        return orders;
+    }
+
+    public static GiftCardApi giftCards() {
+        return giftCards;
+    }
 }
