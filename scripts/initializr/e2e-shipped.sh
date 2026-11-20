@@ -47,6 +47,12 @@ set -euo pipefail
 # these builds to production as if a new developer had made them.
 export CN1_TELEMETRY=0
 
+# The downloads' Maven wrapper fetches its Maven distribution from Central, and it
+# has to: developers get the same wrapper. Central throttles CI, which failed this
+# script before a line of the app was built, so here the wrapper reads the copy on
+# R2 instead (maven/scripts/r2/seed-maven-distributions.sh puts it there).
+export MVNW_REPOURL="${MVNW_REPOURL:-https://repo.codenameone.com/maven2}"
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 WORK="${E2E_WORK:-$HERE/target/e2e-shipped}"
