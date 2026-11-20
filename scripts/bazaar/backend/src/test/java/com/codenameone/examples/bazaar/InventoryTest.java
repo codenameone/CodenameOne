@@ -70,13 +70,13 @@ class InventoryTest {
     private long level(String variantId, String locationId, String column) throws Exception {
         Map row = db.queryOne("SELECT " + column + " AS n FROM inventory_level WHERE variant_id = ? "
                 + "AND location_id = ?", new Object[] {variantId, locationId});
-        return ((Number) row.get("n")).longValue();
+        return Rows.number(row.get("n"));
     }
 
     private long moved(String variantId, String locationId, String column) throws Exception {
         Map row = db.queryOne("SELECT COALESCE(SUM(" + column + "), 0) AS n FROM inventory_move "
                 + "WHERE variant_id = ? AND location_id = ?", new Object[] {variantId, locationId});
-        return ((Number) row.get("n")).longValue();
+        return Rows.number(row.get("n"));
     }
 
     private void ledgerHolds(String variantId, String locationId) throws Exception {

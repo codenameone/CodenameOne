@@ -41,17 +41,20 @@ public interface InventoryLevelRepository extends CrudRepository<InventoryLevel,
 
     List<InventoryLevel> findByStoreId(String storeId);
 
-    /// Commits `qty` units if the row is still at `version` and that many are
-    /// available. A bulk update: it flushes and clears the session, so an
-    /// entity loaded before it is stale afterwards and must be read again.
+    /// Commits `qty` units if that many are available. The check and the
+    /// increment are one statement, judged against the row as committed now,
+    /// so two concurrent reservations never promise the same unit. No version
+    /// condition: under MySQL's REPEATABLE READ a transaction that lost a
+    /// version race re-reads its old snapshot forever, and would answer "not
+    /// enough" while stock remains. A bulk update: it flushes and clears the
+    /// session, so an entity loaded before it is stale afterwards.
     ///
-    /// @return 1 when reserved, 0 when the row moved on or the units are not there
+    /// @return 1 when reserved, 0 when the units are not there
     @Modifying(clearAutomatically = true)
     @Query("update InventoryLevel l set l.committed = l.committed + :qty, l.version = l.version + 1, "
-            + "l.updatedAt = :at where l.id = :id and l.version = :version "
+            + "l.updatedAt = :at where l.id = :id "
             + "and l.onHand - l.committed >= :qty")
-    int reserveIf(@Param("id") String id, @Param("version") long version,
-            @Param("qty") int qty, @Param("at") Instant at);
+    int reserveIf(@Param("id") String id, @Param("qty") int qty, @Param("at") Instant at);
 
     /// Moves the three counters by these amounts, whatever they hold now.
     @Modifying(clearAutomatically = true)

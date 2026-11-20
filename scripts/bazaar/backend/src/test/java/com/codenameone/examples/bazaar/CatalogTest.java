@@ -243,7 +243,7 @@ class CatalogTest {
                 + "(SELECT COALESCE(SUM(m.on_hand_delta), 0) FROM inventory_move m "
                 + "WHERE m.variant_id = l.variant_id AND m.location_id = l.location_id)",
                 new Object[0]);
-        assertEquals(0L, ((Number) bad.get("n")).longValue());
+        assertEquals(0L, Rows.number(bad.get("n")));
         List rows = db.query("SELECT barcode FROM variant WHERE barcode <> ''", new Object[0]);
         assertTrue(rows.size() > 100);
         for (int iter = 0; iter < rows.size(); iter++) {

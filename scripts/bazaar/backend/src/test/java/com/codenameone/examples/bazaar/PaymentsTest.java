@@ -62,7 +62,7 @@ class PaymentsTest {
     private long setupsOf(String username) throws Exception {
         Map row = db.queryOne("SELECT COUNT(*) AS n FROM payment_setup WHERE username = ?",
                 new Object[] {username});
-        return ((Number) row.get("n")).longValue();
+        return Rows.number(row.get("n"));
     }
 
     @Test

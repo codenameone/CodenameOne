@@ -73,7 +73,7 @@ class StockTest {
                 + "OR l.committed <> (SELECT COALESCE(SUM(m.committed_delta), 0) FROM "
                 + "inventory_move m WHERE m.variant_id = l.variant_id AND m.location_id = "
                 + "l.location_id))", new Object[] {storeId});
-        assertEquals(0L, ((Number) bad.get("n")).longValue());
+        assertEquals(0L, Rows.number(bad.get("n")));
     }
 
     @Test

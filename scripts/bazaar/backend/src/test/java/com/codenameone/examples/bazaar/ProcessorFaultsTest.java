@@ -150,7 +150,7 @@ class ProcessorFaultsTest {
         assertEquals(1, processor.detached.size());
         Map kept = db.queryOne("SELECT COUNT(*) AS n FROM payment_method WHERE token = ?",
                 new Object[] {processor.detached.get(0)});
-        assertEquals(0L, ((Number) kept.get("n")).longValue());
+        assertEquals(0L, Rows.number(kept.get("n")));
 
         // A detach that fails is logged, and the customer still hears the limit.
         processor.detachFails = true;

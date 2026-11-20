@@ -128,7 +128,7 @@ class StorefrontTest {
                 .getContentAsString(), "data-ld"));
         Map rating = (Map) ld.get("aggregateRating");
         assertEquals("AggregateRating", rating.get("@type"));
-        assertEquals(2L, ((Number) rating.get("reviewCount")).longValue());
+        assertEquals(2L, Rows.number(rating.get("reviewCount")));
     }
 
     @Test

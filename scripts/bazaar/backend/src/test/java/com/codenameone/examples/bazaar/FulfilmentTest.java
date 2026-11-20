@@ -135,7 +135,7 @@ class FulfilmentTest {
 
     private long count(String sql, Object... args) throws Exception {
         Map row = db.queryOne(sql, args);
-        return ((Number) row.get("n")).longValue();
+        return Rows.number(row.get("n"));
     }
 
     private void expect(int code, Attempt a) throws Exception {

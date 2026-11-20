@@ -134,7 +134,7 @@ class CheckoutTest {
 
     private long count(String sql, Object... args) throws Exception {
         Map row = db.queryOne(sql, args);
-        return ((Number) row.get("n")).longValue();
+        return Rows.number(row.get("n"));
     }
 
     @Test

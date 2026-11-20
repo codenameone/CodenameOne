@@ -34,10 +34,21 @@ public final class Rows {
     private Rows() {
     }
 
-    /// A column as a whole number; 0 for null or anything that is not a
-    /// number.
+    /// A column as a whole number; 0 for null or anything that is not one.
+    /// MySQL can answer an aggregate as text or a decimal, so a numeric
+    /// string is parsed rather than read as 0.
     public static long number(Object value) {
-        return value instanceof Number ? ((Number) value).longValue() : 0L;
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof String) {
+            try {
+                return new java.math.BigDecimal(((String) value).trim()).longValue();
+            } catch (NumberFormatException notNumeric) {
+                return 0L;
+            }
+        }
+        return 0L;
     }
 
     /// A column holding a point in time as milliseconds since the epoch: the

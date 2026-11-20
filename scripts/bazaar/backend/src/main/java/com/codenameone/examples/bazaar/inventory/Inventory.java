@@ -106,19 +106,12 @@ public class Inventory {
             change(storeId, variantId, locationId, 0, qty, 0, RESERVE, reference, username);
             return true;
         }
-        for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
-            InventoryLevel level = level(storeId, variantId, locationId);
-            if (level.getOnHand() - level.getCommitted() < qty) {
-                return false;
-            }
-            if (levels.reserveIf(level.getId(), level.getVersion(), qty, Instant.now()) == 1) {
-                record(storeId, variantId, locationId, 0, qty, RESERVE, reference, username);
-                return true;
-            }
-            // Another transaction moved the row first. The update cleared the
-            // session, so the next read is of the row as it is now.
+        InventoryLevel level = level(storeId, variantId, locationId);
+        if (levels.reserveIf(level.getId(), qty, Instant.now()) != 1) {
+            return false;
         }
-        return false;
+        record(storeId, variantId, locationId, 0, qty, RESERVE, reference, username);
+        return true;
     }
     // end::bazaar-reserve[]
 

@@ -90,13 +90,13 @@ class PushTest {
     private long tokens(String token) throws Exception {
         Map row = db.queryOne("SELECT COUNT(*) AS n FROM push_device WHERE token = ?",
                 new Object[] {token});
-        return ((Number) row.get("n")).longValue();
+        return Rows.number(row.get("n"));
     }
 
     private long devices(String username) throws Exception {
         Map row = db.queryOne("SELECT COUNT(*) AS n FROM push_device WHERE username = ?",
                 new Object[] {username});
-        return ((Number) row.get("n")).longValue();
+        return Rows.number(row.get("n"));
     }
 
     @Test

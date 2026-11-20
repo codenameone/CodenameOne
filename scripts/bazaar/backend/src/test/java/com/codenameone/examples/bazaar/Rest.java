@@ -67,7 +67,7 @@ public final class Rest {
     }
 
     public static long number(Map object, String field) {
-        return ((Number) object.get(field)).longValue();
+        return Rows.number(object.get(field));
     }
 
     public static String card(String number) {
