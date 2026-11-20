@@ -263,6 +263,7 @@ public final class DeviceIntegrity {
     /// [SecureKeyboard], which never goes through the system keyboard:
     ///
     /// ```java
+    /// TextField password = new TextField("", "Password", 20, TextArea.PASSWORD);
     /// if (DeviceIntegrity.isThirdPartyKeyboardActive("com.touchtype.swiftkey")) {
     ///     SecureKeyboard.install(password);
     /// }
