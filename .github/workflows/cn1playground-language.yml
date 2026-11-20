@@ -52,6 +52,9 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Ensure Xvfb is available
         run: |
           set -euo pipefail
@@ -91,6 +94,9 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Set up Node 20
         uses: actions/setup-node@v6

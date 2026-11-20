@@ -5775,6 +5775,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         // are taking action when the key is released... so we need to track whether the
         // control key was down while a key was pressed.
         private HashSet<Integer> ignorePressedKeys = new HashSet<Integer>();
+        private boolean isShortcutKeysFocused() {
+            com.codename1.ui.TopLevelContainer f = canvasTopLevel();
+            com.codename1.ui.Component c = f == null ? null : f.getFocused();
+            return c != null && c.getClientProperty("cn1$shortcutKeys") != null;
+        }
+
         private boolean isPureEditorFocused() {
             com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             return f != null && (f.getFocused() instanceof com.codename1.ui.editor.EditorView);
@@ -5795,6 +5801,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 case KeyEvent.VK_BACK_SPACE:
                 case KeyEvent.VK_DELETE:
                 case KeyEvent.VK_TAB:
+                // Escape's character is below 32, so the test below dropped it and an editor
+                // never saw it; F4's key code is 's', so it is delivered as KEY_CODE_F4
+                case KeyEvent.VK_ESCAPE:
+                case KeyEvent.VK_F4:
                     return true;
                 default:
                     break;
@@ -5864,6 +5874,26 @@ public class JavaSEPort extends CodenameOneImplementation {
             // wants the modifier combos (word / line navigation, clipboard shortcuts)
             if (!editorFocused && (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
                 ignorePressedKeys.add(e.getKeyCode());
+                // A component that asked for shortcut keys (the "cn1$shortcutKeys" client
+                // property: NodeGraph, KanbanBoard) gets the plain letter of a Ctrl or Cmd
+                // combination as a press, and reads the modifier from Display. The key
+                // character is not used: with Ctrl held it is a control character.
+                int vk = e.getKeyCode();
+                if ((e.isControlDown() || e.isMetaDown()) && !e.isAltDown() && !e.isAltGraphDown()
+                        && vk >= KeyEvent.VK_A && vk <= KeyEvent.VK_Z && isShortcutKeysFocused()) {
+                    int letter = 'a' + (vk - KeyEvent.VK_A);
+                    if (testRecorder != null) {
+                        testRecorder.eventKeyPressed(letter);
+                    }
+                    JavaSEPort.this.windowKeyPressed(windowId, letter);
+                    // released at once: the real release is blocked, and a press with
+                    // no release leaves Display repeating the key for as long as
+                    // nothing else is typed
+                    if (testRecorder != null) {
+                        testRecorder.eventKeyReleased(letter);
+                    }
+                    JavaSEPort.this.windowKeyReleased(windowId, letter);
+                }
                 return;
             }
             // This press was not blocked, so any record left over from an earlier blocked press of
@@ -5882,6 +5912,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     code = '\n';
                 } else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
                     code = ' ';
+                } else if (e.getKeyCode() == KeyEvent.VK_F4) {
+                    code = com.codename1.ui.editor.EditorView.KEY_CODE_F4;
+                } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    code = 27;
                 }
             }
             if (testRecorder != null) {
@@ -5918,6 +5952,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                     code = '\n';
                 } else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
                     code = ' ';
+                } else if (e.getKeyCode() == KeyEvent.VK_F4) {
+                    code = com.codename1.ui.editor.EditorView.KEY_CODE_F4;
+                } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    code = 27;
                 }
             }
             if (testRecorder != null) {

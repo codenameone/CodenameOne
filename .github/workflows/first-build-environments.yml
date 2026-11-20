@@ -48,6 +48,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Generate real Initializr downloads
         run: python scripts/tests/generate-initializr-fixtures.py "${{ runner.temp }}/initializr-fixtures"
       - uses: actions/upload-artifact@v4
@@ -85,6 +87,8 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
           java-package: ${{ matrix.package }}
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - uses: actions/download-artifact@v4
         with:
           name: initializr-download

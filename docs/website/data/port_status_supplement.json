@@ -99,6 +99,76 @@
       ]
     },
     {
+      "test": "FlowChartThemeScreenshotTest",
+      "reason": "The flow chart baseline is eight shapes in two swimlanes. A watch face has no room for it, so the capture there would only record how the diagram fails to fit.",
+      "platform_support": "The NodeGraph component and its flow chart shapes compile and run on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "flow-chart-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "KanbanBoardThemeScreenshotTest",
+      "reason": "The Kanban baseline is three columns in two swimlanes and a folded one. A watch face shows a strip of one column, which checks nothing of the board.",
+      "platform_support": "The KanbanBoard component compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "kanban-board-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "KanbanCardsThemeScreenshotTest",
+      "reason": "The Kanban cards baseline is three columns of cards. A watch face shows a strip of one column, which checks nothing of the board.",
+      "platform_support": "The KanbanBoard component compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "kanban-cards-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "FlowChartShapesScreenshotTest",
+      "reason": "The shapes baseline is eleven outlines in three swimlanes. A watch face has no room for it, so the capture there would only record how the diagram fails to fit.",
+      "platform_support": "The NodeGraph component and its flow chart shapes compile and run on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "flow-chart-shapes-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "NodeEditorThemeScreenshotTest",
+      "reason": "The node editor baseline is a palette beside a graph of four nodes. A watch face has no room for the two side by side.",
+      "platform_support": "The NodeGraph and GraphPalette components compile and run on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders it in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "node-editor-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "GanttThemeScreenshotTest",
       "reason": "The Gantt chart baseline is a task table beside a timeline of bars and dependency arrows. A watch face has no room for either, so the capture there would only record how the chart fails to fit.",
       "platform_support": "The Gantt component compiles and runs on watchOS; it is a planning view for phones, tablets and desktops, and only this baseline does not apply to the watch form factor.",
@@ -469,6 +539,34 @@
           "prefix": "credentials-redirects-and-cookies-belong-to-the-browser",
           "ports": [
             "javascript"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "AndroidCompatTallDialogScreenshotTest",
+      "reason": "The tall dialog baseline is a phone-sized AlertDialog whose content is taller than the screen, checking that its buttons stay on screen. The watch form factor lays dialogs out differently and has no comparable phone dialog to capture.",
+      "platform_support": "Android compatibility dialogs work on watchOS; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the dialog and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-dialog-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "PdfViewerScreenshotTest",
+      "reason": "The PDF viewer baseline is a full page of a document. A watch face is too small to show a page legibly, so the capture there would only record how the page fails to fit.",
+      "platform_support": "The PDF viewer compiles and runs on watchOS; only this baseline does not apply to the watch form factor.",
+      "verification": "Every phone, desktop and browser leg renders the document and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "pdf-viewer-on-watch",
+          "ports": [
+            "watchos"
           ]
         }
       ]

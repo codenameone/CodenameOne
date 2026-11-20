@@ -207,6 +207,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Validate Java 25 markdown docs style (CodenameOne + CLDC11)
         run: ./.github/scripts/validate-java25-markdown-docs.sh
       - name: Set up Java
@@ -228,6 +230,8 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set up Node
         if: ${{ matrix.java-version == 8 }}
         uses: actions/setup-node@v6
@@ -417,6 +421,15 @@ jobs:
             -Pcompile-android \
             -DbackendAnalysis \
             -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,backend,backend-test,backend-parparvm,javac,android-res-compiler,android-compat,swing-compat,javafx-compat,compose-compat,fxml-compiler,desktop-compat-runtime,cn1-app-kit/backend,cn1-app-kit/common,python-transpiler -am verify
+      # The step above skips tests, so the Android port's pure-Java unit tests
+      # (maven/android/src/test) run here, against the classes it just built.
+      - name: Run Android port unit tests
+        if: ${{ matrix.java-version == 8 }}
+        working-directory: maven
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          mvn -B -Dcn1.binaries="${CN1_BINARIES}" -Pcompile-android -pl android test
       # The Python runtime compiles at release 17, so it cannot join the JDK 8
       # reactor above; it runs against the core that reactor installed. It ships
       # inside applications, so it is held to the same zero-findings gate.
@@ -880,6 +893,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Build JavaDocs
         if: matrix.java-version == 8

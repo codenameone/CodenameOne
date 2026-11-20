@@ -27,6 +27,7 @@ import android.graphics.Point;
 import com.codename1.ai.vision.Barcode;
 import com.codename1.ai.vision.VisionOptions;
 import com.codename1.ai.vision.VisionPoint;
+import com.codename1.impl.android.BarcodePayloadText;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -35,10 +36,6 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
 import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.common.InputImage;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CodingErrorAction;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -169,10 +166,10 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
     /// For a PDF417 the bytes are decoded here: with the charset named by the
     /// Display property android.barcodeCharset whenever the app sets one
     /// (also when ML Kit answered a value, since ML Kit's own guess may be
-    /// the wrong charset), else -- only when ML Kit answered null -- as UTF-8
-    /// when they are valid UTF-8, else as ISO-8859-1, which maps every byte
-    /// and so never fails. A named charset that cannot be used -- an unknown
-    /// name, or bytes that are not valid in it -- falls back the same way.
+    /// the wrong charset), else -- only when ML Kit answered null -- by
+    /// default. A named charset never overrides a payload that is valid
+    /// multi-byte UTF-8, so one app reads codes in both encodings; see
+    /// BarcodePayloadText.decode for the rules and why.
     /// getRawBytes() still carries the exact payload.
     ///
     /// Only PDF417 is decoded from bytes because only there are getRawBytes()
@@ -190,33 +187,7 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
         if (raw != null && (charset == null || charset.length() == 0)) {
             return raw;
         }
-        return decode(bytes, charset);
-    }
-
-    static String decode(byte[] bytes, String charsetName) {
-        if (charsetName != null && charsetName.length() > 0) {
-            try {
-                return strict(bytes, Charset.forName(charsetName));
-            } catch (IllegalArgumentException unsupported) {
-                // An unknown charset name, and...
-            } catch (CharacterCodingException notInCharset) {
-                // ...bytes that are not valid in the named charset both fall
-                // back to the default decoding rather than losing the code.
-            }
-        }
-        try {
-            return strict(bytes, Charset.forName("UTF-8"));
-        } catch (CharacterCodingException notUtf8) {
-            return new String(bytes, Charset.forName("ISO-8859-1"));
-        }
-    }
-
-    private static String strict(byte[] bytes, Charset charset)
-            throws CharacterCodingException {
-        return charset.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-                .decode(ByteBuffer.wrap(bytes)).toString();
+        return BarcodePayloadText.decode(bytes, charset);
     }
 
     @Override

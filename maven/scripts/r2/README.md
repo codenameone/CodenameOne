@@ -331,3 +331,16 @@ The order matters: nothing uploaded is discoverable until the release is marked,
 `aws` CLI is used rather than rclone: it is preinstalled on GitHub runners, and `aws s3 cp`
 cannot delete. R2 needs `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` with recent
 aws-cli v2 or uploads fail on checksum negotiation; the scripts set this themselves.
+
+### `seed-maven-distributions.sh [--list|--verify]`
+
+Copies the files Maven is bootstrapped from into `maven2/` at their Maven Central paths:
+every `distributionUrl`/`wrapperUrl` in a tracked `maven-wrapper.properties` and the
+Maven archive `scripts/setup-workspace.sh` installs. The set is derived from the tree.
+Each file comes from Google's copy of Central and is checked against its `.sha1`; what R2
+already serves is skipped. Run by the manual *Seed Maven distributions to R2* workflow.
+
+The CI-only wrappers download from `repo.codenameone.com`, which
+`scripts/check-maven-central-mirror.py` enforces, so a Maven or wrapper version bump
+needs that workflow run before it merges. The archetype's wrapper stays on Central: it
+is copied into every customer project.

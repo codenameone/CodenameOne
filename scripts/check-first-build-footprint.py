@@ -227,6 +227,19 @@ def write_settings(path, repo):
           <releases><enabled>true</enabled><checksumPolicy>ignore</checksumPolicy></releases>
           <snapshots><enabled>true</enabled><checksumPolicy>ignore</checksumPolicy></snapshots>
         </{tag}>"""
+    # This settings file replaces ~/.m2/settings.xml, so the CI mirror profile is copied
+    # in after the workspace one: everything not built here comes from Google's copy of
+    # Central rather than Central, which throttles CI. Only the remote changes; the
+    # footprint measured is the same.
+    mirror = ""
+    mirror_settings = Path(__file__).resolve().parent.parent / ".github" / "actions" / "maven-central-mirror" / "settings.xml"
+    if mirror_settings.exists():
+        match = re.search(r"<profile>.*?</profile>", mirror_settings.read_text(encoding="utf-8"), re.S)
+        if match:
+            mirror = match.group(0)
+    active = "<activeProfile>workspace</activeProfile>"
+    if mirror:
+        active += "<activeProfile>cn1-ci-central-mirror</activeProfile>"
     with open(path, "w", encoding="utf-8") as f:
         f.write("""<settings>
   <profiles>
@@ -237,10 +250,11 @@ def write_settings(path, repo):
       <pluginRepositories>%s
       </pluginRepositories>
     </profile>
+    %s
   </profiles>
-  <activeProfiles><activeProfile>workspace</activeProfile></activeProfiles>
+  <activeProfiles>%s</activeProfiles>
 </settings>
-""" % (block.format(tag="repository", url=url), block.format(tag="pluginRepository", url=url)))
+""" % (block.format(tag="repository", url=url), block.format(tag="pluginRepository", url=url), mirror, active))
 
 
 def artifacts(repo):

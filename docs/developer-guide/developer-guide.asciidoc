@@ -75,6 +75,8 @@ include::Data-Grid.asciidoc[]
 
 include::Node-Graphs.asciidoc[]
 
+include::Kanban-Board.asciidoc[]
+
 include::Accessibility-Semantics.asciidoc[]
 
 include::Animations.asciidoc[]

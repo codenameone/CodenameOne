@@ -96,6 +96,36 @@ public abstract class AbstractGraphModel implements GraphModel {
     }
 
     @Override
+    public boolean insertNode(GraphNode node, int index) {
+        return false;
+    }
+
+    @Override
+    public boolean insertEdge(GraphEdge edge, int index) {
+        return false;
+    }
+
+    @Override
+    public boolean resizeNode(GraphNode node, double width, double height) {
+        return false;
+    }
+
+    @Override
+    public boolean setNodeGroup(GraphNode node, String groupId) {
+        return false;
+    }
+
+    @Override
+    public boolean resizeGroup(GraphGroup group, double x, double y, double width, double height) {
+        return false;
+    }
+
+    @Override
+    public boolean setPortValue(GraphPort port, Object value) {
+        return false;
+    }
+
+    @Override
     public void addChangeListener(GraphChangeListener l) {
         if (l != null && !listeners.contains(l)) {
             listeners.add(l);

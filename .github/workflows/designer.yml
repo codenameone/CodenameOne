@@ -56,6 +56,9 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install build dependencies
         run: bash scripts/ci/apt-get-install.sh unzip
 

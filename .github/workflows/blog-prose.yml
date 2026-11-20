@@ -58,6 +58,9 @@ jobs:
           # base version of each changed post.
           fetch-depth: 0
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Detect changed prose and diagram rendering inputs
         id: detect
         run: |
@@ -124,6 +127,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Install language-tool-python
         if: steps.detect.outputs.has_posts == 'true'
@@ -248,6 +254,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Set up Python 3
         uses: actions/setup-python@v6

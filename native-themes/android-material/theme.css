@@ -1000,6 +1000,23 @@ NodeGraphPort { background-color: #ffffff; color: #6750a4; font-family: "native:
 NodeGraphEdge { background-color: transparent; color: #79747e; }
 NodeGraphEdgeLabel { background-color: #ffffff; color: #49454f; font-family: "native:MainRegular"; font-size: 2mm; }
 NodeGraphMinimap { background-color: #f3edf7; color: #49454f; font-family: "native:MainRegular"; font-size: 2mm; }
+NodeGraphLane { background-color: rgba(232,222,248,0.25); color: #49454f; }
+NodeGraphLaneHeader { background-color: #e8def8; color: #49454f; font-family: "native:MainBold"; font-size: 2.5mm; }
+NodeGraphHandle { background-color: #ffffff; color: #6750a4; }
+NodeGraphPalette { background-color: #ece6f0; color: #49454f; font-family: "native:MainRegular"; font-size: 2mm; }
+NodeGraphPaletteItem { background-color: #ffffff; color: #1d1b20; font-family: "native:MainRegular"; font-size: 2mm; }
+
+/* The Kanban board paints its columns and cards from these. */
+KanbanBoard { background-color: #f7f2fa; color: #1d1b20; padding: 0; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
+KanbanColumn { background-color: #ece6f0; color: #49454f; }
+KanbanColumnHeader { background-color: transparent; color: #1d1b20; font-family: "native:MainBold"; font-size: 2.5mm; }
+KanbanColumnOverLimit { background-color: #f9dedc; color: #b3261e; font-family: "native:MainBold"; font-size: 2.5mm; }
+KanbanCard { background-color: #ffffff; color: #1d1b20; font-family: "native:MainRegular"; font-size: 2.5mm; }
+KanbanCardSelected { background-color: #ffffff; color: #6750a4; font-family: "native:MainRegular"; font-size: 2.5mm; }
+KanbanCardTag { background-color: #e8def8; color: #49454f; font-family: "native:MainRegular"; font-size: 2mm; }
+KanbanLane { background-color: #e8def8; color: #49454f; font-family: "native:MainBold"; font-size: 2.5mm; }
+KanbanAddCard { background-color: transparent; color: #79747e; font-family: "native:MainRegular"; font-size: 2mm; }
+KanbanDropSlot { background-color: #eaddff; color: #6750a4; }
 PickerMaterial { background-color: #ece6f0; color: var(--text-color, #1d1b20); padding: 0; margin: 0; }
 PickerMaterialDialog { background-color: #ece6f0; color: var(--text-color, #1d1b20); padding: 2mm; margin: 0; border-radius: 4.4mm; }
 PickerMaterialHeader { background-color: transparent; color: var(--text-color, #1d1b20); padding: 2mm 3mm 2mm 3mm; margin: 0; }
@@ -1303,6 +1320,22 @@ PickerMaterialTab.pressed { color: var(--accent-color, #6750a4); background-colo
     NodeGraphEdge { background-color: transparent; color: #938f99; }
     NodeGraphEdgeLabel { background-color: #2b2930; color: #cac4d0; font-family: "native:MainRegular"; font-size: 2mm; }
     NodeGraphMinimap { background-color: #2b2930; color: #cac4d0; font-family: "native:MainRegular"; font-size: 2mm; }
+    NodeGraphLane { background-color: rgba(43,41,48,0.25); color: #cac4d0; }
+    NodeGraphLaneHeader { background-color: #36343b; color: #cac4d0; font-family: "native:MainBold"; font-size: 2.5mm; }
+    NodeGraphHandle { background-color: #2b2930; color: #d0bcff; }
+    NodeGraphPalette { background-color: #211f26; color: #cac4d0; font-family: "native:MainRegular"; font-size: 2mm; }
+    NodeGraphPaletteItem { background-color: #2b2930; color: #e6e0e9; font-family: "native:MainRegular"; font-size: 2mm; }
+
+    KanbanBoard { background-color: #141218; color: #e6e0e9; padding: 0; margin: 0; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    KanbanColumn { background-color: #211f26; color: #cac4d0; }
+    KanbanColumnHeader { background-color: transparent; color: #e6e0e9; font-family: "native:MainBold"; font-size: 2.5mm; }
+    KanbanColumnOverLimit { background-color: #601410; color: #f2b8b5; font-family: "native:MainBold"; font-size: 2.5mm; }
+    KanbanCard { background-color: #2b2930; color: #e6e0e9; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    KanbanCardSelected { background-color: #2b2930; color: #d0bcff; font-family: "native:MainRegular"; font-size: 2.5mm; }
+    KanbanCardTag { background-color: #4a4458; color: #cac4d0; font-family: "native:MainRegular"; font-size: 2mm; }
+    KanbanLane { background-color: #36343b; color: #cac4d0; font-family: "native:MainBold"; font-size: 2.5mm; }
+    KanbanAddCard { background-color: transparent; color: #938f99; font-family: "native:MainRegular"; font-size: 2mm; }
+    KanbanDropSlot { background-color: #4f378b; color: #d0bcff; }
     PickerMaterial { background-color: #2b2930; color: var(--text-color-dark, #e6e0e9); padding: 0; margin: 0; }
     PickerMaterialDialog { background-color: #2b2930; color: var(--text-color-dark, #e6e0e9); padding: 2mm; margin: 0; border-radius: 4.4mm; }
     PickerMaterialHeader { background-color: transparent; color: var(--text-color-dark, #e6e0e9); padding: 2mm 3mm 2mm 3mm; margin: 0; }

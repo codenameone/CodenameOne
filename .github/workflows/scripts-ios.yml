@@ -185,6 +185,8 @@ jobs:
       watch: ${{ steps.legs.outputs.watch }}
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - id: plan
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -253,6 +255,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Cache CocoaPods and user gems
         uses: actions/cache@v5
@@ -688,6 +693,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Cache CocoaPods and user gems
         uses: actions/cache@v5
@@ -1125,6 +1133,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Cache CocoaPods and user gems
         uses: actions/cache@v5
         with:
@@ -1313,6 +1324,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Cache CocoaPods and user gems
         uses: actions/cache@v5

@@ -43,6 +43,13 @@
  * stubs so isNativeBrowserComponentSupported() reports false and the build
  * still links.
  */
+/* The runner's MSVC STL can be newer than the installed clang, and its
+ * <yvals_core.h> then fails the build outright (STL1000 "Unexpected compiler
+ * version"). This file uses only the long-stable string/vector/mutex subset,
+ * so allow the pairing, as cn1_windows_accessibility.cpp does. */
+#ifndef _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+#define _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+#endif
 #ifdef CN1_HAVE_WEBVIEW2
 /* Include the WebView2 SDK and the C++ standard library headers BEFORE
  * cn1_windows.h: cn1_globals.h installs macros for the bytecode runtime that

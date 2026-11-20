@@ -59,6 +59,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -104,6 +106,9 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       # The starter builds with the PUBLISHED Maven plugin its pom pins, not
       # with this tree, and a published plugin's CSS goal may initialize Java

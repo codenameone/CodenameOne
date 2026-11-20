@@ -24,6 +24,30 @@ package com.codename1.graph;
 
 /// A connection from one node to another, optionally from a port to a port.
 public class GraphEdge {
+    /// An unbroken line, the default.
+    public static final int LINE_SOLID = 0;
+
+    /// A line of dashes.
+    public static final int LINE_DASHED = 1;
+
+    /// A line of dots.
+    public static final int LINE_DOTTED = 2;
+
+    /// No mark at an end of the edge.
+    public static final int ARROW_NONE = 0;
+
+    /// A filled arrowhead.
+    public static final int ARROW_FILLED = 1;
+
+    /// An arrowhead of two open strokes.
+    public static final int ARROW_OPEN = 2;
+
+    /// A diamond.
+    public static final int ARROW_DIAMOND = 3;
+
+    /// A circle.
+    public static final int ARROW_CIRCLE = 4;
+
     private final String id;
     private final String sourceId;
     private final String sourcePortId;
@@ -34,6 +58,9 @@ public class GraphEdge {
     private String styleKey;
     private Object userData;
     private double[] route;
+    private int lineStyle;
+    private int sourceArrow;
+    private int targetArrow = -1;
 
     /// An edge between two nodes.
     public GraphEdge(String id, String sourceId, String targetId) {
@@ -124,6 +151,64 @@ public class GraphEdge {
     /// Sets the bend points; null removes them.
     public void setRoute(double[] route) {
         this.route = route;
+    }
+
+    /// How the line is drawn: `LINE_SOLID`, `LINE_DASHED` or `LINE_DOTTED`.
+    public int getLineStyle() {
+        return lineStyle;
+    }
+
+    /// Sets how the line is drawn.
+    public void setLineStyle(int lineStyle) {
+        this.lineStyle = lineStyle;
+    }
+
+    /// The mark at the source end, one of the `ARROW_` constants;
+    /// `ARROW_NONE` by default.
+    public int getSourceArrow() {
+        return sourceArrow;
+    }
+
+    /// Sets the mark at the source end.
+    public void setSourceArrow(int sourceArrow) {
+        this.sourceArrow = sourceArrow;
+    }
+
+    /// The mark at the target end, one of the `ARROW_` constants. Until
+    /// `setTargetArrow` is called it follows `isDirected`: `ARROW_FILLED` for a
+    /// directed edge and `ARROW_NONE` otherwise.
+    public int getTargetArrow() {
+        if (targetArrow < 0) {
+            return directed ? ARROW_FILLED : ARROW_NONE;
+        }
+        return targetArrow;
+    }
+
+    /// Sets the mark at the target end; a negative value goes back to
+    /// following `isDirected`.
+    public void setTargetArrow(int targetArrow) {
+        this.targetArrow = targetArrow;
+    }
+
+    /// True when `setTargetArrow` chose the target mark, so that it no longer
+    /// follows `isDirected`.
+    public boolean isTargetArrowSet() {
+        return targetArrow >= 0;
+    }
+
+    /// An edge like this one under another id and between other nodes, with
+    /// the same ports, label, line and arrows. The route is not copied: it was
+    /// laid for where the original nodes are.
+    public GraphEdge copy(String newId, String newSourceId, String newTargetId) {
+        GraphEdge c = new GraphEdge(newId, newSourceId, sourcePortId, newTargetId, targetPortId);
+        c.label = label;
+        c.directed = directed;
+        c.styleKey = styleKey;
+        c.userData = userData;
+        c.lineStyle = lineStyle;
+        c.sourceArrow = sourceArrow;
+        c.targetArrow = targetArrow;
+        return c;
     }
 
     /// True when the edge touches the node with this id.

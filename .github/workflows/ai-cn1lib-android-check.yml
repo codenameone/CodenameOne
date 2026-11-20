@@ -46,6 +46,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         # The action's default list includes the legacy `tools` package, which

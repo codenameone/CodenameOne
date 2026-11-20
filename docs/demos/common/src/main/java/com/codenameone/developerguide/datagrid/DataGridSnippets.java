@@ -22,12 +22,21 @@
  */
 package com.codenameone.developerguide.datagrid;
 
+import com.codename1.io.CSVParser;
+import com.codename1.io.CSVWriter;
+import com.codename1.io.Log;
+import com.codename1.spreadsheet.FormulaBar;
+import com.codename1.spreadsheet.Sheet;
+import com.codename1.spreadsheet.Workbook;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Slider;
+import com.codename1.ui.Tabs;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.layouts.BorderLayout;
@@ -46,6 +55,9 @@ import com.codename1.ui.table.GridFormatter;
 import com.codename1.ui.table.GridRow;
 import com.codename1.ui.table.TreeTableModel;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -572,5 +584,110 @@ public final class DataGridSnippets {
         grid.getColumn(2).setWidthMM(18);
         // end::grid-tree-use[]
         return grid;
+    }
+
+    public static DataGrid openSheet(InputStream input) throws IOException {
+        // tag::grid-sheet-open[]
+        Workbook book = Workbook.read(input, Workbook.Format.XLSX);
+        Sheet sheet = book.getSheet(0);
+        sheet.setHeaderRow(true);
+
+        DataGrid grid = new DataGrid(sheet);
+        grid.setColumns(sheet.createColumns());
+        // end::grid-sheet-open[]
+        return grid;
+    }
+
+    public static Sheet formulas() {
+        // tag::grid-sheet-formula[]
+        Workbook book = new Workbook();
+        Sheet sheet = book.addSheet("Orders");
+        sheet.addRow("Item", "Units", "Price", "Total");
+        sheet.addRow("Bolt", 40.0, 0.25);
+        sheet.addRow("Bracket", 12.0, 3.5);
+        sheet.setCellFormula("D2", "=B2*C2");
+        sheet.setCellFormula("D3", "=B3*C3");
+        sheet.setCellFormula("D4", "=SUM(D2:D3)");
+        sheet.setCellFormat(3, 3, "#,##0.00");
+
+        Object total = sheet.getCellValue("D4");      // 52.0
+        sheet.setCellValue("B2", 100.0);
+        total = sheet.getCellValue("D4");             // 67.0
+        String shown = sheet.getCellText(3, 3);       // "67.00"
+        // end::grid-sheet-formula[]
+        Log.p(total + " " + shown);
+        return sheet;
+    }
+
+    public static void saveGrid(DataGrid grid, OutputStream output) throws IOException {
+        // tag::grid-sheet-save[]
+        Workbook book = Workbook.fromGrid(grid);
+        book.write(output, Workbook.Format.XLSX);
+        // end::grid-sheet-save[]
+    }
+
+    public static void csv(InputStream input, OutputStream output) throws IOException {
+        // tag::grid-csv[]
+        CSVParser parser = new CSVParser();
+        String[][] rows = parser.parse(input);
+
+        CSVWriter writer = new CSVWriter(';');
+        // Excel runs a cell that starts with = as a formula; this writes it as text.
+        writer.setEscapeFormulas(true);
+        writer.write(output, rows);
+        // end::grid-csv[]
+    }
+
+    public static Tabs workbookTabs(Workbook book) {
+        // tag::grid-sheet-workbook[]
+        Tabs tabs = new Tabs();
+        for (int i = 0; i < book.getSheetCount(); i++) {
+            Sheet sheet = book.getSheet(i);
+            sheet.setHeaderRow(true);
+            DataGrid grid = new DataGrid(sheet);
+            grid.setColumns(sheet.createColumns());
+            tabs.addTab(sheet.getName(), grid);
+        }
+        // end::grid-sheet-workbook[]
+        return tabs;
+    }
+
+    public static Container formulaBar(Sheet sheet) {
+        // tag::grid-sheet-formula-bar[]
+        sheet.setHeaderRow(true);
+        DataGrid grid = new DataGrid(sheet);
+        grid.setColumns(sheet.createColumns());
+        Container sheetView = new Container(new BorderLayout());
+        sheetView.add(BorderLayout.NORTH, new FormulaBar(sheet, grid));
+        sheetView.add(BorderLayout.CENTER, grid);
+        // end::grid-sheet-formula-bar[]
+        return sheetView;
+    }
+
+    public static Workbook salesWorkbook() throws IOException {
+        // tag::grid-sheet-resource[]
+        InputStream input = Display.getInstance().getResourceAsStream(DataGridSnippets.class, "/regional-sales.xlsx");
+        Workbook book = Workbook.read(input, Workbook.Format.XLSX);
+        // end::grid-sheet-resource[]
+        return book;
+    }
+
+    public static Workbook loanWorkbook() throws IOException {
+        InputStream input = Display.getInstance().getResourceAsStream(DataGridSnippets.class, "/loan-schedule.ods");
+        return Workbook.read(input, Workbook.Format.ODS);
+    }
+
+    public static void correctAnOrder(Workbook book) {
+        // tag::grid-sheet-edit[]
+        // Order 1045 was for 40 compressors, not 6. Units are column E of the Orders sheet.
+        book.getSheet("Orders").setCellValue("E6", 40.0);
+        // end::grid-sheet-edit[]
+    }
+
+    public static void raiseTheRate(Workbook book) {
+        // tag::grid-sheet-name[]
+        // The schedule reads the yearly rate through the defined name Rate, which is Terms!B2.
+        book.getSheet("Terms").setCellValue("B2", 0.089);
+        // end::grid-sheet-name[]
     }
 }

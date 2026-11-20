@@ -78,6 +78,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: |
           echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
           echo "JAVA17_HOME=$JAVA_HOME" >> $GITHUB_ENV
@@ -87,6 +89,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       # xvfb for the reactor build's JavaSE port; the application builds below
       # compile CSS headless and need no display.
       - name: Install xvfb

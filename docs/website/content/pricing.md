@@ -56,6 +56,9 @@ Manual submission is always unlimited and free. You can upload as many builds as
 
 The limits shown above apply only to the optional *automated* submission feature: one-click submit from the build console and pushing your store listing as code (`cn1:metadata-push`). That's a convenience that delivers the binary and updates the listing for you; higher plans raise how many automated submissions and metadata updates you get per month, and add production review and zero-touch auto-submit. It never restricts your ability to publish manually.
 
+### Can we run Codename One in a private cloud or on premises?
+Yes. The Corporate offering runs the Codename One build and services stack in a 100% private cloud hosted for you, or on premises, managed by your own team. Pricing starts at $25,000 USD annually and depends on the deployment. Use the site chat to discuss your requirements.
+
 ### Will my app still work if I cancel subscription?
 Yes. Built apps continue to work.
 

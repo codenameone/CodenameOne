@@ -1,0 +1,40 @@
+name: Maven Central mirror
+description: Install ~/.m2/settings.xml so Maven resolves from Google's copy of Central first and Central second.
+
+# Every job that checks out this repository runs this after its checkout, and again
+# after any actions/setup-java (which writes a settings.xml of its own; this merges into
+# it) or cache restore of the whole ~/.m2 (scripts/check-maven-central-mirror.py fails a
+# job that does not). It is in
+# ~/.m2 rather than a project's .mvn/ because a .mvn/maven.config reaches only builds
+# started under that directory: vm/ByteCodeTranslator, the samples, archetype-generated
+# projects and the integration tests never saw the retry settings that lived there.
+# Every Maven version, from any directory and any forked build, reads ~/.m2/settings.xml.
+runs:
+  using: composite
+  steps:
+    - name: Install Maven settings with the Central mirror
+      shell: bash
+      run: |
+        # In a job container GitHub sets HOME=/github/home, but the JVM takes user.home
+        # from the passwd entry (/root), and that is where Maven reads settings.xml.
+        # Install into both when they differ.
+        homes="$HOME"
+        pw=$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 || true)
+        if [ -n "$pw" ] && [ "$pw" != "$HOME" ]; then homes="$homes $pw"; fi
+        py=$(command -v python3 || command -v python || true)
+        for h in $homes; do
+          dest="$h/.m2/settings.xml"
+          if [ ! -f "$dest" ]; then
+            # The common case, and needs no interpreter (Windows runners and slim
+            # containers do not all have python3).
+            mkdir -p "$h/.m2"
+            cp "$GITHUB_ACTION_PATH/settings.xml" "$dest"
+            echo "Installed $dest"
+            continue
+          fi
+          if [ -z "$py" ]; then
+            echo "::error::$dest exists and no Python is available to merge the mirror profile into it." >&2
+            exit 1
+          fi
+          "$py" "$GITHUB_ACTION_PATH/install.py" "$GITHUB_ACTION_PATH/settings.xml" "$dest"
+        done

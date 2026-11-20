@@ -46,6 +46,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install Codename One artifacts (core / javase / css-compiler / plugin)
         # This step builds rather than tests, and it still narrows what it will retry: a
         # compilation failure has to fail on the first attempt. What it covers is the run that died

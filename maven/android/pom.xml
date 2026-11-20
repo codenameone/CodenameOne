@@ -20,6 +20,12 @@
             <artifactId>codenameone-core</artifactId>
 
         </dependency>
+        <!-- Unit tests for the port's pure-Java helpers (no Android runtime). -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
        
         
     </dependencies>
@@ -27,6 +33,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>6</maven.compiler.source>
         <maven.compiler.target>6</maven.compiler.target>
+        <maven.compiler.testSource>1.8</maven.compiler.testSource>
+        <maven.compiler.testTarget>1.8</maven.compiler.testTarget>
+        <android.test.src.dir>src/no-tests-without-compile-android</android.test.src.dir>
         <src.dir>src/main/java</src.dir>
         <real.src.dir>../../Ports/Android/src</real.src.dir>
         <codename1.src.dir>../../CodenameOne/src</codename1.src.dir>
@@ -35,6 +44,10 @@
 
     <build>
         <sourceDirectory>${src.dir}</sourceDirectory>
+        <!-- The port's classes compile only under -Pcompile-android, so its
+             unit tests compile only there too: the profile points this at
+             src/test-compile-android/java, and every other build sees none. -->
+        <testSourceDirectory>${android.test.src.dir}</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
@@ -234,6 +247,7 @@
                 <property><name>cn1.binaries</name></property>
             </activation>
             <properties>
+                <android.test.src.dir>src/test-compile-android/java</android.test.src.dir>
                 <src.dir>../../Ports/Android/src</src.dir>
             </properties>
             <dependencies>

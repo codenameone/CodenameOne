@@ -9,16 +9,29 @@
 # result and fails the leg rather than letting it compare wrong images.
 set -u
 overlay=com.android.internal.systemui.navbar.gestural
+# Applied before boot completes, SystemUI can reset the overlay while it starts.
+for _ in $(seq 1 120); do
+  [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] && break
+  sleep 1
+done
+is_gestural() {
+  mode="$(adb shell settings get secure navigation_mode 2>/dev/null | tr -d '\r')"
+  adb shell cmd overlay list 2>/dev/null | tr -d '\r' | grep -q "\[x\] $overlay" && [ "$mode" = 2 ]
+}
 for attempt in 1 2 3; do
   adb shell cmd overlay enable-exclusive --category "$overlay" >/dev/null 2>&1 ||
     adb shell cmd overlay enable "$overlay" >/dev/null 2>&1 || true
   for _ in $(seq 1 30); do
-    mode="$(adb shell settings get secure navigation_mode 2>/dev/null | tr -d '\r')"
-    if adb shell cmd overlay list 2>/dev/null | tr -d '\r' | grep -q "\[x\] $overlay" && [ "$mode" = 2 ]; then
-      # SystemUI relays out its window after the mode changes.
-      sleep 3
-      echo "Gesture navigation active (attempt $attempt)."
-      exit 0
+    if is_gestural; then
+      # SystemUI relays out its window after the mode changes; and the mode has
+      # to still hold afterwards, since a SystemUI restart can drop it.
+      sleep 10
+      if is_gestural; then
+        echo "Gesture navigation active (attempt $attempt)."
+        exit 0
+      fi
+      echo "Gesture navigation reverted after it was applied; applying again."
+      break
     fi
     sleep 1
   done

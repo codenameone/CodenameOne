@@ -54,6 +54,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: The embedded stubs match the natives
         run: python3 scripts/embedded/gen-embedded-stubs.py --check
 
@@ -63,6 +66,9 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       # Retried: Maven Central answers 429 from the runner CDN edge (see
       # linux-build-run.yml). This step only builds.

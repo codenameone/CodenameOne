@@ -49,6 +49,9 @@ public class UndoManager {
     private final ArrayList<Edit> undo = new ArrayList<Edit>();
     private final ArrayList<Edit> redo = new ArrayList<Edit>();
     private boolean coalesceAllowed;
+    // the editor this manager serves, told of every new step so it can be
+    // put in that editor's UndoHistory; null for a manager used on its own
+    EditorView owner;
 
     /// Records a mutation for later undo. Clears the redo stack.
     ///
@@ -65,8 +68,11 @@ public class UndoManager {
 
     void record(int start, String removed, String inserted, Object beforeState, Object afterState) {
         redo.clear();
+        // a run of typing joins the last step only while that step is still
+        // the last thing in the editor's history
         if (coalesceAllowed && removed.length() == 0 && inserted.length() == 1
-                && inserted.charAt(0) != '\n' && !undo.isEmpty()) {
+                && inserted.charAt(0) != '\n' && !undo.isEmpty()
+                && (owner == null || owner.canExtendUndoStep())) {
             Edit last = undo.get(undo.size() - 1);
             if (last.removed.length() == 0 && last.start + last.inserted.length() == start
                     && last.inserted.length() > 0 && last.inserted.charAt(last.inserted.length() - 1) != '\n') {
@@ -77,6 +83,9 @@ public class UndoManager {
         }
         undo.add(new Edit(start, removed, inserted, beforeState, afterState));
         coalesceAllowed = removed.length() == 0 && inserted.length() == 1;
+        if (owner != null) {
+            owner.undoStepAdded();
+        }
     }
 
     /// Updates the post-edit feature-model snapshot of the most recent undo unit.

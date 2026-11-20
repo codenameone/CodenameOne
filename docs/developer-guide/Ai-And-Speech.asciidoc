@@ -379,7 +379,9 @@ assumes is read as UTF-8 when it's valid UTF-8 and as ISO-8859-1
 otherwise, so it's never dropped for its encoding; `getRawBytes()`
 always carries the exact payload. A PDF417 in another character set, such as
 ISO-8859-2, reads correctly once the application names that character set
-before scanning. On iOS the system picks the character set itself, so the
+before scanning. The named character set never overrides a payload that's
+valid UTF-8 with non-ASCII text, so one application reads codes from issuers
+that use either encoding. On iOS the system picks the character set itself, so the
 property is Android only:
 
 [source,java]

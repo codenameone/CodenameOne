@@ -22,9 +22,14 @@
  */
 package com.codenameone.developerguide.screenshots;
 
+import com.codename1.spreadsheet.FormulaBar;
+import com.codename1.spreadsheet.Workbook;
+import com.codename1.ui.CodeEditor;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Tabs;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.UIManager;
@@ -135,6 +140,34 @@ public final class DataGridFigures {
         Fig themed = new Fig("datagrid-appearance-theme", grid(DataGridSnippets::sorted), null, false);
         v.add(new FigureVariant(themed, FigureDevice.ANDROID, true, true, "datagrid-dark.png"));
         v.add(new FigureVariant(themed, FigureDevice.IOS, false, true, "datagrid-ios.png"));
+        v.add(wide("datagrid-sheet-orders", book("Regional sales", DataGridSnippets::salesWorkbook, null, 0), null));
+        v.add(wide("datagrid-sheet-summary", book("Regional sales", DataGridSnippets::salesWorkbook, null, 2), null));
+        v.add(wide("datagrid-sheet-recalc",
+                book("Regional sales", DataGridSnippets::salesWorkbook, DataGridSnippets::correctAnOrder, 2), null));
+        v.add(wide("datagrid-sheet-formula-hint", book("Regional sales", DataGridSnippets::salesWorkbook, null, 2),
+                (form, g) -> type(form, g, 0, 5, "=ROUND(D2*VLOOKUP(A2, Rates!A2:C5, 2), ")));
+        v.add(wide("datagrid-sheet-formula-complete", book("Regional sales", DataGridSnippets::salesWorkbook, null, 2),
+                (form, g) -> type(form, g, 1, 5, "=ROU")));
+        v.add(wide("datagrid-sheet-formula-bar", () -> {
+            Workbook workbook;
+            try {
+                workbook = DataGridSnippets.salesWorkbook();
+            } catch (IOException err) {
+                throw new IllegalStateException("the guide's workbook did not load", err);
+            }
+            Form f = new Form("Regional sales", new BorderLayout());
+            f.add(BorderLayout.CENTER, DataGridSnippets.formulaBar(workbook.getSheet(0)));
+            return f;
+        }, (form, g) -> {
+            tap(g, 3, 7);
+            FormulaBar bar = findBar(form);
+            settle();
+            bar.setText("=E5*F5*(1-G5)*(1+");
+            settle();
+        }));
+        v.add(wide("datagrid-sheet-loan", book("Loan", DataGridSnippets::loanWorkbook, null, 1), null));
+        v.add(wide("datagrid-sheet-loan-rate",
+                book("Loan", DataGridSnippets::loanWorkbook, DataGridSnippets::raiseTheRate, 1), null));
         return v.toArray(new FigureVariant[v.size()]);
     }
 
@@ -152,6 +185,124 @@ public final class DataGridFigures {
             f.add(BorderLayout.CENTER, s.build());
             return f;
         };
+    }
+
+    private interface BookSource {
+        Workbook open() throws IOException;
+    }
+
+    private interface BookEdit {
+        void apply(Workbook book);
+    }
+
+    /// A workbook of the guide's resources with a tab per sheet. The edit is made
+    /// after the grids exist, the way an application makes one: what the figure
+    /// shows is then what the recalculation told the grid to repaint.
+    private static Scene book(final String title, final BookSource source, final BookEdit edit, final int sheet) {
+        return () -> {
+            Workbook workbook;
+            try {
+                workbook = source.open();
+            } catch (IOException err) {
+                throw new IllegalStateException("the guide's workbook did not load", err);
+            }
+            Tabs tabs = DataGridSnippets.workbookTabs(workbook);
+            if (edit != null) {
+                edit.apply(workbook);
+            }
+            tabs.setSelectedIndex(sheet);
+            Form f = new Form(title, new BorderLayout());
+            f.add(BorderLayout.CENTER, tabs);
+            return f;
+        };
+    }
+
+    /// Edits a cell and types into it, the way a user does: the editor is painted by Codename
+    /// One, so the capture shows the text, its colors and the popup under it.
+    private static void type(Form form, DataGrid first, int row, int column, String text) {
+        DataGrid grid = first;
+        Tabs tabs = findTabs(form.getContentPane());
+        if (tabs != null && tabs.getSelectedComponent() instanceof DataGrid) {
+            // the sheet the tabs show, not the first one
+            grid = (DataGrid) tabs.getSelectedComponent();
+        }
+        grid.editCellAt(row, column);
+        CodeEditor editor = findEditor(form.getFormLayeredPane(DataGrid.class, true));
+        // the editor's backend comes up on the EDT after it is shown; type once it is there
+        settle();
+        editor.setText("");
+        editor.insertAtCursor(text);
+        settle();
+    }
+
+    private static void settle() {
+        for (int i = 0; i < 3; i++) {
+            // a block that takes a moment, so the EDT runs what is queued while it waits
+            Display.getInstance().invokeAndBlock(() -> {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+    }
+
+    private static void tap(DataGrid grid, int row, int column) {
+        int[] b = new int[4];
+        grid.getCellBounds(row, column, b);
+        int x = grid.getAbsoluteX() + b[0] + b[2] / 2;
+        int y = grid.getAbsoluteY() + b[1] + b[3] / 2;
+        grid.pointerPressed(x, y);
+        grid.pointerReleased(x, y);
+    }
+
+    private static CodeEditor findEditor(Container c) {
+        for (int i = 0; i < c.getComponentCount(); i++) {
+            Component k = c.getComponentAt(i);
+            if (k instanceof CodeEditor) {
+                return (CodeEditor) k;
+            }
+            if (k instanceof Container) {
+                CodeEditor e = findEditor((Container) k);
+                if (e != null) {
+                    return e;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Tabs findTabs(Container c) {
+        for (int i = 0; i < c.getComponentCount(); i++) {
+            Component k = c.getComponentAt(i);
+            if (k instanceof Tabs) {
+                return (Tabs) k;
+            }
+            if (k instanceof Container) {
+                Tabs t = findTabs((Container) k);
+                if (t != null) {
+                    return t;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static FormulaBar findBar(Container c) {
+        for (int i = 0; i < c.getComponentCount(); i++) {
+            Component k = c.getComponentAt(i);
+            if (k instanceof FormulaBar) {
+                return (FormulaBar) k;
+            }
+            if (k instanceof Container) {
+                FormulaBar b = findBar((Container) k);
+                if (b != null) {
+                    return b;
+                }
+            }
+        }
+        return null;
     }
 
     private static FigureVariant wide(String name, Scene scene, Act act) {

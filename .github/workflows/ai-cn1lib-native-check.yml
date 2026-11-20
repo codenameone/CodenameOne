@@ -44,6 +44,8 @@ jobs:
       link: ${{ steps.plan.outputs.admob_link }}
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Select impacted libraries before allocating a Mac
         id: plan
         env:
@@ -59,6 +61,8 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Select Xcode 16
         run: |
           set -euo pipefail

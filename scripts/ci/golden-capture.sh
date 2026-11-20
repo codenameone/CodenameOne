@@ -40,7 +40,13 @@ workflows() {
       scripts/android/*) want+=" scripts-android.yml" ;;
       scripts/javascript/*) want+=" scripts-javascript.yml" ;;
       scripts/linux/*) want+=" linux-build-run.yml" ;;
-      scripts/windows/*) want+=" parparvm-tests-windows.yml windows-cross-build-run.yml" ;;
+      # Three legs compare against scripts/windows (native x64, native arm64,
+      # cross-built x64), but one rendering is a golden: the native x64 leg
+      # alone captures. Rendering all three only made the harvest refuse a
+      # golden whenever arm64 anti-aliased a glyph past its allowance, and
+      # held the capture on the scarcest runner. The other legs are compared
+      # against it by the normal run the harvest commit starts.
+      scripts/windows/*) want+=" parparvm-tests-windows.yml" ;;
       scripts/macos/*) want+=" scripts-macos.yml" ;;
       *) want+=" ${WORKFLOWS[*]}" ;;
     esac
@@ -51,6 +57,10 @@ workflows() {
 }
 
 # A transient API error must not abandon a capture whose runs are fine.
+# The job's own timeout is 60 minutes: the lookup below must end well before
+# it, however long the retries ahead of it took, to reach its error path.
+SCRIPT_START=$(date +%s)
+
 gh_retry() {
   local i
   for i in 1 2 3 4 5; do
@@ -61,11 +71,12 @@ gh_retry() {
 }
 
 dispatch() {
-  local ref="$1" tests="$2" runs_file="$3" wf since seen id tries
+  local ref="$1" tests="$2" runs_file="$3" wf since seen id i deadline missing
   shift 3
   local targets=("$@")
   [ "${#targets[@]}" -gt 0 ] || targets=("${WORKFLOWS[@]}")
   : > "$runs_file"
+  local -a sinces=() seens=() dead=()
   for wf in "${targets[@]}"; do
     # A capture of an earlier head of this branch is rendering code that is
     # gone; its harvest would be skipped anyway (the branch moved).
@@ -78,31 +89,76 @@ dispatch() {
     # A minute early: the runner's clock is not GitHub's. Runs that already
     # existed are excluded by id instead.
     since="$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)"
-    seen="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
-              --event workflow_dispatch --limit 20 --json databaseId --jq '[.[].databaseId] | join(",")')"
+    # Retried, and never fatal: under set -e one transient error here would
+    # end the step with workflows already dispatched and not yet recorded.
+    seen="$(gh_retry gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
+              --event workflow_dispatch --limit 20 --json databaseId --jq '[.[].databaseId] | join(",")')" || seen=""
     # DISPATCH_TOKEN (the push token): GitHub starts no workflow_run for a
     # run github.token started, and golden-harvest.yml is a workflow_run.
     if ! { [ -n "${DISPATCH_TOKEN:-}" ] &&
            GH_TOKEN="$DISPATCH_TOKEN" gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"; }; then
       echo "::warning::could not dispatch $wf with CN1SS_GH_TOKEN (unset, lacking Actions: write, or a transient error); dispatching with github.token, so the harvest will not start by itself: run Golden harvest by hand with head_ref=$ref once the capture completes"
-      gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"
+      if ! gh_retry gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$ref" -f cn1ss_capture="$tests"; then
+        # no run will ever appear: waiting for one would outlast the job
+        log "could not dispatch $wf"
+        dead[${#sinces[@]}]=1
+      fi
     fi
-    # The dispatch API answers without a run id; find the run it created.
-    id=""
-    for tries in $(seq 1 30); do
+    sinces+=("$since")
+    seens+=("$seen")
+  done
+  # The dispatch API answers without a run id, and GitHub can take many
+  # minutes to list a run it has already created (a run created at 18:20:05
+  # was still unlisted five minutes later and failed a whole capture). So every
+  # workflow is dispatched first, then all of them are looked up together
+  # against ONE generous deadline: a slow listing costs time, never the capture,
+  # and never holds up finding the others. CN1SS_FIND_RUN_MINUTES overrides it.
+  deadline=$(( $(date +%s) + ${CN1SS_FIND_RUN_MINUTES:-40} * 60 ))
+  [ "$deadline" -le $((SCRIPT_START + 50 * 60)) ] || deadline=$((SCRIPT_START + 50 * 60))
+  local -a ids=()
+  local pass=0 err_file
+  err_file="$(mktemp)"
+  while :; do
+    missing=0
+    for i in "${!targets[@]}"; do
+      [ -n "${ids[$i]:-}" ] && continue
+      [ -n "${dead[$i]:-}" ] && continue
+      wf="${targets[$i]}"
       id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$wf" --branch "$ref" \
-              --event workflow_dispatch --limit 5 --json databaseId,createdAt \
-              --jq "[.[] | select(.createdAt >= \"$since\") | select(.databaseId | tostring | IN(\"$seen\" | split(\",\")[]) | not)] | .[0].databaseId // empty")"
-      [ -n "$id" ] && break
-      sleep 10
+              --event workflow_dispatch --limit 20 --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt >= \"${sinces[$i]}\") | select(.databaseId | tostring | IN(\"${seens[$i]}\" | split(\",\")[]) | not)] | .[0].databaseId // empty" \
+              2>"$err_file")" || {
+        # A failing lookup (bad token, rate limit) must not pass for "not
+        # listed yet" for forty silent minutes: say so the first time, and
+        # every tenth pass while it keeps failing.
+        id=""
+        if [ $((pass % 10)) -eq 0 ]; then
+          log "listing runs of $wf failed (pass $pass): $(tr '\n' ' ' < "$err_file")"
+        fi
+      }
+      if [ -n "$id" ]; then
+        ids[$i]="$id"
+        log "$wf -> run $id"
+        # recorded at once, so a step that dies later still cancels it
+        printf '%s %s\n' "$wf" "$id" >> "$runs_file"
+      else
+        missing=$((missing + 1))
+      fi
     done
-    if [ -z "$id" ]; then
-      log "no run of $wf appeared after dispatch"
+    [ "$missing" -eq 0 ] && break
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      for i in "${!targets[@]}"; do
+        [ -n "${ids[$i]:-}" ] || log "no run of ${targets[$i]} appeared after dispatch"
+      done
+      [ -s "$err_file" ] && log "last listing error: $(tr '\n' ' ' < "$err_file")"
+      # what did start is already in the runs file, for the failure step
       return 1
     fi
-    log "$wf -> run $id"
-    printf '%s %s\n' "$wf" "$id" >> "$runs_file"
+    pass=$((pass + 1))
+    sleep 20
   done
+  # what started is recorded; a workflow that never did fails the step
+  [ "${#dead[@]}" -eq 0 ]
 }
 
 case "${1:-}" in
